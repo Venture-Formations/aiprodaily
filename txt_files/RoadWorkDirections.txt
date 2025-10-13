@@ -1,0 +1,213 @@
+Section: Road Work
+Current system:
+Start by using this prompt with AI to find road work in the area using the base zip code and a radius. Then select 9 closures to include in the newsletter.
+{
+  "query": {
+    "description": "List every active road, lane, or bridge closure, detour, or major traffic restriction in effect on Sep 25, 2025 within 15 miles of ZIP code 56303 (St. Cloud, MN).",
+    "criteria": {
+      "date": Sep 25, 2025,
+      "location_radius": {
+        "zip_code": "56303",
+        "radius_miles": 15
+      },
+     "inclusion_rules": {
+        "include_types": {
+          "examples": [
+          "full closures",
+          "lane closures",
+          "bridge closures",
+          "detours",
+          "major traffic restrictions"
+        ]},
+        "include_conditions": {
+          "examples": [
+          "current closures",
+          "recurring or periodic closures active on July 16",
+          "closures that started any time before or on July 16 and are still active",
+          "closures from all road types (state, county, city streets)",
+          "segment-specific impacts within larger projects",
+          "direction-specific lane closures (e.g., westbound/eastbound)"
+        ]},
+        "include_synonyms": {
+          "examples": [
+          "construction impacts",
+          "travel advisories",
+          "traffic alerts",
+          "detour notices"
+        ]},
+        "explicitly_include": [
+          "Hwy 55",
+          "Hwy 15",
+          "closures near city boundaries or small towns like Kimball or Annandale"
+        ],
+        "exclusion_rules": {
+          "examples": [
+          "completed closures",
+          "planned or future closures",
+          "shoulder-only work"
+        ]},
+        "deduplicate_only": "truly overlapping or redundant entries"
+      },
+      "required_fields": [
+        "road_segment",
+        "city_or_township",
+        "reason",
+        "start_date",
+        "expected_reopen",
+        "source_url"
+      ],
+      "custom_parsing": {
+        "split_road_segment": "If road_segment contains phrasing like '[road name] from [start point] to [end point]', extract '[road name]' as 'road_name' and 'from [start] to [end]' as 'road_range'."
+      },
+      "minimum_results": 9,
+      "maximum_results": 9,
+      "pagination_allowed": true
+    },
+    "sources": {
+      "examples": [
+        "https://www.dot.state.mn.us/d3/",
+        "https://www.stearnscountymn.gov/185/Public-Works",
+        "https://www.co.benton.mn.us/180/Highway",
+        "https://www.co.sherburne.mn.us/162/Public-Works",
+        "https://www.sartellmn.com/engineering/",
+        "https://www.ci.stcloud.mn.us",
+        "https://www.cityofstjoseph.com/",
+        "https://www.ci.waitepark.mn.us/",
+        "https://ci.sauk-rapids.mn.us/",
+        "https://www.stcloudapo.org",
+        "https://www.ridemetrobus.com",
+        "Official Facebook pages (road/closure updates from last 30 days)",
+        "Local media such as WJON Traffic, St. Cloud Times Roads section"
+      ],
+      "allow_additional_sources": true
+    },
+    "output_rules": {
+      "format": "JSON_array_only",
+      "json_starts_with": "[",
+      "date_format": "ISO-8601",
+      "deduplicate": true,
+      "structure": [
+        {
+          "road_name": "string",
+          "road_range": "string",
+          "city_or_township": "string",
+          "reason": "string",
+          "start_date": "mmm d",
+          "expected_reopen": "mmm d or 'TBD'",
+          "source_url": "https://..."
+        }
+      ]
+    }
+  }
+}
+
+Once we have 9 to include, we need to put them in the correct HTML format. Previously used AI, but we can set it up in a way that it just applies the correct formatting. HJere is the formatting prompt used:
+{
+  "query": {
+    "description": "List every active road, lane, or bridge closure, detour, or major traffic restriction in effect on Sep 25, 2025 within 15 miles of ZIP code 56303 (St. Cloud, MN).",
+    "criteria": {
+      "date": Sep 25, 2025,
+      "location_radius": {
+        "zip_code": "56303",
+        "radius_miles": 15
+      },
+     "inclusion_rules": {
+        "include_types": {
+          "examples": [
+          "full closures",
+          "lane closures",
+          "bridge closures",
+          "detours",
+          "major traffic restrictions"
+        ]},
+        "include_conditions": {
+          "examples": [
+          "current closures",
+          "recurring or periodic closures active on July 16",
+          "closures that started any time before or on July 16 and are still active",
+          "closures from all road types (state, county, city streets)",
+          "segment-specific impacts within larger projects",
+          "direction-specific lane closures (e.g., westbound/eastbound)"
+        ]},
+        "include_synonyms": {
+          "examples": [
+          "construction impacts",
+          "travel advisories",
+          "traffic alerts",
+          "detour notices"
+        ]},
+        "explicitly_include": [
+          "Hwy 55",
+          "Hwy 15",
+          "closures near city boundaries or small towns like Kimball or Annandale"
+        ],
+        "exclusion_rules": {
+          "examples": [
+          "completed closures",
+          "planned or future closures",
+          "shoulder-only work"
+        ]},
+        "deduplicate_only": "truly overlapping or redundant entries"
+      },
+      "required_fields": [
+        "road_segment",
+        "city_or_township",
+        "reason",
+        "start_date",
+        "expected_reopen",
+        "source_url"
+      ],
+      "custom_parsing": {
+        "split_road_segment": "If road_segment contains phrasing like '[road name] from [start point] to [end point]', extract '[road name]' as 'road_name' and 'from [start] to [end]' as 'road_range'."
+      },
+      "minimum_results": 9,
+      "maximum_results": 9,
+      "pagination_allowed": true
+    },
+    "sources": {
+      "examples": [
+        "https://www.dot.state.mn.us/d3/",
+        "https://www.stearnscountymn.gov/185/Public-Works",
+        "https://www.co.benton.mn.us/180/Highway",
+        "https://www.co.sherburne.mn.us/162/Public-Works",
+        "https://www.sartellmn.com/engineering/",
+        "https://www.ci.stcloud.mn.us",
+        "https://www.cityofstjoseph.com/",
+        "https://www.ci.waitepark.mn.us/",
+        "https://ci.sauk-rapids.mn.us/",
+        "https://www.stcloudapo.org",
+        "https://www.ridemetrobus.com",
+        "Official Facebook pages (road/closure updates from last 30 days)",
+        "Local media such as WJON Traffic, St. Cloud Times Roads section"
+      ],
+      "allow_additional_sources": true
+    },
+    "output_rules": {
+      "format": "JSON_array_only",
+      "json_starts_with": "[",
+      "date_format": "ISO-8601",
+      "deduplicate": true,
+      "structure": [
+        {
+          "road_name": "string",
+          "road_range": "string",
+          "city_or_township": "string",
+          "reason": "string",
+          "start_date": "mmm d",
+          "expected_reopen": "mmm d or 'TBD'",
+          "source_url": "https://..."
+        }
+      ]
+    }
+  }
+}
+
+Here is an example of the final HTML:
+</table>
+<br>
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 990px; margin: 0 auto; background-color: #f7f7f7; font-family: Arial, sans-serif;">
+  <tr>
+    <td style="padding: 5px;">
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">Road Work</h2>
+    </td>
+  </tr><tr class="row"><tr class='row'><td class='column' style='padding:8px; vertical-align: top;'><table width='100%' cellpadding='0' cellspacing='0' style='font-size: 16px; line-height: 24px; border: 1px solid #ddd; border-radius: 12px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15); overflow: hidden; font-family: Arial, sans-serif;'><tr><td style='background-color: #F8F9FA; text-align: center; padding: 8px; font-size: 16px; line-height: 26px; color: #3C4043; font-weight: bold;'>Northway Dr</td></tr><tr><td style='padding: 16px; font-size: 16px; line-height: 26px; text-align: center;'><div style='text-align: center;'>from University Dr S to 15th Ave N</div><div style='font-size: 15px; line-height: 20px; text-align: center;'>Southbound lane reduced to one lane for construction (<a href='https://www.ci.stcloud.mn.us/307/Road-Construction-Projects' style='color:#000; text-decoration: underline;'>link</a>)</div><div style='margin-top: 8px; font-size: 14px; text-align: center;'>Sep 23 → Sep 24   📍 St. Cloud</div></td></tr></table></td><td class='column' style='padding:8px; vertical-align: top;'><table width='100%' cellpadding='0' cellspacing='0' style='font-size: 16px; line-height: 24px; border: 1px solid #ddd; border-radius: 12px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15); overflow: hidden; font-family: Arial, sans-serif;'><tr><td style='background-color: #F8F9FA; text-align: center; padding: 8px; font-size: 16px; line-height: 26px; color: #3C4043; font-weight: bold;'>Washington Memorial Dr</td></tr><tr><td style='padding: 16px; font-size: 16px; line-height: 26px; text-align: center;'><div style='text-align: center;'>from 3rd St N to 10th St S</div><div style='font-size: 15px; line-height: 20px; text-align: center;'>Lane shifts for construction activities (<a href='https://www.ci.stcloud.mn.us/307/Road-Construction-Projects' style='color:#000; text-decoration: underline;'>link</a>)</div><div style='margin-top: 8px; font-size: 14px; text-align: center;'>Sep 23 → Sep 25   📍 St. Cloud</div></td></tr></table></td><td class='column' style='padding:8px; vertical-align: top;'><table width='100%' cellpadding='0' cellspacing='0' style='font-size: 16px; line-height: 24px; border: 1px solid #ddd; border-radius: 12px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15); overflow: hidden; font-family: Arial, sans-serif;'><tr><td style='background-color: #F8F9FA; text-align: center; padding: 8px; font-size: 16px; line-height: 26px; color: #3C4043; font-weight: bold;'>Heatherwood Rd</td></tr><tr><td style='padding: 16px; font-size: 16px; line-height: 26px; text-align: center;'><div style='text-align: center;'>from Clearwater Rd (N intersection) to 250 ft S</div><div style='font-size: 15px; line-height: 20px; text-align: center;'>Full closure for pipeline work (<a href='https://www.ci.stcloud.mn.us/307/Road-Construction-Projects' style='color:#000; text-decoration: underline;'>link</a>)</div><div style='margin-top: 8px; font-size: 14px; text-align: center;'>May 8 → mid-Jun   📍 St. Cloud</div></td></tr></table></td></tr><tr class='row'><td class='column' style='padding:8px; vertical-align: top;'><table width='100%' cellpadding='0' cellspacing='0' style='font-size: 16px; line-height: 24px; border: 1px solid #ddd; border-radius: 12px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15); overflow: hidden; font-family: Arial, sans-serif;'><tr><td style='background-color: #F8F9FA; text-align: center; padding: 8px; font-size: 16px; line-height: 26px; color: #3C4043; font-weight: bold;'>26th Ave N</td></tr><tr><td style='padding: 16px; font-size: 16px; line-height: 26px; text-align: center;'><div style='text-align: center;'>from 7th St N to 8th St N</div><div style='font-size: 15px; line-height: 20px; text-align: center;'>Full reconstruction of streets and utilities (<a href='https://www.ci.stcloud.mn.us/307/Road-Construction-Projects' style='color:#000; text-decoration: underline;'>link</a>)</div><div style='margin-top: 8px; font-size: 14px; text-align: center;'>May 1 → Oct 31   📍 St. Cloud</div></td></tr></table></td><td class='column' style='padding:8px; vertical-align: top;'><table width='100%' cellpadding='0' cellspacing='0' style='font-size: 16px; line-height: 24px; border: 1px solid #ddd; border-radius: 12px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15); overflow: hidden; font-family: Arial, sans-serif;'><tr><td style='background-color: #F8F9FA; text-align: center; padding: 8px; font-size: 16px; line-height: 26px; color: #3C4043; font-weight: bold;'>Lincoln Ave</td></tr><tr><td style='padding: 16px; font-size: 16px; line-height: 26px; text-align: center;'><div style='text-align: center;'>from 7th St SE to E St. Germain St</div><div style='font-size: 15px; line-height: 20px; text-align: center;'>Water main replacement, full road reconstruction (<a href='https://www.ci.stcloud.mn.us/307/Road-Construction-Projects' style='color:#000; text-decoration: underline;'>link</a>)</div><div style='margin-top: 8px; font-size: 14px; text-align: center;'>May 1 → Nov 30   📍 St. Cloud</div></td></tr></table></td><td class='column' style='padding:8px; vertical-align: top;'><table width='100%' cellpadding='0' cellspacing='0' style='font-size: 16px; line-height: 24px; border: 1px solid #ddd; border-radius: 12px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15); overflow: hidden; font-family: Arial, sans-serif;'><tr><td style='background-color: #F8F9FA; text-align: center; padding: 8px; font-size: 16px; line-height: 26px; color: #3C4043; font-weight: bold;'>County Rd 75/Division St</td></tr><tr><td style='padding: 16px; font-size: 16px; line-height: 26px; text-align: center;'><div style='text-align: center;'>from Hwy 15 to 15th Ave N</div><div style='font-size: 15px; line-height: 20px; text-align: center;'>Intermittent lane closures for cold patching/road repairs (<a href='https://knsiradio.com/2025/09/24/cold-patching-scheduled-for-rest-of-week-on-busy-area-road/' style='color:#000; text-decoration: underline;'>link</a>)</div><div style='margin-top: 8px; font-size: 14px; text-align: center;'>Sep 24 → Sep 26   📍 Waite Park</div></td></tr></table></td></tr><tr class='row'><td class='column' style='padding:8px; vertical-align: top;'><table width='100%' cellpadding='0' cellspacing='0' style='font-size: 16px; line-height: 24px; border: 1px solid #ddd; border-radius: 12px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15); overflow: hidden; font-family: Arial, sans-serif;'><tr><td style='background-color: #F8F9FA; text-align: center; padding: 8px; font-size: 16px; line-height: 26px; color: #3C4043; font-weight: bold;'>County Rd 75 (Division St)</td></tr><tr><td style='padding: 16px; font-size: 16px; line-height: 26px; text-align: center;'><div style='text-align: center;'>from St. Joseph to Waite Park</div><div style='font-size: 15px; line-height: 20px; text-align: center;'>Patching work with traffic restrictions (<a href='https://www.stearnscountymn.gov/?date=6-9-2025&contentId=6fd2d914-dc7e-4816-af3a-63e7f4240b24' style='color:#000; text-decoration: underline;'>link</a>)</div><div style='margin-top: 8px; font-size: 14px; text-align: center;'>Sep 24 → Sep 26   📍 Stearns County</div></td></tr></table></td><td class='column' style='padding:8px; vertical-align: top;'><table width='100%' cellpadding='0' cellspacing='0' style='font-size: 16px; line-height: 24px; border: 1px solid #ddd; border-radius: 12px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15); overflow: hidden; font-family: Arial, sans-serif;'><tr><td style='background-color: #F8F9FA; text-align: center; padding: 8px; font-size: 16px; line-height: 26px; color: #3C4043; font-weight: bold;'>Route 5 (Metro Bus, Outbound)</td></tr><tr><td style='padding: 16px; font-size: 16px; line-height: 26px; text-align: center;'><div style='text-align: center;'>detour begins at 22nd St S & Oak Grove Rd SW</div><div style='font-size: 15px; line-height: 20px; text-align: center;'>Bus detour due to utility construction (<a href='https://ridemetrobus.com/home/maps-schedules/' style='color:#000; text-decoration: underline;'>link</a>)</div><div style='margin-top: 8px; font-size: 14px; text-align: center;'>Sep 24 → Sep 26   📍 St. Cloud</div></td></tr></table></td><td class='column' style='padding:8px; vertical-align: top;'><table width='100%' cellpadding='0' cellspacing='0' style='font-size: 16px; line-height: 24px; border: 1px solid #ddd; border-radius: 12px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15); overflow: hidden; font-family: Arial, sans-serif;'><tr><td style='background-color: #F8F9FA; text-align: center; padding: 8px; font-size: 16px; line-height: 26px; color: #3C4043; font-weight: bold;'>Route 1 (Metro Bus, Outbound)</td></tr><tr><td style='padding: 16px; font-size: 16px; line-height: 26px; text-align: center;'><div style='text-align: center;'>detour begins at 1st St N & 2nd Ave N</div><div style='font-size: 15px; line-height: 20px; text-align: center;'>Bus detour for construction (<a href='https://ridemetrobus.com/home/maps-schedules/' style='color:#000; text-decoration: underline;'>link</a>)</div><div style='margin-top: 8px; font-size: 14px; text-align: center;'>Sep 24 → Sep 27   📍 Waite Park</div></td></tr></table></td></tr>

@@ -1,0 +1,22 @@
+"html_template": {
+    "row_wrapper": "<tr class='row'>[column]</tr>",
+    "column_wrapper": "<td class='column' style='padding:8px; vertical-align: top;'>[card]</td>",
+    "card": "<table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 12px; background-color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.15); font-family: Arial, sans-serif; font-size: 16px; color: #333; line-height: 26px;'>[rows]</table>",
+    "rows": {
+      "header_row": "<tr><td style='background-color: #F8F9FA; text-align: center; padding: 8px; font-weight: bold; font-size: 24px; color: #3C4043;  text-transform: uppercase;'>[word]</td></tr>",
+      "body_row": "<tr><td style='padding: 16px;'><div style='margin-bottom: 12px;'><strong>Definition:</strong> [definition]</div><div><strong>Interesting Fact:</strong> [interesting_fact]</div></td></tr>"
+
+
+
+
+
+Example of full Wordle Section:
+
+</table>
+<br>
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 990px; margin: 0 auto; background-color: #f7f7f7; font-family: Arial, sans-serif;">
+  <tr>
+    <td style="padding: 5px;">
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">Yesterday's Wordle</h2>
+    </td>
+  </tr><tr class="row"><tr class='row'><td class='column' style='padding:8px; vertical-align: top;'><table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 12px; background-color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.15); font-family: Arial, sans-serif; font-size: 16px; color: #333; line-height: 26px;'><tr><td style='background-color: #F8F9FA; text-align: center; padding: 8px; font-weight: bold; font-size: 24px; color: #3C4043;  text-transform: uppercase;'>QUILL</td></tr><tr><td style='padding: 16px;'><div style='margin-bottom: 12px;'><strong>Definition:</strong> Any of the main wing or tail feathers of a bird. (Oxford)[2]</div><div><strong>Interesting Fact:</strong> The word 'quill' comes from the Low German 'quiele.' In the past, quills were used as writing instruments, especially for important historic documents.[2]</div></td></tr></table></td></tr>

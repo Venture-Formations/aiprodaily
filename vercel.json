@@ -1,0 +1,96 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/populate-events",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/rss-processing",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/create-campaign",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/send-review",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/process-rss",
+      "schedule": "30 20 * * *"
+    },
+    {
+      "path": "/api/cron/send-final",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/import-metrics",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/health-check",
+      "schedule": "*/5 8-22 * * *"
+    },
+    {
+      "path": "/api/cron/sync-events",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/generate-weather",
+      "schedule": "0 20 * * *"
+    },
+    {
+      "path": "/api/cron/collect-wordle",
+      "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-pending-submissions",
+      "schedule": "0 7 * * *"
+    }
+  ],
+  "functions": {
+    "app/api/cron/populate-events/route.ts": {
+      "maxDuration": 120
+    },
+    "app/api/cron/rss-processing/route.ts": {
+      "maxDuration": 720
+    },
+    "app/api/cron/create-campaign/route.ts": {
+      "maxDuration": 120
+    },
+    "app/api/cron/send-review/route.ts": {
+      "maxDuration": 120
+    },
+    "app/api/cron/process-rss/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/send-final/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cron/import-metrics/route.ts": {
+      "maxDuration": 120
+    },
+    "app/api/cron/health-check/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/cron/sync-events/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/generate-weather/route.ts": {
+      "maxDuration": 180
+    },
+    "app/api/cron/collect-wordle/route.ts": {
+      "maxDuration": 120
+    },
+    "app/api/events/sync/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/events/manual-sync/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/cleanup-pending-submissions/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}

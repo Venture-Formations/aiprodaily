@@ -1,0 +1,567 @@
+2025-09-22T17:30:05.528Z [info] === AUTOMATED RSS PROCESSING CHECK (GET) ===
+2025-09-22T17:30:05.528Z [info] Time: 2025-09-22T17:30:05.527Z
+2025-09-22T17:30:05.528Z [info] Request type: Vercel Cron
+2025-09-22T17:30:05.759Z [info] RSS Processing check: Current CT time 12:30, Scheduled: 12:30
+2025-09-22T17:30:05.760Z [info] Time window matched for last_rss_processing_run: current 12:30, scheduled 12:30, diff 0 minutes
+2025-09-22T17:30:05.760Z [info] === RSS PROCESSING STARTED (Time Matched) ===
+2025-09-22T17:30:05.760Z [info] Central Time: 9/22/2025, 12:30:05 PM
+2025-09-22T17:30:05.761Z [info] Processing RSS for tomorrow's campaign date: 2025-09-23
+2025-09-22T17:30:05.761Z [info] Creating campaign for tomorrow before processing RSS...
+2025-09-22T17:30:05.818Z [info] Campaign already exists for tomorrow: 4ed87846-5a44-4a1f-83df-517e49f71eda Status: in_review
+2025-09-22T17:30:05.818Z [info] Starting RSS processing...
+2025-09-22T17:30:05.819Z [info] Starting RSS processing for campaign: 4ed87846-5a44-4a1f-83df-517e49f71eda
+2025-09-22T17:30:05.819Z [info] Clearing previous articles and posts...
+2025-09-22T17:30:05.943Z [info] Previous articles cleared successfully
+2025-09-22T17:30:05.997Z [info] Previous posts cleared successfully
+2025-09-22T17:30:06.064Z [info] === PROCESSING FEED: St. Cloud Local News ===
+2025-09-22T17:30:06.625Z [info] Found 10 recent posts from St. Cloud Local News
+2025-09-22T17:30:06.637Z [info] === DEBUGGING ITEM: "We're only a few days away from our 5th annual Historic Harvest Fest here at the Stearns History Museum!  Llamas, books,..." ===
+2025-09-22T17:30:06.637Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T17:30:06.637Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://scontent-ord5-1.xx.fbcdn.net/v/t39.30808-6/546876855_1413026463578627_3361054370504721694_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=101&ccb=1-7&_nc_sid=1abd25&_nc_ohc=Nwrz66sr3AcQ7kNvwGkRmK3&_nc_oc=AdlKQS8g8BKAeKPBuuQnq3cxf9af0STLYyrHZyFyaXtlKsu4QxUG3c2Gl7U2Tp8tOIw&_nc_zt=23&_nc_ht=scontent-ord5-1.xx&_nc_gid=yb_vM-y9L8ae_IltFA4D4Q&oh=00_AfYUp5qKgxm4vtoocZUKD0bZrQZrAsZWHa8QPaUiPs_Svg&oe=68D75FA8"
+  }
+}
+2025-09-22T17:30:06.637Z [info] Raw content preview: <div><img src="https://scontent-ord5-1.xx.fbcdn.net/v/t39.30808-6/546876855_1413026463578627_3361054370504721694_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=101&ccb=1-7&_nc_sid=1abd25&_nc_ohc=Nwrz66sr3Ac
+2025-09-22T17:30:06.638Z [info] Raw contentSnippet: We're only a few days away from our 5th annual Historic Harvest Fest here at the Stearns History Museum!  Llamas, books, games, pumpkins, a cake walk, crafts, a corn sensory bin, and free admission!
+2025-09-22T17:30:06.638Z [info] Post: "We're only a few days away from our 5th annual Historic Harvest Fest here at the Stearns History Museum!  Llamas, books,..." - Image URL: https://scontent-ord5-1.xx.fbcdn.net/v/t39.30808-6/546876855_1413026463578627_3361054370504721694_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=101&ccb=1-7&_nc_sid=1abd25&_nc_ohc=Nwrz66sr3AcQ7kNvwGkRmK3&_nc_oc=AdlKQS8g8BKAeKPBuuQnq3cxf9af0STLYyrHZyFyaXtlKsu4QxUG3c2Gl7U2Tp8tOIw&_nc_zt=23&_nc_ht=scontent-ord5-1.xx&_nc_gid=yb_vM-y9L8ae_IltFA4D4Q&oh=00_AfYUp5qKgxm4vtoocZUKD0bZrQZrAsZWHa8QPaUiPs_Svg&oe=68D75FA8
+2025-09-22T17:30:06.669Z [info] Attempting to re-host Facebook image immediately: https://scontent-ord5-1.xx.fbcdn.net/v/t39.30808-6/546876855_1413026463578627_3361054370504721694_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=101&ccb=1-7&_nc_sid=1abd25&_nc_ohc=Nwrz66sr3AcQ7kNvwGkRmK3&_nc_oc=AdlKQS8g8BKAeKPBuuQnq3cxf9af0STLYyrHZyFyaXtlKsu4QxUG3c2Gl7U2Tp8tOIw&_nc_zt=23&_nc_ht=scontent-ord5-1.xx&_nc_gid=yb_vM-y9L8ae_IltFA4D4Q&oh=00_AfYUp5qKgxm4vtoocZUKD0bZrQZrAsZWHa8QPaUiPs_Svg&oe=68D75FA8
+2025-09-22T17:30:06.669Z [info] Downloading image from: https://scontent-ord5-1.xx.fbcdn.net/v/t39.30808-6/546876855_1413026463578627_3361054370504721694_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=101&ccb=1-7&_nc_sid=1abd25&_nc_ohc=Nwrz66sr3AcQ7kNvwGkRmK3&_nc_oc=AdlKQS8g8BKAeKPBuuQnq3cxf9af0STLYyrHZyFyaXtlKsu4QxUG3c2Gl7U2Tp8tOIw&_nc_zt=23&_nc_ht=scontent-ord5-1.xx&_nc_gid=yb_vM-y9L8ae_IltFA4D4Q&oh=00_AfYUp5qKgxm4vtoocZUKD0bZrQZrAsZWHa8QPaUiPs_Svg&oe=68D75FA8
+2025-09-22T17:30:06.940Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2Fe5b2a069f0e3bf42c54e16a49ba76db0.jpg - 404 with id A4D6:2CC6C7:199448:5B0570:68D1879E in 99ms
+2025-09-22T17:30:07.045Z [error] PUT /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2Fe5b2a069f0e3bf42c54e16a49ba76db0.jpg - 403 with id A4D6:2CC6C7:1994D2:5B0762:68D1879E in 105ms
+2025-09-22T17:30:07.056Z [error] Error uploading image to GitHub: Error [HttpError]: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents
+    at <unknown> (HttpError: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents)
+    at O (.next/server/chunks/7762.js:1:9283)
+    at async i.uploadImage (.next/server/chunks/6723.js:1:1907)
+    at async d.processFeed (.next/server/chunks/6723.js:199:1457)
+    at async d.processAllFeedsForCampaign (.next/server/chunks/6723.js:198:2170)
+    at async p (.next/server/app/api/cron/rss-processing/route.js:16:2646) {
+  status: 403,
+  request: [Object],
+  response: [Object]
+}
+2025-09-22T17:30:07.056Z [warning] Failed to re-host Facebook image, keeping original URL: https://scontent-ord5-1.xx.fbcdn.net/v/t39.30808-6/546876855_1413026463578627_3361054370504721694_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=101&ccb=1-7&_nc_sid=1abd25&_nc_ohc=Nwrz66sr3AcQ7kNvwGkRmK3&_nc_oc=AdlKQS8g8BKAeKPBuuQnq3cxf9af0STLYyrHZyFyaXtlKsu4QxUG3c2Gl7U2Tp8tOIw&_nc_zt=23&_nc_ht=scontent-ord5-1.xx&_nc_gid=yb_vM-y9L8ae_IltFA4D4Q&oh=00_AfYUp5qKgxm4vtoocZUKD0bZrQZrAsZWHa8QPaUiPs_Svg&oe=68D75FA8
+2025-09-22T17:30:07.092Z [info] Inserted post: We're only a few days away from our 5th annual Historic Harvest Fest here at the Stearns History Museum!  Llamas, books,...
+2025-09-22T17:30:07.092Z [info] === DEBUGGING ITEM: "📢 Happy New Member Monday ⭐️ Join us in welcoming these new members to the St. Cloud Area Chamber of Commerce. Prudenti..." ===
+2025-09-22T17:30:07.092Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T17:30:07.092Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://scontent-sjc6-1.xx.fbcdn.net/v/t39.30808-6/547270348_1196738445811298_4732190887404689566_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=d9jikJQNYV8Q7kNvwGCv8Oc&_nc_oc=AdmjuqvedTiEPznHNA-ASJV2mV8gzG9vE9ojU0ejGZilx7yrMAsRWiB9ZnfG-GD6jkQ&_nc_zt=23&_nc_ht=scontent-sjc6-1.xx&_nc_gid=MBtUKrrdzJl44PQ49xnudg&oh=00_Afa7ONmgNl5v4JjRnxtUS7-o1vLkCIwLIa5y5sF7PG_KvQ&oe=68D75FAD"
+  }
+}
+2025-09-22T17:30:07.092Z [info] Raw content preview: <div><img src="https://scontent-sjc6-1.xx.fbcdn.net/v/t39.30808-6/547270348_1196738445811298_4732190887404689566_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=d9jikJQNYV8Q7kNvwGCv8Oc&_nc_oc=Admjuqv
+2025-09-22T17:30:07.092Z [info] Raw contentSnippet: 📢 Happy New Member Monday ⭐️
+ Join us in welcoming these new members to the St. Cloud Area Chamber of Commerce.
+ Prudential (Walker Creek Financial Group) : Prudential helps people protect their fami
+2025-09-22T17:30:07.092Z [info] Post: "📢 Happy New Member Monday ⭐️ Join us in welcoming these new members to the St. Cloud Area Chamber of Commerce. Prudenti..." - Image URL: https://scontent-sjc6-1.xx.fbcdn.net/v/t39.30808-6/547270348_1196738445811298_4732190887404689566_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=d9jikJQNYV8Q7kNvwGCv8Oc&_nc_oc=AdmjuqvedTiEPznHNA-ASJV2mV8gzG9vE9ojU0ejGZilx7yrMAsRWiB9ZnfG-GD6jkQ&_nc_zt=23&_nc_ht=scontent-sjc6-1.xx&_nc_gid=MBtUKrrdzJl44PQ49xnudg&oh=00_Afa7ONmgNl5v4JjRnxtUS7-o1vLkCIwLIa5y5sF7PG_KvQ&oe=68D75FAD
+2025-09-22T17:30:07.126Z [info] Attempting to re-host Facebook image immediately: https://scontent-sjc6-1.xx.fbcdn.net/v/t39.30808-6/547270348_1196738445811298_4732190887404689566_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=d9jikJQNYV8Q7kNvwGCv8Oc&_nc_oc=AdmjuqvedTiEPznHNA-ASJV2mV8gzG9vE9ojU0ejGZilx7yrMAsRWiB9ZnfG-GD6jkQ&_nc_zt=23&_nc_ht=scontent-sjc6-1.xx&_nc_gid=MBtUKrrdzJl44PQ49xnudg&oh=00_Afa7ONmgNl5v4JjRnxtUS7-o1vLkCIwLIa5y5sF7PG_KvQ&oe=68D75FAD
+2025-09-22T17:30:07.126Z [info] Downloading image from: https://scontent-sjc6-1.xx.fbcdn.net/v/t39.30808-6/547270348_1196738445811298_4732190887404689566_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=d9jikJQNYV8Q7kNvwGCv8Oc&_nc_oc=AdmjuqvedTiEPznHNA-ASJV2mV8gzG9vE9ojU0ejGZilx7yrMAsRWiB9ZnfG-GD6jkQ&_nc_zt=23&_nc_ht=scontent-sjc6-1.xx&_nc_gid=MBtUKrrdzJl44PQ49xnudg&oh=00_Afa7ONmgNl5v4JjRnxtUS7-o1vLkCIwLIa5y5sF7PG_KvQ&oe=68D75FAD
+2025-09-22T17:30:07.596Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2F51c91d23e29428714e7ac9086f4e2361.jpg - 404 with id A4D6:2CC6C7:1997AD:5B118A:68D1879F in 88ms
+2025-09-22T17:30:07.710Z [error] PUT /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2F51c91d23e29428714e7ac9086f4e2361.jpg - 403 with id A4D6:2CC6C7:199830:5B134A:68D1879F in 113ms
+2025-09-22T17:30:07.711Z [error] Error uploading image to GitHub: Error [HttpError]: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents
+    at <unknown> (HttpError: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents)
+    at O (.next/server/chunks/7762.js:1:9283)
+    at async i.uploadImage (.next/server/chunks/6723.js:1:1907)
+    at async d.processFeed (.next/server/chunks/6723.js:199:1457)
+    at async d.processAllFeedsForCampaign (.next/server/chunks/6723.js:198:2170)
+    at async p (.next/server/app/api/cron/rss-processing/route.js:16:2646) {
+  status: 403,
+  request: [Object],
+  response: [Object]
+}
+2025-09-22T17:30:07.711Z [warning] Failed to re-host Facebook image, keeping original URL: https://scontent-sjc6-1.xx.fbcdn.net/v/t39.30808-6/547270348_1196738445811298_4732190887404689566_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=d9jikJQNYV8Q7kNvwGCv8Oc&_nc_oc=AdmjuqvedTiEPznHNA-ASJV2mV8gzG9vE9ojU0ejGZilx7yrMAsRWiB9ZnfG-GD6jkQ&_nc_zt=23&_nc_ht=scontent-sjc6-1.xx&_nc_gid=MBtUKrrdzJl44PQ49xnudg&oh=00_Afa7ONmgNl5v4JjRnxtUS7-o1vLkCIwLIa5y5sF7PG_KvQ&oe=68D75FAD
+2025-09-22T17:30:07.742Z [info] Inserted post: 📢 Happy New Member Monday ⭐️ Join us in welcoming these new members to the St. Cloud Area Chamber of Commerce. Prudenti...
+2025-09-22T17:30:07.742Z [info] === DEBUGGING ITEM: "City of St. Cloud, MN: Fall is Coming: Keep Leaves out of Streets and Storm Drains!" ===
+2025-09-22T17:30:07.742Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T17:30:07.742Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://external-det1-1.xx.fbcdn.net/emg1/v/t13/10608578067623918707?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImageRepository%2FDocument%3FdocumentID%3D27716&fb_obo=1&utld=mn.us&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=WN5ve4m4XOkWTPwOuO6uew&_nc_oc=AdnGNZkyDfAVEd7vM45sip9p39Zll1JxGWG71VWtzunGS1X4fpmLcjLghfBa21J3V00&ccb=13-1&oh=06_Q3-3AXEua-nrqonOqVznbwb4NFV6PFh5pYPGKPdXY4sM9a_m&oe=68D37B10&_nc_sid=e42f53"
+  }
+}
+2025-09-22T17:30:07.743Z [info] Raw content preview: <div><img src="https://external-det1-1.xx.fbcdn.net/emg1/v/t13/10608578067623918707?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImageRepository%2FDocument%3FdocumentID%3D27716&fb_obo=1&utld=mn.us&stp=c0.
+2025-09-22T17:30:07.743Z [info] Raw contentSnippet: Fall is Coming: Keep Leaves out of Streets and Storm Drains!
+2025-09-22T17:30:07.743Z [info] Post: "City of St. Cloud, MN: Fall is Coming: Keep Leaves out of Streets and Storm Drains!" - Image URL: https://external-det1-1.xx.fbcdn.net/emg1/v/t13/10608578067623918707?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImageRepository%2FDocument%3FdocumentID%3D27716&fb_obo=1&utld=mn.us&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=WN5ve4m4XOkWTPwOuO6uew&_nc_oc=AdnGNZkyDfAVEd7vM45sip9p39Zll1JxGWG71VWtzunGS1X4fpmLcjLghfBa21J3V00&ccb=13-1&oh=06_Q3-3AXEua-nrqonOqVznbwb4NFV6PFh5pYPGKPdXY4sM9a_m&oe=68D37B10&_nc_sid=e42f53
+2025-09-22T17:30:07.780Z [info] Attempting to re-host Facebook image immediately: https://external-det1-1.xx.fbcdn.net/emg1/v/t13/10608578067623918707?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImageRepository%2FDocument%3FdocumentID%3D27716&fb_obo=1&utld=mn.us&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=WN5ve4m4XOkWTPwOuO6uew&_nc_oc=AdnGNZkyDfAVEd7vM45sip9p39Zll1JxGWG71VWtzunGS1X4fpmLcjLghfBa21J3V00&ccb=13-1&oh=06_Q3-3AXEua-nrqonOqVznbwb4NFV6PFh5pYPGKPdXY4sM9a_m&oe=68D37B10&_nc_sid=e42f53
+2025-09-22T17:30:07.780Z [info] Downloading image from: https://external-det1-1.xx.fbcdn.net/emg1/v/t13/10608578067623918707?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImageRepository%2FDocument%3FdocumentID%3D27716&fb_obo=1&utld=mn.us&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=WN5ve4m4XOkWTPwOuO6uew&_nc_oc=AdnGNZkyDfAVEd7vM45sip9p39Zll1JxGWG71VWtzunGS1X4fpmLcjLghfBa21J3V00&ccb=13-1&oh=06_Q3-3AXEua-nrqonOqVznbwb4NFV6PFh5pYPGKPdXY4sM9a_m&oe=68D37B10&_nc_sid=e42f53
+2025-09-22T17:30:08.112Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2Fe0dc8324baadc25cf451ba07ef206078.jpg - 404 with id A4D6:2CC6C7:199A91:5B1C15:68D1879F in 90ms
+2025-09-22T17:30:08.204Z [error] PUT /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2Fe0dc8324baadc25cf451ba07ef206078.jpg - 403 with id A4D6:2CC6C7:199B16:5B1E38:68D187A0 in 93ms
+2025-09-22T17:30:08.205Z [error] Error uploading image to GitHub: Error [HttpError]: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents
+    at <unknown> (HttpError: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents)
+    at O (.next/server/chunks/7762.js:1:9283)
+    at async i.uploadImage (.next/server/chunks/6723.js:1:1907)
+    at async d.processFeed (.next/server/chunks/6723.js:199:1457)
+    at async d.processAllFeedsForCampaign (.next/server/chunks/6723.js:198:2170)
+    at async p (.next/server/app/api/cron/rss-processing/route.js:16:2646) {
+  status: 403,
+  request: [Object],
+  response: [Object]
+}
+2025-09-22T17:30:08.205Z [warning] Failed to re-host Facebook image, keeping original URL: https://external-det1-1.xx.fbcdn.net/emg1/v/t13/10608578067623918707?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImageRepository%2FDocument%3FdocumentID%3D27716&fb_obo=1&utld=mn.us&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=WN5ve4m4XOkWTPwOuO6uew&_nc_oc=AdnGNZkyDfAVEd7vM45sip9p39Zll1JxGWG71VWtzunGS1X4fpmLcjLghfBa21J3V00&ccb=13-1&oh=06_Q3-3AXEua-nrqonOqVznbwb4NFV6PFh5pYPGKPdXY4sM9a_m&oe=68D37B10&_nc_sid=e42f53
+2025-09-22T17:30:08.249Z [info] Inserted post: City of St. Cloud, MN: Fall is Coming: Keep Leaves out of Streets and Storm Drains!
+2025-09-22T17:30:08.249Z [info] === DEBUGGING ITEM: "Hello, Fall! 🍂☕ Stay steady this season with a few simple steps. And remember, you can always take fall prevention furt..." ===
+2025-09-22T17:30:08.249Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T17:30:08.249Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://scontent-cph2-1.xx.fbcdn.net/v/t39.30808-6/550820675_1237516728418638_6135553763481749902_n.jpg?stp=dst-jpg_p843x403_tt6&_nc_cat=105&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=3KG19Ob47RQQ7kNvwGHh35s&_nc_oc=AdmpdxmdOMfsRoS-9SwZ6tuAPAFnYi4X-uJpM9N2SsW1613uABPtUR9PX3VYv5oPnB0&_nc_zt=23&_nc_ht=scontent-cph2-1.xx&_nc_gid=Jp9gQGtNxghanxWHsYd3WQ&oh=00_AfaVLZ8pQx0PRrMarAmAv95y3qVrOvzYinIosUAnwocUYQ&oe=68D750E4"
+  }
+}
+2025-09-22T17:30:08.249Z [info] Raw content preview: <div><img src="https://scontent-cph2-1.xx.fbcdn.net/v/t39.30808-6/550820675_1237516728418638_6135553763481749902_n.jpg?stp=dst-jpg_p843x403_tt6&_nc_cat=105&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=3KG19Ob47RQQ7
+2025-09-22T17:30:08.249Z [info] Raw contentSnippet: Hello, Fall! 🍂☕
+ Stay steady this season with a few simple steps. And remember, you can always take fall prevention further with CentraCare Medical Alert Service, where help is just one push of a but
+2025-09-22T17:30:08.249Z [info] Post: "Hello, Fall! 🍂☕ Stay steady this season with a few simple steps. And remember, you can always take fall prevention furt..." - Image URL: https://scontent-cph2-1.xx.fbcdn.net/v/t39.30808-6/550820675_1237516728418638_6135553763481749902_n.jpg?stp=dst-jpg_p843x403_tt6&_nc_cat=105&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=3KG19Ob47RQQ7kNvwGHh35s&_nc_oc=AdmpdxmdOMfsRoS-9SwZ6tuAPAFnYi4X-uJpM9N2SsW1613uABPtUR9PX3VYv5oPnB0&_nc_zt=23&_nc_ht=scontent-cph2-1.xx&_nc_gid=Jp9gQGtNxghanxWHsYd3WQ&oh=00_AfaVLZ8pQx0PRrMarAmAv95y3qVrOvzYinIosUAnwocUYQ&oe=68D750E4
+2025-09-22T17:30:08.284Z [info] Attempting to re-host Facebook image immediately: https://scontent-cph2-1.xx.fbcdn.net/v/t39.30808-6/550820675_1237516728418638_6135553763481749902_n.jpg?stp=dst-jpg_p843x403_tt6&_nc_cat=105&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=3KG19Ob47RQQ7kNvwGHh35s&_nc_oc=AdmpdxmdOMfsRoS-9SwZ6tuAPAFnYi4X-uJpM9N2SsW1613uABPtUR9PX3VYv5oPnB0&_nc_zt=23&_nc_ht=scontent-cph2-1.xx&_nc_gid=Jp9gQGtNxghanxWHsYd3WQ&oh=00_AfaVLZ8pQx0PRrMarAmAv95y3qVrOvzYinIosUAnwocUYQ&oe=68D750E4
+2025-09-22T17:30:08.284Z [info] Downloading image from: https://scontent-cph2-1.xx.fbcdn.net/v/t39.30808-6/550820675_1237516728418638_6135553763481749902_n.jpg?stp=dst-jpg_p843x403_tt6&_nc_cat=105&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=3KG19Ob47RQQ7kNvwGHh35s&_nc_oc=AdmpdxmdOMfsRoS-9SwZ6tuAPAFnYi4X-uJpM9N2SsW1613uABPtUR9PX3VYv5oPnB0&_nc_zt=23&_nc_ht=scontent-cph2-1.xx&_nc_gid=Jp9gQGtNxghanxWHsYd3WQ&oh=00_AfaVLZ8pQx0PRrMarAmAv95y3qVrOvzYinIosUAnwocUYQ&oe=68D750E4
+2025-09-22T17:30:09.026Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2F0eeb75072c45d7ec664c3a54940ea9a3.jpg - 404 with id A4D6:2CC6C7:199FC3:5B2ECF:68D187A0 in 72ms
+2025-09-22T17:30:09.110Z [error] PUT /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2F0eeb75072c45d7ec664c3a54940ea9a3.jpg - 403 with id A4D6:2CC6C7:19A029:5B3048:68D187A1 in 84ms
+2025-09-22T17:30:09.111Z [error] Error uploading image to GitHub: Error [HttpError]: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents
+    at <unknown> (HttpError: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents)
+    at O (.next/server/chunks/7762.js:1:9283)
+    at async i.uploadImage (.next/server/chunks/6723.js:1:1907)
+    at async d.processFeed (.next/server/chunks/6723.js:199:1457)
+    at async d.processAllFeedsForCampaign (.next/server/chunks/6723.js:198:2170)
+    at async p (.next/server/app/api/cron/rss-processing/route.js:16:2646) {
+  status: 403,
+  request: [Object],
+  response: [Object]
+}
+2025-09-22T17:30:09.111Z [warning] Failed to re-host Facebook image, keeping original URL: https://scontent-cph2-1.xx.fbcdn.net/v/t39.30808-6/550820675_1237516728418638_6135553763481749902_n.jpg?stp=dst-jpg_p843x403_tt6&_nc_cat=105&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=3KG19Ob47RQQ7kNvwGHh35s&_nc_oc=AdmpdxmdOMfsRoS-9SwZ6tuAPAFnYi4X-uJpM9N2SsW1613uABPtUR9PX3VYv5oPnB0&_nc_zt=23&_nc_ht=scontent-cph2-1.xx&_nc_gid=Jp9gQGtNxghanxWHsYd3WQ&oh=00_AfaVLZ8pQx0PRrMarAmAv95y3qVrOvzYinIosUAnwocUYQ&oe=68D750E4
+2025-09-22T17:30:09.149Z [info] Inserted post: Hello, Fall! 🍂☕ Stay steady this season with a few simple steps. And remember, you can always take fall prevention furt...
+2025-09-22T17:30:09.149Z [info] === DEBUGGING ITEM: "Are you interested in a career in law enforcement? This is your opportunity to meet several hiring agencies all in one l..." ===
+2025-09-22T17:30:09.149Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T17:30:09.150Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://scontent-cdg4-3.xx.fbcdn.net/v/t39.30808-6/552770738_1100416532299759_2641490495951757390_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=KelOlumZjrkQ7kNvwGFFfp4&_nc_oc=AdmNnminxO1HbRAbXtnhpVj05vyJpcttowQHkBplyZ4sytZPn-ExWB4oqbSyQ205exM&_nc_zt=23&_nc_ht=scontent-cdg4-3.xx&_nc_gid=a192ylmm_P99o81jVOs5ew&oh=00_AfZ19ZuJrm1tI1dK-OabQAHdGGZpeQbrKOnn5JEvcrC2KA&oe=68D74A5E"
+  }
+}
+2025-09-22T17:30:09.150Z [info] Raw content preview: <div><img src="https://scontent-cdg4-3.xx.fbcdn.net/v/t39.30808-6/552770738_1100416532299759_2641490495951757390_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=KelOlumZjrkQ7kNvwGFFfp4&_nc_oc=AdmNnmi
+2025-09-22T17:30:09.150Z [info] Raw contentSnippet: Are you interested in a career in law enforcement? This is your opportunity to meet several hiring agencies all in one location! We will be there too, so feel free to stop by our booth to learn more a
+2025-09-22T17:30:09.150Z [info] Post: "Are you interested in a career in law enforcement? This is your opportunity to meet several hiring agencies all in one l..." - Image URL: https://scontent-cdg4-3.xx.fbcdn.net/v/t39.30808-6/552770738_1100416532299759_2641490495951757390_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=KelOlumZjrkQ7kNvwGFFfp4&_nc_oc=AdmNnminxO1HbRAbXtnhpVj05vyJpcttowQHkBplyZ4sytZPn-ExWB4oqbSyQ205exM&_nc_zt=23&_nc_ht=scontent-cdg4-3.xx&_nc_gid=a192ylmm_P99o81jVOs5ew&oh=00_AfZ19ZuJrm1tI1dK-OabQAHdGGZpeQbrKOnn5JEvcrC2KA&oe=68D74A5E
+2025-09-22T17:30:09.186Z [info] Attempting to re-host Facebook image immediately: https://scontent-cdg4-3.xx.fbcdn.net/v/t39.30808-6/552770738_1100416532299759_2641490495951757390_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=KelOlumZjrkQ7kNvwGFFfp4&_nc_oc=AdmNnminxO1HbRAbXtnhpVj05vyJpcttowQHkBplyZ4sytZPn-ExWB4oqbSyQ205exM&_nc_zt=23&_nc_ht=scontent-cdg4-3.xx&_nc_gid=a192ylmm_P99o81jVOs5ew&oh=00_AfZ19ZuJrm1tI1dK-OabQAHdGGZpeQbrKOnn5JEvcrC2KA&oe=68D74A5E
+2025-09-22T17:30:09.186Z [info] Downloading image from: https://scontent-cdg4-3.xx.fbcdn.net/v/t39.30808-6/552770738_1100416532299759_2641490495951757390_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=KelOlumZjrkQ7kNvwGFFfp4&_nc_oc=AdmNnminxO1HbRAbXtnhpVj05vyJpcttowQHkBplyZ4sytZPn-ExWB4oqbSyQ205exM&_nc_zt=23&_nc_ht=scontent-cdg4-3.xx&_nc_gid=a192ylmm_P99o81jVOs5ew&oh=00_AfZ19ZuJrm1tI1dK-OabQAHdGGZpeQbrKOnn5JEvcrC2KA&oe=68D74A5E
+2025-09-22T17:30:09.892Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2Fc422ac7e307c5a3b9fb095fb9971da12.jpg - 404 with id A4D6:2CC6C7:19A42D:5B3EEE:68D187A1 in 133ms
+2025-09-22T17:30:09.984Z [error] PUT /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2Fc422ac7e307c5a3b9fb095fb9971da12.jpg - 403 with id A4D6:2CC6C7:19A4F1:5B4193:68D187A1 in 91ms
+2025-09-22T17:30:09.985Z [error] Error uploading image to GitHub: Error [HttpError]: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents
+    at <unknown> (HttpError: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents)
+    at O (.next/server/chunks/7762.js:1:9283)
+    at async i.uploadImage (.next/server/chunks/6723.js:1:1907)
+    at async d.processFeed (.next/server/chunks/6723.js:199:1457)
+    at async d.processAllFeedsForCampaign (.next/server/chunks/6723.js:198:2170)
+    at async p (.next/server/app/api/cron/rss-processing/route.js:16:2646) {
+  status: 403,
+  request: [Object],
+  response: [Object]
+}
+2025-09-22T17:30:09.985Z [warning] Failed to re-host Facebook image, keeping original URL: https://scontent-cdg4-3.xx.fbcdn.net/v/t39.30808-6/552770738_1100416532299759_2641490495951757390_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=KelOlumZjrkQ7kNvwGFFfp4&_nc_oc=AdmNnminxO1HbRAbXtnhpVj05vyJpcttowQHkBplyZ4sytZPn-ExWB4oqbSyQ205exM&_nc_zt=23&_nc_ht=scontent-cdg4-3.xx&_nc_gid=a192ylmm_P99o81jVOs5ew&oh=00_AfZ19ZuJrm1tI1dK-OabQAHdGGZpeQbrKOnn5JEvcrC2KA&oe=68D74A5E
+2025-09-22T17:30:10.031Z [info] Inserted post: Are you interested in a career in law enforcement? This is your opportunity to meet several hiring agencies all in one l...
+2025-09-22T17:30:10.031Z [info] === DEBUGGING ITEM: "We'd like to shout out Grace Weitz, speech coach at Apollo. She's been named MSCA Coach of the Year!" ===
+2025-09-22T17:30:10.031Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T17:30:10.031Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://external-iad3-1.xx.fbcdn.net/emg1/v/t13/8400535374054796719?url=https%3A%2F%2Fresources.finalsite.net%2Fimages%2Fv1758545608%2Fisd742org%2Fregqiveijck9gg0rj0am%2FGraceWeitz.jpg&fb_obo=1&utld=finalsite.net&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=xC6dS-uk2cgaJm5XWEHGRg&_nc_oc=AdmFe4kXauB3NDlTZ-LiZBeKgg-hAXy8xFGPBk88YakKfA23MxgIp5BWJLE4q5MUgK0&ccb=13-1&oh=06_Q3-3AVxQWWG0qk1hRW6jA8yxhV2L-hYkD2D35Y8CFYS8iiBx&oe=68D36870&_nc_sid=e42f53"
+  }
+}
+2025-09-22T17:30:10.031Z [info] Raw content preview: <div><img src="https://external-iad3-1.xx.fbcdn.net/emg1/v/t13/8400535374054796719?url=https%3A%2F%2Fresources.finalsite.net%2Fimages%2Fv1758545608%2Fisd742org%2Fregqiveijck9gg0rj0am%2FGraceWeitz.jpg&
+2025-09-22T17:30:10.031Z [info] Raw contentSnippet: We'd like to shout out Grace Weitz, speech coach at Apollo. She's been named MSCA Coach of the Year!
+2025-09-22T17:30:10.031Z [info] Post: "We'd like to shout out Grace Weitz, speech coach at Apollo. She's been named MSCA Coach of the Year!" - Image URL: https://external-iad3-1.xx.fbcdn.net/emg1/v/t13/8400535374054796719?url=https%3A%2F%2Fresources.finalsite.net%2Fimages%2Fv1758545608%2Fisd742org%2Fregqiveijck9gg0rj0am%2FGraceWeitz.jpg&fb_obo=1&utld=finalsite.net&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=xC6dS-uk2cgaJm5XWEHGRg&_nc_oc=AdmFe4kXauB3NDlTZ-LiZBeKgg-hAXy8xFGPBk88YakKfA23MxgIp5BWJLE4q5MUgK0&ccb=13-1&oh=06_Q3-3AVxQWWG0qk1hRW6jA8yxhV2L-hYkD2D35Y8CFYS8iiBx&oe=68D36870&_nc_sid=e42f53
+2025-09-22T17:30:10.076Z [info] Attempting to re-host Facebook image immediately: https://external-iad3-1.xx.fbcdn.net/emg1/v/t13/8400535374054796719?url=https%3A%2F%2Fresources.finalsite.net%2Fimages%2Fv1758545608%2Fisd742org%2Fregqiveijck9gg0rj0am%2FGraceWeitz.jpg&fb_obo=1&utld=finalsite.net&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=xC6dS-uk2cgaJm5XWEHGRg&_nc_oc=AdmFe4kXauB3NDlTZ-LiZBeKgg-hAXy8xFGPBk88YakKfA23MxgIp5BWJLE4q5MUgK0&ccb=13-1&oh=06_Q3-3AVxQWWG0qk1hRW6jA8yxhV2L-hYkD2D35Y8CFYS8iiBx&oe=68D36870&_nc_sid=e42f53
+2025-09-22T17:30:10.076Z [info] Downloading image from: https://external-iad3-1.xx.fbcdn.net/emg1/v/t13/8400535374054796719?url=https%3A%2F%2Fresources.finalsite.net%2Fimages%2Fv1758545608%2Fisd742org%2Fregqiveijck9gg0rj0am%2FGraceWeitz.jpg&fb_obo=1&utld=finalsite.net&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=xC6dS-uk2cgaJm5XWEHGRg&_nc_oc=AdmFe4kXauB3NDlTZ-LiZBeKgg-hAXy8xFGPBk88YakKfA23MxgIp5BWJLE4q5MUgK0&ccb=13-1&oh=06_Q3-3AVxQWWG0qk1hRW6jA8yxhV2L-hYkD2D35Y8CFYS8iiBx&oe=68D36870&_nc_sid=e42f53
+2025-09-22T17:30:10.183Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2F1e351d8a754e43aacab25c138bd898e5.jpg - 404 with id A4D6:2CC6C7:19A5FB:5B453B:68D187A1 in 92ms
+2025-09-22T17:30:10.291Z [error] PUT /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2F1e351d8a754e43aacab25c138bd898e5.jpg - 403 with id A4D6:2CC6C7:19A66C:5B4704:68D187A2 in 107ms
+2025-09-22T17:30:10.291Z [error] Error uploading image to GitHub: Error [HttpError]: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents
+    at <unknown> (HttpError: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents)
+    at O (.next/server/chunks/7762.js:1:9283)
+    at async i.uploadImage (.next/server/chunks/6723.js:1:1907)
+    at async d.processFeed (.next/server/chunks/6723.js:199:1457)
+    at async d.processAllFeedsForCampaign (.next/server/chunks/6723.js:198:2170)
+    at async p (.next/server/app/api/cron/rss-processing/route.js:16:2646) {
+  status: 403,
+  request: [Object],
+  response: [Object]
+}
+2025-09-22T17:30:10.291Z [warning] Failed to re-host Facebook image, keeping original URL: https://external-iad3-1.xx.fbcdn.net/emg1/v/t13/8400535374054796719?url=https%3A%2F%2Fresources.finalsite.net%2Fimages%2Fv1758545608%2Fisd742org%2Fregqiveijck9gg0rj0am%2FGraceWeitz.jpg&fb_obo=1&utld=finalsite.net&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=xC6dS-uk2cgaJm5XWEHGRg&_nc_oc=AdmFe4kXauB3NDlTZ-LiZBeKgg-hAXy8xFGPBk88YakKfA23MxgIp5BWJLE4q5MUgK0&ccb=13-1&oh=06_Q3-3AVxQWWG0qk1hRW6jA8yxhV2L-hYkD2D35Y8CFYS8iiBx&oe=68D36870&_nc_sid=e42f53
+2025-09-22T17:30:10.341Z [info] Inserted post: We'd like to shout out Grace Weitz, speech coach at Apollo. She's been named MSCA Coach of the Year!
+2025-09-22T17:30:10.341Z [info] === DEBUGGING ITEM: "Saint Cloud Area Chamber of Commerce Posted" ===
+2025-09-22T17:30:10.341Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'guid',
+  'isoDate'
+]
+2025-09-22T17:30:10.341Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://scontent-sjc6-1.xx.fbcdn.net/v/t39.30808-6/552149976_1204961328322343_7846580375937864940_n.jpg?stp=dst-jpg_p565x565_tt6&_nc_cat=111&ccb=1-7&_nc_sid=1abd25&_nc_ohc=d98lsXTZiZQQ7kNvwGSTxgZ&_nc_oc=AdkuoIa0apLRHxjq32BorN5fMt0Jgbke-X3JVOrj0ilRYG3uJdqEDL3iCvQVb55TGKM&_nc_zt=23&_nc_ht=scontent-sjc6-1.xx&_nc_gid=MBtUKrrdzJl44PQ49xnudg&oh=00_Afapo3CCBEZBdilYjhsb7ijYj5JkaJKA--gZ1HLcfm6E3g&oe=68D74720"
+  }
+}
+2025-09-22T17:30:10.341Z [info] Raw content preview:
+2025-09-22T17:30:10.341Z [info] Raw contentSnippet:
+2025-09-22T17:30:10.341Z [info] Post: "Saint Cloud Area Chamber of Commerce Posted" - Image URL: https://scontent-sjc6-1.xx.fbcdn.net/v/t39.30808-6/552149976_1204961328322343_7846580375937864940_n.jpg?stp=dst-jpg_p565x565_tt6&_nc_cat=111&ccb=1-7&_nc_sid=1abd25&_nc_ohc=d98lsXTZiZQQ7kNvwGSTxgZ&_nc_oc=AdkuoIa0apLRHxjq32BorN5fMt0Jgbke-X3JVOrj0ilRYG3uJdqEDL3iCvQVb55TGKM&_nc_zt=23&_nc_ht=scontent-sjc6-1.xx&_nc_gid=MBtUKrrdzJl44PQ49xnudg&oh=00_Afapo3CCBEZBdilYjhsb7ijYj5JkaJKA--gZ1HLcfm6E3g&oe=68D74720
+2025-09-22T17:30:10.381Z [info] Attempting to re-host Facebook image immediately: https://scontent-sjc6-1.xx.fbcdn.net/v/t39.30808-6/552149976_1204961328322343_7846580375937864940_n.jpg?stp=dst-jpg_p565x565_tt6&_nc_cat=111&ccb=1-7&_nc_sid=1abd25&_nc_ohc=d98lsXTZiZQQ7kNvwGSTxgZ&_nc_oc=AdkuoIa0apLRHxjq32BorN5fMt0Jgbke-X3JVOrj0ilRYG3uJdqEDL3iCvQVb55TGKM&_nc_zt=23&_nc_ht=scontent-sjc6-1.xx&_nc_gid=MBtUKrrdzJl44PQ49xnudg&oh=00_Afapo3CCBEZBdilYjhsb7ijYj5JkaJKA--gZ1HLcfm6E3g&oe=68D74720
+2025-09-22T17:30:10.381Z [info] Downloading image from: https://scontent-sjc6-1.xx.fbcdn.net/v/t39.30808-6/552149976_1204961328322343_7846580375937864940_n.jpg?stp=dst-jpg_p565x565_tt6&_nc_cat=111&ccb=1-7&_nc_sid=1abd25&_nc_ohc=d98lsXTZiZQQ7kNvwGSTxgZ&_nc_oc=AdkuoIa0apLRHxjq32BorN5fMt0Jgbke-X3JVOrj0ilRYG3uJdqEDL3iCvQVb55TGKM&_nc_zt=23&_nc_ht=scontent-sjc6-1.xx&_nc_gid=MBtUKrrdzJl44PQ49xnudg&oh=00_Afapo3CCBEZBdilYjhsb7ijYj5JkaJKA--gZ1HLcfm6E3g&oe=68D74720
+2025-09-22T17:30:10.600Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2F379a761e7416be73f95ca4550ca89ca1.jpg - 404 with id A4D6:2CC6C7:19A83B:5B4D4B:68D187A2 in 100ms
+2025-09-22T17:30:10.689Z [error] PUT /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2F379a761e7416be73f95ca4550ca89ca1.jpg - 403 with id A4D6:2CC6C7:19A8D0:5B4F3E:68D187A2 in 88ms
+2025-09-22T17:30:10.690Z [error] Error uploading image to GitHub: Error [HttpError]: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents
+    at <unknown> (HttpError: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents)
+    at O (.next/server/chunks/7762.js:1:9283)
+    at async i.uploadImage (.next/server/chunks/6723.js:1:1907)
+    at async d.processFeed (.next/server/chunks/6723.js:199:1457)
+    at async d.processAllFeedsForCampaign (.next/server/chunks/6723.js:198:2170)
+    at async p (.next/server/app/api/cron/rss-processing/route.js:16:2646) {
+  status: 403,
+  request: [Object],
+  response: [Object]
+}
+2025-09-22T17:30:10.690Z [warning] Failed to re-host Facebook image, keeping original URL: https://scontent-sjc6-1.xx.fbcdn.net/v/t39.30808-6/552149976_1204961328322343_7846580375937864940_n.jpg?stp=dst-jpg_p565x565_tt6&_nc_cat=111&ccb=1-7&_nc_sid=1abd25&_nc_ohc=d98lsXTZiZQQ7kNvwGSTxgZ&_nc_oc=AdkuoIa0apLRHxjq32BorN5fMt0Jgbke-X3JVOrj0ilRYG3uJdqEDL3iCvQVb55TGKM&_nc_zt=23&_nc_ht=scontent-sjc6-1.xx&_nc_gid=MBtUKrrdzJl44PQ49xnudg&oh=00_Afapo3CCBEZBdilYjhsb7ijYj5JkaJKA--gZ1HLcfm6E3g&oe=68D74720
+2025-09-22T17:30:10.723Z [info] Inserted post: Saint Cloud Area Chamber of Commerce Posted
+2025-09-22T17:30:10.723Z [info] === DEBUGGING ITEM: "🍂 Happy First Day of Fall from St. Cloud Park & Recreation! Let’s embrace the crisp air, vibrant colors, and all the fu..." ===
+2025-09-22T17:30:10.723Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T17:30:10.723Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/549637389_1178561360984563_4675304148143711445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=103&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=hU8ERps0pXwQ7kNvwEf1Nwl&_nc_oc=AdkXgHd_4WGLW0hShUrceYBW7M9GxI7TNEas9Q3C7qFK3z7BOAtymeH_BtRnM0lASwg&_nc_zt=23&_nc_ht=scontent-cdg4-2.xx&_nc_gid=KJHM7xtAFl380lLXLpCH1A&oh=00_AfbaG96cEtvB8eqM7MLNNBDRJ-vhE88bWCXhWTFwHYyp6A&oe=68D74F69"
+  }
+}
+2025-09-22T17:30:10.723Z [info] Raw content preview: <div><img src="https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/549637389_1178561360984563_4675304148143711445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=103&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=hU8ERps0pXw
+2025-09-22T17:30:10.723Z [info] Raw contentSnippet: 🍂 Happy First Day of Fall from St. Cloud Park & Recreation! Let’s embrace the crisp air, vibrant colors, and all the fun fall activities ahead!
+2025-09-22T17:30:10.723Z [info] Post: "🍂 Happy First Day of Fall from St. Cloud Park & Recreation! Let’s embrace the crisp air, vibrant colors, and all the fu..." - Image URL: https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/549637389_1178561360984563_4675304148143711445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=103&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=hU8ERps0pXwQ7kNvwEf1Nwl&_nc_oc=AdkXgHd_4WGLW0hShUrceYBW7M9GxI7TNEas9Q3C7qFK3z7BOAtymeH_BtRnM0lASwg&_nc_zt=23&_nc_ht=scontent-cdg4-2.xx&_nc_gid=KJHM7xtAFl380lLXLpCH1A&oh=00_AfbaG96cEtvB8eqM7MLNNBDRJ-vhE88bWCXhWTFwHYyp6A&oe=68D74F69
+2025-09-22T17:30:10.759Z [info] Attempting to re-host Facebook image immediately: https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/549637389_1178561360984563_4675304148143711445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=103&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=hU8ERps0pXwQ7kNvwEf1Nwl&_nc_oc=AdkXgHd_4WGLW0hShUrceYBW7M9GxI7TNEas9Q3C7qFK3z7BOAtymeH_BtRnM0lASwg&_nc_zt=23&_nc_ht=scontent-cdg4-2.xx&_nc_gid=KJHM7xtAFl380lLXLpCH1A&oh=00_AfbaG96cEtvB8eqM7MLNNBDRJ-vhE88bWCXhWTFwHYyp6A&oe=68D74F69
+2025-09-22T17:30:10.759Z [info] Downloading image from: https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/549637389_1178561360984563_4675304148143711445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=103&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=hU8ERps0pXwQ7kNvwEf1Nwl&_nc_oc=AdkXgHd_4WGLW0hShUrceYBW7M9GxI7TNEas9Q3C7qFK3z7BOAtymeH_BtRnM0lASwg&_nc_zt=23&_nc_ht=scontent-cdg4-2.xx&_nc_gid=KJHM7xtAFl380lLXLpCH1A&oh=00_AfbaG96cEtvB8eqM7MLNNBDRJ-vhE88bWCXhWTFwHYyp6A&oe=68D74F69
+2025-09-22T17:30:11.475Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2Fd61965365869db3e46aa4fb499ecc29f.jpg - 404 with id A4D6:2CC6C7:19ACD0:5B5DCE:68D187A2 in 99ms
+2025-09-22T17:30:11.576Z [error] PUT /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2Fd61965365869db3e46aa4fb499ecc29f.jpg - 403 with id A4D6:2CC6C7:19AD57:5B5F92:68D187A3 in 99ms
+2025-09-22T17:30:11.576Z [error] Error uploading image to GitHub: Error [HttpError]: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents
+    at <unknown> (HttpError: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents)
+    at O (.next/server/chunks/7762.js:1:9283)
+    at async i.uploadImage (.next/server/chunks/6723.js:1:1907)
+    at async d.processFeed (.next/server/chunks/6723.js:199:1457)
+    at async d.processAllFeedsForCampaign (.next/server/chunks/6723.js:198:2170)
+    at async p (.next/server/app/api/cron/rss-processing/route.js:16:2646) {
+  status: 403,
+  request: [Object],
+  response: [Object]
+}
+2025-09-22T17:30:11.577Z [warning] Failed to re-host Facebook image, keeping original URL: https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/549637389_1178561360984563_4675304148143711445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=103&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=hU8ERps0pXwQ7kNvwEf1Nwl&_nc_oc=AdkXgHd_4WGLW0hShUrceYBW7M9GxI7TNEas9Q3C7qFK3z7BOAtymeH_BtRnM0lASwg&_nc_zt=23&_nc_ht=scontent-cdg4-2.xx&_nc_gid=KJHM7xtAFl380lLXLpCH1A&oh=00_AfbaG96cEtvB8eqM7MLNNBDRJ-vhE88bWCXhWTFwHYyp6A&oe=68D74F69
+2025-09-22T17:30:11.606Z [info] Inserted post: 🍂 Happy First Day of Fall from St. Cloud Park & Recreation! Let’s embrace the crisp air, vibrant colors, and all the fu...
+2025-09-22T17:30:11.606Z [info] === DEBUGGING ITEM: "Harvest season is starting to ramp up. Please be patient and share the roads with the people who work to feed us. Give t..." ===
+2025-09-22T17:30:11.606Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T17:30:11.606Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://scontent-cdg4-3.xx.fbcdn.net/v/t39.30808-6/548013353_1231798685656101_7670178318006756445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=bl1jRv2oLgUQ7kNvwHlV157&_nc_oc=AdkaM8V_tcuyrG0_B_i8HQzD80cke9Koi_wHSjysHlqTS4RJSS_HmlsoQuiUbedNcng&_nc_zt=23&_nc_ht=scontent-cdg4-3.xx&_nc_gid=X1rEvQ46LbPc_DUsGccfgA&oh=00_AfYFrw96hinsdwDKIibfRSwIIJXYToGlVP56Bd-IMr7rnA&oe=68D766DF"
+  }
+}
+2025-09-22T17:30:11.606Z [info] Raw content preview: <div><img src="https://scontent-cdg4-3.xx.fbcdn.net/v/t39.30808-6/548013353_1231798685656101_7670178318006756445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=bl1jRv2oLgU
+2025-09-22T17:30:11.606Z [info] Raw contentSnippet: Harvest season is starting to ramp up. Please be patient and share the roads with the people who work to feed us. Give these large machines extra time and room.
+2025-09-22T17:30:11.606Z [info] Post: "Harvest season is starting to ramp up. Please be patient and share the roads with the people who work to feed us. Give t..." - Image URL: https://scontent-cdg4-3.xx.fbcdn.net/v/t39.30808-6/548013353_1231798685656101_7670178318006756445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=bl1jRv2oLgUQ7kNvwHlV157&_nc_oc=AdkaM8V_tcuyrG0_B_i8HQzD80cke9Koi_wHSjysHlqTS4RJSS_HmlsoQuiUbedNcng&_nc_zt=23&_nc_ht=scontent-cdg4-3.xx&_nc_gid=X1rEvQ46LbPc_DUsGccfgA&oh=00_AfYFrw96hinsdwDKIibfRSwIIJXYToGlVP56Bd-IMr7rnA&oe=68D766DF
+2025-09-22T17:30:11.632Z [info] Attempting to re-host Facebook image immediately: https://scontent-cdg4-3.xx.fbcdn.net/v/t39.30808-6/548013353_1231798685656101_7670178318006756445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=bl1jRv2oLgUQ7kNvwHlV157&_nc_oc=AdkaM8V_tcuyrG0_B_i8HQzD80cke9Koi_wHSjysHlqTS4RJSS_HmlsoQuiUbedNcng&_nc_zt=23&_nc_ht=scontent-cdg4-3.xx&_nc_gid=X1rEvQ46LbPc_DUsGccfgA&oh=00_AfYFrw96hinsdwDKIibfRSwIIJXYToGlVP56Bd-IMr7rnA&oe=68D766DF
+2025-09-22T17:30:11.632Z [info] Downloading image from: https://scontent-cdg4-3.xx.fbcdn.net/v/t39.30808-6/548013353_1231798685656101_7670178318006756445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=bl1jRv2oLgUQ7kNvwHlV157&_nc_oc=AdkaM8V_tcuyrG0_B_i8HQzD80cke9Koi_wHSjysHlqTS4RJSS_HmlsoQuiUbedNcng&_nc_zt=23&_nc_ht=scontent-cdg4-3.xx&_nc_gid=X1rEvQ46LbPc_DUsGccfgA&oh=00_AfYFrw96hinsdwDKIibfRSwIIJXYToGlVP56Bd-IMr7rnA&oe=68D766DF
+2025-09-22T17:30:11.860Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2F2597cc97d6a59920c41897a0939d1134.jpg - 404 with id A4D6:2CC6C7:19AED0:5B6516:68D187A3 in 106ms
+2025-09-22T17:30:11.954Z [error] PUT /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2F2597cc97d6a59920c41897a0939d1134.jpg - 403 with id A4D6:2CC6C7:19AF72:5B672E:68D187A3 in 93ms
+2025-09-22T17:30:11.955Z [error] Error uploading image to GitHub: Error [HttpError]: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents
+    at <unknown> (HttpError: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents)
+    at O (.next/server/chunks/7762.js:1:9283)
+    at async i.uploadImage (.next/server/chunks/6723.js:1:1907)
+    at async d.processFeed (.next/server/chunks/6723.js:199:1457)
+    at async d.processAllFeedsForCampaign (.next/server/chunks/6723.js:198:2170)
+    at async p (.next/server/app/api/cron/rss-processing/route.js:16:2646) {
+  status: 403,
+  request: [Object],
+  response: [Object]
+}
+2025-09-22T17:30:11.955Z [warning] Failed to re-host Facebook image, keeping original URL: https://scontent-cdg4-3.xx.fbcdn.net/v/t39.30808-6/548013353_1231798685656101_7670178318006756445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=bl1jRv2oLgUQ7kNvwHlV157&_nc_oc=AdkaM8V_tcuyrG0_B_i8HQzD80cke9Koi_wHSjysHlqTS4RJSS_HmlsoQuiUbedNcng&_nc_zt=23&_nc_ht=scontent-cdg4-3.xx&_nc_gid=X1rEvQ46LbPc_DUsGccfgA&oh=00_AfYFrw96hinsdwDKIibfRSwIIJXYToGlVP56Bd-IMr7rnA&oe=68D766DF
+2025-09-22T17:30:11.985Z [info] Inserted post: Harvest season is starting to ramp up. Please be patient and share the roads with the people who work to feed us. Give t...
+2025-09-22T17:30:11.985Z [info] === DEBUGGING ITEM: "City of St. Cloud, MN: City Council Meeting" ===
+2025-09-22T17:30:11.985Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T17:30:11.985Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://external-det1-1.xx.fbcdn.net/emg1/v/t13/8968225735085706704?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImages%2FSocialMedia%2FIconModuleCalendar.png&fb_obo=1&utld=mn.us&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=WN5ve4m4XOkWTPwOuO6uew&_nc_oc=AdlKiD7HL0aJ2AokoZICCOVIKV6Tm8WhFT-rcY-GBT74lXDGcyrkpMgvnZ9O9OiWnnE&ccb=13-1&oh=06_Q3-3AXsOqL0FxTknxGfOLJduwEh9rmFDzUVbQUBZGSgm5H7h&oe=68D356C5&_nc_sid=e42f53"
+  }
+}
+2025-09-22T17:30:11.985Z [info] Raw content preview: <div><img src="https://external-det1-1.xx.fbcdn.net/emg1/v/t13/8968225735085706704?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImages%2FSocialMedia%2FIconModuleCalendar.png&fb_obo=1&utld=mn.us&stp=c0.500
+2025-09-22T17:30:11.985Z [info] Raw contentSnippet: City Council Meeting
+2025-09-22T17:30:11.985Z [info] Post: "City of St. Cloud, MN: City Council Meeting" - Image URL: https://external-det1-1.xx.fbcdn.net/emg1/v/t13/8968225735085706704?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImages%2FSocialMedia%2FIconModuleCalendar.png&fb_obo=1&utld=mn.us&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=WN5ve4m4XOkWTPwOuO6uew&_nc_oc=AdlKiD7HL0aJ2AokoZICCOVIKV6Tm8WhFT-rcY-GBT74lXDGcyrkpMgvnZ9O9OiWnnE&ccb=13-1&oh=06_Q3-3AXsOqL0FxTknxGfOLJduwEh9rmFDzUVbQUBZGSgm5H7h&oe=68D356C5&_nc_sid=e42f53
+2025-09-22T17:30:12.020Z [info] Attempting to re-host Facebook image immediately: https://external-det1-1.xx.fbcdn.net/emg1/v/t13/8968225735085706704?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImages%2FSocialMedia%2FIconModuleCalendar.png&fb_obo=1&utld=mn.us&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=WN5ve4m4XOkWTPwOuO6uew&_nc_oc=AdlKiD7HL0aJ2AokoZICCOVIKV6Tm8WhFT-rcY-GBT74lXDGcyrkpMgvnZ9O9OiWnnE&ccb=13-1&oh=06_Q3-3AXsOqL0FxTknxGfOLJduwEh9rmFDzUVbQUBZGSgm5H7h&oe=68D356C5&_nc_sid=e42f53
+2025-09-22T17:30:12.020Z [info] Downloading image from: https://external-det1-1.xx.fbcdn.net/emg1/v/t13/8968225735085706704?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImages%2FSocialMedia%2FIconModuleCalendar.png&fb_obo=1&utld=mn.us&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=WN5ve4m4XOkWTPwOuO6uew&_nc_oc=AdlKiD7HL0aJ2AokoZICCOVIKV6Tm8WhFT-rcY-GBT74lXDGcyrkpMgvnZ9O9OiWnnE&ccb=13-1&oh=06_Q3-3AXsOqL0FxTknxGfOLJduwEh9rmFDzUVbQUBZGSgm5H7h&oe=68D356C5&_nc_sid=e42f53
+2025-09-22T17:30:12.934Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2Fcc6c2c4de82ae3fe59cc767ca7ac30f0.jpg - 404 with id A4D6:2CC6C7:19B4A4:5B79D0:68D187A3 in 76ms
+2025-09-22T17:30:13.030Z [error] PUT /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2Fcc6c2c4de82ae3fe59cc767ca7ac30f0.jpg - 403 with id A4D6:2CC6C7:19B507:5B7B5A:68D187A4 in 95ms
+2025-09-22T17:30:13.030Z [error] Error uploading image to GitHub: Error [HttpError]: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents
+    at <unknown> (HttpError: Resource not accessible by personal access token - https://docs.github.com/rest/repos/contents#create-or-update-file-contents)
+    at O (.next/server/chunks/7762.js:1:9283)
+    at async i.uploadImage (.next/server/chunks/6723.js:1:1907)
+    at async d.processFeed (.next/server/chunks/6723.js:199:1457)
+    at async d.processAllFeedsForCampaign (.next/server/chunks/6723.js:198:2170)
+    at async p (.next/server/app/api/cron/rss-processing/route.js:16:2646) {
+  status: 403,
+  request: [Object],
+  response: [Object]
+}
+2025-09-22T17:30:13.030Z [warning] Failed to re-host Facebook image, keeping original URL: https://external-det1-1.xx.fbcdn.net/emg1/v/t13/8968225735085706704?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImages%2FSocialMedia%2FIconModuleCalendar.png&fb_obo=1&utld=mn.us&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=WN5ve4m4XOkWTPwOuO6uew&_nc_oc=AdlKiD7HL0aJ2AokoZICCOVIKV6Tm8WhFT-rcY-GBT74lXDGcyrkpMgvnZ9O9OiWnnE&ccb=13-1&oh=06_Q3-3AXsOqL0FxTknxGfOLJduwEh9rmFDzUVbQUBZGSgm5H7h&oe=68D356C5&_nc_sid=e42f53
+2025-09-22T17:30:13.060Z [info] Inserted post: City of St. Cloud, MN: City Council Meeting
+2025-09-22T17:30:13.091Z [info] Starting AI processing of posts...
+2025-09-22T17:30:13.125Z [info] Processing 10 posts with AI
+2025-09-22T17:30:13.125Z [info] Processing batch 1/4 (3 posts)
+2025-09-22T17:30:13.125Z [info] Evaluating post 1/10: Hello, Fall! 🍂☕ Stay steady this season with a few simple steps. And remember, you can always take fall prevention furt...
+2025-09-22T17:30:13.126Z [info] Calling OpenAI API...
+2025-09-22T17:30:13.126Z [info] Evaluating post 2/10: Harvest season is starting to ramp up. Please be patient and share the roads with the people who work to feed us. Give t...
+2025-09-22T17:30:13.126Z [info] Calling OpenAI API...
+2025-09-22T17:30:13.126Z [info] Evaluating post 3/10: Are you interested in a career in law enforcement? This is your opportunity to meet several hiring agencies all in one l...
+2025-09-22T17:30:13.126Z [info] Calling OpenAI API...
+2025-09-22T17:30:17.161Z [info] OpenAI response received
+2025-09-22T17:30:17.161Z [info] AI evaluation response: {
+  "interest_level": 5,
+  "local_relevance": 8,
+  "community_impact": 7,
+  "reasoning": "The article is moderately interesting as it offers a unique opportunity for those interested in law enforcement careers to meet multiple hiring agencies in one location, which could be engaging for job seekers. The local relevance is high because it involves the Stearns County Sheriff's Office, directly impacting St. Cloud and surrounding areas. The community impact is also significant as it provides potential employment opportunities and supports local law enforcement staffing, which can affect public safety and community services."
+}
+2025-09-22T17:30:17.238Z [info] Successfully evaluated post 3/10
+2025-09-22T17:30:18.743Z [info] OpenAI response received
+2025-09-22T17:30:18.743Z [info] AI evaluation response: {
+  "interest_level": 5,
+  "local_relevance": 7,
+  "community_impact": 6,
+  "reasoning": "The article discusses the start of the harvest season and the need for patience on the roads, which is moderately interesting as it relates to a seasonal event that affects many rural communities. It scores a 5 in interest level because while it's not particularly surprising or unique, it is a timely reminder that can engage residents. The local relevance is rated at 7 because agriculture is a significant part of the economy in the St. Cloud area and surrounding communities, making this information pertinent to local residents. The community impact is rated at 6 as it affects daily commutes and road safety, which are important to the community, but it does not introduce new services or policy changes."
+}
+2025-09-22T17:30:18.786Z [info] Successfully evaluated post 2/10
+2025-09-22T17:30:19.242Z [info] OpenAI response received
+2025-09-22T17:30:19.242Z [info] AI evaluation response: {
+  "interest_level": 3,
+  "local_relevance": 5,
+  "community_impact": 4,
+  "reasoning": "The article provides information about fall prevention and promotes CentraCare Medical Alert Service. The interest level is low because it is a routine promotional piece without unique or engaging content. Local relevance is moderate as it mentions CentraCare, a local healthcare provider, which may interest St. Cloud residents. Community impact is slightly below average; while fall prevention is important, the article primarily serves as an advertisement for a service rather than offering new services or policy changes."
+}
+2025-09-22T17:30:19.297Z [info] Successfully evaluated post 1/10
+2025-09-22T17:30:19.297Z [info] Batch 1 complete: 3 successful, 0 errors
+2025-09-22T17:30:19.297Z [info] Waiting 2 seconds before next batch...
+2025-09-22T17:30:21.298Z [info] Processing batch 2/4 (3 posts)
+2025-09-22T17:30:21.298Z [info] Evaluating post 4/10: City of St. Cloud, MN: City Council Meeting
+2025-09-22T17:30:21.298Z [info] Calling OpenAI API...
+2025-09-22T17:30:21.298Z [info] Evaluating post 5/10: 🍂 Happy First Day of Fall from St. Cloud Park & Recreation! Let’s embrace the crisp air, vibrant colors, and all the fu...
+2025-09-22T17:30:21.298Z [info] Calling OpenAI API...
+2025-09-22T17:30:21.298Z [info] Evaluating post 6/10: We're only a few days away from our 5th annual Historic Harvest Fest here at the Stearns History Museum!  Llamas, books,...
+2025-09-22T17:30:21.298Z [info] Calling OpenAI API...
+2025-09-22T17:30:25.275Z [info] OpenAI response received
+2025-09-22T17:30:25.275Z [info] AI evaluation response: {
+  "interest_level": 4,
+  "local_relevance": 7,
+  "community_impact": 3,
+  "reasoning": "The article celebrates the first day of fall, which is a routine seasonal announcement and not particularly surprising or unique, thus scoring a 4 in interest level. It is locally relevant as it is from St. Cloud Park & Recreation and encourages local residents to enjoy fall activities, earning a 7 in local relevance. However, it lacks specific information about events or activities that would directly impact the community, resulting in a community impact score of 3."
+}
+2025-09-22T17:30:25.342Z [info] Successfully evaluated post 5/10
+2025-09-22T17:30:26.144Z [info] OpenAI response received
+2025-09-22T17:30:26.144Z [info] AI evaluation response: {
+  "interest_level": 2,
+  "local_relevance": 8,
+  "community_impact": 6,
+  "reasoning": "The article is about a City Council Meeting in St. Cloud, which is a routine event and not particularly intriguing or surprising, hence a low interest level score of 2. However, it is highly relevant to local residents as it pertains directly to city governance, earning a local relevance score of 8. The community impact is moderate with a score of 6, as decisions made in these meetings can affect local policies and services, but the article lacks specific details on the agenda or potential outcomes that might affect residents' daily lives."
+}
+2025-09-22T17:30:26.175Z [info] Successfully evaluated post 4/10
+2025-09-22T17:30:28.487Z [info] OpenAI response received
+2025-09-22T17:30:28.487Z [info] AI evaluation response: {
+  "interest_level": 6,
+  "local_relevance": 9,
+  "community_impact": 5,
+  "reasoning": "The article about the Historic Harvest Fest at the Stearns History Museum scores a 6 for interest level because it features a variety of engaging activities like llamas, games, and crafts, which are likely to attract families and individuals looking for entertainment. It scores a 9 for local relevance as it is an event happening directly in St. Cloud, specifically at a local museum, making it highly relevant to the community. The community impact is rated at 5 because while it provides a fun and engaging event for locals, it does not have a significant long-term effect on residents' daily lives or the broader community beyond offering a day of entertainment."
+}
+2025-09-22T17:30:28.520Z [info] Successfully evaluated post 6/10
+2025-09-22T17:30:28.520Z [info] Batch 2 complete: 3 successful, 0 errors
+2025-09-22T17:30:28.520Z [info] Waiting 2 seconds before next batch...
+2025-09-22T17:30:30.520Z [info] Processing batch 3/4 (3 posts)
+2025-09-22T17:30:30.520Z [info] Evaluating post 7/10: We'd like to shout out Grace Weitz, speech coach at Apollo. She's been named MSCA Coach of the Year!
+2025-09-22T17:30:30.520Z [info] Calling OpenAI API...
+2025-09-22T17:30:30.520Z [info] Evaluating post 8/10: 📢 Happy New Member Monday ⭐️ Join us in welcoming these new members to the St. Cloud Area Chamber of Commerce. Prudenti...
+2025-09-22T17:30:30.520Z [info] Calling OpenAI API...
+2025-09-22T17:30:30.520Z [info] Evaluating post 9/10: Saint Cloud Area Chamber of Commerce Posted
+2025-09-22T17:30:30.520Z [info] Calling OpenAI API...
+2025-09-22T17:30:33.029Z [info] OpenAI response received
+2025-09-22T17:30:33.029Z [info] AI evaluation response: {
+  "interest_level": 1,
+  "local_relevance": 1,
+  "community_impact": 1,
+  "reasoning": "The article lacks any description or content, making it impossible to assess its interest level, local relevance, or community impact. Without any details, it cannot engage readers, relate to the St. Cloud area, or impact the community in any meaningful way."
+}
+2025-09-22T17:30:33.158Z [info] Successfully evaluated post 9/10
+2025-09-22T17:30:35.882Z [info] OpenAI response received
+2025-09-22T17:30:35.882Z [info] AI evaluation response: {
+  "interest_level": 4,
+  "local_relevance": 7,
+  "community_impact": 5,
+  "reasoning": "The article scores moderately on interest level as it is a routine announcement about new members joining the local Chamber of Commerce, which may not be highly engaging to a broad audience. However, it could be of interest to those in the business community. The local relevance is higher because it specifically pertains to the St. Cloud Area Chamber of Commerce and involves businesses serving central Minnesota, making it relevant to local residents. The community impact is moderate, as the inclusion of new businesses could have some effect on local economic activity and services, but it does not introduce significant changes or benefits to the broader community."
+}
+2025-09-22T17:30:35.919Z [info] Successfully evaluated post 8/10
+2025-09-22T17:30:36.222Z [info] OpenAI response received
+2025-09-22T17:30:36.222Z [info] AI evaluation response: {
+  "interest_level": 4,
+  "local_relevance": 7,
+  "community_impact": 3,
+  "reasoning": "The article highlights an individual achievement, which is the recognition of Grace Weitz as the MSCA Coach of the Year. This is a positive story but not particularly surprising or unique, thus scoring a 4 for interest level. The local relevance is higher at 7 because it involves a local resident and educator from Apollo High School, which is in St. Cloud. However, the impact on the broader community is limited, as it primarily affects those directly involved with the speech team or school, resulting in a community impact score of 3."
+}
+2025-09-22T17:30:36.256Z [info] Successfully evaluated post 7/10
+2025-09-22T17:30:36.256Z [info] Batch 3 complete: 3 successful, 0 errors
+2025-09-22T17:30:36.256Z [info] Waiting 2 seconds before next batch...
+2025-09-22T17:30:38.256Z [info] Processing batch 4/4 (1 posts)
+2025-09-22T17:30:38.256Z [info] Evaluating post 10/10: City of St. Cloud, MN: Fall is Coming: Keep Leaves out of Streets and Storm Drains!
+2025-09-22T17:30:38.256Z [info] Calling OpenAI API...
+2025-09-22T17:30:43.160Z [info] OpenAI response received
+2025-09-22T17:30:43.160Z [info] AI evaluation response: {
+  "interest_level": 3,
+  "local_relevance": 8,
+  "community_impact": 6,
+  "reasoning": "The article's interest level is relatively low as it covers a routine seasonal reminder about leaf management, which is not particularly intriguing or surprising. However, it is highly relevant to St. Cloud residents as it addresses a local environmental concern specific to the area. The community impact is moderate because while it does not introduce new services or policy changes, it does affect public safety and environmental quality by encouraging residents to keep leaves out of streets and storm drains, potentially preventing blockages and flooding."
+}
+2025-09-22T17:30:43.214Z [info] Successfully evaluated post 10/10
+2025-09-22T17:30:43.214Z [info] Batch 4 complete: 1 successful, 0 errors
+2025-09-22T17:30:43.214Z [info] AI evaluation complete: 10 successful, 0 errors
+2025-09-22T17:30:43.288Z [info] Calling OpenAI API...
+2025-09-22T17:30:48.460Z [info] OpenAI response received
+2025-09-22T17:30:48.802Z [info] Starting newsletter article generation...
+2025-09-22T17:30:48.848Z [info] Found 10 top posts for article generation
+2025-09-22T17:30:48.883Z [info] 10 posts have ratings
+2025-09-22T17:30:48.932Z [info] Generating article for: Are you interested in a career in law enforcement? This is your opportunity to meet several hiring agencies all in one l...
+2025-09-22T17:30:48.932Z [info] Calling OpenAI API...
+2025-09-22T17:30:52.040Z [info] OpenAI response received
+2025-09-22T17:30:52.040Z [info] Calling OpenAI API...
+2025-09-22T17:30:52.885Z [info] OpenAI response received
+2025-09-22T17:30:52.885Z [info] Fact-check result for "Are you interested in a career in law enforcement? This is your opportunity to meet several hiring agencies all in one l...": PASSED (score: 26)
+2025-09-22T17:30:52.952Z [info] Successfully created article: "Explore Law Enforcement Careers at Local Hiring Event"
+2025-09-22T17:30:53.036Z [info] Generating article for: We're only a few days away from our 5th annual Historic Harvest Fest here at the Stearns History Museum!  Llamas, books,...
+2025-09-22T17:30:53.036Z [info] Calling OpenAI API...
+2025-09-22T17:30:55.654Z [info] OpenAI response received
+2025-09-22T17:30:55.654Z [info] Calling OpenAI API...
+2025-09-22T17:31:00.704Z [info] OpenAI response received
+2025-09-22T17:31:00.704Z [info] Fact-check result for "We're only a few days away from our 5th annual Historic Harvest Fest here at the Stearns History Museum!  Llamas, books,...": PASSED (score: 23)
+2025-09-22T17:31:00.780Z [info] Successfully created article: "Celebrate Community Spirit at Stearns History Museum's Harvest Fest"
+2025-09-22T17:31:00.865Z [info] Generating article for: Harvest season is starting to ramp up. Please be patient and share the roads with the people who work to feed us. Give t...
+2025-09-22T17:31:00.865Z [info] Calling OpenAI API...
+2025-09-22T17:31:03.898Z [info] OpenAI response received
+2025-09-22T17:31:03.898Z [info] Calling OpenAI API...
+2025-09-22T17:31:05.328Z [info] OpenAI response received
+2025-09-22T17:31:05.328Z [info] Fact-check result for "Harvest season is starting to ramp up. Please be patient and share the roads with the people who work to feed us. Give t...": PASSED (score: 21)
+2025-09-22T17:31:05.418Z [info] Successfully created article: "Exercise Caution: Harvest Machinery on Local Roads"
+2025-09-22T17:31:05.487Z [info] Generating article for: City of St. Cloud, MN: Fall is Coming: Keep Leaves out of Streets and Storm Drains!
+2025-09-22T17:31:05.487Z [info] Calling OpenAI API...
+2025-09-22T17:31:10.117Z [info] OpenAI response received
+2025-09-22T17:31:10.117Z [info] Calling OpenAI API...
+2025-09-22T17:31:31.994Z [info] OpenAI response received
+2025-09-22T17:31:31.994Z [info] Fact-check result for "City of St. Cloud, MN: Fall is Coming: Keep Leaves out of Streets and Storm Drains!": PASSED (score: 22)
+2025-09-22T17:31:32.075Z [info] Successfully created article: "Protect St. Cloud's Streets: Prevent Leaf Blockages"
+2025-09-22T17:31:32.153Z [info] Generating article for: City of St. Cloud, MN: City Council Meeting
+2025-09-22T17:31:32.153Z [info] Calling OpenAI API...
+2025-09-22T17:31:34.975Z [info] OpenAI response received
+2025-09-22T17:31:34.975Z [info] Calling OpenAI API...
+2025-09-22T17:31:39.516Z [info] OpenAI response received
+2025-09-22T17:31:39.516Z [info] Fact-check result for "City of St. Cloud, MN: City Council Meeting": PASSED (score: 20)
+2025-09-22T17:31:39.634Z [info] Successfully created article: "St. Cloud City Council Prepares for Upcoming Meeting"
+2025-09-22T17:31:39.700Z [info] Generating article for: 📢 Happy New Member Monday ⭐️ Join us in welcoming these new members to the St. Cloud Area Chamber of Commerce. Prudenti...
+2025-09-22T17:31:39.700Z [info] Calling OpenAI API...
+2025-09-22T17:31:41.483Z [info] OpenAI response received
+2025-09-22T17:31:41.483Z [info] Calling OpenAI API...
+2025-09-22T17:31:47.811Z [info] OpenAI response received

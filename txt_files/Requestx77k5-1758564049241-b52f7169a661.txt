@@ -1,0 +1,509 @@
+2025-09-22T18:00:49.387Z [info] === AUTOMATED RSS PROCESSING CHECK (GET) ===
+2025-09-22T18:00:49.387Z [info] Time: 2025-09-22T18:00:49.387Z
+2025-09-22T18:00:49.387Z [info] Request type: Vercel Cron
+2025-09-22T18:00:49.516Z [info] RSS Processing check: Current CT time 13:00, Scheduled: 13:00
+2025-09-22T18:00:49.516Z [info] Time window matched for last_rss_processing_run: current 13:00, scheduled 13:00, diff 0 minutes
+2025-09-22T18:00:49.516Z [info] === RSS PROCESSING STARTED (Time Matched) ===
+2025-09-22T18:00:49.517Z [info] Central Time: 9/22/2025, 1:00:49 PM
+2025-09-22T18:00:49.517Z [info] Processing RSS for tomorrow's campaign date: 2025-09-23
+2025-09-22T18:00:49.517Z [info] Creating campaign for tomorrow before processing RSS...
+2025-09-22T18:00:49.668Z [info] Created new campaign for tomorrow: 114d350c-da81-406a-bfd9-01266bd6b2cb
+2025-09-22T18:00:49.668Z [info] Starting RSS processing...
+2025-09-22T18:00:49.670Z [info] Starting RSS processing for campaign: 114d350c-da81-406a-bfd9-01266bd6b2cb
+2025-09-22T18:00:49.670Z [info] Clearing previous articles and posts...
+2025-09-22T18:00:49.719Z [info] Previous articles cleared successfully
+2025-09-22T18:00:49.777Z [info] Previous posts cleared successfully
+2025-09-22T18:00:49.825Z [info] === PROCESSING FEED: St. Cloud Local News ===
+2025-09-22T18:00:50.367Z [info] Found 12 recent posts from St. Cloud Local News
+2025-09-22T18:00:50.367Z [info] === DEBUGGING ITEM: "News Release- Semi Rollover" ===
+2025-09-22T18:00:50.367Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T18:00:50.367Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://external-atl3-2.xx.fbcdn.net/emg1/v/t13/10025698979064021491?url=https%3A%2F%2Fcontent.govdelivery.com%2Fattachments%2Ffancy_images%2FSTEARNS%2F2025%2F08%2F12115741%2Fstearns-county-sheriff-gold-badge-small_original.png&fb_obo=1&utld=govdelivery.com&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=BR9IfyDgIKYKSyoD1B7IFw&_nc_oc=AdnOaWrcUKIi95LxOUUFBRTgDfVjFh7fSukokZQ2kwSJsRUPicNsoK0CVvqLcRXZj-w&ccb=13-1&oh=06_Q3-3Adi26IqH3X8KWXYyfPvRPadXAyH-RbWbeeNQJp-xwqnp&oe=68D36A87&_nc_sid=e42f53"
+  }
+}
+2025-09-22T18:00:50.367Z [info] Raw content preview: <div><img src="https://external-atl3-2.xx.fbcdn.net/emg1/v/t13/10025698979064021491?url=https%3A%2F%2Fcontent.govdelivery.com%2Fattachments%2Ffancy_images%2FSTEARNS%2F2025%2F08%2F12115741%2Fstearns-co
+2025-09-22T18:00:50.367Z [info] Raw contentSnippet: News Release- Semi Rollover
+2025-09-22T18:00:50.367Z [info] Post: "News Release- Semi Rollover" - Image URL: https://external-atl3-2.xx.fbcdn.net/emg1/v/t13/10025698979064021491?url=https%3A%2F%2Fcontent.govdelivery.com%2Fattachments%2Ffancy_images%2FSTEARNS%2F2025%2F08%2F12115741%2Fstearns-county-sheriff-gold-badge-small_original.png&fb_obo=1&utld=govdelivery.com&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=BR9IfyDgIKYKSyoD1B7IFw&_nc_oc=AdnOaWrcUKIi95LxOUUFBRTgDfVjFh7fSukokZQ2kwSJsRUPicNsoK0CVvqLcRXZj-w&ccb=13-1&oh=06_Q3-3Adi26IqH3X8KWXYyfPvRPadXAyH-RbWbeeNQJp-xwqnp&oe=68D36A87&_nc_sid=e42f53
+2025-09-22T18:00:50.447Z [info] Attempting to re-host Facebook image immediately: https://external-atl3-2.xx.fbcdn.net/emg1/v/t13/10025698979064021491?url=https%3A%2F%2Fcontent.govdelivery.com%2Fattachments%2Ffancy_images%2FSTEARNS%2F2025%2F08%2F12115741%2Fstearns-county-sheriff-gold-badge-small_original.png&fb_obo=1&utld=govdelivery.com&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=BR9IfyDgIKYKSyoD1B7IFw&_nc_oc=AdnOaWrcUKIi95LxOUUFBRTgDfVjFh7fSukokZQ2kwSJsRUPicNsoK0CVvqLcRXZj-w&ccb=13-1&oh=06_Q3-3Adi26IqH3X8KWXYyfPvRPadXAyH-RbWbeeNQJp-xwqnp&oe=68D36A87&_nc_sid=e42f53
+2025-09-22T18:00:50.448Z [info] Downloading image from: https://external-atl3-2.xx.fbcdn.net/emg1/v/t13/10025698979064021491?url=https%3A%2F%2Fcontent.govdelivery.com%2Fattachments%2Ffancy_images%2FSTEARNS%2F2025%2F08%2F12115741%2Fstearns-county-sheriff-gold-badge-small_original.png&fb_obo=1&utld=govdelivery.com&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=BR9IfyDgIKYKSyoD1B7IFw&_nc_oc=AdnOaWrcUKIi95LxOUUFBRTgDfVjFh7fSukokZQ2kwSJsRUPicNsoK0CVvqLcRXZj-w&ccb=13-1&oh=06_Q3-3Adi26IqH3X8KWXYyfPvRPadXAyH-RbWbeeNQJp-xwqnp&oe=68D36A87&_nc_sid=e42f53
+2025-09-22T18:00:50.962Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2Ff59e1260ecf6ede6211693ad234772cd.jpg - 404 with id B3DC:1807CB:4054B2:E40B47:68D18ED2 in 147ms
+2025-09-22T18:00:51.421Z [info] Image uploaded to GitHub: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/f59e1260ecf6ede6211693ad234772cd.jpg
+2025-09-22T18:00:51.421Z [info] Successfully re-hosted Facebook image: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/f59e1260ecf6ede6211693ad234772cd.jpg
+2025-09-22T18:00:51.468Z [info] Inserted post: News Release- Semi Rollover
+2025-09-22T18:00:51.468Z [info] === DEBUGGING ITEM: "Check out this offering!" ===
+2025-09-22T18:00:51.468Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T18:00:51.468Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://scontent-sea1-1.xx.fbcdn.net/v/t39.30808-6/549822514_1084388183857929_1955700680346543618_n.jpg?stp=dst-jpg_p720x720_tt6&_nc_cat=104&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=lyu1bV6c8loQ7kNvwGYpmTL&_nc_oc=AdlwLGQylvTKGokOZlvJkfJ8bgdnxEqizjGQuG2BmppRFBEa1dX5-4m7OjEznSHN3YY&_nc_zt=23&_nc_ht=scontent-sea1-1.xx&_nc_gid=vgDc6YrsEYOi_AdXscmPpg&oh=00_AfaDXrbNdhzCIVNjqFa3fMBZyWqjt04_bmh_4hOV4BbffQ&oe=68D74FB3"
+  }
+}
+2025-09-22T18:00:51.468Z [info] Raw content preview: <div><img src="https://scontent-sea1-1.xx.fbcdn.net/v/t39.30808-6/549822514_1084388183857929_1955700680346543618_n.jpg?stp=dst-jpg_p720x720_tt6&_nc_cat=104&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=lyu1bV6c8loQ7
+2025-09-22T18:00:51.469Z [info] Raw contentSnippet: Check out this offering!
+2025-09-22T18:00:51.469Z [info] Post: "Check out this offering!" - Image URL: https://scontent-sea1-1.xx.fbcdn.net/v/t39.30808-6/549822514_1084388183857929_1955700680346543618_n.jpg?stp=dst-jpg_p720x720_tt6&_nc_cat=104&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=lyu1bV6c8loQ7kNvwGYpmTL&_nc_oc=AdlwLGQylvTKGokOZlvJkfJ8bgdnxEqizjGQuG2BmppRFBEa1dX5-4m7OjEznSHN3YY&_nc_zt=23&_nc_ht=scontent-sea1-1.xx&_nc_gid=vgDc6YrsEYOi_AdXscmPpg&oh=00_AfaDXrbNdhzCIVNjqFa3fMBZyWqjt04_bmh_4hOV4BbffQ&oe=68D74FB3
+2025-09-22T18:00:51.515Z [info] Attempting to re-host Facebook image immediately: https://scontent-sea1-1.xx.fbcdn.net/v/t39.30808-6/549822514_1084388183857929_1955700680346543618_n.jpg?stp=dst-jpg_p720x720_tt6&_nc_cat=104&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=lyu1bV6c8loQ7kNvwGYpmTL&_nc_oc=AdlwLGQylvTKGokOZlvJkfJ8bgdnxEqizjGQuG2BmppRFBEa1dX5-4m7OjEznSHN3YY&_nc_zt=23&_nc_ht=scontent-sea1-1.xx&_nc_gid=vgDc6YrsEYOi_AdXscmPpg&oh=00_AfaDXrbNdhzCIVNjqFa3fMBZyWqjt04_bmh_4hOV4BbffQ&oe=68D74FB3
+2025-09-22T18:00:51.515Z [info] Downloading image from: https://scontent-sea1-1.xx.fbcdn.net/v/t39.30808-6/549822514_1084388183857929_1955700680346543618_n.jpg?stp=dst-jpg_p720x720_tt6&_nc_cat=104&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=lyu1bV6c8loQ7kNvwGYpmTL&_nc_oc=AdlwLGQylvTKGokOZlvJkfJ8bgdnxEqizjGQuG2BmppRFBEa1dX5-4m7OjEznSHN3YY&_nc_zt=23&_nc_ht=scontent-sea1-1.xx&_nc_gid=vgDc6YrsEYOi_AdXscmPpg&oh=00_AfaDXrbNdhzCIVNjqFa3fMBZyWqjt04_bmh_4hOV4BbffQ&oe=68D74FB3
+2025-09-22T18:00:52.003Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2F980fc709615df124395c5914f9c92c48.jpg - 404 with id B3DC:1807CB:405A2F:E41EC7:68D18ED3 in 97ms
+2025-09-22T18:00:52.573Z [info] Image uploaded to GitHub: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/980fc709615df124395c5914f9c92c48.jpg
+2025-09-22T18:00:52.573Z [info] Successfully re-hosted Facebook image: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/980fc709615df124395c5914f9c92c48.jpg
+2025-09-22T18:00:52.625Z [info] Inserted post: Check out this offering!
+2025-09-22T18:00:52.625Z [info] === DEBUGGING ITEM: "We're only a few days away from our 5th annual Historic Harvest Fest here at the Stearns History Museum!  Llamas, books,..." ===
+2025-09-22T18:00:52.625Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T18:00:52.625Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/546876855_1413026463578627_3361054370504721694_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=101&ccb=1-7&_nc_sid=1abd25&_nc_ohc=Nwrz66sr3AcQ7kNvwFx9ErL&_nc_oc=AdkikcBRUufSFLlYwfJThr1u9awlUxQ2u66_Os_sb_Pu6QC4uB87JNWoBkJb3o-wxzY&_nc_zt=23&_nc_ht=scontent-cdg4-2.xx&_nc_gid=3EGfshhMq5zJeqaCVLSqUQ&oh=00_AfakRAu64FfXQ2c6huNsl-uKdoxB3K5vg08UIrsmhv2N3g&oe=68D75FA8"
+  }
+}
+2025-09-22T18:00:52.625Z [info] Raw content preview: <div><img src="https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/546876855_1413026463578627_3361054370504721694_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=101&ccb=1-7&_nc_sid=1abd25&_nc_ohc=Nwrz66sr3Ac
+2025-09-22T18:00:52.626Z [info] Raw contentSnippet: We're only a few days away from our 5th annual Historic Harvest Fest here at the Stearns History Museum!  Llamas, books, games, pumpkins, a cake walk, crafts, a corn sensory bin, and free admission!
+2025-09-22T18:00:52.626Z [info] Post: "We're only a few days away from our 5th annual Historic Harvest Fest here at the Stearns History Museum!  Llamas, books,..." - Image URL: https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/546876855_1413026463578627_3361054370504721694_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=101&ccb=1-7&_nc_sid=1abd25&_nc_ohc=Nwrz66sr3AcQ7kNvwFx9ErL&_nc_oc=AdkikcBRUufSFLlYwfJThr1u9awlUxQ2u66_Os_sb_Pu6QC4uB87JNWoBkJb3o-wxzY&_nc_zt=23&_nc_ht=scontent-cdg4-2.xx&_nc_gid=3EGfshhMq5zJeqaCVLSqUQ&oh=00_AfakRAu64FfXQ2c6huNsl-uKdoxB3K5vg08UIrsmhv2N3g&oe=68D75FA8
+2025-09-22T18:00:52.656Z [info] Attempting to re-host Facebook image immediately: https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/546876855_1413026463578627_3361054370504721694_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=101&ccb=1-7&_nc_sid=1abd25&_nc_ohc=Nwrz66sr3AcQ7kNvwFx9ErL&_nc_oc=AdkikcBRUufSFLlYwfJThr1u9awlUxQ2u66_Os_sb_Pu6QC4uB87JNWoBkJb3o-wxzY&_nc_zt=23&_nc_ht=scontent-cdg4-2.xx&_nc_gid=3EGfshhMq5zJeqaCVLSqUQ&oh=00_AfakRAu64FfXQ2c6huNsl-uKdoxB3K5vg08UIrsmhv2N3g&oe=68D75FA8
+2025-09-22T18:00:52.656Z [info] Downloading image from: https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/546876855_1413026463578627_3361054370504721694_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=101&ccb=1-7&_nc_sid=1abd25&_nc_ohc=Nwrz66sr3AcQ7kNvwFx9ErL&_nc_oc=AdkikcBRUufSFLlYwfJThr1u9awlUxQ2u66_Os_sb_Pu6QC4uB87JNWoBkJb3o-wxzY&_nc_zt=23&_nc_ht=scontent-cdg4-2.xx&_nc_gid=3EGfshhMq5zJeqaCVLSqUQ&oh=00_AfakRAu64FfXQ2c6huNsl-uKdoxB3K5vg08UIrsmhv2N3g&oe=68D75FA8
+2025-09-22T18:00:53.470Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2F087d739dd4b08ba17e73c829ffdbe7bb.jpg - 404 with id B3DC:1807CB:4061A2:E43832:68D18ED4 in 94ms
+2025-09-22T18:00:54.045Z [info] Image uploaded to GitHub: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/087d739dd4b08ba17e73c829ffdbe7bb.jpg
+2025-09-22T18:00:54.045Z [info] Successfully re-hosted Facebook image: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/087d739dd4b08ba17e73c829ffdbe7bb.jpg
+2025-09-22T18:00:54.097Z [info] Inserted post: We're only a few days away from our 5th annual Historic Harvest Fest here at the Stearns History Museum!  Llamas, books,...
+2025-09-22T18:00:54.097Z [info] === DEBUGGING ITEM: "📢 Happy New Member Monday ⭐️ Join us in welcoming these new members to the St. Cloud Area Chamber of Commerce. Prudenti..." ===
+2025-09-22T18:00:54.097Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T18:00:54.098Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/547270348_1196738445811298_4732190887404689566_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=d9jikJQNYV8Q7kNvwEmKBej&_nc_oc=AdnEEHiI7r6V8IsyOQ8nx9a733zpDZD5OV6BFVpxoNLVq6pYhRLnPsnAY63lfwMLjAI&_nc_zt=23&_nc_ht=scontent-cdg4-2.xx&_nc_gid=uS2UPXazuTergXSmQI_ILw&oh=00_AfbIIkMKkaltvT_uNUBVEtbWN2pHgFNangyqVJOtCoaThA&oe=68D75FAD"
+  }
+}
+2025-09-22T18:00:54.098Z [info] Raw content preview: <div><img src="https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/547270348_1196738445811298_4732190887404689566_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=d9jikJQNYV8Q7kNvwEmKBej&_nc_oc=AdnEEHi
+2025-09-22T18:00:54.098Z [info] Raw contentSnippet: 📢 Happy New Member Monday ⭐️
+ Join us in welcoming these new members to the St. Cloud Area Chamber of Commerce.
+ Prudential (Walker Creek Financial Group) : Prudential helps people protect their fami
+2025-09-22T18:00:54.098Z [info] Post: "📢 Happy New Member Monday ⭐️ Join us in welcoming these new members to the St. Cloud Area Chamber of Commerce. Prudenti..." - Image URL: https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/547270348_1196738445811298_4732190887404689566_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=d9jikJQNYV8Q7kNvwEmKBej&_nc_oc=AdnEEHiI7r6V8IsyOQ8nx9a733zpDZD5OV6BFVpxoNLVq6pYhRLnPsnAY63lfwMLjAI&_nc_zt=23&_nc_ht=scontent-cdg4-2.xx&_nc_gid=uS2UPXazuTergXSmQI_ILw&oh=00_AfbIIkMKkaltvT_uNUBVEtbWN2pHgFNangyqVJOtCoaThA&oe=68D75FAD
+2025-09-22T18:00:54.151Z [info] Attempting to re-host Facebook image immediately: https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/547270348_1196738445811298_4732190887404689566_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=d9jikJQNYV8Q7kNvwEmKBej&_nc_oc=AdnEEHiI7r6V8IsyOQ8nx9a733zpDZD5OV6BFVpxoNLVq6pYhRLnPsnAY63lfwMLjAI&_nc_zt=23&_nc_ht=scontent-cdg4-2.xx&_nc_gid=uS2UPXazuTergXSmQI_ILw&oh=00_AfbIIkMKkaltvT_uNUBVEtbWN2pHgFNangyqVJOtCoaThA&oe=68D75FAD
+2025-09-22T18:00:54.151Z [info] Downloading image from: https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/547270348_1196738445811298_4732190887404689566_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=d9jikJQNYV8Q7kNvwEmKBej&_nc_oc=AdnEEHiI7r6V8IsyOQ8nx9a733zpDZD5OV6BFVpxoNLVq6pYhRLnPsnAY63lfwMLjAI&_nc_zt=23&_nc_ht=scontent-cdg4-2.xx&_nc_gid=uS2UPXazuTergXSmQI_ILw&oh=00_AfbIIkMKkaltvT_uNUBVEtbWN2pHgFNangyqVJOtCoaThA&oe=68D75FAD
+2025-09-22T18:00:54.354Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2Fa980adb72e67636385c2a85939246fc9.jpg - 404 with id B3DC:1807CB:4065E1:E44713:68D18ED6 in 94ms
+2025-09-22T18:01:42.798Z [info] OpenAI response received
+2025-09-22T18:01:42.798Z [info] Fact-check result for "We're only a few days away from our 5th annual Historic Harvest Fest here at the Stearns History Museum!  Llamas, books,...": PASSED (score: 20)
+2025-09-22T18:01:42.860Z [info] Successfully created article: "Experience the Excitement at Stearns History Museum's Harvest Fest"
+2025-09-22T18:01:42.940Z [info] Generating article for: City of St. Cloud, MN: Fall is Coming: Keep Leaves out of Streets and Storm Drains!
+2025-09-22T18:01:42.940Z [info] Calling OpenAI API...
+2025-09-22T18:01:50.707Z [info] OpenAI response received
+2025-09-22T18:01:50.707Z [info] Fact-check result for "City of St. Cloud, MN: Fall is Coming: Keep Leaves out of Streets and Storm Drains!": PASSED (score: 25)
+2025-09-22T18:01:50.774Z [info] Successfully created article: "Residents Urged to Prevent Leaf Blockages in St. Cloud"
+2025-09-22T18:01:50.833Z [info] Generating article for: Are you interested in a career in law enforcement? This is your opportunity to meet several hiring agencies all in one l...
+2025-09-22T18:01:50.834Z [info] Calling OpenAI API...
+2025-09-22T18:01:33.249Z [info] OpenAI response received
+2025-09-22T18:01:33.249Z [info] AI evaluation response: {
+  "interest_level": 5,
+  "local_relevance": 7,
+  "community_impact": 6,
+  "reasoning": "The article discusses the start of the harvest season and encourages patience and road-sharing with agricultural machinery. The interest level is moderate as it is a routine seasonal reminder rather than a unique or surprising event. The local relevance is fairly high because agriculture is significant in the St. Cloud area, and this message directly pertains to local road use and safety. The community impact is moderate because while it affects daily commuting and road safety, it does not introduce new services or significant changes. The message is important for public awareness but does not have a broad or long-lasting impact."
+}
+2025-09-22T18:01:33.295Z [info] Successfully evaluated post 11/12
+2025-09-22T18:01:33.295Z [info] Batch 4 complete: 3 successful, 0 errors
+2025-09-22T18:01:33.295Z [info] AI evaluation complete: 12 successful, 0 errors
+2025-09-22T18:01:33.348Z [info] Calling OpenAI API...
+2025-09-22T18:01:35.767Z [info] OpenAI response received
+2025-09-22T18:01:35.910Z [info] Starting newsletter article generation...
+2025-09-22T18:01:35.955Z [info] Found 12 top posts for article generation
+2025-09-22T18:01:36.061Z [info] 12 posts have ratings
+2025-09-22T18:01:36.116Z [info] Generating article for: We're only a few days away from our 5th annual Historic Harvest Fest here at the Stearns History Museum!  Llamas, books,...
+2025-09-22T18:01:36.116Z [info] Calling OpenAI API...
+2025-09-22T18:01:39.281Z [info] OpenAI response received
+2025-09-22T18:01:39.281Z [info] Calling OpenAI API...
+2025-09-22T18:00:57.647Z [info] Image uploaded to GitHub: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/549c48dcb891315608413035c6bb806d.jpg
+2025-09-22T18:00:57.647Z [info] Successfully re-hosted Facebook image: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/549c48dcb891315608413035c6bb806d.jpg
+2025-09-22T18:00:57.691Z [info] Inserted post: Are you interested in a career in law enforcement? This is your opportunity to meet several hiring agencies all in one l...
+2025-09-22T18:00:57.691Z [info] === DEBUGGING ITEM: "We'd like to shout out Grace Weitz, speech coach at Apollo. She's been named MSCA Coach of the Year!" ===
+2025-09-22T18:00:57.692Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T18:00:57.692Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://external-mrs2-2.xx.fbcdn.net/emg1/v/t13/8400535374054796719?url=https%3A%2F%2Fresources.finalsite.net%2Fimages%2Fv1758545608%2Fisd742org%2Fregqiveijck9gg0rj0am%2FGraceWeitz.jpg&fb_obo=1&utld=finalsite.net&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=LXmCngaZNlsNvjnyw0fWxw&_nc_oc=AdlC5gT8Cgpqs40L3QpicQwVEvecoDCWOqHEVmDmd8_JwOmmwLkDjf7wCQxciUqyolg&ccb=13-1&oh=06_Q3-3AR6G4ML17-IRExQkUtiklVME3u6VnqqumRJl7Vhpf9a_&oe=68D36870&_nc_sid=e42f53"
+  }
+}
+2025-09-22T18:00:57.692Z [info] Raw content preview: <div><img src="https://external-mrs2-2.xx.fbcdn.net/emg1/v/t13/8400535374054796719?url=https%3A%2F%2Fresources.finalsite.net%2Fimages%2Fv1758545608%2Fisd742org%2Fregqiveijck9gg0rj0am%2FGraceWeitz.jpg&
+2025-09-22T18:00:57.692Z [info] Raw contentSnippet: We'd like to shout out Grace Weitz, speech coach at Apollo. She's been named MSCA Coach of the Year!
+2025-09-22T18:00:57.692Z [info] Post: "We'd like to shout out Grace Weitz, speech coach at Apollo. She's been named MSCA Coach of the Year!" - Image URL: https://external-mrs2-2.xx.fbcdn.net/emg1/v/t13/8400535374054796719?url=https%3A%2F%2Fresources.finalsite.net%2Fimages%2Fv1758545608%2Fisd742org%2Fregqiveijck9gg0rj0am%2FGraceWeitz.jpg&fb_obo=1&utld=finalsite.net&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=LXmCngaZNlsNvjnyw0fWxw&_nc_oc=AdlC5gT8Cgpqs40L3QpicQwVEvecoDCWOqHEVmDmd8_JwOmmwLkDjf7wCQxciUqyolg&ccb=13-1&oh=06_Q3-3AR6G4ML17-IRExQkUtiklVME3u6VnqqumRJl7Vhpf9a_&oe=68D36870&_nc_sid=e42f53
+2025-09-22T18:00:57.722Z [info] Attempting to re-host Facebook image immediately: https://external-mrs2-2.xx.fbcdn.net/emg1/v/t13/8400535374054796719?url=https%3A%2F%2Fresources.finalsite.net%2Fimages%2Fv1758545608%2Fisd742org%2Fregqiveijck9gg0rj0am%2FGraceWeitz.jpg&fb_obo=1&utld=finalsite.net&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=LXmCngaZNlsNvjnyw0fWxw&_nc_oc=AdlC5gT8Cgpqs40L3QpicQwVEvecoDCWOqHEVmDmd8_JwOmmwLkDjf7wCQxciUqyolg&ccb=13-1&oh=06_Q3-3AR6G4ML17-IRExQkUtiklVME3u6VnqqumRJl7Vhpf9a_&oe=68D36870&_nc_sid=e42f53
+2025-09-22T18:00:57.722Z [info] Downloading image from: https://external-mrs2-2.xx.fbcdn.net/emg1/v/t13/8400535374054796719?url=https%3A%2F%2Fresources.finalsite.net%2Fimages%2Fv1758545608%2Fisd742org%2Fregqiveijck9gg0rj0am%2FGraceWeitz.jpg&fb_obo=1&utld=finalsite.net&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=LXmCngaZNlsNvjnyw0fWxw&_nc_oc=AdlC5gT8Cgpqs40L3QpicQwVEvecoDCWOqHEVmDmd8_JwOmmwLkDjf7wCQxciUqyolg&ccb=13-1&oh=06_Q3-3AR6G4ML17-IRExQkUtiklVME3u6VnqqumRJl7Vhpf9a_&oe=68D36870&_nc_sid=e42f53
+2025-09-22T18:00:58.115Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2F668f6152bf8bcf63515d1f159fc17d45.jpg - 404 with id B3DC:1807CB:4077D6:E485F3:68D18ED9 in 97ms
+2025-09-22T18:00:58.569Z [info] Image uploaded to GitHub: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/668f6152bf8bcf63515d1f159fc17d45.jpg
+2025-09-22T18:00:58.569Z [info] Successfully re-hosted Facebook image: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/668f6152bf8bcf63515d1f159fc17d45.jpg
+2025-09-22T18:00:58.640Z [info] Inserted post: We'd like to shout out Grace Weitz, speech coach at Apollo. She's been named MSCA Coach of the Year!
+2025-09-22T18:00:58.640Z [info] === DEBUGGING ITEM: "Saint Cloud Area Chamber of Commerce Posted" ===
+2025-09-22T18:00:58.640Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'guid',
+  'isoDate'
+]
+2025-09-22T18:00:58.640Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://scontent-cdg4-3.xx.fbcdn.net/v/t39.30808-6/552149976_1204961328322343_7846580375937864940_n.jpg?stp=dst-jpg_p565x565_tt6&_nc_cat=111&ccb=1-7&_nc_sid=1abd25&_nc_ohc=d98lsXTZiZQQ7kNvwHDcvZB&_nc_oc=AdnUVdcUlCnz530HZlbG7DtvPUhCnQlXntfHBoxb3v9xdhEa2op1RXOuPTbiNSB_0yo&_nc_zt=23&_nc_ht=scontent-cdg4-3.xx&_nc_gid=uS2UPXazuTergXSmQI_ILw&oh=00_AfbWV7u5ETP-sULfIkRaXcNHl5swuqM8bP3WrbFfdXZkYQ&oe=68D74720"
+  }
+}
+2025-09-22T18:00:58.640Z [info] Raw content preview:
+2025-09-22T18:00:58.641Z [info] Raw contentSnippet:
+2025-09-22T18:00:58.641Z [info] Post: "Saint Cloud Area Chamber of Commerce Posted" - Image URL: https://scontent-cdg4-3.xx.fbcdn.net/v/t39.30808-6/552149976_1204961328322343_7846580375937864940_n.jpg?stp=dst-jpg_p565x565_tt6&_nc_cat=111&ccb=1-7&_nc_sid=1abd25&_nc_ohc=d98lsXTZiZQQ7kNvwHDcvZB&_nc_oc=AdnUVdcUlCnz530HZlbG7DtvPUhCnQlXntfHBoxb3v9xdhEa2op1RXOuPTbiNSB_0yo&_nc_zt=23&_nc_ht=scontent-cdg4-3.xx&_nc_gid=uS2UPXazuTergXSmQI_ILw&oh=00_AfbWV7u5ETP-sULfIkRaXcNHl5swuqM8bP3WrbFfdXZkYQ&oe=68D74720
+2025-09-22T18:00:58.668Z [info] Attempting to re-host Facebook image immediately: https://scontent-cdg4-3.xx.fbcdn.net/v/t39.30808-6/552149976_1204961328322343_7846580375937864940_n.jpg?stp=dst-jpg_p565x565_tt6&_nc_cat=111&ccb=1-7&_nc_sid=1abd25&_nc_ohc=d98lsXTZiZQQ7kNvwHDcvZB&_nc_oc=AdnUVdcUlCnz530HZlbG7DtvPUhCnQlXntfHBoxb3v9xdhEa2op1RXOuPTbiNSB_0yo&_nc_zt=23&_nc_ht=scontent-cdg4-3.xx&_nc_gid=uS2UPXazuTergXSmQI_ILw&oh=00_AfbWV7u5ETP-sULfIkRaXcNHl5swuqM8bP3WrbFfdXZkYQ&oe=68D74720
+2025-09-22T18:00:58.668Z [info] Downloading image from: https://scontent-cdg4-3.xx.fbcdn.net/v/t39.30808-6/552149976_1204961328322343_7846580375937864940_n.jpg?stp=dst-jpg_p565x565_tt6&_nc_cat=111&ccb=1-7&_nc_sid=1abd25&_nc_ohc=d98lsXTZiZQQ7kNvwHDcvZB&_nc_oc=AdnUVdcUlCnz530HZlbG7DtvPUhCnQlXntfHBoxb3v9xdhEa2op1RXOuPTbiNSB_0yo&_nc_zt=23&_nc_ht=scontent-cdg4-3.xx&_nc_gid=uS2UPXazuTergXSmQI_ILw&oh=00_AfbWV7u5ETP-sULfIkRaXcNHl5swuqM8bP3WrbFfdXZkYQ&oe=68D74720
+2025-09-22T18:00:59.218Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2Fe4a05846c3f2c566affecdb4922c9c2c.jpg - 404 with id B3DC:1807CB:407D1C:E498C1:68D18EDA in 85ms
+2025-09-22T18:00:59.672Z [info] Image uploaded to GitHub: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/e4a05846c3f2c566affecdb4922c9c2c.jpg
+2025-09-22T18:00:59.672Z [info] Successfully re-hosted Facebook image: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/e4a05846c3f2c566affecdb4922c9c2c.jpg
+2025-09-22T18:00:59.735Z [info] Inserted post: Saint Cloud Area Chamber of Commerce Posted
+2025-09-22T18:00:59.735Z [info] === DEBUGGING ITEM: "🍂 Happy First Day of Fall from St. Cloud Park & Recreation! Let’s embrace the crisp air, vibrant colors, and all the fu..." ===
+2025-09-22T18:00:59.735Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T18:00:59.735Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/549637389_1178561360984563_4675304148143711445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=103&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=hU8ERps0pXwQ7kNvwEMiGmC&_nc_oc=Adm_2-juioOkJyAfoVA6TNyhltIFVZxqdw7MY8LYPjGaVPSD6YJ3jRZqqX_TXVL2oIo&_nc_zt=23&_nc_ht=scontent-cdg4-2.xx&_nc_gid=hnZ5KfD-GPVy5lcH_bSB_g&oh=00_Afapk8z8H98qZdNKSuEFrcJK6JRYEY8sPttfwNxPKqws_Q&oe=68D74F69"
+  }
+}
+2025-09-22T18:00:59.735Z [info] Raw content preview: <div><img src="https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/549637389_1178561360984563_4675304148143711445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=103&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=hU8ERps0pXw
+2025-09-22T18:00:59.736Z [info] Raw contentSnippet: 🍂 Happy First Day of Fall from St. Cloud Park & Recreation! Let’s embrace the crisp air, vibrant colors, and all the fun fall activities ahead!
+2025-09-22T18:00:59.736Z [info] Post: "🍂 Happy First Day of Fall from St. Cloud Park & Recreation! Let’s embrace the crisp air, vibrant colors, and all the fu..." - Image URL: https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/549637389_1178561360984563_4675304148143711445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=103&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=hU8ERps0pXwQ7kNvwEMiGmC&_nc_oc=Adm_2-juioOkJyAfoVA6TNyhltIFVZxqdw7MY8LYPjGaVPSD6YJ3jRZqqX_TXVL2oIo&_nc_zt=23&_nc_ht=scontent-cdg4-2.xx&_nc_gid=hnZ5KfD-GPVy5lcH_bSB_g&oh=00_Afapk8z8H98qZdNKSuEFrcJK6JRYEY8sPttfwNxPKqws_Q&oe=68D74F69
+2025-09-22T18:00:59.772Z [info] Attempting to re-host Facebook image immediately: https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/549637389_1178561360984563_4675304148143711445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=103&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=hU8ERps0pXwQ7kNvwEMiGmC&_nc_oc=Adm_2-juioOkJyAfoVA6TNyhltIFVZxqdw7MY8LYPjGaVPSD6YJ3jRZqqX_TXVL2oIo&_nc_zt=23&_nc_ht=scontent-cdg4-2.xx&_nc_gid=hnZ5KfD-GPVy5lcH_bSB_g&oh=00_Afapk8z8H98qZdNKSuEFrcJK6JRYEY8sPttfwNxPKqws_Q&oe=68D74F69
+2025-09-22T18:00:59.772Z [info] Downloading image from: https://scontent-cdg4-2.xx.fbcdn.net/v/t39.30808-6/549637389_1178561360984563_4675304148143711445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=103&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=hU8ERps0pXwQ7kNvwEMiGmC&_nc_oc=Adm_2-juioOkJyAfoVA6TNyhltIFVZxqdw7MY8LYPjGaVPSD6YJ3jRZqqX_TXVL2oIo&_nc_zt=23&_nc_ht=scontent-cdg4-2.xx&_nc_gid=hnZ5KfD-GPVy5lcH_bSB_g&oh=00_Afapk8z8H98qZdNKSuEFrcJK6JRYEY8sPttfwNxPKqws_Q&oe=68D74F69
+2025-09-22T18:01:00.499Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2Fbde79d0a4303fcba5061bb7b00a0d049.jpg - 404 with id B3DC:1807CB:40831C:E4ADA3:68D18EDB in 100ms
+2025-09-22T18:01:01.128Z [info] Image uploaded to GitHub: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/bde79d0a4303fcba5061bb7b00a0d049.jpg
+2025-09-22T18:01:01.129Z [info] Successfully re-hosted Facebook image: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/bde79d0a4303fcba5061bb7b00a0d049.jpg
+2025-09-22T18:01:01.175Z [info] Inserted post: 🍂 Happy First Day of Fall from St. Cloud Park & Recreation! Let’s embrace the crisp air, vibrant colors, and all the fu...
+2025-09-22T18:01:01.175Z [info] === DEBUGGING ITEM: "Harvest season is starting to ramp up. Please be patient and share the roads with the people who work to feed us. Give t..." ===
+2025-09-22T18:01:01.175Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T18:01:01.177Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://scontent-hou1-1.xx.fbcdn.net/v/t39.30808-6/548013353_1231798685656101_7670178318006756445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=bl1jRv2oLgUQ7kNvwGZjfCl&_nc_oc=AdnZwoiPmJC1-nJpDnAg5zRgH78ew6mSGa4h5_-5Js7SwFRi8Z_Q4trqaOiZli8LfgI&_nc_zt=23&_nc_ht=scontent-hou1-1.xx&_nc_gid=zQ2eWhYZBzxN_F2DDZAesA&oh=00_AfaIziKmGB_3-ns5GlVghL55hCzHW7HwB_XRuiOJTTVkGA&oe=68D766DF"
+  }
+}
+2025-09-22T18:01:01.177Z [info] Raw content preview: <div><img src="https://scontent-hou1-1.xx.fbcdn.net/v/t39.30808-6/548013353_1231798685656101_7670178318006756445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=bl1jRv2oLgU
+2025-09-22T18:01:01.177Z [info] Raw contentSnippet: Harvest season is starting to ramp up. Please be patient and share the roads with the people who work to feed us. Give these large machines extra time and room.
+2025-09-22T18:01:01.177Z [info] Post: "Harvest season is starting to ramp up. Please be patient and share the roads with the people who work to feed us. Give t..." - Image URL: https://scontent-hou1-1.xx.fbcdn.net/v/t39.30808-6/548013353_1231798685656101_7670178318006756445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=bl1jRv2oLgUQ7kNvwGZjfCl&_nc_oc=AdnZwoiPmJC1-nJpDnAg5zRgH78ew6mSGa4h5_-5Js7SwFRi8Z_Q4trqaOiZli8LfgI&_nc_zt=23&_nc_ht=scontent-hou1-1.xx&_nc_gid=zQ2eWhYZBzxN_F2DDZAesA&oh=00_AfaIziKmGB_3-ns5GlVghL55hCzHW7HwB_XRuiOJTTVkGA&oe=68D766DF
+2025-09-22T18:01:01.217Z [info] Attempting to re-host Facebook image immediately: https://scontent-hou1-1.xx.fbcdn.net/v/t39.30808-6/548013353_1231798685656101_7670178318006756445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=bl1jRv2oLgUQ7kNvwGZjfCl&_nc_oc=AdnZwoiPmJC1-nJpDnAg5zRgH78ew6mSGa4h5_-5Js7SwFRi8Z_Q4trqaOiZli8LfgI&_nc_zt=23&_nc_ht=scontent-hou1-1.xx&_nc_gid=zQ2eWhYZBzxN_F2DDZAesA&oh=00_AfaIziKmGB_3-ns5GlVghL55hCzHW7HwB_XRuiOJTTVkGA&oe=68D766DF
+2025-09-22T18:01:01.218Z [info] Downloading image from: https://scontent-hou1-1.xx.fbcdn.net/v/t39.30808-6/548013353_1231798685656101_7670178318006756445_n.jpg?stp=dst-jpg_s1080x2048_tt6&_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=bl1jRv2oLgUQ7kNvwGZjfCl&_nc_oc=AdnZwoiPmJC1-nJpDnAg5zRgH78ew6mSGa4h5_-5Js7SwFRi8Z_Q4trqaOiZli8LfgI&_nc_zt=23&_nc_ht=scontent-hou1-1.xx&_nc_gid=zQ2eWhYZBzxN_F2DDZAesA&oh=00_AfaIziKmGB_3-ns5GlVghL55hCzHW7HwB_XRuiOJTTVkGA&oe=68D766DF
+2025-09-22T18:01:01.507Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2Fbafff7ea258c1b09468058ea243785b3.jpg - 404 with id B3DC:1807CB:408818:E4BF79:68D18EDD in 90ms
+2025-09-22T18:01:01.974Z [info] Image uploaded to GitHub: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/bafff7ea258c1b09468058ea243785b3.jpg
+2025-09-22T18:01:01.974Z [info] Successfully re-hosted Facebook image: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/bafff7ea258c1b09468058ea243785b3.jpg
+2025-09-22T18:01:02.014Z [info] Inserted post: Harvest season is starting to ramp up. Please be patient and share the roads with the people who work to feed us. Give t...
+2025-09-22T18:01:02.014Z [info] === DEBUGGING ITEM: "City of St. Cloud, MN: City Council Meeting" ===
+2025-09-22T18:01:02.014Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T18:01:02.014Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://external-det1-1.xx.fbcdn.net/emg1/v/t13/8968225735085706704?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImages%2FSocialMedia%2FIconModuleCalendar.png&fb_obo=1&utld=mn.us&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=WN5ve4m4XOkWTPwOuO6uew&_nc_oc=AdlKiD7HL0aJ2AokoZICCOVIKV6Tm8WhFT-rcY-GBT74lXDGcyrkpMgvnZ9O9OiWnnE&ccb=13-1&oh=06_Q3-3AXsOqL0FxTknxGfOLJduwEh9rmFDzUVbQUBZGSgm5H7h&oe=68D356C5&_nc_sid=e42f53"
+  }
+}
+2025-09-22T18:01:02.014Z [info] Raw content preview: <div><img src="https://external-det1-1.xx.fbcdn.net/emg1/v/t13/8968225735085706704?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImages%2FSocialMedia%2FIconModuleCalendar.png&fb_obo=1&utld=mn.us&stp=c0.500
+2025-09-22T18:01:02.014Z [info] Raw contentSnippet: City Council Meeting
+2025-09-22T18:01:02.014Z [info] Post: "City of St. Cloud, MN: City Council Meeting" - Image URL: https://external-det1-1.xx.fbcdn.net/emg1/v/t13/8968225735085706704?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImages%2FSocialMedia%2FIconModuleCalendar.png&fb_obo=1&utld=mn.us&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=WN5ve4m4XOkWTPwOuO6uew&_nc_oc=AdlKiD7HL0aJ2AokoZICCOVIKV6Tm8WhFT-rcY-GBT74lXDGcyrkpMgvnZ9O9OiWnnE&ccb=13-1&oh=06_Q3-3AXsOqL0FxTknxGfOLJduwEh9rmFDzUVbQUBZGSgm5H7h&oe=68D356C5&_nc_sid=e42f53
+2025-09-22T18:01:02.070Z [info] Attempting to re-host Facebook image immediately: https://external-det1-1.xx.fbcdn.net/emg1/v/t13/8968225735085706704?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImages%2FSocialMedia%2FIconModuleCalendar.png&fb_obo=1&utld=mn.us&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=WN5ve4m4XOkWTPwOuO6uew&_nc_oc=AdlKiD7HL0aJ2AokoZICCOVIKV6Tm8WhFT-rcY-GBT74lXDGcyrkpMgvnZ9O9OiWnnE&ccb=13-1&oh=06_Q3-3AXsOqL0FxTknxGfOLJduwEh9rmFDzUVbQUBZGSgm5H7h&oe=68D356C5&_nc_sid=e42f53
+2025-09-22T18:01:02.070Z [info] Downloading image from: https://external-det1-1.xx.fbcdn.net/emg1/v/t13/8968225735085706704?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImages%2FSocialMedia%2FIconModuleCalendar.png&fb_obo=1&utld=mn.us&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=WN5ve4m4XOkWTPwOuO6uew&_nc_oc=AdlKiD7HL0aJ2AokoZICCOVIKV6Tm8WhFT-rcY-GBT74lXDGcyrkpMgvnZ9O9OiWnnE&ccb=13-1&oh=06_Q3-3AXsOqL0FxTknxGfOLJduwEh9rmFDzUVbQUBZGSgm5H7h&oe=68D356C5&_nc_sid=e42f53
+2025-09-22T18:01:02.243Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2Fcc6c2c4de82ae3fe59cc767ca7ac30f0.jpg - 404 with id B3DC:1807CB:408C00:E4CD4D:68D18EDD in 76ms
+2025-09-22T18:01:02.749Z [info] Image uploaded to GitHub: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/cc6c2c4de82ae3fe59cc767ca7ac30f0.jpg
+2025-09-22T18:01:02.749Z [info] Successfully re-hosted Facebook image: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/cc6c2c4de82ae3fe59cc767ca7ac30f0.jpg
+2025-09-22T18:01:02.813Z [info] Inserted post: City of St. Cloud, MN: City Council Meeting
+2025-09-22T18:01:02.848Z [info] Starting AI processing of posts...
+2025-09-22T18:01:02.903Z [info] Processing 12 posts with AI
+2025-09-22T18:01:02.903Z [info] Processing batch 1/4 (3 posts)
+2025-09-22T18:01:02.903Z [info] Evaluating post 1/12: We're only a few days away from our 5th annual Historic Harvest Fest here at the Stearns History Museum!  Llamas, books,...
+2025-09-22T18:01:02.903Z [info] Calling OpenAI API...
+2025-09-22T18:01:02.904Z [info] Evaluating post 2/12: 📢 Happy New Member Monday ⭐️ Join us in welcoming these new members to the St. Cloud Area Chamber of Commerce. Prudenti...
+2025-09-22T18:01:02.904Z [info] Calling OpenAI API...
+2025-09-22T18:01:02.904Z [info] Evaluating post 3/12: Saint Cloud Area Chamber of Commerce Posted
+2025-09-22T18:01:02.904Z [info] Calling OpenAI API...
+2025-09-22T18:01:25.638Z [info] Successfully evaluated post 9/12
+2025-09-22T18:01:25.638Z [info] Batch 3 complete: 3 successful, 0 errors
+2025-09-22T18:01:25.638Z [info] Waiting 2 seconds before next batch...
+2025-09-22T18:01:27.638Z [info] Processing batch 4/4 (3 posts)
+2025-09-22T18:01:27.638Z [info] Evaluating post 10/12: Hello, Fall! 🍂☕ Stay steady this season with a few simple steps. And remember, you can always take fall prevention furt...
+2025-09-22T18:01:27.638Z [info] Calling OpenAI API...
+2025-09-22T18:01:27.638Z [info] Evaluating post 11/12: Harvest season is starting to ramp up. Please be patient and share the roads with the people who work to feed us. Give t...
+2025-09-22T18:01:27.638Z [info] Calling OpenAI API...
+2025-09-22T18:01:27.639Z [info] Evaluating post 12/12: Check out this offering!
+2025-09-22T18:01:27.639Z [info] Calling OpenAI API...
+2025-09-22T18:01:31.836Z [info] OpenAI response received
+2025-09-22T18:01:31.836Z [info] AI evaluation response: {
+  "interest_level": 1,
+  "local_relevance": 1,
+  "community_impact": 1,
+  "reasoning": "The article lacks substantive content, providing only a generic invitation to 'check out this offering' without any details or context. It does not specify what the offering is, nor does it provide any information that would engage readers or indicate relevance to the St. Cloud area. Consequently, it has minimal interest level, local relevance, and community impact."
+}
+2025-09-22T18:01:31.897Z [info] Successfully evaluated post 12/12
+2025-09-22T18:01:32.286Z [info] OpenAI response received
+2025-09-22T18:01:32.286Z [info] AI evaluation response: {
+  "interest_level": 3,
+  "local_relevance": 5,
+  "community_impact": 4,
+  "reasoning": "The article discusses fall prevention and promotes CentraCare's Medical Alert Service. The interest level is relatively low (3) because it is more of a routine announcement and lacks a unique or engaging angle. Local relevance is moderate (5) as CentraCare is a local healthcare provider, which makes the service relevant to St. Cloud residents. The community impact is also moderate (4) because while fall prevention is important, the article mainly promotes a service rather than providing new or impactful information directly affecting daily lives."
+}
+2025-09-22T18:01:32.340Z [info] Successfully evaluated post 10/12
+2025-09-22T18:01:16.674Z [info] OpenAI response received
+2025-09-22T18:01:16.674Z [info] AI evaluation response: {
+  "interest_level": 5,
+  "local_relevance": 8,
+  "community_impact": 7,
+  "reasoning": "The article is moderately interesting as it offers a career opportunity event, which can be engaging for those interested in law enforcement careers. It scores high on local relevance since it involves the Stearns County Sheriff's Office and is likely taking place in the St. Cloud area. The community impact is significant as it provides job opportunities and potential career paths for local residents, which can affect their daily lives positively by offering employment and career development."
+}
+2025-09-22T18:01:16.721Z [info] Successfully evaluated post 6/12
+2025-09-22T18:01:16.722Z [info] Batch 2 complete: 3 successful, 0 errors
+2025-09-22T18:01:16.722Z [info] Waiting 2 seconds before next batch...
+2025-09-22T18:01:18.722Z [info] Processing batch 3/4 (3 posts)
+2025-09-22T18:01:18.722Z [info] Evaluating post 7/12: City of St. Cloud, MN: City Council Meeting
+2025-09-22T18:01:18.722Z [info] Calling OpenAI API...
+2025-09-22T18:01:18.722Z [info] Evaluating post 8/12: We'd like to shout out Grace Weitz, speech coach at Apollo. She's been named MSCA Coach of the Year!
+2025-09-22T18:01:18.723Z [info] Calling OpenAI API...
+2025-09-22T18:01:18.723Z [info] Evaluating post 9/12: News Release- Semi Rollover
+2025-09-22T18:01:18.723Z [info] Calling OpenAI API...
+2025-09-22T18:00:54.778Z [info] Image uploaded to GitHub: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/a980adb72e67636385c2a85939246fc9.jpg
+2025-09-22T18:00:54.778Z [info] Successfully re-hosted Facebook image: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/a980adb72e67636385c2a85939246fc9.jpg
+2025-09-22T18:00:54.846Z [info] Inserted post: 📢 Happy New Member Monday ⭐️ Join us in welcoming these new members to the St. Cloud Area Chamber of Commerce. Prudenti...
+2025-09-22T18:00:54.846Z [info] === DEBUGGING ITEM: "City of St. Cloud, MN: Fall is Coming: Keep Leaves out of Streets and Storm Drains!" ===
+2025-09-22T18:00:54.847Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T18:00:54.847Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://external-det1-1.xx.fbcdn.net/emg1/v/t13/10608578067623918707?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImageRepository%2FDocument%3FdocumentID%3D27716&fb_obo=1&utld=mn.us&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=WN5ve4m4XOkWTPwOuO6uew&_nc_oc=AdnGNZkyDfAVEd7vM45sip9p39Zll1JxGWG71VWtzunGS1X4fpmLcjLghfBa21J3V00&ccb=13-1&oh=06_Q3-3AXEua-nrqonOqVznbwb4NFV6PFh5pYPGKPdXY4sM9a_m&oe=68D37B10&_nc_sid=e42f53"
+  }
+}
+2025-09-22T18:00:54.847Z [info] Raw content preview: <div><img src="https://external-det1-1.xx.fbcdn.net/emg1/v/t13/10608578067623918707?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImageRepository%2FDocument%3FdocumentID%3D27716&fb_obo=1&utld=mn.us&stp=c0.
+2025-09-22T18:00:54.847Z [info] Raw contentSnippet: Fall is Coming: Keep Leaves out of Streets and Storm Drains!
+2025-09-22T18:00:54.847Z [info] Post: "City of St. Cloud, MN: Fall is Coming: Keep Leaves out of Streets and Storm Drains!" - Image URL: https://external-det1-1.xx.fbcdn.net/emg1/v/t13/10608578067623918707?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImageRepository%2FDocument%3FdocumentID%3D27716&fb_obo=1&utld=mn.us&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=WN5ve4m4XOkWTPwOuO6uew&_nc_oc=AdnGNZkyDfAVEd7vM45sip9p39Zll1JxGWG71VWtzunGS1X4fpmLcjLghfBa21J3V00&ccb=13-1&oh=06_Q3-3AXEua-nrqonOqVznbwb4NFV6PFh5pYPGKPdXY4sM9a_m&oe=68D37B10&_nc_sid=e42f53
+2025-09-22T18:00:54.896Z [info] Attempting to re-host Facebook image immediately: https://external-det1-1.xx.fbcdn.net/emg1/v/t13/10608578067623918707?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImageRepository%2FDocument%3FdocumentID%3D27716&fb_obo=1&utld=mn.us&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=WN5ve4m4XOkWTPwOuO6uew&_nc_oc=AdnGNZkyDfAVEd7vM45sip9p39Zll1JxGWG71VWtzunGS1X4fpmLcjLghfBa21J3V00&ccb=13-1&oh=06_Q3-3AXEua-nrqonOqVznbwb4NFV6PFh5pYPGKPdXY4sM9a_m&oe=68D37B10&_nc_sid=e42f53
+2025-09-22T18:00:54.896Z [info] Downloading image from: https://external-det1-1.xx.fbcdn.net/emg1/v/t13/10608578067623918707?url=https%3A%2F%2Fwww.ci.stcloud.mn.us%2FImageRepository%2FDocument%3FdocumentID%3D27716&fb_obo=1&utld=mn.us&stp=c0.5000x0.5000f_dst-emg0_p540x282_q75_tt6_u&_nc_gid=WN5ve4m4XOkWTPwOuO6uew&_nc_oc=AdnGNZkyDfAVEd7vM45sip9p39Zll1JxGWG71VWtzunGS1X4fpmLcjLghfBa21J3V00&ccb=13-1&oh=06_Q3-3AXEua-nrqonOqVznbwb4NFV6PFh5pYPGKPdXY4sM9a_m&oe=68D37B10&_nc_sid=e42f53
+2025-09-22T18:00:55.116Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2Fe0dc8324baadc25cf451ba07ef206078.jpg - 404 with id B3DC:1807CB:40699F:E45439:68D18ED6 in 86ms
+2025-09-22T18:00:55.629Z [info] Image uploaded to GitHub: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/e0dc8324baadc25cf451ba07ef206078.jpg
+2025-09-22T18:00:55.629Z [info] Successfully re-hosted Facebook image: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/e0dc8324baadc25cf451ba07ef206078.jpg
+2025-09-22T18:00:55.689Z [info] Inserted post: City of St. Cloud, MN: Fall is Coming: Keep Leaves out of Streets and Storm Drains!
+2025-09-22T18:00:55.689Z [info] === DEBUGGING ITEM: "Hello, Fall! 🍂☕ Stay steady this season with a few simple steps. And remember, you can always take fall prevention furt..." ===
+2025-09-22T18:00:55.689Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T18:00:55.689Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://scontent-cdg4-1.xx.fbcdn.net/v/t39.30808-6/550820675_1237516728418638_6135553763481749902_n.jpg?stp=dst-jpg_p843x403_tt6&_nc_cat=105&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=3KG19Ob47RQQ7kNvwGD2aa_&_nc_oc=Adkq5jp4_pm1SKbHWgCBphPRQ7QORRnSKZo0IA1kX0jFiMfEEiJwGJM-AyLDV8iYHPs&_nc_zt=23&_nc_ht=scontent-cdg4-1.xx&_nc_gid=z_b4xeCuET3jshjXKdFuXQ&oh=00_AfYNwG5ZdW44X50s-5F0OwPA3klJ70j3pPePfRlvCScpsA&oe=68D750E4"
+  }
+}
+2025-09-22T18:00:55.689Z [info] Raw content preview: <div><img src="https://scontent-cdg4-1.xx.fbcdn.net/v/t39.30808-6/550820675_1237516728418638_6135553763481749902_n.jpg?stp=dst-jpg_p843x403_tt6&_nc_cat=105&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=3KG19Ob47RQQ7
+2025-09-22T18:00:55.689Z [info] Raw contentSnippet: Hello, Fall! 🍂☕
+ Stay steady this season with a few simple steps. And remember, you can always take fall prevention further with CentraCare Medical Alert Service, where help is just one push of a but
+2025-09-22T18:00:55.689Z [info] Post: "Hello, Fall! 🍂☕ Stay steady this season with a few simple steps. And remember, you can always take fall prevention furt..." - Image URL: https://scontent-cdg4-1.xx.fbcdn.net/v/t39.30808-6/550820675_1237516728418638_6135553763481749902_n.jpg?stp=dst-jpg_p843x403_tt6&_nc_cat=105&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=3KG19Ob47RQQ7kNvwGD2aa_&_nc_oc=Adkq5jp4_pm1SKbHWgCBphPRQ7QORRnSKZo0IA1kX0jFiMfEEiJwGJM-AyLDV8iYHPs&_nc_zt=23&_nc_ht=scontent-cdg4-1.xx&_nc_gid=z_b4xeCuET3jshjXKdFuXQ&oh=00_AfYNwG5ZdW44X50s-5F0OwPA3klJ70j3pPePfRlvCScpsA&oe=68D750E4
+2025-09-22T18:00:55.741Z [info] Attempting to re-host Facebook image immediately: https://scontent-cdg4-1.xx.fbcdn.net/v/t39.30808-6/550820675_1237516728418638_6135553763481749902_n.jpg?stp=dst-jpg_p843x403_tt6&_nc_cat=105&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=3KG19Ob47RQQ7kNvwGD2aa_&_nc_oc=Adkq5jp4_pm1SKbHWgCBphPRQ7QORRnSKZo0IA1kX0jFiMfEEiJwGJM-AyLDV8iYHPs&_nc_zt=23&_nc_ht=scontent-cdg4-1.xx&_nc_gid=z_b4xeCuET3jshjXKdFuXQ&oh=00_AfYNwG5ZdW44X50s-5F0OwPA3klJ70j3pPePfRlvCScpsA&oe=68D750E4
+2025-09-22T18:00:55.741Z [info] Downloading image from: https://scontent-cdg4-1.xx.fbcdn.net/v/t39.30808-6/550820675_1237516728418638_6135553763481749902_n.jpg?stp=dst-jpg_p843x403_tt6&_nc_cat=105&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=3KG19Ob47RQQ7kNvwGD2aa_&_nc_oc=Adkq5jp4_pm1SKbHWgCBphPRQ7QORRnSKZo0IA1kX0jFiMfEEiJwGJM-AyLDV8iYHPs&_nc_zt=23&_nc_ht=scontent-cdg4-1.xx&_nc_gid=z_b4xeCuET3jshjXKdFuXQ&oh=00_AfYNwG5ZdW44X50s-5F0OwPA3klJ70j3pPePfRlvCScpsA&oe=68D750E4
+2025-09-22T18:00:56.320Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2F0b0a896d57f3129b9dd42286d3feed88.jpg - 404 with id B3DC:1807CB:406F51:E4685D:68D18ED7 in 81ms
+2025-09-22T18:00:56.796Z [info] Image uploaded to GitHub: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/0b0a896d57f3129b9dd42286d3feed88.jpg
+2025-09-22T18:00:56.796Z [info] Successfully re-hosted Facebook image: https://raw.githubusercontent.com/VFDavid/st-cloud-scoop/main/newsletter-images/0b0a896d57f3129b9dd42286d3feed88.jpg
+2025-09-22T18:00:56.847Z [info] Inserted post: Hello, Fall! 🍂☕ Stay steady this season with a few simple steps. And remember, you can always take fall prevention furt...
+2025-09-22T18:00:56.847Z [info] === DEBUGGING ITEM: "Are you interested in a career in law enforcement? This is your opportunity to meet several hiring agencies all in one l..." ===
+2025-09-22T18:00:56.847Z [info] Raw item keys: [
+  'creator',
+  'title',
+  'link',
+  'pubDate',
+  'dc:creator',
+  'media:content',
+  'content',
+  'contentSnippet',
+  'guid',
+  'isoDate'
+]
+2025-09-22T18:00:56.847Z [info] media:content: {
+  "$": {
+    "medium": "image",
+    "url": "https://scontent-atl3-3.xx.fbcdn.net/v/t39.30808-6/552770738_1100416532299759_2641490495951757390_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=KelOlumZjrkQ7kNvwEJRM_m&_nc_oc=AdnooAiJxaxcYcWikGwSHDr-sh1pa0jzGjzLMXZHeNdn791v72ByFT6dwyCo8OkIM_s&_nc_zt=23&_nc_ht=scontent-atl3-3.xx&_nc_gid=BR9IfyDgIKYKSyoD1B7IFw&oh=00_Afb3ojV6QbuNHJRbsWi9BIKM-A-nnq3tk6Hfixy8EsxjdA&oe=68D74A5E"
+  }
+}
+2025-09-22T18:00:56.847Z [info] Raw content preview: <div><img src="https://scontent-atl3-3.xx.fbcdn.net/v/t39.30808-6/552770738_1100416532299759_2641490495951757390_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=KelOlumZjrkQ7kNvwEJRM_m&_nc_oc=AdnooAi
+2025-09-22T18:00:56.847Z [info] Raw contentSnippet: Are you interested in a career in law enforcement? This is your opportunity to meet several hiring agencies all in one location! We will be there too, so feel free to stop by our booth to learn more a
+2025-09-22T18:00:56.847Z [info] Post: "Are you interested in a career in law enforcement? This is your opportunity to meet several hiring agencies all in one l..." - Image URL: https://scontent-atl3-3.xx.fbcdn.net/v/t39.30808-6/552770738_1100416532299759_2641490495951757390_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=KelOlumZjrkQ7kNvwEJRM_m&_nc_oc=AdnooAiJxaxcYcWikGwSHDr-sh1pa0jzGjzLMXZHeNdn791v72ByFT6dwyCo8OkIM_s&_nc_zt=23&_nc_ht=scontent-atl3-3.xx&_nc_gid=BR9IfyDgIKYKSyoD1B7IFw&oh=00_Afb3ojV6QbuNHJRbsWi9BIKM-A-nnq3tk6Hfixy8EsxjdA&oe=68D74A5E
+2025-09-22T18:00:56.893Z [info] Attempting to re-host Facebook image immediately: https://scontent-atl3-3.xx.fbcdn.net/v/t39.30808-6/552770738_1100416532299759_2641490495951757390_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=KelOlumZjrkQ7kNvwEJRM_m&_nc_oc=AdnooAiJxaxcYcWikGwSHDr-sh1pa0jzGjzLMXZHeNdn791v72ByFT6dwyCo8OkIM_s&_nc_zt=23&_nc_ht=scontent-atl3-3.xx&_nc_gid=BR9IfyDgIKYKSyoD1B7IFw&oh=00_Afb3ojV6QbuNHJRbsWi9BIKM-A-nnq3tk6Hfixy8EsxjdA&oe=68D74A5E
+2025-09-22T18:00:56.893Z [info] Downloading image from: https://scontent-atl3-3.xx.fbcdn.net/v/t39.30808-6/552770738_1100416532299759_2641490495951757390_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=KelOlumZjrkQ7kNvwEJRM_m&_nc_oc=AdnooAiJxaxcYcWikGwSHDr-sh1pa0jzGjzLMXZHeNdn791v72ByFT6dwyCo8OkIM_s&_nc_zt=23&_nc_ht=scontent-atl3-3.xx&_nc_gid=BR9IfyDgIKYKSyoD1B7IFw&oh=00_Afb3ojV6QbuNHJRbsWi9BIKM-A-nnq3tk6Hfixy8EsxjdA&oe=68D74A5E
+2025-09-22T18:00:57.161Z [error] GET /repos/VFDavid/st-cloud-scoop/contents/newsletter-images%2F549c48dcb891315608413035c6bb806d.jpg - 404 with id B3DC:1807CB:407369:E47674:68D18ED8 in 82ms
+2025-09-22T18:01:04.471Z [info] OpenAI response received
+2025-09-22T18:01:04.471Z [info] AI evaluation response: {
+  "interest_level": 1,
+  "local_relevance": 1,
+  "community_impact": 1,
+  "reasoning": "The article lacks any description or content, making it impossible to evaluate its interest level, local relevance, or community impact. Without any information, it scores the lowest possible on all dimensions."
+}
+2025-09-22T18:01:04.536Z [info] Successfully evaluated post 3/12
+2025-09-22T18:01:07.287Z [info] OpenAI response received
+2025-09-22T18:01:07.288Z [info] AI evaluation response: {
+  "interest_level": 4,
+  "local_relevance": 7,
+  "community_impact": 5,
+  "reasoning": "The article introduces new members to the St. Cloud Area Chamber of Commerce, which may be of interest to local business owners and residents interested in local economic activities. However, it lacks broader appeal as it primarily focuses on business introductions without any unique or surprising elements. The local relevance is relatively high because it pertains directly to the St. Cloud area and involves local businesses. The community impact is moderate, as the introduction of new businesses can have some effect on the local economy and services, but the impact is not substantial or immediate for most residents."
+}
+2025-09-22T18:01:07.377Z [info] Successfully evaluated post 2/12
+2025-09-22T18:01:07.402Z [info] OpenAI response received
+2025-09-22T18:01:07.402Z [info] AI evaluation response: {
+  "interest_level": 7,
+  "local_relevance": 9,
+  "community_impact": 6,
+  "reasoning": "The article about the 5th annual Historic Harvest Fest at the Stearns History Museum scores high on local relevance (9) because it is a community event taking place in St. Cloud, directly involving local residents. The interest level is moderately high (7) due to the variety of activities offered, such as llamas, games, and crafts, which can attract families and individuals looking for entertainment. However, it is not a unique or groundbreaking event, which limits its intrigue. The community impact is moderate (6) as it provides a social and recreational opportunity for residents, but it does not have a significant long-term effect on the community's daily life or infrastructure."
+}
+2025-09-22T18:01:07.453Z [info] Successfully evaluated post 1/12
+2025-09-22T18:01:07.453Z [info] Batch 1 complete: 3 successful, 0 errors
+2025-09-22T18:01:07.453Z [info] Waiting 2 seconds before next batch...
+2025-09-22T18:01:09.454Z [info] Processing batch 2/4 (3 posts)
+2025-09-22T18:01:09.454Z [info] Evaluating post 4/12: City of St. Cloud, MN: Fall is Coming: Keep Leaves out of Streets and Storm Drains!
+2025-09-22T18:01:09.454Z [info] Calling OpenAI API...
+2025-09-22T18:01:09.454Z [info] Evaluating post 5/12: 🍂 Happy First Day of Fall from St. Cloud Park & Recreation! Let’s embrace the crisp air, vibrant colors, and all the fu...
+2025-09-22T18:01:09.454Z [info] Calling OpenAI API...
+2025-09-22T18:01:09.454Z [info] Evaluating post 6/12: Are you interested in a career in law enforcement? This is your opportunity to meet several hiring agencies all in one l...
+2025-09-22T18:01:09.454Z [info] Calling OpenAI API...
+2025-09-22T18:01:14.150Z [info] OpenAI response received
+2025-09-22T18:01:14.151Z [info] AI evaluation response: {
+  "interest_level": 4,
+  "local_relevance": 9,
+  "community_impact": 7,
+  "reasoning": "The article addresses a routine seasonal reminder about keeping leaves out of streets and storm drains, which is not particularly intriguing or surprising, thus scoring a 4 for interest level. However, it is highly relevant to St. Cloud residents as it pertains directly to local environmental management and city maintenance, earning a 9 for local relevance. The community impact is significant because proper leaf disposal affects stormwater management and can prevent local flooding or drainage issues, scoring a 7."
+}
+2025-09-22T18:01:14.212Z [info] Successfully evaluated post 4/12
+2025-09-22T18:01:14.250Z [info] OpenAI response received
+2025-09-22T18:01:14.250Z [info] AI evaluation response: {
+  "interest_level": 5,
+  "local_relevance": 8,
+  "community_impact": 4,
+  "reasoning": "The article celebrates the first day of fall, which is a seasonal milestone that can be engaging and fun, but it lacks specific details about events or activities, resulting in a moderate interest level score. It is highly relevant to St. Cloud residents as it is from the local Park & Recreation department, scoring high on local relevance. However, the community impact is limited as the article does not mention specific events, services, or changes that would significantly affect residents' daily lives."
+}
+2025-09-22T18:01:14.285Z [info] Successfully evaluated post 5/12
+2025-09-22T18:01:23.852Z [info] OpenAI response received
+2025-09-22T18:01:23.852Z [info] AI evaluation response: {
+  "interest_level": 3,
+  "local_relevance": 9,
+  "community_impact": 7,
+  "reasoning": "The article describes a City Council Meeting in St. Cloud, which is a routine event and thus not highly intriguing, resulting in a lower interest level score. However, it is highly relevant to local residents as it pertains directly to St. Cloud, earning a high local relevance score. The community impact is moderate to high because decisions made during City Council meetings can affect local policies, services, and development, impacting residents' daily lives."
+}
+2025-09-22T18:01:23.918Z [info] Successfully evaluated post 7/12
+2025-09-22T18:01:24.144Z [info] OpenAI response received
+2025-09-22T18:01:24.144Z [info] AI evaluation response: {
+  "interest_level": 5,
+  "local_relevance": 8,
+  "community_impact": 4,
+  "reasoning": "The article highlights a local achievement, which can be of interest to the community, especially those connected to Apollo High School. However, it is not a broadly engaging story for those outside the immediate school community. The local relevance is high as it pertains to a St. Cloud school and a local educator. The community impact is moderate because while it is a notable personal achievement, it does not significantly affect the broader community's daily lives or services."
+}
+2025-09-22T18:01:24.199Z [info] Successfully evaluated post 8/12
+2025-09-22T18:01:25.572Z [info] OpenAI response received
+2025-09-22T18:01:25.572Z [info] AI evaluation response: {
+  "interest_level": 4,
+  "local_relevance": 7,
+  "community_impact": 5,
+  "reasoning": "The interest level is moderate because while a semi rollover is a notable incident, the article lacks details that might make it more engaging or surprising. The local relevance is higher as this incident likely occurred in or near St. Cloud, affecting local traffic and residents. The community impact is moderate; such an event could disrupt traffic and require emergency response, but it doesn't have a long-term effect on the community. The lack of detailed information in the article limits its overall impact and interest."
+}
+2025-09-22T18:01:46.255Z [info] OpenAI response received
+2025-09-22T18:01:46.255Z [info] Calling OpenAI API...

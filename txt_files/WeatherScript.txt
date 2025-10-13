@@ -1,0 +1,435 @@
+/**
+ * Clean Weather Widget Generator - National Weather Service API
+ * Uses NWS API for St. Cloud, MN with GitHub-hosted Images
+ * Modified to treat "TODAY" as 12 hours from script execution time
+ * 
+ * Run generateWeatherHTML5() to get your HTML code
+ */
+
+// Configuration
+const CONFIG_V5 = {
+  CITY: 'St. Cloud',
+  STATE: 'MN',
+  LAT: 45.5742,
+  LON: -94.2112,
+  DAYS_TO_SHOW: 3,
+  
+  // GitHub-hosted images
+  HEADER_IMAGE_URL: 'https://raw.githubusercontent.com/VFDavid/weatherwidget/main/WeatherBanner2.png',
+  BACKGROUND_IMAGE_URL: 'https://raw.githubusercontent.com/VFDavid/weatherwidget/main/Reflective%20Roadway%20Under%20Blue%20Sky%202.png'
+};
+
+/**
+ * Web App endpoint for Make/Integromat
+ */
+function doGetNWS(e) {
+  try {
+    const weatherData = getWeatherFromNWS5();
+    const html = createWeatherHTML5(weatherData);
+    
+    return ContentService.createTextOutput(JSON.stringify({
+      success: true,
+      timestamp: new Date().toISOString(),
+      location: `${CONFIG_V5.CITY}, ${CONFIG_V5.STATE}`,
+      weatherData: weatherData,
+      html: html,
+      message: 'Weather widget generated successfully'
+    })).setMimeType(ContentService.MimeType.JSON);
+    
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({
+      success: false,
+      error: error.toString(),
+      timestamp: new Date().toISOString(),
+      message: 'Failed to generate weather widget'
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doPostNWS(e) {
+  return doGetNWS(e);
+}
+
+/**
+ * Main function to generate weather HTML
+ */
+function generateWeatherHTML5() {
+  try {
+    const weatherData = getWeatherFromNWS5();
+    const html = createWeatherHTML5(weatherData);
+    saveHTMLToSheet5(html);
+    return html;
+  } catch (error) {
+    console.error('Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get weather data from National Weather Service API
+ * Modified to treat "TODAY" as 12 hours from script execution time
+ */
+function getWeatherFromNWS5() {
+  console.log('Fetching weather from NWS...');
+  
+  // Step 1: Get forecast URL
+  const pointsUrl = `https://api.weather.gov/points/${CONFIG_V5.LAT},${CONFIG_V5.LON}`;
+  const pointsResponse = UrlFetchApp.fetch(pointsUrl);
+  const pointsData = JSON.parse(pointsResponse.getContentText());
+  
+  // Step 2: Get forecast data
+  const forecastUrl = pointsData.properties.forecast;
+  const forecastResponse = UrlFetchApp.fetch(forecastUrl);
+  const forecastData = JSON.parse(forecastResponse.getContentText());
+  
+  // Step 3: Calculate the target start date (12 hours from now)
+  const now = new Date();
+  const targetStartDate = new Date(now.getTime() + (12 * 60 * 60 * 1000)); // Add 12 hours
+  const targetStartDay = new Date(targetStartDate.getFullYear(), targetStartDate.getMonth(), targetStartDate.getDate()); // Start of that day
+  
+  console.log(`Current time: ${now}`);
+  console.log(`Target start date (12 hours from now): ${targetStartDate}`);
+  console.log(`Looking for forecasts starting from: ${targetStartDay}`);
+  
+  // Step 4: Process periods into 3-day forecast starting from target date
+  const periods = forecastData.properties.periods;
+  const weatherData = [];
+  
+  // Find periods that are on or after our target start day
+  let dayIndex = 0;
+  const processedDates = new Set(); // Track which dates we've already processed
+  
+  for (let i = 0; i < periods.length && weatherData.length < CONFIG_V5.DAYS_TO_SHOW; i++) {
+    const period = periods[i];
+    const periodDate = new Date(period.startTime);
+    const periodDay = new Date(periodDate.getFullYear(), periodDate.getMonth(), periodDate.getDate());
+    
+    // Skip periods that are before our target start day
+    if (periodDay < targetStartDay) {
+      continue;
+    }
+    
+    // Skip night periods for main data collection
+    if (period.name.toLowerCase().includes('tonight') || period.name.toLowerCase().includes('night')) {
+      continue;
+    }
+    
+    // Skip if we've already processed this date
+    const dateKey = periodDay.toDateString();
+    if (processedDates.has(dateKey)) {
+      continue;
+    }
+    processedDates.add(dateKey);
+    
+    // Get day label based on relationship to target start day
+    let dayLabel;
+    const daysDiff = Math.floor((periodDay - targetStartDay) / (24 * 60 * 60 * 1000));
+    
+    if (daysDiff === 0) dayLabel = "TODAY";
+    else if (daysDiff === 1) dayLabel = "TOMORROW";
+    else {
+      const dayNames = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+      dayLabel = dayNames[periodDay.getDay()];
+    }
+    
+    // Format date
+    const dateLabel = Utilities.formatDate(periodDay, 'America/Chicago', "MMM d");
+    
+    // Map condition to icon
+    const iconCode = mapConditionToIcon5(period.shortForecast);
+    
+    // Get precipitation from NWS API data
+    let precipitation = 0;
+    if (period.probabilityOfPrecipitation && typeof period.probabilityOfPrecipitation.value === 'number') {
+      precipitation = period.probabilityOfPrecipitation.value;
+    }
+    
+    // Get high temp from this day period
+    let high = period.temperature;
+    
+    // Look for the corresponding night period to get low temp
+    let low = period.temperature; // Default to day temp if no night period found
+    
+    // Search for night period for this same date or the following night
+    for (let j = 0; j < periods.length; j++) {
+      const nightPeriod = periods[j];
+      const nightPeriodDate = new Date(nightPeriod.startTime);
+      const nightPeriodDay = new Date(nightPeriodDate.getFullYear(), nightPeriodDate.getMonth(), nightPeriodDate.getDate());
+      
+      // Check if this is a night period for the same date or next day
+      if ((nightPeriod.name.toLowerCase().includes('tonight') || nightPeriod.name.toLowerCase().includes('night'))) {
+        // Accept night period if it's the same day or the following day
+        const nightDaysDiff = Math.floor((nightPeriodDay - periodDay) / (24 * 60 * 60 * 1000));
+        if (nightDaysDiff >= 0 && nightDaysDiff <= 1) {
+          low = nightPeriod.temperature;
+          break;
+        }
+      }
+    }
+    
+    console.log(`Processing: ${dayLabel} (${dateLabel}) - Period: ${period.name} - ${period.shortForecast} - High: ${high}° Low: ${low}° - ${precipitation}% precip`);
+    
+    weatherData.push({
+      day: dayLabel,
+      dateLabel: dateLabel,
+      icon: iconCode,
+      precipitation: precipitation,
+      high: high,
+      low: low,
+      condition: period.shortForecast
+    });
+    
+    dayIndex++;
+  }
+  
+  console.log('Generated weather data:', weatherData);
+  return weatherData;
+}
+
+/**
+ * Map NWS conditions to icon codes
+ */
+function mapConditionToIcon5(condition) {
+  const conditionLower = condition.toLowerCase();
+  
+  if (conditionLower.includes('sunny') || conditionLower.includes('clear')) return '01d';
+  if (conditionLower.includes('partly cloudy') || conditionLower.includes('mostly sunny')) return '02d';
+  if (conditionLower.includes('mostly cloudy')) return '03d';
+  if (conditionLower.includes('cloudy') || conditionLower.includes('overcast')) return '04d';
+  if (conditionLower.includes('freezing') || conditionLower.includes('sleet')) return 'sleet';
+  if (conditionLower.includes('blizzard') || conditionLower.includes('heavy snow')) return 'blizzard';
+  if (conditionLower.includes('snow')) return '13d';
+  if (conditionLower.includes('hail')) return 'hail';
+  if (conditionLower.includes('thunder')) return '11d';
+  if (conditionLower.includes('rain')) {
+    if (conditionLower.includes('light')) return '09d';
+    return '10d';
+  }
+  if (conditionLower.includes('fog') || conditionLower.includes('mist')) return '50d';
+  
+  return '02d'; // Default partly cloudy
+}
+
+/**
+ * Get weather icon URL
+ */
+function getWeatherIconUrl5(iconCode) {
+  const iconMap = {
+    '01d': 'https://raw.githubusercontent.com/VFDavid/weatherwidget/main/Sun.png',
+    '02d': 'https://raw.githubusercontent.com/VFDavid/weatherwidget/main/Cloudy_day.png',
+    '03d': 'https://raw.githubusercontent.com/VFDavid/weatherwidget/main/Cloudy_day.png',
+    '04d': 'https://raw.githubusercontent.com/VFDavid/weatherwidget/main/Mostly_Cloudy.png',
+    '09d': 'https://raw.githubusercontent.com/VFDavid/weatherwidget/main/Drizzle.png',
+    '10d': 'https://raw.githubusercontent.com/VFDavid/weatherwidget/main/Heavy_Rain.png',
+    '11d': 'https://raw.githubusercontent.com/VFDavid/weatherwidget/main/Thunderstorms.png',
+    '13d': 'https://raw.githubusercontent.com/VFDavid/weatherwidget/main/Snow.png',
+    '50d': 'https://raw.githubusercontent.com/VFDavid/weatherwidget/main/Fog.png',
+    'hail': 'https://raw.githubusercontent.com/VFDavid/weatherwidget/refs/heads/main/Clip_hail_rain.png',
+    'blizzard': 'https://raw.githubusercontent.com/VFDavid/weatherwidget/refs/heads/main/Blizzard.png',
+    'sleet': 'https://raw.githubusercontent.com/VFDavid/weatherwidget/refs/heads/main/Sleet.png'
+  };
+  
+  return iconMap[iconCode] || iconMap['01d'];
+}
+
+/**
+ * Create the weather HTML
+ */
+function createWeatherHTML5(weatherData) {
+  let cards = '';
+  
+  weatherData.forEach((day) => {
+    const iconUrl = getWeatherIconUrl5(day.icon);
+    
+    cards += `
+          <td class="weather-card" align="center" valign="top" style="width: 33.33%; padding: 10px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(#023D8E 0%, #1877F2 100%); box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 2px solid rgba(255,255,255,0.3);">
+              <tr>
+                <td align="center" style="padding: 0;">
+                  
+                  <!-- Day Label -->
+                  <div style="background: linear-gradient(90deg, #BABABA 0%, #FEFEFE 25%, #FEFEFE 75%, #BABABA 100%); color: #023D8E; font-size: 24px; font-weight: bold; margin-bottom: 5px; font-family: 'Montserrat', 'Arial Black', 'Trebuchet MS', Arial, sans-serif; text-transform: uppercase; padding: 8px 0;">
+                    ${day.day}
+                  </div>
+
+                  <!-- Calendar Date -->
+                  <div style="color: white; font-size: 16px; font-weight: bold; margin-bottom: 0; font-family: 'Montserrat', 'Arial Black', 'Trebuchet MS', Arial, sans-serif;">
+                    ${day.dateLabel}
+                  </div>
+                  
+                  <!-- Weather Icon -->
+                  <div style="margin-bottom: -5px;">
+                    <img src="${iconUrl}" alt="Weather" style="width: 150px; height: 150px; display: block; margin: 0 auto;" />
+                  </div>
+                  
+                  <!-- Precipitation -->
+                  <div style="color: white; font-size: 16px; font-weight: bold; margin-bottom: 0; font-family: 'Montserrat', 'Arial Black', 'Trebuchet MS', Arial, sans-serif;">
+                    ${day.precipitation > 0 ? day.precipitation + '%' : '0%'}
+                  </div>
+                  
+                  <!-- High Temperature -->
+                  <div style="color: white; font-size: 72px; font-weight: bold; margin-bottom: 0; font-family: 'Montserrat', 'Arial Black', 'Trebuchet MS', Arial, sans-serif; line-height: 1;">
+                    ${day.high}
+                  </div>
+                  
+                  <!-- Low Temperature -->
+                  <div style="color: white; font-size: 22px; font-weight: bold; font-family: 'Montserrat', 'Arial Black', 'Trebuchet MS', Arial, sans-serif;">
+                    ${day.low}
+                  </div>
+                  
+                </td>
+              </tr>
+            </table>
+          </td>`;
+  });
+
+  return `
+<!--[if mso]>
+<table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td>
+<![endif]-->
+
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 650px; margin: 0 auto; background-image: url('${CONFIG_V5.BACKGROUND_IMAGE_URL}'); background-size: cover; background-position: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2); font-family: Arial, sans-serif; overflow: hidden;">
+  <tr>
+    <td align="center" style="padding: 0;">
+      
+      <!-- Header Image -->
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td align="center" style="padding: 0;">
+            <img src="${CONFIG_V5.HEADER_IMAGE_URL}" alt="Weather Forecast" style="width: 90%; max-width: 650px; height: auto; display: block;" />
+          </td>
+        </tr>
+      </table>
+
+      <!-- Weather Cards Container -->
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="padding: 10px 20px;">
+        <tr>
+          ${cards}
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+</table>
+
+<style>
+  @media only screen and (max-width: 600px) {
+    .weather-card {
+      display: block !important;
+      width: 100% !important;
+      margin-bottom: 15px !important;
+      padding: 10px !important;
+    }
+    
+    .weather-card table {
+      width: 90% !important;
+      margin: 0 auto !important;
+    }
+    
+    .weather-card td {
+      padding: 15px 10px !important;
+    }
+  }
+</style>
+
+<!--[if mso]>
+    </td>
+  </tr>
+</table>
+<![endif]-->`;
+}
+
+/**
+ * Save HTML to sheet
+ */
+function saveHTMLToSheet5(html) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('NWS Weather HTML') || 
+                 SpreadsheetApp.getActiveSpreadsheet().insertSheet('NWS Weather HTML');
+    
+    sheet.clear();
+    sheet.getRange('A1').setValue('NWS Weather HTML - Clean Version');
+    sheet.getRange('A1').setFontWeight('bold').setFontSize(16);
+    
+    sheet.getRange('A3').setValue('Generated HTML:');
+    sheet.getRange('A3').setFontWeight('bold');
+    sheet.getRange('A5').setValue(html);
+    sheet.getRange('A5').setWrap(true);
+    
+    console.log('HTML saved to "NWS Weather HTML" sheet');
+  } catch (error) {
+    console.error('Could not save to sheet:', error);
+  }
+}
+
+/**
+ * Debug function to check NWS precipitation data
+ */
+function debugNWSPrecip5() {
+  const pointsUrl = `https://api.weather.gov/points/${CONFIG_V5.LAT},${CONFIG_V5.LON}`;
+  const pointsResponse = UrlFetchApp.fetch(pointsUrl);
+  const pointsData = JSON.parse(pointsResponse.getContentText());
+  
+  const forecastUrl = pointsData.properties.forecast;
+  const forecastResponse = UrlFetchApp.fetch(forecastUrl);
+  const forecastData = JSON.parse(forecastResponse.getContentText());
+  
+  console.log('Checking first 3 periods for precipitation data:');
+  forecastData.properties.periods.slice(0, 3).forEach((period, index) => {
+    console.log(`Period ${index + 1}: ${period.name}`);
+    console.log(`  Short Forecast: ${period.shortForecast}`);
+    console.log(`  Detailed Forecast: ${period.detailedForecast}`);
+    console.log(`  Probability of Precipitation:`, period.probabilityOfPrecipitation);
+    console.log(`  Temperature: ${period.temperature}°${period.temperatureUnit}`);
+    console.log('---');
+  });
+}
+
+/**
+ * Debug function to show timing logic
+ */
+function debugTimingLogic5() {
+  const now = new Date();
+  const targetStartDate = new Date(now.getTime() + (12 * 60 * 60 * 1000));
+  const targetStartDay = new Date(targetStartDate.getFullYear(), targetStartDate.getMonth(), targetStartDate.getDate());
+  
+  console.log(`Current time: ${now.toString()}`);
+  console.log(`12 hours from now: ${targetStartDate.toString()}`);
+  console.log(`Target start day: ${targetStartDay.toString()}`);
+  console.log(`Current hour: ${now.getHours()}`);
+  console.log(`Will show forecast starting from: ${targetStartDay.toDateString()}`);
+  
+  // Show what days will be labeled as what
+  for (let i = 0; i < 3; i++) {
+    const forecastDay = new Date(targetStartDay.getTime() + (i * 24 * 60 * 60 * 1000));
+    let label;
+    if (i === 0) label = "TODAY";
+    else if (i === 1) label = "TOMORROW"; 
+    else {
+      const dayNames = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+      label = dayNames[forecastDay.getDay()];
+    }
+    console.log(`Day ${i + 1}: ${label} - ${forecastDay.toDateString()}`);
+  }
+}
+
+/**
+ * Test function
+ */
+function testNWS5() {
+  try {
+    console.log('Testing NWS weather data...');
+    const weatherData = getWeatherFromNWS5();
+    
+    weatherData.forEach((day, index) => {
+      console.log(`Day ${index + 1}: ${day.day} (${day.dateLabel}) - ${day.condition} - ${day.high}°/${day.low}° - ${day.precipitation}% chance of precipitation`);
+    });
+    
+    return weatherData;
+  } catch (error) {
+    console.error('Test failed:', error);
+    return null;
+  }
+}

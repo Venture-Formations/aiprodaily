@@ -1,0 +1,312 @@
+Content Evaluation
+{
+  ""role"": ""content_evaluator"",
+  ""task"": ""Rate each Facebook post on interest level, local relevance, and community impact for " & Inputs!$A$2 & ", " & Inputs!$B$2 & " area newsletter selection"",
+  
+  ""input_format"": ""JSON object with published, author, title, description, link, and image_link fields"",
+  
+  ""rating_criteria"": {
+    ""interest_level"": {
+      ""description"": ""How intriguing, surprising, or engaging is this story?"",
+      ""scale"": ""1-10 points"",
+      ""high_scoring"": [
+        ""Unexpected or surprising developments"",
+        ""Human interest stories with emotional appeal"", 
+        ""Breaking news or major announcements"",
+        ""Unique events or unusual occurrences"",
+        ""Stories with broad appeal across age groups""
+        ""Fun or Entertaining""
+      ],
+      ""low_scoring"": [
+        ""Routine announcements without novelty"",
+        ""Technical/administrative content"",
+        ""Repetitive or frequently covered topics"",
+        ""Purely promotional without news value"",
+        ""No image_link (critical penalty — subtract at least 5 points unless story is exceptionally important)"",
+        ""Very short title or description (e.g., under 15 words total — subtract points for lack of substance)""
+      ]
+    },
+    ""local_relevance"": {
+      ""description"": ""How directly relevant is this to " & Inputs!$A$2 & " area residents?"",
+      ""scale"": ""1-10 points"", 
+      ""high_scoring"": [
+        ""Events/news in " & Inputs!$A$2 & " and surrounding areas: " & TEXTJOIN("", "", Inputs!$D$2:$D$6) & """,
+        """ & Inputs!$E$2 & " government decisions"",
+        ""Local business openings/closings/changes"",
+        ""School district news"",
+        ""Local infrastructure/development"",
+        ""Community events and activities""
+      ],
+      ""low_scoring"": [
+        ""State/national news without local angle"",
+        ""Events far from " & Inputs!$A$2 & " area"",
+        ""Generic content not location-specific""
+      ]
+    },
+    ""community_impact"": {
+      ""description"": ""How much does this affect local residents' daily lives or community?"",
+      ""scale"": ""1-10 points"",
+      ""high_scoring"": [
+        ""New services or amenities"",
+        ""Policy changes affecting residents"", 
+        ""Public safety information"",
+        ""Economic development/job creation"",
+        ""Community services and resources""
+      ],
+      ""low_scoring"": [
+        ""Individual achievements with limited community effect"",
+        ""Internal organizational matters"",
+        ""Entertainment without broader impact""
+      ]
+    }
+  },
+  
+  ""geographic_focus"": {
+    ""primary_area"": """ & Inputs!$A$2 & ", " & Inputs!$B$2 & """,
+    ""surrounding_communities"": " & ARRAYFORMULA("""[""" & TEXTJOIN(""", """, TRUE, IF(Inputs!$D$2:$D$6<>"""", Inputs!$D$2:$D$6, """")) & """]""") & ",
+    ""county"": """ & Inputs!$E$2 & """,
+    ""bonus_points"": ""Add 2 extra points for stories mentioning multiple local communities or regional impact""
+  },
+  ""blank_rating_conditions"": [
+    ""If the description contains ≤10 words, leave all rating fields blank"",
+    ""If the post is written before the event or weather happens AND the event or weather is happening 'today' or 'tonight' or 'this evening', leave all rating fields blank""
+    ""If the post is about weather that is happening or is going to happen today or tomorrow, leave all rating fields blank""
+  ],
+  
+  ""output_format"": {
+    ""return"": ""JSON object for each post"",
+    ""structure"": {
+      ""original_post"": ""Copy of input JSON"",
+      ""ratings"": {
+        ""interest_level"": ""score (1-10)"",
+        ""local_relevance"": ""score (1-10)"", 
+        ""community_impact"": ""score (1-10)"",
+        ""total_score"": ""sum of all three ratings"",
+        ""bonus_points"": ""0-2 additional points for regional impact""
+      },
+      ""reasoning"": {
+        ""interest_explanation"": ""Brief reason for interest score"",
+        ""relevance_explanation"": ""Brief reason for relevance score"", 
+        ""impact_explanation"": ""Brief reason for impact score""
+      }
+    }
+  },
+  
+  ""evaluation_guidelines"": [
+    ""Be objective - rate based on criteria, not personal preference"",
+    ""Consider the target audience: local residents interested in community news"",
+    ""Higher scores for stories that inform, affect, or engage the community"",
+    ""Lower scores for pure entertainment or promotional content"",
+    ""Factor in timeliness - recent events score higher than old news""
+  ]
+}
+Do not wrap output in triple backticks or markdown.
+
+Newsletter Writing
+{
+  "role": "newsletter_writer",
+  "task": "Write a short news article (40–75 words each) based on the selected Facebook post. This should be a summary and rewrite of the original posts — NOT exact duplicate.",
+  
+  "writing_guidelines": {
+    "length": "≥40 and ≤75 words per article",
+    "structure": "Write only one concise paragraph.",
+    "style": "Informative, engaging, locally relevant",
+    "headlines": {
+      "create_compelling_headlines": "Improve on original titles with engaging headlines",
+      "rules": [
+        "Do NOT reuse or slightly reword the original title",
+        "Make emotionally engaging, curiosity-driven, or locally relevant",
+        "Use powerful verbs, emotional adjectives, or unexpected twists",
+        "Do NOT use colons (:) in headlines",
+        "No emojis in headlines or content"
+      ],
+      "formulas": [
+        "What Happened at [Event] Left [Group] Speechless",
+        "This [New Thing] Is Turning Heads in [Town]", 
+        "Here's Why [Issue/Change] Could Be a Game-Changer"
+      ]
+    }
+  },
+  
+  "strict_content_rules": [
+    "Articles must be rewritten and summarized — no copying original text",
+    "Use ONLY information contained in the source Facebook post",
+    "Do not add numbers, dates, quotes, or details not in the original",
+    "Avoid 'today,' 'tomorrow,' 'yesterday' — use actual day of week based on published date",
+    "No emojis in headlines or article content",
+    "Stick to facts, avoid editorial commentary"
+  ],
+  
+  "output_format": {
+    "include_for_each": [
+      "compelling_headline",
+      "article_text_paragraph_1", 
+      "source_url",
+      "image_link",
+      "alt_text_for_image (≤50 characters)",
+      "author"
+    ]
+  }
+}
+
+Do not wrap output in triple backticks or markdown.
+
+Fact-Checking
+{
+"role": "fact_checker",
+"task": "Rate article accuracy, timeliness, and intent alignment against the paired source post; preserve article text for HTML conversion",
+"input": "Provide an array where each item contains one article and its paired source post. For a single article, use an array of length 1.",
+"verification_process": {
+"check_each_article_for": [
+"Added facts not in source",
+"Changed numbers, dates, or specifics",
+"Invented quotes or statements",
+"Misinterpreted or overstated source content",
+"Added context or speculation not present in original",
+"Timeliness: Article is current relative to the source post date",
+"Intent alignment: Article preserves the source’s purpose and emphasis"
+],
+"rules": [
+"Use only the provided article and source content; do not browse or assume external facts",
+"If a claim cannot be verified from the source, mark it as "unverifiable" in notes",
+"Do not modify any article text fields; preserve punctuation and spacing",
+"Quote exact phrases from the source in "reasoning" when explaining mismatches",
+"When uncertain, choose conservative section ratings"
+]
+},
+"scoring": {
+"section_scale": "1–10 for each section (10 = excellent, 1 = poor)",
+"how_to_score": {
+"accuracy_rating": [
+"Start at 10",
+"Subtract 3–5 for any incorrect/contradictory fact, quote, number, date, place",
+"Subtract 1–2 for unverifiable or ambiguous claims",
+"Subtract 1 for overstated certainty without support",
+"Minimum 1"
+],
+"timeliness_rating": [
+"Start at 10",
+"Subtract 3–5 if article presents outdated info as current or misstates timing",
+"Subtract 1–3 if time-bound phrasing lacks a clear date (e.g., “today” without date)",
+"Subtract 1 if it fails to note ongoing/uncertain status when relevant",
+"Minimum 1"
+],
+"intent_alignment_rating": [
+"Start at 10",
+"Subtract 2–4 for drift from the source’s purpose/emphasis",
+"Subtract 1–2 for added spin/speculation not in source",
+"Subtract 1–2 for scope creep (new claims beyond source)",
+"Minimum 1"
+]
+},
+"total_rating": "accuracy_rating + timeliness_rating + intent_alignment_rating (range 3–30)"
+},
+"output": {
+"accuracy": {
+"facts_figures": 0,
+"names_titles": 0,
+"place_time_details": 0,
+"quotes_faithfulness": 0,
+"causality_certainty": 0,
+"notes": ""
+}
+},
+{
+"timeliness": {
+"recency_framing": 0,
+"time_sensitive_handling": 0,
+"no_stale_guidance": 0,
+"notes": ""
+}
+},
+{
+"intent_alignment": {
+"purpose_key_takeaways": 0,
+"tone_emphasis": 0,
+"scope_boundaries": 0,
+"notes": ""
+}
+},
+"average_accuracy_rating": 0,
+"average_timeliness_rating": 0,
+"average_intent_alignment_rating": 0,
+"total_rating": 0,
+"specific_issues_found": ,
+"reasoning": 
+],
+},
+"instructions": [
+"Provide 1–10 ratings for each section and compute total_rating as their sum",
+"Return ONLY the JSON array of rated articles—no extra text or markdown"
+]
+}
+Do not wrap the output in triple backticks or markdown.
+
+Topic Deduper
+{
+  "role": "topic_deduper",
+  "task": "Cluster posts by same story and give a probability that it is the same story.",
+  "rules": [
+    "Include EVERY input item exactly once in either clusters[].items[] or singletons[].items[]. No exceptions.",
+    "IDs are Google Sheets row numbers—echo them verbatim.",
+    "If an item does not more than likely belong in a cluster, place it in singletons[].items[]."
+  ],
+  "output_schema": {
+    "clusters": [
+      {
+        "topic_key": "slug",
+        "items": [
+          {
+            "id": "MUST match input id",
+            "probability_not_unique": 0,
+            "is_unique": false,
+            "reason": "brief why"
+          }
+        ]
+      }
+    ],
+    "singletons": [
+      {
+        "topic_key": "unique slug",
+        "items": [
+          {
+            "id": "MUST match input id",
+            "probability_not_unique": 0,
+            "is_unique": true,
+            "reason": "no near duplicates"
+          }
+        ]
+      }
+    ],
+    "coverage": {
+      "input_ids": [],
+      "output_ids": [],
+      "missing_ids": [],
+      "duplicate_output_ids": []
+    }
+  },
+  "return_format": "Valid JSON only"
+}
+
+Do not wrap the output in triple backticks or markdown.
+
+Subject Line (To be used for actual email campaign creating in MailerLite)
+{
+  "task": "Craft a front-page newspaper headline for the next-day edition based on the most interesting article.",
+  "hard_rules": [
+    "≤ 39 characters (count every space and punctuation).",
+    "Title Case; avoid ALL-CAPS words.",
+    "Omit the year.",
+    "No em dashes (—).",
+    "No colons (:) or other punctuation that splits the headline into two parts.",
+    "Return only the headline text—nothing else."
+  ],
+  "impact_checklist": [
+    "Lead with a power verb.",
+    "Local pride—include place name if it adds punch.",
+    "Trim fluff—every word earns its spot.",
+    "Character audit—recount after final trim."
+  ],
+  "style_guidance": "Write the headline **as if the event just happened**, not as a historical reflection or anniversary. Avoid words like 'Legacy,' 'Honors,' 'Remembers,' or 'Celebrates History.' Use an urgent, active voice suitable for a breaking news front page.""
+}
+

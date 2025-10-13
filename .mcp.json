@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://postgres.zvyzhmhsubazkvcsxbjs:StoringData247!@aws-0-us-west-1.pooler.supabase.com:6543/postgres"]
+    },
+    "vercel": {
+      "command": "npx",
+      "args": ["-y", "vercel-mcp", "VERCEL_API_KEY=b2rRlFmL9kPxMPl6ZA7pgGDX"]
+    },
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"]
+    }
+  }
+}

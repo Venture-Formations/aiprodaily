@@ -1,0 +1,698 @@
+Section: Minnesota Getaways
+Create a database of Vrbo listings. Be able to add listing information one at a time in the UI interface, or upload a CSV to do multiple at one time. When a new listing is added to the database, the listing image needs to be resized and added to GitHub for hosting. The current method uses:
+build.yml
+name: Build listing images (VRBO + ETSY) — force rewrite
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ Vrbo ]
+    paths:
+      - scripts/build-images.js
+      - .github/workflows/build.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build-both:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: VRBO
+            SHEET_TAB: "VRBO"
+            OUT_DIR: "images/vrbo"
+            WIDTH: "575"
+            HEIGHT: "325"
+            FORCE_REBUILD: "0"
+          - name: ETSY
+            SHEET_TAB: "ETSY"
+            OUT_DIR: "images/etsy"
+            # 1:1 square (pick your size)
+            WIDTH: "575"
+            HEIGHT: "575"
+            # force a one-time full rebuild
+            FORCE_REBUILD: "1"
+
+    steps:
+      - name: Checkout Vrbo branch
+        uses: actions/checkout@v4
+        with:
+          ref: Vrbo
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm i sharp@^0.33 node-fetch@3 csv-parse@^5
+
+      # Hard wipe ETSY outputs so we 100% rewrite them
+      - name: Wipe ETSY outputs (one-time)
+        if: matrix.name == 'ETSY'
+        run: |
+          mkdir -p images/etsy
+          rm -f images/etsy/*.jpg
+          rm -f images/etsy/_manifest.json
+
+      - name: Build images for ${{ matrix.name }}
+        env:
+          SHEET_TAB: ${{ matrix.SHEET_TAB }}
+          OUT_DIR: ${{ matrix.OUT_DIR }}
+          WIDTH: ${{ matrix.WIDTH }}
+          HEIGHT: ${{ matrix.HEIGHT }}
+          FORCE_REBUILD: ${{ matrix.FORCE_REBUILD }}
+        run: node scripts/build-images.js
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Stage outputs
+        run: git add images/
+
+      - name: Commit if changes
+        run: |
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Rewrite processed images for ${{ matrix.name }}"
+          fi
+
+      - name: Rebase on remote Vrbo
+        run: |
+          git fetch origin Vrbo
+          set -e
+          if ! git rebase origin/Vrbo; then
+            git rebase --abort || true
+            git pull --no-rebase origin Vrbo
+          fi
+
+      - name: Push changes
+        run: git push origin HEAD:Vrbo
+
+build-images.js
+// scripts/build-images.js
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
+import fetch from "node-fetch";
+import { parse } from "csv-parse/sync";
+import sharp from "sharp";
+
+// ---- Your Google Sheet ----
+const SHEET_ID = "1Igj7ohYqH3TnrESbSQwMSRLMx2tfOqDwmoXEzrNarag";
+
+// ---- Matrix / env config (provided by workflow; with defaults for local runs) ----
+const SHEET_TAB = process.env.SHEET_TAB || "VRBO";
+const OUT_DIR   = process.env.OUT_DIR   || (SHEET_TAB === "ETSY" ? "images/etsy" : "images/vrbo");
+const WIDTH     = parseInt(process.env.WIDTH  || (SHEET_TAB === "ETSY" ? "325" : "575"), 10);
+const HEIGHT    = parseInt(process.env.HEIGHT || (SHEET_TAB === "ETSY" ? "575" : "325"), 10);
+const FORCE_REBUILD = process.env.FORCE_REBUILD === "1";
+
+// Header mapping per tab (IMPORTANT: must match your sheet headers exactly)
+const SOURCE_HEADER_BY_TAB = {
+  VRBO: "Main Image URL",
+  ETSY: "Product Image URL",
+};
+const SRC_HEADER = SOURCE_HEADER_BY_TAB[SHEET_TAB] || "Main Image URL";
+
+// Public CSV export URL for the tab
+const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_TAB)}`;
+
+function sha1_16(str) {
+  return crypto.createHash("sha1").update(str).digest("hex").slice(0, 16);
+}
+
+async function fetchCsvText(url) {
+  const res = await fetch(url, { headers: { "User-Agent": "img-bot" } });
+  if (!res.ok) throw new Error(`CSV fetch failed: HTTP ${res.status}`);
+  return await res.text();
+}
+
+async function fetchImageBuffer(url) {
+  const r = await fetch(url, { redirect: "follow", headers: { "User-Agent": "img-bot" } });
+  if (!r.ok) throw new Error(`Image fetch failed: HTTP ${r.status}`);
+  return Buffer.from(await r.arrayBuffer());
+}
+
+async function needsBuild(outPath, width, height) {
+  if (!fs.existsSync(outPath)) return true;
+  if (FORCE_REBUILD) return true;
+
+  try {
+    const meta = await sharp(outPath).metadata();
+    if (meta && meta.width === width && meta.height === height) {
+      return false; // already correct size
+    }
+    console.log(`[${SHEET_TAB}] Size mismatch (${meta?.width}x${meta?.height}), will rebuild: ${outPath}`);
+    return true;
+  } catch {
+    console.log(`[${SHEET_TAB}] Couldn't read metadata, will rebuild: ${outPath}`);
+    return true;
+  }
+}
+
+async function main() {
+  console.log(`=== START ${SHEET_TAB} -> ${OUT_DIR} (${WIDTH}x${HEIGHT}) ===`);
+  console.log(`CSV: ${csvUrl}`);
+  fs.mkdirSync(OUT_DIR, { recursive: true });
+
+  // 1) Fetch & parse CSV
+  const csv = await fetchCsvText(csvUrl);
+  const rows = parse(csv, { columns: true, skip_empty_lines: true });
+  console.log(`[${SHEET_TAB}] Rows parsed: ${rows.length}`);
+
+  if (!rows.length) {
+    console.error(`[${SHEET_TAB}] No rows found. Is the "${SHEET_TAB}" tab published to CSV?`);
+    process.exit(1);
+  }
+
+  if (!(SRC_HEADER in rows[0])) {
+    console.error(`[${SHEET_TAB}] Column "${SRC_HEADER}" not found. Headers:`, Object.keys(rows[0]));
+    process.exit(1);
+  }
+
+  // 2) Process rows
+  const manifest = [];
+  let written = 0, skipped = 0, errors = 0;
+
+  for (const row of rows) {
+    const src = String(row[SRC_HEADER] || "").trim();
+    if (!src) {
+      manifest.push({ status: "skip-no-src" });
+      continue;
+    }
+
+    const id = sha1_16(src);
+    const outPath = path.join(OUT_DIR, `${id}.jpg`);
+    let build = await needsBuild(outPath, WIDTH, HEIGHT);
+
+    if (!build) {
+      skipped++;
+      manifest.push({ id, src, file: `${OUT_DIR}/${id}.jpg`, status: "exists-correct" });
+      continue;
+    }
+
+    try {
+      const buf = await fetchImageBuffer(src);
+      const outBuf = await sharp(buf)
+        .resize(WIDTH, HEIGHT, { fit: "cover", position: "centre" }) // or "attention"
+        .jpeg({ quality: 85 })
+        .toBuffer();
+
+      fs.writeFileSync(outPath, outBuf);
+      written++;
+      console.log(`[${SHEET_TAB}] Wrote ${outPath}`);
+      manifest.push({ id, src, file: `${OUT_DIR}/${id}.jpg`, status: "written" });
+    } catch (e) {
+      errors++;
+      console.error(`[${SHEET_TAB}] ERROR ${src}: ${e.message}`);
+      manifest.push({ id, src, file: `${OUT_DIR}/${id}.jpg`, status: `error: ${e.message}` });
+    }
+  }
+
+  // 3) Write a manifest for quick inspection
+  const manifestPath = path.join(OUT_DIR, "_manifest.json");
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  console.log(`[${SHEET_TAB}] Manifest: ${manifestPath}`);
+  console.log(`[${SHEET_TAB}] Done. written=${written}, skipped=${skipped}, errors=${errors}`);
+}
+
+main().catch((e) => {
+  console.error(`[${SHEET_TAB}] Uncaught error:`, e);
+  process.exit(1);
+});
+
+The database then should show the adjusted image URL of the resized image hosted in GitHub.
+
+Then upon newsletter campaign creation, 3 listings need to be chosen. 1 local and 2 greater. Currently using this script:
+/**
+ * Google Apps Script to select properties sequentially and generate HTML
+ * Uses PropertiesService for reliable sequential tracking
+ */
+
+function selectPropertiesAndGenerateHTML() {
+  try {
+    Logger.log('=== STARTING PROPERTY SELECTOR ===');
+    
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const mainSheet = ss.getSheetByName('VRBO');
+    
+    if (!mainSheet) {
+      throw new Error('VRBO sheet not found');
+    }
+    Logger.log('Found VRBO sheet');
+    
+    // Get all data
+    const data = mainSheet.getDataRange().getValues();
+    const headers = data[0];
+    const rows = data.slice(1);
+    
+    Logger.log(`Found ${rows.length} data rows`);
+    
+    // Find column indices
+    const titleCol = headers.indexOf('Title');
+    const imageCol = headers.indexOf('Adjusted Main Image URL');
+    const cityCol = headers.indexOf('City');
+    const bedroomsCol = headers.indexOf('Bedrooms');
+    const bathroomsCol = headers.indexOf('Bathrooms');
+    const sleepsCol = headers.indexOf('Sleeps');
+    const linkCol = headers.indexOf('Link');
+    const typeCol = headers.indexOf('Local/Greater');
+    
+    Logger.log(`Column indices - Title:${titleCol}, Image:${imageCol}, City:${cityCol}, Bedrooms:${bedroomsCol}, Bathrooms:${bathroomsCol}, Sleeps:${sleepsCol}, Link:${linkCol}, Type:${typeCol}`);
+    
+    // Check required columns
+    if (titleCol === -1 || typeCol === -1 || linkCol === -1) {
+      throw new Error('Required columns missing - need Title, Link, and Local/Greater');
+    }
+    
+    // Filter properties - safer approach
+    const localProperties = [];
+    const greaterProperties = [];
+    
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || !row[typeCol]) continue;
+      
+      const type = row[typeCol].toString().toLowerCase().trim();
+      if (type === 'local' && row[titleCol]) {
+        localProperties.push(row);
+      } else if (type === 'greater' && row[titleCol]) {
+        greaterProperties.push(row);
+      }
+    }
+    
+    Logger.log(`Found ${localProperties.length} Local and ${greaterProperties.length} Greater properties`);
+    
+    // Get current indices and shuffled orders from PropertiesService
+    const props = PropertiesService.getScriptProperties();
+    let localIndex = parseInt(props.getProperty('localIndex')) || 0;
+    let greaterIndex = parseInt(props.getProperty('greaterIndex')) || 0;
+    
+    // Get or create shuffled orders
+    let localOrder = props.getProperty('localOrder');
+    let greaterOrder = props.getProperty('greaterOrder');
+    
+    // Parse shuffled orders (or create new ones)
+    let localShuffle = [];
+    let greaterShuffle = [];
+    
+    if (localOrder && localOrder !== 'null') {
+      try {
+        localShuffle = JSON.parse(localOrder);
+      } catch (e) {
+        Logger.log('Error parsing localOrder, creating new shuffle');
+        localShuffle = [];
+      }
+    }
+    
+    if (greaterOrder && greaterOrder !== 'null') {
+      try {
+        greaterShuffle = JSON.parse(greaterOrder);
+      } catch (e) {
+        Logger.log('Error parsing greaterOrder, creating new shuffle');
+        greaterShuffle = [];
+      }
+    }
+    
+    // Create new shuffles if needed (first run or exhausted)
+    if (localShuffle.length === 0 || localIndex >= localShuffle.length) {
+      localShuffle = shuffleArray([...Array(localProperties.length).keys()]);
+      localIndex = 0;
+      Logger.log('Created new Local shuffle order:', localShuffle);
+    }
+    
+    if (greaterShuffle.length === 0 || greaterIndex >= greaterShuffle.length) {
+      greaterShuffle = shuffleArray([...Array(greaterProperties.length).keys()]);
+      greaterIndex = 0;
+      Logger.log('Created new Greater shuffle order:', greaterShuffle);
+    }
+    
+    Logger.log(`Current shuffle positions - Local: ${localIndex}/${localShuffle.length}, Greater: ${greaterIndex}/${greaterShuffle.length}`);
+    Logger.log(`Next selections will be - Local: property #${localShuffle[localIndex]}, Greater: properties #${greaterShuffle[greaterIndex]} and #${greaterShuffle[greaterIndex + 1] || 'N/A'}`);
+    
+    // Select properties using shuffled order (1 Local, 2 Greater)
+    const selectedProperties = [];
+    
+    // Select 1 Local property
+    if (localProperties.length > 0 && localIndex < localShuffle.length) {
+      const randomLocalIndex = localShuffle[localIndex];
+      const selectedLocal = localProperties[randomLocalIndex];
+      selectedProperties.push({
+        data: selectedLocal,
+        type: 'Local'
+      });
+      localIndex++; // Increment for next time
+      Logger.log(`Selected Local: property #${randomLocalIndex} (${selectedLocal[titleCol]}) from shuffle position ${localIndex - 1}`);
+    }
+    
+    // Select 2 Greater properties
+    if (greaterProperties.length > 0) {
+      for (let i = 0; i < 2 && greaterIndex < greaterShuffle.length; i++) {
+        const randomGreaterIndex = greaterShuffle[greaterIndex];
+        const selectedGreater = greaterProperties[randomGreaterIndex];
+        selectedProperties.push({
+          data: selectedGreater,
+          type: 'Greater'
+        });
+        greaterIndex++; // Increment for next time
+        Logger.log(`Selected Greater: property #${randomGreaterIndex} (${selectedGreater[titleCol]}) from shuffle position ${greaterIndex - 1}`);
+      }
+    }
+    
+    if (selectedProperties.length === 0) {
+      throw new Error('No valid properties found');
+    }
+    
+    // Save updated indices and shuffle orders back to PropertiesService
+    Logger.log(`About to save - Local: ${localIndex}, Greater: ${greaterIndex}`);
+    try {
+      props.setProperties({
+        'localIndex': localIndex.toString(),
+        'greaterIndex': greaterIndex.toString(),
+        'localOrder': JSON.stringify(localShuffle),
+        'greaterOrder': JSON.stringify(greaterShuffle)
+      });
+      Logger.log(`Successfully saved indices and shuffle orders to PropertiesService`);
+    } catch (error) {
+      Logger.log(`Error saving to PropertiesService: ${error.toString()}`);
+    }
+    
+    Logger.log(`Selected ${selectedProperties.length} properties total`);
+    
+    // Generate HTML
+    const htmlOutput = generateHTML(selectedProperties, titleCol, imageCol, cityCol, bedroomsCol, bathroomsCol, sleepsCol, linkCol);
+    Logger.log('Generated HTML, length:', htmlOutput.length);
+    
+    // Write to a safe cell in the VRBO sheet (column Z to avoid headers)
+    Logger.log('Writing to VRBO sheet column Z1...');
+    mainSheet.getRange('Z1').setValue(htmlOutput);
+    Logger.log('SUCCESS: HTML written to VRBO sheet Z1');
+    
+    return htmlOutput;
+    
+  } catch (error) {
+    Logger.log('ERROR:', error.toString());
+    throw error;
+  }
+}
+
+function generateHTML(properties, titleCol, imageCol, cityCol, bedroomsCol, bathroomsCol, sleepsCol, linkCol) {
+  if (!properties || !Array.isArray(properties)) {
+    throw new Error('Properties parameter is not a valid array');
+  }
+  
+  if (properties.length === 0) {
+    return '<tr class="row"><td colspan="3">No properties to display</td></tr>';
+  }
+  
+  let html = `<tr class="row">`;
+
+  properties.forEach((property, index) => {
+    const data = property.data;
+    
+    // Clean and validate data
+    const title = (data[titleCol] || '').toString().trim();
+    const imageUrl = (data[imageCol] || '').toString().trim();
+    const city = (data[cityCol] || '').toString().trim();
+    const bedrooms = (data[bedroomsCol] || '').toString().trim();
+    const bathrooms = (data[bathroomsCol] || '').toString().trim();
+    const sleeps = (data[sleepsCol] || '').toString().trim();
+    const link = (data[linkCol] || '').toString().trim();
+    
+    // Skip if essential data is missing
+    if (!title || !link) {
+      Logger.log(`Skipping property ${index + 1} - missing title or link`);
+      return;
+    }
+    
+    html += `
+    <!-- CARD ${index + 1} -->
+    <td class="column" width="33.33%" style="padding:8px;vertical-align:top;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+             style="table-layout:fixed;border:1px solid #ddd;border-radius:8px;background:#fff;height:100%;font-size:16px;line-height:26px;box-shadow:0 4px 12px rgba(0,0,0,.15);">
+        <!-- Image -->
+        <tr>
+          <!-- remove any gap above image -->
+          <td style="padding:0;line-height:0;font-size:0;mso-line-height-rule:exactly;border-top-left-radius:8px;border-top-right-radius:8px;">
+            <a href="${link}" style="display:block;text-decoration:none;">
+              <img src="${imageUrl}"
+                   alt="${title}, ${city}" border="0"
+                   style="display:block;width:100%;height:auto;border:0;outline:none;text-decoration:none;border-top-left-radius:8px;border-top-right-radius:8px;">
+            </a>
+          </td>
+        </tr>
+        <!-- Body -->
+        <tr>
+          <td style="padding:6px 10px 6px;">
+            <!-- 2-line clamp on desktop; mobile unlocks below -->
+            <div class="vrbo-title" style="font-size:16px;line-height:20px;height:auto;overflow:hidden;font-weight:bold;margin:0 0 4px;">
+              <a href="${link}" style="color:#0A66C2;text-decoration:none;">${title}</a>
+            </div>
+            <div style="font-size:13px;line-height:18px;color:#555;margin:0 0 8px;">${city}</div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #eee;table-layout:fixed;">
+              <tr>
+                <td align="center" style="padding:4px 0;font-size:12px;color:#222;white-space:nowrap;"><strong>${bedrooms}</strong> BR</td>
+                <td align="center" style="padding:4px 0;font-size:12px;color:#222;border-left:1px solid #eee;border-right:1px solid #eee;white-space:nowrap;"><strong>${bathrooms}</strong> BA</td>
+                <td align="center" style="padding:4px 0;font-size:12px;color:#222;white-space:nowrap;">Sleeps <strong>${sleeps}</strong></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>`;
+  });
+
+  html += `
+</tr>`;
+  
+  return html;
+}
+
+// Fisher-Yates shuffle algorithm for random ordering
+function shuffleArray(array) {
+  const shuffled = [...array]; // Create a copy
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+// Function to manually reset indices if needed
+function resetIndices() {
+  PropertiesService.getScriptProperties().setProperties({
+    'localIndex': '0',
+    'greaterIndex': '0',
+    'localOrder': '',
+    'greaterOrder': ''
+  });
+  Logger.log('Indices and shuffle orders reset - will create new random orders on next run');
+}
+
+// Function to check current indices
+function checkCurrentIndices() {
+  const props = PropertiesService.getScriptProperties();
+  const localIndex = parseInt(props.getProperty('localIndex')) || 0;
+  const greaterIndex = parseInt(props.getProperty('greaterIndex')) || 0;
+  
+  Logger.log(`Current indices - Local: ${localIndex}, Greater: ${greaterIndex}`);
+  return { localIndex, greaterIndex };
+}
+
+// Function to set up a daily trigger
+function createDailyTrigger() {
+  ScriptApp.newTrigger('selectPropertiesAndGenerateHTML')
+    .timeBased()
+    .everyDays(1)
+    .atHour(9) // Run at 9 AM daily, change as needed
+    .create();
+  
+  Logger.log('Daily trigger created');
+}
+
+This also creates the HTML code needed for the email (preview and send to mailerlite to be the same)
+
+An example of the final HTML:
+</table>
+<br>
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 990px; margin: 0 auto; background-color: #f7f7f7; font-family: Arial, sans-serif;">
+  <tr>
+    <td style="padding: 5px;">
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">Minnesota Getaways</h2>
+    </td>
+  </tr>
+  <tr>
+<tr class="row">
+    <!-- CARD 1 -->
+    <td class="column" width="33.33%" style="padding:8px;vertical-align:top;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+             style="table-layout:fixed;border:1px solid #ddd;border-radius:8px;background:#fff;height:100%;font-size:16px;line-height:26px;box-shadow:0 4px 12px rgba(0,0,0,.15);">
+        <!-- Image -->
+        <tr>
+          <!-- remove any gap above image -->
+          <td style="padding:0;line-height:0;font-size:0;mso-line-height-rule:exactly;border-top-left-radius:8px;border-top-right-radius:8px;">
+            <a href="https://vrbo.com/affiliates/3355390.n1Yxz2F" style="display:block;text-decoration:none;">
+              <img src="https://cdn.jsdelivr.net/gh/VFDavid/STCScoop@Vrbo/images/vrbo/f1c1e277931af339.jpg"
+                   alt="Stunning Lake View - Cabin 11, South Haven, MN" border="0"
+                   style="display:block;width:100%;height:auto;border:0;outline:none;text-decoration:none;border-top-left-radius:8px;border-top-right-radius:8px;">
+            </a>
+          </td>
+        </tr>
+        <!-- Body -->
+        <tr>
+          <td style="padding:6px 10px 6px;">
+            <!-- 2-line clamp on desktop; mobile unlocks below -->
+            <div class="vrbo-title" style="font-size:16px;line-height:20px;height:auto;overflow:hidden;font-weight:bold;margin:0 0 4px;">
+              <a href="https://vrbo.com/affiliates/3355390.n1Yxz2F" style="color:#0A66C2;text-decoration:none;">Stunning Lake View - Cabin 11</a>
+            </div>
+            <div style="font-size:13px;line-height:18px;color:#555;margin:0 0 8px;">South Haven, MN</div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #eee;table-layout:fixed;">
+              <tr>
+                <td align="center" style="padding:4px 0;font-size:12px;color:#222;white-space:nowrap;"><strong>2</strong> BR</td>
+                <td align="center" style="padding:4px 0;font-size:12px;color:#222;border-left:1px solid #eee;border-right:1px solid #eee;white-space:nowrap;"><strong>1</strong> BA</td>
+                <td align="center" style="padding:4px 0;font-size:12px;color:#222;white-space:nowrap;">Sleeps <strong>4</strong></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+    <!-- CARD 2 -->
+    <td class="column" width="33.33%" style="padding:8px;vertical-align:top;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+             style="table-layout:fixed;border:1px solid #ddd;border-radius:8px;background:#fff;height:100%;font-size:16px;line-height:26px;box-shadow:0 4px 12px rgba(0,0,0,.15);">
+        <!-- Image -->
+        <tr>
+          <!-- remove any gap above image -->
+          <td style="padding:0;line-height:0;font-size:0;mso-line-height-rule:exactly;border-top-left-radius:8px;border-top-right-radius:8px;">
+            <a href="https://vrbo.com/affiliates/2203843.tWsa8P0" style="display:block;text-decoration:none;">
+              <img src="https://cdn.jsdelivr.net/gh/VFDavid/STCScoop@Vrbo/images/vrbo/f1de54f07cac3656.jpg"
+                   alt="Bayview Cottage – Lakeside Getaway with Dock, Beach Access & Near Canal Park, Duluth, MN" border="0"
+                   style="display:block;width:100%;height:auto;border:0;outline:none;text-decoration:none;border-top-left-radius:8px;border-top-right-radius:8px;">
+            </a>
+          </td>
+        </tr>
+        <!-- Body -->
+        <tr>
+          <td style="padding:6px 10px 6px;">
+            <!-- 2-line clamp on desktop; mobile unlocks below -->
+            <div class="vrbo-title" style="font-size:16px;line-height:20px;height:auto;overflow:hidden;font-weight:bold;margin:0 0 4px;">
+              <a href="https://vrbo.com/affiliates/2203843.tWsa8P0" style="color:#0A66C2;text-decoration:none;">Bayview Cottage – Lakeside Getaway with Dock, Beach Access & Near Canal Park</a>
+            </div>
+            <div style="font-size:13px;line-height:18px;color:#555;margin:0 0 8px;">Duluth, MN</div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #eee;table-layout:fixed;">
+              <tr>
+                <td align="center" style="padding:4px 0;font-size:12px;color:#222;white-space:nowrap;"><strong>3</strong> BR</td>
+                <td align="center" style="padding:4px 0;font-size:12px;color:#222;border-left:1px solid #eee;border-right:1px solid #eee;white-space:nowrap;"><strong>2</strong> BA</td>
+                <td align="center" style="padding:4px 0;font-size:12px;color:#222;white-space:nowrap;">Sleeps <strong>7</strong></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+    <!-- CARD 3 -->
+    <td class="column" width="33.33%" style="padding:8px;vertical-align:top;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+             style="table-layout:fixed;border:1px solid #ddd;border-radius:8px;background:#fff;height:100%;font-size:16px;line-height:26px;box-shadow:0 4px 12px rgba(0,0,0,.15);">
+        <!-- Image -->
+        <tr>
+          <!-- remove any gap above image -->
+          <td style="padding:0;line-height:0;font-size:0;mso-line-height-rule:exactly;border-top-left-radius:8px;border-top-right-radius:8px;">
+            <a href="https://vrbo.com/affiliates/748059.WRmvUeY" style="display:block;text-decoration:none;">
+              <img src="https://cdn.jsdelivr.net/gh/VFDavid/STCScoop@Vrbo/images/vrbo/2b13b9bff9a056bb.jpg"
+                   alt="Charming Cottage On Lake Superior-15 minutes from Grand Marais and Lutsen, Lutsen, MN" border="0"
+                   style="display:block;width:100%;height:auto;border:0;outline:none;text-decoration:none;border-top-left-radius:8px;border-top-right-radius:8px;">
+            </a>
+          </td>
+        </tr>
+        <!-- Body -->
+        <tr>
+          <td style="padding:6px 10px 6px;">
+            <!-- 2-line clamp on desktop; mobile unlocks below -->
+            <div class="vrbo-title" style="font-size:16px;line-height:20px;height:auto;overflow:hidden;font-weight:bold;margin:0 0 4px;">
+              <a href="https://vrbo.com/affiliates/748059.WRmvUeY" style="color:#0A66C2;text-decoration:none;">Charming Cottage On Lake Superior-15 minutes from Grand Marais and Lutsen</a>
+            </div>
+            <div style="font-size:13px;line-height:18px;color:#555;margin:0 0 8px;">Lutsen, MN</div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #eee;table-layout:fixed;">
+              <tr>
+                <td align="center" style="padding:4px 0;font-size:12px;color:#222;white-space:nowrap;"><strong>1</strong> BR</td>
+                <td align="center" style="padding:4px 0;font-size:12px;color:#222;border-left:1px solid #eee;border-right:1px solid #eee;white-space:nowrap;"><strong>1</strong> BA</td>
+                <td align="center" style="padding:4px 0;font-size:12px;color:#222;white-space:nowrap;">Sleeps <strong>2</strong></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+</tr>
+</table>
+<!--[if mso]></td></tr></table><![endif]-->
+
+<!-- Mobile helpers: stack columns + allow long titles -->
+<style>
+@media only screen and (max-width:600px){
+  .row .column{display:block !important;width:100% !important;max-width:100% !important;}
+}
+</style>
+<!-- ===== /Minnesota Vrbo ===== -->
+<br>
+
+The Minnesota Getaways section in the Newsletter Camping page should show what the HTML code is showing.
+
+Adjusted URL Naming Script:
+const REPO_USER = 'VFDavid';
+const REPO_NAME = 'STCScoop';
+const BRANCH    = 'Vrbo'; // case-sensitive GitHub branch
+
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('Images')
+    .addItem('Fill VRBO Adjusted URLs', 'fillAdjustedUrlsVRBO')
+    .addItem('Fill ETSY Adjusted URLs', 'fillAdjustedUrlsETSY')
+    .addToUi();
+}
+
+// --- Hash helper (same as Node script) ---
+function sha1Hex16_(s) {
+  const raw = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_1, String(s));
+  return raw.map(b => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('').slice(0,16);
+}
+
+// --- Generic filler for any sheet ---
+function fillAdjustedUrlsForSheet_(sheetName, srcHeader, dstHeader, subfolder) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(sheetName);
+  if (!sh) throw new Error(`Sheet not found: ${sheetName}`);
+
+  const last = sh.getLastRow();
+  if (last < 2) return;
+
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const colSrc  = headers.indexOf(srcHeader) + 1;
+  const colDst  = headers.indexOf(dstHeader) + 1;
+  if (colSrc < 1 || colDst < 1)
+    throw new Error(`[${sheetName}] Missing required columns "${srcHeader}" or "${dstHeader}".`);
+
+  const srcVals = sh.getRange(2, colSrc, last - 1, 1).getValues();
+  const dstVals = sh.getRange(2, colDst, last - 1, 1).getValues();
+
+  const out = [];
+  for (let i = 0; i < srcVals.length; i++) {
+    const src = String(srcVals[i][0] || '').trim();
+    const already = dstVals[i][0];
+    if (!src || already) { out.push([already]); continue; }
+
+    const hash16 = sha1Hex16_(src);
+    const url = `https://cdn.jsdelivr.net/gh/${REPO_USER}/${REPO_NAME}@${BRANCH}/images/${subfolder}/${hash16}.jpg`;
+    out.push([url]);
+  }
+
+  sh.getRange(2, colDst, out.length, 1).setValues(out);
+}

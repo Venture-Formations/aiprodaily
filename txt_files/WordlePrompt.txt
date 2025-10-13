@@ -1,0 +1,74 @@
+{
+  "query": {
+    "description": "Find the Wordle answer for September 23, 2025, based on trusted spoiler sources and high-confidence solver reports. If the answer is not confirmed, return the most likely guess reported by multiple sources.",
+    "criteria": {
+      "date": "September 23, 2025",
+      "required_fields": [
+        "word",
+        "definition",
+        "interesting_fact"
+      ],
+      "field_constraints": {
+        "definition": {
+          "type": "string",
+          "max_words": 30,
+          "source": [
+            "Merriam-Webster",
+            "Oxford",
+            "Collins"
+          ]
+        },
+        "interesting_fact": {
+          "type": "string",
+          "max_words": 50,
+          "style": "game show-worthy",
+          "content": [
+            "etymology",
+            "pop culture use",
+            "trivia",
+            "historical notes"
+          ],
+          "source_required": true,
+          "source_flexibility": "any reputable source"
+        }
+      },
+      "sources": {
+        "preferred": [
+          "Reddit r/wordle daily thread",
+          "wordlesolver.net",
+          "Tom’s Cafe Wordle spoiler site",
+          "NYT WordleBot"
+        ],
+        "allow_additional_sources": true
+      },
+      "multiple_answers": {
+        "allow": true,
+        "format": "one object per answer",
+        "label_alt": "(alt answer)"
+      },
+      "fallback": {
+        "if_unconfirmed": [
+          {
+            "word": "Unknown",
+            "definition": "Unknown",
+            "interesting_fact": "Unknown"
+          }
+        ]
+      }
+    },
+    "output_rules": {
+      "format": "JSON_array_only",
+      "json_starts_with": "[",
+      "output_structure": [
+        {
+          "word": "string",
+          "definition": "string (≤ 30 words)",
+          "interesting_fact": "string (≤ 50 words, game show-worthy, do not show source)"
+        }
+      ],
+      "no_extras": true
+    }
+  }
+}
+
+Do not wrap the output in triple backticks or markdown. Return on JSON. No comments or explainations

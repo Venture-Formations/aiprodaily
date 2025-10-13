@@ -1,0 +1,220 @@
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 990px; margin: 0 auto; background-color: #f7f7f7; font-family: Arial, sans-serif;">
+  <tr>
+    <td style="padding: 5px;">
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">Local Events</h2>
+    </td>
+  </tr><tr class="row"><td class='column' style='padding:8px; vertical-align: top;'>
+  <table width='100%' cellpadding='0' cellspacing='0' style='table-layout: fixed; border: 1px solid #ddd; border-radius: 8px; background: #fff; height: 100%; font-family: Arial, sans-serif; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
+    <tr>
+      <td style='background: #F8F9FA; padding: 8px; text-align: center; font-weight: normal; font-size: 16px; line-height: 26px; color: #3C4043; border-top-left-radius: 8px; border-top-right-radius: 8px;'>Friday, September 19</td>
+    </tr>
+    <tr>
+      <td style='padding:0; border-top: 1px solid #eee;'>
+        <div style='padding:8px 16px; background:#E8F0FE; border:2px solid #1877F2; border-radius:6px;'>
+          <span style='font-size: 16px;'>🌽 <strong>Stoney Brook Farms Harvest Fun Days and Corn Maze</strong></span><br>
+          <span style='font-size:14px;'><a href='https://visitstcloud.com/event/stoney-brook-farms-harvest-fun-days-and-corn-maze/2025-09-19/' style='color: #000; text-decoration: underline;'>12PM → 5PM</a>  | Stoney Brook Farms</span><br><br><span style='font-size:13px;'>Explore a massive 64-acre farm with three distinct mazes, a pumpkin patch, and scavenger hunts. Each maze offers varying levels of difficulty.</span>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🎨 <strong>Branch Out: Art Exhibition</strong></span><br>
+        <span style='font-size:14px;'><a href='https://visitstcloud.com/event/branch-out-art-exhbition/2025-09-19/' style='color: #000; text-decoration: underline;'>10AM → 2PM</a>  | Paramount Center for the Arts</span>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🎯 <strong>$5 Fridays at Blacklight Adventures!</strong></span><br>
+        <span style='font-size:14px;'><a href='https://visitstcloud.com/event/5-fridays-at-blacklight-adventures/2025-09-19/' style='color: #000; text-decoration: underline;'>12PM → 10PM</a>  | Black Light Adventures</span>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🥕 <strong>St. Joseph’s Farmers’ Market</strong></span><br>
+        <span style='font-size:14px;'><a href='https://visitstcloud.com/event/st-josephs-farmers-market/2025-09-19/' style='color: #000; text-decoration: underline;'>3PM → 6PM</a>  | Resurrection Lutheran Church</span>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🛼 <strong>Open Skate at The Skatin’ Place</strong></span><br>
+        <span style='font-size:14px;'><a href='https://visitstcloud.com/event/open-skate-at-the-skatin-place-2/2025-09-19/' style='color: #000; text-decoration: underline;'>3PM → 6PM</a>  | Skatin’ Place</span>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🎡 <strong>Carnival at Crossroads Center</strong></span><br>
+        <span style='font-size:14px;'><a href='https://visitstcloud.com/event/carnival-at-crossroads-center/2025-09-19/' style='color: #000; text-decoration: underline;'>4PM → 9PM</a>  | Crossroads Center</span>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🎶 <strong>Kansas</strong></span><br>
+        <span style='font-size:14px;'><a href='https://visitstcloud.com/event/kansas/' style='color: #000; text-decoration: underline;'>7:30PM → 9:30PM</a>  | The Ledge Amphitheater</span>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🎲 <strong>Magic The Gathering- Commander League</strong></span><br>
+        <span style='font-size:14px;'><a href='https://visitstcloud.com/event/magic-gathering-commander-league/2025-09-19/' style='color: #000; text-decoration: underline;'>7PM → 10:30PM</a>  | Sneak Attack’s Games</span>
+      </td>
+    </tr>
+  </table>
+</td> 
+<td class='column' style='padding:8px; vertical-align: top;'>
+  <table width='100%' cellpadding='0' cellspacing='0' style='table-layout: fixed; border: 1px solid #ddd; border-radius: 8px; background: #fff; height: 100%; font-family: Arial, sans-serif; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
+    <tr>
+      <td style='background: #F8F9FA; padding: 8px; text-align: center; font-weight: normal; font-size: 16px; line-height: 26px; color: #3C4043; border-top-left-radius: 8px; border-top-right-radius: 8px;'>Saturday, September 20</td>
+    </tr>
+    <tr>
+      <td style='padding:0; border-top: 1px solid #eee;'>
+        <div style='padding:8px 16px; background:#E8F0FE; border:2px solid #1877F2; border-radius:6px;'>
+          <span style='font-size: 16px;'>🏃‍♂️ <strong>Rock Your Sole 5K</strong></span><br>
+          <span style='font-size:14px;'>
+            <a href='https://visitstcloud.com/event/rock-your-sole-5k/' style='color: #000; text-decoration: underline;'>8AM &nbsp;→ 11AM</a>  | Quarry Park & Nature Preserve
+          </span><br><br>
+          <span style='font-size:13px;'>Experience the thrill of the trail run at Quarry Park. Perfect for family fitness with additional short races for kids.</span>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🌽 <strong>St. Cloud Area Farmer’s Market</strong></span><br>
+        <span style='font-size:14px;'>
+          <a href='https://visitstcloud.com/event/st-cloud-area-farmers-market/2025-09-20/' style='color: #000; text-decoration: underline;'>8AM &nbsp;→ 12PM</a>  | Lady Slipper Parking Lot
+        </span>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🍂 <strong>Festi-Fall Downtown St. Cloud</strong></span><br>
+        <span style='font-size:14px;'>
+          <a href='https://visitstcloud.com/event/festi-fall-downtown-st-cloud/2025-09-20/' style='color: #000; text-decoration: underline;'>8AM &nbsp;→ 12PM</a>  | East End St. Cloud
+        </span>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🎨 <strong>Ceramic Butter Dish</strong></span><br>
+        <span style='font-size:14px;'>
+          <a href='https://visitstcloud.com/event/ceramic-butter-dish/' style='color: #000; text-decoration: underline;'>10AM &nbsp;→ 2PM</a>  | Paramount Center for the Arts
+        </span>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🏒 <strong>St. Cloud SCHEELS Hockey Demo Days</strong></span><br>
+        <span style='font-size:14px;'>
+          <a href='https://visitstcloud.com/event/st-cloud-scheels-hockey-demo-days/2025-09-20/' style='color: #000; text-decoration: underline;'>10AM &nbsp;→ 5PM</a>  | SCHEELS
+        </span>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🏳️‍🌈 <strong>St. Cloud Pride in the Park</strong></span><br>
+        <span style='font-size:14px;'>
+          <a href='https://visitstcloud.com/event/50906/' style='color: #000; text-decoration: underline;'>11AM &nbsp;→ 4PM</a>  | Lake George Complex
+        </span>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🍺 <strong>BIBCo Oktoberfest Celebration</strong></span><br>
+        <span style='font-size:14px;'>
+          <a href='https://visitstcloud.com/event/bibco-oktoberfest-celebration/' style='color: #000; text-decoration: underline;'>12PM &nbsp;→ 10PM</a>  | Beaver Island Brewing Co.
+        </span>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🎶 <strong>Bonnie Raitt</strong></span><br>
+        <span style='font-size:14px;'>
+          <a href='https://visitstcloud.com/event/bonnie-raitt/' style='color: #000; text-decoration: underline;'>7:30PM &nbsp;→ 9PM</a>  | The Ledge Amphitheater
+        </span>
+      </td>
+    </tr>
+  </table>
+</td> 
+<td class='column' style='padding:8px; vertical-align: top;'>
+  <table width='100%' cellpadding='0' cellspacing='0' style='table-layout: fixed; border: 1px solid #ddd; border-radius: 8px; background: #fff; height: 100%; font-family: Arial, sans-serif; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
+    <tr>
+      <td style='background: #F8F9FA; padding: 8px; text-align: center; font-weight: normal; font-size: 16px; line-height: 26px; color: #3C4043; border-top-left-radius: 8px; border-top-right-radius: 8px;'>Thursday, September 21</td>
+    </tr>
+    <tr>
+      <td style='padding:0; border-top: 1px solid #eee;'>
+        <div style='padding:8px 16px; background:#E8F0FE; border:2px solid #1877F2; border-radius:6px;'>
+          <span style='font-size: 16px;'>🧒 <strong>Sensory Friendly Days at Stoney Brook Farms</strong></span>
+          <br>
+          <span style='font-size:14px;'>
+            <a href='https://visitstcloud.com/event/sensory-friendly-days-at-stoney-brook-farms/2025-09-21/' style='color: #000; text-decoration: underline;'>8:30AM → 10AM</a>  | Stoney Brook Farms
+          </span>
+          <br><br>
+          <span style='font-size:13px;'>Enjoy a calm and welcoming atmosphere with fewer crowds at Stoney Brook Farms, perfect for a serene family outing.</span>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🏒 <strong>St. Cloud SCHEELS Hockey Demo Days</strong></span>
+        <br>
+        <span style='font-size:14px;'>
+          <a href='https://visitstcloud.com/event/st-cloud-scheels-hockey-demo-days/2025-09-21/' style='color: #000; text-decoration: underline;'>10AM → 5PM</a>  | SCHEELS
+        </span>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🌽 <strong>Stoney Brook Farms Harvest Fun Days and Corn Maze</strong></span>
+        <br>
+        <span style='font-size:14px;'>
+          <a href='https://visitstcloud.com/event/stoney-brook-farms-harvest-fun-days-and-corn-maze/2025-09-21/' style='color: #000; text-decoration: underline;'>10AM → 6PM</a>  | Stoney Brook Farms
+        </span>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🍁 <strong>Festi-Fall Downtown St. Cloud</strong></span>
+        <br>
+        <span style='font-size:14px;'>
+          <a href='https://visitstcloud.com/event/festi-fall-downtown-st-cloud/2025-09-21/' style='color: #000; text-decoration: underline;'>12PM → 5PM</a>  | East End St. Cloud
+        </span>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🎡 <strong>Carnival at Crossroads Center</strong></span>
+        <br>
+        <span style='font-size:14px;'>
+          <a href='https://visitstcloud.com/event/carnival-at-crossroads-center/2025-09-21/' style='color: #000; text-decoration: underline;'>12PM → 8PM</a>  | Crossroads Center
+        </span>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🐉 <strong>Dungeons and Dragons League</strong></span>
+        <br>
+        <span style='font-size:14px;'>
+          <a href='https://visitstcloud.com/event/dungeons-dragons-league/2025-09-21/' style='color: #000; text-decoration: underline;'>1PM → 4PM</a>  | Sneak Attack's Games
+        </span>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🎶 <strong>Bluegrass & Brews</strong></span>
+        <br>
+        <span style='font-size:14px;'>
+          <a href='https://visitstcloud.com/event/bluegrass-brews/2025-09-21/' style='color: #000; text-decoration: underline;'>1PM → 5PM</a>  | Beaver Island Brewing Co.
+        </span>
+      </td>
+    </tr>
+    <tr>
+      <td style='padding: 8px 16px; border-top: 1px solid #eee;'>
+        <span style='font-size: 16px;'>🎭 <strong>GREAT Theater Presents “Elephant & Piggie’s “We Are In A Play!” Jr.”</strong></span>
+        <br>
+        <span style='font-size:14px;'>
+          <a href='https://visitstcloud.com/event/elephant-piggies-we-are-in-a-play-jr/2025-09-21/1/' style='color: #000; text-decoration: underline;'>2PM → 3PM</a>  | Helgeson Learning Lab Theatre
+        </span>
+      </td>
+    </tr>
+  </table>
+</td>
+</td></table>

@@ -1,0 +1,118 @@
+Event Curator
+{
+  "role": "event curator",
+  "task": "You're analyzing a list of events to select a diverse, relevant lineup for each day.",
+  "instructions": [
+    "Only include events from the first event_date in the dataset. Ignore events scheduled for later dates.",
+    "Select up to 8 events.",
+    "Choose a mix of event types — include family-friendly, 21+, kids, free events, and large public events when possible.",
+    "Prioritize popular, unique, or high-impact events (e.g., concerts, festivals, parades, etc.).",
+    "Avoid near-duplicate listings unless they're different in type, time, or audience.",
+    "Sort events by start_time.",
+    "For each selected event, assign an appropriate event_emoji that best represents the nature or type of the event (e.g., 🎶 for concerts, 🎨 for art, 🍔 for food, 🧒 for kids, ⚾ for sports, etc.)."
+  ],
+  "output_format": {
+    "type": "json",
+    "structure": "Map to an array of up to 8 events",
+    "fields": [
+      "event_date",
+      "title",
+      "description",
+      "start_time",
+      "end_time",
+      "venue",
+      "address",
+      "event_link",
+      "event_emoji"
+    ],
+    "date_format": "Convert event_date to MM-DD-YYYY format (e.g. 07-04-2025).",
+    "time_format": "Convert to 12-hour format using AM/PM (e.g. 3PM, 11:30AM). Remove :00 if on the hour. No space before AM/PM."
+  },
+  "formatting_rules": {
+    "json_output": "Return only a JSON object with a single date key (the first event_date in the input) and an array of 8 or fewer events as the value. Do not include markdown, comments, or explanatory text."
+  }
+}
+
+Do not wrap the output in triple backticks or markdown.
+
+
+HTML Formatting
+{
+"role": "expert formatter",
+"task": "Convert a JSON list of events for a single date into one HTML 'card' for use in a 3-column layout email. Return only the <td class='column'> block that wraps a date card with all its events stacked inside.",
+"output_format": "Inline HTML starting with <td class='column'> only (no <tr> or <table> wrappers)",
+"requirements": {
+"preserve_html_in_event_field": true,
+"use_event_name_as_link_if_anchor_present": false,
+"extract_text_from_event_if_no_link": true,
+"remove_city_from_location": true,
+"inline_css_only": true,
+"no_wrapper_or_header": true,
+"no_markdown_or_code_blocks": true,
+"no_extra_output": true,
+"emoji_clock_by_start_time": true,
+"timezone": "America/Chicago",
+"date_format": "dddd, MMMM D",
+"time_format": "[start_time] → [end_time] (omit → if end_time is '–')",
+"date_calculation": "Calculate the correct day of the week strictly from the provided event_date using America/Chicago. Do not infer from context, current date, or any text fields.",
+"highlight_random_event": true,
+"no_border_or_radius_on_td": true,
+"use_nbsp_entities_for_spacing": true
+},
+"date_processing": {
+"step_1": "Read the date from the input as an ISO string in the form 'YYYY-MM-DD'. Use only the first event's event_date for the card.",
+"step_2": "Interpret this date in the 'America/Chicago' timezone at local noon (12:00) to avoid DST/offset rollover issues. Do NOT add or subtract days.",
+"step_3": "Compute the weekday from that local date (e.g., getDay() after converting to America/Chicago). Ignore any weekday words found elsewhere in the input.",
+"step_4": "Format as 'DayName, Month D' (e.g., 'Tuesday, August 12').",
+"validation": "Recompute the weekday a second time (fresh from the same source date) and ensure both results match. If there is any mismatch, prefer the result from America/Chicago at 12:00 local time."
+},
+"input_format": {
+"events": [
+{
+"event_date": "2025-08-12",
+"start_time": "6PM",
+"end_time": "9PM",
+"title": "Downtown Music Fest",
+"venue": "Lake George",
+"address": "St. Cloud",
+"event_link": "https://example.com/concert
+",
+"event_emoji": "🎤",
+"description": "An outdoor community concert with local bands, food trucks, and activities."
+}
+]
+},
+"html_template": {
+"column_wrapper": "<td class='column' style='padding:8px; vertical-align: top;'>[date_card]</td>",
+"date_card_wrapper": {
+"table": "<table width='100%' cellpadding='0' cellspacing='0' style='table-layout: fixed; border: 1px solid #ddd; border-radius: 8px; background: #fff; height: 100%; font-family: Arial, sans-serif; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>[rows]</table>",
+"header_row": "<tr><td style='background: #F8F9FA; padding: 8px; text-align: center; font-weight: normal; font-size: 16px; line-height: 26px; color: #3C4043; border-top-left-radius: 8px; border-top-right-radius: 8px;'>[formatted_date]</td></tr>",
+"event_row_first": "<tr><td style='padding:0; border-top: 1px solid #eee;'><div style='padding:8px 16px; background:#E8F0FE; border:2px solid #1877F2; border-radius:6px;'><span style='font-size: 16px;'>[event_emoji] <strong>[event_text_only]</strong></span><br><span style='font-size:14px;'><a href='[event_url]' style='color: #000; text-decoration: underline;'>[time_range]</a>  | [location_short]</span>[first_summary_block]</div></td></tr>",
+"event_row": "<tr><td style='padding: 8px 16px; border-top: 1px solid #eee;'><span style='font-size: 16px;'>[event_emoji] <strong>[event_text_only]</strong></span><br><span style='font-size:14px;'><a href='[event_url]' style='color: #000; text-decoration: underline;'>[time_range]</a>  | [location_short]</span></td></tr>"
+}
+},
+"event_logic": {
+"highlighted_event": "Randomly select ONE event from the input list. Render it using event_row_first with first_summary_block.",
+"non_highlighted_events": "Render all remaining events using event_row without first_summary_block.",
+"event_text_only": "Use title field as the event name.",
+"event_url": "Use event_link field for the URL.",
+"location_short": "Use venue field, exclude city/state information.",
+"first_summary_block": "If description exists: render <br><br><span style='font-size:13px;'>[event_summary]</span>; otherwise render empty string.",
+"event_summary": "Rewrite the description field into a concise, natural-language highlight of 50 words or fewer. Do not copy or truncate the first words; paraphrase so it reads well."
+},
+"examples": {
+"correct_date_formatting": [
+"2025-08-12 → Tuesday, August 12",
+"2025-08-13 → Wednesday, August 13",
+"2025-08-15 → Friday, August 15",
+"2025-12-25 → Thursday, December 25"
+],
+"incorrect_examples": [
+"Do NOT output: Thursday, August 12 (when date is 2025-08-12)",
+"Do NOT shift the date due to UTC/local differences",
+"Do NOT guess day names without calculating from the actual date"
+]
+}
+}
+
+Do not wrap the output in triple backticks or markdown. Return plain HTML only.

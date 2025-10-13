@@ -1,0 +1,88 @@
+<html>
+<body style='margin:0!important;padding:0!important;background-color:#f7f7f7;'>
+   <div style='width:100%;margin:0 auto;padding:10px;background-color:#f7f7f7;box-sizing:border-box;overflow-x:auto;'>
+     <div style='width:100%;max-width:990px;margin:0 auto;padding:5px;text-align:right;font-weight:bold;'>
+       <a href='{$url}' style='color:#000;text-decoration:underline;'>View Online</a>&nbsp;|&nbsp;
+       <a href='https://stcscoop.com/' style='color:#000;text-decoration:underline;'>Sign Up</a>&nbsp;|&nbsp;
+       <a href='{$forward}' style='color:#000;text-decoration:underline;'>Share</a>
+     </div>
+     <div style='width:100%;max-width:990px;margin:0 auto;padding:0px;'>
+       <div style='font-family:Arial,sans-serif;background-color:#1877F2;text-align:center;border-radius:12px;border:1px solid #333;'>
+         <img alt='St. Cloud Scoop' src='https://raw.githubusercontent.com/VFDavid/STCScoop/refs/heads/main/STCSCOOP_Logo_824X148_clear.png' style='width:100%;max-width:500px;height:auto;margin-bottom:2px;'/>
+         <div style='color:#fff;font-size:16px;font-weight:bold;padding:0 0 5px;'>Tuesday, September 16, 2025</div>
+       </div>
+     </div>
+   </div>
+<br>
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 990px; margin: 0 auto; background-color: #f7f7f7; font-family: Arial, sans-serif;">
+  <tr>
+    <td style="padding: 5px;">
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">The Local Scoop</h2>
+    </td>
+  </tr><tr class="row"><tr class='row'>
+ <td class='column' style='padding:8px; vertical-align: top;'>
+ <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: Arial, sans-serif; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
+ <tr><td style='padding: 12px 12px 4px; font-size: 20px; font-weight: bold;'>Discover How Roadwork on County Road 81 Is Altering Waite Park Commutes</td></tr>
+ <tr><td style='padding: 0; text-align: center;'><img src='https://scontent-iad3-1.xx.fbcdn.net/v/t39.30808-6/548259460_1218519473644405_2532538445491361977_n.jpg?_nc_cat=110&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=NnqUM2nPvGoQ7kNvwHUaJjr&_nc_oc=Adn2kvy3hmdDEm0XTHXfeHqfNDM3zl44PnFqsSyhCV0-4PUeGULa769-EXMHvjt9VDU&_nc_zt=23&_nc_ht=scontent-iad3-1.xx&_nc_gid=X-IESVvb0VCuwLyLkgVCeQ&oh=00_AfZEzbW_bVcRDi6-sKCR4cKWaS75WaXC09kf1G4yzP6CSA&oe=68CE9F65' alt='Roadwork on County Road 81 in Waite Park' style='max-width: 100%; max-height: 500px; border-radius: 4px;'/></td></tr>
+ <tr><td style='padding: 0 12px 12px; text-align: center; font-size: 12px; color: #555; font-style: italic;'>Photo by Stearns County MN Government</td></tr>
+ <tr><td style='padding: 0 12px 20px;'>Waite Park residents will experience changes in their travel routes as the resurfacing project on County Road 81 kicks off, closing Waite Avenue to through traffic. While 10th Avenue remains accessible, commuters will need to navigate these changes carefully. The project runs between Highway 15 and 12th Avenue North, impacting accessibility throughout the area. (<a href='https://www.facebook.com/StearnsCounty/posts/pfbid0xRFM46ZY6hmnUBwt3ziGVrWxnqqQ6Zti1jctgqfjZx6XY1PMxaN55EaWuDpe4UWVl?app=fbl' style='color: #0080FE; text-decoration: none;'>read more</a>)</td></tr>
+ </table>
+ </td>
+</tr> 
+<tr class='row'>
+ <td class='column' style='padding:8px; vertical-align: top;'>
+ <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: Arial, sans-serif; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
+ <tr><td style='padding: 12px 12px 4px; font-size: 20px; font-weight: bold;'>New Highway Project Spurs Local Dialogue</td></tr>
+ <tr><td style='padding: 0 12px; text-align: center;'><img src='https://scontent-ord5-2.xx.fbcdn.net/v/t39.30808-6/549421536_1186533700177589_266867873106186308_n.jpg?stp=dst-jpg_p843x403_tt6&_nc_cat=104&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=vgyTIxLTcbkQ7kNvwH1dLGA&_nc_oc=Adl1U-Z9_p7jfwRKxTC9VdgvEvI4GS1Ec_5ajI_39Jqx-svqaKrMbsHT0divNmI8yjc&_nc_zt=23&_nc_ht=scontent-ord5-2.xx&_nc_gid=w_hsReQPiyH6fr0Jzy1L3w&oh=00_AfY7f9VJpi2dKVJhfTTOTHBCJCfZD04AkRokoVeemC4PCg&oe=68CE666F' alt='Benton County highway project plan' style='max-width: 100%; max-height: 500px; border-radius: 4px;'/></td></tr>
+ <tr><td style='padding: 0 12px 12px; text-align: center; font-size: 12px; color: #555; font-style: italic;'>Photo by Benton County Highway Department</td></tr>
+ <tr><td style='padding: 0 12px 20px;'>Residents of Benton County are invited to an open house to discuss the planned 2.5-mile highway extension joining County Highway 29 and CH 3. The event promises insights from project team members who are eager to share details and answer community questions, aiming to gather valuable public feedback on the significant regional development. (<a href='https://www.facebook.com/bchwy.projects/posts/pfbid04WeriPRVaMD4pcWojKBtBSegD7JeukRUWiLKdmsKAix14EKcTY3QrPCsR9VXEM8hl?app=fbl' style='color: #0080FE; text-decoration: none;'>read more</a>)</td></tr>
+ </table>
+ </td>
+</tr> 
+<tr class='row'>
+ <td class='column' style='padding:8px; vertical-align: top;'>
+ <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: Arial, sans-serif; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
+ <tr><td style='padding: 12px 12px 4px; font-size: 20px; font-weight: bold;'>Unleash Fun and Adventure at St. Cloud's AirMaxx Park</td></tr>
+ <tr><td style='padding: 0 12px; text-align: center;'><img src='https://scontent-den2-1.xx.fbcdn.net/v/t39.30808-6/547276040_1337069718424662_4092191556869840416_n.jpg?stp=dst-jpg_p526x296_tt6&_nc_cat=102&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=uOlWwKfAl3kQ7kNvwH73kKI&_nc_oc=AdltGqUGinuuX6uRTgoEnjCGWp234HHXVVbPVw1_9ti7P7votKFrc0EhGgUlRINFXqY&_nc_zt=23&_nc_ht=scontent-den2-1.xx&_nc_gid=RBBgLu5s_yLaQUgOc2uiGg&oh=00_Afa5qQEMawKF0L0FFAEGZjS1wURZ5g590-iBl2e-CPyfRg&oe=68CE7D30' alt='Kids enjoying trampoline at AirMaxx' style='max-width: 100%; max-height: 500px; border-radius: 4px;'/></td></tr>
+ <tr><td style='padding: 0 12px 12px; text-align: center; font-size: 12px; color: #555; font-style: italic;'>Photo by Visit Greater St. Cloud</td></tr>
+ <tr><td style='padding: 0 12px 20px;'>Experience unforgettable excitement at AirMaxx Trampoline Park and Ninja Warrior Course in St. Cloud. Perfect for families and thrill-seekers alike, the venue promises a day filled with adventure, laughter, and lasting memories. Whether you're tackling the ninja course or bouncing in the trampoline park, it's a fun-filled way to energize your day! Discover the thrill and say yes to adventure. (<a href='https://www.facebook.com/VisitStCloudMN/posts/pfbid0UkdAwXt3Qa5m6arXVYXdB5NbN8Z81wSuyVV2ZrFECt1FvQQZfa1YRyEK9XzLrePil?app=fbl' style='color: #0080FE; text-decoration: none;'>read more</a>)</td></tr>
+ </table>
+ </td>
+</tr> 
+<tr class='row'>
+ <td class='column' style='padding:8px; vertical-align: top;'>
+ <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: Arial, sans-serif; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
+ <tr><td style='padding: 12px 12px 4px; font-size: 20px; font-weight: bold;'>Discover Autumn Opportunities with St. Cloud's Chamber</td></tr>
+ <tr><td style='padding: 0 12px; text-align: center;'><img src='https://scontent-fra5-2.xx.fbcdn.net/v/t39.30808-6/548092950_1199142345570908_8256346898296750837_n.jpg?stp=dst-jpg_p180x540_tt6&_nc_cat=109&ccb=1-7&_nc_sid=e5c1b6&_nc_ohc=vO9mp16sPecQ7kNvwFYjfKj&_nc_oc=AdljvOrB0NNZl83RSUwQROvoyREWBceJclIaIMOgxPLPFveg5IhoSFq6bKoeP3E-zgU&_nc_zt=23&_nc_ht=scontent-fra5-2.xx&_nc_gid=7gmmDA096w-t5dKusMxxHA&oh=00_AfYoGruKGSEhwC9eS_AB5VsEYq3i_Mpt-U6KToCmyyDUxA&oe=68CE9C02' alt='Fall event at St. Cloud Chamber' style='max-width: 100%; max-height: 500px; border-radius: 4px;'/></td></tr>
+ <tr><td style='padding: 0 12px 12px; text-align: center; font-size: 12px; color: #555; font-style: italic;'>Photo by Saint Cloud Area Chamber of Commerce</td></tr>
+ <tr><td style='padding: 0 12px 20px;'>This fall, the St. Cloud Area Chamber of Commerce is buzzing with opportunities for local businesses. The Chamber invites members to explore upcoming events, new benefits, and success stories in the latest edition of The Bottom Line. They also encourage sharing testimonials to highlight impactful members within the community. Explore these exciting developments today. (<a href='https://www.facebook.com/SaintCloudAreaChamberofCommerce/posts/pfbid02s31sagWpJNVVrSLv4gXTYyvLaUJCezua8NjT7qMZ4hyZco8DStk5hqnbWWoHMYEPl?app=fbl' style='color: #0080FE; text-decoration: none;'>read more</a>)</td></tr>
+ </table>
+ </td>
+</tr> 
+<tr class='row'>
+ <td class='column' style='padding:8px; vertical-align: top;'>
+ <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: Arial, sans-serif; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
+ <tr><td style='padding: 12px 12px 4px; font-size: 20px; font-weight: bold;'>Discover the Hidden Duties of Local Dispatchers</td></tr>
+ <tr><td style='padding: 0 12px; text-align: center;'><img src='https://scontent-lga3-1.xx.fbcdn.net/v/t39.30808-6/548213937_1233953535440616_7637491453600564004_n.jpg?stp=cp6_dst-jpg_p843x403_tt6&_nc_cat=103&ccb=1-7&_nc_sid=e21142&_nc_ohc=ZLe02_qsvZ0Q7kNvwF31ew9&_nc_oc=AdkoxjYKHjfw-EHCClXz3Z7pN20Zjfp9nZ0suiReKwqwIfX5IyW2D14fyr6L5G6g_rA&_nc_zt=23&_nc_ht=scontent-lga3-1.xx&_nc_gid=_hdkqkyA5xnc6aySzVDX1A&oh=00_Afbh9E4rXtG6BvXhH8OZNoqbtQ-q1bvb1TwKoWYzE2Efzg&oe=68CE93C9' alt='Dispatcher filing cabinet and paperwork' style='max-width: 100%; max-height: 500px; border-radius: 4px;'/></td></tr>
+ <tr><td style='padding: 0 12px 12px; text-align: center; font-size: 12px; color: #555; font-style: italic;'>Photo by Benton County Sheriff's Office</td></tr>
+ <tr><td style='padding: 0 12px 20px;'>The Benton County Sheriff's Office reveals that dispatchers play a more significant role than commonly perceived. Beyond answering calls and handling radio communication, these essential workers are also responsible for managing warrants. Each warrant is meticulously organized into folders and stored in a filing cabinet, ensuring seamless coordination of operations within the community. This behind-the-scenes work is crucial for maintaining safety and efficiency in Benton County. (<a href='https://www.facebook.com/BentonMNSheriff/posts/pfbid02XshAj6h7NUZAYuEztZZTM8W7qhrDtUXwETUmAdB5C31w4zbYfCVmPApiVify7LQYl?app=fbl' style='color: #0080FE; text-decoration: none;'>read more</a>)</td></tr>
+ </table>
+ </td>
+</tr></table>
+<br>
+<div style="max-width: 990px; margin: 0 auto; background-color: #1877F2; padding: 8px 0; text-align: center;">
+  <a href="https://www.facebook.com/61578947310955/" target="_blank">
+    <img src="https://raw.githubusercontent.com/VFDavid/STCScoop/refs/heads/main/facebook_light.png" alt="Facebook" width="24" height="24" style="border: none; display: inline-block;">
+  </a>
+</div>
+<div style="font-family: Arial, sans-serif; font-size: 12px; color: #777; text-align: center; padding: 20px 10px; border-top: 1px solid #ccc; background-color: #ffffff; max-width: 990px; margin: 0 auto ;">
+  <p style="margin: 0;text-align: center;">You're receiving this email because you subscribed to <strong>St. Cloud Scoop</strong>.</p>
+  <p style="margin: 5px 0 0;text-align: center;">
+    <a href="{$unsubscribe}" style='text-decoration: underline;'>Unsubscribe</a>
+  </p>
+  <p style="margin: 5px;text-align: center;">©2025 Venture Formations LLC, all rights reserved</p>
+</div>
+</body>
+</html>
+
+

@@ -1,0 +1,32 @@
+Section: Dining Deals
+Create a database of Dining Deals. Be able to add deals one at a time in the UI interface, or upload a CSV to do multiple at one time.
+
+Upon campaign creation, the section should show the dining deals for the campaign date day of the week in a randomized order and randomly select up to 8. If there are 8 or fewer, select all of them. Include a column in the database for featured. If there are one or more featured on a day of the week, they must be at the top of the list. IF no featured for that day, mark the first deal in the randomized order as featured. Featured deals should use the "first_special" format with all others using the "subsequent_specials" format.
+
+The selected deals should use this HTML format:
+card_style": {
+      "row_wrapper": "<tr class='row'><td class='column' style='padding:8px; vertical-align: top;'>[dining_card]</td></tr>",
+      "card_wrapper": "<table width='100%' cellpadding='0' cellspacing='0' style='table-layout: fixed; border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: Arial, sans-serif; font-size: 16px; line-height: 20px; box-shadow: 0 4px 12px rgba(0,0,0,.15);'>[rows]</table>",
+      "date_header_row": "<tr><td style='background: #F8F9FA; padding: 8px; text-align: center; font-size: 16px; font-weight: normal; color: #3C4043; border-top-left-radius: 8px; border-top-right-radius: 8px;'>[date]</td></tr>",
+      "special_template": {
+        "first_special": [
+         "<tr><td style='padding: 8px 16px; background:#E8F0FE; border:2px solid #1877F2; border-radius:6px;'>",
+         "<div style='font-weight: bold;'>[Business Name]</div>",
+         "<div>[Special Description]</div>",
+         "<div style='font-size: 14px;'><a href='[Google Profile]' style='text-decoration: underline; color: inherit;'>[Special Time]</a></div>",
+         "</td></tr>"
+        ],
+        "subsequent_specials": [
+          "<tr><td style='padding: 8px 16px 4px; font-weight: bold; border-top: 1px solid #eee;'>[Business Name]</td></tr>",
+          "<tr><td style='padding: 0 16px 2px;'>[Special Description]</td></tr>",
+          "<tr><td style='padding: 0 16px 8px; font-size: 14px;'><a href='[Google Profile]' style='text-decoration: underline; color: inherit;'>[Special Time]</a></td></tr>"
+
+Here is an example of a final HTML:
+<br>
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 990px; margin: 0 auto; background-color: #f7f7f7; font-family: Arial, sans-serif;">
+  <tr>
+    <td style="padding: 5px;">
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">Dining Deals</h2>
+    </td>
+  </tr><tr class="row"><tr class='row'><td class='column' style='padding:8px; vertical-align: top;'><table width='100%' cellpadding='0' cellspacing='0' style='table-layout: fixed; border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: Arial, sans-serif; font-size: 16px; line-height: 20px; box-shadow: 0 4px 12px rgba(0,0,0,.15);'><tr><td style='background: #F8F9FA; padding: 8px; text-align: center; font-size: 16px; font-weight: normal; color: #3C4043; border-top-left-radius: 8px; border-top-right-radius: 8px;'>Tuesday, September 23</td></tr><tr><td style='padding: 8px 16px; background:#E8F0FE; border:2px solid #1877F2; border-radius:6px;'><div style='font-weight: bold;'>Jimmy’s Pour House</div><div>$12 Lunch Specials Soup & Sandwich</div><div style='font-size: 14px;'><a href='https://www.google.com/maps?cid=9931203142589866897' style='text-decoration: underline; color: inherit;'>11AM – 3PM</a></div></td></tr><tr><td style='padding: 8px 16px 4px; font-weight: bold; border-top: 1px solid #eee;'>La Casita</td></tr><tr><td style='padding: 0 16px 2px;'>$1.00 off all large House Margaritas, Complimentary Appetizer Bar </td></tr><tr><td style='padding: 0 16px 8px; font-size: 14px;'><a href='https://www.google.com/maps?cid=13363612168362794215' style='text-decoration: underline; color: inherit;'>3PM – 6PM</a></td></tr><tr><td style='padding: 8px 16px 4px; font-weight: bold; border-top: 1px solid #eee;'>Benton Station</td></tr><tr><td style='padding: 0 16px 2px;'>$1 Tacos</td></tr><tr><td style='padding: 0 16px 8px; font-size: 14px;'><a href='https://www.google.com/maps?cid=10716134797234147187' style='text-decoration: underline; color: inherit;'>After 5PM</a></td></tr><tr><td style='padding: 8px 16px 4px; font-weight: bold; border-top: 1px solid #eee;'>Granite City Food & Brewery</td></tr><tr><td style='padding: 0 16px 2px;'>$10 Taco Trio with chips & salsa, $3 Margaritas</td></tr><tr><td style='padding: 0 16px 8px; font-size: 14px;'><a href='https://www.google.com/maps?cid=3291221017508555052' style='text-decoration: underline; color: inherit;'>All day</a></td></tr><tr><td style='padding: 8px 16px 4px; font-weight: bold; border-top: 1px solid #eee;'>Lost Times Tavern</td></tr><tr><td style='padding: 0 16px 2px;'>$3 Tacos</td></tr><tr><td style='padding: 0 16px 8px; font-size: 14px;'><a href='https://www.google.com/maps?cid=12323015935555331724' style='text-decoration: underline; color: inherit;'>Evening</a></td></tr><tr><td style='padding: 8px 16px 4px; font-weight: bold; border-top: 1px solid #eee;'>Crooked Pint Ale House</td></tr><tr><td style='padding: 0 16px 2px;'>Burger & Fries $11 (add cheese $1)</td></tr><tr><td style='padding: 0 16px 8px; font-size: 14px;'><a href='https://maps.google.com/?cid=2758443587475522305' style='text-decoration: underline; color: inherit;'>11AM – 2PM</a></td></tr><tr><td style='padding: 8px 16px 4px; font-weight: bold; border-top: 1px solid #eee;'>Park Diner</td></tr><tr><td style='padding: 0 16px 2px;'>Blue Plate Special - Beef Stroganoff</td></tr><tr><td style='padding: 0 16px 8px; font-size: 14px;'><a href='https://www.google.com/maps?cid=12544076905762526534' style='text-decoration: underline; color: inherit;'>11AM - Gone</a></td></tr><tr><td style='padding: 8px 16px 4px; font-weight: bold; border-top: 1px solid #eee;'>Crooked Pint Ale House</td></tr><tr><td style='padding: 0 16px 2px;'>$1 Off All Taps</td></tr><tr><td style='padding: 0 16px 8px; font-size: 14px;'><a href='https://maps.google.com/?cid=2758443587475522305' style='text-decoration: underline; color: inherit;'>11AM – 6PM</a></td></tr></table></td></tr>
+</tr>

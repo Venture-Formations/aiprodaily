@@ -1,0 +1,115 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f7f7f7;
+      font-family: Arial, sans-serif;
+      color: #000;
+    }
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+    .row-content {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #e0f0ff;
+    }
+    .stack .column {
+      display: inline-block;
+      vertical-align: top;
+    }
+    .mobile_hide {
+      display: block;
+    }
+    .desktop_hide {
+      display: none;
+      max-height: 0;
+      overflow: hidden;
+    }
+    @media (max-width: 620px) {
+      .row-content {
+        width: 100% !important;
+      }
+      .stack .column {
+        width: 100% !important;
+        display: block !important;
+      }
+      .mobile_hide {
+        display: none !important;
+      }
+      .desktop_hide {
+        display: table !important;
+        max-height: none !important;
+      }
+    }
+  </style>
+    <title>Upcoming Events - Balanced Indent</title>
+  <style>
+    @media only screen and (max-width: 620px) {
+      body, table, td, div {
+        padding-left: 5px !important;
+        padding-right: 5px !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+      }
+      .row {
+        display: block !important;
+        width: 100% !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+      .column {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 4px !important;
+        padding-right: 4px !important;
+        box-sizing: border-box !important;
+      }
+    }
+    @media only screen and (min-width: 621px) {
+      .row {
+        display: table !important;
+        width: 100% !important;
+        table-layout: fixed !important;
+      }
+      .column {
+        display: table-cell !important;
+        width: 33.33% !important;
+        vertical-align: top;
+        box-sizing: border-box !important;
+        padding: 8px !important;
+      }
+    }
+@media only screen and (max-width: 620px) {
+  .event-card {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+@media only screen and (max-width:620px){
+  .weather-desktop{display:none!important;max-height:0!important;overflow:hidden!important;}
+  .weather-mobile{display:table!important;max-height:none!important;width:100%!important;}
+  .weather-mobile .wxcol{display:block!important;width:100%!important;max-width:100%!important;padding:4px 0!important;}
+  .weather-mobile .weather-card{width:100%!important;max-width:100%!important;margin:0 auto!important;}
+}
+@media only screen and (min-width:621px){
+  .weather-mobile{display:none!important;max-height:0!important;overflow:hidden!important;}
+}
+  /* Desktop only: 4-up + doubled gutters */
+  @media only screen and (min-width:621px){
+    .etsy-wrap{font-size:0 !important;} /* kill inline-block gaps */
+    .etsy-col{display:inline-block !important; width:25% !important; max-width:25% !important; vertical-align:top !important;}
+    .etsy-pad{padding:8px !important;} /* doubled desktop spacing */
+  }
+  }
+</style>
+</head>
