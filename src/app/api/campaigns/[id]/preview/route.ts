@@ -13,7 +13,9 @@ import {
   generateMinnesotaGetawaysSection,
   generateDiningDealsSection,
   generateRoadWorkSection,
-  generatePollSection
+  generatePollSection,
+  generateBreakingNewsSection,
+  generateBeyondTheFeedSection
 } from '@/lib/newsletter-templates'
 
 export async function GET(
@@ -215,6 +217,16 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
           const roadWorkHtml = await generateRoadWorkSection(campaign)
           if (roadWorkHtml) {
             sectionsHtml += roadWorkHtml
+          }
+        } else if (section.name === 'Breaking News') {
+          const breakingNewsHtml = await generateBreakingNewsSection(campaign)
+          if (breakingNewsHtml) {
+            sectionsHtml += breakingNewsHtml
+          }
+        } else if (section.name === 'Beyond the Feed') {
+          const beyondFeedHtml = await generateBeyondTheFeedSection(campaign)
+          if (beyondFeedHtml) {
+            sectionsHtml += beyondFeedHtml
           }
         } else if (section.name === 'Community Business Spotlight') {
           const spotlightHtml = await generateCommunityBusinessSpotlightSection(campaign, false) // Don't record usage during preview
