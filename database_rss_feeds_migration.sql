@@ -49,6 +49,26 @@ CREATE INDEX IF NOT EXISTS idx_articles_breaking_score ON articles(breaking_news
 CREATE INDEX IF NOT EXISTS idx_articles_breaking_category ON articles(breaking_news_category);
 
 -- ============================================
+-- 4. CREATE campaign_breaking_news TABLE
+-- ============================================
+
+-- Table to store Breaking News article selections for campaigns
+CREATE TABLE IF NOT EXISTS campaign_breaking_news (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id TEXT NOT NULL REFERENCES newsletter_campaigns(id) ON DELETE CASCADE,
+  post_id UUID NOT NULL REFERENCES rss_posts(id) ON DELETE CASCADE,
+  section TEXT NOT NULL CHECK (section IN ('breaking', 'beyond_feed')),
+  position INT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(campaign_id, post_id)
+);
+
+-- Create indexes
+CREATE INDEX IF NOT EXISTS idx_campaign_breaking_news_campaign ON campaign_breaking_news(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_campaign_breaking_news_section ON campaign_breaking_news(section);
+
+-- ============================================
 -- COMMENTS
 -- ============================================
 COMMENT ON COLUMN rss_feeds.newsletter_id IS 'Links feed to specific newsletter for multi-tenant support';
@@ -59,3 +79,7 @@ COMMENT ON COLUMN articles.breaking_news_score IS 'AI relevance/importance score
 COMMENT ON COLUMN articles.breaking_news_category IS 'Category: breaking (top 3) or beyond_feed (next 3)';
 COMMENT ON COLUMN articles.ai_summary IS 'ChatGPT-generated 2-3 sentence summary for newsletter';
 COMMENT ON COLUMN articles.ai_title IS 'ChatGPT-generated title for newsletter display';
+
+COMMENT ON TABLE campaign_breaking_news IS 'Stores Breaking News and Beyond the Feed article selections for campaigns';
+COMMENT ON COLUMN campaign_breaking_news.section IS 'Section type: breaking (top 3) or beyond_feed (next 3)';
+COMMENT ON COLUMN campaign_breaking_news.position IS 'Display position within the section (1, 2, or 3)';
