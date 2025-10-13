@@ -2,6 +2,94 @@ export type CampaignStatus = 'draft' | 'in_review' | 'changes_made' | 'sent' | '
 export type UserRole = 'admin' | 'reviewer'
 export type LogLevel = 'info' | 'warn' | 'error' | 'debug'
 
+// Multi-Tenant Newsletter Interfaces
+export interface Newsletter {
+  id: string
+  slug: string
+  name: string
+  subdomain: string
+  description: string | null
+  logo_url: string | null
+  primary_color: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsletterSetting {
+  id: string
+  newsletter_id: string
+  key: string
+  value: string | null
+  custom_default: string | null
+  description: string | null
+  updated_by: string | null
+  updated_at: string
+  created_at: string
+}
+
+// AI Professional Newsletter Features
+export interface AIApplication {
+  id: string
+  newsletter_id: string
+  app_name: string
+  tagline: string | null
+  description: string
+  category: string | null
+  app_url: string
+  tracked_link: string | null
+  logo_url: string | null
+  screenshot_url: string | null
+  pricing: string | null
+  is_featured: boolean
+  is_paid_placement: boolean
+  is_active: boolean
+  display_order: number | null
+  last_used_date: string | null
+  times_used: number
+  created_at: string
+  updated_at: string
+}
+
+export interface CampaignAIAppSelection {
+  id: string
+  campaign_id: string
+  app_id: string
+  selection_order: number
+  is_featured: boolean
+  created_at: string
+  app?: AIApplication
+}
+
+export interface PromptIdea {
+  id: string
+  newsletter_id: string
+  title: string
+  prompt_text: string
+  category: string | null
+  use_case: string | null
+  suggested_model: string | null
+  difficulty_level: string | null
+  estimated_time: string | null
+  is_featured: boolean
+  is_active: boolean
+  display_order: number | null
+  last_used_date: string | null
+  times_used: number
+  created_at: string
+  updated_at: string
+}
+
+export interface CampaignPromptSelection {
+  id: string
+  campaign_id: string
+  prompt_id: string
+  selection_order: number
+  is_featured: boolean
+  created_at: string
+  prompt?: PromptIdea
+}
+
 export interface NewsletterCampaign {
   id: string
   date: string
@@ -20,10 +108,13 @@ export interface NewsletterCampaign {
 
 export interface RssFeed {
   id: string
+  newsletter_id: string | null
   url: string
   name: string
+  description: string | null
   active: boolean
   last_processed: string | null
+  last_error: string | null
   processing_errors: number
   created_at: string
   updated_at: string
@@ -42,6 +133,10 @@ export interface RssPost {
   source_url: string | null
   image_url: string | null
   processed_at: string
+  breaking_news_score: number | null
+  breaking_news_category: string | null
+  ai_summary: string | null
+  ai_title: string | null
 }
 
 export interface PostRating {
@@ -69,6 +164,10 @@ export interface Article {
   word_count: number | null
   review_position: number | null
   final_position: number | null
+  breaking_news_score: number | null
+  breaking_news_category: string | null
+  ai_summary: string | null
+  ai_title: string | null
   created_at: string
   updated_at: string
 }
