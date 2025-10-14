@@ -501,6 +501,243 @@ Respond with valid JSON in this exact format:
   }
 }`,
 
+  // Multi-Criteria Scoring Prompts (customizable per criteria)
+  criteria1Evaluator: (post: { title: string; description: string; content?: string }) => `
+You are evaluating a newsletter article for INTEREST LEVEL to accounting professionals.
+
+Your task is to score this article on a scale of 0-10 based on how interesting and engaging it is.
+
+SCORING CRITERIA (0-10 scale):
+
+HIGH SCORES (8-10):
+- Unexpected developments or surprising insights
+- Human interest stories with broad appeal
+- Breaking news that will impact daily work
+- Unique events or innovative solutions
+- Fun, entertaining, or inspiring content
+- Content that sparks conversation or curiosity
+
+MEDIUM SCORES (4-7):
+- Standard industry news
+- Useful but routine updates
+- Educational content with moderate appeal
+- Business updates with some interest
+- Typical professional development topics
+
+LOW SCORES (0-3):
+- Dry technical content
+- Routine announcements with minimal appeal
+- Purely administrative or procedural content
+- Overly promotional material
+- Repetitive topics recently covered
+- Very niche content with limited broader interest
+
+Article Title: ${post.title}
+Article Description: ${post.description || 'No description available'}
+Article Content: ${post.content ? post.content.substring(0, 1000) + '...' : 'No content available'}
+
+IMPORTANT: You must respond with ONLY valid JSON. Do not include any text before or after the JSON.
+
+Response format:
+{
+  "score": <integer 0-10>,
+  "reason": "<detailed explanation of your scoring>"
+}`,
+
+  criteria2Evaluator: (post: { title: string; description: string; content?: string }) => `
+You are evaluating a newsletter article for PROFESSIONAL RELEVANCE to accounting professionals.
+
+Your task is to score this article on a scale of 0-10 based on how directly relevant it is to accounting practice.
+
+SCORING CRITERIA (0-10 scale):
+
+HIGH SCORES (8-10):
+- Regulatory changes (IRS, FASB, SEC, PCAOB)
+- Tax law updates or compliance requirements
+- Accounting standards or practice guidelines
+- Firm management best practices
+- Technology specifically for accounting/tax work
+- Industry trends affecting accounting profession
+- Professional ethics or liability issues
+
+MEDIUM SCORES (4-7):
+- General business topics with accounting relevance
+- Software tools used by accountants
+- Professional development opportunities
+- Economic trends affecting clients
+- Client service strategies
+- Marketing for accounting firms
+- Leadership and management topics
+
+LOW SCORES (0-3):
+- Generic business content without accounting angle
+- Topics unrelated to accounting practice
+- Content for other industries
+- Personal interest stories without professional connection
+- Overly broad topics with minimal accounting relevance
+
+Article Title: ${post.title}
+Article Description: ${post.description || 'No description available'}
+Article Content: ${post.content ? post.content.substring(0, 1000) + '...' : 'No content available'}
+
+IMPORTANT: You must respond with ONLY valid JSON. Do not include any text before or after the JSON.
+
+Response format:
+{
+  "score": <integer 0-10>,
+  "reason": "<detailed explanation of your scoring>"
+}`,
+
+  criteria3Evaluator: (post: { title: string; description: string; content?: string }) => `
+You are evaluating a newsletter article for PROFESSION IMPACT on accounting professionals.
+
+Your task is to score this article on a scale of 0-10 based on how much it affects accountants' daily work or professional lives.
+
+SCORING CRITERIA (0-10 scale):
+
+HIGH SCORES (8-10):
+- Urgent compliance deadline changes
+- Critical regulatory updates requiring immediate action
+- Significant technology disruptions or security threats
+- Major industry-wide policy changes
+- Time-sensitive information professionals must act on
+- Changes affecting how accountants do core work
+- New requirements or standards to implement
+
+MEDIUM SCORES (4-7):
+- Helpful tips that improve efficiency
+- New tools or features that enhance productivity
+- Industry trends to be aware of
+- Best practices worth considering
+- Educational content for skill development
+- Networking or career development opportunities
+- Firm management improvements
+
+LOW SCORES (0-3):
+- Nice-to-know information without actionable impact
+- Individual achievements or announcements
+- Content with no clear application to daily work
+- Opinion pieces without concrete implications
+- Historical context without current relevance
+- Promotional content for products/services
+
+Article Title: ${post.title}
+Article Description: ${post.description || 'No description available'}
+Article Content: ${post.content ? post.content.substring(0, 1000) + '...' : 'No content available'}
+
+IMPORTANT: You must respond with ONLY valid JSON. Do not include any text before or after the JSON.
+
+Response format:
+{
+  "score": <integer 0-10>,
+  "reason": "<detailed explanation of your scoring>"
+}`,
+
+  criteria4Evaluator: (post: { title: string; description: string; content?: string }) => `
+You are evaluating a newsletter article for Criteria 4.
+
+Score this article on a scale of 0-10.
+
+Article Title: ${post.title}
+Article Description: ${post.description || 'No description available'}
+Article Content: ${post.content ? post.content.substring(0, 1000) + '...' : 'No content available'}
+
+IMPORTANT: You must respond with ONLY valid JSON. Do not include any text before or after the JSON.
+
+Response format:
+{
+  "score": <integer 0-10>,
+  "reason": "<detailed explanation of your scoring>"
+}`,
+
+  criteria5Evaluator: (post: { title: string; description: string; content?: string }) => `
+You are evaluating a newsletter article for Criteria 5.
+
+Score this article on a scale of 0-10.
+
+Article Title: ${post.title}
+Article Description: ${post.description || 'No description available'}
+Article Content: ${post.content ? post.content.substring(0, 1000) + '...' : 'No content available'}
+
+IMPORTANT: You must respond with ONLY valid JSON. Do not include any text before or after the JSON.
+
+Response format:
+{
+  "score": <integer 0-10>,
+  "reason": "<detailed explanation of your scoring>"
+}`,
+
+  articleWriter: (post: { title: string; description: string; content?: string; source_url?: string }) => `
+CRITICAL: You are writing a newsletter article for accounting professionals that MUST follow strict content rules.
+
+Original Source Post:
+Title: ${post.title}
+Description: ${post.description || 'No description available'}
+Content: ${post.content ? post.content.substring(0, 1500) + '...' : 'No additional content'}
+
+MANDATORY STRICT CONTENT RULES:
+1. Articles must be COMPLETELY REWRITTEN and summarized
+2. Use ONLY information from the source post - NO external information
+3. DO NOT add numbers, dates, quotes, or details not in the original
+4. NEVER use 'today,' 'tomorrow,' 'yesterday'
+5. NO emojis, hashtags (#), or URLs
+6. Facts only - NO editorial commentary or opinions
+7. Write from THIRD-PARTY PERSPECTIVE
+
+HEADLINE REQUIREMENTS:
+- Create completely new, engaging headline (not modified original)
+- Use powerful verbs and emotional adjectives
+- NO colons (:) or emojis
+
+ARTICLE REQUIREMENTS:
+- Length: EXACTLY 75-150 words
+- Structure: 1-2 concise paragraphs
+- Style: Professional, informative, engaging
+- REWRITE completely - do not copy phrases
+
+Response format:
+{
+  "headline": "<completely new engaging headline>",
+  "content": "<75-150 word rewritten article>",
+  "word_count": <exact word count>
+}`,
+
+  factChecker: (newsletterContent: string, originalContent: string) => `
+CRITICAL FACT-CHECK: Verify this newsletter article follows strict content rules.
+
+Newsletter Article:
+${newsletterContent}
+
+Original Source:
+${originalContent.substring(0, 2000)}
+
+CHECK FOR VIOLATIONS:
+1. EXACT COPIED TEXT: Word-for-word copying (similar phrasing OK)
+2. ADDED INFORMATION: Facts not in original source
+3. PROHIBITED WORDS: 'today,' 'tomorrow,' 'yesterday'
+4. FORMATTING: Emojis, hashtags (#), URLs
+5. PERSPECTIVE: Inappropriate "we/our/us"
+6. EDITORIAL: Opinions or speculation
+7. MODIFIED TITLE: Just reworded original
+
+SCORING (each 1-10):
+- Accuracy: Content matches source, no additions
+- Compliance: Follows all formatting/style rules
+- Quality: Professional, engaging, well-written
+
+Total Score = accuracy + compliance + quality (3-30)
+PASSING: 20/30 minimum
+
+Response format:
+{
+  "accuracy_score": <1-10>,
+  "compliance_score": <1-10>,
+  "quality_score": <1-10>,
+  "total_score": <3-30>,
+  "violations": "<detailed list or 'none'>",
+  "passed": <boolean true if >= 20>
+}`,
+
   breakingNewsScorer: (article: { title: string; description: string; content?: string }) => `
 You are evaluating a news article for inclusion in the AI Accounting Professionals newsletter's "Breaking News" section.
 
@@ -697,6 +934,152 @@ export const AI_PROMPTS = {
     } catch (error) {
       console.error('Error fetching breakingNewsScorer prompt, using fallback:', error)
       return FALLBACK_PROMPTS.breakingNewsScorer(article)
+    }
+  },
+
+  // Multi-Criteria Evaluators (database-driven with fallbacks)
+  criteria1Evaluator: async (post: { title: string; description: string; content?: string }) => {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'ai_prompt_criteria_1')
+        .single()
+
+      if (error || !data) {
+        console.log('Using code fallback for criteria1Evaluator prompt')
+        return FALLBACK_PROMPTS.criteria1Evaluator(post)
+      }
+
+      console.log('Using database prompt for criteria1Evaluator')
+      return data.value
+        .replace(/\{\{title\}\}/g, post.title)
+        .replace(/\{\{description\}\}/g, post.description || 'No description available')
+        .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
+    } catch (error) {
+      console.error('Error fetching criteria1Evaluator prompt, using fallback:', error)
+      return FALLBACK_PROMPTS.criteria1Evaluator(post)
+    }
+  },
+
+  criteria2Evaluator: async (post: { title: string; description: string; content?: string }) => {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'ai_prompt_criteria_2')
+        .single()
+
+      if (error || !data) {
+        console.log('Using code fallback for criteria2Evaluator prompt')
+        return FALLBACK_PROMPTS.criteria2Evaluator(post)
+      }
+
+      console.log('Using database prompt for criteria2Evaluator')
+      return data.value
+        .replace(/\{\{title\}\}/g, post.title)
+        .replace(/\{\{description\}\}/g, post.description || 'No description available')
+        .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
+    } catch (error) {
+      console.error('Error fetching criteria2Evaluator prompt, using fallback:', error)
+      return FALLBACK_PROMPTS.criteria2Evaluator(post)
+    }
+  },
+
+  criteria3Evaluator: async (post: { title: string; description: string; content?: string }) => {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'ai_prompt_criteria_3')
+        .single()
+
+      if (error || !data) {
+        console.log('Using code fallback for criteria3Evaluator prompt')
+        return FALLBACK_PROMPTS.criteria3Evaluator(post)
+      }
+
+      console.log('Using database prompt for criteria3Evaluator')
+      return data.value
+        .replace(/\{\{title\}\}/g, post.title)
+        .replace(/\{\{description\}\}/g, post.description || 'No description available')
+        .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
+    } catch (error) {
+      console.error('Error fetching criteria3Evaluator prompt, using fallback:', error)
+      return FALLBACK_PROMPTS.criteria3Evaluator(post)
+    }
+  },
+
+  criteria4Evaluator: async (post: { title: string; description: string; content?: string }) => {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'ai_prompt_criteria_4')
+        .single()
+
+      if (error || !data) {
+        console.log('Using code fallback for criteria4Evaluator prompt')
+        return FALLBACK_PROMPTS.criteria4Evaluator(post)
+      }
+
+      console.log('Using database prompt for criteria4Evaluator')
+      return data.value
+        .replace(/\{\{title\}\}/g, post.title)
+        .replace(/\{\{description\}\}/g, post.description || 'No description available')
+        .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
+    } catch (error) {
+      console.error('Error fetching criteria4Evaluator prompt, using fallback:', error)
+      return FALLBACK_PROMPTS.criteria4Evaluator(post)
+    }
+  },
+
+  criteria5Evaluator: async (post: { title: string; description: string; content?: string }) => {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'ai_prompt_criteria_5')
+        .single()
+
+      if (error || !data) {
+        console.log('Using code fallback for criteria5Evaluator prompt')
+        return FALLBACK_PROMPTS.criteria5Evaluator(post)
+      }
+
+      console.log('Using database prompt for criteria5Evaluator')
+      return data.value
+        .replace(/\{\{title\}\}/g, post.title)
+        .replace(/\{\{description\}\}/g, post.description || 'No description available')
+        .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
+    } catch (error) {
+      console.error('Error fetching criteria5Evaluator prompt, using fallback:', error)
+      return FALLBACK_PROMPTS.criteria5Evaluator(post)
+    }
+  },
+
+  articleWriter: async (post: { title: string; description: string; content?: string; source_url?: string }) => {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'ai_prompt_article_writer')
+        .single()
+
+      if (error || !data) {
+        console.log('Using code fallback for articleWriter prompt')
+        return FALLBACK_PROMPTS.articleWriter(post)
+      }
+
+      console.log('Using database prompt for articleWriter')
+      return data.value
+        .replace(/\{\{title\}\}/g, post.title)
+        .replace(/\{\{description\}\}/g, post.description || 'No description available')
+        .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1500) + '...' : 'No additional content')
+        .replace(/\{\{url\}\}/g, post.source_url || '')
+    } catch (error) {
+      console.error('Error fetching articleWriter prompt, using fallback:', error)
+      return FALLBACK_PROMPTS.articleWriter(post)
     }
   }
 }

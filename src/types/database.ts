@@ -137,6 +137,19 @@ export interface RssPost {
   breaking_news_category: string | null
   ai_summary: string | null
   ai_title: string | null
+  // Multi-criteria scoring system (expandable 1-5 criteria)
+  criteria_1_score: number | null
+  criteria_1_reason: string | null
+  criteria_2_score: number | null
+  criteria_2_reason: string | null
+  criteria_3_score: number | null
+  criteria_3_reason: string | null
+  criteria_4_score: number | null
+  criteria_4_reason: string | null
+  criteria_5_score: number | null
+  criteria_5_reason: string | null
+  final_priority_score: number | null
+  criteria_enabled: number | null
 }
 
 export interface PostRating {

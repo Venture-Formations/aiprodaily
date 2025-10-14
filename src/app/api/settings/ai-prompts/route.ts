@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authOptions } from '@/lib/auth'
 
-// GET - Fetch all AI prompts
+// GET - Fetch all AI prompts with weights for criteria
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -21,9 +21,38 @@ export async function GET(request: NextRequest) {
       throw error
     }
 
+    // Fetch criteria weights and names
+    const { data: weights } = await supabaseAdmin
+      .from('app_settings')
+      .select('key, value')
+      .or('key.like.criteria_%_weight,key.like.criteria_%_name')
+
+    const weightMap: Record<string, string> = {}
+    const nameMap: Record<string, string> = {}
+
+    weights?.forEach(w => {
+      if (w.key.endsWith('_weight')) {
+        weightMap[w.key] = w.value || '1.0'
+      } else if (w.key.endsWith('_name')) {
+        nameMap[w.key] = w.value || ''
+      }
+    })
+
     // Parse prompts into structured format
     const formattedPrompts = prompts?.map(p => {
       const description = p.description || ''
+
+      // Check if this is a criteria prompt
+      const criteriaMatch = p.key.match(/ai_prompt_criteria_(\d+)/)
+      let weight: string | undefined
+      let criteriaName: string | undefined
+
+      if (criteriaMatch) {
+        const num = criteriaMatch[1]
+        weight = weightMap[`criteria_${num}_weight`] || '1.0'
+        criteriaName = nameMap[`criteria_${num}_name`] || `Criteria ${num}`
+      }
+
       const parts = description.split(' - ')
       const category = parts[0] || 'General'
       const nameAndDesc = parts.slice(1).join(' - ')
@@ -32,9 +61,10 @@ export async function GET(request: NextRequest) {
       return {
         key: p.key,
         category,
-        name: name || p.key.replace('ai_prompt_', '').replace(/_/g, ' '),
-        description: descParts.join(': ') || '',
-        value: p.value
+        name: criteriaName || name || p.key.replace('ai_prompt_', '').replace(/_/g, ' '),
+        description: descParts.join(': ') || description,
+        value: p.value,
+        weight: weight
       }
     }) || []
 

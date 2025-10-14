@@ -1612,6 +1612,7 @@ function AIPromptsSettings() {
   const [message, setMessage] = useState('')
   const [expandedPrompt, setExpandedPrompt] = useState<string | null>(null)
   const [editingPrompt, setEditingPrompt] = useState<{key: string, value: string} | null>(null)
+  const [editingWeight, setEditingWeight] = useState<{key: string, value: string} | null>(null)
 
   useEffect(() => {
     loadPrompts()
@@ -1763,6 +1764,50 @@ function AIPromptsSettings() {
     window.open(testUrl, '_blank')
   }
 
+  const handleWeightEdit = (prompt: any) => {
+    setEditingWeight({ key: prompt.key, value: prompt.weight || '1.0' })
+  }
+
+  const handleWeightCancel = () => {
+    setEditingWeight(null)
+  }
+
+  const handleWeightSave = async (key: string) => {
+    if (!editingWeight || editingWeight.key !== key) return
+
+    const criteriaMatch = key.match(/ai_prompt_criteria_(\d+)/)
+    if (!criteriaMatch) return
+
+    const criteriaNumber = criteriaMatch[1]
+    setSaving(key)
+    setMessage('')
+
+    try {
+      const response = await fetch('/api/settings/criteria-weights', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          criteriaNumber,
+          weight: parseFloat(editingWeight.value)
+        })
+      })
+
+      if (response.ok) {
+        setMessage('Weight updated successfully!')
+        setEditingWeight(null)
+        await loadPrompts()
+        setTimeout(() => setMessage(''), 3000)
+      } else {
+        throw new Error('Failed to update weight')
+      }
+    } catch (error) {
+      setMessage('Error: Failed to update weight')
+      setTimeout(() => setMessage(''), 5000)
+    } finally {
+      setSaving(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -1798,6 +1843,8 @@ function AIPromptsSettings() {
               const isExpanded = expandedPrompt === prompt.key
               const isEditing = editingPrompt?.key === prompt.key
               const isSaving = saving === prompt.key
+              const isEditingWeight = editingWeight?.key === prompt.key
+              const hasCriteriaWeight = prompt.weight !== undefined
 
               return (
                 <div key={prompt.key} className="p-6">
@@ -1805,6 +1852,53 @@ function AIPromptsSettings() {
                     <div className="flex-1">
                       <h4 className="text-base font-medium text-gray-900">{prompt.name}</h4>
                       <p className="text-sm text-gray-600 mt-1">{prompt.description}</p>
+
+                      {/* Weight Input for Criteria Prompts */}
+                      {hasCriteriaWeight && (
+                        <div className="mt-3 flex items-center space-x-3">
+                          <label className="text-sm font-medium text-gray-700">Weight:</label>
+                          {isEditingWeight ? (
+                            <>
+                              <input
+                                type="number"
+                                min="0"
+                                max="10"
+                                step="0.1"
+                                value={editingWeight?.value || '1.0'}
+                                onChange={(e) => setEditingWeight({ key: prompt.key, value: e.target.value })}
+                                className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                              />
+                              <button
+                                onClick={() => handleWeightSave(prompt.key)}
+                                disabled={isSaving}
+                                className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                              >
+                                {isSaving ? 'Saving...' : 'Save'}
+                              </button>
+                              <button
+                                onClick={handleWeightCancel}
+                                disabled={isSaving}
+                                className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-sm font-semibold text-brand-primary">{prompt.weight}</span>
+                              <button
+                                onClick={() => handleWeightEdit(prompt)}
+                                className="text-xs text-blue-600 hover:text-blue-800"
+                              >
+                                Edit
+                              </button>
+                              <span className="text-xs text-gray-500">
+                                (Max final score contribution: {(parseFloat(prompt.weight) * 10).toFixed(1)} points)
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={() => setExpandedPrompt(isExpanded ? null : prompt.key)}
