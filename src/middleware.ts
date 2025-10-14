@@ -39,9 +39,9 @@ export async function middleware(request: NextRequest) {
 
   // Handle admin subdomain
   if (subdomain === 'admin') {
-    // Redirect root to newsletter selector
+    // Redirect root to dashboard (newsletter selector)
     if (url.pathname === '/') {
-      return NextResponse.redirect(new URL('/admin/newsletters', request.url))
+      return NextResponse.redirect(new URL('/dashboard', request.url))
     }
     return NextResponse.next()
   }

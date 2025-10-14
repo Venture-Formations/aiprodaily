@@ -120,16 +120,6 @@ export default function NewsletterSelect() {
               ))}
             </div>
           )}
-
-          {/* Admin Link */}
-          <div className="text-center mt-8">
-            <a
-              href="/admin/newsletters"
-              className="text-sm text-brand-primary hover:text-blue-700 font-medium"
-            >
-              Manage Newsletters
-            </a>
-          </div>
         </div>
       </div>
     </Layout>
