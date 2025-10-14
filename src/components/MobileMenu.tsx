@@ -9,9 +9,24 @@ export interface MobileMenuProps {
   onClose: () => void
   onSignOut?: () => void
   userDisplay?: string
+  dashboardUrl?: string
+  campaignsUrl?: string
+  analyticsUrl?: string
+  databasesUrl?: string
+  settingsUrl?: string
 }
 
-export default function MobileMenu({ isOpen, onClose, onSignOut, userDisplay }: MobileMenuProps) {
+export default function MobileMenu({
+  isOpen,
+  onClose,
+  onSignOut,
+  userDisplay,
+  dashboardUrl = '/dashboard',
+  campaignsUrl = '/dashboard/campaigns',
+  analyticsUrl = '/dashboard/analytics',
+  databasesUrl = '/dashboard/databases',
+  settingsUrl = '/dashboard/settings'
+}: MobileMenuProps) {
   const pathname = usePathname()
 
   // Close menu on route change
@@ -43,11 +58,11 @@ export default function MobileMenu({ isOpen, onClose, onSignOut, userDisplay }: 
   }, [isOpen])
 
   const navLinks = [
-    { href: '/dashboard', label: 'Dashboard' },
-    { href: '/dashboard/campaigns', label: 'Campaigns' },
-    { href: '/dashboard/analytics', label: 'Analytics' },
-    { href: '/dashboard/databases', label: 'Databases' },
-    { href: '/dashboard/settings', label: 'Settings' },
+    { href: dashboardUrl, label: 'Dashboard' },
+    { href: campaignsUrl, label: 'Campaigns' },
+    { href: analyticsUrl, label: 'Analytics' },
+    { href: databasesUrl, label: 'Databases' },
+    { href: settingsUrl, label: 'Settings' },
   ]
 
   const isActive = (href: string) => {

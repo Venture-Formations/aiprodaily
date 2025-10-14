@@ -1,10 +1,11 @@
 'use client'
 
 import { useSession, signOut } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import MobileMenu from './MobileMenu'
+import type { Newsletter } from '@/types/database'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -13,8 +14,11 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const pathname = usePathname()
   const [isStaging, setIsStaging] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [newsletter, setNewsletter] = useState<Newsletter | null>(null)
+  const [newsletterSlug, setNewsletterSlug] = useState<string | null>(null)
 
   useEffect(() => {
     // Check if we're in staging environment
@@ -35,8 +39,48 @@ export default function Layout({ children }: LayoutProps) {
     }
   }, [session, status, router])
 
+  // Extract newsletter slug from pathname
+  useEffect(() => {
+    if (pathname) {
+      const match = pathname.match(/^\/dashboard\/([^\/]+)/)
+      if (match && match[1] !== 'campaigns' && match[1] !== 'analytics' && match[1] !== 'databases' && match[1] !== 'settings') {
+        setNewsletterSlug(match[1])
+      } else {
+        setNewsletterSlug(null)
+      }
+    }
+  }, [pathname])
+
+  // Fetch newsletter data when slug changes
+  useEffect(() => {
+    if (newsletterSlug) {
+      fetchNewsletter(newsletterSlug)
+    } else {
+      setNewsletter(null)
+    }
+  }, [newsletterSlug])
+
+  const fetchNewsletter = async (slug: string) => {
+    try {
+      const response = await fetch('/api/newsletters')
+      if (!response.ok) return
+      const data = await response.json()
+      const found = data.newsletters?.find((n: Newsletter) => n.slug === slug)
+      setNewsletter(found || null)
+    } catch (error) {
+      console.error('Error fetching newsletter:', error)
+      setNewsletter(null)
+    }
+  }
+
   // In staging, skip loading state and show content immediately
   if (isStaging) {
+    const dashboardUrl = newsletterSlug ? `/dashboard/${newsletterSlug}` : '/dashboard'
+    const campaignsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/campaigns` : '/dashboard/campaigns'
+    const analyticsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/analytics` : '/dashboard/analytics'
+    const databasesUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/databases` : '/dashboard/databases'
+    const settingsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/settings` : '/dashboard/settings'
+
     return (
       <div className="min-h-screen bg-gray-50">
         <nav className="bg-white shadow-sm border-b">
@@ -45,36 +89,36 @@ export default function Layout({ children }: LayoutProps) {
               <div className="flex items-center space-x-8">
                 <Link href="/dashboard" className="flex items-center">
                   <h1 className="text-xl font-bold text-brand-primary">
-                    AI Accounting Daily
+                    {newsletter?.name || 'AI Pro Newsletters'}
                   </h1>
                 </Link>
                 <nav className="hidden md:flex space-x-8">
                   <Link
-                    href="/dashboard"
+                    href={dashboardUrl}
                     className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium"
                   >
                     Dashboard
                   </Link>
                   <Link
-                    href="/dashboard/campaigns"
+                    href={campaignsUrl}
                     className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium"
                   >
                     Campaigns
                   </Link>
                   <Link
-                    href="/dashboard/analytics"
+                    href={analyticsUrl}
                     className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium"
                   >
                     Analytics
                   </Link>
                   <Link
-                    href="/dashboard/databases"
+                    href={databasesUrl}
                     className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium"
                   >
                     Databases
                   </Link>
                   <Link
-                    href="/dashboard/settings"
+                    href={settingsUrl}
                     className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium"
                   >
                     Settings
@@ -106,6 +150,11 @@ export default function Layout({ children }: LayoutProps) {
           isOpen={isMobileMenuOpen}
           onClose={() => setIsMobileMenuOpen(false)}
           userDisplay="Staging Test User"
+          dashboardUrl={dashboardUrl}
+          campaignsUrl={campaignsUrl}
+          analyticsUrl={analyticsUrl}
+          databasesUrl={databasesUrl}
+          settingsUrl={settingsUrl}
         />
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           {children}
@@ -126,6 +175,12 @@ export default function Layout({ children }: LayoutProps) {
     return null
   }
 
+  const dashboardUrl = newsletterSlug ? `/dashboard/${newsletterSlug}` : '/dashboard'
+  const campaignsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/campaigns` : '/dashboard/campaigns'
+  const analyticsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/analytics` : '/dashboard/analytics'
+  const databasesUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/databases` : '/dashboard/databases'
+  const settingsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/settings` : '/dashboard/settings'
+
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow-sm border-b">
@@ -134,36 +189,36 @@ export default function Layout({ children }: LayoutProps) {
             <div className="flex items-center space-x-8">
               <Link href="/dashboard" className="flex items-center">
                 <h1 className="text-xl font-bold text-brand-primary">
-                  AI Accounting Daily
+                  {newsletter?.name || 'AI Pro Newsletters'}
                 </h1>
               </Link>
               <nav className="hidden md:flex space-x-8">
                 <Link
-                  href="/dashboard"
+                  href={dashboardUrl}
                   className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium"
                 >
                   Dashboard
                 </Link>
                 <Link
-                  href="/dashboard/campaigns"
+                  href={campaignsUrl}
                   className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium"
                 >
                   Campaigns
                 </Link>
                 <Link
-                  href="/dashboard/analytics"
+                  href={analyticsUrl}
                   className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium"
                 >
                   Analytics
                 </Link>
                 <Link
-                  href="/dashboard/databases"
+                  href={databasesUrl}
                   className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium"
                 >
                   Databases
                 </Link>
                 <Link
-                  href="/dashboard/settings"
+                  href={settingsUrl}
                   className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium"
                 >
                   Settings
@@ -199,6 +254,11 @@ export default function Layout({ children }: LayoutProps) {
         onClose={() => setIsMobileMenuOpen(false)}
         onSignOut={() => signOut()}
         userDisplay={session.user?.name || session.user?.email || ''}
+        dashboardUrl={dashboardUrl}
+        campaignsUrl={campaignsUrl}
+        analyticsUrl={analyticsUrl}
+        databasesUrl={databasesUrl}
+        settingsUrl={settingsUrl}
       />
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {children}

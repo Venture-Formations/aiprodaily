@@ -25,7 +25,15 @@
       "mcp__postgres__query",
       "Bash(git remote add:*)",
       "Bash(openssl rand:*)",
-      "Bash(git remote set-url:*)"
+      "Bash(git remote set-url:*)",
+      "Bash(git log:*)",
+      "Bash(git config:*)",
+      "Bash(npx vercel:*)",
+      "Bash(cat:*)",
+      "Bash(echo:*)",
+      "Bash(where npx)",
+      "Bash(npx supabase:*)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []

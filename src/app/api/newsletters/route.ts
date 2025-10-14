@@ -6,10 +6,11 @@ import { supabaseAdmin } from '@/lib/supabase'
  */
 export async function GET(request: NextRequest) {
   try {
+    // Return all newsletters (including inactive ones) for admin view
+    // Frontend can filter by is_active if needed
     const { data: newsletters, error } = await supabaseAdmin
       .from('newsletters')
       .select('*')
-      .eq('is_active', true)
       .order('name', { ascending: true })
 
     if (error) throw error
