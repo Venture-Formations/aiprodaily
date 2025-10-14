@@ -702,42 +702,6 @@ Response format:
   "word_count": <exact word count>
 }`,
 
-  factChecker: (newsletterContent: string, originalContent: string) => `
-CRITICAL FACT-CHECK: Verify this newsletter article follows strict content rules.
-
-Newsletter Article:
-${newsletterContent}
-
-Original Source:
-${originalContent.substring(0, 2000)}
-
-CHECK FOR VIOLATIONS:
-1. EXACT COPIED TEXT: Word-for-word copying (similar phrasing OK)
-2. ADDED INFORMATION: Facts not in original source
-3. PROHIBITED WORDS: 'today,' 'tomorrow,' 'yesterday'
-4. FORMATTING: Emojis, hashtags (#), URLs
-5. PERSPECTIVE: Inappropriate "we/our/us"
-6. EDITORIAL: Opinions or speculation
-7. MODIFIED TITLE: Just reworded original
-
-SCORING (each 1-10):
-- Accuracy: Content matches source, no additions
-- Compliance: Follows all formatting/style rules
-- Quality: Professional, engaging, well-written
-
-Total Score = accuracy + compliance + quality (3-30)
-PASSING: 20/30 minimum
-
-Response format:
-{
-  "accuracy_score": <1-10>,
-  "compliance_score": <1-10>,
-  "quality_score": <1-10>,
-  "total_score": <3-30>,
-  "violations": "<detailed list or 'none'>",
-  "passed": <boolean true if >= 20>
-}`,
-
   breakingNewsScorer: (article: { title: string; description: string; content?: string }) => `
 You are evaluating a news article for inclusion in the AI Accounting Professionals newsletter's "Breaking News" section.
 
