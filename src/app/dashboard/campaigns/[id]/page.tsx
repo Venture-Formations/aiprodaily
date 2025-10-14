@@ -771,12 +771,6 @@ function NewsletterSectionComponent({
 
   const renderSectionContent = () => {
     switch (section.name) {
-      case 'Local Events':
-        return (
-          <div className="text-center py-8 text-gray-500">
-            Event management is handled in the dedicated Local Events section above
-          </div>
-        )
       case 'Local Weather':
         return (
           <div className="p-6">
@@ -863,12 +857,6 @@ function NewsletterSectionComponent({
                 Click "View Dining Deals" to load management interface
               </div>
             )}
-          </div>
-        )
-      case 'The Local Scoop':
-        return (
-          <div className="text-center py-8 text-gray-500">
-            Article management is handled in the dedicated Articles section above
           </div>
         )
       case 'Road Work':
@@ -2625,7 +2613,7 @@ export default function CampaignDetailPage() {
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-medium text-gray-900">
-                The Local Scoop
+                Articles
               </h2>
               <button
                 onClick={() => setArticlesExpanded(!articlesExpanded)}
@@ -2745,71 +2733,9 @@ export default function CampaignDetailPage() {
           )}
         </div>
 
-        {/* Local Events Section */}
-        <div className="bg-white shadow rounded-lg mt-6">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-medium text-gray-900">
-                Local Events
-              </h2>
-              <button
-                onClick={handleEventsExpand}
-                className="flex items-center space-x-2 text-sm text-brand-primary hover:text-blue-700"
-              >
-                <span>{eventsExpanded ? 'Minimize' : 'Manage Events'}</span>
-                <svg
-                  className={`w-4 h-4 transform transition-transform ${eventsExpanded ? 'rotate-180' : ''}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {eventsExpanded && (
-            <div className="p-6">
-              {loadingEvents ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
-                  <span className="ml-3 text-gray-600">Loading events...</span>
-                </div>
-              ) : (
-                <EventsManager
-                  campaign={campaign}
-                  availableEvents={availableEvents}
-                  campaignEvents={campaignEvents}
-                  onUpdateEvents={updateEventSelections}
-                  updating={updatingEvents}
-                />
-              )}
-            </div>
-          )}
-
-          {!eventsExpanded && campaignEvents.length > 0 && (
-            <div className="px-6 pb-4">
-              <div className="flex space-x-4">
-                {getEventCountsByDate().map((dateInfo) => (
-                  <div key={dateInfo.date} className="flex flex-col items-center">
-                    <div className="text-xs text-gray-500 mb-1">
-                      {dateInfo.dayName} {dateInfo.monthDay}
-                    </div>
-                    <div className={`text-sm font-semibold ${dateInfo.colorClass}`}>
-                      {dateInfo.count}/8
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-
         {/* Dynamic Newsletter Sections */}
         {newsletterSections
-          .filter(section => section.is_active && !['The Local Scoop', 'Local Events'].includes(section.name))
+          .filter(section => section.is_active)
           .map(section => (
             <NewsletterSectionComponent
               key={section.id}

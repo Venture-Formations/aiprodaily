@@ -51,7 +51,7 @@ CREATE INDEX idx_ai_apps_last_used ON ai_applications(last_used_date);
 
 CREATE TABLE campaign_ai_app_selections (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  campaign_id TEXT NOT NULL REFERENCES newsletter_campaigns(id) ON DELETE CASCADE,
+  campaign_id UUID NOT NULL REFERENCES newsletter_campaigns(id) ON DELETE CASCADE,
   app_id UUID NOT NULL REFERENCES ai_applications(id) ON DELETE CASCADE,
   selection_order INT NOT NULL, -- 1-5 for display position
   is_featured BOOLEAN DEFAULT false,
@@ -108,7 +108,7 @@ CREATE INDEX idx_prompt_ideas_last_used ON prompt_ideas(last_used_date);
 
 CREATE TABLE campaign_prompt_selections (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  campaign_id TEXT NOT NULL REFERENCES newsletter_campaigns(id) ON DELETE CASCADE,
+  campaign_id UUID NOT NULL REFERENCES newsletter_campaigns(id) ON DELETE CASCADE,
   prompt_id UUID NOT NULL REFERENCES prompt_ideas(id) ON DELETE CASCADE,
   selection_order INT NOT NULL, -- 1-5 for display position
   is_featured BOOLEAN DEFAULT false,
