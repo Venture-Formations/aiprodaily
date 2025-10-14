@@ -24,7 +24,16 @@ export function isStagingEnvironment(): boolean {
 }
 
 export function shouldBypassAuth(): boolean {
-  return isStagingEnvironment()
+  // Bypass auth if staging environment
+  if (isStagingEnvironment()) return true
+
+  // Also bypass auth if Google OAuth credentials are not configured
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    console.log('[Auth Bypass] Google OAuth credentials not configured - bypassing authentication')
+    return true
+  }
+
+  return false
 }
 
 /**
