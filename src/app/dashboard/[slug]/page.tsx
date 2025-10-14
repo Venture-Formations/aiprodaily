@@ -119,7 +119,7 @@ export default function NewsletterDashboard() {
                     Recent Campaigns
                   </h2>
                   <Link
-                    href="/dashboard/campaigns"
+                    href={`/dashboard/${slug}/campaigns`}
                     className="text-brand-primary hover:text-blue-700 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-primary rounded px-2 py-1"
                     aria-label="View all campaigns"
                   >
@@ -146,13 +146,13 @@ export default function NewsletterDashboard() {
                     title="No campaigns yet"
                     description="Get started by creating your first newsletter campaign"
                     actionLabel="Create Campaign"
-                    actionHref="/dashboard/campaigns/new"
+                    actionHref={`/dashboard/${slug}/campaigns/new`}
                   />
                 ) : (
                   campaigns.map((campaign) => (
                     <Link
                       key={campaign.id}
-                      href={`/dashboard/campaigns/${campaign.id}`}
+                      href={`/dashboard/${slug}/campaigns/${campaign.id}`}
                       className="block p-4 sm:p-6 hover:bg-gray-50 focus:outline-none focus:bg-gray-50 transition-colors"
                       role="listitem"
                     >
@@ -179,7 +179,7 @@ export default function NewsletterDashboard() {
             <h2 className="sr-only">Quick Actions</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               <Link
-                href="/dashboard/campaigns/new"
+                href={`/dashboard/${slug}/campaigns/new`}
                 className="group focus:outline-none focus:ring-2 focus:ring-brand-primary rounded-lg"
                 aria-label="Create a new campaign"
               >
@@ -196,7 +196,7 @@ export default function NewsletterDashboard() {
                 </Card>
               </Link>
               <Link
-                href="/dashboard/analytics"
+                href={`/dashboard/${slug}/analytics`}
                 className="group focus:outline-none focus:ring-2 focus:ring-brand-primary rounded-lg"
                 aria-label="View analytics"
               >
@@ -213,7 +213,7 @@ export default function NewsletterDashboard() {
                 </Card>
               </Link>
               <Link
-                href="/dashboard/settings"
+                href={`/dashboard/${slug}/settings`}
                 className="group focus:outline-none focus:ring-2 focus:ring-brand-primary rounded-lg"
                 aria-label="Open settings"
               >

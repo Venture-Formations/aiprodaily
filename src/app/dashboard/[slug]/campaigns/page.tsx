@@ -1,12 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
 import Layout from '@/components/Layout'
 import Link from 'next/link'
 import DeleteCampaignModal from '@/components/DeleteCampaignModal'
 import type { NewsletterCampaign } from '@/types/database'
 
 export default function CampaignsPage() {
+  const params = useParams()
+  const slug = params.slug as string
   const [campaigns, setCampaigns] = useState<NewsletterCampaign[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -92,7 +95,7 @@ export default function CampaignsPage() {
               Newsletter Campaigns
             </h1>
             <Link
-              href="/dashboard/campaigns/new"
+              href={`/dashboard/${slug}/campaigns/new`}
               className="bg-brand-primary hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
             >
               Create Campaign
@@ -178,7 +181,7 @@ export default function CampaignsPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-3">
                           <Link
-                            href={`/dashboard/campaigns/${campaign.id}`}
+                            href={`/dashboard/${slug}/campaigns/${campaign.id}`}
                             className="text-brand-primary hover:text-blue-700"
                           >
                             View
