@@ -521,16 +521,31 @@ export class RSSProcessor {
             throw new Error(`Invalid score types returned by AI`)
           }
 
+          // Prepare database record with both legacy and new multi-criteria fields
+          const ratingRecord: any = {
+            post_id: post.id,
+            interest_level: evaluation.interest_level,
+            local_relevance: evaluation.local_relevance,
+            community_impact: evaluation.community_impact,
+            ai_reasoning: evaluation.reasoning,
+            total_score: (evaluation as any).total_score || ((evaluation.interest_level + evaluation.local_relevance + evaluation.community_impact) / 30 * 100)
+          }
+
+          // Add individual criteria scores and reasons if available
+          const criteriaScores = (evaluation as any).criteria_scores
+          if (criteriaScores && Array.isArray(criteriaScores)) {
+            for (let i = 0; i < criteriaScores.length && i < 5; i++) {
+              const criterionNum = i + 1
+              ratingRecord[`criteria_${criterionNum}_score`] = criteriaScores[i].score
+              ratingRecord[`criteria_${criterionNum}_reason`] = criteriaScores[i].reason
+              ratingRecord[`criteria_${criterionNum}_weight`] = criteriaScores[i].weight
+            }
+          }
+
           // Store evaluation with error handling
           const { error: ratingError } = await supabaseAdmin
             .from('post_ratings')
-            .insert([{
-              post_id: post.id,
-              interest_level: evaluation.interest_level,
-              local_relevance: evaluation.local_relevance,
-              community_impact: evaluation.community_impact,
-              ai_reasoning: evaluation.reasoning,
-            }])
+            .insert([ratingRecord])
 
           if (ratingError) {
             console.error(`Failed to insert rating for post ${post.id}:`, ratingError)
@@ -584,41 +599,128 @@ export class RSSProcessor {
   }
 
   private async evaluatePost(post: RssPost): Promise<ContentEvaluation> {
-    const prompt = await AI_PROMPTS.contentEvaluator({
-      title: post.title,
-      description: post.description || '',
-      content: post.content || '',
-      hasImage: !!post.image_url
-    })
+    // Fetch enabled criteria configuration from database
+    const { data: criteriaConfig, error: configError } = await supabaseAdmin
+      .from('app_settings')
+      .select('key, value')
+      .or('key.eq.criteria_enabled_count,key.like.criteria_%_name,key.like.criteria_%_weight')
 
-    const result = await callOpenAI(prompt)
+    if (configError) {
+      console.error('Failed to fetch criteria configuration:', configError)
+      throw new Error('Failed to fetch criteria configuration')
+    }
 
-    // Log the actual response for debugging
-    console.log('AI evaluation response:', JSON.stringify(result, null, 2))
+    // Parse criteria configuration
+    const enabledCountSetting = criteriaConfig?.find(s => s.key === 'criteria_enabled_count')
+    const enabledCount = enabledCountSetting?.value ? parseInt(enabledCountSetting.value) : 3
 
-    // Check if we got a raw response that needs parsing
-    if (result.raw && typeof result.raw === 'string') {
+    console.log(`Evaluating post with ${enabledCount} enabled criteria`)
+
+    // Collect enabled criteria with their weights
+    const criteria: Array<{ number: number; name: string; weight: number }> = []
+    for (let i = 1; i <= enabledCount; i++) {
+      const nameSetting = criteriaConfig?.find(s => s.key === `criteria_${i}_name`)
+      const weightSetting = criteriaConfig?.find(s => s.key === `criteria_${i}_weight`)
+
+      criteria.push({
+        number: i,
+        name: nameSetting?.value || `Criteria ${i}`,
+        weight: weightSetting?.value ? parseFloat(weightSetting.value) : 1.0
+      })
+    }
+
+    // Evaluate post against each enabled criterion
+    const criteriaScores: Array<{ score: number; reason: string; weight: number }> = []
+
+    for (const criterion of criteria) {
       try {
-        const parsed = JSON.parse(result.raw)
-        if (parsed.interest_level && parsed.local_relevance && parsed.community_impact) {
-          return parsed as ContentEvaluation
+        console.log(`Evaluating criterion ${criterion.number}: ${criterion.name} (weight: ${criterion.weight})`)
+
+        // Call the appropriate criteria evaluator
+        const evaluatorKey = `criteria${criterion.number}Evaluator` as keyof typeof AI_PROMPTS
+        const evaluator = AI_PROMPTS[evaluatorKey]
+
+        if (typeof evaluator !== 'function') {
+          console.error(`No evaluator found for criterion ${criterion.number}`)
+          continue
         }
-      } catch (parseError) {
-        console.error('Failed to parse raw AI response:', result.raw)
+
+        // Type assertion to help TypeScript understand this is a function
+        const evaluatorFn = evaluator as (post: { title: string; description: string; content?: string }) => Promise<string>
+        const prompt = await evaluatorFn({
+          title: post.title,
+          description: post.description || '',
+          content: post.content || ''
+        })
+
+        const result = await callOpenAI(prompt)
+
+        // Parse the AI response
+        let score: number
+        let reason: string
+
+        if (result.raw && typeof result.raw === 'string') {
+          try {
+            const parsed = JSON.parse(result.raw)
+            score = parsed.score
+            reason = parsed.reason || ''
+          } catch (parseError) {
+            console.error(`Failed to parse criterion ${criterion.number} response:`, result.raw)
+            throw new Error(`Invalid criterion ${criterion.number} response format`)
+          }
+        } else if (typeof result.score === 'number') {
+          score = result.score
+          reason = result.reason || ''
+        } else {
+          throw new Error(`Invalid criterion ${criterion.number} response format`)
+        }
+
+        // Validate score is a number between 0-10
+        if (typeof score !== 'number' || score < 0 || score > 10) {
+          console.error(`Invalid score for criterion ${criterion.number}: ${score}`)
+          throw new Error(`Criterion ${criterion.number} score must be between 0-10`)
+        }
+
+        criteriaScores.push({
+          score,
+          reason,
+          weight: criterion.weight
+        })
+
+        console.log(`Criterion ${criterion.number} score: ${score}/10`)
+
+      } catch (error) {
+        console.error(`Error evaluating criterion ${criterion.number}:`, error)
+        throw error
       }
     }
 
-    // Check for direct response format
-    if (!result.interest_level || !result.local_relevance || !result.community_impact) {
-      await this.logError(`Invalid AI evaluation response for post: ${post.title}`, {
-        postId: post.id,
-        aiResponse: result,
-        error: 'Missing required fields: interest_level, local_relevance, community_impact'
-      })
-      throw new Error('Invalid AI evaluation response')
-    }
+    // Calculate weighted total score
+    let totalWeightedScore = 0
+    let totalWeight = 0
 
-    return result as ContentEvaluation
+    criteriaScores.forEach(({ score, weight }) => {
+      totalWeightedScore += score * weight
+      totalWeight += weight
+    })
+
+    // Normalize to 0-100 scale (assuming max score per criterion is 10)
+    const maxPossibleScore = totalWeight * 10
+    const normalizedScore = totalWeight > 0 ? (totalWeightedScore / maxPossibleScore) * 100 : 0
+
+    console.log(`Total weighted score: ${totalWeightedScore}/${maxPossibleScore} = ${normalizedScore.toFixed(2)}/100`)
+
+    // Return evaluation in legacy format for backward compatibility
+    // Store individual criteria scores in post_ratings table
+    return {
+      interest_level: criteriaScores[0]?.score || 0,
+      local_relevance: criteriaScores[1]?.score || 0,
+      community_impact: criteriaScores[2]?.score || 0,
+      reasoning: criteriaScores.map((c, i) => `${criteria[i]?.name}: ${c.reason}`).join('\n\n'),
+      // Include new fields for multi-criteria system
+      criteria_scores: criteriaScores,
+      total_score: normalizedScore
+    } as any
   }
 
   private async handleDuplicates(posts: RssPost[], campaignId: string) {
