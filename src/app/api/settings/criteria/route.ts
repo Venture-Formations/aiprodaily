@@ -81,17 +81,40 @@ export async function PATCH(request: NextRequest) {
 
       const key = `criteria_${criteriaNumber}_name`
 
-      // Upsert the criteria name
-      const { error } = await supabaseAdmin
+      // Check if setting exists
+      const { data: existing } = await supabaseAdmin
         .from('app_settings')
-        .upsert({
-          key,
-          value: name,
-          description: `Name for criteria ${criteriaNumber}`,
-          updated_at: new Date().toISOString()
-        })
+        .select('key')
+        .eq('key', key)
+        .single()
 
-      if (error) throw error
+      let error
+      if (existing) {
+        // Update existing
+        const result = await supabaseAdmin
+          .from('app_settings')
+          .update({
+            value: name,
+            updated_at: new Date().toISOString()
+          })
+          .eq('key', key)
+        error = result.error
+      } else {
+        // Insert new
+        const result = await supabaseAdmin
+          .from('app_settings')
+          .insert({
+            key,
+            value: name,
+            description: `Name for criteria ${criteriaNumber}`
+          })
+        error = result.error
+      }
+
+      if (error) {
+        console.error('Database error:', error)
+        throw error
+      }
 
       return NextResponse.json({
         success: true,
@@ -107,17 +130,40 @@ export async function PATCH(request: NextRequest) {
         )
       }
 
-      // Update enabled count
-      const { error } = await supabaseAdmin
+      // Check if criteria_enabled_count exists
+      const { data: existing } = await supabaseAdmin
         .from('app_settings')
-        .upsert({
-          key: 'criteria_enabled_count',
-          value: enabledCount.toString(),
-          description: 'Number of criteria currently enabled (1-5)',
-          updated_at: new Date().toISOString()
-        })
+        .select('key')
+        .eq('key', 'criteria_enabled_count')
+        .single()
 
-      if (error) throw error
+      let error
+      if (existing) {
+        // Update existing
+        const result = await supabaseAdmin
+          .from('app_settings')
+          .update({
+            value: enabledCount.toString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('key', 'criteria_enabled_count')
+        error = result.error
+      } else {
+        // Insert new
+        const result = await supabaseAdmin
+          .from('app_settings')
+          .insert({
+            key: 'criteria_enabled_count',
+            value: enabledCount.toString(),
+            description: 'Number of criteria currently enabled (1-5)'
+          })
+        error = result.error
+      }
+
+      if (error) {
+        console.error('Database error:', error)
+        throw error
+      }
 
       return NextResponse.json({
         success: true,
