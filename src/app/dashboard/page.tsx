@@ -42,7 +42,7 @@ export default function NewsletterSelect() {
               Select Your Newsletter
             </h1>
             <p className="text-lg text-gray-600">
-              Choose which professional newsletter you'd like to manage
+              Select a newsletter to access your dashboard
             </p>
           </header>
 
