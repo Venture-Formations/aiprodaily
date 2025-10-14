@@ -41,8 +41,6 @@ export default function SettingsPage() {
                 { id: 'system', name: 'System Status' },
                 { id: 'newsletter', name: 'Newsletter' },
                 { id: 'email', name: 'Email' },
-                { id: 'public-events', name: 'Public Events' },
-                { id: 'ads', name: 'Ads' },
                 { id: 'slack', name: 'Slack' },
                 { id: 'ai-prompts', name: 'AI Prompts' },
                 { id: 'rss', name: 'RSS Feeds' },
@@ -70,8 +68,6 @@ export default function SettingsPage() {
           {activeTab === 'system' && <SystemStatus />}
           {activeTab === 'newsletter' && <NewsletterSettings />}
           {activeTab === 'email' && <EmailSettings />}
-          {activeTab === 'public-events' && <PublicEventsSettings />}
-          {activeTab === 'ads' && <AdsSettings />}
           {activeTab === 'slack' && <SlackSettings />}
           {activeTab === 'ai-prompts' && <AIPromptsSettings />}
           {activeTab === 'rss' && <RSSFeeds />}
