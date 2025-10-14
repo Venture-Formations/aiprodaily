@@ -2,29 +2,40 @@ import { Octokit } from '@octokit/rest'
 import crypto from 'crypto'
 
 export class GitHubImageStorage {
-  private octokit: Octokit
+  private octokit: Octokit | null
   private owner: string
   private repo: string
+  private enabled: boolean
 
   constructor() {
-    if (!process.env.GITHUB_TOKEN) {
-      throw new Error('GITHUB_TOKEN environment variable is required')
-    }
-    if (!process.env.GITHUB_OWNER) {
-      throw new Error('GITHUB_OWNER environment variable is required')
-    }
-    if (!process.env.GITHUB_REPO) {
-      throw new Error('GITHUB_REPO environment variable is required')
+    // Check if GitHub storage is configured
+    this.enabled = !!(process.env.GITHUB_TOKEN && process.env.GITHUB_OWNER && process.env.GITHUB_REPO)
+
+    if (!this.enabled) {
+      console.warn('GitHub image storage is disabled - missing GITHUB_TOKEN, GITHUB_OWNER, or GITHUB_REPO environment variables')
+      this.octokit = null
+      this.owner = ''
+      this.repo = ''
+      return
     }
 
     this.octokit = new Octokit({
       auth: process.env.GITHUB_TOKEN,
     })
-    this.owner = process.env.GITHUB_OWNER
-    this.repo = process.env.GITHUB_REPO
+    this.owner = process.env.GITHUB_OWNER!
+    this.repo = process.env.GITHUB_REPO!
+  }
+
+  isEnabled(): boolean {
+    return this.enabled
   }
 
   async uploadWeatherImage(imageUrl: string, forecastDate: string): Promise<string | null> {
+    if (!this.enabled || !this.octokit) {
+      console.warn('GitHub storage not enabled, skipping weather image upload')
+      return null
+    }
+
     try {
       console.log(`Downloading weather image from: ${imageUrl}`)
 
@@ -120,6 +131,11 @@ export class GitHubImageStorage {
   }
 
   async uploadImage(imageUrl: string, articleTitle: string): Promise<string | null> {
+    if (!this.enabled || !this.octokit) {
+      console.warn('GitHub storage not enabled, skipping image upload')
+      return null
+    }
+
     try {
       console.log(`Downloading image from: ${imageUrl}`)
 
@@ -242,6 +258,10 @@ export class GitHubImageStorage {
   }
 
   async listImages(): Promise<string[]> {
+    if (!this.enabled || !this.octokit) {
+      return []
+    }
+
     try {
       const { data } = await this.octokit.repos.getContent({
         owner: this.owner,
@@ -264,6 +284,10 @@ export class GitHubImageStorage {
   }
 
   async listWeatherImages(): Promise<string[]> {
+    if (!this.enabled || !this.octokit) {
+      return []
+    }
+
     try {
       const { data } = await this.octokit.repos.getContent({
         owner: this.owner,
@@ -286,6 +310,10 @@ export class GitHubImageStorage {
   }
 
   async cleanupOldWeatherImages(daysToKeep: number = 30): Promise<number> {
+    if (!this.enabled || !this.octokit) {
+      return 0
+    }
+
     try {
       console.log(`Cleaning up weather images older than ${daysToKeep} days...`)
 
@@ -342,6 +370,11 @@ export class GitHubImageStorage {
    * Used for VRBO images that have already been processed/resized
    */
   async uploadBuffer(buffer: Buffer, fileName: string, description: string): Promise<string | null> {
+    if (!this.enabled || !this.octokit) {
+      console.warn('GitHub storage not enabled, skipping buffer upload')
+      return null
+    }
+
     try {
       console.log(`Uploading buffer to GitHub: ${fileName}`)
 
@@ -408,6 +441,11 @@ export class GitHubImageStorage {
     variant: string = '1200x675',
     description: string = 'Library image variant'
   ): Promise<string | null> {
+    if (!this.enabled || !this.octokit) {
+      console.warn('GitHub storage not enabled, skipping image variant upload')
+      return null
+    }
+
     try {
       console.log(`Uploading ${variant} variant for image: ${imageId}`)
 
@@ -477,6 +515,10 @@ export class GitHubImageStorage {
    * List all image variants in the library
    */
   async listImageVariants(variant: string = '1200x675'): Promise<Array<{id: string, url: string}>> {
+    if (!this.enabled || !this.octokit) {
+      return []
+    }
+
     try {
       const { data } = await this.octokit.repos.getContent({
         owner: this.owner,
@@ -505,6 +547,10 @@ export class GitHubImageStorage {
    * Delete an image variant from GitHub
    */
   async deleteImageVariant(imageId: string, variant: string = '1200x675'): Promise<boolean> {
+    if (!this.enabled || !this.octokit) {
+      return false
+    }
+
     try {
       const fileName = `${imageId}.jpg`
       const filePath = `images/library/${variant}/${fileName}`
