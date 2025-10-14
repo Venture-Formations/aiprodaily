@@ -34,7 +34,8 @@
       "Bash(where npx)",
       "Bash(npx supabase:*)",
       "Bash(node:*)",
-      "mcp__vercel__getDeployments"
+      "mcp__vercel__getDeployments",
+      "Bash(git mv:*)"
     ],
     "deny": [],
     "ask": []
