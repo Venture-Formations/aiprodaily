@@ -39,7 +39,7 @@ export default function NewsletterSelect() {
           {/* Header */}
           <header className="text-center mb-12">
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
-              Select a Newsletter
+              Select Your Newsletter
             </h1>
             <p className="text-lg text-gray-600">
               Choose which professional newsletter you'd like to manage
