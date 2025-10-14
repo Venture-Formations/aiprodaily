@@ -5,63 +5,50 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Skip auth check in development (localhost)
+    const isDevelopment = process.env.NODE_ENV === 'development'
+
+    if (!isDevelopment) {
+      const session = await getServerSession(authOptions)
+      if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
     }
 
-    const { data: eventsCount, error: eventsError } = await supabaseAdmin
-      .from('events')
+    // AI Applications count
+    const { data: aiAppsCount, error: aiAppsError } = await supabaseAdmin
+      .from('ai_applications')
       .select('id', { count: 'exact' })
 
-    if (eventsError) {
-      console.error('Error fetching events count:', eventsError)
-      return NextResponse.json({ error: 'Failed to fetch events count' }, { status: 500 })
+    if (aiAppsError) {
+      console.error('Error fetching AI applications count:', aiAppsError)
     }
 
-    const { data: vrboCount, error: vrboError } = await supabaseAdmin
-      .from('vrbo_listings')
+    // Prompt Ideas count
+    const { data: promptsCount, error: promptsError } = await supabaseAdmin
+      .from('prompt_ideas')
       .select('id', { count: 'exact' })
 
-    if (vrboError) {
-      console.error('Error fetching VRBO count:', vrboError)
-      // Don't fail the request if VRBO table doesn't exist yet
+    if (promptsError) {
+      console.error('Error fetching prompt ideas count:', promptsError)
     }
 
-    const { data: diningCount, error: diningError } = await supabaseAdmin
-      .from('dining_deals')
-      .select('id', { count: 'exact' })
-
-    if (diningError) {
-      console.error('Error fetching Dining Deals count:', diningError)
-      // Don't fail the request if table doesn't exist yet
-    }
-
+    // Images count
     const { data: imagesCount, error: imagesError } = await supabaseAdmin
       .from('images')
       .select('id', { count: 'exact' })
 
     if (imagesError) {
       console.error('Error fetching Images count:', imagesError)
-      // Don't fail the request if table doesn't exist yet
     }
 
-    const { data: pollsCount, error: pollsError } = await supabaseAdmin
-      .from('polls')
-      .select('id', { count: 'exact' })
-
-    if (pollsError) {
-      console.error('Error fetching Polls count:', pollsError)
-      // Don't fail the request if table doesn't exist yet
-    }
-
+    // Advertisements count
     const { data: adsCount, error: adsError } = await supabaseAdmin
       .from('advertisements')
       .select('id', { count: 'exact' })
 
     if (adsError) {
       console.error('Error fetching Ads count:', adsError)
-      // Don't fail the request if table doesn't exist yet
     }
 
     // Get unique RSS sources count
@@ -75,34 +62,22 @@ export async function GET(request: NextRequest) {
 
     const databases = [
       {
-        name: 'Local Events',
-        description: 'Events pulled from Visit St. Cloud API',
-        count: eventsCount?.length || 0,
-        href: '/dashboard/databases/events'
+        name: 'AI Applications',
+        description: 'AI tools and applications for accountants',
+        count: aiAppsCount?.length || 0,
+        href: '/dashboard/databases/ai-apps'
       },
       {
-        name: 'Dining Deals',
-        description: 'Restaurant specials organized by day of week',
-        count: diningCount?.length || 0,
-        href: '/dashboard/databases/dining'
-      },
-      {
-        name: 'VRBO Listings',
-        description: 'Minnesota Getaways properties for newsletters',
-        count: vrboCount?.length || 0,
-        href: '/dashboard/databases/vrbo'
+        name: 'Prompt Ideas',
+        description: 'AI prompts and templates for accounting tasks',
+        count: promptsCount?.length || 0,
+        href: '/dashboard/databases/prompt-ideas'
       },
       {
         name: 'Images',
         description: 'AI-tagged image library with crop and tag management',
         count: imagesCount?.length || 0,
         href: '/dashboard/databases/images'
-      },
-      {
-        name: 'Polls',
-        description: 'Newsletter polls and subscriber responses',
-        count: pollsCount?.length || 0,
-        href: '/dashboard/polls'
       },
       {
         name: 'RSS Sources',
@@ -112,7 +87,7 @@ export async function GET(request: NextRequest) {
       },
       {
         name: 'Advertisements',
-        description: 'Community Business Spotlight submissions',
+        description: 'Newsletter advertisement submissions',
         count: adsCount?.length || 0,
         href: '/dashboard/databases/ads'
       }

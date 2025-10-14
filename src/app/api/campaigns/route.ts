@@ -2,126 +2,119 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authOptions } from '@/lib/auth'
-import { selectPropertiesForCampaign } from '@/lib/vrbo-selector'
-import { selectDiningDealsForCampaign } from '@/lib/dining-selector'
 
-// Helper function to initialize random event selection for a new campaign
-async function initializeRandomEventSelection(campaignId: string) {
+// Helper function to initialize AI app selection for a new campaign
+async function initializeAIAppSelection(campaignId: string) {
   try {
-    console.log(`Initializing random event selection for campaign ${campaignId}`)
+    console.log(`Initializing AI app selection for campaign ${campaignId}`)
 
-    // Get the campaign's date and created_at timestamp
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
-      .select('date, created_at')
-      .eq('id', campaignId)
+    // Get accounting newsletter ID
+    const { data: newsletter } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('slug', 'accounting')
       .single()
 
-    if (campaignError || !campaign) {
-      console.error('Could not fetch campaign for event selection:', campaignError)
+    if (!newsletter) {
+      console.error('Accounting newsletter not found')
       return
     }
 
-    // Calculate 3-day range starting from the campaign date (same day as newsletter)
-    // Use the campaign.date for consistent timezone handling
-    const campaignDate = new Date(campaign.date + 'T00:00:00')
-    console.log(`Campaign date: ${campaign.date}, Starting events from campaign date`)
+    // Get 5 active AI applications randomly
+    const { data: apps, error } = await supabaseAdmin
+      .from('ai_applications')
+      .select('*')
+      .eq('newsletter_id', newsletter.id)
+      .eq('is_active', true)
+      .order('times_used', { ascending: true }) // Prioritize less-used apps
+      .limit(10) // Get 10 to choose from
 
-    const dates = []
-    for (let i = 0; i < 3; i++) { // Start from i=0 to include campaign date itself
-      const date = new Date(campaignDate)
-      date.setDate(campaignDate.getDate() + i)
-      dates.push(date.toISOString().split('T')[0])
+    if (error || !apps || apps.length === 0) {
+      console.error('Error fetching AI applications:', error)
+      return
     }
 
-    console.log('Event selection dates:', dates)
+    // Shuffle and select 5
+    const shuffledApps = [...apps].sort(() => Math.random() - 0.5)
+    const selectedApps = shuffledApps.slice(0, 5)
 
-    // For each date, fetch available events and randomly select up to 8
-    for (const eventDate of dates) {
-      const dateStart = new Date(eventDate + 'T00:00:00-05:00')
-      const dateEnd = new Date(eventDate + 'T23:59:59-05:00')
+    // Insert selections
+    const selections = selectedApps.map((app, index) => ({
+      campaign_id: campaignId,
+      app_id: app.id,
+      selection_order: index + 1,
+      is_featured: index === 0 // First app is featured
+    }))
 
-      // Fetch events for this date using broader range matching
-      const { data: availableEvents, error: eventsError } = await supabaseAdmin
-        .from('events')
-        .select('*')
-        .eq('active', true)
-        .gte('start_date', eventDate)
-        .lte('start_date', eventDate + 'T23:59:59')
-        .order('start_date', { ascending: true })
+    const { error: insertError } = await supabaseAdmin
+      .from('campaign_ai_app_selections')
+      .insert(selections)
 
-      if (eventsError) {
-        console.error('Error fetching events for date', eventDate, eventsError)
-        continue
-      }
-
-      if (!availableEvents || availableEvents.length === 0) {
-        console.log('No events found for date:', eventDate)
-        continue
-      }
-
-      console.log(`Found ${availableEvents.length} events for ${eventDate}`)
-
-      // Randomly shuffle all available events
-      const shuffledEvents = [...availableEvents].sort(() => Math.random() - 0.5)
-
-      // Select up to 8 events randomly
-      const selectedEvents = shuffledEvents.slice(0, Math.min(8, availableEvents.length))
-
-      console.log(`Selected ${selectedEvents.length} events for ${eventDate}`)
-
-      // Insert campaign_events records
-      const campaignEventInserts = selectedEvents.map((event, index) => ({
-        campaign_id: campaignId,
-        event_id: event.id,
-        event_date: eventDate,
-        is_selected: true,
-        is_featured: index === 0, // First event of each day is featured
-        display_order: index + 1
-      }))
-
-      if (campaignEventInserts.length > 0) {
-        const { error: insertError } = await supabaseAdmin
-          .from('campaign_events')
-          .insert(campaignEventInserts)
-
-        if (insertError) {
-          console.error('Error inserting campaign events for date', eventDate, insertError)
-        } else {
-          console.log(`Successfully inserted ${campaignEventInserts.length} campaign events for ${eventDate}`)
-        }
-      }
+    if (insertError) {
+      console.error('Error inserting AI app selections:', insertError)
+    } else {
+      console.log(`Successfully selected ${selectedApps.length} AI applications`)
     }
-
-    console.log('Random event selection initialization completed')
   } catch (error) {
-    console.error('Error initializing random event selection:', error)
-    // Don't throw error to prevent campaign creation from failing
+    console.error('Error initializing AI app selection:', error)
   }
 }
 
-// Helper function to initialize VRBO property selection for a new campaign
-async function initializeVrboSelection(campaignId: string) {
+// Helper function to initialize prompt ideas selection for a new campaign
+async function initializePromptSelection(campaignId: string) {
   try {
-    console.log(`Initializing VRBO property selection for campaign ${campaignId}`)
-    const result = await selectPropertiesForCampaign(campaignId)
-    console.log('VRBO selection result:', result.message)
-  } catch (error) {
-    console.error('Error initializing VRBO selection:', error)
-    // Don't throw error to prevent campaign creation from failing
-  }
-}
+    console.log(`Initializing prompt ideas selection for campaign ${campaignId}`)
 
-// Helper function to initialize dining deals selection for a new campaign
-async function initializeDiningDealsSelection(campaignId: string, campaignDate: string) {
-  try {
-    console.log(`Initializing dining deals selection for campaign ${campaignId}`)
-    const date = new Date(campaignDate + 'T00:00:00')
-    const result = await selectDiningDealsForCampaign(campaignId, date)
-    console.log('Dining deals selection result:', result.message)
+    // Get accounting newsletter ID
+    const { data: newsletter } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('slug', 'accounting')
+      .single()
+
+    if (!newsletter) {
+      console.error('Accounting newsletter not found')
+      return
+    }
+
+    // Get 3-5 active prompt ideas randomly
+    const { data: prompts, error } = await supabaseAdmin
+      .from('prompt_ideas')
+      .select('*')
+      .eq('newsletter_id', newsletter.id)
+      .eq('is_active', true)
+      .order('times_used', { ascending: true }) // Prioritize less-used prompts
+      .limit(10) // Get 10 to choose from
+
+    if (error || !prompts || prompts.length === 0) {
+      console.error('Error fetching prompt ideas:', error)
+      return
+    }
+
+    // Shuffle and select 3-5 prompts
+    const shuffledPrompts = [...prompts].sort(() => Math.random() - 0.5)
+    const promptCount = Math.min(5, Math.max(3, prompts.length))
+    const selectedPrompts = shuffledPrompts.slice(0, promptCount)
+
+    // Insert selections
+    const selections = selectedPrompts.map((prompt, index) => ({
+      campaign_id: campaignId,
+      prompt_id: prompt.id,
+      selection_order: index + 1,
+      is_featured: index === 0 // First prompt is featured
+    }))
+
+    const { error: insertError } = await supabaseAdmin
+      .from('campaign_prompt_selections')
+      .insert(selections)
+
+    if (insertError) {
+      console.error('Error inserting prompt selections:', insertError)
+    } else {
+      console.log(`Successfully selected ${selectedPrompts.length} prompt ideas`)
+    }
   } catch (error) {
-    console.error('Error initializing dining deals selection:', error)
-    // Don't throw error to prevent campaign creation from failing
+    console.error('Error initializing prompt selection:', error)
   }
 }
 
@@ -209,9 +202,8 @@ export async function POST(request: NextRequest) {
 
     // Run all initializations in parallel for better performance
     await Promise.all([
-      initializeRandomEventSelection(campaign.id),
-      initializeVrboSelection(campaign.id),
-      initializeDiningDealsSelection(campaign.id, campaign.date)
+      initializeAIAppSelection(campaign.id),
+      initializePromptSelection(campaign.id)
     ])
 
     console.log('Campaign content initialization completed')

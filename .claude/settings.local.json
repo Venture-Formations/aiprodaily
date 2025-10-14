@@ -13,14 +13,27 @@
       "Bash(wsl:*)",
       "Bash(git restore:*)",
       "Read(//c/Users/dpenn/Documents/**)",
-      "Bash(rsync:*)"
+      "Bash(rsync:*)",
+      "Bash(psql:*)",
+      "Bash(npm run dev)",
+      "Bash(curl:*)",
+      "Bash(xargs rm:*)",
+      "Bash(taskkill:*)",
+      "Bash(bash:*)",
+      "Read(//c/Users/dpenn/**)",
+      "Bash(git clone:*)",
+      "mcp__postgres__query",
+      "Bash(git remote add:*)",
+      "Bash(openssl rand:*)",
+      "Bash(git remote set-url:*)"
     ],
     "deny": [],
     "ask": []
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
-    "supabase",
-    "vercel"
+    "postgres",
+    "vercel",
+    "memory"
   ]
 }

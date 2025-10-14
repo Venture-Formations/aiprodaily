@@ -158,33 +158,6 @@ export class RSSProcessor {
       // Process posts with AI
       await this.processPostsWithAI(campaignId)
 
-      // Generate road work data for this campaign
-      console.log('Generating road work data for campaign...')
-      try {
-        const { generateDailyRoadWork, storeRoadWorkItems } = await import('@/lib/road-work-manager')
-
-        // Get campaign date for road work generation
-        const { data: campaignData } = await supabaseAdmin
-          .from('newsletter_campaigns')
-          .select('date')
-          .eq('id', campaignId)
-          .single()
-
-        if (campaignData) {
-          const roadWorkData = await generateDailyRoadWork(campaignData.date)
-
-          if (roadWorkData.road_work_data && roadWorkData.road_work_data.length > 0) {
-            await storeRoadWorkItems(roadWorkData.road_work_data, campaignId)
-            console.log(`✅ Generated and stored ${roadWorkData.road_work_data.length} road work items for campaign`)
-          } else {
-            console.log('⚠️ No road work items generated')
-          }
-        }
-      } catch (roadWorkError) {
-        console.error('Failed to generate road work, but continuing:', roadWorkError)
-        // Don't fail the entire RSS processing if road work fails
-      }
-
       // Campaign remains in 'draft' status for MailerLite cron to process
       // Status will be updated to 'in_review' by create-campaign cron after MailerLite send
 

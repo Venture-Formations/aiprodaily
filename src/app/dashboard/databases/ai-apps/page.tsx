@@ -1,0 +1,515 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import Layout from '@/components/Layout'
+import type { AIApplication } from '@/types/database'
+
+export default function AIApplicationsPage() {
+  const [apps, setApps] = useState<AIApplication[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<Partial<AIApplication>>({})
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [addForm, setAddForm] = useState<Partial<AIApplication>>({
+    app_name: '',
+    tagline: '',
+    description: '',
+    category: 'Automation',
+    app_url: '',
+    pricing: 'Free',
+    is_active: true,
+    is_featured: false
+  })
+  const [filterCategory, setFilterCategory] = useState<string>('all')
+
+  useEffect(() => {
+    fetchApps()
+  }, [])
+
+  const fetchApps = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/ai-apps')
+      if (response.ok) {
+        const data = await response.json()
+        setApps(data.apps || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch AI applications:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleEdit = (app: AIApplication) => {
+    setEditingId(app.id)
+    setEditForm({ ...app })
+  }
+
+  const handleCancelEdit = () => {
+    setEditingId(null)
+    setEditForm({})
+  }
+
+  const handleSave = async (id: string) => {
+    try {
+      const response = await fetch(`/api/ai-apps/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm)
+      })
+
+      if (response.ok) {
+        await fetchApps()
+        setEditingId(null)
+        setEditForm({})
+      }
+    } catch (error) {
+      console.error('Failed to update application:', error)
+    }
+  }
+
+  const handleDelete = async (id: string, appName: string) => {
+    if (!confirm(`Are you sure you want to delete "${appName}"?`)) return
+
+    try {
+      const response = await fetch(`/api/ai-apps/${id}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        await fetchApps()
+      }
+    } catch (error) {
+      console.error('Failed to delete application:', error)
+    }
+  }
+
+  const handleAddApp = async () => {
+    if (!addForm.app_name || !addForm.description || !addForm.app_url) {
+      alert('Please fill in required fields: App Name, Description, and URL')
+      return
+    }
+
+    try {
+      const response = await fetch('/api/ai-apps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(addForm)
+      })
+
+      if (response.ok) {
+        await fetchApps()
+        setShowAddForm(false)
+        setAddForm({
+          app_name: '',
+          tagline: '',
+          description: '',
+          category: 'Automation',
+          app_url: '',
+          pricing: 'Free',
+          is_active: true,
+          is_featured: false
+        })
+      }
+    } catch (error) {
+      console.error('Failed to add application:', error)
+    }
+  }
+
+  const filteredApps = apps.filter(app =>
+    filterCategory === 'all' || app.category === filterCategory
+  )
+
+  const categories = ['Automation', 'Analysis', 'Writing', 'Research', 'Communication', 'Documentation']
+  const pricingOptions = ['Free', 'Freemium', 'Paid', 'Enterprise']
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary"></div>
+        </div>
+      </Layout>
+    )
+  }
+
+  return (
+    <Layout>
+      <div className="px-4 py-6 sm:px-0">
+        <div className="mb-6 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              AI Applications Database
+            </h1>
+            <p className="text-gray-600">
+              Manage AI tools and applications for accounting professionals
+            </p>
+          </div>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
+          >
+            + Add Application
+          </button>
+        </div>
+
+        {/* Add Form */}
+        {showAddForm && (
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6 border-2 border-blue-500">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Add New AI Application</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  App Name *
+                </label>
+                <input
+                  type="text"
+                  value={addForm.app_name || ''}
+                  onChange={(e) => setAddForm({ ...addForm, app_name: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                  placeholder="QuickBooks AI Assistant"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tagline
+                </label>
+                <input
+                  type="text"
+                  value={addForm.tagline || ''}
+                  onChange={(e) => setAddForm({ ...addForm, tagline: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                  placeholder="Automate your bookkeeping with AI"
+                  maxLength={80}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description * (max 200 characters)
+                </label>
+                <textarea
+                  value={addForm.description || ''}
+                  onChange={(e) => setAddForm({ ...addForm, description: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                  rows={3}
+                  maxLength={200}
+                  placeholder="AI-powered accounting assistant that categorizes transactions..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Category
+                </label>
+                <select
+                  value={addForm.category || ''}
+                  onChange={(e) => setAddForm({ ...addForm, category: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                >
+                  {categories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Pricing
+                </label>
+                <select
+                  value={addForm.pricing || ''}
+                  onChange={(e) => setAddForm({ ...addForm, pricing: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                >
+                  {pricingOptions.map(price => (
+                    <option key={price} value={price}>{price}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  App URL *
+                </label>
+                <input
+                  type="url"
+                  value={addForm.app_url || ''}
+                  onChange={(e) => setAddForm({ ...addForm, app_url: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                  placeholder="https://example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Logo URL (optional)
+                </label>
+                <input
+                  type="url"
+                  value={addForm.logo_url || ''}
+                  onChange={(e) => setAddForm({ ...addForm, logo_url: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                  placeholder="https://example.com/logo.png"
+                />
+              </div>
+              <div className="flex items-center space-x-4">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={addForm.is_active}
+                    onChange={(e) => setAddForm({ ...addForm, is_active: e.target.checked })}
+                    className="mr-2"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Active</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={addForm.is_featured}
+                    onChange={(e) => setAddForm({ ...addForm, is_featured: e.target.checked })}
+                    className="mr-2"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Featured</span>
+                </label>
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => setShowAddForm(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddApp}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+              >
+                Add Application
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Filter */}
+        <div className="mb-4">
+          <label className="text-sm font-medium text-gray-700 mr-2">Filter by Category:</label>
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="border border-gray-300 rounded px-3 py-1"
+          >
+            <option value="all">All Categories</option>
+            {categories.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+          <span className="ml-4 text-sm text-gray-600">
+            Showing {filteredApps.length} of {apps.length} applications
+          </span>
+        </div>
+
+        {/* Applications Table */}
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Application
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Description
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Category
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Pricing
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredApps.map((app) => (
+                <tr key={app.id} className={!app.is_active ? 'bg-gray-50' : ''}>
+                  {editingId === app.id ? (
+                    <>
+                      <td className="px-6 py-4">
+                        <input
+                          type="text"
+                          value={editForm.app_name || ''}
+                          onChange={(e) => setEditForm({ ...editForm, app_name: e.target.value })}
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                        />
+                        <input
+                          type="text"
+                          value={editForm.tagline || ''}
+                          onChange={(e) => setEditForm({ ...editForm, tagline: e.target.value })}
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-xs mt-1"
+                          placeholder="Tagline"
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <textarea
+                          value={editForm.description || ''}
+                          onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                          rows={3}
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <select
+                          value={editForm.category || ''}
+                          onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                        >
+                          {categories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-6 py-4">
+                        <select
+                          value={editForm.pricing || ''}
+                          onChange={(e) => setEditForm({ ...editForm, pricing: e.target.value })}
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                        >
+                          {pricingOptions.map(price => (
+                            <option key={price} value={price}>{price}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-6 py-4">
+                        <label className="flex items-center text-sm">
+                          <input
+                            type="checkbox"
+                            checked={editForm.is_active}
+                            onChange={(e) => setEditForm({ ...editForm, is_active: e.target.checked })}
+                            className="mr-1"
+                          />
+                          Active
+                        </label>
+                        <label className="flex items-center text-sm mt-1">
+                          <input
+                            type="checkbox"
+                            checked={editForm.is_featured}
+                            onChange={(e) => setEditForm({ ...editForm, is_featured: e.target.checked })}
+                            className="mr-1"
+                          />
+                          Featured
+                        </label>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <button
+                          onClick={() => handleSave(app.id)}
+                          className="text-green-600 hover:text-green-900 mr-3"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={handleCancelEdit}
+                          className="text-gray-600 hover:text-gray-900"
+                        >
+                          Cancel
+                        </button>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center">
+                          {app.logo_url && (
+                            <img
+                              src={app.logo_url}
+                              alt={app.app_name}
+                              className="w-10 h-10 rounded mr-3"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                            />
+                          )}
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{app.app_name}</div>
+                            {app.tagline && (
+                              <div className="text-xs text-gray-500 italic">{app.tagline}</div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-700 max-w-md">
+                        {app.description}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {app.category}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                          {app.pricing}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {app.is_active ? (
+                          <span className="text-green-600">✓ Active</span>
+                        ) : (
+                          <span className="text-gray-400">Inactive</span>
+                        )}
+                        {app.is_featured && (
+                          <span className="block text-yellow-600 text-xs">★ Featured</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <button
+                          onClick={() => handleEdit(app)}
+                          className="text-blue-600 hover:text-blue-900 mr-3"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(app.id, app.app_name)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {filteredApps.length === 0 && (
+            <div className="text-center py-12 text-gray-500">
+              No AI applications found. Click "Add Application" to get started.
+            </div>
+          )}
+        </div>
+
+        {/* Stats */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-lg shadow">
+            <div className="text-2xl font-bold text-blue-600">{apps.length}</div>
+            <div className="text-sm text-gray-600">Total Applications</div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <div className="text-2xl font-bold text-green-600">
+              {apps.filter(a => a.is_active).length}
+            </div>
+            <div className="text-sm text-gray-600">Active</div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <div className="text-2xl font-bold text-yellow-600">
+              {apps.filter(a => a.is_featured).length}
+            </div>
+            <div className="text-sm text-gray-600">Featured</div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <div className="text-2xl font-bold text-purple-600">
+              {new Set(apps.map(a => a.category)).size}
+            </div>
+            <div className="text-sm text-gray-600">Categories</div>
+          </div>
+        </div>
+      </div>
+    </Layout>
+  )
+}

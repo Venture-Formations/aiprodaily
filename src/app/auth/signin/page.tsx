@@ -9,6 +9,16 @@ export default function SignIn() {
   const router = useRouter()
 
   useEffect(() => {
+    // Check for staging mode
+    const isStaging = process.env.NEXT_PUBLIC_STAGING === 'true'
+
+    if (isStaging) {
+      // In staging mode, redirect directly to dashboard
+      console.log('[SignIn] Staging mode detected - redirecting to dashboard')
+      router.push('/dashboard')
+      return
+    }
+
     // Check if user is already signed in
     getSession().then((session) => {
       if (session) {
