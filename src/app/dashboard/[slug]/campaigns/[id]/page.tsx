@@ -2090,7 +2090,9 @@ export default function CampaignDetailPage() {
       console.error('Failed to reorder secondary articles:', error)
       alert('Failed to reorder secondary articles')
       // Refresh to get correct state
-      fetchCampaign()
+      if (campaign?.id) {
+        fetchCampaign(campaign.id)
+      }
     }
   }
 
