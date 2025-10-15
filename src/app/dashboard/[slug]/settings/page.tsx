@@ -2731,10 +2731,14 @@ function AdsSettings() {
   const [editPrice, setEditPrice] = useState('')
   const [adsPerNewsletter, setAdsPerNewsletter] = useState<number>(1)
   const [savingAdsPerNewsletter, setSavingAdsPerNewsletter] = useState(false)
+  const [maxTopArticles, setMaxTopArticles] = useState<number>(3)
+  const [maxBottomArticles, setMaxBottomArticles] = useState<number>(3)
+  const [savingMaxArticles, setSavingMaxArticles] = useState(false)
 
   useEffect(() => {
     loadTiers()
     loadAdsPerNewsletter()
+    loadMaxArticles()
   }, [])
 
   const loadTiers = async () => {
@@ -2795,6 +2799,63 @@ function AdsSettings() {
       console.error('Save error:', error)
     } finally {
       setSavingAdsPerNewsletter(false)
+    }
+  }
+
+  const loadMaxArticles = async () => {
+    try {
+      const response = await fetch('/api/settings/email')
+      if (response.ok) {
+        const data = await response.json()
+        const maxTopSetting = data.settings.find((s: any) => s.key === 'max_top_articles')
+        const maxBottomSetting = data.settings.find((s: any) => s.key === 'max_bottom_articles')
+
+        if (maxTopSetting) {
+          setMaxTopArticles(parseInt(maxTopSetting.value))
+        }
+        if (maxBottomSetting) {
+          setMaxBottomArticles(parseInt(maxBottomSetting.value))
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load max articles settings:', error)
+    }
+  }
+
+  const saveMaxArticles = async () => {
+    if (maxTopArticles < 1 || maxTopArticles > 10) {
+      alert('Max top articles must be between 1 and 10')
+      return
+    }
+    if (maxBottomArticles < 1 || maxBottomArticles > 10) {
+      alert('Max bottom articles must be between 1 and 10')
+      return
+    }
+
+    setSavingMaxArticles(true)
+    setMessage('')
+
+    try {
+      const response = await fetch('/api/settings/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          max_top_articles: maxTopArticles.toString(),
+          max_bottom_articles: maxBottomArticles.toString()
+        })
+      })
+
+      if (response.ok) {
+        setMessage('Max articles settings updated successfully!')
+        setTimeout(() => setMessage(''), 3000)
+      } else {
+        throw new Error('Failed to update settings')
+      }
+    } catch (error) {
+      setMessage('Failed to update max articles settings. Please try again.')
+      console.error('Save error:', error)
+    } finally {
+      setSavingMaxArticles(false)
     }
   }
 
@@ -3098,6 +3159,61 @@ function AdsSettings() {
         <div className="mt-4 bg-blue-50 p-4 rounded-lg">
           <p className="text-sm text-blue-800">
             <strong>Current configuration:</strong> {adsPerNewsletter} {adsPerNewsletter === 1 ? 'ad' : 'ads'} + {5 - adsPerNewsletter} {5 - adsPerNewsletter === 1 ? 'article' : 'articles'} = 5 total items
+          </p>
+        </div>
+      </div>
+
+      {/* Article Limit Settings */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Article Limit Settings</h3>
+        <p className="text-sm text-gray-600 mb-6">
+          Configure the maximum number of articles that can be selected for the Top Articles and Bottom Articles sections in each newsletter campaign.
+        </p>
+
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <label className="font-medium text-gray-700 w-56">Max Articles in Top Articles:</label>
+            <input
+              type="number"
+              min="1"
+              max="10"
+              value={maxTopArticles}
+              onChange={(e) => setMaxTopArticles(parseInt(e.target.value) || 1)}
+              className="w-20 px-3 py-2 border border-gray-300 rounded-md"
+              disabled={savingMaxArticles}
+            />
+            <span className="text-sm text-gray-500">(1-10)</span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <label className="font-medium text-gray-700 w-56">Max Articles in Bottom Articles:</label>
+            <input
+              type="number"
+              min="1"
+              max="10"
+              value={maxBottomArticles}
+              onChange={(e) => setMaxBottomArticles(parseInt(e.target.value) || 1)}
+              className="w-20 px-3 py-2 border border-gray-300 rounded-md"
+              disabled={savingMaxArticles}
+            />
+            <span className="text-sm text-gray-500">(1-10)</span>
+          </div>
+
+          <button
+            onClick={saveMaxArticles}
+            disabled={savingMaxArticles}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-300"
+          >
+            {savingMaxArticles ? 'Saving...' : 'Save Article Limits'}
+          </button>
+        </div>
+
+        <div className="mt-4 bg-blue-50 p-4 rounded-lg">
+          <p className="text-sm text-blue-800">
+            <strong>Current configuration:</strong> Top Articles: {maxTopArticles}, Bottom Articles: {maxBottomArticles}
+          </p>
+          <p className="text-xs text-blue-700 mt-2">
+            These limits control how many articles can be selected during RSS processing and on the campaign detail page.
           </p>
         </div>
       </div>
