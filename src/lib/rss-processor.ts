@@ -890,16 +890,19 @@ export class RSSProcessor {
       const finalArticleCount = maxTopArticlesSetting ? parseInt(maxTopArticlesSetting.value) : 3
       console.log(`Max top articles setting: ${finalArticleCount}`)
 
-      // Get all articles for this campaign with their ratings
+      // Get all articles for this campaign with their ratings AND fact-check scores
+      // Only select articles that PASSED the fact-check (score >= 15)
       const { data: articles, error } = await supabaseAdmin
         .from('articles')
         .select(`
           id,
+          fact_check_score,
           rss_post:rss_posts(
             post_rating:post_ratings(total_score)
           )
         `)
         .eq('campaign_id', campaignId)
+        .gte('fact_check_score', 15)
 
       if (error || !articles) {
         console.error('Failed to fetch articles for top selection:', error)
@@ -1054,30 +1057,32 @@ export class RSSProcessor {
 
       console.log(`Fact-check result for "${post.title}": ${factCheck.passed ? 'PASSED' : 'FAILED'} (score: ${factCheck.score})`)
 
-      if (factCheck.passed) {
-        // Create article
-        const { data, error } = await supabaseAdmin
-          .from('articles')
-          .insert([{
-            post_id: post.id,
-            campaign_id: campaignId,
-            headline: content.headline,
-            content: content.content,
-            rank: null, // Will be set by ranking algorithm
-            is_active: false, // Will be set to true for top 5 articles
-            fact_check_score: factCheck.score,
-            fact_check_details: factCheck.details,
-            word_count: content.word_count
-          }])
+      // Store ALL articles (both passed and failed) so we can review what's being rejected
+      const { data, error } = await supabaseAdmin
+        .from('articles')
+        .insert([{
+          post_id: post.id,
+          campaign_id: campaignId,
+          headline: content.headline,
+          content: content.content,
+          rank: null, // Will be set by ranking algorithm
+          is_active: false, // Only passed articles can be activated
+          fact_check_score: factCheck.score,
+          fact_check_details: factCheck.details,
+          word_count: content.word_count
+        }])
 
-        if (error) {
-          console.error(`Error inserting article for post ${post.id}:`, error)
-        } else {
-          console.log(`Successfully created article: "${content.headline}"`)
-          await this.logInfo(`Successfully created article: "${content.headline}"`, { campaignId, postId: post.id })
-        }
+      if (error) {
+        console.error(`Error inserting article for post ${post.id}:`, error)
       } else {
-        console.log(`Article rejected due to fact-check failure: "${post.title}"`)
+        const status = factCheck.passed ? 'PASSED' : 'FAILED'
+        console.log(`Successfully stored article (${status}): "${content.headline}"`)
+        await this.logInfo(`Successfully stored article (${status}): "${content.headline}"`, {
+          campaignId,
+          postId: post.id,
+          factCheckPassed: factCheck.passed,
+          factCheckScore: factCheck.score
+        })
       }
 
     } catch (error) {
