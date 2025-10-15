@@ -14,9 +14,11 @@ const BUSINESS_SETTINGS_KEYS = [
   'website_url',
   'heading_font',
   'body_font',
-  'social_media_enabled',
+  'facebook_enabled',
   'facebook_url',
+  'twitter_enabled',
   'twitter_url',
+  'linkedin_enabled',
   'linkedin_url'
 ]
 

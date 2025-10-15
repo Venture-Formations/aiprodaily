@@ -3876,9 +3876,11 @@ function BusinessSettings() {
     website_url: '',
     heading_font: 'Arial',
     body_font: 'Arial',
-    social_media_enabled: false,
+    facebook_enabled: false,
     facebook_url: '',
+    twitter_enabled: false,
     twitter_url: '',
+    linkedin_enabled: false,
     linkedin_url: ''
   })
   const [loading, setLoading] = useState(true)
@@ -4225,64 +4227,88 @@ function BusinessSettings() {
 
       {/* Social Media */}
       <div className="bg-white shadow rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-gray-900">Social Media Links</h3>
-          <label className="flex items-center space-x-2">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Social Media Links</h3>
+        <p className="text-sm text-gray-600 mb-4">Enable individual social media links to display in the newsletter footer.</p>
+
+        <div className="space-y-4">
+          {/* Facebook */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Facebook
+              </label>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={settings.facebook_enabled}
+                  onChange={(e) => setSettings({ ...settings, facebook_enabled: e.target.checked })}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">Enable</span>
+              </label>
+            </div>
             <input
-              type="checkbox"
-              checked={settings.social_media_enabled}
-              onChange={(e) => setSettings({ ...settings, social_media_enabled: e.target.checked })}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              type="url"
+              value={settings.facebook_url}
+              onChange={(e) => setSettings({ ...settings, facebook_url: e.target.value })}
+              disabled={!settings.facebook_enabled}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+              placeholder="https://facebook.com/yourpage"
             />
-            <span className="text-sm text-gray-700">Enable in footer</span>
-          </label>
-        </div>
-
-        {settings.social_media_enabled && (
-          <div className="space-y-4">
-            {/* Facebook */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Facebook URL
-              </label>
-              <input
-                type="url"
-                value={settings.facebook_url}
-                onChange={(e) => setSettings({ ...settings, facebook_url: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                placeholder="https://facebook.com/yourpage"
-              />
-            </div>
-
-            {/* Twitter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Twitter/X URL
-              </label>
-              <input
-                type="url"
-                value={settings.twitter_url}
-                onChange={(e) => setSettings({ ...settings, twitter_url: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                placeholder="https://twitter.com/yourhandle"
-              />
-            </div>
-
-            {/* LinkedIn */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                LinkedIn URL
-              </label>
-              <input
-                type="url"
-                value={settings.linkedin_url}
-                onChange={(e) => setSettings({ ...settings, linkedin_url: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                placeholder="https://linkedin.com/company/yourcompany"
-              />
-            </div>
           </div>
-        )}
+
+          {/* Twitter */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Twitter/X
+              </label>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={settings.twitter_enabled}
+                  onChange={(e) => setSettings({ ...settings, twitter_enabled: e.target.checked })}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">Enable</span>
+              </label>
+            </div>
+            <input
+              type="url"
+              value={settings.twitter_url}
+              onChange={(e) => setSettings({ ...settings, twitter_url: e.target.value })}
+              disabled={!settings.twitter_enabled}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+              placeholder="https://twitter.com/yourhandle"
+            />
+          </div>
+
+          {/* LinkedIn */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                LinkedIn
+              </label>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={settings.linkedin_enabled}
+                  onChange={(e) => setSettings({ ...settings, linkedin_enabled: e.target.checked })}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">Enable</span>
+              </label>
+            </div>
+            <input
+              type="url"
+              value={settings.linkedin_url}
+              onChange={(e) => setSettings({ ...settings, linkedin_url: e.target.value })}
+              disabled={!settings.linkedin_enabled}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+              placeholder="https://linkedin.com/company/yourcompany"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Save Button */}
