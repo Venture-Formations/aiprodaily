@@ -28,7 +28,6 @@ export async function GET() {
       .from('rss_posts')
       .select('*')
       .eq('campaign_id', campaign.id)
-      .order('created_at', { ascending: false })
 
     console.log(`Found ${rssPosts?.length || 0} RSS posts for campaign ${campaign.id}`)
 
@@ -76,7 +75,7 @@ export async function GET() {
       return {
         id: post.id,
         title: post.title,
-        created_at: post.created_at,
+        published_date: post.published_date,
         has_rating: !!rating,
         total_score: rating?.total_score,
         criteria_1_score: rating?.criteria_1_score,
