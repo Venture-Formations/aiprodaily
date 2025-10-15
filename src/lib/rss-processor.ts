@@ -98,6 +98,18 @@ export class RSSProcessor {
         console.log('Previous articles cleared successfully')
       }
 
+      // Delete existing secondary articles for this campaign
+      const { error: secondaryDeleteError } = await supabaseAdmin
+        .from('secondary_articles')
+        .delete()
+        .eq('campaign_id', campaignId)
+
+      if (secondaryDeleteError) {
+        console.warn('Warning: Failed to delete previous secondary articles:', secondaryDeleteError)
+      } else {
+        console.log('Previous secondary articles cleared successfully')
+      }
+
       // Delete existing posts for this campaign
       const { error: postsDeleteError } = await supabaseAdmin
         .from('rss_posts')
@@ -110,8 +122,8 @@ export class RSSProcessor {
         console.log('Previous posts cleared successfully')
       }
 
-      // Get active RSS feeds
-      const { data: feeds, error: feedsError } = await supabaseAdmin
+      // Get active RSS feeds - separate primary and secondary
+      const { data: allFeeds, error: feedsError } = await supabaseAdmin
         .from('rss_feeds')
         .select('*')
         .eq('active', true)
@@ -120,17 +132,43 @@ export class RSSProcessor {
         throw new Error(`Failed to fetch feeds: ${feedsError.message}`)
       }
 
-      if (!feeds || feeds.length === 0) {
+      if (!allFeeds || allFeeds.length === 0) {
         await this.logError('No active RSS feeds found')
         return
       }
 
-      // Process each feed
-      for (const feed of feeds) {
+      // Separate feeds by section
+      const primaryFeeds = allFeeds.filter(feed => feed.use_for_primary_section)
+      const secondaryFeeds = allFeeds.filter(feed => feed.use_for_secondary_section)
+
+      console.log(`Processing ${primaryFeeds.length} primary feeds and ${secondaryFeeds.length} secondary feeds`)
+
+      // Process primary feeds
+      for (const feed of primaryFeeds) {
         try {
-          await this.processFeed(feed, campaignId)
+          await this.processFeed(feed, campaignId, 'primary')
         } catch (error) {
-          await this.logError(`Failed to process feed ${feed.name}`, {
+          await this.logError(`Failed to process primary feed ${feed.name}`, {
+            feedId: feed.id,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          })
+
+          // Increment error count
+          await supabaseAdmin
+            .from('rss_feeds')
+            .update({
+              processing_errors: feed.processing_errors + 1
+            })
+            .eq('id', feed.id)
+        }
+      }
+
+      // Process secondary feeds
+      for (const feed of secondaryFeeds) {
+        try {
+          await this.processFeed(feed, campaignId, 'secondary')
+        } catch (error) {
+          await this.logError(`Failed to process secondary feed ${feed.name}`, {
             feedId: feed.id,
             error: error instanceof Error ? error.message : 'Unknown error'
           })
@@ -155,8 +193,9 @@ export class RSSProcessor {
         // Don't fail the entire RSS processing if event population fails
       }
 
-      // Process posts with AI
-      await this.processPostsWithAI(campaignId)
+      // Process posts with AI for both sections
+      await this.processPostsWithAI(campaignId, 'primary')
+      await this.processPostsWithAI(campaignId, 'secondary')
 
       // Campaign remains in 'draft' status for MailerLite cron to process
       // Status will be updated to 'in_review' by create-campaign cron after MailerLite send
@@ -294,8 +333,8 @@ export class RSSProcessor {
     return newCampaign.id
   }
 
-  private async processFeed(feed: RssFeed, campaignId: string) {
-    console.log(`=== PROCESSING FEED: ${feed.name} ===`)
+  private async processFeed(feed: RssFeed, campaignId: string, section: 'primary' | 'secondary' = 'primary') {
+    console.log(`=== PROCESSING ${section.toUpperCase()} FEED: ${feed.name} ===`)
 
     try {
       // Get excluded RSS sources from settings
@@ -477,20 +516,35 @@ export class RSSProcessor {
     }
   }
 
-  private async processPostsWithAI(campaignId: string) {
-    console.log('Starting AI processing of posts...')
+  private async processPostsWithAI(campaignId: string, section: 'primary' | 'secondary' = 'primary') {
+    console.log(`Starting AI processing of ${section} posts...`)
 
-    // Get all posts for this campaign
+    // Get feeds for this section
+    const { data: feeds, error: feedsError } = await supabaseAdmin
+      .from('rss_feeds')
+      .select('id')
+      .eq('active', true)
+      .eq(section === 'primary' ? 'use_for_primary_section' : 'use_for_secondary_section', true)
+
+    if (feedsError || !feeds || feeds.length === 0) {
+      console.log(`No ${section} feeds found, skipping ${section} post processing`)
+      return
+    }
+
+    const feedIds = feeds.map(f => f.id)
+
+    // Get posts for this campaign from feeds in this section
     const { data: posts, error } = await supabaseAdmin
       .from('rss_posts')
       .select('*')
       .eq('campaign_id', campaignId)
+      .in('feed_id', feedIds)
 
     if (error || !posts) {
-      throw new Error('Failed to fetch posts for AI processing')
+      throw new Error(`Failed to fetch ${section} posts for AI processing`)
     }
 
-    console.log(`Processing ${posts.length} posts with AI`)
+    console.log(`Processing ${posts.length} ${section} posts with AI`)
 
     // Step 1: Evaluate posts in batches
     const BATCH_SIZE = 3 // Process 3 posts at a time
@@ -594,8 +648,8 @@ export class RSSProcessor {
     await this.handleDuplicates(posts, campaignId)
 
     // Step 3: Generate newsletter articles for top posts
-    await this.logInfo('Starting newsletter article generation...', { campaignId })
-    await this.generateNewsletterArticles(campaignId)
+    await this.logInfo(`Starting ${section} newsletter article generation...`, { campaignId, section })
+    await this.generateNewsletterArticles(campaignId, section)
   }
 
   private async evaluatePost(post: RssPost): Promise<ContentEvaluation> {
@@ -779,18 +833,33 @@ export class RSSProcessor {
     }
   }
 
-  private async generateNewsletterArticles(campaignId: string) {
-    console.log('Starting newsletter article generation...')
+  private async generateNewsletterArticles(campaignId: string, section: 'primary' | 'secondary' = 'primary') {
+    console.log(`Starting ${section} newsletter article generation...`)
+
+    // Get feeds for this section
+    const { data: feeds, error: feedsError } = await supabaseAdmin
+      .from('rss_feeds')
+      .select('id')
+      .eq('active', true)
+      .eq(section === 'primary' ? 'use_for_primary_section' : 'use_for_secondary_section', true)
+
+    if (feedsError || !feeds || feeds.length === 0) {
+      console.log(`No ${section} feeds found, skipping ${section} article generation`)
+      return
+    }
+
+    const feedIds = feeds.map(f => f.id)
 
     // Get posts with ratings and check for duplicates
-    const { data: topPosts, error: queryError } = await supabaseAdmin
+    const { data: topPosts, error: queryError} = await supabaseAdmin
       .from('rss_posts')
       .select(`
         *,
         post_ratings(*)
       `)
       .eq('campaign_id', campaignId)
-      // NO LIMIT - Get ALL posts for this campaign
+      .in('feed_id', feedIds)
+      // NO LIMIT - Get ALL posts for this campaign section
 
     // Get duplicate post IDs to exclude
     const { data: duplicatePosts } = await supabaseAdmin
@@ -853,22 +922,28 @@ export class RSSProcessor {
         const filteredPosts = allRatedPosts.filter(post => !duplicatePostIds.has(post.id))
         // Generate articles for ALL non-duplicate posts
         for (const post of filteredPosts) {
-          await this.processPostIntoArticle(post, campaignId)
+          await this.processPostIntoArticle(post, campaignId, section)
         }
       }
       return
     }
 
     for (const post of postsWithRatings) {
-      await this.processPostIntoArticle(post, campaignId)
+      await this.processPostIntoArticle(post, campaignId, section)
     }
 
-    console.log('Newsletter article generation complete')
+    console.log(`${section} newsletter article generation complete`)
 
-    // Auto-select top 5 articles based on ratings
-    console.log('=== ABOUT TO SELECT TOP 5 ARTICLES ===')
-    await this.selectTop5Articles(campaignId)
-    console.log('=== TOP 5 ARTICLES SELECTION COMPLETE ===')
+    // Auto-select top articles based on ratings (only for primary section)
+    if (section === 'primary') {
+      console.log('=== ABOUT TO SELECT TOP ARTICLES ===')
+      await this.selectTop5Articles(campaignId)
+      console.log('=== TOP ARTICLES SELECTION COMPLETE ===')
+    } else {
+      console.log('=== ABOUT TO SELECT SECONDARY ARTICLES ===')
+      await this.selectTopSecondaryArticles(campaignId)
+      console.log('=== SECONDARY ARTICLES SELECTION COMPLETE ===')
+    }
 
     // Download and store images for selected articles
     console.log('=== ABOUT TO PROCESS ARTICLE IMAGES ===')
@@ -943,6 +1018,70 @@ export class RSSProcessor {
       console.log('Article selection complete')
     } catch (error) {
       console.error('Error selecting top articles:', error)
+    }
+  }
+
+  private async selectTopSecondaryArticles(campaignId: string) {
+    try {
+      console.log('Selecting top secondary articles for campaign (dynamic count from settings):', campaignId)
+
+      // Get max_secondary_articles setting (defaults to 3)
+      const { data: maxSecondaryArticlesSetting } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'max_secondary_articles')
+        .single()
+
+      const finalArticleCount = maxSecondaryArticlesSetting ? parseInt(maxSecondaryArticlesSetting.value) : 3
+      console.log(`Max secondary articles setting: ${finalArticleCount}`)
+
+      // Get all secondary articles for this campaign with their ratings AND fact-check scores
+      // Only select articles that PASSED the fact-check (score >= 15)
+      const { data: articles, error } = await supabaseAdmin
+        .from('secondary_articles')
+        .select(`
+          id,
+          fact_check_score,
+          rss_post:rss_posts(
+            post_rating:post_ratings(total_score)
+          )
+        `)
+        .eq('campaign_id', campaignId)
+        .gte('fact_check_score', 15)
+
+      if (error || !articles) {
+        console.error('Failed to fetch secondary articles for top selection:', error)
+        return
+      }
+
+      // Sort articles by rating (highest first)
+      const sortedArticles = articles
+        .map((article: any) => ({
+          id: article.id,
+          score: article.rss_post?.post_rating?.[0]?.total_score || 0
+        }))
+        .sort((a, b) => b.score - a.score)
+
+      console.log(`Selecting top ${finalArticleCount} secondary articles from ${sortedArticles.length} total`)
+
+      // Only activate the top N articles
+      const topArticles = sortedArticles.slice(0, finalArticleCount)
+
+      for (let i = 0; i < topArticles.length; i++) {
+        const article = topArticles[i]
+        await supabaseAdmin
+          .from('secondary_articles')
+          .update({
+            is_active: true,
+            rank: i + 1  // Rank 1, 2, 3...
+          })
+          .eq('id', article.id)
+      }
+
+      console.log(`Activated top ${topArticles.length} secondary articles`)
+      console.log('Secondary article selection complete')
+    } catch (error) {
+      console.error('Error selecting top secondary articles:', error)
     }
   }
 
@@ -1045,9 +1184,9 @@ export class RSSProcessor {
   }
 
 
-  private async processPostIntoArticle(post: any, campaignId: string) {
+  private async processPostIntoArticle(post: any, campaignId: string, section: 'primary' | 'secondary' = 'primary') {
     try {
-      console.log(`Generating article for: ${post.title}`)
+      console.log(`Generating ${section} article for: ${post.title}`)
 
       // Generate newsletter content
       const content = await this.generateNewsletterContent(post)
@@ -1058,8 +1197,9 @@ export class RSSProcessor {
       console.log(`Fact-check result for "${post.title}": ${factCheck.passed ? 'PASSED' : 'FAILED'} (score: ${factCheck.score})`)
 
       // Store ALL articles (both passed and failed) so we can review what's being rejected
+      const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
       const { data, error } = await supabaseAdmin
-        .from('articles')
+        .from(tableName)
         .insert([{
           post_id: post.id,
           campaign_id: campaignId,
