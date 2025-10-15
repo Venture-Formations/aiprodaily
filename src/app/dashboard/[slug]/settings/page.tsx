@@ -3949,52 +3949,37 @@ function BusinessSettings() {
     setMessage('')
 
     try {
-      // Get upload URL
-      const uploadResponse = await fetch('/api/images/upload-url', {
+      // Create FormData with file and type
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('type', type)
+
+      // Upload to server
+      const uploadResponse = await fetch('/api/settings/upload-business-image', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filename: file.name,
-          contentType: file.type
-        })
+        body: formData
       })
 
       if (!uploadResponse.ok) {
-        throw new Error('Failed to get upload URL')
+        const error = await uploadResponse.json()
+        throw new Error(error.error || 'Upload failed')
       }
 
-      const { uploadUrl, publicUrl } = await uploadResponse.json()
+      const data = await uploadResponse.json()
 
-      // Upload to GitHub
-      const reader = new FileReader()
-      reader.onloadend = async () => {
-        const base64Content = (reader.result as string).split(',')[1]
+      // Update settings with new URL
+      const fieldName = type === 'header' ? 'header_image_url' : 'logo_url'
+      setSettings(prev => ({ ...prev, [fieldName]: data.url }))
+      setMessage(data.message || `${type === 'header' ? 'Header' : 'Logo'} image uploaded successfully!`)
 
-        const githubResponse = await fetch(uploadUrl, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `token ${process.env.NEXT_PUBLIC_GITHUB_TOKEN}`
-          },
-          body: JSON.stringify({
-            message: `Upload ${type} image: ${file.name}`,
-            content: base64Content
-          })
-        })
+      // Auto-save the settings with the new image URL
+      setTimeout(async () => {
+        await handleSave()
+      }, 500)
 
-        if (githubResponse.ok) {
-          // Update settings with new URL
-          const fieldName = type === 'header' ? 'header_image_url' : 'logo_url'
-          setSettings(prev => ({ ...prev, [fieldName]: publicUrl }))
-          setMessage(`${type === 'header' ? 'Header' : 'Logo'} image uploaded successfully!`)
-          setTimeout(() => setMessage(''), 3000)
-        } else {
-          throw new Error('Failed to upload to GitHub')
-        }
-      }
-      reader.readAsDataURL(file)
     } catch (error) {
-      setMessage(`Error: Failed to upload ${type} image`)
+      console.error('Upload error:', error)
+      setMessage(`Error: ${error instanceof Error ? error.message : 'Failed to upload image'}`)
     } finally {
       setUploading(false)
     }
