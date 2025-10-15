@@ -704,11 +704,11 @@ export class RSSProcessor {
       totalWeight += weight
     })
 
-    // Normalize to 0-100 scale (assuming max score per criterion is 10)
+    // For reference: normalized would be (totalWeightedScore / (totalWeight * 10)) * 100
+    // But we want the raw weighted sum, not normalized
     const maxPossibleScore = totalWeight * 10
-    const normalizedScore = totalWeight > 0 ? (totalWeightedScore / maxPossibleScore) * 100 : 0
 
-    console.log(`Total weighted score: ${totalWeightedScore}/${maxPossibleScore} = ${normalizedScore.toFixed(2)}/100`)
+    console.log(`Total weighted score: ${totalWeightedScore} (max possible: ${maxPossibleScore})`)
 
     // Return evaluation in legacy format for backward compatibility
     // Store individual criteria scores in post_ratings table
@@ -719,7 +719,7 @@ export class RSSProcessor {
       reasoning: criteriaScores.map((c, i) => `${criteria[i]?.name}: ${c.reason}`).join('\n\n'),
       // Include new fields for multi-criteria system
       criteria_scores: criteriaScores,
-      total_score: normalizedScore
+      total_score: totalWeightedScore  // Return raw weighted sum, not normalized
     } as any
   }
 
