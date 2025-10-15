@@ -1495,7 +1495,8 @@ function SortableArticle({
   skipArticle,
   saving,
   getScoreColor,
-  criteriaConfig
+  criteriaConfig,
+  maxTopArticles
 }: {
   article: ArticleWithPost
   toggleArticle: (id: string, currentState: boolean) => void
@@ -1503,6 +1504,7 @@ function SortableArticle({
   saving: boolean
   getScoreColor: (score: number) => string
   criteriaConfig: Array<{name: string, weight: number}>
+  maxTopArticles: number
 }) {
   const {
     attributes,
@@ -2524,7 +2526,7 @@ export default function CampaignDetailPage() {
                   {formatStatus(campaign.status)}
                 </span>
                 <span className="text-sm text-gray-500">
-                  {campaign.articles.filter(a => a.is_active && !a.skipped).length}/{maxTopArticles} top articles selected
+                  {campaign.articles.filter(a => a.is_active && !a.skipped).length}/{maxTopArticles} selected
                 </span>
               </div>
             </div>
@@ -2679,13 +2681,13 @@ export default function CampaignDetailPage() {
             </div>
             <div className="flex items-center justify-between mt-2">
               <p className="text-sm text-gray-600">
-                Drag to reorder articles. Articles are ranked by AI evaluation.
+                Check articles to select them for the newsletter. Drag to reorder selected articles.
               </p>
               <div className="text-sm">
                 <span className={`font-medium ${campaign.articles.filter(a => a.is_active && !a.skipped).length === maxTopArticles ? 'text-green-600' : 'text-yellow-600'}`}>
                   {campaign.articles.filter(a => a.is_active && !a.skipped).length}/{maxTopArticles} selected
                 </span>
-                <span className="text-gray-500 ml-1">for newsletter</span>
+                <span className="text-gray-500 ml-1">• {campaign.articles.filter(a => !a.skipped).length} total articles</span>
               </div>
             </div>
           </div>
@@ -2717,14 +2719,22 @@ export default function CampaignDetailPage() {
               >
                 <SortableContext
                   items={campaign.articles
-                    .filter(article => article.is_active && !article.skipped)
-                    .sort((a, b) => (a.rank || 999) - (b.rank || 999))
+                    .filter(article => !article.skipped)
+                    .sort((a, b) => {
+                      const scoreA = a.rss_post?.post_rating?.[0]?.total_score || 0
+                      const scoreB = b.rss_post?.post_rating?.[0]?.total_score || 0
+                      return scoreB - scoreA  // Sort by total score descending
+                    })
                     .map(article => article.id)}
                   strategy={verticalListSortingStrategy}
                 >
                   {campaign.articles
-                    .filter(article => article.is_active && !article.skipped)
-                    .sort((a, b) => (a.rank || 999) - (b.rank || 999))
+                    .filter(article => !article.skipped)
+                    .sort((a, b) => {
+                      const scoreA = a.rss_post?.post_rating?.[0]?.total_score || 0
+                      const scoreB = b.rss_post?.post_rating?.[0]?.total_score || 0
+                      return scoreB - scoreA  // Sort by total score descending
+                    })
                     .map((article) => (
                       <SortableArticle
                         key={article.id}
@@ -2734,6 +2744,7 @@ export default function CampaignDetailPage() {
                         saving={saving}
                         getScoreColor={getScoreColor}
                         criteriaConfig={criteriaConfig}
+                        maxTopArticles={maxTopArticles}
                       />
                     ))}
                 </SortableContext>

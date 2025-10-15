@@ -905,7 +905,7 @@ export class RSSProcessor {
         return
       }
 
-      // Sort articles by rating (highest first) and take top N
+      // Sort articles by rating (highest first)
       const sortedArticles = articles
         .map((article: any) => ({
           id: article.id,
@@ -913,35 +913,32 @@ export class RSSProcessor {
         }))
         .sort((a, b) => b.score - a.score)
 
-      const topArticleIds = sortedArticles.slice(0, finalArticleCount).map(a => a.id)
-      const remainingArticleIds = sortedArticles.slice(finalArticleCount).map(a => a.id)
+      console.log(`Selecting top ${finalArticleCount} articles from ${sortedArticles.length} total`)
 
-      console.log(`Setting ${topArticleIds.length} articles as active, ${remainingArticleIds.length} as inactive`)
+      // Only activate the top N articles
+      const topArticles = sortedArticles.slice(0, finalArticleCount)
 
-      // Set top 5 as active
-      if (topArticleIds.length > 0) {
+      for (let i = 0; i < topArticles.length; i++) {
+        const article = topArticles[i]
         await supabaseAdmin
           .from('articles')
-          .update({ is_active: true })
-          .in('id', topArticleIds)
-
-        // Generate subject line immediately after top articles are activated
-        console.log('=== GENERATING SUBJECT LINE (After Top Articles Activated) ===')
-        await this.generateSubjectLineForCampaign(campaignId)
-        console.log('=== SUBJECT LINE GENERATION COMPLETED ===')
+          .update({
+            is_active: true,
+            rank: i + 1  // Rank 1, 2, 3...
+          })
+          .eq('id', article.id)
       }
 
-      // Set remaining as inactive
-      if (remainingArticleIds.length > 0) {
-        await supabaseAdmin
-          .from('articles')
-          .update({ is_active: false })
-          .in('id', remainingArticleIds)
-      }
+      console.log(`Activated top ${topArticles.length} articles`)
 
-      console.log('Top 5 article selection complete')
+      // Generate subject line using the top-ranked article
+      console.log('=== GENERATING SUBJECT LINE (After Article Selection) ===')
+      await this.generateSubjectLineForCampaign(campaignId)
+      console.log('=== SUBJECT LINE GENERATION COMPLETED ===')
+
+      console.log('Article selection complete')
     } catch (error) {
-      console.error('Error selecting top 5 articles:', error)
+      console.error('Error selecting top articles:', error)
     }
   }
 
