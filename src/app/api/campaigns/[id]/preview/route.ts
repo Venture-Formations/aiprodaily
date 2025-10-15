@@ -7,6 +7,8 @@ import {
   generateNewsletterHeader,
   generateNewsletterFooter,
   generateLocalScoopSection,
+  generatePrimaryArticlesSection,
+  generateSecondaryArticlesSection,
   generateLocalEventsSection,
   generateCommunityBusinessSpotlightSection,
   generateWordleSection,
@@ -184,7 +186,17 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
     let sectionsHtml = ''
     if (sections && sections.length > 0) {
       for (const section of sections) {
-        if (section.name === 'The Local Scoop' && activeArticles.length > 0) {
+        // Check if this is a primary articles section (display_order 3)
+        if (section.display_order === 3 && activeArticles.length > 0) {
+          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, campaign.date, campaign.mailerlite_campaign_id, section.name)
+          sectionsHtml += primaryHtml
+        }
+        // Check if this is a secondary articles section (display_order 5)
+        else if (section.display_order === 5) {
+          const secondaryHtml = await generateSecondaryArticlesSection(campaign, section.name)
+          sectionsHtml += secondaryHtml
+        }
+        else if (section.name === 'The Local Scoop' && activeArticles.length > 0) {
           sectionsHtml += generateLocalScoopSection(activeArticles, campaign.date)
         } else if (section.name === 'Local Events') {
           sectionsHtml += await generateLocalEventsSection(campaign)

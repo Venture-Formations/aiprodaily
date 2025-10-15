@@ -171,6 +171,41 @@ export function generateNewsletterHeader(formattedDate: string): string {
 <br>`
 }
 
+// ==================== ARTICLE EMOJI GENERATOR ====================
+
+function getArticleEmoji(headline: string, content: string): string {
+  const text = (headline + ' ' + content).toLowerCase()
+
+  // Regulatory & Compliance
+  if (text.includes('irs') || text.includes('sec') || text.includes('fasb') || text.includes('pcaob')) return '⚖️'
+  if (text.includes('regulation') || text.includes('compliance')) return '📋'
+  if (text.includes('audit') || text.includes('auditing')) return '🔍'
+
+  // Tax Related
+  if (text.includes('tax')) return '💰'
+
+  // Technology & AI
+  if (text.includes('ai') || text.includes('artificial intelligence')) return '🤖'
+  if (text.includes('software') || text.includes('technology')) return '💻'
+  if (text.includes('cybersecurity') || text.includes('security')) return '🔐'
+  if (text.includes('automation') || text.includes('machine learning')) return '⚙️'
+
+  // Business & Finance
+  if (text.includes('accounting') || text.includes('cpa') || text.includes('accountant')) return '📊'
+  if (text.includes('acquisition') || text.includes('merger')) return '🤝'
+  if (text.includes('scandal') || text.includes('fraud')) return '⚠️'
+  if (text.includes('lawsuit') || text.includes('court')) return '⚖️'
+  if (text.includes('finance') || text.includes('financial')) return '💵'
+  if (text.includes('revenue') || text.includes('profit')) return '💹'
+
+  // Professional Development
+  if (text.includes('training') || text.includes('education') || text.includes('course')) return '🎓'
+  if (text.includes('career') || text.includes('job')) return '💼'
+
+  // Default accounting icon
+  return '📈'
+}
+
 // ==================== LOCAL SCOOP (ARTICLES) ====================
 
 export function generateLocalScoopSection(articles: any[], campaignDate: string, campaignId?: string): string {
@@ -219,6 +254,124 @@ export function generateLocalScoopSection(articles: any[], campaignDate: string,
     </td>
   </tr>
   ${articlesHtml}
+</table>
+<br>`
+}
+
+// ==================== PRIMARY ARTICLES SECTION ====================
+
+export async function generatePrimaryArticlesSection(articles: any[], campaignDate: string, campaignId: string | undefined, sectionName: string): Promise<string> {
+  if (!articles || articles.length === 0) {
+    return ''
+  }
+
+  // Fetch secondary color from business settings
+  const { data: colorSetting } = await supabaseAdmin
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'secondary_color')
+    .single()
+
+  const secondaryColor = colorSetting?.value || '#10B981'
+
+  const articlesHtml = articles.map((article) => {
+    const headline = article.headline || 'No headline'
+    const content = article.content || ''
+    const sourceUrl = article.rss_post?.source_url || '#'
+    const emoji = getArticleEmoji(headline, content)
+
+    // Wrap URL with tracking
+    const trackedUrl = sourceUrl !== '#' ? wrapTrackingUrl(sourceUrl, sectionName, campaignDate, campaignId) : '#'
+
+    return `
+      <div style='padding: 16px 0; border-bottom: 1px solid #e0e0e0;'>
+        <div style='font-size: 18px; font-weight: bold; margin-bottom: 8px;'>
+          ${emoji} <a href='${trackedUrl}' style='color: ${secondaryColor}; text-decoration: none;'>${headline}</a>
+        </div>
+        <div style='font-size: 16px; line-height: 24px; color: #333;'>${content}</div>
+      </div>`
+  }).join('')
+
+  return `
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 990px; margin: 0 auto; background-color: #fff;">
+  <tr>
+    <td style="padding: 5px;">
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">${sectionName}</h2>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 0 20px 20px 20px;">
+      ${articlesHtml}
+    </td>
+  </tr>
+</table>
+<br>`
+}
+
+// ==================== SECONDARY ARTICLES SECTION ====================
+
+export async function generateSecondaryArticlesSection(campaign: any, sectionName: string): Promise<string> {
+  // Fetch secondary articles for this campaign
+  const { data: secondaryArticles } = await supabaseAdmin
+    .from('secondary_articles')
+    .select(`
+      id,
+      headline,
+      content,
+      is_active,
+      rank,
+      rss_post:rss_posts(
+        source_url
+      )
+    `)
+    .eq('campaign_id', campaign.id)
+    .eq('is_active', true)
+    .order('rank', { ascending: true })
+
+  if (!secondaryArticles || secondaryArticles.length === 0) {
+    return ''
+  }
+
+  // Fetch secondary color from business settings
+  const { data: colorSetting } = await supabaseAdmin
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'secondary_color')
+    .single()
+
+  const secondaryColor = colorSetting?.value || '#10B981'
+
+  const articlesHtml = secondaryArticles.map((article) => {
+    const headline = article.headline || 'No headline'
+    const content = article.content || ''
+    const rssPost = Array.isArray(article.rss_post) ? article.rss_post[0] : article.rss_post
+    const sourceUrl = rssPost?.source_url || '#'
+    const emoji = getArticleEmoji(headline, content)
+
+    // Wrap URL with tracking
+    const trackedUrl = sourceUrl !== '#' ? wrapTrackingUrl(sourceUrl, sectionName, campaign.date, campaign.mailerlite_campaign_id) : '#'
+
+    return `
+      <div style='padding: 16px 0; border-bottom: 1px solid #e0e0e0;'>
+        <div style='font-size: 18px; font-weight: bold; margin-bottom: 8px;'>
+          ${emoji} <a href='${trackedUrl}' style='color: ${secondaryColor}; text-decoration: none;'>${headline}</a>
+        </div>
+        <div style='font-size: 16px; line-height: 24px; color: #333;'>${content}</div>
+      </div>`
+  }).join('')
+
+  return `
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 990px; margin: 0 auto; background-color: #fff;">
+  <tr>
+    <td style="padding: 5px;">
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">${sectionName}</h2>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 0 20px 20px 20px;">
+      ${articlesHtml}
+    </td>
+  </tr>
 </table>
 <br>`
 }
