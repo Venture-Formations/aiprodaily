@@ -37,6 +37,7 @@ export default function NewCampaignPage() {
       }
 
       // Redirect to the newly created campaign
+      console.log('Redirecting with slug:', slug, 'campaign ID:', data.campaign.id)
       router.push(`/dashboard/${slug}/campaigns/${data.campaign.id}`)
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error')
