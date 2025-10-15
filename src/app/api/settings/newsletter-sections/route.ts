@@ -71,6 +71,31 @@ export async function PATCH(request: NextRequest) {
       })
     }
 
+    // Handle section name update
+    if (body.section_id && body.name !== undefined) {
+      const { section_id, name } = body
+
+      if (!name || typeof name !== 'string' || !name.trim()) {
+        return NextResponse.json({
+          error: 'Section name cannot be empty'
+        }, { status: 400 })
+      }
+
+      const { error } = await supabaseAdmin
+        .from('newsletter_sections')
+        .update({ name: name.trim() })
+        .eq('id', section_id)
+
+      if (error) {
+        throw error
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Section name updated successfully'
+      })
+    }
+
     // Handle single section status update
     if (body.section_id && typeof body.is_active === 'boolean') {
       const { section_id, is_active } = body

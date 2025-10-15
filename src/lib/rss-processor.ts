@@ -826,7 +826,7 @@ export class RSSProcessor {
         const scoreB = b.post_ratings?.[0]?.total_score || 0
         return scoreB - scoreA
       })
-      .slice(0, 12) // Take top 12 after sorting
+      // Generate articles for ALL non-duplicate posts, not just top 12
 
     console.log(`${postsWithRatings.length} posts have ratings`)
     await this.logInfo(`${postsWithRatings.length} posts have ratings`, { campaignId, postsWithRatings: postsWithRatings.length })

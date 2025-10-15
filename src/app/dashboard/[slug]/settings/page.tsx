@@ -83,12 +83,18 @@ export default function SettingsPage() {
 function SortableSection({
   section,
   toggleSection,
-  saving
+  saving,
+  onEditName
 }: {
   section: NewsletterSection
   toggleSection: (id: string, isActive: boolean) => void
   saving: boolean
+  onEditName: (id: string, name: string) => Promise<void>
 }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editName, setEditName] = useState(section.name)
+  const [editSaving, setEditSaving] = useState(false)
+
   const {
     attributes,
     listeners,
@@ -104,6 +110,34 @@ function SortableSection({
     opacity: isDragging ? 0.5 : 1,
   }
 
+  const handleSaveName = async () => {
+    if (editName.trim() === section.name) {
+      setIsEditing(false)
+      return
+    }
+
+    if (!editName.trim()) {
+      alert('Section name cannot be empty')
+      return
+    }
+
+    setEditSaving(true)
+    try {
+      await onEditName(section.id, editName.trim())
+      setIsEditing(false)
+    } catch (error) {
+      console.error('Failed to update name:', error)
+      setEditName(section.name) // Reset on error
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditName(section.name)
+    setIsEditing(false)
+  }
+
   return (
     <div
       ref={setNodeRef}
@@ -112,7 +146,7 @@ function SortableSection({
         isDragging ? 'shadow-lg' : 'shadow-sm'
       } ${section.is_active ? 'border-blue-300' : 'border-gray-200'}`}
     >
-      <div className="flex items-center space-x-3">
+      <div className="flex items-center space-x-3 flex-1">
         {/* Drag handle */}
         <div
           {...attributes}
@@ -126,8 +160,49 @@ function SortableSection({
         </div>
 
         {/* Section info */}
-        <div>
-          <h4 className="font-medium text-gray-900">{section.name}</h4>
+        <div className="flex-1">
+          {isEditing ? (
+            <div className="flex items-center space-x-2">
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="flex-1 px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Section name"
+                disabled={editSaving}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveName()
+                  if (e.key === 'Escape') handleCancelEdit()
+                }}
+              />
+              <button
+                onClick={handleSaveName}
+                disabled={editSaving}
+                className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+              >
+                {editSaving ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                onClick={handleCancelEdit}
+                disabled={editSaving}
+                className="px-3 py-1 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <h4 className="font-medium text-gray-900">{section.name}</h4>
+              <button
+                onClick={() => setIsEditing(true)}
+                disabled={saving}
+                className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                title="Edit section name"
+              >
+                Edit name
+              </button>
+            </div>
+          )}
           <p className="text-sm text-gray-500">Display Order: {Math.floor(section.display_order / 10)}</p>
         </div>
       </div>
@@ -301,6 +376,36 @@ function NewsletterSettings() {
     }
   }
 
+  const handleEditName = async (sectionId: string, newName: string) => {
+    try {
+      const response = await fetch('/api/settings/newsletter-sections', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          section_id: sectionId,
+          name: newName
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update section name')
+      }
+
+      // Update local state
+      setSections(prev => prev.map(section =>
+        section.id === sectionId
+          ? { ...section, name: newName }
+          : section
+      ))
+
+      setMessage('Section name updated successfully!')
+      setTimeout(() => setMessage(''), 3000)
+    } catch (error) {
+      setMessage('Failed to update section name. Please try again.')
+      throw error
+    }
+  }
+
   if (loading) {
     return <div className="text-center py-8">Loading newsletter settings...</div>
   }
@@ -355,6 +460,7 @@ function NewsletterSettings() {
                       section={section}
                       toggleSection={toggleSection}
                       saving={saving}
+                      onEditName={handleEditName}
                     />
                   ))}
               </SortableContext>
@@ -365,18 +471,20 @@ function NewsletterSettings() {
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <h4 className="font-medium text-blue-900 mb-3">Newsletter Section Information</h4>
           <div className="text-sm text-blue-800 space-y-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
-              <div>• <strong>The Local Scoop</strong> - Main news articles from RSS feeds</div>
-              <div>• <strong>Local Events</strong> - Community events and activities (3-day span)</div>
-              <div>• <strong>Local Weather</strong> - 3-day weather forecast with image charts</div>
-              <div>• <strong>Yesterday's Wordle</strong> - Previous day's Wordle word with definition</div>
-              <div>• <strong>Minnesota Getaways</strong> - Featured VRBO vacation rental properties</div>
-              <div>• <strong>Dining Deals</strong> - Restaurant specials based on day of the week</div>
+            <div className="space-y-2 mb-3">
+              <p><strong>Manage Your Newsletter Sections:</strong></p>
+              <ul className="list-disc list-inside space-y-1 ml-2">
+                <li><strong>Drag & Drop:</strong> Reorder sections to change how they appear in your newsletter</li>
+                <li><strong>Toggle On/Off:</strong> Use the switch to activate or deactivate sections</li>
+                <li><strong>Edit Names:</strong> Click "Edit name" to customize section titles for your audience</li>
+                <li><strong>Custom Content:</strong> Each section pulls dynamic content based on its type</li>
+              </ul>
             </div>
-            <div className="border-t border-blue-300 pt-2">
-              <div>📋 <strong>Management:</strong> Sections appear in newsletters in the order shown above</div>
+            <div className="border-t border-blue-300 pt-2 space-y-1">
+              <div>📋 <strong>Display Order:</strong> Sections appear in newsletters in the order shown above</div>
               <div>🔄 <strong>Status:</strong> Inactive sections are hidden but can be reactivated anytime</div>
-              <div>⚠️ <strong>Missing sections?</strong> Run database migration to add all supported sections</div>
+              <div>✏️ <strong>Customization:</strong> Section names can be customized to match your newsletter's voice</div>
+              <div>⚠️ <strong>Missing sections?</strong> Use "Add Missing Sections" button to enable additional features</div>
             </div>
           </div>
         </div>
