@@ -6,7 +6,7 @@ import AuthProvider from '@/components/AuthProvider'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'St. Cloud Scoop - Newsletter Admin',
+  title: 'AI Accounting Daily - Newsletter Admin',
   description: 'Automated newsletter generation and management system',
 }
 
