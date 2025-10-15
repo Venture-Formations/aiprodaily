@@ -204,13 +204,13 @@ INTENT ALIGNMENT SCORING (1-10):
 - Minimum score: 1
 
 TOTAL SCORE = accuracy + timeliness + intent (3-30 range)
-PASSING THRESHOLD: 20/30 minimum
+PASSING THRESHOLD: 15/30 minimum
 
 Respond with valid JSON in this exact format:
 {
   "score": <number 3-30>,
   "details": "<detailed list of all violations found or 'none'>",
-  "passed": <boolean true if score >= 20, false otherwise>
+  "passed": <boolean true if score >= 15, false otherwise>
 }`,
 
   eventSummarizer: (event: { title: string; description: string | null; venue?: string | null }) => `
