@@ -2242,8 +2242,17 @@ function AIPromptsSettings() {
   }
 
   // Filter criteria prompts from other prompts
-  const criteriaPrompts = prompts.filter(p => p.key.startsWith('ai_prompt_criteria_'))
-  const otherPrompts = prompts.filter(p => !p.key.startsWith('ai_prompt_criteria_'))
+  const criteriaPrompts = prompts.filter(p => p.key.startsWith('ai_prompt_criteria_') && !p.key.startsWith('ai_prompt_secondary_'))
+  const secondaryCriteriaPrompts = prompts.filter(p => p.key.startsWith('ai_prompt_secondary_criteria_'))
+  const otherPrompts = prompts.filter(p =>
+    !p.key.startsWith('ai_prompt_criteria_') &&
+    !p.key.startsWith('ai_prompt_secondary_criteria_') &&
+    !p.key.startsWith('ai_prompt_secondary_')
+  )
+  const secondaryOtherPrompts = prompts.filter(p =>
+    p.key.startsWith('ai_prompt_secondary_') &&
+    !p.key.startsWith('ai_prompt_secondary_criteria_')
+  )
 
   type PromptType = typeof prompts[0]
   const otherGrouped = otherPrompts.reduce((acc, prompt) => {
@@ -2270,14 +2279,14 @@ function AIPromptsSettings() {
         )}
       </div>
 
-      {/* Evaluation Criteria Section */}
+      {/* Primary Evaluation Criteria Section */}
       <div className="bg-white shadow rounded-lg">
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-medium text-gray-900">Evaluation Criteria</h3>
+              <h3 className="text-lg font-medium text-gray-900">Primary Evaluation Criteria</h3>
               <p className="text-sm text-gray-600 mt-1">
-                Configure the criteria used to evaluate articles. {enabledCount} of 5 criteria enabled.
+                Configure the criteria used to evaluate primary (top) articles. {enabledCount} of 5 criteria enabled.
               </p>
             </div>
             <div className="flex items-center space-x-2">
@@ -2490,6 +2499,229 @@ function AIPromptsSettings() {
           })}
         </div>
       </div>
+
+      {/* Secondary Evaluation Criteria Section */}
+      <div className="bg-white shadow rounded-lg">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">Secondary Evaluation Criteria</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Configure the criteria used to evaluate secondary (bottom) articles. Uses same {enabledCount} criteria as primary section.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="divide-y divide-gray-200">
+          {criteria.filter(c => c.enabled).map((criterion) => {
+            const promptKey = `ai_prompt_secondary_criteria_${criterion.number}`
+            const prompt = secondaryCriteriaPrompts.find(p => p.key === promptKey)
+            const isExpanded = expandedPrompt === promptKey
+            const isEditing = editingPrompt?.key === promptKey
+            const isSaving = saving === promptKey
+
+            if (!prompt) return null
+
+            return (
+              <div key={criterion.number} className="p-6">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <label className="text-xs font-medium text-gray-500 uppercase">Criteria Name:</label>
+                      <span className="text-sm font-medium text-gray-900">{criterion.name}</span>
+                      <span className="text-xs text-gray-500">(matches primary criteria {criterion.number})</span>
+                    </div>
+                    <h4 className="text-base font-medium text-gray-900">{prompt.name}</h4>
+                    <p className="text-sm text-gray-600 mt-1">{prompt.description}</p>
+                  </div>
+                  <button
+                    onClick={() => setExpandedPrompt(isExpanded ? null : promptKey)}
+                    className="ml-4 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  >
+                    {isExpanded ? 'Collapse' : 'View/Edit'}
+                  </button>
+                </div>
+
+                {isExpanded && (
+                  <div className="mt-4">
+                    {isEditing ? (
+                      <>
+                        <textarea
+                          value={editingPrompt.value}
+                          onChange={(e) => setEditingPrompt({ ...editingPrompt, value: e.target.value })}
+                          rows={20}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-xs"
+                          disabled={isSaving}
+                        />
+                        <div className="mt-3 flex justify-end space-x-3">
+                          <button
+                            onClick={handleCancel}
+                            disabled={isSaving}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => handleSave(promptKey)}
+                            disabled={isSaving}
+                            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                          >
+                            {isSaving ? 'Saving...' : 'Save Changes'}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
+                          {prompt.value}
+                        </div>
+                        <div className="mt-3 flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <button
+                              onClick={() => handleReset(promptKey)}
+                              disabled={saving === promptKey}
+                              className="px-4 py-2 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50"
+                            >
+                              {saving === promptKey ? 'Resetting...' : 'Reset to Default'}
+                            </button>
+                            <button
+                              onClick={() => handleSaveAsDefault(promptKey)}
+                              disabled={saving === promptKey}
+                              className="px-4 py-2 text-sm font-medium text-green-700 bg-white border border-green-300 rounded-md hover:bg-green-50 disabled:opacity-50"
+                            >
+                              {saving === promptKey ? 'Saving...' : 'Save as Default'}
+                            </button>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <button
+                              onClick={() => handleTestPrompt(promptKey)}
+                              className="px-4 py-2 text-sm font-medium text-purple-700 bg-white border border-purple-300 rounded-md hover:bg-purple-50"
+                            >
+                              Test Prompt
+                            </button>
+                            <button
+                              onClick={() => handleEdit(prompt)}
+                              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                            >
+                              Edit Prompt
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Secondary Other Prompts */}
+      {secondaryOtherPrompts.length > 0 && (
+        <div className="bg-white shadow rounded-lg">
+          <div className="p-6 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">Secondary Article Prompts</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Additional AI prompts for secondary article processing (content evaluator, article writer, etc.)
+            </p>
+          </div>
+          <div className="divide-y divide-gray-200">
+            {secondaryOtherPrompts.map((prompt) => {
+              const isExpanded = expandedPrompt === prompt.key
+              const isEditing = editingPrompt?.key === prompt.key
+              const isSaving = saving === prompt.key
+
+              return (
+                <div key={prompt.key} className="p-6">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1">
+                      <h4 className="text-base font-medium text-gray-900">{prompt.name}</h4>
+                      <p className="text-sm text-gray-600 mt-1">{prompt.description}</p>
+                    </div>
+                    <button
+                      onClick={() => setExpandedPrompt(isExpanded ? null : prompt.key)}
+                      className="ml-4 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    >
+                      {isExpanded ? 'Collapse' : 'View/Edit'}
+                    </button>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="mt-4">
+                      {isEditing ? (
+                        <>
+                          <textarea
+                            value={editingPrompt.value}
+                            onChange={(e) => setEditingPrompt({ ...editingPrompt, value: e.target.value })}
+                            rows={20}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-xs"
+                            disabled={isSaving}
+                          />
+                          <div className="mt-3 flex justify-end space-x-3">
+                            <button
+                              onClick={handleCancel}
+                              disabled={isSaving}
+                              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleSave(prompt.key)}
+                              disabled={isSaving}
+                              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                            >
+                              {isSaving ? 'Saving...' : 'Save Changes'}
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
+                            {prompt.value}
+                          </div>
+                          <div className="mt-3 flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <button
+                                onClick={() => handleReset(prompt.key)}
+                                disabled={saving === prompt.key}
+                                className="px-4 py-2 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50"
+                              >
+                                {saving === prompt.key ? 'Resetting...' : 'Reset to Default'}
+                              </button>
+                              <button
+                                onClick={() => handleSaveAsDefault(prompt.key)}
+                                disabled={saving === prompt.key}
+                                className="px-4 py-2 text-sm font-medium text-green-700 bg-white border border-green-300 rounded-md hover:bg-green-50 disabled:opacity-50"
+                              >
+                                {saving === prompt.key ? 'Saving...' : 'Save as Default'}
+                              </button>
+                            </div>
+                            <div className="flex items-center space-x-3">
+                              <button
+                                onClick={() => handleTestPrompt(prompt.key)}
+                                className="px-4 py-2 text-sm font-medium text-purple-700 bg-white border border-purple-300 rounded-md hover:bg-purple-50"
+                              >
+                                Test Prompt
+                              </button>
+                              <button
+                                onClick={() => handleEdit(prompt)}
+                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                              >
+                                Edit Prompt
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Other Prompts by Category */}
       {Object.entries(otherGrouped).map(([category, categoryPrompts]) => (

@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
       .select('key, value, description')
       .in('key', [
         'ai_prompt_content_evaluator',
-        'ai_prompt_newsletter_writer',
+        'ai_prompt_article_writer',
         'ai_prompt_criteria_1',
         'ai_prompt_criteria_2',
         'ai_prompt_criteria_3',
@@ -33,9 +33,9 @@ export async function GET(request: NextRequest) {
         description: 'AI Prompt: Secondary Article Content Evaluator (rates interest_level, local_relevance, community_impact)'
       },
       {
-        primary_key: 'ai_prompt_newsletter_writer',
-        secondary_key: 'ai_prompt_secondary_newsletter_writer',
-        description: 'AI Prompt: Secondary Article Newsletter Writer (converts RSS into newsletter articles)'
+        primary_key: 'ai_prompt_article_writer',
+        secondary_key: 'ai_prompt_secondary_article_writer',
+        description: 'AI Prompt: Secondary Article Writer (converts RSS into newsletter articles for secondary section)'
       },
       {
         primary_key: 'ai_prompt_criteria_1',
