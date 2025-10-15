@@ -2829,7 +2829,7 @@ export default function CampaignDetailPage() {
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-medium text-gray-900">
-                {newsletterSections.find(s => s.name === 'Latest in Accounting AI')?.name || 'Top Articles'}
+                Latest in Accounting AI
               </h2>
               <button
                 onClick={() => setArticlesExpanded(!articlesExpanded)}
@@ -2930,7 +2930,7 @@ export default function CampaignDetailPage() {
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-medium text-gray-900">
-                {newsletterSections.find(s => s.name === 'Bottom Articles')?.name || 'Secondary Articles'}
+                Bottom Articles
               </h2>
               <button
                 onClick={() => setSecondaryArticlesExpanded(!secondaryArticlesExpanded)}
@@ -3012,7 +3012,7 @@ export default function CampaignDetailPage() {
 
         {/* Dynamic Newsletter Sections */}
         {newsletterSections
-          .filter(section => section.is_active)
+          .filter(section => section.is_active && section.name !== 'Latest in Accounting AI' && section.name !== 'Bottom Articles')
           .map(section => (
             <NewsletterSectionComponent
               key={section.id}
