@@ -670,7 +670,9 @@ function RSSFeeds() {
     url: '',
     name: '',
     description: '',
-    active: true
+    active: true,
+    use_for_primary_section: true,
+    use_for_secondary_section: false
   })
 
   useEffect(() => {
@@ -756,7 +758,9 @@ function RSSFeeds() {
           url: '',
           name: '',
           description: '',
-          active: true
+          active: true,
+          use_for_primary_section: true,
+          use_for_secondary_section: false
         })
       }
     } catch (error) {
@@ -779,7 +783,7 @@ function RSSFeeds() {
       <div className="flex justify-between items-center mb-4">
         <div>
           <h3 className="text-lg font-medium text-gray-900">RSS Feed Configuration</h3>
-          <p className="text-sm text-gray-600 mt-1">Manage RSS feeds for Breaking News and Beyond the Feed sections</p>
+          <p className="text-sm text-gray-600 mt-1">Manage RSS feeds and assign them to Primary (top) and Secondary (bottom) article sections</p>
         </div>
         <button
           onClick={() => setShowAddForm(true)}
@@ -841,6 +845,31 @@ function RSSFeeds() {
                 <span className="font-medium text-gray-700">Active (process this feed)</span>
               </label>
             </div>
+            <div className="border-t pt-3 mt-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Use for Article Sections:
+              </label>
+              <div className="space-y-2 pl-2">
+                <label className="flex items-center text-sm">
+                  <input
+                    type="checkbox"
+                    checked={addForm.use_for_primary_section}
+                    onChange={(e) => setAddForm({ ...addForm, use_for_primary_section: e.target.checked })}
+                    className="mr-2"
+                  />
+                  <span className="text-gray-700">Primary Section (Top Articles)</span>
+                </label>
+                <label className="flex items-center text-sm">
+                  <input
+                    type="checkbox"
+                    checked={addForm.use_for_secondary_section}
+                    onChange={(e) => setAddForm({ ...addForm, use_for_secondary_section: e.target.checked })}
+                    className="mr-2"
+                  />
+                  <span className="text-gray-700">Secondary Section (Additional Articles)</span>
+                </label>
+              </div>
+            </div>
           </div>
           <div className="flex justify-end space-x-3 mt-4">
             <button
@@ -878,6 +907,9 @@ function RSSFeeds() {
                   URL
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Sections
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -908,6 +940,28 @@ function RSSFeeds() {
                           onChange={(e) => setEditForm({ ...editForm, url: e.target.value })}
                           className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
                         />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="space-y-1">
+                          <label className="flex items-center text-xs">
+                            <input
+                              type="checkbox"
+                              checked={editForm.use_for_primary_section ?? false}
+                              onChange={(e) => setEditForm({ ...editForm, use_for_primary_section: e.target.checked })}
+                              className="mr-1"
+                            />
+                            Primary
+                          </label>
+                          <label className="flex items-center text-xs">
+                            <input
+                              type="checkbox"
+                              checked={editForm.use_for_secondary_section ?? false}
+                              onChange={(e) => setEditForm({ ...editForm, use_for_secondary_section: e.target.checked })}
+                              className="mr-1"
+                            />
+                            Secondary
+                          </label>
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <label className="flex items-center text-sm">
@@ -948,6 +1002,17 @@ function RSSFeeds() {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700 max-w-xs truncate">
                         {feed.url}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-xs">
+                        {feed.use_for_primary_section && (
+                          <div className="text-blue-600">✓ Primary</div>
+                        )}
+                        {feed.use_for_secondary_section && (
+                          <div className="text-purple-600">✓ Secondary</div>
+                        )}
+                        {!feed.use_for_primary_section && !feed.use_for_secondary_section && (
+                          <span className="text-gray-400 italic">None</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm">
                         {feed.active ? (

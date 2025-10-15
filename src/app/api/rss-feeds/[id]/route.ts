@@ -76,6 +76,8 @@ export async function PATCH(request: NextRequest, props: RouteParams) {
     if (body.name !== undefined) updates.name = body.name
     if (body.description !== undefined) updates.description = body.description
     if (body.active !== undefined) updates.active = body.active
+    if (body.use_for_primary_section !== undefined) updates.use_for_primary_section = body.use_for_primary_section
+    if (body.use_for_secondary_section !== undefined) updates.use_for_secondary_section = body.use_for_secondary_section
 
     const { data: feed, error } = await supabaseAdmin
       .from('rss_feeds')

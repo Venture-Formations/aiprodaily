@@ -155,8 +155,22 @@ export class RSSProcessor {
         // Don't fail the entire RSS processing if event population fails
       }
 
-      // Process posts with AI
+      // Process posts with AI (PRIMARY SECTION)
       await this.processPostsWithAI(campaignId)
+
+      // Process secondary articles (SECONDARY SECTION)
+      console.log('=== STARTING SECONDARY ARTICLE PROCESSING ===')
+      try {
+        await this.processSecondaryArticles(campaignId)
+        console.log('✅ Secondary article processing completed successfully')
+      } catch (secondaryError) {
+        console.error('Failed to process secondary articles, but continuing:', secondaryError)
+        await this.logError('Failed to process secondary articles', {
+          campaignId,
+          error: secondaryError instanceof Error ? secondaryError.message : 'Unknown error'
+        })
+        // Don't fail the entire RSS processing if secondary article processing fails
+      }
 
       // Campaign remains in 'draft' status for MailerLite cron to process
       // Status will be updated to 'in_review' by create-campaign cron after MailerLite send
@@ -1687,6 +1701,483 @@ export class RSSProcessor {
         campaignId,
         error: error instanceof Error ? error.message : 'Unknown error'
       })
+    }
+  }
+
+  // ============================================================================
+  // SECONDARY ARTICLE PROCESSING METHODS
+  // ============================================================================
+
+  /**
+   * Main method for processing secondary articles
+   * Similar to processPostsWithAI but uses secondary-specific AI prompts
+   */
+  private async processSecondaryArticles(campaignId: string) {
+    console.log('Starting secondary article processing...')
+
+    // Get RSS feeds designated for secondary section
+    const { data: secondaryFeeds, error: feedsError } = await supabaseAdmin
+      .from('rss_feeds')
+      .select('*')
+      .eq('active', true)
+      .eq('use_for_secondary_section', true)
+
+    if (feedsError) {
+      throw new Error(`Failed to fetch secondary section feeds: ${feedsError.message}`)
+    }
+
+    if (!secondaryFeeds || secondaryFeeds.length === 0) {
+      console.log('No active RSS feeds configured for secondary section, skipping...')
+      return
+    }
+
+    console.log(`Found ${secondaryFeeds.length} feeds configured for secondary section`)
+
+    // Get all posts from secondary feeds for this campaign
+    const feedIds = secondaryFeeds.map(feed => feed.id)
+    const { data: posts, error: postsError } = await supabaseAdmin
+      .from('rss_posts')
+      .select('*')
+      .eq('campaign_id', campaignId)
+      .in('feed_id', feedIds)
+
+    if (postsError || !posts) {
+      throw new Error('Failed to fetch posts for secondary article processing')
+    }
+
+    console.log(`Processing ${posts.length} posts for secondary section with AI`)
+
+    // Step 1: Evaluate posts with secondary AI prompts
+    const BATCH_SIZE = 3
+    let successCount = 0
+    let errorCount = 0
+
+    for (let i = 0; i < posts.length; i += BATCH_SIZE) {
+      const batch = posts.slice(i, i + BATCH_SIZE)
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1
+      const totalBatches = Math.ceil(posts.length / BATCH_SIZE)
+
+      console.log(`Processing secondary batch ${batchNum}/${totalBatches} (${batch.length} posts)`)
+
+      const batchPromises = batch.map(async (post, index) => {
+        try {
+          const overallIndex = i + index + 1
+          console.log(`Evaluating secondary post ${overallIndex}/${posts.length}: ${post.title}`)
+
+          const evaluation = await this.evaluateSecondaryPost(post)
+
+          // Validate scores
+          if (typeof evaluation.interest_level !== 'number' ||
+              typeof evaluation.local_relevance !== 'number' ||
+              typeof evaluation.community_impact !== 'number') {
+            console.error(`Secondary AI returned non-numeric scores`)
+            throw new Error(`Invalid score types returned by secondary AI`)
+          }
+
+          // Store evaluation in post_ratings (same table, same structure)
+          const ratingRecord: any = {
+            post_id: post.id,
+            interest_level: evaluation.interest_level,
+            local_relevance: evaluation.local_relevance,
+            community_impact: evaluation.community_impact,
+            ai_reasoning: evaluation.reasoning,
+            total_score: (evaluation as any).total_score || ((evaluation.interest_level + evaluation.local_relevance + evaluation.community_impact) / 30 * 100)
+          }
+
+          // Add individual criteria scores if available
+          const criteriaScores = (evaluation as any).criteria_scores
+          if (criteriaScores && Array.isArray(criteriaScores)) {
+            for (let i = 0; i < criteriaScores.length && i < 5; i++) {
+              const criterionNum = i + 1
+              ratingRecord[`criteria_${criterionNum}_score`] = criteriaScores[i].score
+              ratingRecord[`criteria_${criterionNum}_reason`] = criteriaScores[i].reason
+              ratingRecord[`criteria_${criterionNum}_weight`] = criteriaScores[i].weight
+            }
+          }
+
+          const { error: ratingError } = await supabaseAdmin
+            .from('post_ratings')
+            .insert([ratingRecord])
+
+          if (ratingError) {
+            console.error(`Failed to insert secondary rating for post ${post.id}:`, ratingError)
+            throw new Error(`Secondary rating insert failed: ${ratingError.message}`)
+          }
+
+          console.log(`Successfully evaluated secondary post ${overallIndex}/${posts.length}`)
+          return { success: true, post: post }
+
+        } catch (error) {
+          console.error(`Error evaluating secondary post ${post.id}:`, error)
+          await this.logError(`Failed to evaluate secondary post: ${post.title}`, {
+            postId: post.id,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          })
+          return { success: false, post: post, error }
+        }
+      })
+
+      const batchResults = await Promise.all(batchPromises)
+      const batchSuccess = batchResults.filter(r => r.success).length
+      const batchErrors = batchResults.filter(r => !r.success).length
+
+      successCount += batchSuccess
+      errorCount += batchErrors
+
+      console.log(`Secondary batch ${batchNum} complete: ${batchSuccess} successful, ${batchErrors} errors`)
+
+      if (i + BATCH_SIZE < posts.length) {
+        console.log('Waiting 2 seconds before next secondary batch...')
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      }
+    }
+
+    console.log(`Secondary AI evaluation complete: ${successCount} successful, ${errorCount} errors`)
+    await this.logInfo(`Secondary AI evaluation complete: ${successCount} successful, ${errorCount} errors`, { campaignId, successCount, errorCount })
+
+    // Step 2: Generate secondary newsletter articles
+    await this.logInfo('Starting secondary newsletter article generation...', { campaignId })
+    await this.generateSecondaryNewsletterArticles(campaignId, feedIds)
+  }
+
+  /**
+   * Evaluate a post using secondary section AI prompts
+   */
+  private async evaluateSecondaryPost(post: RssPost): Promise<ContentEvaluation> {
+    // Fetch enabled criteria configuration from database
+    const { data: criteriaConfig, error: configError } = await supabaseAdmin
+      .from('app_settings')
+      .select('key, value')
+      .or('key.eq.criteria_enabled_count,key.like.criteria_%_name,key.like.criteria_%_weight')
+
+    if (configError) {
+      console.error('Failed to fetch criteria configuration:', configError)
+      throw new Error('Failed to fetch criteria configuration')
+    }
+
+    const enabledCountSetting = criteriaConfig?.find(s => s.key === 'criteria_enabled_count')
+    const enabledCount = enabledCountSetting?.value ? parseInt(enabledCountSetting.value) : 3
+
+    console.log(`Evaluating secondary post with ${enabledCount} enabled criteria`)
+
+    // Collect enabled criteria with their weights
+    const criteria: Array<{ number: number; name: string; weight: number }> = []
+    for (let i = 1; i <= enabledCount; i++) {
+      const nameSetting = criteriaConfig?.find(s => s.key === `criteria_${i}_name`)
+      const weightSetting = criteriaConfig?.find(s => s.key === `criteria_${i}_weight`)
+
+      criteria.push({
+        number: i,
+        name: nameSetting?.value || `Criteria ${i}`,
+        weight: weightSetting?.value ? parseFloat(weightSetting.value) : 1.0
+      })
+    }
+
+    // Evaluate post against each enabled criterion using SECONDARY evaluators
+    const criteriaScores: Array<{ score: number; reason: string; weight: number }> = []
+
+    for (const criterion of criteria) {
+      try {
+        console.log(`Evaluating secondary criterion ${criterion.number}: ${criterion.name} (weight: ${criterion.weight})`)
+
+        // Call the SECONDARY criteria evaluator
+        const evaluatorKey = `secondaryCriteria${criterion.number}Evaluator` as keyof typeof AI_PROMPTS
+        const evaluator = AI_PROMPTS[evaluatorKey]
+
+        if (typeof evaluator !== 'function') {
+          console.error(`No secondary evaluator found for criterion ${criterion.number}`)
+          continue
+        }
+
+        const evaluatorFn = evaluator as (post: { title: string; description: string; content?: string }) => Promise<string>
+        const prompt = await evaluatorFn({
+          title: post.title,
+          description: post.description || '',
+          content: post.content || ''
+        })
+
+        const result = await callOpenAI(prompt)
+
+        let score: number
+        let reason: string
+
+        if (result.raw && typeof result.raw === 'string') {
+          try {
+            const parsed = JSON.parse(result.raw)
+            score = parsed.score
+            reason = parsed.reason || ''
+          } catch (parseError) {
+            console.error(`Failed to parse secondary criterion ${criterion.number} response:`, result.raw)
+            throw new Error(`Invalid secondary criterion ${criterion.number} response format`)
+          }
+        } else if (typeof result.score === 'number') {
+          score = result.score
+          reason = result.reason || ''
+        } else {
+          throw new Error(`Invalid secondary criterion ${criterion.number} response format`)
+        }
+
+        if (typeof score !== 'number' || score < 0 || score > 10) {
+          console.error(`Invalid score for secondary criterion ${criterion.number}: ${score}`)
+          throw new Error(`Secondary criterion ${criterion.number} score must be between 0-10`)
+        }
+
+        criteriaScores.push({
+          score,
+          reason,
+          weight: criterion.weight
+        })
+
+        console.log(`Secondary criterion ${criterion.number} score: ${score}/10`)
+
+      } catch (error) {
+        console.error(`Error evaluating secondary criterion ${criterion.number}:`, error)
+        throw error
+      }
+    }
+
+    // Calculate weighted total score
+    let totalWeightedScore = 0
+    let totalWeight = 0
+
+    criteriaScores.forEach(({ score, weight }) => {
+      totalWeightedScore += score * weight
+      totalWeight += weight
+    })
+
+    const maxPossibleScore = totalWeight * 10
+    console.log(`Secondary total weighted score: ${totalWeightedScore} (max possible: ${maxPossibleScore})`)
+
+    return {
+      interest_level: criteriaScores[0]?.score || 0,
+      local_relevance: criteriaScores[1]?.score || 0,
+      community_impact: criteriaScores[2]?.score || 0,
+      reasoning: criteriaScores.map((c, i) => `${criteria[i]?.name}: ${c.reason}`).join('\n\n'),
+      criteria_scores: criteriaScores,
+      total_score: totalWeightedScore
+    } as any
+  }
+
+  /**
+   * Generate secondary newsletter articles from rated posts
+   */
+  private async generateSecondaryNewsletterArticles(campaignId: string, feedIds: string[]) {
+    console.log('Starting secondary newsletter article generation...')
+
+    // Get posts with ratings from secondary feeds
+    const { data: topPosts, error: queryError } = await supabaseAdmin
+      .from('rss_posts')
+      .select(`
+        *,
+        post_ratings(*)
+      `)
+      .eq('campaign_id', campaignId)
+      .in('feed_id', feedIds)
+
+    // Get duplicate post IDs to exclude
+    const { data: duplicatePosts } = await supabaseAdmin
+      .from('duplicate_posts')
+      .select(`
+        post_id,
+        group:duplicate_groups!inner(campaign_id)
+      `)
+      .eq('group.campaign_id', campaignId)
+
+    const duplicatePostIds = new Set(duplicatePosts?.map(d => d.post_id) || [])
+    console.log(`Found ${duplicatePostIds.size} duplicate secondary posts to exclude`)
+
+    if (queryError) {
+      console.error('Error fetching secondary posts:', queryError)
+      await this.logError('Error fetching secondary posts for article generation', { campaignId, queryError: queryError.message })
+      return
+    }
+
+    if (!topPosts || topPosts.length === 0) {
+      console.log('No secondary posts found for article generation')
+      await this.logInfo('No secondary posts found for article generation', { campaignId })
+      return
+    }
+
+    console.log(`Found ${topPosts.length} secondary posts for article generation`)
+
+    const postsWithRatings = topPosts
+      .filter(post => post.post_ratings?.[0] && !duplicatePostIds.has(post.id))
+      .sort((a, b) => {
+        const scoreA = a.post_ratings?.[0]?.total_score || 0
+        const scoreB = b.post_ratings?.[0]?.total_score || 0
+        return scoreB - scoreA
+      })
+
+    console.log(`${postsWithRatings.length} secondary posts have ratings`)
+
+    if (postsWithRatings.length === 0) {
+      console.log('No secondary posts with ratings found')
+      return
+    }
+
+    // Generate secondary articles for all rated posts
+    for (const post of postsWithRatings) {
+      await this.processPostIntoSecondaryArticle(post, campaignId)
+    }
+
+    console.log('Secondary newsletter article generation complete')
+
+    // Auto-select top 3 secondary articles based on ratings
+    console.log('=== ABOUT TO SELECT TOP SECONDARY ARTICLES ===')
+    await this.selectTopSecondaryArticles(campaignId)
+    console.log('=== TOP SECONDARY ARTICLES SELECTION COMPLETE ===')
+  }
+
+  /**
+   * Process a post into a secondary article
+   */
+  private async processPostIntoSecondaryArticle(post: any, campaignId: string) {
+    try {
+      console.log(`Generating secondary article for: ${post.title}`)
+
+      // Generate newsletter content using secondary prompt
+      const content = await this.generateSecondaryNewsletterContent(post)
+
+      // Fact-check the content (same fact-checker for both sections)
+      const factCheck = await this.factCheckContent(content.content, post.content || post.description || '')
+
+      console.log(`Secondary fact-check result for "${post.title}": ${factCheck.passed ? 'PASSED' : 'FAILED'} (score: ${factCheck.score})`)
+
+      // Store in secondary_articles table
+      const { data, error } = await supabaseAdmin
+        .from('secondary_articles')
+        .insert([{
+          post_id: post.id,
+          campaign_id: campaignId,
+          headline: content.headline,
+          content: content.content,
+          rank: null,
+          is_active: false,
+          fact_check_score: factCheck.score,
+          fact_check_details: factCheck.details,
+          word_count: content.word_count
+        }])
+
+      if (error) {
+        console.error(`Error inserting secondary article for post ${post.id}:`, error)
+      } else {
+        const status = factCheck.passed ? 'PASSED' : 'FAILED'
+        console.log(`Successfully stored secondary article (${status}): "${content.headline}"`)
+        await this.logInfo(`Successfully stored secondary article (${status}): "${content.headline}"`, {
+          campaignId,
+          postId: post.id,
+          factCheckPassed: factCheck.passed,
+          factCheckScore: factCheck.score
+        })
+      }
+
+    } catch (error) {
+      console.error(`Error generating secondary article for post ${post.id}:`, error)
+      await this.logError(`Error generating secondary article for post: ${post.title}`, {
+        postId: post.id,
+        campaignId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      })
+    }
+  }
+
+  /**
+   * Generate newsletter content using secondary writer prompt
+   */
+  private async generateSecondaryNewsletterContent(post: RssPost): Promise<NewsletterContent> {
+    let prompt: string
+    try {
+      prompt = await AI_PROMPTS.secondaryNewsletterWriter({
+        title: post.title,
+        description: post.description || '',
+        content: post.content || '',
+        source_url: post.source_url || ''
+      })
+      console.log('Using secondaryNewsletterWriter prompt for article generation')
+    } catch (error) {
+      // Fallback to primary newsletterWriter if secondary doesn't exist
+      console.log('secondaryNewsletterWriter not found, falling back to newsletterWriter')
+      prompt = await AI_PROMPTS.newsletterWriter({
+        title: post.title,
+        description: post.description || '',
+        content: post.content || '',
+        source_url: post.source_url || ''
+      })
+    }
+
+    const result = await callOpenAI(prompt)
+
+    if (!result.headline || !result.content || !result.word_count) {
+      throw new Error('Invalid secondary newsletter content response')
+    }
+
+    return result as NewsletterContent
+  }
+
+  /**
+   * Select and activate top N secondary articles based on ratings
+   */
+  private async selectTopSecondaryArticles(campaignId: string) {
+    try {
+      console.log('Selecting top secondary articles for campaign:', campaignId)
+
+      // Get max_articles setting (defaults to 3 for secondary)
+      const { data: maxArticlesSetting } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'max_articles')
+        .single()
+
+      const finalArticleCount = maxArticlesSetting ? parseInt(maxArticlesSetting.value) : 3
+      console.log(`Max secondary articles setting: ${finalArticleCount}`)
+
+      // Get all secondary articles for this campaign that passed fact-check
+      const { data: articles, error } = await supabaseAdmin
+        .from('secondary_articles')
+        .select(`
+          id,
+          fact_check_score,
+          rss_post:rss_posts(
+            post_rating:post_ratings(total_score)
+          )
+        `)
+        .eq('campaign_id', campaignId)
+        .gte('fact_check_score', 15)
+
+      if (error || !articles) {
+        console.error('Failed to fetch secondary articles for top selection:', error)
+        return
+      }
+
+      // Sort articles by rating (highest first)
+      const sortedArticles = articles
+        .map((article: any) => ({
+          id: article.id,
+          score: article.rss_post?.post_rating?.[0]?.total_score || 0
+        }))
+        .sort((a, b) => b.score - a.score)
+
+      console.log(`Selecting top ${finalArticleCount} secondary articles from ${sortedArticles.length} total`)
+
+      // Only activate the top N articles
+      const topArticles = sortedArticles.slice(0, finalArticleCount)
+
+      for (let i = 0; i < topArticles.length; i++) {
+        const article = topArticles[i]
+        await supabaseAdmin
+          .from('secondary_articles')
+          .update({
+            is_active: true,
+            rank: i + 1
+          })
+          .eq('id', article.id)
+      }
+
+      console.log(`Activated top ${topArticles.length} secondary articles`)
+      console.log('Secondary article selection complete')
+    } catch (error) {
+      console.error('Error selecting top secondary articles:', error)
     }
   }
 }

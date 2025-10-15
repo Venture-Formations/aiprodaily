@@ -113,6 +113,8 @@ export interface RssFeed {
   name: string
   description: string | null
   active: boolean
+  use_for_primary_section: boolean
+  use_for_secondary_section: boolean
   last_processed: string | null
   last_error: string | null
   processing_errors: number
@@ -199,6 +201,52 @@ export interface Article {
   ai_title: string | null
   created_at: string
   updated_at: string
+}
+
+export interface SecondaryArticle {
+  id: string
+  post_id: string
+  campaign_id: string
+  headline: string
+  content: string
+  rank: number | null
+  is_active: boolean
+  skipped: boolean
+  fact_check_score: number | null
+  fact_check_details: string | null
+  word_count: number | null
+  review_position: number | null
+  final_position: number | null
+  breaking_news_score: number | null
+  breaking_news_category: string | null
+  ai_summary: string | null
+  ai_title: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ArchivedSecondaryArticle {
+  id: string
+  original_article_id: string
+  post_id: string | null
+  campaign_id: string
+  headline: string
+  content: string
+  rank: number | null
+  is_active: boolean
+  skipped: boolean
+  fact_check_score: number | null
+  fact_check_details: string | null
+  word_count: number | null
+  review_position: number | null
+  final_position: number | null
+  archived_at: string
+  archive_reason: string
+  campaign_date: string | null
+  campaign_status: string | null
+  original_created_at: string
+  original_updated_at: string
+  created_at: string
 }
 
 export interface ManualArticle {
@@ -396,6 +444,13 @@ export interface ArticleWithPost extends Article {
   }
 }
 
+export interface SecondaryArticleWithPost extends SecondaryArticle {
+  rss_post: RssPost & {
+    post_rating: PostRating[]
+    rss_feed: RssFeed
+  }
+}
+
 // Local Events types
 export interface Event {
   id: string
@@ -521,6 +576,7 @@ export interface NewsletterSection {
 
 export interface CampaignWithArticles extends NewsletterCampaign {
   articles: ArticleWithPost[]
+  secondary_articles: SecondaryArticleWithPost[]
   manual_articles: ManualArticle[]
   email_metrics: EmailMetrics | null
 }

@@ -7,6 +7,7 @@ import {
   generateNewsletterHeader,
   generateNewsletterFooter,
   generateLocalScoopSection,
+  generateSecondaryArticlesSection,
   generateLocalEventsSection,
   generateCommunityBusinessSpotlightSection,
   generateWordleSection,
@@ -36,12 +37,27 @@ export async function GET(
     }
 
     console.log('Fetching campaign with ID:', id)
-    // Fetch campaign with active articles and events
+    // Fetch campaign with active articles, secondary articles, and events
     const { data: campaign, error: campaignError } = await supabaseAdmin
       .from('newsletter_campaigns')
       .select(`
         *,
         articles(
+          id,
+          headline,
+          content,
+          word_count,
+          fact_check_score,
+          is_active,
+          rank,
+          rss_post:rss_posts(
+            source_url,
+            image_url,
+            author,
+            rss_feed:rss_feeds(name)
+          )
+        ),
+        secondary_articles(
           id,
           headline,
           content,
@@ -93,6 +109,7 @@ export async function GET(
     }
 
     console.log('Campaign found, articles count:', campaign.articles?.length || 0)
+    console.log('Campaign secondary articles count:', campaign.secondary_articles?.length || 0)
     console.log('Campaign events count:', campaign.campaign_events?.length || 0)
 
     // Filter to only active articles (max 5)
@@ -103,6 +120,16 @@ export async function GET(
         .sort((a: any, b: any) => (b.rss_post?.post_rating?.[0]?.total_score || 0) - (a.rss_post?.post_rating?.[0]?.total_score || 0))
         .slice(0, 5) // Limit to 5 articles maximum
       console.log('Active articles after filter:', campaign.articles.length, 'from', beforeFilter, '(max 5)')
+    }
+
+    // Filter to only active secondary articles (max 3)
+    if (campaign.secondary_articles) {
+      const beforeFilter = campaign.secondary_articles.length
+      campaign.secondary_articles = campaign.secondary_articles
+        .filter((article: any) => article.is_active)
+        .sort((a: any, b: any) => (b.rss_post?.post_rating?.[0]?.total_score || 0) - (a.rss_post?.post_rating?.[0]?.total_score || 0))
+        .slice(0, 3) // Limit to 3 secondary articles maximum
+      console.log('Active secondary articles after filter:', campaign.secondary_articles.length, 'from', beforeFilter, '(max 3)')
     }
 
     // Filter to only selected events and group by date
@@ -145,6 +172,14 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
     console.log('PREVIEW - Article order:', activeArticles.map((a: any) => `${a.headline} (rank: ${a.rank})`).join(', '))
     console.log('PREVIEW - Raw article data:', activeArticles.map((a: any) => `ID: ${a.id}, Rank: ${a.rank}, Active: ${a.is_active}`).join(' | '))
 
+    // Filter active secondary articles and sort by rank (custom order)
+    const activeSecondaryArticles = (campaign.secondary_articles || [])
+      .filter((article: any) => article.is_active)
+      .sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999))
+
+    console.log('PREVIEW - Active secondary articles to render:', activeSecondaryArticles.length)
+    console.log('PREVIEW - Secondary article order:', activeSecondaryArticles.map((a: any) => `${a.headline} (rank: ${a.rank})`).join(', '))
+
     console.log('Generating events section using calculated dates...')
 
     // Fetch newsletter sections order
@@ -186,6 +221,8 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
       for (const section of sections) {
         if (section.name === 'The Local Scoop' && activeArticles.length > 0) {
           sectionsHtml += generateLocalScoopSection(activeArticles, campaign.date)
+        } else if (section.name === 'Secondary Articles' && activeSecondaryArticles.length > 0) {
+          sectionsHtml += generateSecondaryArticlesSection(activeSecondaryArticles, campaign.date, campaign.id)
         } else if (section.name === 'Local Events') {
           sectionsHtml += await generateLocalEventsSection(campaign)
         } else if (section.name === 'Poll') {

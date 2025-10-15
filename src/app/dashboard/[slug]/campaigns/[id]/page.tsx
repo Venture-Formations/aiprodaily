@@ -1708,6 +1708,7 @@ export default function CampaignDetailPage() {
   const [eventsExpanded, setEventsExpanded] = useState(false)
   const [updatingEvents, setUpdatingEvents] = useState(false)
   const [articlesExpanded, setArticlesExpanded] = useState(false)
+  const [secondaryArticlesExpanded, setSecondaryArticlesExpanded] = useState(false)
 
   // Weather state
   const [weatherExpanded, setWeatherExpanded] = useState(false)
@@ -1725,8 +1726,8 @@ export default function CampaignDetailPage() {
 
   // Criteria and article limits state
   const [criteriaConfig, setCriteriaConfig] = useState<Array<{name: string, weight: number}>>([])
-  const [maxTopArticles, setMaxTopArticles] = useState(3)
-  const [maxBottomArticles, setMaxBottomArticles] = useState(3)
+  const [maxPrimaryArticles, setMaxPrimaryArticles] = useState(3)
+  const [maxSecondaryArticles, setMaxSecondaryArticles] = useState(3)
   const [sectionExpandedStates, setSectionExpandedStates] = useState<{ [key: string]: boolean }>({})
 
   // Drag and drop sensors
@@ -1799,11 +1800,11 @@ export default function CampaignDetailPage() {
         setCriteriaConfig(criteria)
 
         // Get max articles settings
-        const maxTopSetting = data.settings.find((s: any) => s.key === 'max_top_articles')
-        const maxBottomSetting = data.settings.find((s: any) => s.key === 'max_bottom_articles')
+        const maxPrimarySetting = data.settings.find((s: any) => s.key === 'max_primary_articles')
+        const maxSecondarySetting = data.settings.find((s: any) => s.key === 'max_secondary_articles')
 
-        setMaxTopArticles(maxTopSetting?.value ? parseInt(maxTopSetting.value) : 3)
-        setMaxBottomArticles(maxBottomSetting?.value ? parseInt(maxBottomSetting.value) : 3)
+        setMaxPrimaryArticles(maxPrimarySetting?.value ? parseInt(maxPrimarySetting.value) : 3)
+        setMaxSecondaryArticles(maxSecondarySetting?.value ? parseInt(maxSecondarySetting.value) : 3)
       }
     } catch (error) {
       console.error('Failed to fetch criteria config:', error)
@@ -1942,6 +1943,154 @@ export default function CampaignDetailPage() {
       alert('Failed to skip article: ' + (error instanceof Error ? error.message : 'Unknown error'))
     } finally {
       setSaving(false)
+    }
+  }
+
+  // Secondary Article Functions
+  const toggleSecondaryArticle = async (articleId: string, currentState: boolean) => {
+    if (!campaign) return
+
+    setSaving(true)
+    try {
+      const response = await fetch(`/api/secondary-articles/${articleId}/toggle`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ is_active: !currentState })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to toggle secondary article')
+      }
+
+      // Update local state
+      setCampaign(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          secondary_articles: prev.secondary_articles.map(article =>
+            article.id === articleId
+              ? { ...article, is_active: !currentState }
+              : article
+          )
+        }
+      })
+
+    } catch (error) {
+      alert('Failed to toggle secondary article: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const skipSecondaryArticle = async (articleId: string) => {
+    if (!campaign) return
+
+    setSaving(true)
+    try {
+      const response = await fetch(`/api/secondary-articles/${articleId}/skip`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to skip secondary article')
+      }
+
+      // Update local state to remove the skipped article
+      setCampaign(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          secondary_articles: prev.secondary_articles.map(article =>
+            article.id === articleId
+              ? { ...article, skipped: true, is_active: false }
+              : article
+          )
+        }
+      })
+
+      alert('Secondary article skipped successfully')
+
+    } catch (error) {
+      alert('Failed to skip secondary article: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSecondaryDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id || !campaign) {
+      return
+    }
+
+    console.log('Reordering secondary articles:', { activeId: active.id, overId: over.id })
+
+    // Get non-skipped secondary articles sorted by rank
+    const sortedSecondaryArticles = campaign.secondary_articles
+      .filter(article => !article.skipped)
+      .sort((a, b) => {
+        const rankA = a.rank ?? 9999
+        const rankB = b.rank ?? 9999
+        return rankA - rankB
+      })
+
+    const oldIndex = sortedSecondaryArticles.findIndex(article => article.id === active.id)
+    const newIndex = sortedSecondaryArticles.findIndex(article => article.id === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) {
+      console.error('Could not find secondary articles in list')
+      return
+    }
+
+    // Reorder the array
+    const reorderedArticles = arrayMove(sortedSecondaryArticles, oldIndex, newIndex)
+
+    // Update ranks: 1, 2, 3...
+    const articleOrders = reorderedArticles.map((article, index) => ({
+      articleId: article.id,
+      rank: index + 1
+    }))
+
+    // Optimistically update UI
+    setCampaign(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        secondary_articles: prev.secondary_articles.map(article => {
+          const order = articleOrders.find(o => o.articleId === article.id)
+          return order ? { ...article, rank: order.rank } : article
+        })
+      }
+    })
+
+    // Send to API
+    try {
+      const response = await fetch(`/api/campaigns/${campaign.id}/secondary-articles/reorder`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ articleOrders })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to reorder secondary articles')
+      }
+
+      console.log('Secondary articles reordered successfully')
+    } catch (error) {
+      console.error('Failed to reorder secondary articles:', error)
+      alert('Failed to reorder secondary articles')
+      // Refresh to get correct state
+      fetchCampaign()
     }
   }
 
@@ -2541,7 +2690,7 @@ export default function CampaignDetailPage() {
                   {formatStatus(campaign.status)}
                 </span>
                 <span className="text-sm text-gray-500">
-                  {campaign.articles.filter(a => a.is_active && !a.skipped).length}/{maxTopArticles} selected
+                  {campaign.articles.filter(a => a.is_active && !a.skipped).length}/{maxPrimaryArticles} selected
                 </span>
               </div>
             </div>
@@ -2699,8 +2848,8 @@ export default function CampaignDetailPage() {
                 Check articles to select them for the newsletter. Drag to reorder selected articles.
               </p>
               <div className="text-sm">
-                <span className={`font-medium ${campaign.articles.filter(a => a.is_active && !a.skipped).length === maxTopArticles ? 'text-green-600' : 'text-yellow-600'}`}>
-                  {campaign.articles.filter(a => a.is_active && !a.skipped).length}/{maxTopArticles} selected
+                <span className={`font-medium ${campaign.articles.filter(a => a.is_active && !a.skipped).length === maxPrimaryArticles ? 'text-green-600' : 'text-yellow-600'}`}>
+                  {campaign.articles.filter(a => a.is_active && !a.skipped).length}/{maxPrimaryArticles} selected
                 </span>
                 <span className="text-gray-500 ml-1">• {campaign.articles.filter(a => !a.skipped).length} total articles</span>
               </div>
@@ -2763,7 +2912,92 @@ export default function CampaignDetailPage() {
                         saving={saving}
                         getScoreColor={getScoreColor}
                         criteriaConfig={criteriaConfig}
-                        maxTopArticles={maxTopArticles}
+                        maxTopArticles={maxPrimaryArticles}
+                      />
+                    ))}
+                </SortableContext>
+              </DndContext>
+            )}
+            </div>
+          )}
+        </div>
+
+        {/* Secondary Articles Section */}
+        <div className="bg-white shadow rounded-lg">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-medium text-gray-900">
+                Secondary Articles
+              </h2>
+              <button
+                onClick={() => setSecondaryArticlesExpanded(!secondaryArticlesExpanded)}
+                className="flex items-center space-x-2 text-sm text-brand-primary hover:text-blue-700"
+              >
+                <span>{secondaryArticlesExpanded ? 'Collapse' : 'Expand'}</span>
+                <svg
+                  className={`w-4 h-4 transform transition-transform ${secondaryArticlesExpanded ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-sm text-gray-600">
+                Secondary section articles appear below the main articles. Drag to reorder.
+              </p>
+              <div className="text-sm">
+                <span className={`font-medium ${campaign.secondary_articles?.filter(a => a.is_active && !a.skipped).length === (maxSecondaryArticles || 3) ? 'text-green-600' : 'text-yellow-600'}`}>
+                  {campaign.secondary_articles?.filter(a => a.is_active && !a.skipped).length || 0}/{maxSecondaryArticles || 3} selected
+                </span>
+                <span className="text-gray-500 ml-1">• {campaign.secondary_articles?.filter(a => !a.skipped).length || 0} total articles</span>
+              </div>
+            </div>
+          </div>
+
+          {secondaryArticlesExpanded && (
+            <div className="divide-y divide-gray-200">
+              {!campaign.secondary_articles || campaign.secondary_articles.length === 0 ? (
+              <div className="p-6 text-center text-gray-500">
+                <p className="mb-2">No secondary articles generated yet.</p>
+                <p className="text-sm">Configure RSS feeds for secondary section in Settings, then run RSS processing.</p>
+              </div>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={pointerWithin}
+                onDragEnd={handleSecondaryDragEnd}
+              >
+                <SortableContext
+                  items={campaign.secondary_articles
+                    .filter(article => !article.skipped)
+                    .sort((a, b) => {
+                      const rankA = a.rank ?? 9999
+                      const rankB = b.rank ?? 9999
+                      return rankA - rankB
+                    })
+                    .map(article => article.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {campaign.secondary_articles
+                    .filter(article => !article.skipped)
+                    .sort((a, b) => {
+                      const rankA = a.rank ?? 9999
+                      const rankB = b.rank ?? 9999
+                      return rankA - rankB
+                    })
+                    .map((article) => (
+                      <SortableArticle
+                        key={article.id}
+                        article={article}
+                        toggleArticle={toggleSecondaryArticle}
+                        skipArticle={skipSecondaryArticle}
+                        saving={saving}
+                        getScoreColor={getScoreColor}
+                        criteriaConfig={criteriaConfig}
+                        maxTopArticles={maxSecondaryArticles || 3}
                       />
                     ))}
                 </SortableContext>
