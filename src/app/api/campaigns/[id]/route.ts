@@ -30,6 +30,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             rss_feed:rss_feeds(*)
           )
         ),
+        secondary_articles:secondary_articles(
+          *,
+          rss_post:rss_posts(
+            *,
+            post_rating:post_ratings(*),
+            rss_feed:rss_feeds(*)
+          )
+        ),
         manual_articles:manual_articles(*),
         email_metrics(*)
       `)
