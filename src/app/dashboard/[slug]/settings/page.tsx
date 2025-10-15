@@ -2652,8 +2652,8 @@ function AIPromptsSettings() {
                       {isEditing ? (
                         <>
                           <textarea
-                            value={editingPrompt.value}
-                            onChange={(e) => setEditingPrompt({ ...editingPrompt, value: e.target.value })}
+                            value={editingPrompt?.value || ''}
+                            onChange={(e) => editingPrompt && setEditingPrompt({ ...editingPrompt, value: e.target.value })}
                             rows={20}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-xs"
                             disabled={isSaving}
