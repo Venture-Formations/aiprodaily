@@ -1,11 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import Layout from '@/components/Layout'
 
 export default function NewCampaignPage() {
   const router = useRouter()
+  const params = useParams()
+  const slug = params.slug as string
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [date, setDate] = useState(() => {
@@ -35,7 +37,7 @@ export default function NewCampaignPage() {
       }
 
       // Redirect to the newly created campaign
-      router.push(`/dashboard/campaigns/${data.campaign.id}`)
+      router.push(`/dashboard/${slug}/campaigns/${data.campaign.id}`)
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error')
     } finally {
