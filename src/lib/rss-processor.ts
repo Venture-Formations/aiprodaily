@@ -790,7 +790,7 @@ export class RSSProcessor {
         post_ratings(*)
       `)
       .eq('campaign_id', campaignId)
-      .limit(20) // Get more posts to filter later
+      // NO LIMIT - Get ALL posts for this campaign
 
     // Get duplicate post IDs to exclude
     const { data: duplicatePosts } = await supabaseAdmin
@@ -851,7 +851,8 @@ export class RSSProcessor {
       if (allRatedPosts && allRatedPosts.length > 0) {
         // Use these posts instead, excluding duplicates
         const filteredPosts = allRatedPosts.filter(post => !duplicatePostIds.has(post.id))
-        for (const post of filteredPosts.slice(0, 12)) {
+        // Generate articles for ALL non-duplicate posts
+        for (const post of filteredPosts) {
           await this.processPostIntoArticle(post, campaignId)
         }
       }
