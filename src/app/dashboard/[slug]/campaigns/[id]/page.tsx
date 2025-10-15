@@ -2655,18 +2655,18 @@ export default function CampaignDetailPage() {
           </div>
         </div>
 
-        {/* Articles Section */}
+        {/* Top Articles Section */}
         <div className="bg-white shadow rounded-lg">
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-medium text-gray-900">
-                Articles
+                Top Articles
               </h2>
               <button
                 onClick={() => setArticlesExpanded(!articlesExpanded)}
                 className="flex items-center space-x-2 text-sm text-brand-primary hover:text-blue-700"
               >
-                <span>{articlesExpanded ? 'Minimize' : 'Manage Articles'}</span>
+                <span>{articlesExpanded ? 'Collapse' : 'Expand'}</span>
                 <svg
                   className={`w-4 h-4 transform transition-transform ${articlesExpanded ? 'rotate-180' : ''}`}
                   fill="none"
@@ -2679,11 +2679,11 @@ export default function CampaignDetailPage() {
             </div>
             <div className="flex items-center justify-between mt-2">
               <p className="text-sm text-gray-600">
-                Toggle articles on/off for the newsletter. Articles are ranked by AI evaluation.
+                Drag to reorder articles. Articles are ranked by AI evaluation.
               </p>
               <div className="text-sm">
-                <span className={`font-medium ${campaign.articles.filter(a => a.is_active && !a.skipped).length === 5 ? 'text-green-600' : 'text-yellow-600'}`}>
-                  {campaign.articles.filter(a => a.is_active && !a.skipped).length}/5 selected
+                <span className={`font-medium ${campaign.articles.filter(a => a.is_active && !a.skipped).length === maxTopArticles ? 'text-green-600' : 'text-yellow-600'}`}>
+                  {campaign.articles.filter(a => a.is_active && !a.skipped).length}/{maxTopArticles} selected
                 </span>
                 <span className="text-gray-500 ml-1">for newsletter</span>
               </div>
@@ -2715,42 +2715,28 @@ export default function CampaignDetailPage() {
                 }}
                 onDragEnd={handleDragEnd}
               >
-                {/* Top Articles section - sortable */}
-                {(() => {
-                  const activeArticles = campaign.articles
+                <SortableContext
+                  items={campaign.articles
                     .filter(article => article.is_active && !article.skipped)
                     .sort((a, b) => (a.rank || 999) - (b.rank || 999))
-
-                  return (
-                    <>
-                      {activeArticles.length > 0 && (
-                        <>
-                          <div className="px-6 py-3 bg-blue-50 border-b">
-                            <h3 className="text-sm font-medium text-blue-900">
-                              Top Articles (Drag to reorder)
-                            </h3>
-                          </div>
-                          <SortableContext
-                            items={activeArticles.map(article => article.id)}
-                            strategy={verticalListSortingStrategy}
-                          >
-                            {activeArticles.map((article) => (
-                              <SortableArticle
-                                key={article.id}
-                                article={article}
-                                toggleArticle={toggleArticle}
-                                skipArticle={skipArticle}
-                                saving={saving}
-                                getScoreColor={getScoreColor}
-                                criteriaConfig={criteriaConfig}
-                              />
-                            ))}
-                          </SortableContext>
-                        </>
-                      )}
-                    </>
-                  )
-                })()}
+                    .map(article => article.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {campaign.articles
+                    .filter(article => article.is_active && !article.skipped)
+                    .sort((a, b) => (a.rank || 999) - (b.rank || 999))
+                    .map((article) => (
+                      <SortableArticle
+                        key={article.id}
+                        article={article}
+                        toggleArticle={toggleArticle}
+                        skipArticle={skipArticle}
+                        saving={saving}
+                        getScoreColor={getScoreColor}
+                        criteriaConfig={criteriaConfig}
+                      />
+                    ))}
+                </SortableContext>
               </DndContext>
             )}
             </div>
