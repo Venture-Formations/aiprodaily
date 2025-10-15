@@ -2825,11 +2825,11 @@ export default function CampaignDetailPage() {
         </div>
 
         {/* Top Articles Section */}
-        <div className="bg-white shadow rounded-lg">
+        <div className="bg-white shadow rounded-lg mb-6">
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-medium text-gray-900">
-                Top Articles
+                {newsletterSections.find(s => s.name === 'Latest in Accounting AI')?.name || 'Top Articles'}
               </h2>
               <button
                 onClick={() => setArticlesExpanded(!articlesExpanded)}
@@ -2926,11 +2926,11 @@ export default function CampaignDetailPage() {
         </div>
 
         {/* Secondary Articles Section */}
-        <div className="bg-white shadow rounded-lg">
+        <div className="bg-white shadow rounded-lg mb-6">
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-medium text-gray-900">
-                Secondary Articles
+                {newsletterSections.find(s => s.name === 'Bottom Articles')?.name || 'Secondary Articles'}
               </h2>
               <button
                 onClick={() => setSecondaryArticlesExpanded(!secondaryArticlesExpanded)}
