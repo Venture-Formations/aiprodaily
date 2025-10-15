@@ -2507,8 +2507,24 @@ function AIPromptsSettings() {
             <div>
               <h3 className="text-lg font-medium text-gray-900">Secondary Evaluation Criteria</h3>
               <p className="text-sm text-gray-600 mt-1">
-                Configure the criteria used to evaluate secondary (bottom) articles. Uses same {enabledCount} criteria as primary section.
+                Configure the criteria used to evaluate secondary (bottom) articles. {enabledCount} of 5 criteria enabled.
               </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleAddCriteria}
+                disabled={enabledCount >= 5 || saving === 'add_criteria'}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving === 'add_criteria' ? 'Adding...' : 'Add Criteria'}
+              </button>
+              <button
+                onClick={handleRemoveCriteria}
+                disabled={enabledCount <= 1 || saving === 'remove_criteria'}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving === 'remove_criteria' ? 'Removing...' : 'Remove Criteria'}
+              </button>
             </div>
           </div>
         </div>
@@ -2519,6 +2535,8 @@ function AIPromptsSettings() {
             const isExpanded = expandedPrompt === promptKey
             const isEditing = editingPrompt?.key === promptKey
             const isSaving = saving === promptKey
+            const isEditingWeight = editingWeight?.key === promptKey
+            const isEditingCriteriaName = editingName?.number === criterion.number
 
             if (!prompt) return null
 
@@ -2526,34 +2544,122 @@ function AIPromptsSettings() {
               <div key={criterion.number} className="p-6">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
+                    {/* Criteria Name */}
                     <div className="flex items-center space-x-2 mb-2">
                       <label className="text-xs font-medium text-gray-500 uppercase">Criteria Name:</label>
-                      <span className="text-sm font-medium text-gray-900">{criterion.name}</span>
-                      <span className="text-xs text-gray-500">(matches primary criteria {criterion.number})</span>
+                      {isEditingCriteriaName ? (
+                        <>
+                          <input
+                            type="text"
+                            value={editingName?.value || ''}
+                            onChange={(e) => setEditingName({ number: criterion.number, value: e.target.value })}
+                            className="px-2 py-1 border border-gray-300 rounded text-sm flex-1 max-w-xs"
+                            placeholder="Enter criteria name"
+                          />
+                          <button
+                            onClick={() => handleNameSave(criterion.number)}
+                            disabled={saving === `criteria_${criterion.number}_name`}
+                            className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                          >
+                            {saving === `criteria_${criterion.number}_name` ? 'Saving...' : 'Save'}
+                          </button>
+                          <button
+                            onClick={handleNameCancel}
+                            disabled={saving === `criteria_${criterion.number}_name`}
+                            className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <h4 className="text-base font-medium text-gray-900">{criterion.name}</h4>
+                          <button
+                            onClick={() => handleNameEdit(criterion.number, criterion.name)}
+                            className="text-xs text-blue-600 hover:text-blue-800"
+                          >
+                            Edit Name
+                          </button>
+                        </>
+                      )}
                     </div>
-                    <h4 className="text-base font-medium text-gray-900">{prompt.name}</h4>
-                    <p className="text-sm text-gray-600 mt-1">{prompt.description}</p>
+
+                    {/* Weight Input */}
+                    <div className="mt-2 flex items-center space-x-3">
+                      <label className="text-sm font-medium text-gray-700">Weight:</label>
+                      {isEditingWeight ? (
+                        <>
+                          <input
+                            type="number"
+                            min="0"
+                            max="10"
+                            step="0.1"
+                            value={editingWeight?.value || '1.0'}
+                            onChange={(e) => setEditingWeight({ key: promptKey, value: e.target.value })}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                          />
+                          <button
+                            onClick={() => handleWeightSave(promptKey)}
+                            disabled={isSaving}
+                            className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                          >
+                            {isSaving ? 'Saving...' : 'Save'}
+                          </button>
+                          <button
+                            onClick={handleWeightCancel}
+                            disabled={isSaving}
+                            className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-sm font-semibold text-brand-primary">{criterion.weight}</span>
+                          <button
+                            onClick={() => handleWeightEdit({ key: promptKey, weight: criterion.weight.toString() })}
+                            className="text-xs text-blue-600 hover:text-blue-800"
+                          >
+                            Edit
+                          </button>
+                          <span className="text-xs text-gray-500">
+                            (Max final score contribution: {(criterion.weight * 10).toFixed(1)} points)
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    {prompt && (
+                      <p className="text-sm text-gray-600 mt-2">{prompt.description}</p>
+                    )}
                   </div>
                   <button
                     onClick={() => setExpandedPrompt(isExpanded ? null : promptKey)}
                     className="ml-4 text-blue-600 hover:text-blue-800 text-sm font-medium"
                   >
-                    {isExpanded ? 'Collapse' : 'View/Edit'}
+                    {isExpanded ? 'Collapse' : 'View/Edit Prompt'}
                   </button>
                 </div>
 
-                {isExpanded && (
+                {isExpanded && prompt && (
                   <div className="mt-4">
+                    <div className="mb-2 flex items-center justify-between">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Prompt Content
+                      </label>
+                      <span className="text-xs text-gray-500">
+                        {isEditing ? editingPrompt?.value.length || 0 : prompt.value.length} characters
+                      </span>
+                    </div>
                     {isEditing ? (
                       <>
                         <textarea
-                          value={editingPrompt.value}
-                          onChange={(e) => setEditingPrompt({ ...editingPrompt, value: e.target.value })}
-                          rows={20}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-xs"
-                          disabled={isSaving}
+                          value={editingPrompt?.value || ''}
+                          onChange={(e) => editingPrompt && setEditingPrompt({ ...editingPrompt, value: e.target.value })}
+                          rows={15}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
-                        <div className="mt-3 flex justify-end space-x-3">
+                        <div className="mt-3 flex items-center justify-end space-x-3">
                           <button
                             onClick={handleCancel}
                             disabled={isSaving}
