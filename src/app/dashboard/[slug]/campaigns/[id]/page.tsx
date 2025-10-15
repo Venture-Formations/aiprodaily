@@ -2829,7 +2829,7 @@ export default function CampaignDetailPage() {
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-medium text-gray-900">
-                Latest in Accounting AI
+                {newsletterSections.find(s => s.name === 'Latest in Accounting AI')?.name || 'Latest in Accounting AI'}
               </h2>
               <button
                 onClick={() => setArticlesExpanded(!articlesExpanded)}
@@ -2930,7 +2930,7 @@ export default function CampaignDetailPage() {
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-medium text-gray-900">
-                Bottom Articles
+                {newsletterSections.find(s => s.name === 'Bottom Articles')?.name || 'Bottom Articles'}
               </h2>
               <button
                 onClick={() => setSecondaryArticlesExpanded(!secondaryArticlesExpanded)}
