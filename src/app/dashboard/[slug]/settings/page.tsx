@@ -39,6 +39,7 @@ export default function SettingsPage() {
             <nav className="-mb-px flex space-x-8">
               {[
                 { id: 'system', name: 'System Status' },
+                { id: 'business', name: 'Business Settings' },
                 { id: 'newsletter', name: 'Newsletter' },
                 { id: 'email', name: 'Email' },
                 { id: 'slack', name: 'Slack' },
@@ -66,6 +67,7 @@ export default function SettingsPage() {
         {/* Tab Content */}
         <div className="mt-6">
           {activeTab === 'system' && <SystemStatus />}
+          {activeTab === 'business' && <BusinessSettings />}
           {activeTab === 'newsletter' && <NewsletterSettings />}
           {activeTab === 'email' && <EmailSettings />}
           {activeTab === 'slack' && <SlackSettings />}
@@ -3857,6 +3859,441 @@ function AdsSettings() {
           <li>• All ads are reviewed before approval and must meet content guidelines</li>
           <li>• Ads appear in the "Community Business Spotlight" section</li>
         </ul>
+      </div>
+    </div>
+  )
+}
+
+function BusinessSettings() {
+  const [settings, setSettings] = useState({
+    newsletter_name: '',
+    business_name: '',
+    primary_color: '#3B82F6',
+    secondary_color: '#10B981',
+    header_image_url: '',
+    logo_url: '',
+    contact_email: '',
+    website_url: '',
+    heading_font: 'Arial',
+    body_font: 'Arial',
+    social_media_enabled: false,
+    facebook_url: '',
+    twitter_url: '',
+    linkedin_url: ''
+  })
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [uploadingHeader, setUploadingHeader] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [message, setMessage] = useState('')
+
+  const fontOptions = [
+    'Arial',
+    'Helvetica',
+    'Georgia',
+    'Times New Roman',
+    'Verdana',
+    'Trebuchet MS',
+    'Courier New',
+    'Tahoma'
+  ]
+
+  useEffect(() => {
+    loadSettings()
+  }, [])
+
+  const loadSettings = async () => {
+    try {
+      const response = await fetch('/api/settings/business')
+      if (response.ok) {
+        const data = await response.json()
+        setSettings(prev => ({ ...prev, ...data }))
+      }
+    } catch (error) {
+      console.error('Failed to load business settings:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    setMessage('')
+
+    try {
+      const response = await fetch('/api/settings/business', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+      })
+
+      if (response.ok) {
+        setMessage('Business settings saved successfully!')
+        setTimeout(() => setMessage(''), 3000)
+      } else {
+        const error = await response.json()
+        setMessage(`Error: ${error.message || 'Failed to save settings'}`)
+      }
+    } catch (error) {
+      setMessage('Error: Failed to save settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleImageUpload = async (file: File, type: 'header' | 'logo') => {
+    const setUploading = type === 'header' ? setUploadingHeader : setUploadingLogo
+    setUploading(true)
+    setMessage('')
+
+    try {
+      // Get upload URL
+      const uploadResponse = await fetch('/api/images/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type
+        })
+      })
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to get upload URL')
+      }
+
+      const { uploadUrl, publicUrl } = await uploadResponse.json()
+
+      // Upload to GitHub
+      const reader = new FileReader()
+      reader.onloadend = async () => {
+        const base64Content = (reader.result as string).split(',')[1]
+
+        const githubResponse = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `token ${process.env.NEXT_PUBLIC_GITHUB_TOKEN}`
+          },
+          body: JSON.stringify({
+            message: `Upload ${type} image: ${file.name}`,
+            content: base64Content
+          })
+        })
+
+        if (githubResponse.ok) {
+          // Update settings with new URL
+          const fieldName = type === 'header' ? 'header_image_url' : 'logo_url'
+          setSettings(prev => ({ ...prev, [fieldName]: publicUrl }))
+          setMessage(`${type === 'header' ? 'Header' : 'Logo'} image uploaded successfully!`)
+          setTimeout(() => setMessage(''), 3000)
+        } else {
+          throw new Error('Failed to upload to GitHub')
+        }
+      }
+      reader.readAsDataURL(file)
+    } catch (error) {
+      setMessage(`Error: Failed to upload ${type} image`)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  if (loading) {
+    return <div className="text-center py-8">Loading business settings...</div>
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white shadow rounded-lg p-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Business Information</h3>
+
+        {message && (
+          <div className={`mb-4 p-3 rounded ${message.includes('Error') ? 'bg-red-50 text-red-800' : 'bg-green-50 text-green-800'}`}>
+            {message}
+          </div>
+        )}
+
+        <div className="space-y-4">
+          {/* Newsletter Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Newsletter Name
+            </label>
+            <input
+              type="text"
+              value={settings.newsletter_name}
+              onChange={(e) => setSettings({ ...settings, newsletter_name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              placeholder="e.g., AI Accounting Daily"
+            />
+          </div>
+
+          {/* Business Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Business Name
+            </label>
+            <input
+              type="text"
+              value={settings.business_name}
+              onChange={(e) => setSettings({ ...settings, business_name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              placeholder="e.g., AI Pros Inc."
+            />
+          </div>
+
+          {/* Contact Email */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Contact Email
+            </label>
+            <input
+              type="email"
+              value={settings.contact_email}
+              onChange={(e) => setSettings({ ...settings, contact_email: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              placeholder="e.g., contact@aiaccountingdaily.com"
+            />
+          </div>
+
+          {/* Website URL */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Website URL
+            </label>
+            <input
+              type="url"
+              value={settings.website_url}
+              onChange={(e) => setSettings({ ...settings, website_url: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              placeholder="e.g., https://aiaccountingdaily.com"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Colors */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Brand Colors</h3>
+        <div className="grid grid-cols-2 gap-4">
+          {/* Primary Color */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Primary Color (Header/Footer Background)
+            </label>
+            <div className="flex items-center space-x-2">
+              <input
+                type="color"
+                value={settings.primary_color}
+                onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
+                className="h-10 w-20 border border-gray-300 rounded cursor-pointer"
+              />
+              <input
+                type="text"
+                value={settings.primary_color}
+                onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                placeholder="#3B82F6"
+              />
+            </div>
+          </div>
+
+          {/* Secondary Color */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Secondary Color (Buttons/Links)
+            </label>
+            <div className="flex items-center space-x-2">
+              <input
+                type="color"
+                value={settings.secondary_color}
+                onChange={(e) => setSettings({ ...settings, secondary_color: e.target.value })}
+                className="h-10 w-20 border border-gray-300 rounded cursor-pointer"
+              />
+              <input
+                type="text"
+                value={settings.secondary_color}
+                onChange={(e) => setSettings({ ...settings, secondary_color: e.target.value })}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                placeholder="#10B981"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Fonts */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Typography</h3>
+        <div className="grid grid-cols-2 gap-4">
+          {/* Heading Font */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Heading Font
+            </label>
+            <select
+              value={settings.heading_font}
+              onChange={(e) => setSettings({ ...settings, heading_font: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            >
+              {fontOptions.map(font => (
+                <option key={font} value={font}>{font}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Body Font */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Body Font
+            </label>
+            <select
+              value={settings.body_font}
+              onChange={(e) => setSettings({ ...settings, body_font: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            >
+              {fontOptions.map(font => (
+                <option key={font} value={font}>{font}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Images */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Images</h3>
+
+        {/* Header Image */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Header Image
+          </label>
+          {settings.header_image_url && (
+            <div className="mb-2">
+              <img
+                src={settings.header_image_url}
+                alt="Header preview"
+                className="max-w-md h-32 object-cover rounded border"
+              />
+            </div>
+          )}
+          <div className="flex items-center space-x-2">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) handleImageUpload(file, 'header')
+              }}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              disabled={uploadingHeader}
+            />
+            {uploadingHeader && <span className="text-sm text-gray-500">Uploading...</span>}
+          </div>
+        </div>
+
+        {/* Logo */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Logo (Square Image)
+          </label>
+          {settings.logo_url && (
+            <div className="mb-2">
+              <img
+                src={settings.logo_url}
+                alt="Logo preview"
+                className="w-16 h-16 object-cover rounded border"
+              />
+            </div>
+          )}
+          <div className="flex items-center space-x-2">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) handleImageUpload(file, 'logo')
+              }}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              disabled={uploadingLogo}
+            />
+            {uploadingLogo && <span className="text-sm text-gray-500">Uploading...</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Social Media */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Social Media Links</h3>
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={settings.social_media_enabled}
+              onChange={(e) => setSettings({ ...settings, social_media_enabled: e.target.checked })}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700">Enable in footer</span>
+          </label>
+        </div>
+
+        {settings.social_media_enabled && (
+          <div className="space-y-4">
+            {/* Facebook */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Facebook URL
+              </label>
+              <input
+                type="url"
+                value={settings.facebook_url}
+                onChange={(e) => setSettings({ ...settings, facebook_url: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                placeholder="https://facebook.com/yourpage"
+              />
+            </div>
+
+            {/* Twitter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Twitter/X URL
+              </label>
+              <input
+                type="url"
+                value={settings.twitter_url}
+                onChange={(e) => setSettings({ ...settings, twitter_url: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                placeholder="https://twitter.com/yourhandle"
+              />
+            </div>
+
+            {/* LinkedIn */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                LinkedIn URL
+              </label>
+              <input
+                type="url"
+                value={settings.linkedin_url}
+                onChange={(e) => setSettings({ ...settings, linkedin_url: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                placeholder="https://linkedin.com/company/yourcompany"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Save Button */}
+      <div className="flex justify-end">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-2 rounded-md font-medium"
+        >
+          {saving ? 'Saving...' : 'Save Business Settings'}
+        </button>
       </div>
     </div>
   )
