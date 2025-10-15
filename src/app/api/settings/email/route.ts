@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const { data: settingsRows, error } = await supabaseAdmin
       .from('app_settings')
       .select('key, value')
-      .like('key', 'email_%')
+      .or('key.like.email_%,key.eq.max_top_articles,key.eq.max_bottom_articles')
 
     if (error) {
       throw error
@@ -23,8 +23,13 @@ export async function GET(request: NextRequest) {
     // Convert rows to object
     const savedSettings: Record<string, string> = {}
     settingsRows?.forEach(row => {
-      const settingKey = row.key.replace('email_', '')
-      savedSettings[settingKey] = row.value
+      if (row.key.startsWith('email_')) {
+        const settingKey = row.key.replace('email_', '')
+        savedSettings[settingKey] = row.value
+      } else {
+        // Keep max_top_articles and max_bottom_articles as-is
+        savedSettings[row.key] = row.value
+      }
     })
 
     // Return current settings or defaults
@@ -65,7 +70,50 @@ export async function POST(request: NextRequest) {
 
     const settings = await request.json()
 
-    // Validate required fields
+    // Check if this is a max articles update request
+    if (settings.max_top_articles !== undefined || settings.max_bottom_articles !== undefined) {
+      // Handle max articles settings separately
+      const settingsToSave = []
+
+      if (settings.max_top_articles !== undefined) {
+        settingsToSave.push({
+          key: 'max_top_articles',
+          value: settings.max_top_articles.toString()
+        })
+      }
+
+      if (settings.max_bottom_articles !== undefined) {
+        settingsToSave.push({
+          key: 'max_bottom_articles',
+          value: settings.max_bottom_articles.toString()
+        })
+      }
+
+      // Upsert max articles settings
+      for (const setting of settingsToSave) {
+        const { error } = await supabaseAdmin
+          .from('app_settings')
+          .upsert({
+            key: setting.key,
+            value: setting.value,
+            description: `Max articles setting: ${setting.key}`,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'key'
+          })
+
+        if (error) {
+          throw error
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Max articles settings saved successfully'
+      })
+    }
+
+    // Validate required fields for email settings
     if (!settings.fromEmail || !settings.senderName) {
       return NextResponse.json({
         error: 'From Email and Sender Name are required'
