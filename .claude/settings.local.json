@@ -37,7 +37,8 @@
       "mcp__vercel__getDeployments",
       "Bash(git mv:*)",
       "mcp__vercel__getDeployment",
-      "mcp__vercel__getDeploymentEvents"
+      "mcp__vercel__getDeploymentEvents",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []
