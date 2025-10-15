@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { generateNewsletterHeader, generateNewsletterFooter } from '@/lib/newsletter-templates'
 
-function generateTestHeader(): string {
+async function generateTestHeader(): Promise<string> {
   const formattedDate = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -11,11 +11,11 @@ function generateTestHeader(): string {
     day: 'numeric'
   })
 
-  return generateNewsletterHeader(formattedDate)
+  return await generateNewsletterHeader(formattedDate)
 }
 
-function generateTestFooter(): string {
-  return generateNewsletterFooter()
+async function generateTestFooter(): Promise<string> {
+  return await generateNewsletterFooter()
 }
 
 async function fetchSectionHtml(sectionName: string): Promise<string> {
@@ -64,8 +64,8 @@ export async function GET(request: NextRequest) {
     // Since we can't easily call the other endpoints from here due to auth,
     // we'll create a simplified version that includes test content for all sections
 
-    const header = generateTestHeader()
-    const footer = generateTestFooter()
+    const header = await generateTestHeader()
+    const footer = await generateTestFooter()
 
     // Sample content for each section
     const sampleArticlesSection = `

@@ -179,8 +179,8 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
     console.log('Formatted date:', formattedDate)
 
     // Generate modular HTML sections
-    const header = generateNewsletterHeader(formattedDate)
-    const footer = generateNewsletterFooter()
+    const header = await generateNewsletterHeader(formattedDate)
+    const footer = await generateNewsletterFooter()
 
     // Generate sections in order based on database configuration
     let sectionsHtml = ''

@@ -152,7 +152,22 @@ export function getEventEmoji(title: string, venue: string): string {
 
 // ==================== HEADER ====================
 
-export function generateNewsletterHeader(formattedDate: string): string {
+export async function generateNewsletterHeader(formattedDate: string): Promise<string> {
+  // Fetch business settings for header image and primary color
+  const { data: settings } = await supabaseAdmin
+    .from('app_settings')
+    .select('key, value')
+    .in('key', ['header_image_url', 'primary_color', 'newsletter_name'])
+
+  const settingsMap: Record<string, string> = {}
+  settings?.forEach(setting => {
+    settingsMap[setting.key] = setting.value
+  })
+
+  const headerImageUrl = settingsMap.header_image_url || 'https://raw.githubusercontent.com/VFDavid/STCScoop/refs/heads/main/STCSCOOP_Logo_824X148_clear.png'
+  const primaryColor = settingsMap.primary_color || '#1877F2'
+  const newsletterName = settingsMap.newsletter_name || 'St. Cloud Scoop'
+
   return `<html>
 <body style='margin:0!important;padding:0!important;background-color:#f7f7f7;'>
    <div style='width:100%;margin:0 auto;padding:10px;background-color:#f7f7f7;box-sizing:border-box;overflow-x:auto;'>
@@ -161,9 +176,9 @@ export function generateNewsletterHeader(formattedDate: string): string {
        <a href='https://stcscoop.com/' style='color:#000;text-decoration:underline;'>Sign Up</a>&nbsp;|&nbsp;
        <a href='{$forward}' style='color:#000;text-decoration:underline;'>Share</a>
      </div>
-     <div style='width:100%;max-width:990px;margin:0 auto;padding:0px;'>
-       <div style='font-family:Arial,sans-serif;background-color:#1877F2;text-align:center;border-radius:12px;border:1px solid #333;'>
-         <img alt='St. Cloud Scoop' src='https://raw.githubusercontent.com/VFDavid/STCScoop/refs/heads/main/STCSCOOP_Logo_824X148_clear.png' style='width:100%;max-width:500px;height:auto;margin-bottom:2px;'/>
+     <div style='width:100%;max-width:750px;margin:0 auto;padding:0px;'>
+       <div style='font-family:Arial,sans-serif;background-color:${primaryColor};text-align:center;border-radius:12px;border:1px solid #333;'>
+         <img alt='${newsletterName}' src='${headerImageUrl}' style='width:100%;max-width:500px;height:auto;margin-bottom:2px;'/>
          <div style='color:#fff;font-size:16px;font-weight:bold;padding:0 0 5px;'>${formattedDate}</div>
        </div>
      </div>
@@ -946,15 +961,29 @@ export async function generateRoadWorkSection(campaign: any): Promise<string> {
 
 // ==================== FOOTER ====================
 
-export function generateNewsletterFooter(): string {
+export async function generateNewsletterFooter(): Promise<string> {
+  // Fetch business settings for primary color and newsletter name
+  const { data: settings } = await supabaseAdmin
+    .from('app_settings')
+    .select('key, value')
+    .in('key', ['primary_color', 'newsletter_name'])
+
+  const settingsMap: Record<string, string> = {}
+  settings?.forEach(setting => {
+    settingsMap[setting.key] = setting.value
+  })
+
+  const primaryColor = settingsMap.primary_color || '#1877F2'
+  const newsletterName = settingsMap.newsletter_name || 'St. Cloud Scoop'
+
   return `
-<div style="max-width: 990px; margin: 0 auto; background-color: #1877F2; padding: 8px 0; text-align: center;">
+<div style="max-width: 990px; margin: 0 auto; background-color: ${primaryColor}; padding: 8px 0; text-align: center;">
   <a href="https://www.facebook.com/61578947310955/" target="_blank">
     <img src="https://raw.githubusercontent.com/VFDavid/STCScoop/refs/heads/main/facebook_light.png" alt="Facebook" width="24" height="24" style="border: none; display: inline-block;">
   </a>
 </div>
 <div style="font-family: Arial, sans-serif; font-size: 12px; color: #777; text-align: center; padding: 20px 10px; border-top: 1px solid #ccc; background-color: #ffffff; max-width: 990px; margin: 0 auto ;">
-  <p style="margin: 0;text-align: center;">You're receiving this email because you subscribed to <strong>St. Cloud Scoop</strong>.</p>
+  <p style="margin: 0;text-align: center;">You're receiving this email because you subscribed to <strong>${newsletterName}</strong>.</p>
   <p style="margin: 5px 0 0;text-align: center;">
     <a href="{$unsubscribe}" style='text-decoration: underline;'>Unsubscribe</a>
   </p>

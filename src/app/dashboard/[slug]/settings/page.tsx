@@ -4142,6 +4142,9 @@ function BusinessSettings() {
                 <option key={font} value={font}>{font}</option>
               ))}
             </select>
+            <p className="mt-2 text-sm text-gray-600" style={{ fontFamily: settings.heading_font }}>
+              This is how your headings will look in the newsletter.
+            </p>
           </div>
 
           {/* Body Font */}
@@ -4158,6 +4161,9 @@ function BusinessSettings() {
                 <option key={font} value={font}>{font}</option>
               ))}
             </select>
+            <p className="mt-2 text-sm text-gray-600" style={{ fontFamily: settings.body_font }}>
+              This is how your body text will appear in the newsletter.
+            </p>
           </div>
         </div>
       </div>
