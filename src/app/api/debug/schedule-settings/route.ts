@@ -10,6 +10,12 @@ export async function GET(request: NextRequest) {
       .select('key, value')
       .like('key', 'email_%')
 
+    // Get max article settings
+    const { data: maxArticles } = await supabaseAdmin
+      .from('app_settings')
+      .select('key, value')
+      .in('key', ['max_top_articles', 'max_bottom_articles'])
+
     // Also check the last run dates
     const { data: lastRuns } = await supabaseAdmin
       .from('app_settings')
@@ -28,6 +34,7 @@ export async function GET(request: NextRequest) {
         centralTime24h: currentCT
       },
       settings: settings || [],
+      maxArticles: maxArticles || [],
       lastRuns: lastRuns || [],
       today: new Date().toISOString().split('T')[0]
     })
