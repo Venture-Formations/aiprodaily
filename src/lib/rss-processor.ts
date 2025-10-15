@@ -1097,12 +1097,27 @@ export class RSSProcessor {
   }
 
   private async generateNewsletterContent(post: RssPost): Promise<NewsletterContent> {
-    const prompt = await AI_PROMPTS.newsletterWriter({
-      title: post.title,
-      description: post.description || '',
-      content: post.content || '',
-      source_url: post.source_url || ''
-    })
+    // Check if articleWriter prompt exists in database, fallback to newsletterWriter
+    let prompt: string
+    try {
+      // First try articleWriter for accounting newsletter
+      prompt = await AI_PROMPTS.articleWriter({
+        title: post.title,
+        description: post.description || '',
+        content: post.content || '',
+        source_url: post.source_url || ''
+      })
+      console.log('Using articleWriter prompt for article generation')
+    } catch (error) {
+      // Fallback to newsletterWriter if articleWriter doesn't exist
+      console.log('articleWriter not found, falling back to newsletterWriter')
+      prompt = await AI_PROMPTS.newsletterWriter({
+        title: post.title,
+        description: post.description || '',
+        content: post.content || '',
+        source_url: post.source_url || ''
+      })
+    }
 
     const result = await callOpenAI(prompt)
 

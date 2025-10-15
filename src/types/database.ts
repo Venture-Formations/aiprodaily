@@ -160,6 +160,22 @@ export interface PostRating {
   community_impact: number
   total_score: number
   ai_reasoning: string | null
+  // Multi-criteria scoring system (expandable 1-5 criteria)
+  criteria_1_score?: number | null
+  criteria_1_reason?: string | null
+  criteria_1_weight?: number | null
+  criteria_2_score?: number | null
+  criteria_2_reason?: string | null
+  criteria_2_weight?: number | null
+  criteria_3_score?: number | null
+  criteria_3_reason?: string | null
+  criteria_3_weight?: number | null
+  criteria_4_score?: number | null
+  criteria_4_reason?: string | null
+  criteria_4_weight?: number | null
+  criteria_5_score?: number | null
+  criteria_5_reason?: string | null
+  criteria_5_weight?: number | null
   created_at: string
 }
 

@@ -1645,20 +1645,35 @@ function SortableArticle({
           </div>
 
           {article.rss_post?.post_rating?.[0] && criteriaConfig.length > 0 && (
-            <div className={`mt-3 grid grid-cols-${Math.min(criteriaConfig.length, 4)} gap-4 text-xs`}>
-              {criteriaConfig.map((criterion, index) => {
-                const criterionNum = index + 1
-                const score = article.rss_post.post_rating[0][`criteria_${criterionNum}_score` as keyof typeof article.rss_post.post_rating[0]]
-                const weight = criterion.weight
-                const weightedScore = typeof score === 'number' ? (score * weight).toFixed(1) : '0.0'
+            <div className="mt-3">
+              <div className="text-xs font-medium text-gray-700 mb-2">Criteria Scores:</div>
+              <div className={`grid grid-cols-${Math.min(criteriaConfig.length, 3)} gap-3 text-xs`}>
+                {criteriaConfig.map((criterion, index) => {
+                  const criterionNum = index + 1
+                  const score = article.rss_post.post_rating[0][`criteria_${criterionNum}_score` as keyof typeof article.rss_post.post_rating[0]]
+                  const weight = criterion.weight
+                  const rawScore = typeof score === 'number' ? score : 0
+                  const weightedScore = (rawScore * weight).toFixed(1)
 
-                return (
-                  <div key={criterionNum}>
-                    <span className="text-gray-600">{criterion.name}:</span>
-                    <span className="ml-1 font-medium">{weightedScore}</span>
-                  </div>
-                )
-              })}
+                  return (
+                    <div key={criterionNum} className="bg-gray-50 p-2 rounded">
+                      <div className="text-gray-600 font-medium mb-1">{criterion.name}</div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-500">Raw Score:</span>
+                        <span className="font-semibold text-gray-900">{rawScore}/10</span>
+                      </div>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span className="text-gray-500">Weight:</span>
+                        <span className="font-medium text-gray-700">{weight}x</span>
+                      </div>
+                      <div className="flex items-center justify-between mt-0.5 pt-1 border-t border-gray-200">
+                        <span className="text-gray-600 font-medium">Weighted:</span>
+                        <span className="font-bold text-blue-600">{weightedScore}</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -2721,9 +2736,11 @@ export default function CampaignDetailPage() {
                   items={campaign.articles
                     .filter(article => !article.skipped)
                     .sort((a, b) => {
-                      const scoreA = a.rss_post?.post_rating?.[0]?.total_score || 0
-                      const scoreB = b.rss_post?.post_rating?.[0]?.total_score || 0
-                      return scoreB - scoreA  // Sort by total score descending
+                      // Sort by rank field (lower rank = higher priority)
+                      // Articles without rank go to the end
+                      const rankA = a.rank ?? 9999
+                      const rankB = b.rank ?? 9999
+                      return rankA - rankB
                     })
                     .map(article => article.id)}
                   strategy={verticalListSortingStrategy}
@@ -2731,9 +2748,11 @@ export default function CampaignDetailPage() {
                   {campaign.articles
                     .filter(article => !article.skipped)
                     .sort((a, b) => {
-                      const scoreA = a.rss_post?.post_rating?.[0]?.total_score || 0
-                      const scoreB = b.rss_post?.post_rating?.[0]?.total_score || 0
-                      return scoreB - scoreA  // Sort by total score descending
+                      // Sort by rank field (lower rank = higher priority)
+                      // Articles without rank go to the end
+                      const rankA = a.rank ?? 9999
+                      const rankB = b.rank ?? 9999
+                      return rankA - rankB
                     })
                     .map((article) => (
                       <SortableArticle
