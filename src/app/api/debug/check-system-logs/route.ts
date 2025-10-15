@@ -17,7 +17,7 @@ export async function GET() {
       .from('system_logs')
       .select('*')
       .eq('source', 'rss_processor')
-      .order('created_at', { ascending: false })
+      .order('timestamp', { ascending: false })
       .limit(50)
 
     if (error) {
@@ -38,7 +38,7 @@ export async function GET() {
         level: log.level,
         message: log.message,
         context: log.context,
-        created_at: log.created_at
+        timestamp: log.timestamp
       }))
     })
 
