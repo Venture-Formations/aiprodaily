@@ -962,11 +962,11 @@ export async function generateRoadWorkSection(campaign: any): Promise<string> {
 // ==================== FOOTER ====================
 
 export async function generateNewsletterFooter(): Promise<string> {
-  // Fetch business settings for primary color and newsletter name
+  // Fetch business settings for primary color, newsletter name, business name, and Facebook URL
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
     .select('key, value')
-    .in('key', ['primary_color', 'newsletter_name'])
+    .in('key', ['primary_color', 'newsletter_name', 'business_name', 'facebook_url'])
 
   const settingsMap: Record<string, string> = {}
   settings?.forEach(setting => {
@@ -975,10 +975,13 @@ export async function generateNewsletterFooter(): Promise<string> {
 
   const primaryColor = settingsMap.primary_color || '#1877F2'
   const newsletterName = settingsMap.newsletter_name || 'St. Cloud Scoop'
+  const businessName = settingsMap.business_name || 'Venture Formations LLC'
+  const facebookUrl = settingsMap.facebook_url || 'https://www.facebook.com/61578947310955/'
+  const currentYear = new Date().getFullYear()
 
   return `
 <div style="max-width: 990px; margin: 0 auto; background-color: ${primaryColor}; padding: 8px 0; text-align: center;">
-  <a href="https://www.facebook.com/61578947310955/" target="_blank">
+  <a href="${facebookUrl}" target="_blank">
     <img src="https://raw.githubusercontent.com/VFDavid/STCScoop/refs/heads/main/facebook_light.png" alt="Facebook" width="24" height="24" style="border: none; display: inline-block;">
   </a>
 </div>
@@ -987,7 +990,7 @@ export async function generateNewsletterFooter(): Promise<string> {
   <p style="margin: 5px 0 0;text-align: center;">
     <a href="{$unsubscribe}" style='text-decoration: underline;'>Unsubscribe</a>
   </p>
-  <p style="margin: 5px;text-align: center;">©2025 Venture Formations LLC, all rights reserved</p>
+  <p style="margin: 5px;text-align: center;">©${currentYear} ${businessName}, all rights reserved</p>
 </div>
     </div>
   </div>
