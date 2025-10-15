@@ -1724,6 +1724,10 @@ export default function CampaignDetailPage() {
   const [newsletterSections, setNewsletterSections] = useState<NewsletterSection[]>([])
   const [loadingSections, setLoadingSections] = useState(false)
 
+  // Section IDs for Top and Secondary Articles (to filter from dynamic sections)
+  const primaryArticlesSection = newsletterSections.find(s => s.display_order === 3)
+  const secondaryArticlesSection = newsletterSections.find(s => s.display_order === 5)
+
   // Criteria and article limits state
   const [criteriaConfig, setCriteriaConfig] = useState<Array<{name: string, weight: number}>>([])
   const [maxTopArticles, setMaxTopArticles] = useState(3)
@@ -2829,7 +2833,7 @@ export default function CampaignDetailPage() {
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-medium text-gray-900">
-                {newsletterSections.find(s => s.name === 'Latest in Accounting AI')?.name || 'Latest in Accounting AI'}
+                {primaryArticlesSection?.name || 'Top Articles'}
               </h2>
               <button
                 onClick={() => setArticlesExpanded(!articlesExpanded)}
@@ -2930,7 +2934,7 @@ export default function CampaignDetailPage() {
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-medium text-gray-900">
-                {newsletterSections.find(s => s.name === 'Bottom Articles')?.name || 'Bottom Articles'}
+                {secondaryArticlesSection?.name || 'Secondary Articles'}
               </h2>
               <button
                 onClick={() => setSecondaryArticlesExpanded(!secondaryArticlesExpanded)}
@@ -3012,7 +3016,7 @@ export default function CampaignDetailPage() {
 
         {/* Dynamic Newsletter Sections */}
         {newsletterSections
-          .filter(section => section.is_active && section.name !== 'Latest in Accounting AI' && section.name !== 'Bottom Articles')
+          .filter(section => section.is_active && section.id !== primaryArticlesSection?.id && section.id !== secondaryArticlesSection?.id)
           .map(section => (
             <NewsletterSectionComponent
               key={section.id}
