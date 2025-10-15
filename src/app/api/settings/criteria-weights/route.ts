@@ -12,7 +12,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { criteriaNumber, weight } = body
+    const { criteriaNumber, weight, section } = body
 
     if (!criteriaNumber || weight === undefined) {
       return NextResponse.json(
@@ -29,7 +29,9 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    const key = `criteria_${criteriaNumber}_weight`
+    // Support both primary and secondary criteria weights
+    const prefix = section === 'secondary' ? 'secondary_criteria' : 'criteria'
+    const key = `${prefix}_${criteriaNumber}_weight`
 
     // Check if setting exists
     const { data: existing } = await supabaseAdmin
