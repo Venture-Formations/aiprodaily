@@ -1378,13 +1378,15 @@ function RegularArticle({
   toggleArticle,
   skipArticle,
   saving,
-  getScoreColor
+  getScoreColor,
+  criteriaConfig
 }: {
   article: ArticleWithPost
   toggleArticle: (id: string, currentState: boolean) => void
   skipArticle: (id: string) => void
   saving: boolean
   getScoreColor: (score: number) => string
+  criteriaConfig: Array<{name: string, weight: number}>
 }) {
   return (
     <div className="border-b border-gray-200 p-4 bg-white hover:bg-gray-50">
@@ -1433,7 +1435,7 @@ function RegularArticle({
             {article.rss_post?.post_rating?.[0] && (
               <div className="flex space-x-1 text-xs flex-shrink-0">
                 <span className={`font-medium ${getScoreColor(article.rss_post.post_rating[0].total_score)}`}>
-                  Score: {article.rss_post.post_rating[0].total_score}/40
+                  Score: {article.rss_post.post_rating[0].total_score}
                 </span>
               </div>
             )}
@@ -1492,13 +1494,15 @@ function SortableArticle({
   toggleArticle,
   skipArticle,
   saving,
-  getScoreColor
+  getScoreColor,
+  criteriaConfig
 }: {
   article: ArticleWithPost
   toggleArticle: (id: string, currentState: boolean) => void
   skipArticle: (id: string) => void
   saving: boolean
   getScoreColor: (score: number) => string
+  criteriaConfig: Array<{name: string, weight: number}>
 }) {
   const {
     attributes,
@@ -1583,7 +1587,7 @@ function SortableArticle({
                 {article.rss_post?.post_rating?.[0] && (
                   <div className="flex space-x-1 text-xs flex-shrink-0">
                     <span className={`font-medium ${getScoreColor(article.rss_post.post_rating[0].total_score)}`}>
-                      Score: {article.rss_post.post_rating[0].total_score}/40
+                      Score: {article.rss_post.post_rating[0].total_score}
                     </span>
                   </div>
                 )}
@@ -1638,20 +1642,21 @@ function SortableArticle({
             </div>
           </div>
 
-          {article.rss_post?.post_rating?.[0] && (
-            <div className="mt-3 grid grid-cols-3 gap-4 text-xs">
-              <div>
-                <span className="text-gray-600">Interest:</span>
-                <span className="ml-1 font-medium">{article.rss_post.post_rating[0].interest_level}/20</span>
-              </div>
-              <div>
-                <span className="text-gray-600">Relevance:</span>
-                <span className="ml-1 font-medium">{article.rss_post.post_rating[0].local_relevance}/10</span>
-              </div>
-              <div>
-                <span className="text-gray-600">Impact:</span>
-                <span className="ml-1 font-medium">{article.rss_post.post_rating[0].community_impact}/10</span>
-              </div>
+          {article.rss_post?.post_rating?.[0] && criteriaConfig.length > 0 && (
+            <div className={`mt-3 grid grid-cols-${Math.min(criteriaConfig.length, 4)} gap-4 text-xs`}>
+              {criteriaConfig.map((criterion, index) => {
+                const criterionNum = index + 1
+                const score = article.rss_post.post_rating[0][`criteria_${criterionNum}_score` as keyof typeof article.rss_post.post_rating[0]]
+                const weight = criterion.weight
+                const weightedScore = typeof score === 'number' ? (score * weight).toFixed(1) : '0.0'
+
+                return (
+                  <div key={criterionNum}>
+                    <span className="text-gray-600">{criterion.name}:</span>
+                    <span className="ml-1 font-medium">{weightedScore}</span>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
@@ -1700,6 +1705,11 @@ export default function CampaignDetailPage() {
   // Newsletter sections state
   const [newsletterSections, setNewsletterSections] = useState<NewsletterSection[]>([])
   const [loadingSections, setLoadingSections] = useState(false)
+
+  // Criteria and article limits state
+  const [criteriaConfig, setCriteriaConfig] = useState<Array<{name: string, weight: number}>>([])
+  const [maxTopArticles, setMaxTopArticles] = useState(3)
+  const [maxBottomArticles, setMaxBottomArticles] = useState(3)
   const [sectionExpandedStates, setSectionExpandedStates] = useState<{ [key: string]: boolean }>({})
 
   // Drag and drop sensors
@@ -1716,6 +1726,7 @@ export default function CampaignDetailPage() {
       fetchCampaign(params.id as string)
       fetchCampaignEvents(params.id as string)
       fetchNewsletterSections()
+      fetchCriteriaConfig()
     }
   }, [params.id])
 
@@ -1743,6 +1754,42 @@ export default function CampaignDetailPage() {
       }
     } catch (error) {
       console.error('Failed to fetch campaign events:', error)
+    }
+  }
+
+  const fetchCriteriaConfig = async () => {
+    try {
+      const response = await fetch('/api/settings/email')
+      if (response.ok) {
+        const data = await response.json()
+
+        // Get enabled criteria count
+        const enabledCountSetting = data.settings.find((s: any) => s.key === 'criteria_enabled_count')
+        const enabledCount = enabledCountSetting?.value ? parseInt(enabledCountSetting.value) : 3
+
+        // Build criteria config array
+        const criteria: Array<{name: string, weight: number}> = []
+        for (let i = 1; i <= enabledCount; i++) {
+          const nameSetting = data.settings.find((s: any) => s.key === `criteria_${i}_name`)
+          const weightSetting = data.settings.find((s: any) => s.key === `criteria_${i}_weight`)
+
+          criteria.push({
+            name: nameSetting?.value || `Criteria ${i}`,
+            weight: weightSetting?.value ? parseFloat(weightSetting.value) : 1.0
+          })
+        }
+
+        setCriteriaConfig(criteria)
+
+        // Get max articles settings
+        const maxTopSetting = data.settings.find((s: any) => s.key === 'max_top_articles')
+        const maxBottomSetting = data.settings.find((s: any) => s.key === 'max_bottom_articles')
+
+        setMaxTopArticles(maxTopSetting?.value ? parseInt(maxTopSetting.value) : 3)
+        setMaxBottomArticles(maxBottomSetting?.value ? parseInt(maxBottomSetting.value) : 3)
+      }
+    } catch (error) {
+      console.error('Failed to fetch criteria config:', error)
     }
   }
 
@@ -2477,7 +2524,7 @@ export default function CampaignDetailPage() {
                   {formatStatus(campaign.status)}
                 </span>
                 <span className="text-sm text-gray-500">
-                  {campaign.articles.length} articles selected
+                  {campaign.articles.filter(a => a.is_active && !a.skipped).length}/{maxTopArticles} top articles selected
                 </span>
               </div>
             </div>
@@ -2668,15 +2715,11 @@ export default function CampaignDetailPage() {
                 }}
                 onDragEnd={handleDragEnd}
               >
-                {/* Active articles section - sortable */}
+                {/* Top Articles section - sortable */}
                 {(() => {
                   const activeArticles = campaign.articles
                     .filter(article => article.is_active && !article.skipped)
                     .sort((a, b) => (a.rank || 999) - (b.rank || 999))
-
-                  const inactiveArticles = campaign.articles
-                    .filter(article => !article.is_active && !article.skipped)
-                    .sort((a, b) => (b.rss_post?.post_rating?.[0]?.total_score || 0) - (a.rss_post?.post_rating?.[0]?.total_score || 0))
 
                   return (
                     <>
@@ -2684,7 +2727,7 @@ export default function CampaignDetailPage() {
                         <>
                           <div className="px-6 py-3 bg-blue-50 border-b">
                             <h3 className="text-sm font-medium text-blue-900">
-                              Selected Articles (Drag to reorder)
+                              Top Articles (Drag to reorder)
                             </h3>
                           </div>
                           <SortableContext
@@ -2699,29 +2742,10 @@ export default function CampaignDetailPage() {
                                 skipArticle={skipArticle}
                                 saving={saving}
                                 getScoreColor={getScoreColor}
+                                criteriaConfig={criteriaConfig}
                               />
                             ))}
                           </SortableContext>
-                        </>
-                      )}
-
-                      {inactiveArticles.length > 0 && (
-                        <>
-                          <div className="px-6 py-3 bg-gray-50 border-b">
-                            <h3 className="text-sm font-medium text-gray-700">
-                              Available Articles (Click to add)
-                            </h3>
-                          </div>
-                          {inactiveArticles.map((article) => (
-                            <RegularArticle
-                              key={article.id}
-                              article={article}
-                              toggleArticle={toggleArticle}
-                              skipArticle={skipArticle}
-                              saving={saving}
-                              getScoreColor={getScoreColor}
-                            />
-                          ))}
                         </>
                       )}
                     </>
