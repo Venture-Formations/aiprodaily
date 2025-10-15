@@ -877,35 +877,17 @@ export class RSSProcessor {
 
   private async selectTop5Articles(campaignId: string) {
     try {
-      console.log('Selecting top articles for campaign (dynamic count based on ad settings):', campaignId)
+      console.log('Selecting top articles for campaign (dynamic count from settings):', campaignId)
 
-      // Check if Community Business Spotlight section is active
-      const { data: spotlightSection } = await supabaseAdmin
-        .from('newsletter_sections')
-        .select('is_active')
-        .eq('name', 'Community Business Spotlight')
-        .single()
-
-      const isSpotlightActive = spotlightSection?.is_active || false
-      console.log('Community Business Spotlight section is active:', isSpotlightActive)
-
-      // Get ads_per_newsletter setting (defaults to 1)
-      const { data: adsPerNewsletterSetting } = await supabaseAdmin
+      // Get max_top_articles setting (defaults to 3)
+      const { data: maxTopArticlesSetting } = await supabaseAdmin
         .from('app_settings')
         .select('value')
-        .eq('key', 'ads_per_newsletter')
+        .eq('key', 'max_top_articles')
         .single()
 
-      const adsPerNewsletter = adsPerNewsletterSetting ? parseInt(adsPerNewsletterSetting.value) : 1
-      console.log('Ads per newsletter setting:', adsPerNewsletter)
-
-      // Calculate article count: 5 total items, minus ads if spotlight is active
-      const articleCount = isSpotlightActive ? (5 - adsPerNewsletter) : 5
-      console.log(`Article count calculation: ${isSpotlightActive ? '5 - ' + adsPerNewsletter : '5'} = ${articleCount}`)
-
-      // Validate article count is at least 1
-      const finalArticleCount = Math.max(1, Math.min(5, articleCount))
-      console.log(`Final article count (after validation): ${finalArticleCount}`)
+      const finalArticleCount = maxTopArticlesSetting ? parseInt(maxTopArticlesSetting.value) : 3
+      console.log(`Max top articles setting: ${finalArticleCount}`)
 
       // Get all articles for this campaign with their ratings
       const { data: articles, error } = await supabaseAdmin
