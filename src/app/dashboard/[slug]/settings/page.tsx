@@ -2086,7 +2086,6 @@ function AIPromptsSettings() {
     if (!criteriaMatch) return
 
     const criteriaNumber = criteriaMatch[1]
-    const isSecondary = key.includes('secondary')
     setSaving(key)
     setMessage('')
 
@@ -2096,8 +2095,7 @@ function AIPromptsSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           criteriaNumber,
-          weight: parseFloat(editingWeight.value),
-          section: isSecondary ? 'secondary' : 'primary'
+          weight: parseFloat(editingWeight.value)
         })
       })
 
