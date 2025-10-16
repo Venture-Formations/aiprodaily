@@ -92,6 +92,25 @@ export default function Layout({ children }: LayoutProps) {
                     {newsletter?.name || 'AI Pro Newsletters'}
                   </h1>
                 </Link>
+                {newsletterSlug && (
+                  <nav className="hidden md:flex space-x-8">
+                    <Link href={dashboardUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
+                      Dashboard
+                    </Link>
+                    <Link href={campaignsUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
+                      Campaigns
+                    </Link>
+                    <Link href={analyticsUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
+                      Analytics
+                    </Link>
+                    <Link href={databasesUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
+                      Databases
+                    </Link>
+                    <Link href={settingsUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
+                      Settings
+                    </Link>
+                  </nav>
+                )}
               </div>
               <div className="flex items-center space-x-4">
                 <span className="hidden sm:inline text-sm text-gray-700">
@@ -160,6 +179,25 @@ export default function Layout({ children }: LayoutProps) {
                   {newsletter?.name || 'AI Pro Newsletters'}
                 </h1>
               </Link>
+              {newsletterSlug && (
+                <nav className="hidden md:flex space-x-8">
+                  <Link href={dashboardUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
+                    Dashboard
+                  </Link>
+                  <Link href={campaignsUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
+                    Campaigns
+                  </Link>
+                  <Link href={analyticsUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
+                    Analytics
+                  </Link>
+                  <Link href={databasesUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
+                    Databases
+                  </Link>
+                  <Link href={settingsUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
+                    Settings
+                  </Link>
+                </nav>
+              )}
             </div>
             <div className="flex items-center space-x-4">
               <span className="hidden sm:inline text-sm text-gray-700">

@@ -43,7 +43,8 @@
       "Read(//tmp/homepage-review/**)",
       "Bash(npx pnpm install)",
       "Bash(find:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(nslookup:*)"
     ],
     "deny": [],
     "ask": []
