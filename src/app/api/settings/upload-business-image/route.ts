@@ -4,8 +4,11 @@ import { authOptions } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('🖼️ [Upload] Starting image upload...')
+
     const session = await getServerSession(authOptions)
     if (!session) {
+      console.log('❌ [Upload] Unauthorized - no session')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -13,11 +16,15 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File
     const type = formData.get('type') as string // 'header' or 'logo'
 
+    console.log('📄 [Upload] File received:', file?.name, 'Type:', type)
+
     if (!file) {
+      console.log('❌ [Upload] No file provided')
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
     if (!type || !['header', 'logo'].includes(type)) {
+      console.log('❌ [Upload] Invalid type parameter:', type)
       return NextResponse.json({ error: 'Invalid type parameter' }, { status: 400 })
     }
 
@@ -26,11 +33,15 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes)
     const base64Content = buffer.toString('base64')
 
+    console.log('📦 [Upload] File converted to base64, size:', buffer.length, 'bytes')
+
     // Generate filename
     const timestamp = Date.now()
     const extension = file.name.split('.').pop()
     const filename = `business-${type}-${timestamp}.${extension}`
     const githubPath = `business/${filename}`
+
+    console.log('🏷️ [Upload] Generated filename:', filename)
 
     // Upload to GitHub
     const githubToken = process.env.GITHUB_TOKEN
@@ -38,11 +49,12 @@ export async function POST(request: NextRequest) {
     const githubBranch = process.env.GITHUB_BRANCH || 'main'
 
     if (!githubToken) {
-      console.error('GITHUB_TOKEN not configured')
+      console.error('❌ [Upload] GITHUB_TOKEN not configured')
       return NextResponse.json({ error: 'GitHub configuration missing' }, { status: 500 })
     }
 
     const githubUrl = `https://api.github.com/repos/${githubRepo}/contents/${githubPath}`
+    console.log('🚀 [Upload] Uploading to GitHub:', githubUrl)
 
     const githubResponse = await fetch(githubUrl, {
       method: 'PUT',
@@ -60,14 +72,19 @@ export async function POST(request: NextRequest) {
 
     if (!githubResponse.ok) {
       const errorText = await githubResponse.text()
-      console.error('GitHub upload failed:', errorText)
-      return NextResponse.json({ error: 'Failed to upload to GitHub' }, { status: 500 })
+      console.error('❌ [Upload] GitHub upload failed:', githubResponse.status, errorText)
+      return NextResponse.json({
+        error: 'Failed to upload to GitHub',
+        details: errorText
+      }, { status: 500 })
     }
 
     const githubData = await githubResponse.json()
+    console.log('✅ [Upload] GitHub upload successful')
 
     // Generate the raw content URL
     const publicUrl = `https://raw.githubusercontent.com/${githubRepo}/${githubBranch}/${githubPath}`
+    console.log('🔗 [Upload] Public URL:', publicUrl)
 
     return NextResponse.json({
       success: true,
