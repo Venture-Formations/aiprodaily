@@ -265,7 +265,7 @@ export function generateLocalScoopSection(articles: any[], campaignDate: string,
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">The Local Scoop</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">The Local Scoop</h2>
     </td>
   </tr>
   ${articlesHtml}
@@ -311,7 +311,7 @@ export async function generatePrimaryArticlesSection(articles: any[], campaignDa
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">${sectionName}</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">${sectionName}</h2>
     </td>
   </tr>
   <tr>
@@ -379,7 +379,7 @@ export async function generateSecondaryArticlesSection(campaign: any, sectionNam
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">${sectionName}</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">${sectionName}</h2>
     </td>
   </tr>
   <tr>
@@ -547,12 +547,12 @@ export async function generateLocalEventsSection(campaign: any): Promise<string>
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7; font-family: Arial, sans-serif;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">Local Events</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">Local Events</h2>
     </td>
   </tr><tr class="row">${dayColumns}
 </td></table>
 <div style="text-align: center; padding: 20px 10px; max-width: 750px; margin: 0 auto;">
-  <a href="https://events.stcscoop.com/events/view" style="display: inline-block; background-color: #1877F2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 10px; font-family: Arial, sans-serif;">View All Events</a>
+  <a href="https://events.stcscoop.com/events/view" style="display: inline-block; background-color: ${primaryColor}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 10px; font-family: Arial, sans-serif;">View All Events</a>
   <a href="https://events.stcscoop.com/events/submit" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 10px; font-family: Arial, sans-serif;">Submit Your Event</a>
 </div>
 <br>`
@@ -601,7 +601,7 @@ export async function generateWordleSection(campaign: any): Promise<string> {
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7; font-family: Arial, sans-serif;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">Yesterday's Wordle</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">Yesterday's Wordle</h2>
     </td>
   </tr>
   <tr class="row">${wordleColumn}</tr>
@@ -757,7 +757,7 @@ export async function generateCommunityBusinessSpotlightSection(campaign: any, r
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">Community Business Spotlight</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">Community Business Spotlight</h2>
     </td>
   </tr>
   <tr class='row'>
@@ -864,7 +864,7 @@ export async function generateBreakingNewsSection(campaign: any): Promise<string
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">Breaking News</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">Breaking News</h2>
     </td>
   </tr>
   ${articlesHtml}
@@ -938,7 +938,7 @@ export async function generateBeyondTheFeedSection(campaign: any): Promise<strin
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">Beyond the Feed</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">Beyond the Feed</h2>
     </td>
   </tr>
   ${articlesHtml}
