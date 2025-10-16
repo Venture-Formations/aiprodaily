@@ -24,13 +24,18 @@ export async function middleware(request: NextRequest) {
     method: request.method
   })
 
-  // Detect staging environment - be more strict
-  const isStaging = (process.env.VERCEL_ENV === 'preview' && !hostname.includes('aiprodaily.com')) ||
-                    process.env.VERCEL_GIT_COMMIT_REF === 'staging' ||
-                    process.env.NEXT_PUBLIC_STAGING === 'true' ||
-                    hostname.includes('git-staging') ||
-                    hostname.includes('-staging.') ||
-                    (hostname.includes('staging') && !hostname.includes('aiprodaily'))
+  // Detect staging environment - VERY strict, only for actual staging deployments
+  // NEVER treat production domains as staging
+  const isProductionDomain = hostname === 'aiprodaily.com' ||
+                             hostname === 'www.aiprodaily.com' ||
+                             hostname === 'aiaccountingdaily.com' ||
+                             hostname === 'www.aiaccountingdaily.com'
+
+  const isStaging = !isProductionDomain && (
+    process.env.VERCEL_GIT_COMMIT_REF === 'staging' ||
+    hostname.includes('git-staging') ||
+    hostname.includes('-staging-')
+  )
 
   // Skip authentication for staging environment
   if (isStaging) {
