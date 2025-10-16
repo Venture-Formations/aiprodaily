@@ -1,31 +1,13 @@
 'use client'
 
-import { signIn, getSession } from 'next-auth/react'
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { signIn } from 'next-auth/react'
+import { useState } from 'react'
 
 export default function SignIn() {
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
 
-  useEffect(() => {
-    // Check for staging mode
-    const isStaging = process.env.NEXT_PUBLIC_STAGING === 'true'
-
-    if (isStaging) {
-      // In staging mode, redirect directly to dashboard
-      console.log('[SignIn] Staging mode detected - redirecting to dashboard')
-      router.push('/dashboard')
-      return
-    }
-
-    // Check if user is already signed in
-    getSession().then((session) => {
-      if (session) {
-        router.push('/dashboard')
-      }
-    })
-  }, [router])
+  // Removed useEffect session check that was causing redirect loops
+  // NextAuth will handle redirecting authenticated users via middleware/callbacks
 
   const handleSignIn = async () => {
     setLoading(true)
