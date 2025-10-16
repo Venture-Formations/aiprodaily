@@ -39,6 +39,27 @@ export class MailerLiteService {
     try {
       console.log(`Creating review campaign for ${campaign.date}`)
 
+      // Get sender and group settings from database
+      const { data: settings } = await supabaseAdmin
+        .from('app_settings')
+        .select('key, value')
+        .in('key', ['email_senderName', 'email_fromEmail', 'email_reviewGroupId'])
+
+      const settingsMap = (settings || []).reduce((acc, setting) => {
+        acc[setting.key] = setting.value
+        return acc
+      }, {} as Record<string, string>)
+
+      const senderName = settingsMap['email_senderName'] || 'St. Cloud Scoop'
+      const fromEmail = settingsMap['email_fromEmail'] || 'scoop@stcscoop.com'
+      const reviewGroupId = settingsMap['email_reviewGroupId']
+
+      if (!reviewGroupId) {
+        throw new Error('Review Group ID not configured in database settings')
+      }
+
+      console.log('Using database settings:', { senderName, fromEmail, reviewGroupId })
+
       const emailContent = await this.generateEmailHTML(campaign, true)
 
       // Log subject line status
@@ -55,11 +76,11 @@ export class MailerLiteService {
         type: 'regular',
         emails: [{
           subject: `🍦 ${subjectLine}`,
-          from_name: 'St. Cloud Scoop',
-          from: 'scoop@stcscoop.com',
+          from_name: senderName,
+          from: fromEmail,
           content: emailContent,
         }],
-        groups: [process.env.MAILERLITE_REVIEW_GROUP_ID]
+        groups: [reviewGroupId]
         // Note: Removed delivery_schedule - we'll schedule separately after creation
       }
 
