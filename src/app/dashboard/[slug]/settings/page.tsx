@@ -1141,6 +1141,7 @@ function EmailSettings() {
   const [maxTopArticles, setMaxTopArticles] = useState<number>(3)
   const [maxBottomArticles, setMaxBottomArticles] = useState<number>(3)
   const [savingMaxArticles, setSavingMaxArticles] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(false)
 
   useEffect(() => {
     loadSettings()
@@ -1161,7 +1162,8 @@ function EmailSettings() {
           dailyScheduleEnabled: data.dailyScheduleEnabled === 'true'
         }
         console.log('FRONTEND: Processed settings with boolean conversion:', processedData)
-        setSettings(prev => ({ ...prev, ...processedData }))
+        setSettings(processedData)  // Don't merge with prev - use fresh data from API
+        setIsLoaded(true)
         console.log('FRONTEND: Settings state updated')
       }
     } catch (error) {
