@@ -1149,25 +1149,31 @@ function EmailSettings() {
 
   const loadSettings = async () => {
     try {
+      console.log('FRONTEND: Loading email settings...')
       const response = await fetch('/api/settings/email')
       if (response.ok) {
         const data = await response.json()
+        console.log('FRONTEND: Loaded settings from API:', data)
         // Convert string boolean values back to actual booleans
         const processedData = {
           ...data,
           reviewScheduleEnabled: data.reviewScheduleEnabled === 'true',
           dailyScheduleEnabled: data.dailyScheduleEnabled === 'true'
         }
+        console.log('FRONTEND: Processed settings with boolean conversion:', processedData)
         setSettings(prev => ({ ...prev, ...processedData }))
+        console.log('FRONTEND: Settings state updated')
       }
     } catch (error) {
-      console.error('Failed to load email settings:', error)
+      console.error('FRONTEND: Failed to load email settings:', error)
     }
   }
 
   const handleSave = async () => {
     setSaving(true)
     setMessage('')
+
+    console.log('FRONTEND: Saving email settings:', settings)
 
     try {
       const response = await fetch('/api/settings/email', {
@@ -1176,15 +1182,23 @@ function EmailSettings() {
         body: JSON.stringify(settings)
       })
 
+      console.log('FRONTEND: Response status:', response.status)
+
       if (response.ok) {
+        const result = await response.json()
+        console.log('FRONTEND: Save successful:', result)
         setMessage('Settings saved successfully!')
+        // Reload settings to verify they were saved
+        await loadSettings()
         setTimeout(() => setMessage(''), 3000)
       } else {
+        const errorData = await response.json()
+        console.error('FRONTEND: Save failed:', errorData)
         throw new Error('Failed to save settings')
       }
     } catch (error) {
       setMessage('Failed to save settings. Please try again.')
-      console.error('Save error:', error)
+      console.error('FRONTEND: Save error:', error)
     } finally {
       setSaving(false)
     }

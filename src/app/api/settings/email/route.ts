@@ -7,9 +7,11 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
+      console.error('BACKEND GET: Unauthorized - no session')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    console.log('BACKEND GET: Loading email settings from database')
     // Get current settings from database (key-value structure)
     const { data: settingsRows, error } = await supabaseAdmin
       .from('app_settings')
@@ -17,8 +19,11 @@ export async function GET(request: NextRequest) {
       .or('key.like.email_%,key.eq.max_top_articles,key.eq.max_bottom_articles')
 
     if (error) {
+      console.error('BACKEND GET: Database error:', error)
       throw error
     }
+
+    console.log('BACKEND GET: Found settings rows:', settingsRows)
 
     // Convert rows to object
     const savedSettings: Record<string, string> = {}
@@ -31,6 +36,8 @@ export async function GET(request: NextRequest) {
         savedSettings[row.key] = row.value
       }
     })
+
+    console.log('BACKEND GET: Processed saved settings:', savedSettings)
 
     // Return current settings or defaults
     const defaultSettings = {
@@ -47,10 +54,14 @@ export async function GET(request: NextRequest) {
       dailyScheduledSendTime: '04:55'  // 4:55 AM CT
     }
 
-    return NextResponse.json({
+    const finalSettings = {
       ...defaultSettings,
       ...savedSettings
-    })
+    }
+
+    console.log('BACKEND GET: Returning final settings:', finalSettings)
+
+    return NextResponse.json(finalSettings)
 
   } catch (error) {
     console.error('Failed to load email settings:', error)
@@ -65,10 +76,12 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
+      console.error('BACKEND: Unauthorized - no session')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const settings = await request.json()
+    console.log('BACKEND: Received email settings:', JSON.stringify(settings, null, 2))
 
     // Check if this is a max articles update request
     if (settings.max_top_articles !== undefined || settings.max_bottom_articles !== undefined) {
@@ -146,8 +159,10 @@ export async function POST(request: NextRequest) {
     ]
 
     // Upsert each setting
+    console.log('BACKEND: Saving settings to database:', settingsToSave)
     for (const setting of settingsToSave) {
-      const { error } = await supabaseAdmin
+      console.log(`BACKEND: Upserting ${setting.key} = ${setting.value}`)
+      const { error, data } = await supabaseAdmin
         .from('app_settings')
         .upsert({
           key: setting.key,
@@ -157,10 +172,13 @@ export async function POST(request: NextRequest) {
         }, {
           onConflict: 'key'
         })
+        .select()
 
       if (error) {
+        console.error(`BACKEND: Error saving ${setting.key}:`, error)
         throw error
       }
+      console.log(`BACKEND: Successfully saved ${setting.key}:`, data)
     }
 
     // Log the settings update
@@ -190,6 +208,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    console.log('BACKEND: All settings saved successfully')
     return NextResponse.json({
       success: true,
       message: 'Email settings saved successfully'

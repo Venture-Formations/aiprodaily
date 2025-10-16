@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
-import { getWeatherForCampaign } from '@/lib/weather-manager'
 import {
   generateNewsletterHeader,
   generateNewsletterFooter,
@@ -17,7 +16,8 @@ import {
   generateRoadWorkSection,
   generatePollSection,
   generateBreakingNewsSection,
-  generateBeyondTheFeedSection
+  generateBeyondTheFeedSection,
+  generatePromptIdeasSection
 } from '@/lib/newsletter-templates'
 
 export async function GET(
@@ -205,11 +205,6 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
           if (pollHtml) {
             sectionsHtml += pollHtml
           }
-        } else if (section.name === 'Local Weather') {
-          const weatherHtml = await getWeatherForCampaign(campaign.id)
-          if (weatherHtml) {
-            sectionsHtml += weatherHtml
-          }
         } else if (section.name === "Yesterday's Wordle") {
           const wordleHtml = await generateWordleSection(campaign)
           if (wordleHtml) {
@@ -244,6 +239,11 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
           const spotlightHtml = await generateCommunityBusinessSpotlightSection(campaign, false) // Don't record usage during preview
           if (spotlightHtml) {
             sectionsHtml += spotlightHtml
+          }
+        } else if (section.name === 'Prompt Ideas') {
+          const promptHtml = await generatePromptIdeasSection(campaign)
+          if (promptHtml) {
+            sectionsHtml += promptHtml
           }
         }
       }

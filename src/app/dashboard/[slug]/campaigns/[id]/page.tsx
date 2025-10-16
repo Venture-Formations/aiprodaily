@@ -818,9 +818,6 @@ function NewsletterSectionComponent({
   campaign,
   expanded,
   onToggleExpanded,
-  weatherData,
-  loadingWeather,
-  onWeatherExpand,
   availableDiningDeals,
   campaignDiningDeals,
   onDiningDealsExpand,
@@ -831,9 +828,6 @@ function NewsletterSectionComponent({
   campaign: CampaignWithArticles | null
   expanded: boolean
   onToggleExpanded: () => void
-  weatherData?: any
-  loadingWeather?: boolean
-  onWeatherExpand?: () => void
   availableDiningDeals?: any[]
   campaignDiningDeals?: any[]
   onDiningDealsExpand?: () => void
@@ -844,72 +838,6 @@ function NewsletterSectionComponent({
 
   const renderSectionContent = () => {
     switch (section.name) {
-      case 'Local Weather':
-        return (
-          <div className="p-6">
-            {loadingWeather ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
-                <span className="ml-3 text-gray-600">Loading weather data...</span>
-              </div>
-            ) : weatherData ? (
-              weatherData.success === false ? (
-                <div className="text-center py-8">
-                  <div className="text-gray-500 mb-2">
-                    {weatherData.message || 'Weather forecast not available'}
-                  </div>
-                  <div className="text-sm text-gray-400">
-                    Weather data will be generated during the next scheduled RSS processing
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {weatherData.cached && (
-                    <div className="mb-4 text-center text-sm text-blue-600 bg-blue-50 p-2 rounded">
-                      📋 Showing cached weather forecast (generated at {new Date(weatherData.generatedAt).toLocaleString()})
-                    </div>
-                  )}
-                  {weatherData.imageUrl ? (
-                    <div className="mb-4">
-                      <img
-                        src={weatherData.imageUrl}
-                        alt="Weather Forecast"
-                        className="w-full max-w-md mx-auto rounded-lg border"
-                      />
-                    </div>
-                  ) : (
-                    <div className="mb-4 text-center text-sm text-gray-500">
-                      Weather image generation is not configured
-                    </div>
-                  )}
-
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="font-medium text-gray-900 mb-3">3-Day Forecast</h4>
-                    <div className="grid grid-cols-3 gap-4">
-                      {weatherData.weatherData && weatherData.weatherData.map((day: any, index: number) => (
-                        <div key={index} className="text-center">
-                          <div className="font-semibold text-gray-900">{day.day}</div>
-                          <div className="text-sm text-gray-500 mb-2">{day.dateLabel}</div>
-                          <div className="text-2xl mb-2">{day.icon === 'sunny' ? '☀️' : day.icon === 'cloudy' ? '☁️' : day.icon === 'rainy' ? '🌧️' : '☀️'}</div>
-                          <div className="text-sm">
-                            <div className="font-semibold">{day.high}° / {day.low}°</div>
-                            <div className="text-gray-500">{day.precipitation}% rain</div>
-                            <div className="text-xs text-gray-500 mt-1">{day.condition}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                </div>
-              )
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                Click "View {section.name}" to load forecast data
-              </div>
-            )}
-          </div>
-        )
       case 'Yesterday\'s Wordle':
         return <WordleSection campaign={campaign} />
       case 'Minnesota Getaways':
@@ -972,10 +900,7 @@ function NewsletterSectionComponent({
           </h2>
           <button
             onClick={() => {
-              if (section.name === 'Local Weather' && onWeatherExpand) {
-                onWeatherExpand()
-                onToggleExpanded()
-              } else if (section.name === 'Dining Deals' && onDiningDealsExpand) {
+              if (section.name === 'Dining Deals' && onDiningDealsExpand) {
                 onDiningDealsExpand()
                 onToggleExpanded()
               } else {
@@ -1785,10 +1710,6 @@ export default function CampaignDetailPage() {
   const [articlesExpanded, setArticlesExpanded] = useState(false)
   const [secondaryArticlesExpanded, setSecondaryArticlesExpanded] = useState(false)
 
-  // Weather state
-  const [weatherExpanded, setWeatherExpanded] = useState(false)
-  const [weatherData, setWeatherData] = useState<any>(null)
-  const [loadingWeather, setLoadingWeather] = useState(false)
   const [diningDealsExpanded, setDiningDealsExpanded] = useState(false)
   const [availableDiningDeals, setAvailableDiningDeals] = useState<any[]>([])
   const [campaignDiningDeals, setCampaignDiningDeals] = useState<any[]>([])
@@ -2446,39 +2367,6 @@ export default function CampaignDetailPage() {
     setEventsExpanded(!eventsExpanded)
   }
 
-  const handleWeatherExpand = async () => {
-    if (!weatherExpanded && campaign) {
-      setLoadingWeather(true)
-      try {
-        // Fetch cached weather data for the campaign date
-        const response = await fetch(`/api/weather/forecast?date=${campaign.date}`)
-        const data = await response.json()
-
-        if (data.success) {
-          setWeatherData(data)
-        } else {
-          console.error('Failed to fetch cached weather data:', data.error)
-          // If no cached data, show message about weather generation
-          setWeatherData({
-            success: false,
-            error: data.error,
-            message: data.message || 'Weather forecast not available'
-          })
-        }
-      } catch (error) {
-        console.error('Error fetching weather data:', error)
-        setWeatherData({
-          success: false,
-          error: 'Network error',
-          message: 'Failed to load weather forecast'
-        })
-      } finally {
-        setLoadingWeather(false)
-      }
-    }
-    setWeatherExpanded(!weatherExpanded)
-  }
-
   const handleDiningDealsExpand = async () => {
     if (!diningDealsExpanded && campaign) {
       setLoadingDiningDeals(true)
@@ -3104,9 +2992,6 @@ export default function CampaignDetailPage() {
                   [section.id]: !prev[section.id]
                 }))
               }}
-              weatherData={section.name === 'Local Weather' ? weatherData : null}
-              loadingWeather={section.name === 'Local Weather' ? loadingWeather : false}
-              onWeatherExpand={section.name === 'Local Weather' ? handleWeatherExpand : undefined}
               availableDiningDeals={section.name === 'Dining Deals' ? availableDiningDeals : undefined}
               campaignDiningDeals={section.name === 'Dining Deals' ? campaignDiningDeals : undefined}
               onDiningDealsExpand={section.name === 'Dining Deals' ? handleDiningDealsExpand : undefined}
