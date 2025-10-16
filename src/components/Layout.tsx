@@ -89,7 +89,7 @@ export default function Layout({ children }: LayoutProps) {
               <div className="flex items-center space-x-8">
                 <Link href="/dashboard" className="flex items-center">
                   <h1 className="text-xl font-bold text-brand-primary">
-                    {newsletter?.name || 'AI Pro Newsletters'}
+                    {newsletter?.name || 'AI Pro Daily'}
                   </h1>
                 </Link>
                 {newsletterSlug && (
@@ -176,7 +176,7 @@ export default function Layout({ children }: LayoutProps) {
             <div className="flex items-center space-x-8">
               <Link href="/dashboard" className="flex items-center">
                 <h1 className="text-xl font-bold text-brand-primary">
-                  {newsletter?.name || 'AI Pro Newsletters'}
+                  {newsletter?.name || 'AI Pro Daily'}
                 </h1>
               </Link>
               {newsletterSlug && (
