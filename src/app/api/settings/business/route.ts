@@ -97,6 +97,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Sync logo_url to newsletters table if it was updated
+    if (body.logo_url !== undefined) {
+      await supabaseAdmin
+        .from('newsletters')
+        .update({ logo_url: body.logo_url })
+        .eq('slug', 'accounting') // Update the accounting newsletter
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Business settings saved successfully'
