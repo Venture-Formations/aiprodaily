@@ -1,6 +1,6 @@
-import { Card } from "@/components/ui/card"
+import { Card } from "@/components/website/ui/card"
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/website/ui/button"
 
 const newsStories = [
   {

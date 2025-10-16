@@ -41,7 +41,9 @@
       "Bash(python:*)",
       "Bash(git rm:*)",
       "Read(//tmp/homepage-review/**)",
-      "Bash(npx pnpm install)"
+      "Bash(npx pnpm install)",
+      "Bash(find:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

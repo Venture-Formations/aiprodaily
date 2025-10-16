@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/website/ui/button"
 
 export function Header() {
   return (
