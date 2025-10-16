@@ -1235,11 +1235,11 @@ function EmailSettings() {
 
   const saveMaxArticles = async () => {
     if (maxTopArticles < 1 || maxTopArticles > 10) {
-      alert('Max top articles must be between 1 and 10')
+      alert('Max primary articles must be between 1 and 10')
       return
     }
     if (maxBottomArticles < 1 || maxBottomArticles > 10) {
-      alert('Max bottom articles must be between 1 and 10')
+      alert('Max secondary articles must be between 1 and 10')
       return
     }
 
@@ -1839,12 +1839,12 @@ function EmailSettings() {
       <div className="bg-white shadow rounded-lg p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Article Limit Settings</h3>
         <p className="text-sm text-gray-600 mb-6">
-          Configure the maximum number of articles that can be selected for the Top Articles and Bottom Articles sections in each newsletter campaign.
+          Configure the maximum number of articles that can be selected for the Primary Articles and Secondary Articles sections in each newsletter campaign.
         </p>
 
         <div className="space-y-4">
           <div className="flex items-center gap-4">
-            <label className="font-medium text-gray-700 w-56">Max Articles in Top Articles:</label>
+            <label className="font-medium text-gray-700 w-56">Max Articles in Primary Section:</label>
             <input
               type="number"
               min="1"
@@ -1858,7 +1858,7 @@ function EmailSettings() {
           </div>
 
           <div className="flex items-center gap-4">
-            <label className="font-medium text-gray-700 w-56">Max Articles in Bottom Articles:</label>
+            <label className="font-medium text-gray-700 w-56">Max Articles in Secondary Section:</label>
             <input
               type="number"
               min="1"
@@ -1882,7 +1882,7 @@ function EmailSettings() {
 
         <div className="mt-4 bg-blue-50 p-4 rounded-lg">
           <p className="text-sm text-blue-800">
-            <strong>Current configuration:</strong> Top Articles: {maxTopArticles}, Bottom Articles: {maxBottomArticles}
+            <strong>Current configuration:</strong> Primary Articles: {maxTopArticles}, Secondary Articles: {maxBottomArticles}
           </p>
           <p className="text-xs text-blue-700 mt-2">
             These limits control how many articles can be selected during RSS processing and on the campaign detail page.
@@ -3473,11 +3473,11 @@ function AdsSettings() {
 
   const saveMaxArticles = async () => {
     if (maxTopArticles < 1 || maxTopArticles > 10) {
-      alert('Max top articles must be between 1 and 10')
+      alert('Max primary articles must be between 1 and 10')
       return
     }
     if (maxBottomArticles < 1 || maxBottomArticles > 10) {
-      alert('Max bottom articles must be between 1 and 10')
+      alert('Max secondary articles must be between 1 and 10')
       return
     }
 
@@ -3816,12 +3816,12 @@ function AdsSettings() {
       <div className="bg-white shadow rounded-lg p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Article Limit Settings</h3>
         <p className="text-sm text-gray-600 mb-6">
-          Configure the maximum number of articles that can be selected for the Top Articles and Bottom Articles sections in each newsletter campaign.
+          Configure the maximum number of articles that can be selected for the Primary Articles and Secondary Articles sections in each newsletter campaign.
         </p>
 
         <div className="space-y-4">
           <div className="flex items-center gap-4">
-            <label className="font-medium text-gray-700 w-56">Max Articles in Top Articles:</label>
+            <label className="font-medium text-gray-700 w-56">Max Articles in Primary Section:</label>
             <input
               type="number"
               min="1"
@@ -3835,7 +3835,7 @@ function AdsSettings() {
           </div>
 
           <div className="flex items-center gap-4">
-            <label className="font-medium text-gray-700 w-56">Max Articles in Bottom Articles:</label>
+            <label className="font-medium text-gray-700 w-56">Max Articles in Secondary Section:</label>
             <input
               type="number"
               min="1"
@@ -3859,7 +3859,7 @@ function AdsSettings() {
 
         <div className="mt-4 bg-blue-50 p-4 rounded-lg">
           <p className="text-sm text-blue-800">
-            <strong>Current configuration:</strong> Top Articles: {maxTopArticles}, Bottom Articles: {maxBottomArticles}
+            <strong>Current configuration:</strong> Primary Articles: {maxTopArticles}, Secondary Articles: {maxBottomArticles}
           </p>
           <p className="text-xs text-blue-700 mt-2">
             These limits control how many articles can be selected during RSS processing and on the campaign detail page.
