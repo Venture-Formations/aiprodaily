@@ -99,10 +99,8 @@ export async function middleware(request: NextRequest) {
   if (isAdminDomain) {
     console.log('[Middleware] ✓ Admin domain matched:', hostname)
     // Admin domain - allow normal dashboard/auth routing
-    if (url.pathname === '/') {
-      console.log('[Middleware] → Redirecting root to /dashboard')
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
+    // Don't redirect root to /dashboard - let NextAuth handle authentication first
+    // The signin page will redirect to /dashboard after successful login
     console.log('[Middleware] → Passing through to Next.js routing')
     return NextResponse.next()
   }
