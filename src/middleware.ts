@@ -24,16 +24,21 @@ export async function middleware(request: NextRequest) {
     method: request.method
   })
 
-  // Detect staging environment
-  const isStaging = process.env.VERCEL_ENV === 'preview' ||
+  // Detect staging environment - be more strict
+  const isStaging = (process.env.VERCEL_ENV === 'preview' && !hostname.includes('aiprodaily.com')) ||
                     process.env.VERCEL_GIT_COMMIT_REF === 'staging' ||
                     process.env.NEXT_PUBLIC_STAGING === 'true' ||
-                    hostname.includes('staging') ||
-                    hostname.includes('git-staging')
+                    hostname.includes('git-staging') ||
+                    hostname.includes('-staging.') ||
+                    (hostname.includes('staging') && !hostname.includes('aiprodaily'))
 
   // Skip authentication for staging environment
   if (isStaging) {
-    console.log('[Middleware] Staging environment detected - authentication bypassed')
+    console.log('[Middleware] Staging environment detected - authentication bypassed', {
+      vercelEnv: process.env.VERCEL_ENV,
+      gitRef: process.env.VERCEL_GIT_COMMIT_REF,
+      hostname
+    })
     // Redirect signin page to dashboard when in staging mode
     if (url.pathname === '/auth/signin') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
