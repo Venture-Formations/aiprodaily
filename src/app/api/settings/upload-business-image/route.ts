@@ -82,8 +82,9 @@ export async function POST(request: NextRequest) {
     const githubData = await githubResponse.json()
     console.log('✅ [Upload] GitHub upload successful')
 
-    // Generate the raw content URL
-    const publicUrl = `https://raw.githubusercontent.com/${githubRepo}/${githubBranch}/${githubPath}`
+    // Use the download_url from GitHub API response (works for private repos)
+    const publicUrl = githubData.content?.download_url ||
+                      `https://raw.githubusercontent.com/${githubRepo}/${githubBranch}/${githubPath}`
     console.log('🔗 [Upload] Public URL:', publicUrl)
 
     return NextResponse.json({
