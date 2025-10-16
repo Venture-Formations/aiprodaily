@@ -105,29 +105,8 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Website routing - rewrite root and other non-admin paths to website subdirectory
-  const path = url.pathname
-
-  // Skip admin routes - let them pass through to main app
-  if (
-    path.startsWith('/dashboard') ||
-    path.startsWith('/api') ||
-    path.startsWith('/auth') ||
-    path.startsWith('/admin') ||
-    path.startsWith('/events') ||
-    path.startsWith('/feedback') ||
-    path.startsWith('/poll') ||
-    path.startsWith('/ads') ||
-    path === '/favicon.ico' ||
-    path.startsWith('/_next')
-  ) {
-    return NextResponse.next()
-  }
-
-  // All other routes - rewrite to website subdirectory
-  const websiteUrl = request.nextUrl.clone()
-  websiteUrl.pathname = `/website${path}`
-  return NextResponse.rewrite(websiteUrl)
+  // Default: pass through to Next.js routing
+  return NextResponse.next()
 }
 
 export const config = {

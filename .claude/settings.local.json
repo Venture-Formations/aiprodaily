@@ -40,7 +40,8 @@
       "mcp__vercel__getDeploymentEvents",
       "Bash(python:*)",
       "Bash(git rm:*)",
-      "Read(//tmp/homepage-review/**)"
+      "Read(//tmp/homepage-review/**)",
+      "Bash(npx pnpm install)"
     ],
     "deny": [],
     "ask": []
