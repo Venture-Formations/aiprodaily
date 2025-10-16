@@ -1,18 +1,4 @@
 {
-  "rewrites": [
-    {
-      "source": "/dashboard/:path*",
-      "destination": "/dashboard/:path*"
-    },
-    {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
-    },
-    {
-      "source": "/:path*",
-      "destination": "/website/:path*"
-    }
-  ],
   "crons": [
     {
       "path": "/api/cron/populate-events",
