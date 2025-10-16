@@ -77,12 +77,12 @@ export async function POST(request: NextRequest) {
       const prompt: any = {
         title: row.title,
         prompt_text: row.prompt_text,
-        category: row.category || 'Tax Preparation',
+        category: row.category || null,
         use_case: row.use_case || null,
-        suggested_model: row.suggested_model || 'ChatGPT',
-        difficulty_level: row.difficulty_level || 'Intermediate',
-        is_active: row.is_active === 'true' || row.is_active === '1' || row.is_active === 'TRUE',
-        is_featured: row.is_featured === 'true' || row.is_featured === '1' || row.is_featured === 'TRUE'
+        suggested_model: row.suggested_model || null,
+        difficulty_level: row.difficulty_level || null,
+        is_active: true, // Always active by default
+        is_featured: false // Never featured by default (only one used per day)
       }
 
       if (prompt.title && prompt.prompt_text) {
