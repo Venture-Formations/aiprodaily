@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authOptions } from '@/lib/auth'
+import { PromptSelector } from '@/lib/prompt-selector'
 
 // Helper function to initialize AI app selection for a new campaign
 async function initializeAIAppSelection(campaignId: string) {
@@ -65,53 +66,13 @@ async function initializePromptSelection(campaignId: string) {
   try {
     console.log(`Initializing prompt ideas selection for campaign ${campaignId}`)
 
-    // Get accounting newsletter ID
-    const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
-      .select('id')
-      .eq('slug', 'accounting')
-      .single()
+    // Use PromptSelector to select ONE prompt with proper rotation logic
+    const selectedPrompt = await PromptSelector.selectPromptForCampaign(campaignId)
 
-    if (!newsletter) {
-      console.error('Accounting newsletter not found')
-      return
-    }
-
-    // Get 3-5 active prompt ideas randomly
-    const { data: prompts, error } = await supabaseAdmin
-      .from('prompt_ideas')
-      .select('*')
-      .eq('newsletter_id', newsletter.id)
-      .eq('is_active', true)
-      .order('times_used', { ascending: true }) // Prioritize less-used prompts
-      .limit(10) // Get 10 to choose from
-
-    if (error || !prompts || prompts.length === 0) {
-      console.error('Error fetching prompt ideas:', error)
-      return
-    }
-
-    // Shuffle and select 3-5 prompts
-    const shuffledPrompts = [...prompts].sort(() => Math.random() - 0.5)
-    const promptCount = Math.min(5, Math.max(3, prompts.length))
-    const selectedPrompts = shuffledPrompts.slice(0, promptCount)
-
-    // Insert selections
-    const selections = selectedPrompts.map((prompt, index) => ({
-      campaign_id: campaignId,
-      prompt_id: prompt.id,
-      selection_order: index + 1,
-      is_featured: index === 0 // First prompt is featured
-    }))
-
-    const { error: insertError } = await supabaseAdmin
-      .from('campaign_prompt_selections')
-      .insert(selections)
-
-    if (insertError) {
-      console.error('Error inserting prompt selections:', insertError)
+    if (selectedPrompt) {
+      console.log(`Successfully selected prompt: ${selectedPrompt.title}`)
     } else {
-      console.log(`Successfully selected ${selectedPrompts.length} prompt ideas`)
+      console.log('No prompts available for selection')
     }
   } catch (error) {
     console.error('Error initializing prompt selection:', error)

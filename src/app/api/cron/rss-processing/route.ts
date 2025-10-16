@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { RSSProcessor } from '@/lib/rss-processor'
 import { ScheduleChecker } from '@/lib/schedule-checker'
 import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
+import { PromptSelector } from '@/lib/prompt-selector'
 
 export async function POST(request: NextRequest) {
   try {
@@ -84,6 +85,15 @@ export async function POST(request: NextRequest) {
 
     const campaignId = newCampaign.id
     console.log('Created new campaign:', campaignId, 'for date:', campaignDate)
+
+    // Select prompt for the campaign immediately after creation
+    console.log('Selecting prompt for campaign...')
+    const selectedPrompt = await PromptSelector.selectPromptForCampaign(campaignId)
+    if (selectedPrompt) {
+      console.log(`Selected prompt: ${selectedPrompt.title}`)
+    } else {
+      console.log('No prompts available for selection')
+    }
 
     // Process RSS feeds for the specific campaign
     console.log('Starting RSS processing...')
@@ -198,6 +208,15 @@ export async function GET(request: NextRequest) {
 
     const campaignId = newCampaign.id
     console.log('Created new campaign:', campaignId, 'for date:', campaignDate)
+
+    // Select prompt for the campaign immediately after creation
+    console.log('Selecting prompt for campaign...')
+    const selectedPrompt = await PromptSelector.selectPromptForCampaign(campaignId)
+    if (selectedPrompt) {
+      console.log(`Selected prompt: ${selectedPrompt.title}`)
+    } else {
+      console.log('No prompts available for selection')
+    }
 
     // Process RSS feeds for the specific campaign
     console.log('Starting RSS processing...')
