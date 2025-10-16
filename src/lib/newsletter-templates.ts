@@ -177,7 +177,7 @@ export async function generateNewsletterHeader(formattedDate: string): Promise<s
        <a href='{$forward}' style='color:#000;text-decoration:underline;'>Share</a>
      </div>
      <div style='width:100%;max-width:750px;margin:0 auto;padding:0px;'>
-       <div style='font-family:Arial,sans-serif;background-color:#1877F2;text-align:center;border-radius:12px;border:1px solid #333;'>
+       <div style='font-family:Arial,sans-serif;background-color:${primaryColor};text-align:center;border-radius:12px;border:1px solid #333;'>
          <img alt='${newsletterName}' src='${headerImageUrl}' style='width:100%;max-width:500px;height:auto;margin-bottom:2px;'/>
          <div style='color:#fff;font-size:16px;font-weight:bold;padding:0 0 5px;'>${formattedDate}</div>
        </div>
@@ -221,12 +221,33 @@ function getArticleEmoji(headline: string, content: string): string {
   return '📈'
 }
 
+// ==================== HELPER: FETCH COLORS ====================
+
+async function fetchBusinessColors(): Promise<{ primaryColor: string; secondaryColor: string }> {
+  const { data: settings } = await supabaseAdmin
+    .from('app_settings')
+    .select('key, value')
+    .in('key', ['primary_color', 'secondary_color'])
+
+  const settingsMap: Record<string, string> = {}
+  settings?.forEach(setting => {
+    settingsMap[setting.key] = setting.value
+  })
+
+  return {
+    primaryColor: settingsMap.primary_color || '#1877F2',
+    secondaryColor: settingsMap.secondary_color || '#10B981'
+  }
+}
+
 // ==================== LOCAL SCOOP (ARTICLES) ====================
 
-export function generateLocalScoopSection(articles: any[], campaignDate: string, campaignId?: string): string {
+export async function generateLocalScoopSection(articles: any[], campaignDate: string, campaignId?: string): Promise<string> {
   if (!articles || articles.length === 0) {
     return '<p style="text-align: center; color: #666;">No articles available</p>'
   }
+
+  const { primaryColor } = await fetchBusinessColors()
 
   const articlesHtml = articles.map((article, index) => {
     const headline = article.headline || 'No headline'
@@ -265,7 +286,7 @@ export function generateLocalScoopSection(articles: any[], campaignDate: string,
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">The Local Scoop</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">The Local Scoop</h2>
     </td>
   </tr>
   ${articlesHtml}
@@ -280,14 +301,8 @@ export async function generatePrimaryArticlesSection(articles: any[], campaignDa
     return ''
   }
 
-  // Fetch secondary color from business settings
-  const { data: colorSetting } = await supabaseAdmin
-    .from('app_settings')
-    .select('value')
-    .eq('key', 'secondary_color')
-    .single()
-
-  const secondaryColor = colorSetting?.value || '#10B981'
+  // Fetch colors from business settings
+  const { primaryColor, secondaryColor } = await fetchBusinessColors()
 
   const articlesHtml = articles.map((article) => {
     const headline = article.headline || 'No headline'
@@ -311,7 +326,7 @@ export async function generatePrimaryArticlesSection(articles: any[], campaignDa
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">${sectionName}</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">${sectionName}</h2>
     </td>
   </tr>
   <tr>
@@ -347,14 +362,8 @@ export async function generateSecondaryArticlesSection(campaign: any, sectionNam
     return ''
   }
 
-  // Fetch secondary color from business settings
-  const { data: colorSetting } = await supabaseAdmin
-    .from('app_settings')
-    .select('value')
-    .eq('key', 'secondary_color')
-    .single()
-
-  const secondaryColor = colorSetting?.value || '#10B981'
+  // Fetch colors from business settings
+  const { primaryColor, secondaryColor } = await fetchBusinessColors()
 
   const articlesHtml = secondaryArticles.map((article) => {
     const headline = article.headline || 'No headline'
@@ -379,7 +388,7 @@ export async function generateSecondaryArticlesSection(campaign: any, sectionNam
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">${sectionName}</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">${sectionName}</h2>
     </td>
   </tr>
   <tr>
@@ -395,6 +404,9 @@ export async function generateSecondaryArticlesSection(campaign: any, sectionNam
 
 export async function generateLocalEventsSection(campaign: any): Promise<string> {
   console.log('Generating Local Events section for campaign:', campaign?.id)
+
+  // Fetch colors from business settings
+  const { primaryColor } = await fetchBusinessColors()
 
   // Calculate the 3-day date range in Central Time
   const campaignDate = new Date(campaign.date + 'T00:00:00-05:00')
@@ -502,9 +514,9 @@ export async function generateLocalEventsSection(campaign: any): Promise<string>
       return `
     <tr>
       <td style='padding:0; border-top: 1px solid #eee;'>
-        <div style='padding:8px 16px; background:#E8F0FE; border:2px solid #1877F2; border-radius:6px;'>
+        <div style='padding:8px 16px; background:#E8F0FE; border:2px solid ${primaryColor}; border-radius:6px;'>
           ${featuredEvent.cropped_image_url ? `
-          <img src='${featuredEvent.cropped_image_url}' alt='${featuredEvent.title}' style='width:100%; max-width:400px; height:auto; object-fit:cover; border-radius:4px; border:1px solid #1877F2; display:block; margin-bottom:8px;' />
+          <img src='${featuredEvent.cropped_image_url}' alt='${featuredEvent.title}' style='width:100%; max-width:400px; height:auto; object-fit:cover; border-radius:4px; border:1px solid ${primaryColor}; display:block; margin-bottom:8px;' />
           <span style='font-size: 16px;'>${getEventEmoji(featuredEvent.title, featuredEvent.venue)} <strong>${featuredEvent.title}</strong></span><br>
           <span style='font-size:14px;'><a href='${eventUrl}' style='color: #000; text-decoration: underline;'>${formatEventTime(featuredEvent.start_date, featuredEvent.end_date)}</a>  | ${featuredEvent.venue || 'TBA'}</span><br><br>${(featuredEvent.event_summary || featuredEvent.description) ? `<span style='font-size:13px;'>${featuredEvent.event_summary || featuredEvent.description}</span><br>` : ''}
           ` : `
@@ -547,12 +559,12 @@ export async function generateLocalEventsSection(campaign: any): Promise<string>
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7; font-family: Arial, sans-serif;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">Local Events</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">Local Events</h2>
     </td>
   </tr><tr class="row">${dayColumns}
 </td></table>
 <div style="text-align: center; padding: 20px 10px; max-width: 750px; margin: 0 auto;">
-  <a href="https://events.stcscoop.com/events/view" style="display: inline-block; background-color: #1877F2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 10px; font-family: Arial, sans-serif;">View All Events</a>
+  <a href="https://events.stcscoop.com/events/view" style="display: inline-block; background-color: ${primaryColor}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 10px; font-family: Arial, sans-serif;">View All Events</a>
   <a href="https://events.stcscoop.com/events/submit" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 10px; font-family: Arial, sans-serif;">Submit Your Event</a>
 </div>
 <br>`
@@ -563,6 +575,9 @@ export async function generateLocalEventsSection(campaign: any): Promise<string>
 export async function generateWordleSection(campaign: any): Promise<string> {
   try {
     console.log('Generating Wordle section for campaign:', campaign?.id)
+
+    // Fetch colors from business settings
+    const { primaryColor } = await fetchBusinessColors()
 
     // Get yesterday's date from the newsletter date (since this is for "Yesterday's Wordle")
     const newsletterDate = new Date(campaign.date + 'T00:00:00')
@@ -601,7 +616,7 @@ export async function generateWordleSection(campaign: any): Promise<string> {
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7; font-family: Arial, sans-serif;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">Yesterday's Wordle</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">Yesterday's Wordle</h2>
     </td>
   </tr>
   <tr class="row">${wordleColumn}</tr>
@@ -628,6 +643,9 @@ export async function generatePollSection(campaignId: string): Promise<string> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://st-cloud-scoop.vercel.app'
 
   try {
+    // Fetch colors from business settings
+    const { primaryColor } = await fetchBusinessColors()
+
     // Get active poll
     const { data: pollData } = await supabaseAdmin
       .from('polls')
@@ -650,7 +668,7 @@ export async function generatePollSection(campaignId: string): Promise<string> {
               <tr>
                 <td style="${paddingStyle}">
                   <a href="${baseUrl}/api/polls/${pollData.id}/respond?option=${encodeURIComponent(option)}&amp;campaign_id=${campaignId}&amp;email={$email}"
-                     style="display:block; text-decoration:none; background:#1877F2; color:#ffffff; font-weight:bold;
+                     style="display:block; text-decoration:none; background:${primaryColor}; color:#ffffff; font-weight:bold;
                             font-size:16px; line-height:20px; padding:12px; border-radius:8px; text-align:center;">${option}</a>
                 </td>
               </tr>`
@@ -664,12 +682,12 @@ export async function generatePollSection(campaignId: string): Promise<string> {
       <!-- Poll Box -->
       <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"
              style="width:100%; max-width:650px; margin:10px auto; background-color:#E8F0FE;
-                    border:2px solid #1877F2; border-radius:10px; font-family:Arial, sans-serif;">
+                    border:2px solid ${primaryColor}; border-radius:10px; font-family:Arial, sans-serif;">
         <tr>
           <td style="padding:14px; color:#1a1a1a; font-size:16px; line-height:1.5; text-align:center;">
 
             <!-- Text Sections -->
-            <p style="margin:0 0 6px 0; font-weight:bold; font-size:20px; color:#1877F2; text-align:center;">${pollData.title}</p>
+            <p style="margin:0 0 6px 0; font-weight:bold; font-size:20px; color:${primaryColor}; text-align:center;">${pollData.title}</p>
             <p style="margin:0 0 14px 0; font-size:16px; color:#333; text-align:center;">
               ${pollData.question}
             </p>
@@ -705,6 +723,9 @@ export async function generateDiningDealsSection(campaign: any): Promise<string>
 export async function generateCommunityBusinessSpotlightSection(campaign: any, recordUsage: boolean = false): Promise<string> {
   try {
     console.log('Generating Community Business Spotlight section for campaign:', campaign?.id, 'recordUsage:', recordUsage)
+
+    // Fetch colors from business settings
+    const { primaryColor } = await fetchBusinessColors()
 
     // Check if ad already selected for this campaign
     const { data: existingAd } = await supabaseAdmin
@@ -757,7 +778,7 @@ export async function generateCommunityBusinessSpotlightSection(campaign: any, r
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">Community Business Spotlight</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">Community Business Spotlight</h2>
     </td>
   </tr>
   <tr class='row'>
@@ -808,6 +829,9 @@ function getBreakingNewsEmoji(title: string, description: string): string {
 export async function generateBreakingNewsSection(campaign: any): Promise<string> {
   try {
     console.log('Generating Breaking News section for campaign:', campaign?.id)
+
+    // Fetch colors from business settings
+    const { primaryColor } = await fetchBusinessColors()
 
     // Fetch selected Breaking News articles
     const { data: selections } = await supabaseAdmin
@@ -864,7 +888,7 @@ export async function generateBreakingNewsSection(campaign: any): Promise<string
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">Breaking News</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">Breaking News</h2>
     </td>
   </tr>
   ${articlesHtml}
@@ -882,6 +906,9 @@ export async function generateBreakingNewsSection(campaign: any): Promise<string
 export async function generateBeyondTheFeedSection(campaign: any): Promise<string> {
   try {
     console.log('Generating Beyond the Feed section for campaign:', campaign?.id)
+
+    // Fetch colors from business settings
+    const { primaryColor } = await fetchBusinessColors()
 
     // Fetch selected Beyond the Feed articles
     const { data: selections } = await supabaseAdmin
@@ -938,7 +965,7 @@ export async function generateBeyondTheFeedSection(campaign: any): Promise<strin
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: #1877F2; margin: 0; padding: 0;">Beyond the Feed</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">Beyond the Feed</h2>
     </td>
   </tr>
   ${articlesHtml}
@@ -980,7 +1007,7 @@ export async function generateNewsletterFooter(): Promise<string> {
   const currentYear = new Date().getFullYear()
 
   return `
-<div style="max-width: 750px; margin: 0 auto; background-color: #1877F2; padding: 8px 0; text-align: center;">
+<div style="max-width: 750px; margin: 0 auto; background-color: ${primaryColor}; padding: 8px 0; text-align: center;">
   <a href="${facebookUrl}" target="_blank">
     <img src="https://raw.githubusercontent.com/VFDavid/STCScoop/refs/heads/main/facebook_light.png" alt="Facebook" width="24" height="24" style="border: none; display: inline-block;">
   </a>
