@@ -4163,11 +4163,11 @@ function BusinessSettings() {
             Header Image
           </label>
           {settings.header_image_url && (
-            <div className="mb-2">
+            <div className="mb-2 p-4 rounded border" style={{ backgroundColor: settings.primary_color }}>
               <img
                 src={settings.header_image_url}
                 alt="Header preview"
-                className="max-w-md h-32 object-cover rounded border"
+                className="max-w-md h-32 object-contain mx-auto"
               />
             </div>
           )}
