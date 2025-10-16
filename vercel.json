@@ -1,4 +1,46 @@
 {
+  "rewrites": [
+    {
+      "source": "/:path((?!dashboard|api|auth|_next|favicon.ico).*)*",
+      "destination": "/website/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "aiaccountingdaily.com"
+        }
+      ]
+    },
+    {
+      "source": "/:path((?!dashboard|api|auth|_next|favicon.ico).*)*",
+      "destination": "/website/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.aiaccountingdaily.com"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "destination": "/website",
+      "has": [
+        {
+          "type": "host",
+          "value": "aiaccountingdaily.com"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "destination": "/website",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.aiaccountingdaily.com"
+        }
+      ]
+    }
+  ],
   "crons": [
     {
       "path": "/api/cron/populate-events",
