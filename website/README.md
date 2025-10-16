@@ -1,36 +1,30 @@
-# Website
+# AI Accounting Daily homepage
 
-This directory contains the landing page and public website code.
+*Automatically synced with your [v0.app](https://v0.app) deployments*
 
-**Source Repository:** https://github.com/Venture-Formations/ai-accounting-daily-homepage
+[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/venture-formations/v0-ai-accounting-daily-homepage)
+[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/projects/3TaUs6P2RL5)
 
-**Sync Method:** Automated via GitHub Actions workflow (`.github/workflows/sync-website.yml`)
+## Overview
 
-## For Website Developers
+This repository will stay in sync with your deployed chats on [v0.app](https://v0.app).
+Any changes you make to your deployed app will be automatically pushed to this repository from [v0.app](https://v0.app).
 
-Continue working in the source repository: `ai-accounting-daily-homepage`
+## Deployment
 
-Changes will be automatically synced to this directory when the sync workflow is triggered.
+Your project is live at:
 
-## Accessing Newsletter APIs
+**[https://vercel.com/venture-formations/v0-ai-accounting-daily-homepage](https://vercel.com/venture-formations/v0-ai-accounting-daily-homepage)**
 
-The website can access newsletter business settings and data via:
+## Build your app
 
-```typescript
-// Use relative URLs (works in production)
-const response = await fetch('/api/settings/business')
-const settings = await response.json()
+Continue building your app on:
 
-// For local development, use full URL
-const response = await fetch('http://localhost:3000/api/settings/business')
-```
+**[https://v0.app/chat/projects/3TaUs6P2RL5](https://v0.app/chat/projects/3TaUs6P2RL5)**
 
-## Local Development
+## How It Works
 
-```bash
-cd website
-npm install
-npm run dev
-```
-
-The website will run on a separate port from the main admin dashboard.
+1. Create and modify your project using [v0.app](https://v0.app)
+2. Deploy your chats from the v0 interface
+3. Changes are automatically pushed to this repository
+4. Vercel deploys the latest version from this repository
