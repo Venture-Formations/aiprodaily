@@ -23,6 +23,8 @@ export default function PromptIdeasPage() {
   const [filterCategory, setFilterCategory] = useState<string>('all')
   const [filterDifficulty, setFilterDifficulty] = useState<string>('all')
   const [expandedPromptId, setExpandedPromptId] = useState<string | null>(null)
+  const [uploadingCSV, setUploadingCSV] = useState(false)
+  const [uploadMessage, setUploadMessage] = useState('')
 
   useEffect(() => {
     fetchPrompts()
@@ -119,6 +121,36 @@ export default function PromptIdeasPage() {
     }
   }
 
+  const handleCSVUpload = async (file: File) => {
+    setUploadingCSV(true)
+    setUploadMessage('')
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/prompt-ideas/upload', {
+        method: 'POST',
+        body: formData
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setUploadMessage(`✓ Successfully uploaded ${data.imported} prompts`)
+        await fetchPrompts()
+      } else {
+        setUploadMessage(`✗ Error: ${data.error || 'Upload failed'}`)
+      }
+    } catch (error) {
+      setUploadMessage('✗ Error uploading CSV file')
+      console.error('Failed to upload CSV:', error)
+    } finally {
+      setUploadingCSV(false)
+      setTimeout(() => setUploadMessage(''), 5000)
+    }
+  }
+
   const filteredPrompts = prompts.filter(prompt =>
     (filterCategory === 'all' || prompt.category === filterCategory) &&
     (filterDifficulty === 'all' || prompt.difficulty_level === filterDifficulty)
@@ -150,13 +182,36 @@ export default function PromptIdeasPage() {
               Manage AI prompt templates for accounting tasks
             </p>
           </div>
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
-          >
-            + Add Prompt
-          </button>
+          <div className="flex items-center space-x-3">
+            <label className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium cursor-pointer">
+              {uploadingCSV ? 'Uploading...' : '📤 Upload CSV'}
+              <input
+                type="file"
+                accept=".csv"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) handleCSVUpload(file)
+                  e.target.value = ''
+                }}
+                className="hidden"
+                disabled={uploadingCSV}
+              />
+            </label>
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
+            >
+              + Add Prompt
+            </button>
+          </div>
         </div>
+
+        {/* Upload Message */}
+        {uploadMessage && (
+          <div className={`mb-4 p-3 rounded-lg ${uploadMessage.startsWith('✓') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+            {uploadMessage}
+          </div>
+        )}
 
         {/* Add Form */}
         {showAddForm && (
