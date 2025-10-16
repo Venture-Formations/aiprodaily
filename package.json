@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:all": "next build && cd website && npm install && npm run build",
+    "build:all": "next build && cd website && npx pnpm install && npx pnpm run build",
     "start": "next start",
     "lint": "next lint"
   },
