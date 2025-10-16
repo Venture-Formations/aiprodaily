@@ -2,7 +2,6 @@ import axios from 'axios'
 import { supabaseAdmin } from './supabase'
 import { ErrorHandler, SlackNotificationService } from './slack'
 import type { CampaignWithArticles, CampaignWithEvents, Article } from '@/types/database'
-import { getWeatherForCampaign } from './weather-manager'
 import {
   generateNewsletterHeader,
   generateNewsletterFooter,
@@ -274,11 +273,6 @@ export class MailerLiteService {
           sectionsHtml += eventsHtml
           // Add poll section after Local Events
           sectionsHtml += await generatePollSection(campaign.id)
-        } else if (section.name === 'Local Weather') {
-          const weatherHtml = await getWeatherForCampaign(campaign.id)
-          if (weatherHtml) {
-            sectionsHtml += weatherHtml
-          }
         } else if (section.name === "Yesterday's Wordle") {
           const wordleHtml = await generateWordleSection(campaign)
           if (wordleHtml) {
