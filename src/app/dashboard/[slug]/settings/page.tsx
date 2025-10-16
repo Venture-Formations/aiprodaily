@@ -1188,8 +1188,7 @@ function EmailSettings() {
         const result = await response.json()
         console.log('FRONTEND: Save successful:', result)
         setMessage('Settings saved successfully!')
-        // Reload settings to verify they were saved
-        await loadSettings()
+        // Don't reload - keep current state to avoid clearing user's input
         setTimeout(() => setMessage(''), 3000)
       } else {
         const errorData = await response.json()
