@@ -19,14 +19,76 @@ export async function POST(request: NextRequest) {
 
     // Read CSV file
     const text = await file.text()
-    const lines = text.split('\n').filter(line => line.trim())
 
-    if (lines.length < 2) {
+    // Parse CSV properly handling quoted fields with newlines and commas
+    const parseCSV = (csvText: string): string[][] => {
+      const rows: string[][] = []
+      let currentRow: string[] = []
+      let currentField = ''
+      let insideQuotes = false
+
+      for (let i = 0; i < csvText.length; i++) {
+        const char = csvText[i]
+        const nextChar = csvText[i + 1]
+
+        if (char === '"') {
+          if (insideQuotes && nextChar === '"') {
+            // Escaped quote
+            currentField += '"'
+            i++ // Skip next quote
+          } else {
+            // Toggle quote state
+            insideQuotes = !insideQuotes
+          }
+        } else if (char === ',' && !insideQuotes) {
+          // End of field
+          currentRow.push(currentField.trim())
+          currentField = ''
+        } else if (char === '\n' && !insideQuotes) {
+          // End of row
+          if (currentField || currentRow.length > 0) {
+            currentRow.push(currentField.trim())
+            if (currentRow.some(f => f)) { // Only add non-empty rows
+              rows.push(currentRow)
+            }
+            currentRow = []
+            currentField = ''
+          }
+        } else if (char === '\r' && nextChar === '\n' && !insideQuotes) {
+          // Windows line ending
+          if (currentField || currentRow.length > 0) {
+            currentRow.push(currentField.trim())
+            if (currentRow.some(f => f)) {
+              rows.push(currentRow)
+            }
+            currentRow = []
+            currentField = ''
+          }
+          i++ // Skip the \n
+        } else {
+          currentField += char
+        }
+      }
+
+      // Add last field and row
+      if (currentField || currentRow.length > 0) {
+        currentRow.push(currentField.trim())
+        if (currentRow.some(f => f)) {
+          rows.push(currentRow)
+        }
+      }
+
+      return rows
+    }
+
+    const rows = parseCSV(text)
+
+    if (rows.length < 2) {
       return NextResponse.json({ error: 'CSV file is empty or invalid' }, { status: 400 })
     }
 
     // Parse header
-    const header = lines[0].split(',').map(h => h.trim().replace(/^"(.*)"$/, '$1'))
+    const header = rows[0].map(h => h.trim())
 
     // Column mapping - accept various common column name variations
     const columnMappings: Record<string, string[]> = {
@@ -73,37 +135,17 @@ export async function POST(request: NextRequest) {
 
     // Parse data rows
     const prompts = []
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i]
-      if (!line.trim()) continue
-
-      // Simple CSV parsing (handles quoted fields)
-      const values: string[] = []
-      let currentValue = ''
-      let inQuotes = false
-
-      for (let j = 0; j < line.length; j++) {
-        const char = line[j]
-
-        if (char === '"') {
-          inQuotes = !inQuotes
-        } else if (char === ',' && !inQuotes) {
-          values.push(currentValue.trim())
-          currentValue = ''
-        } else {
-          currentValue += char
-        }
-      }
-      values.push(currentValue.trim()) // Add last value
+    for (let i = 1; i < rows.length; i++) {
+      const values = rows[i]
 
       if (values.length !== header.length) {
-        console.warn(`Skipping row ${i}: column count mismatch`)
+        console.warn(`Skipping row ${i}: column count mismatch (expected ${header.length}, got ${values.length})`)
         continue
       }
 
       const row: Record<string, any> = {}
       header.forEach((col, idx) => {
-        row[col] = values[idx].replace(/^"(.*)"$/, '$1') // Remove quotes
+        row[col] = values[idx] || ''
       })
 
       // Build prompt object using mapped column names
