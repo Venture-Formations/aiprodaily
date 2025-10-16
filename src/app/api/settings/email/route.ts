@@ -83,12 +83,9 @@ export async function POST(request: NextRequest) {
     const settings = await request.json()
     console.log('BACKEND: Received email settings:', JSON.stringify(settings, null, 2))
 
-    // Check if this is ONLY a max articles update request (no email fields)
-    const hasEmailFields = settings.fromEmail || settings.senderName || settings.reviewScheduleEnabled !== undefined
-    const hasMaxArticles = settings.max_top_articles !== undefined || settings.max_bottom_articles !== undefined
-
-    if (hasMaxArticles && !hasEmailFields) {
-      // Handle ONLY max articles settings
+    // Check if this is a max articles update request
+    if (settings.max_top_articles !== undefined || settings.max_bottom_articles !== undefined) {
+      // Handle max articles settings separately
       const settingsToSave = []
 
       if (settings.max_top_articles !== undefined) {

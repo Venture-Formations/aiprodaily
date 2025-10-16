@@ -1155,13 +1155,17 @@ function EmailSettings() {
       if (response.ok) {
         const data = await response.json()
         console.log('FRONTEND: Loaded settings from API:', data)
+
+        // Exclude max articles fields - they have their own state and save button
+        const { max_top_articles, max_bottom_articles, ...emailSettings } = data
+
         // Convert string boolean values back to actual booleans
         const processedData = {
-          ...data,
-          reviewScheduleEnabled: data.reviewScheduleEnabled === 'true',
-          dailyScheduleEnabled: data.dailyScheduleEnabled === 'true'
+          ...emailSettings,
+          reviewScheduleEnabled: emailSettings.reviewScheduleEnabled === 'true',
+          dailyScheduleEnabled: emailSettings.dailyScheduleEnabled === 'true'
         }
-        console.log('FRONTEND: Processed settings with boolean conversion:', processedData)
+        console.log('FRONTEND: Processed settings with boolean conversion (max articles excluded):', processedData)
         setSettings(processedData)  // Don't merge with prev - use fresh data from API
         setIsLoaded(true)
         console.log('FRONTEND: Settings state updated')
