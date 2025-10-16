@@ -1,3 +1,6 @@
+'use client'
+
+import { useState } from "react"
 import { Card } from "@/components/website/ui/card"
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/website/ui/button"
@@ -9,7 +12,7 @@ const newsStories = [
     title: "OpenAI Launches Specialized Accounting GPT Model",
     description:
       "New AI model trained specifically on GAAP standards and tax codes promises to revolutionize financial reporting accuracy.",
-    image: "/ai-artificial-intelligence-accounting-financial-te.jpg",
+    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=450&fit=crop",
   },
   {
     date: "Oct 13, 2025",
@@ -17,7 +20,7 @@ const newsStories = [
     title: "Big Four Firms Report 40% Efficiency Gains with AI",
     description:
       "Major accounting firms reveal significant productivity improvements after implementing AI-powered audit tools across their practices.",
-    image: "/professional-accounting-firm-office-technology.jpg",
+    image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&h=450&fit=crop",
   },
   {
     date: "Oct 12, 2025",
@@ -25,7 +28,7 @@ const newsStories = [
     title: "SEC Announces New Guidelines for AI in Financial Reporting",
     description:
       "Regulatory body releases comprehensive framework for using artificial intelligence in preparing and auditing financial statements.",
-    image: "/financial-regulation-compliance-documents.jpg",
+    image: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800&h=450&fit=crop",
   },
   {
     date: "Oct 11, 2025",
@@ -33,7 +36,7 @@ const newsStories = [
     title: "Automated Tax Preparation Reaches 95% Accuracy Rate",
     description:
       "Latest AI tax software demonstrates near-perfect accuracy in complex corporate tax scenarios, reducing review time by 60%.",
-    image: "/tax-preparation-software-automation-technology.jpg",
+    image: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&h=450&fit=crop",
   },
   {
     date: "Oct 10, 2025",
@@ -41,7 +44,7 @@ const newsStories = [
     title: "Mid-Size Firm Cuts Month-End Close Time in Half",
     description:
       "Regional accounting firm shares how AI-powered reconciliation tools transformed their financial close process.",
-    image: "/accounting-team-working-with-financial-reports.jpg",
+    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=450&fit=crop",
   },
   {
     date: "Oct 9, 2025",
@@ -49,11 +52,13 @@ const newsStories = [
     title: "Why Every Accountant Needs to Understand Machine Learning",
     description:
       "Industry leaders discuss the critical importance of AI literacy for finance professionals in the modern workplace.",
-    image: "/machine-learning-data-analytics-finance.jpg",
+    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=450&fit=crop",
   },
 ]
 
 export function Features() {
+  const [currentPage, setCurrentPage] = useState(1)
+  const totalPages = 8
   return (
     <section id="features" className="py-10 px-4 sm:px-6 lg:px-8 bg-[#F5F5F7]">
       <div className="container mx-auto max-w-6xl">
@@ -93,7 +98,8 @@ export function Features() {
             variant="ghost"
             size="sm"
             className="text-sm text-[#1D1D1F]/40 hover:text-[#1D1D1F]/60 hover:bg-transparent"
-            disabled
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(1)}
           >
             First
           </Button>
@@ -101,22 +107,25 @@ export function Features() {
             variant="ghost"
             size="sm"
             className="text-sm text-[#1D1D1F]/40 hover:text-[#1D1D1F]/60 hover:bg-transparent"
-            disabled
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
           >
             <ChevronLeft className="w-4 h-4 mr-1" />
             Back
           </Button>
 
           <div className="flex items-center gap-2">
-            <Button size="sm" className="w-10 h-10 rounded-lg bg-[#1c293d] text-white hover:bg-[#1c293d]/90">
-              1
-            </Button>
-            {[2, 3, 4, 5, 6, 7, 8].map((page) => (
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((page) => (
               <Button
                 key={page}
-                variant="ghost"
+                variant={currentPage === page ? "default" : "ghost"}
                 size="sm"
-                className="w-10 h-10 rounded-lg text-[#1D1D1F] hover:bg-white/50"
+                className={`w-10 h-10 rounded-lg ${
+                  currentPage === page
+                    ? "bg-[#1c293d] text-white hover:bg-[#1c293d]/90"
+                    : "text-[#1D1D1F] hover:bg-white/50"
+                }`}
+                onClick={() => setCurrentPage(page)}
               >
                 {page}
               </Button>
@@ -127,6 +136,8 @@ export function Features() {
             variant="ghost"
             size="sm"
             className="text-sm text-[#1D1D1F] hover:text-[#1D1D1F]/80 hover:bg-transparent"
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
           >
             Next
             <ChevronRight className="w-4 h-4 ml-1" />
@@ -135,6 +146,8 @@ export function Features() {
             variant="ghost"
             size="sm"
             className="text-sm text-[#1D1D1F] hover:text-[#1D1D1F]/80 hover:bg-transparent"
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(totalPages)}
           >
             Last
           </Button>
