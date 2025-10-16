@@ -243,12 +243,6 @@ export class MailerLiteService {
 
     console.log('MAILERLITE - Active articles to render:', activeArticles.length)
     console.log('MAILERLITE - Article order:', activeArticles.map(a => `${a.headline} (rank: ${a.rank})`).join(', '))
-    console.log('MAILERLITE - Raw article data:', activeArticles.map(a => `ID: ${a.id}, Rank: ${a.rank}, Active: ${a.is_active}`).join(' | '))
-
-    // Generate events using the same logic as preview
-    const eventsHtml = await generateLocalEventsSection(campaign)
-
-    console.log('MailerLite - Events HTML generated, length:', eventsHtml.length)
 
     // Fetch newsletter sections order
     const { data: sections } = await supabaseAdmin
@@ -259,7 +253,7 @@ export class MailerLiteService {
 
     console.log('MailerLite - Active newsletter sections:', sections?.map(s => `${s.name} (order: ${s.display_order})`).join(', '))
 
-    // Use the same format as the preview template with local date parsing
+    // Format date using local date parsing (same as preview)
     const [year, month, day] = campaign.date.split('-').map(Number)
     const date = new Date(year, month - 1, day) // month is 0-indexed
     const formattedDate = date.toLocaleDateString('en-US', {
@@ -269,9 +263,13 @@ export class MailerLiteService {
       day: 'numeric'
     })
 
-    // Review header for review campaigns - now at very top
-    const reviewHeaderTop = isReview ? `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin: 10px auto; max-width: 990px; background-color: #FEF3C7; font-family: Arial, sans-serif;">
+    // Use the modular template functions - SAME AS PREVIEW
+    const header = await generateNewsletterHeader(formattedDate)
+    const footer = await generateNewsletterFooter()
+
+    // Review banner for review campaigns
+    const reviewBanner = isReview ? `
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin: 10px auto; max-width: 750px; background-color: #FEF3C7; font-family: Arial, sans-serif;">
   <tr>
     <td style="padding: 12px; text-align: center;">
       <h3 style="margin: 0; color: #92400E; font-size: 18px; font-weight: bold;">📝 Newsletter Review</h3>
@@ -283,17 +281,31 @@ export class MailerLiteService {
 </table>
 <br>` : ''
 
-    // Generate sections in order based on database configuration
+    // Generate sections in order based on database configuration - SAME AS PREVIEW
     let sectionsHtml = ''
     if (sections && sections.length > 0) {
       for (const section of sections) {
-        if (section.name === 'The Local Scoop' && activeArticles.length > 0) {
-          // Note: mailerlite_campaign_id is undefined during preview, only available after sending
-          sectionsHtml += generateLocalScoopSection(activeArticles, campaign.date, undefined)
+        // Check if this is a primary articles section (display_order 3)
+        if (section.display_order === 3 && activeArticles.length > 0) {
+          const { generatePrimaryArticlesSection } = await import('./newsletter-templates')
+          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, campaign.date, campaign.mailerlite_campaign_id, section.name)
+          sectionsHtml += primaryHtml
+        }
+        // Check if this is a secondary articles section (display_order 5)
+        else if (section.display_order === 5) {
+          const { generateSecondaryArticlesSection } = await import('./newsletter-templates')
+          const secondaryHtml = await generateSecondaryArticlesSection(campaign, section.name)
+          sectionsHtml += secondaryHtml
+        }
+        else if (section.name === 'The Local Scoop' && activeArticles.length > 0) {
+          sectionsHtml += generateLocalScoopSection(activeArticles, campaign.date)
         } else if (section.name === 'Local Events') {
-          sectionsHtml += eventsHtml
-          // Add poll section after Local Events
-          sectionsHtml += await generatePollSection(campaign.id)
+          sectionsHtml += await generateLocalEventsSection(campaign)
+        } else if (section.name === 'Poll') {
+          const pollHtml = await generatePollSection(campaign.id)
+          if (pollHtml) {
+            sectionsHtml += pollHtml
+          }
         } else if (section.name === "Yesterday's Wordle") {
           const wordleHtml = await generateWordleSection(campaign)
           if (wordleHtml) {
@@ -314,162 +326,39 @@ export class MailerLiteService {
           if (roadWorkHtml) {
             sectionsHtml += roadWorkHtml
           }
+        } else if (section.name === 'Breaking News') {
+          const { generateBreakingNewsSection } = await import('./newsletter-templates')
+          const breakingNewsHtml = await generateBreakingNewsSection(campaign)
+          if (breakingNewsHtml) {
+            sectionsHtml += breakingNewsHtml
+          }
+        } else if (section.name === 'Beyond the Feed') {
+          const { generateBeyondTheFeedSection } = await import('./newsletter-templates')
+          const beyondFeedHtml = await generateBeyondTheFeedSection(campaign)
+          if (beyondFeedHtml) {
+            sectionsHtml += beyondFeedHtml
+          }
         } else if (section.name === 'Community Business Spotlight') {
           const spotlightHtml = await generateCommunityBusinessSpotlightSection(campaign, !isReview) // Record usage for final campaigns only
           if (spotlightHtml) {
             sectionsHtml += spotlightHtml
+          }
+        } else if (section.name === 'Prompt Ideas') {
+          const { generatePromptIdeasSection } = await import('./newsletter-templates')
+          const promptHtml = await generatePromptIdeasSection(campaign)
+          if (promptHtml) {
+            sectionsHtml += promptHtml
           }
         }
       }
     } else {
       // Fallback to default order if no sections configured
       console.log('MailerLite - No sections found, using default order')
-      sectionsHtml = generateLocalScoopSection(activeArticles, campaign.date, undefined) + eventsHtml
+      sectionsHtml = generateLocalScoopSection(activeArticles, campaign.date) + await generateLocalEventsSection(campaign)
     }
 
-    // Use exact same template as preview with review banner at top and global email rules
-    return `<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-    body {
-      margin: 0;
-      padding: 0;
-      background-color: #f7f7f7;
-      font-family: Arial, sans-serif;
-      color: #000;
-    }
-    a {
-      color: inherit;
-      text-decoration: none;
-    }
-    .row-content {
-      max-width: 600px;
-      margin: 0 auto;
-      background-color: #e0f0ff;
-    }
-    .stack .column {
-      display: inline-block;
-      vertical-align: top;
-    }
-    .mobile_hide {
-      display: block;
-    }
-    .desktop_hide {
-      display: none;
-      max-height: 0;
-      overflow: hidden;
-    }
-    @media (max-width: 620px) {
-      .row-content {
-        width: 100% !important;
-      }
-      .stack .column {
-        width: 100% !important;
-        display: block !important;
-      }
-      .mobile_hide {
-        display: none !important;
-      }
-      .desktop_hide {
-        display: table !important;
-        max-height: none !important;
-      }
-    }
-    @media only screen and (max-width: 620px) {
-      body, table, td, div {
-        padding-left: 5px !important;
-        padding-right: 5px !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-      }
-      .row {
-        display: block !important;
-        width: 100% !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-      }
-      .column {
-        display: block !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        padding-left: 4px !important;
-        padding-right: 4px !important;
-        box-sizing: border-box !important;
-      }
-    }
-    @media only screen and (min-width: 621px) {
-      .row {
-        display: table !important;
-        width: 100% !important;
-        table-layout: fixed !important;
-      }
-      .column {
-        display: table-cell !important;
-        width: 33.33% !important;
-        vertical-align: top;
-        box-sizing: border-box !important;
-        padding: 8px !important;
-      }
-    }
-    @media only screen and (max-width: 620px) {
-      .event-card {
-        width: 100% !important;
-        max-width: 100% !important;
-      }
-    }
-    @media only screen and (max-width:620px){
-      .weather-desktop{display:none!important;max-height:0!important;overflow:hidden!important;}
-      .weather-mobile{display:table!important;max-height:none!important;width:100%!important;}
-      .weather-mobile .wxcol{display:block!important;width:100%!important;max-width:100%!important;padding:4px 0!important;}
-      .weather-mobile .weather-card{width:100%!important;max-width:100%!important;margin:0 auto!important;}
-    }
-    @media only screen and (min-width:621px){
-      .weather-mobile{display:none!important;max-height:0!important;overflow:hidden!important;}
-    }
-    @media only screen and (min-width:621px){
-      .etsy-wrap{font-size:0 !important;}
-      .etsy-col{display:inline-block !important; width:25% !important; max-width:25% !important; vertical-align:top !important;}
-      .etsy-pad{padding:8px !important;}
-    }
-  </style>
-  <title>St. Cloud Scoop Newsletter</title>
-</head>
-<body style='margin:0!important;padding:0!important;background-color:#f7f7f7;'>
-${reviewHeaderTop}
-   <div style='width:100%;margin:0 auto;padding:10px;background-color:#f7f7f7;box-sizing:border-box;overflow-x:auto;'>
-     <div style='width:100%;max-width:990px;margin:0 auto;padding:5px;text-align:right;font-weight:bold;'>
-       <a href='{$url}' style='color:#000;text-decoration:underline;'>View Online</a>&nbsp;|&nbsp;
-       <a href='https://stcscoop.com/' style='color:#000;text-decoration:underline;'>Sign Up</a>&nbsp;|&nbsp;
-       <a href='{$forward}' style='color:#000;text-decoration:underline;'>Share</a>
-     </div>
-     <div style='width:100%;max-width:990px;margin:0 auto;padding:0px;'>
-       <div style='font-family:Arial,sans-serif;background-color:#1877F2;text-align:center;border-radius:12px;border:1px solid #333;'>
-         <img alt='St. Cloud Scoop' src='https://raw.githubusercontent.com/VFDavid/STCScoop/refs/heads/main/STCSCOOP_Logo_824X148_clear.png' style='width:100%;max-width:500px;height:auto;margin-bottom:2px;'/>
-         <div style='color:#fff;font-size:16px;font-weight:bold;padding:0 0 5px;'>${formattedDate}</div>
-       </div>
-     </div>
-   </div>
-<br>
-${sectionsHtml}
-<div style="max-width: 990px; margin: 0 auto; background-color: #1877F2; padding: 8px 0; text-align: center;">
-  <a href="https://www.facebook.com/61578947310955/" target="_blank">
-    <img src="https://raw.githubusercontent.com/VFDavid/STCScoop/refs/heads/main/facebook_light.png" alt="Facebook" width="24" height="24" style="border: none; display: inline-block;">
-  </a>
-</div>
-<div style="font-family: Arial, sans-serif; font-size: 12px; color: #777; text-align: center; padding: 20px 10px; border-top: 1px solid #ccc; background-color: #ffffff; max-width: 990px; margin: 0 auto ;">
-  <p style="margin: 0;text-align: center;">You're receiving this email because you subscribed to <strong>St. Cloud Scoop</strong>.</p>
-  <p style="margin: 5px 0 0;text-align: center;">
-    <a href="{$unsubscribe}" style='text-decoration: underline;'>Unsubscribe</a>
-  </p>
-  <p style="margin: 5px;text-align: center;">©2025 Venture Formations LLC, all rights reserved</p>
-</div>
-</body>
-</html>`
+    // Combine using the SAME template structure as preview
+    return reviewBanner + header + sectionsHtml + footer
   }
 
 
