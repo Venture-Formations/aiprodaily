@@ -51,6 +51,16 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching Ads count:', adsError)
     }
 
+    // AI Prompts count (from app_settings with key starting with 'ai_prompt_')
+    const { count: aiPromptsCount, error: aiPromptsError } = await supabaseAdmin
+      .from('app_settings')
+      .select('*', { count: 'exact', head: true })
+      .like('key', 'ai_prompt_%')
+
+    if (aiPromptsError) {
+      console.error('Error fetching AI Prompts count:', aiPromptsError)
+    }
+
     // Get unique RSS sources count
     const { data: rssPosts, error: rssError } = await supabaseAdmin
       .from('rss_posts')
@@ -72,6 +82,12 @@ export async function GET(request: NextRequest) {
         description: 'AI prompts and templates for accounting tasks',
         count: promptsCount?.length || 0,
         href: '/dashboard/databases/prompt-ideas'
+      },
+      {
+        name: 'AI Prompts',
+        description: 'System AI prompts for newsletter generation',
+        count: aiPromptsCount || 0,
+        href: '/dashboard/databases/ai-prompts'
       },
       {
         name: 'Images',
