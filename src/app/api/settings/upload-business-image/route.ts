@@ -45,8 +45,8 @@ export async function POST(request: NextRequest) {
 
     // Upload to GitHub
     const githubToken = process.env.GITHUB_TOKEN
-    const githubRepo = process.env.GITHUB_REPO || 'VFDavid/STCScoop'
-    const githubBranch = process.env.GITHUB_BRANCH || 'main'
+    const githubRepo = process.env.GITHUB_REPO || 'Venture-Formations/aiprodaily'
+    const githubBranch = process.env.GITHUB_BRANCH || 'master'
 
     if (!githubToken) {
       console.error('❌ [Upload] GITHUB_TOKEN not configured')
