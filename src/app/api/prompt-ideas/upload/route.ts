@@ -28,15 +28,48 @@ export async function POST(request: NextRequest) {
     // Parse header
     const header = lines[0].split(',').map(h => h.trim().replace(/^"(.*)"$/, '$1'))
 
-    // Expected columns: title, prompt_text, category, use_case, suggested_model, difficulty_level, is_active, is_featured
-    const requiredColumns = ['title', 'prompt_text']
-    const hasRequiredColumns = requiredColumns.every(col => header.includes(col))
+    // Column mapping - accept various common column name variations
+    const columnMappings: Record<string, string[]> = {
+      title: ['title', 'Title', 'name', 'Name', 'Prompt Title', 'prompt_title', 'TITLE'],
+      prompt_text: ['prompt_text', 'Prompt Text', 'Prompt', 'prompt', 'Prompt_Text', 'PROMPT', 'text', 'Text', 'Content', 'content'],
+      category: ['category', 'Category', 'CATEGORY'],
+      use_case: ['use_case', 'Use Case', 'UseCase', 'use case', 'USE_CASE'],
+      suggested_model: ['suggested_model', 'Suggested Model', 'Model', 'model', 'SUGGESTED_MODEL'],
+      difficulty_level: ['difficulty_level', 'Difficulty Level', 'Difficulty', 'difficulty', 'DIFFICULTY_LEVEL']
+    }
 
-    if (!hasRequiredColumns) {
+    // Function to find matching column
+    const findColumn = (fieldName: string): string | null => {
+      const possibleNames = columnMappings[fieldName] || [fieldName]
+      for (const possibleName of possibleNames) {
+        if (header.includes(possibleName)) {
+          return possibleName
+        }
+      }
+      return null
+    }
+
+    // Map required fields
+    const titleColumn = findColumn('title')
+    const promptColumn = findColumn('prompt_text')
+
+    if (!titleColumn || !promptColumn) {
+      const missing = []
+      if (!titleColumn) missing.push('title (or variations: Title, Name, Prompt Title)')
+      if (!promptColumn) missing.push('prompt_text (or variations: Prompt, Prompt Text, Text)')
+
       return NextResponse.json({
-        error: `CSV must have columns: ${requiredColumns.join(', ')}. Found: ${header.join(', ')}`
+        error: `CSV is missing required columns: ${missing.join(', ')}`,
+        foundColumns: header.join(', '),
+        suggestion: 'Please ensure your CSV has columns for title/name and prompt/text'
       }, { status: 400 })
     }
+
+    // Map optional fields
+    const categoryColumn = findColumn('category')
+    const useCaseColumn = findColumn('use_case')
+    const modelColumn = findColumn('suggested_model')
+    const difficultyColumn = findColumn('difficulty_level')
 
     // Parse data rows
     const prompts = []
@@ -73,14 +106,14 @@ export async function POST(request: NextRequest) {
         row[col] = values[idx].replace(/^"(.*)"$/, '$1') // Remove quotes
       })
 
-      // Build prompt object
+      // Build prompt object using mapped column names
       const prompt: any = {
-        title: row.title,
-        prompt_text: row.prompt_text,
-        category: row.category || null,
-        use_case: row.use_case || null,
-        suggested_model: row.suggested_model || null,
-        difficulty_level: row.difficulty_level || null,
+        title: row[titleColumn],
+        prompt_text: row[promptColumn],
+        category: categoryColumn ? (row[categoryColumn] || null) : null,
+        use_case: useCaseColumn ? (row[useCaseColumn] || null) : null,
+        suggested_model: modelColumn ? (row[modelColumn] || null) : null,
+        difficulty_level: difficultyColumn ? (row[difficultyColumn] || null) : null,
         is_active: true, // Always active by default
         is_featured: false // Never featured by default (only one used per day)
       }

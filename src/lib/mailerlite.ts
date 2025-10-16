@@ -288,7 +288,7 @@ export class MailerLiteService {
         // Check if this is a primary articles section (display_order 3)
         if (section.display_order === 3 && activeArticles.length > 0) {
           const { generatePrimaryArticlesSection } = await import('./newsletter-templates')
-          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, campaign.date, campaign.mailerlite_campaign_id, section.name)
+          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, campaign.date, campaign.id, section.name)
           sectionsHtml += primaryHtml
         }
         // Check if this is a secondary articles section (display_order 5)

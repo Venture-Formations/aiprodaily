@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
 import Layout from '@/components/Layout'
 import Link from 'next/link'
 
@@ -12,6 +13,8 @@ interface DatabaseInfo {
 }
 
 export default function DatabasesPage() {
+  const params = useParams()
+  const slug = params?.slug as string || ''
   const [databases, setDatabases] = useState<DatabaseInfo[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -24,7 +27,12 @@ export default function DatabasesPage() {
       const response = await fetch('/api/databases/stats')
       if (response.ok) {
         const data = await response.json()
-        setDatabases(data.databases || [])
+        // Add slug to all database hrefs
+        const databasesWithSlug = (data.databases || []).map((db: DatabaseInfo) => ({
+          ...db,
+          href: `/dashboard/${slug}${db.href.replace('/dashboard', '')}`
+        }))
+        setDatabases(databasesWithSlug)
       }
     } catch (error) {
       console.error('Failed to fetch database stats:', error)

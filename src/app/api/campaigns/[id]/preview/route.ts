@@ -188,7 +188,7 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
       for (const section of sections) {
         // Check if this is a primary articles section (display_order 3)
         if (section.display_order === 3 && activeArticles.length > 0) {
-          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, campaign.date, campaign.mailerlite_campaign_id, section.name)
+          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, campaign.date, campaign.id, section.name)
           sectionsHtml += primaryHtml
         }
         // Check if this is a secondary articles section (display_order 5)
