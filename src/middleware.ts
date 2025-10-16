@@ -1,6 +1,19 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+// Newsletter website domain mappings (for easy addition of new newsletters)
+// Format: domain -> newsletter slug
+const NEWSLETTER_DOMAINS: Record<string, string> = {
+  'aiaccountingdaily.com': 'accounting',
+  'www.aiaccountingdaily.com': 'accounting',
+  // Future newsletters - just add new domains here:
+  // 'ainursingdaily.com': 'nursing',
+  // 'www.ainursingdaily.com': 'nursing',
+}
+
+// Admin domains (dashboard access)
+const ADMIN_DOMAINS = ['aiprodaily.com', 'www.aiprodaily.com', 'aiprodaily.vercel.app']
+
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
   const url = request.nextUrl
@@ -17,6 +30,50 @@ export async function middleware(request: NextRequest) {
     console.log('[Middleware] Staging environment detected - authentication bypassed')
     // Redirect signin page to dashboard when in staging mode
     if (url.pathname === '/auth/signin') {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+    return NextResponse.next()
+  }
+
+  // Check if this is a newsletter website domain (takes priority over subdomain logic)
+  const newsletterSlug = NEWSLETTER_DOMAINS[hostname]
+
+  if (newsletterSlug) {
+    // Skip for API routes, Next.js internals, static files, dashboard, and auth
+    if (
+      url.pathname.startsWith('/_next') ||
+      url.pathname.startsWith('/api') ||
+      url.pathname.startsWith('/auth') ||
+      url.pathname.startsWith('/dashboard') ||
+      url.pathname.includes('.')
+    ) {
+      return NextResponse.next()
+    }
+
+    // Rewrite to /website routes for newsletter domains
+    const rewriteUrl = url.clone()
+
+    if (url.pathname === '/') {
+      rewriteUrl.pathname = '/website'
+    } else {
+      rewriteUrl.pathname = `/website${url.pathname}`
+    }
+
+    // Add newsletter context to headers
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.set('x-newsletter-slug', newsletterSlug)
+
+    return NextResponse.rewrite(rewriteUrl, {
+      request: {
+        headers: requestHeaders,
+      },
+    })
+  }
+
+  // Check if this is an admin domain
+  if (ADMIN_DOMAINS.some(domain => hostname === domain || hostname.startsWith(domain))) {
+    // Admin domain - allow normal dashboard/auth routing
+    if (url.pathname === '/') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
     return NextResponse.next()

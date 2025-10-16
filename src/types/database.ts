@@ -8,6 +8,7 @@ export interface Newsletter {
   slug: string
   name: string
   subdomain: string
+  website_domain: string | null
   description: string | null
   logo_url: string | null
   primary_color: string
