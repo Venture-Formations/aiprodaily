@@ -18,6 +18,12 @@ export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
   const url = request.nextUrl
 
+  console.log('[Middleware] Request:', {
+    hostname,
+    pathname: url.pathname,
+    method: request.method
+  })
+
   // Detect staging environment
   const isStaging = process.env.VERCEL_ENV === 'preview' ||
                     process.env.VERCEL_GIT_COMMIT_REF === 'staging' ||
@@ -39,6 +45,7 @@ export async function middleware(request: NextRequest) {
   const newsletterSlug = NEWSLETTER_DOMAINS[hostname]
 
   if (newsletterSlug) {
+    console.log('[Middleware] Newsletter domain detected:', newsletterSlug)
     // Skip for API routes, Next.js internals, static files, dashboard, and auth
     if (
       url.pathname.startsWith('/_next') ||
@@ -70,14 +77,27 @@ export async function middleware(request: NextRequest) {
     })
   }
 
-  // Check if this is an admin domain
-  if (ADMIN_DOMAINS.some(domain => hostname === domain || hostname.startsWith(domain))) {
+  // Check if this is an admin domain (exact match)
+  const isAdminDomain = ADMIN_DOMAINS.includes(hostname)
+
+  console.log('[Middleware] Admin domain check:', {
+    hostname,
+    isAdminDomain,
+    adminDomains: ADMIN_DOMAINS
+  })
+
+  if (isAdminDomain) {
+    console.log('[Middleware] ✓ Admin domain matched:', hostname)
     // Admin domain - allow normal dashboard/auth routing
     if (url.pathname === '/') {
+      console.log('[Middleware] → Redirecting root to /dashboard')
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
+    console.log('[Middleware] → Passing through to Next.js routing')
     return NextResponse.next()
   }
+
+  console.log('[Middleware] ✗ Not an admin domain, checking subdomain logic...')
 
   // Extract subdomain
   const parts = hostname.split('.')
@@ -163,6 +183,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Default: pass through to Next.js routing
+  console.log('[Middleware] → Default: passing through to Next.js routing')
   return NextResponse.next()
 }
 
