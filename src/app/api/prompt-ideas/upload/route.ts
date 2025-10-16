@@ -127,10 +127,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No valid prompts found in CSV' }, { status: 400 })
     }
 
+    // Get accounting newsletter ID
+    const { data: newsletter } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('slug', 'accounting')
+      .single()
+
+    if (!newsletter) {
+      return NextResponse.json({ error: 'Newsletter not found' }, { status: 404 })
+    }
+
+    // Add newsletter_id and times_used to all prompts
+    const promptsWithNewsletterId = prompts.map(prompt => ({
+      ...prompt,
+      newsletter_id: newsletter.id,
+      times_used: 0
+    }))
+
     // Insert prompts into database
     const { data, error } = await supabaseAdmin
       .from('prompt_ideas')
-      .insert(prompts)
+      .insert(promptsWithNewsletterId)
       .select()
 
     if (error) {
