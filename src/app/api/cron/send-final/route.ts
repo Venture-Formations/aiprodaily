@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
         manual_articles:manual_articles(*)
       `)
       .eq('date', today)
-      .in('status', ['in_review', 'changes_made'])
+      .eq('status', 'ready_to_send')
       .single()
 
     campaign = data
@@ -301,7 +301,7 @@ export async function GET(request: NextRequest) {
         manual_articles:manual_articles(*)
       `)
       .eq('date', today)
-      .in('status', ['in_review', 'changes_made'])
+      .eq('status', 'ready_to_send')
       .single()
 
     campaign = data
