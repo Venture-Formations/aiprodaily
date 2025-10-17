@@ -330,6 +330,37 @@ export class RSSProcessor {
       throw new Error('Failed to create campaign')
     }
 
+    // Initialize AI Applications and Prompt Ideas for the new campaign
+    console.log('Initializing campaign content selections (AI Apps & Prompts)...')
+    try {
+      const { AppSelector } = await import('./app-selector')
+      const { PromptSelector } = await import('./prompt-selector')
+
+      // Get accounting newsletter ID
+      const { data: newsletter } = await supabaseAdmin
+        .from('newsletters')
+        .select('id')
+        .eq('slug', 'accounting')
+        .single()
+
+      if (newsletter) {
+        // Initialize AI Applications
+        const selectedApps = await AppSelector.selectAppsForCampaign(newCampaign.id, newsletter.id)
+        console.log(`Selected ${selectedApps.length} AI applications for campaign`)
+
+        // Initialize Prompt Ideas
+        const selectedPrompt = await PromptSelector.selectPromptForCampaign(newCampaign.id)
+        if (selectedPrompt) {
+          console.log(`Selected prompt: ${selectedPrompt.title}`)
+        }
+      } else {
+        console.warn('Accounting newsletter not found, skipping AI content initialization')
+      }
+    } catch (initError) {
+      console.error('Error initializing campaign content:', initError)
+      // Don't throw - continue with RSS processing even if initialization fails
+    }
+
     return newCampaign.id
   }
 
