@@ -153,11 +153,11 @@ export function getEventEmoji(title: string, venue: string): string {
 // ==================== HEADER ====================
 
 export async function generateNewsletterHeader(formattedDate: string): Promise<string> {
-  // Fetch business settings for header image and primary color
+  // Fetch business settings for header image, primary color, and website URL
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
     .select('key, value')
-    .in('key', ['header_image_url', 'primary_color', 'newsletter_name'])
+    .in('key', ['header_image_url', 'primary_color', 'newsletter_name', 'website_url'])
 
   const settingsMap: Record<string, string> = {}
   settings?.forEach(setting => {
@@ -167,13 +167,14 @@ export async function generateNewsletterHeader(formattedDate: string): Promise<s
   const headerImageUrl = settingsMap.header_image_url || 'https://raw.githubusercontent.com/VFDavid/STCScoop/refs/heads/main/STCSCOOP_Logo_824X148_clear.png'
   const primaryColor = settingsMap.primary_color || '#1877F2'
   const newsletterName = settingsMap.newsletter_name || 'St. Cloud Scoop'
+  const websiteUrl = settingsMap.website_url || 'https://www.aiaccountingdaily.com'
 
   return `<html>
 <body style='margin:0!important;padding:0!important;background-color:#f7f7f7;'>
    <div style='width:100%;margin:0 auto;padding:10px;background-color:#f7f7f7;box-sizing:border-box;overflow-x:auto;'>
      <div style='width:100%;max-width:750px;margin:0 auto;padding:5px;text-align:right;font-weight:bold;'>
        <a href='{$url}' style='color:#000;text-decoration:underline;'>View Online</a>&nbsp;|&nbsp;
-       <a href='https://www.aiaccountingdaily.com' style='color:#000;text-decoration:underline;'>Sign Up</a>&nbsp;|&nbsp;
+       <a href='${websiteUrl}' style='color:#000;text-decoration:underline;'>Sign Up</a>&nbsp;|&nbsp;
        <a href='{$forward}' style='color:#000;text-decoration:underline;'>Share</a>
      </div>
      <div style='width:100%;max-width:750px;margin:0 auto;padding:0px;'>
