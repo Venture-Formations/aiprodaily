@@ -29,15 +29,17 @@ export async function POST(request: NextRequest) {
     console.log('=== CAMPAIGN CREATION STARTED (Time Matched) ===')
     console.log('Central Time:', new Date().toLocaleString("en-US", {timeZone: "America/Chicago"}))
 
-    // Get tomorrow's campaign (already processed with RSS and subject line)
-    // Use Central Time for consistent date calculations
+    // Get campaign (already processed with RSS and subject line)
+    // Use Central Time + 12 hours for consistent date calculations
+    // This ensures evening runs (8pm+) create campaigns for tomorrow
     const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
     const centralDate = new Date(nowCentral)
-    const tomorrow = new Date(centralDate)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const campaignDate = tomorrow.toISOString().split('T')[0]
+    // Add 12 hours to determine campaign date (same logic as RSS Processing)
+    centralDate.setHours(centralDate.getHours() + 12)
+    const campaignDate = centralDate.toISOString().split('T')[0]
 
-    console.log('Creating review campaign for tomorrow\'s date:', campaignDate)
+    console.log('Campaign date calculation: Current CT time + 12 hours =', campaignDate)
+    console.log('Creating review campaign for date:', campaignDate)
 
     // Find tomorrow's campaign with articles
     const { data: campaign, error: campaignError } = await supabaseAdmin
@@ -159,15 +161,17 @@ export async function GET(request: NextRequest) {
     console.log('=== CAMPAIGN CREATION STARTED (Time Matched) ===')
     console.log('Central Time:', new Date().toLocaleString("en-US", {timeZone: "America/Chicago"}))
 
-    // Get tomorrow's campaign (already processed with RSS and subject line)
-    // Use Central Time for consistent date calculations
+    // Get campaign (already processed with RSS and subject line)
+    // Use Central Time + 12 hours for consistent date calculations
+    // This ensures evening runs (8pm+) create campaigns for tomorrow
     const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
     const centralDate = new Date(nowCentral)
-    const tomorrow = new Date(centralDate)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const campaignDate = tomorrow.toISOString().split('T')[0]
+    // Add 12 hours to determine campaign date (same logic as RSS Processing)
+    centralDate.setHours(centralDate.getHours() + 12)
+    const campaignDate = centralDate.toISOString().split('T')[0]
 
-    console.log('Creating review campaign for tomorrow\'s date:', campaignDate)
+    console.log('Campaign date calculation: Current CT time + 12 hours =', campaignDate)
+    console.log('Creating review campaign for date:', campaignDate)
 
     // Find tomorrow's campaign with articles
     const { data: campaign, error: campaignError } = await supabaseAdmin

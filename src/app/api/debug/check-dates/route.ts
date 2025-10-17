@@ -6,14 +6,14 @@ export async function GET(request: NextRequest) {
     // Calculate dates EXACTLY as RSS Processing does
     const nowCentral1 = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
     const centralDate1 = new Date(nowCentral1)
+    centralDate1.setHours(centralDate1.getHours() + 12)
     const rssProcessingDate = centralDate1.toISOString().split('T')[0]
 
     // Calculate dates EXACTLY as Create Campaign does
     const nowCentral2 = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
     const centralDate2 = new Date(nowCentral2)
-    const tomorrow = new Date(centralDate2)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const createCampaignDate = tomorrow.toISOString().split('T')[0]
+    centralDate2.setHours(centralDate2.getHours() + 12)
+    const createCampaignDate = centralDate2.toISOString().split('T')[0]
 
     // Check for campaign with RSS Processing date
     const { data: rssCampaign } = await supabaseAdmin
@@ -45,8 +45,8 @@ export async function GET(request: NextRequest) {
         central: nowCentral1,
       },
       rssProcessing: {
-        description: "RSS Processing creates campaign for 'today' (line 309 of rss-processor.ts)",
-        calculation: "centralDate.toISOString().split('T')[0]",
+        description: "RSS Processing creates campaign for 'CT + 12 hours' (line 311-312 of rss-processor.ts)",
+        calculation: "centralDate.setHours(centralDate.getHours() + 12); centralDate.toISOString().split('T')[0]",
         campaignDate: rssProcessingDate,
         foundCampaign: rssCampaign ? {
           id: rssCampaign.id,
@@ -56,8 +56,8 @@ export async function GET(request: NextRequest) {
         } : null
       },
       createCampaign: {
-        description: "Create Campaign queries for 'tomorrow' (line 36-38 of create-campaign/route.ts)",
-        calculation: "tomorrow = new Date(centralDate); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.toISOString().split('T')[0]",
+        description: "Create Campaign queries for 'CT + 12 hours' (line 37-38 of create-campaign/route.ts)",
+        calculation: "centralDate.setHours(centralDate.getHours() + 12); centralDate.toISOString().split('T')[0]",
         campaignDate: createCampaignDate,
         foundCampaign: createCampaign ? {
           id: createCampaign.id,
@@ -70,10 +70,11 @@ export async function GET(request: NextRequest) {
         datesMismatch,
         diagnosis: datesMismatch
           ? "❌ DATES DON'T MATCH - RSS Processing creates for " + rssProcessingDate + " but Create Campaign looks for " + createCampaignDate
-          : "✅ Dates match - both endpoints are looking at the same date: " + rssProcessingDate,
+          : "✅ Dates match - both endpoints use CT + 12 hours: " + rssProcessingDate,
+        explanation: "Both endpoints now add 12 hours to Central Time before extracting the date. This ensures morning runs use today's date, evening runs (8pm+) use tomorrow's date.",
         possibleCause: datesMismatch
           ? "If Create Campaign doesn't find a campaign, it would return 404. No duplicate should be created."
-          : "Both endpoints should work with the same campaign. If duplicates exist, the issue is elsewhere."
+          : "Both endpoints should work with the same campaign."
       },
       allCampaigns: allCampaigns || [],
       timestamp: new Date().toISOString()

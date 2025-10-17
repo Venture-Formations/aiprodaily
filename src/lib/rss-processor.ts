@@ -303,16 +303,21 @@ export class RSSProcessor {
   }
 
   private async getOrCreateTodaysCampaign(): Promise<string> {
-    // Use Central Time for consistent date calculations
+    // Use Central Time + 12 hours for consistent date calculations
+    // This ensures evening runs (8pm+) create campaigns for tomorrow
     const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
     const centralDate = new Date(nowCentral)
-    const today = centralDate.toISOString().split('T')[0]
+    // Add 12 hours to determine campaign date
+    centralDate.setHours(centralDate.getHours() + 12)
+    const campaignDate = centralDate.toISOString().split('T')[0]
 
-    // Check if campaign exists for today
+    console.log(`Campaign date calculation: Current CT time + 12 hours = ${campaignDate}`)
+
+    // Check if campaign exists for this date
     const { data: existing } = await supabaseAdmin
       .from('newsletter_campaigns')
       .select('id')
-      .eq('date', today)
+      .eq('date', campaignDate)
       .single()
 
     let campaignId: string
