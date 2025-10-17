@@ -1112,7 +1112,7 @@ export async function generateNewsletterFooter(campaignDate?: string, campaignId
     : facebookUrl
 
   return `
-<div style="max-width: 750px; margin: 0 auto; background-color: ${primaryColor}; padding: 8px 0; text-align: center;">
+<div style="width: 100%; background-color: ${primaryColor}; padding: 8px 0; text-align: center; margin: 0;">
   <a href="${trackedFacebookUrl}" target="_blank">
     <img src="https://raw.githubusercontent.com/VFDavid/STCScoop/refs/heads/main/facebook_light.png" alt="Facebook" width="24" height="24" style="border: none; display: inline-block;">
   </a>

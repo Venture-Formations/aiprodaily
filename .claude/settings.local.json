@@ -45,7 +45,9 @@
       "Bash(find:*)",
       "Bash(npm install:*)",
       "Bash(nslookup:*)",
-      "Bash(TZ=\"America/Chicago\" date:*)"
+      "Bash(TZ=\"America/Chicago\" date:*)",
+      "WebSearch",
+      "WebFetch(domain:developers.mailerlite.com)"
     ],
     "deny": [],
     "ask": []
