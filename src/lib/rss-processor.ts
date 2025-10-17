@@ -314,11 +314,18 @@ export class RSSProcessor {
     console.log(`Campaign date calculation: Current CT time + 12 hours = ${campaignDate}`)
 
     // Check if campaign exists for this date
-    const { data: existing } = await supabaseAdmin
+    // Use maybeSingle() to gracefully handle multiple matches
+    const { data: existing, error: existingError } = await supabaseAdmin
       .from('newsletter_campaigns')
       .select('id')
       .eq('date', campaignDate)
-      .single()
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    if (existingError) {
+      console.error('Error checking for existing campaign:', existingError)
+    }
 
     let campaignId: string
     let isNewCampaign = false
