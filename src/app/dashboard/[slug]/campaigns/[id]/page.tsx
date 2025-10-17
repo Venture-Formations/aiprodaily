@@ -935,7 +935,25 @@ function NewsletterSectionComponent({
 }) {
   if (!campaign) return null
 
+  // Section ID constants (reference IDs from newsletter_sections table)
+  // These IDs are stable and won't change even if section names are updated
+  const SECTION_IDS = {
+    AI_APPLICATIONS: '853f8d0b-bc76-473a-bfc6-421418266222',
+    PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b'
+  }
+
   const renderSectionContent = () => {
+    // Use section ID for AI Applications (stable across name changes)
+    if (section.id === SECTION_IDS.AI_APPLICATIONS) {
+      return <AIAppsSection campaign={campaign} />
+    }
+
+    // Use section ID for Prompt Ideas (stable across name changes)
+    if (section.id === SECTION_IDS.PROMPT_IDEAS) {
+      return <PromptIdeasSection campaign={campaign} />
+    }
+
+    // Legacy name-based matching for other sections
     switch (section.name) {
       case 'Yesterday\'s Wordle':
         return <WordleSection campaign={campaign} />
@@ -963,11 +981,6 @@ function NewsletterSectionComponent({
         return <RoadWorkSection campaign={campaign} />
       case 'Poll':
         return <PollSection campaign={campaign} />
-      case 'Prompt Ideas':
-        return <PromptIdeasSection campaign={campaign} />
-      case 'AI Applications':
-      case 'AI Apps':
-        return <AIAppsSection campaign={campaign} />
       case 'Breaking News':
         return <BreakingNewsSection campaign={campaign} />
       case 'Beyond the Feed':

@@ -179,6 +179,13 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
     const header = await generateNewsletterHeader(formattedDate)
     const footer = await generateNewsletterFooter()
 
+    // Section ID constants (reference IDs from newsletter_sections table)
+    // These IDs are stable and won't change even if section names are updated
+    const SECTION_IDS = {
+      AI_APPLICATIONS: '853f8d0b-bc76-473a-bfc6-421418266222',
+      PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b'
+    }
+
     // Generate sections in order based on database configuration
     let sectionsHtml = ''
     if (sections && sections.length > 0) {
@@ -193,6 +200,21 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
           const secondaryHtml = await generateSecondaryArticlesSection(campaign, section.name)
           sectionsHtml += secondaryHtml
         }
+        // Use section ID for AI Applications (stable across name changes)
+        else if (section.id === SECTION_IDS.AI_APPLICATIONS) {
+          const aiAppsHtml = await generateAIAppsSection(campaign)
+          if (aiAppsHtml) {
+            sectionsHtml += aiAppsHtml
+          }
+        }
+        // Use section ID for Prompt Ideas (stable across name changes)
+        else if (section.id === SECTION_IDS.PROMPT_IDEAS) {
+          const promptHtml = await generatePromptIdeasSection(campaign)
+          if (promptHtml) {
+            sectionsHtml += promptHtml
+          }
+        }
+        // Legacy name-based matching for other sections
         else if (section.name === 'Poll') {
           const pollHtml = await generatePollSection(campaign.id)
           if (pollHtml) {
@@ -222,16 +244,6 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
           const spotlightHtml = await generateCommunityBusinessSpotlightSection(campaign, false) // Don't record usage during preview
           if (spotlightHtml) {
             sectionsHtml += spotlightHtml
-          }
-        } else if (section.name === 'Prompt Ideas') {
-          const promptHtml = await generatePromptIdeasSection(campaign)
-          if (promptHtml) {
-            sectionsHtml += promptHtml
-          }
-        } else if (section.name === 'AI Applications' || section.name === 'AI Apps') {
-          const aiAppsHtml = await generateAIAppsSection(campaign)
-          if (aiAppsHtml) {
-            sectionsHtml += aiAppsHtml
           }
         }
       }
