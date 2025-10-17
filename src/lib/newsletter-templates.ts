@@ -1092,7 +1092,7 @@ export async function generatePromptIdeasSection(campaign: any): Promise<string>
 
     // Generate HTML with terminal styling (email-safe)
     return `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7;">
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff;">
   <tr>
     <td style="padding: 5px;">
       <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">Prompt Ideas</h2>
@@ -1100,8 +1100,8 @@ export async function generatePromptIdeasSection(campaign: any): Promise<string>
   </tr>
   <tr class='row'>
     <td class='column' style='padding:8px; vertical-align: top;'>
-      <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: Arial, sans-serif; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
-        <tr><td style='padding: 12px 12px 8px; font-size: 20px; font-weight: bold;'>${prompt.title}</td></tr>
+      <table width='100%' cellpadding='0' cellspacing='0' style='font-family: Arial, sans-serif; font-size: 16px; line-height: 26px;'>
+        <tr><td style='padding: 12px 12px 8px; font-size: 20px; font-weight: bold; text-align: center;'>${prompt.title}</td></tr>
         <tr>
           <td style='padding: 0 12px 12px;'>
             <div style='background-color: #000000; color: #00FF00; padding: 16px; border-radius: 6px; border: 2px solid #333; font-family: "Courier New", Courier, monospace; font-size: 14px; line-height: 22px; white-space: pre-wrap; max-width: 550px; margin: 0 auto;'>${prompt.prompt_text}</div>
