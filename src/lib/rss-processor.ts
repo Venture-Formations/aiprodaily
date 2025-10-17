@@ -315,53 +315,92 @@ export class RSSProcessor {
       .eq('date', today)
       .single()
 
+    let campaignId: string
+    let isNewCampaign = false
+
     if (existing) {
-      return existing.id
+      console.log(`Campaign already exists for ${today}: ${existing.id}`)
+      campaignId = existing.id
+    } else {
+      // Create new campaign with processing status
+      const { data: newCampaign, error } = await supabaseAdmin
+        .from('newsletter_campaigns')
+        .insert([{ date: today, status: 'processing' }])
+        .select('id')
+        .single()
+
+      if (error || !newCampaign) {
+        throw new Error('Failed to create campaign')
+      }
+
+      console.log(`Created new campaign for ${today}: ${newCampaign.id}`)
+      campaignId = newCampaign.id
+      isNewCampaign = true
     }
 
-    // Create new campaign with processing status
-    const { data: newCampaign, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
-      .insert([{ date: today, status: 'processing' }])
-      .select('id')
-      .single()
-
-    if (error || !newCampaign) {
-      throw new Error('Failed to create campaign')
-    }
-
-    // Initialize AI Applications and Prompt Ideas for the new campaign
-    console.log('Initializing campaign content selections (AI Apps & Prompts)...')
+    // Initialize AI Applications and Prompt Ideas if not already done
+    console.log('Checking campaign content selections (AI Apps & Prompts)...')
     try {
       const { AppSelector } = await import('./app-selector')
       const { PromptSelector } = await import('./prompt-selector')
 
-      // Get accounting newsletter ID
-      const { data: newsletter } = await supabaseAdmin
-        .from('newsletters')
+      // Check if AI Apps already selected
+      const { data: existingApps } = await supabaseAdmin
+        .from('campaign_ai_app_selections')
         .select('id')
-        .eq('slug', 'accounting')
-        .single()
+        .eq('campaign_id', campaignId)
+        .limit(1)
 
-      if (newsletter) {
-        // Initialize AI Applications
-        const selectedApps = await AppSelector.selectAppsForCampaign(newCampaign.id, newsletter.id)
-        console.log(`Selected ${selectedApps.length} AI applications for campaign`)
+      // Check if Prompt already selected
+      const { data: existingPrompt } = await supabaseAdmin
+        .from('campaign_prompt_selections')
+        .select('id')
+        .eq('campaign_id', campaignId)
+        .limit(1)
 
-        // Initialize Prompt Ideas
-        const selectedPrompt = await PromptSelector.selectPromptForCampaign(newCampaign.id)
-        if (selectedPrompt) {
-          console.log(`Selected prompt: ${selectedPrompt.title}`)
+      const needsApps = !existingApps || existingApps.length === 0
+      const needsPrompt = !existingPrompt || existingPrompt.length === 0
+
+      if (needsApps || needsPrompt) {
+        console.log(`Initializing missing content: Apps=${needsApps}, Prompt=${needsPrompt}`)
+
+        // Get accounting newsletter ID
+        const { data: newsletter } = await supabaseAdmin
+          .from('newsletters')
+          .select('id')
+          .eq('slug', 'accounting')
+          .single()
+
+        if (newsletter) {
+          // Initialize AI Applications if needed
+          if (needsApps) {
+            const selectedApps = await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
+            console.log(`Selected ${selectedApps.length} AI applications for campaign`)
+          } else {
+            console.log('AI Applications already selected, skipping')
+          }
+
+          // Initialize Prompt Ideas if needed
+          if (needsPrompt) {
+            const selectedPrompt = await PromptSelector.selectPromptForCampaign(campaignId)
+            if (selectedPrompt) {
+              console.log(`Selected prompt: ${selectedPrompt.title}`)
+            }
+          } else {
+            console.log('Prompt already selected, skipping')
+          }
+        } else {
+          console.warn('Accounting newsletter not found, skipping AI content initialization')
         }
       } else {
-        console.warn('Accounting newsletter not found, skipping AI content initialization')
+        console.log('Campaign content already initialized, skipping')
       }
     } catch (initError) {
       console.error('Error initializing campaign content:', initError)
       // Don't throw - continue with RSS processing even if initialization fails
     }
 
-    return newCampaign.id
+    return campaignId
   }
 
   private async processFeed(feed: RssFeed, campaignId: string, section: 'primary' | 'secondary' = 'primary') {
