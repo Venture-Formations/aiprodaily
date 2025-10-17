@@ -143,6 +143,18 @@ export async function middleware(request: NextRequest) {
         : `${url.protocol}//${hostname}/api/newsletters/by-subdomain?subdomain=${subdomain}`
 
       const response = await fetch(apiUrl)
+
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error('[Middleware] API returned non-JSON response:', {
+          status: response.status,
+          contentType,
+          url: apiUrl
+        })
+        return NextResponse.next()
+      }
+
       const data = await response.json()
 
       if (data.success && data.newsletter) {
@@ -158,6 +170,7 @@ export async function middleware(request: NextRequest) {
         })
       } else {
         // Newsletter not found for this subdomain
+        console.log('[Middleware] Newsletter not found for subdomain:', subdomain)
         return new NextResponse('Newsletter not found', { status: 404 })
       }
     } catch (error) {
