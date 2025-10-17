@@ -44,6 +44,7 @@ export default function SettingsPage() {
                 { id: 'email', name: 'Email' },
                 { id: 'slack', name: 'Slack' },
                 { id: 'ai-prompts', name: 'AI Prompts' },
+                { id: 'ai-apps', name: 'AI Apps' },
                 { id: 'rss', name: 'RSS Feeds' },
                 { id: 'notifications', name: 'Notifications' },
                 { id: 'users', name: 'Users' }
@@ -72,6 +73,7 @@ export default function SettingsPage() {
           {activeTab === 'email' && <EmailSettings />}
           {activeTab === 'slack' && <SlackSettings />}
           {activeTab === 'ai-prompts' && <AIPromptsSettings />}
+          {activeTab === 'ai-apps' && <AIAppsSettings />}
           {activeTab === 'rss' && <RSSFeeds />}
           {activeTab === 'notifications' && <Notifications />}
           {activeTab === 'users' && <Users />}
@@ -4353,6 +4355,155 @@ function Users() {
           <li>• User activity is logged for audit purposes</li>
         </ul>
       </div>
+    </div>
+  )
+}
+
+// AI Apps Settings Component
+function AIAppsSettings() {
+  const [settings, setSettings] = useState<any>({})
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    fetchSettings()
+  }, [])
+
+  const fetchSettings = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/settings/ai-apps')
+      const data = await response.json()
+
+      // Convert to flat object for easier editing
+      const flatSettings: any = {}
+      Object.entries(data.settings).forEach(([key, val]: [string, any]) => {
+        flatSettings[key] = parseInt(val.value) || 0
+      })
+      setSettings(flatSettings)
+    } catch (error) {
+      console.error('Failed to fetch AI app settings:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSave = async () => {
+    try {
+      setSaving(true)
+      setMessage('')
+
+      const response = await fetch('/api/settings/ai-apps', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings })
+      })
+
+      if (response.ok) {
+        setMessage('✓ Settings saved successfully')
+        setTimeout(() => setMessage(''), 3000)
+      } else {
+        setMessage('✗ Failed to save settings')
+      }
+    } catch (error) {
+      console.error('Failed to save settings:', error)
+      setMessage('✗ Error saving settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleChange = (key: string, value: number) => {
+    setSettings({ ...settings, [key]: value })
+  }
+
+  if (loading) {
+    return <div className="text-gray-600">Loading...</div>
+  }
+
+  const categories = [
+    { key: 'ai_apps_payroll_count', label: 'Payroll', color: 'bg-blue-100 text-blue-800' },
+    { key: 'ai_apps_hr_count', label: 'HR', color: 'bg-green-100 text-green-800' },
+    { key: 'ai_apps_accounting_count', label: 'Accounting System', color: 'bg-purple-100 text-purple-800' },
+    { key: 'ai_apps_finance_count', label: 'Finance (Filler)', color: 'bg-gray-100 text-gray-800' },
+    { key: 'ai_apps_productivity_count', label: 'Productivity (Filler)', color: 'bg-gray-100 text-gray-800' },
+    { key: 'ai_apps_client_mgmt_count', label: 'Client Management (Filler)', color: 'bg-gray-100 text-gray-800' },
+    { key: 'ai_apps_banking_count', label: 'Banking', color: 'bg-yellow-100 text-yellow-800' }
+  ]
+
+  return (
+    <div className="bg-white shadow rounded-lg p-6">
+      <h2 className="text-xl font-bold text-gray-900 mb-4">AI Applications Selection Settings</h2>
+
+      <p className="text-gray-600 mb-6">
+        Configure how many apps from each category are selected for each newsletter campaign.
+        Set count to 0 for "filler" categories (used to fill remaining slots).
+      </p>
+
+      {message && (
+        <div className={`mb-4 p-3 rounded-lg ${message.startsWith('✓') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+          {message}
+        </div>
+      )}
+
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Total Apps Per Newsletter
+        </label>
+        <input
+          type="number"
+          min="1"
+          max="20"
+          value={settings.ai_apps_per_newsletter || 6}
+          onChange={(e) => handleChange('ai_apps_per_newsletter', parseInt(e.target.value) || 6)}
+          className="w-32 border border-gray-300 rounded px-3 py-2"
+        />
+        <p className="text-sm text-gray-500 mt-1">Default: 6 apps</p>
+      </div>
+
+      <div className="space-y-4 mb-6">
+        <h3 className="text-lg font-semibold text-gray-900">Category Counts</h3>
+        {categories.map(({ key, label, color }) => (
+          <div key={key} className="flex items-center justify-between">
+            <div className="flex items-center">
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${color} mr-3`}>
+                {label}
+              </span>
+              <p className="text-sm text-gray-600">
+                {settings[key] === 0 ? 'Filler category' : `${settings[key]} per newsletter`}
+              </p>
+            </div>
+            <input
+              type="number"
+              min="0"
+              max="10"
+              value={settings[key] || 0}
+              onChange={(e) => handleChange(key, parseInt(e.target.value) || 0)}
+              className="w-20 border border-gray-300 rounded px-3 py-2"
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <h4 className="font-semibold text-blue-900 mb-2">How it works:</h4>
+        <ul className="text-sm text-blue-800 space-y-1">
+          <li>• Apps are selected automatically when creating a new campaign</li>
+          <li>• Categories with count &gt; 0 are "must-have" (always included)</li>
+          <li>• Categories with count = 0 are "fillers" (used to reach total apps)</li>
+          <li>• Apps rotate like prompts: each app is used before cycling through again</li>
+          <li>• Within each category, unused apps are prioritized</li>
+        </ul>
+      </div>
+
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-2 rounded-lg font-medium"
+      >
+        {saving ? 'Saving...' : 'Save Settings'}
+      </button>
     </div>
   )
 }
