@@ -173,7 +173,7 @@ export async function generateNewsletterHeader(formattedDate: string): Promise<s
    <div style='width:100%;margin:0 auto;padding:10px;background-color:#f7f7f7;box-sizing:border-box;overflow-x:auto;'>
      <div style='width:100%;max-width:750px;margin:0 auto;padding:5px;text-align:right;font-weight:bold;'>
        <a href='{$url}' style='color:#000;text-decoration:underline;'>View Online</a>&nbsp;|&nbsp;
-       <a href='https://stcscoop.com/' style='color:#000;text-decoration:underline;'>Sign Up</a>&nbsp;|&nbsp;
+       <a href='https://www.aiaccountingdaily.com' style='color:#000;text-decoration:underline;'>Sign Up</a>&nbsp;|&nbsp;
        <a href='{$forward}' style='color:#000;text-decoration:underline;'>Share</a>
      </div>
      <div style='width:100%;max-width:750px;margin:0 auto;padding:0px;'>
