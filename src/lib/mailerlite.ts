@@ -97,10 +97,13 @@ export class MailerLiteService {
         // Step 2: Schedule the campaign using the campaign ID
         let scheduleData
         try {
-          // Schedule review for campaign.date (newsletter date) at scheduled send time
-          // Campaign is created at Campaign Creation Time, but scheduled to send at Scheduled Send Time
-          scheduleData = await this.getReviewScheduleData(campaign.date)
-          console.log('Scheduling review campaign for campaign date with data:', scheduleData)
+          // Schedule review for TODAY at scheduled send time
+          // Campaign is created at Campaign Creation Time (8:50pm) and scheduled to send same day at Scheduled Send Time
+          const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
+          const centralDate = new Date(nowCentral)
+          const today = centralDate.toISOString().split('T')[0] // Today's date in YYYY-MM-DD
+          scheduleData = await this.getReviewScheduleData(today)
+          console.log('Scheduling review campaign for today with data:', scheduleData)
 
           const scheduleResponse = await mailerliteClient.post(`/campaigns/${campaignId}/schedule`, scheduleData)
 
@@ -530,10 +533,14 @@ export class MailerLiteService {
 
         console.log('Final campaign created successfully:', campaignId)
 
-        // Schedule the final campaign for the newsletter date
+        // Schedule the final campaign for TODAY at scheduled send time
+        // Campaign is created at Campaign Creation Time and scheduled to send same day at Scheduled Send Time
         try {
-          const finalScheduleData = await this.getFinalScheduleData(campaign.date)
-          console.log('Scheduling final campaign for newsletter date with data:', finalScheduleData)
+          const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
+          const centralDate = new Date(nowCentral)
+          const today = centralDate.toISOString().split('T')[0] // Today's date in YYYY-MM-DD
+          const finalScheduleData = await this.getFinalScheduleData(today)
+          console.log('Scheduling final campaign for today with data:', finalScheduleData)
 
           const scheduleResponse = await mailerliteClient.post(`/campaigns/${campaignId}/schedule`, finalScheduleData)
 
