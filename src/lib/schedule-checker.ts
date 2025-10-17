@@ -75,24 +75,14 @@ export class ScheduleChecker {
 
       console.log(`Time window matched for ${lastRunKey}: current ${currentTime}, scheduled ${scheduledTime}, diff ${timeDiff} minutes`)
 
-      // Check if we already ran today (use Central Time for consistency)
+      // Allow running multiple times per day for testing purposes
+      // Only check if time window matches, don't prevent multiple runs per day
       try {
         const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
         const centralDate = new Date(nowCentral)
         const today = centralDate.toISOString().split('T')[0]
-        const { data: setting } = await supabaseAdmin
-          .from('app_settings')
-          .select('value')
-          .eq('key', lastRunKey)
-          .single()
 
-        if (setting?.value === today) {
-          console.log(`${lastRunKey} already ran today (${today}), skipping`)
-          resolve(false)
-          return
-        }
-
-        // Update the last run date to today
+        // Update the last run date to today (for logging/tracking purposes only)
         await supabaseAdmin
           .from('app_settings')
           .upsert({
@@ -102,11 +92,12 @@ export class ScheduleChecker {
             updated_at: new Date().toISOString()
           })
 
-        console.log(`${lastRunKey} updating last run date to ${today}`)
+        console.log(`${lastRunKey} running at ${currentTime} (last run tracking updated to ${today})`)
         resolve(true)
       } catch (error) {
-        console.error(`Error checking/updating last run for ${lastRunKey}:`, error)
-        resolve(false)
+        console.error(`Error updating last run for ${lastRunKey}:`, error)
+        // Still allow the run even if tracking update fails
+        resolve(true)
       }
     })
   }

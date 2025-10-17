@@ -44,7 +44,8 @@
       "Bash(npx pnpm install)",
       "Bash(find:*)",
       "Bash(npm install:*)",
-      "Bash(nslookup:*)"
+      "Bash(nslookup:*)",
+      "Bash(TZ=\"America/Chicago\" date:*)"
     ],
     "deny": [],
     "ask": []
