@@ -153,8 +153,7 @@ export class MailerLiteService {
           .from('email_metrics')
           .upsert({
             campaign_id: campaign.id,
-            mailerlite_campaign_id: campaignId,
-            created_at: new Date().toISOString()
+            mailerlite_campaign_id: campaignId
           }, {
             onConflict: 'campaign_id'
           })
@@ -591,8 +590,7 @@ export class MailerLiteService {
           .from('email_metrics')
           .upsert({
             campaign_id: campaign.id,
-            mailerlite_campaign_id: campaignId,
-            created_at: new Date().toISOString()
+            mailerlite_campaign_id: campaignId
           }, {
             onConflict: 'campaign_id'
           })
