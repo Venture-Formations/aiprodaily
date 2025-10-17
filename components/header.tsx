@@ -11,7 +11,7 @@ export function Header() {
 
           <nav className="hidden md:flex items-center gap-8 absolute left-1/2 -translate-x-1/2">
             <a
-              href="#features"
+              href="#latest"
               className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
               Latest

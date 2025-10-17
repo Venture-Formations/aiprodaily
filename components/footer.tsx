@@ -19,7 +19,7 @@ export function Footer() {
             <h3 className="text-sm font-semibold mb-3">Quick Links</h3>
             <ul className="space-y-1.5 text-sm text-white/70">
               <li>
-                <a href="#features" className="hover:text-white transition-colors">
+                <a href="#latest" className="hover:text-white transition-colors">
                   Latest
                 </a>
               </li>
