@@ -435,16 +435,19 @@ export class RSSProcessor {
 
           console.log(`Post: "${item.title}" - Image URL: ${imageUrl || 'None found'}`)
 
-          // Check if post already exists
+          // Check if post already exists FOR THIS CAMPAIGN
+          // This allows the same RSS post to be used by multiple campaigns
           const { data: existingPost } = await supabaseAdmin
             .from('rss_posts')
             .select('id')
             .eq('feed_id', feed.id)
+            .eq('campaign_id', campaignId)
             .eq('external_id', item.guid || item.link || '')
             .single()
 
           if (existingPost) {
-            continue // Skip if already processed
+            console.log(`Post already exists for this campaign, skipping: "${item.title}"`)
+            continue // Skip if already processed for this campaign
           }
 
           // Attempt to download and re-host image immediately if it's a Facebook URL
