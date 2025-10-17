@@ -156,11 +156,11 @@ export class ScheduleChecker {
       }
 
       const currentTime = this.getCurrentTimeInCT()
-      console.log(`Review Send check: Current CT time ${currentTime.timeString}, Scheduled: ${settings.scheduledSendTime}`)
+      console.log(`Review Send check: Current CT time ${currentTime.timeString}, Campaign Creation Time: ${settings.campaignCreationTime}`)
 
       return await this.isTimeToRun(
         currentTime.timeString,
-        settings.scheduledSendTime,
+        settings.campaignCreationTime,
         'last_review_send_run'
       )
     } catch (error) {
@@ -206,11 +206,11 @@ export class ScheduleChecker {
       }
 
       const currentTime = this.getCurrentTimeInCT()
-      console.log(`Final Send check: Current CT time ${currentTime.timeString}, Scheduled: ${settings.dailyScheduledSendTime}`)
+      console.log(`Final Send check: Current CT time ${currentTime.timeString}, Daily Campaign Creation Time: ${settings.dailyCampaignCreationTime}`)
 
       return await this.isTimeToRun(
         currentTime.timeString,
-        settings.dailyScheduledSendTime,
+        settings.dailyCampaignCreationTime,
         'last_final_send_run'
       )
     } catch (error) {
