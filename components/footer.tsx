@@ -20,17 +20,7 @@ export function Footer() {
             <ul className="space-y-1.5 text-sm text-white/70">
               <li>
                 <a href="#features" className="hover:text-white transition-colors">
-                  Features
-                </a>
-              </li>
-              <li>
-                <a href="#newsletter" className="hover:text-white transition-colors">
-                  Newsletter
-                </a>
-              </li>
-              <li>
-                <a href="#testimonials" className="hover:text-white transition-colors">
-                  Testimonials
+                  Latest
                 </a>
               </li>
               <li>
