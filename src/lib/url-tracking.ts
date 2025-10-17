@@ -17,7 +17,7 @@ export function wrapTrackingUrl(
   campaignDate: string,
   campaignId?: string
 ): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://st-cloud-scoop.vercel.app'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.aiaccountingdaily.com'
 
   const params = new URLSearchParams({
     url: url,

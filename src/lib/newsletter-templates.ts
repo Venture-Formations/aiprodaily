@@ -460,7 +460,8 @@ export async function generateLocalEventsSection(campaign: any): Promise<string>
     // Generate featured events HTML (can be multiple)
     const featuredHtml = featuredEvents.map(featuredEvent => {
       // Link to our individual event page with tracking
-      const eventPageUrl = `https://st-cloud-scoop.vercel.app/events/${featuredEvent.id}`
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.aiaccountingdaily.com'
+      const eventPageUrl = `${baseUrl}/events/${featuredEvent.id}`
       const eventUrl = wrapTrackingUrl(eventPageUrl, 'Local Events', campaign.date, campaign.mailerlite_campaign_id)
 
       return `
@@ -483,7 +484,8 @@ export async function generateLocalEventsSection(campaign: any): Promise<string>
     // Generate regular events HTML
     const regularEventsHtml = regularEvents.map((event: any) => {
       // Link to our individual event page with tracking
-      const eventPageUrl = `https://st-cloud-scoop.vercel.app/events/${event.id}`
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.aiaccountingdaily.com'
+      const eventPageUrl = `${baseUrl}/events/${event.id}`
       const eventUrl = wrapTrackingUrl(eventPageUrl, 'Local Events', campaign.date, campaign.mailerlite_campaign_id)
 
       return `
@@ -596,7 +598,7 @@ export async function generateMinnesotaGetawaysSection(campaign: any): Promise<s
 // ==================== POLL SECTION ====================
 
 export async function generatePollSection(campaignId: string): Promise<string> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://st-cloud-scoop.vercel.app'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.aiaccountingdaily.com'
 
   try {
     // Fetch colors from business settings

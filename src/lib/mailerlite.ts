@@ -746,7 +746,7 @@ export class MailerLiteService {
       <p>Best regards,<br>The St. Cloud Scoop Team</p>
 
       <div class="footer">
-        <p>St. Cloud Scoop | <a href="https://st-cloud-scoop.vercel.app">st-cloud-scoop.vercel.app</a></p>
+        <p>AI Accounting Daily | <a href="https://www.aiaccountingdaily.com">www.aiaccountingdaily.com</a></p>
       </div>
     </div>
   </div>
@@ -822,7 +822,7 @@ export class MailerLiteService {
       <p>Best regards,<br>The St. Cloud Scoop Team</p>
 
       <div class="footer">
-        <p>St. Cloud Scoop | <a href="https://st-cloud-scoop.vercel.app">st-cloud-scoop.vercel.app</a></p>
+        <p>AI Accounting Daily | <a href="https://www.aiaccountingdaily.com">www.aiaccountingdaily.com</a></p>
       </div>
     </div>
   </div>
