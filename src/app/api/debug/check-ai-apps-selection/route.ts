@@ -8,10 +8,10 @@ export async function GET(request: NextRequest) {
 
     // Get all AI apps
     const { data: allApps, error: appsError } = await supabaseAdmin
-      .from('ai_apps')
+      .from('ai_applications')
       .select('*')
-      .eq('active', true)
-      .order('name')
+      .eq('is_active', true)
+      .order('app_name')
 
     if (appsError) {
       return NextResponse.json({ error: appsError.message }, { status: 500 })
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
         .from('campaign_ai_app_selections')
         .select(`
           *,
-          ai_app:ai_apps(*)
+          app:ai_applications(*)
         `)
         .eq('campaign_id', campaignId)
 
@@ -47,17 +47,17 @@ export async function GET(request: NextRequest) {
       total_ai_apps: allApps?.length || 0,
       ai_apps: allApps?.map(app => ({
         id: app.id,
-        name: app.name,
-        active: app.active,
+        name: app.app_name,
+        is_active: app.is_active,
         newsletter_id: app.newsletter_id
       })),
       newsletter: newsletter || null,
       campaign_id: campaignId,
       campaign_selections: campaignSelections?.length || 0,
       selected_apps: campaignSelections?.map(s => ({
-        ai_app_id: s.ai_app_id,
-        display_order: s.display_order,
-        app_name: s.ai_app?.name
+        app_id: s.app_id,
+        selection_order: s.selection_order,
+        app_name: s.app?.app_name
       })) || []
     })
 
