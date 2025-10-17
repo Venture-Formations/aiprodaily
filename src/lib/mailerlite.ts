@@ -259,9 +259,9 @@ export class MailerLiteService {
       day: 'numeric'
     })
 
-    // Use the modular template functions - SAME AS PREVIEW
-    const header = await generateNewsletterHeader(formattedDate)
-    const footer = await generateNewsletterFooter()
+    // Use the modular template functions with tracking - SAME AS PREVIEW
+    const header = await generateNewsletterHeader(formattedDate, campaign.date, campaign.mailerlite_campaign_id)
+    const footer = await generateNewsletterFooter(campaign.date, campaign.mailerlite_campaign_id)
 
     // Review banner for review campaigns
     const reviewBanner = isReview ? `

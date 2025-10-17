@@ -152,7 +152,7 @@ export function getEventEmoji(title: string, venue: string): string {
 
 // ==================== HEADER ====================
 
-export async function generateNewsletterHeader(formattedDate: string): Promise<string> {
+export async function generateNewsletterHeader(formattedDate: string, campaignDate?: string, campaignId?: string): Promise<string> {
   // Fetch business settings for header image, primary color, and website URL
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
@@ -169,12 +169,17 @@ export async function generateNewsletterHeader(formattedDate: string): Promise<s
   const newsletterName = settingsMap.newsletter_name || 'St. Cloud Scoop'
   const websiteUrl = settingsMap.website_url || 'https://www.aiaccountingdaily.com'
 
+  // Add tracking to Sign Up link if campaign info available
+  const signUpUrl = campaignDate
+    ? wrapTrackingUrl(websiteUrl, 'Header', campaignDate, campaignId)
+    : websiteUrl
+
   return `<html>
 <body style='margin:0!important;padding:0!important;background-color:#f7f7f7;'>
    <div style='width:100%;margin:0 auto;padding:10px;background-color:#f7f7f7;box-sizing:border-box;overflow-x:auto;'>
      <div style='width:100%;max-width:750px;margin:0 auto;padding:5px;text-align:right;font-weight:bold;'>
        <a href='{$url}' style='color:#000;text-decoration:underline;'>View Online</a>&nbsp;|&nbsp;
-       <a href='${websiteUrl}' style='color:#000;text-decoration:underline;'>Sign Up</a>&nbsp;|&nbsp;
+       <a href='${signUpUrl}' style='color:#000;text-decoration:underline;'>Sign Up</a>&nbsp;|&nbsp;
        <a href='{$forward}' style='color:#000;text-decoration:underline;'>Share</a>
      </div>
      <div style='width:100%;max-width:750px;margin:0 auto;padding:0px;'>
@@ -502,6 +507,10 @@ export async function generateLocalEventsSection(campaign: any): Promise<string>
 </td>`
   }).join(' ')
 
+  // Add tracking to event action buttons
+  const viewAllEventsUrl = wrapTrackingUrl('https://events.stcscoop.com/events/view', 'Local Events', campaign.date, campaign.mailerlite_campaign_id)
+  const submitEventUrl = wrapTrackingUrl('https://events.stcscoop.com/events/submit', 'Local Events', campaign.date, campaign.mailerlite_campaign_id)
+
   return `
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7; font-family: Arial, sans-serif;">
   <tr>
@@ -511,8 +520,8 @@ export async function generateLocalEventsSection(campaign: any): Promise<string>
   </tr><tr class="row">${dayColumns}
 </td></table>
 <div style="text-align: center; padding: 20px 10px; max-width: 750px; margin: 0 auto;">
-  <a href="https://events.stcscoop.com/events/view" style="display: inline-block; background-color: ${primaryColor}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 10px; font-family: Arial, sans-serif;">View All Events</a>
-  <a href="https://events.stcscoop.com/events/submit" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 10px; font-family: Arial, sans-serif;">Submit Your Event</a>
+  <a href="${viewAllEventsUrl}" style="display: inline-block; background-color: ${primaryColor}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 10px; font-family: Arial, sans-serif;">View All Events</a>
+  <a href="${submitEventUrl}" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 10px; font-family: Arial, sans-serif;">Submit Your Event</a>
 </div>
 <br>`
 }
@@ -1079,7 +1088,7 @@ export async function generateRoadWorkSection(campaign: any): Promise<string> {
 
 // ==================== FOOTER ====================
 
-export async function generateNewsletterFooter(): Promise<string> {
+export async function generateNewsletterFooter(campaignDate?: string, campaignId?: string): Promise<string> {
   // Fetch business settings for primary color, newsletter name, business name, and Facebook URL
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
@@ -1097,9 +1106,14 @@ export async function generateNewsletterFooter(): Promise<string> {
   const facebookUrl = settingsMap.facebook_url || 'https://www.facebook.com/61578947310955/'
   const currentYear = new Date().getFullYear()
 
+  // Add tracking to Facebook link if campaign info available
+  const trackedFacebookUrl = campaignDate
+    ? wrapTrackingUrl(facebookUrl, 'Footer', campaignDate, campaignId)
+    : facebookUrl
+
   return `
 <div style="max-width: 750px; margin: 0 auto; background-color: ${primaryColor}; padding: 8px 0; text-align: center;">
-  <a href="${facebookUrl}" target="_blank">
+  <a href="${trackedFacebookUrl}" target="_blank">
     <img src="https://raw.githubusercontent.com/VFDavid/STCScoop/refs/heads/main/facebook_light.png" alt="Facebook" width="24" height="24" style="border: none; display: inline-block;">
   </a>
 </div>
