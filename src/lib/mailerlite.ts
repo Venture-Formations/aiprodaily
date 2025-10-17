@@ -122,6 +122,23 @@ export class MailerLiteService {
           // Don't fail the whole process if scheduling fails - campaign is still created
         }
 
+        // Store MailerLite campaign ID in email_metrics table
+        const { error: metricsError } = await supabaseAdmin
+          .from('email_metrics')
+          .upsert({
+            campaign_id: campaign.id,
+            mailerlite_campaign_id: campaignId,
+            created_at: new Date().toISOString()
+          }, {
+            onConflict: 'campaign_id'
+          })
+
+        if (metricsError) {
+          console.error('Failed to store MailerLite campaign ID:', metricsError)
+        } else {
+          console.log(`Stored MailerLite campaign ID ${campaignId} in email_metrics table`)
+        }
+
         // Update campaign with review sent timestamp
         await supabaseAdmin
           .from('newsletter_campaigns')
@@ -511,6 +528,23 @@ export class MailerLiteService {
         } catch (scheduleError) {
           console.error('Error scheduling final campaign:', scheduleError)
           // Don't fail the whole process if scheduling fails - campaign is still created
+        }
+
+        // Store MailerLite campaign ID in email_metrics table
+        const { error: metricsError } = await supabaseAdmin
+          .from('email_metrics')
+          .upsert({
+            campaign_id: campaign.id,
+            mailerlite_campaign_id: campaignId,
+            created_at: new Date().toISOString()
+          }, {
+            onConflict: 'campaign_id'
+          })
+
+        if (metricsError) {
+          console.error('Failed to store MailerLite campaign ID:', metricsError)
+        } else {
+          console.log(`Stored MailerLite campaign ID ${campaignId} in email_metrics table`)
         }
 
         await this.logInfo('Final campaign created successfully', {
