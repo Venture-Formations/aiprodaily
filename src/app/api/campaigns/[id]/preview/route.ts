@@ -5,13 +5,9 @@ import { supabaseAdmin } from '@/lib/supabase'
 import {
   generateNewsletterHeader,
   generateNewsletterFooter,
-  generateLocalScoopSection,
   generatePrimaryArticlesSection,
   generateSecondaryArticlesSection,
-  generateLocalEventsSection,
   generateCommunityBusinessSpotlightSection,
-  generateWordleSection,
-  generateMinnesotaGetawaysSection,
   generateDiningDealsSection,
   generateRoadWorkSection,
   generatePollSection,
@@ -197,24 +193,10 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
           const secondaryHtml = await generateSecondaryArticlesSection(campaign, section.name)
           sectionsHtml += secondaryHtml
         }
-        else if (section.name === 'The Local Scoop' && activeArticles.length > 0) {
-          sectionsHtml += generateLocalScoopSection(activeArticles, campaign.date)
-        } else if (section.name === 'Local Events') {
-          sectionsHtml += await generateLocalEventsSection(campaign)
-        } else if (section.name === 'Poll') {
+        else if (section.name === 'Poll') {
           const pollHtml = await generatePollSection(campaign.id)
           if (pollHtml) {
             sectionsHtml += pollHtml
-          }
-        } else if (section.name === "Yesterday's Wordle") {
-          const wordleHtml = await generateWordleSection(campaign)
-          if (wordleHtml) {
-            sectionsHtml += wordleHtml
-          }
-        } else if (section.name === 'Minnesota Getaways') {
-          const getawaysHtml = await generateMinnesotaGetawaysSection(campaign)
-          if (getawaysHtml) {
-            sectionsHtml += getawaysHtml
           }
         } else if (section.name === 'Dining Deals') {
           const diningHtml = await generateDiningDealsSection(campaign)
@@ -256,9 +238,7 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
     } else {
       // Fallback to default order if no sections configured
       console.log('No sections found, using default order')
-      const wordleHtml = await generateWordleSection(campaign)
-      const getawaysHtml = await generateMinnesotaGetawaysSection(campaign)
-      sectionsHtml = generateLocalScoopSection(activeArticles, campaign.date) + await generateLocalEventsSection(campaign) + (wordleHtml || '') + (getawaysHtml || '')
+      sectionsHtml = ''
     }
 
     // Combine all sections

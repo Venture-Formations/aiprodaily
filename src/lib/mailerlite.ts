@@ -5,10 +5,6 @@ import type { CampaignWithArticles, CampaignWithEvents, Article } from '@/types/
 import {
   generateNewsletterHeader,
   generateNewsletterFooter,
-  generateLocalScoopSection,
-  generateLocalEventsSection,
-  generateWordleSection,
-  generateMinnesotaGetawaysSection,
   generateDiningDealsSection,
   generateRoadWorkSection,
   generatePollSection,
@@ -297,24 +293,10 @@ export class MailerLiteService {
           const secondaryHtml = await generateSecondaryArticlesSection(campaign, section.name)
           sectionsHtml += secondaryHtml
         }
-        else if (section.name === 'The Local Scoop' && activeArticles.length > 0) {
-          sectionsHtml += generateLocalScoopSection(activeArticles, campaign.date)
-        } else if (section.name === 'Local Events') {
-          sectionsHtml += await generateLocalEventsSection(campaign)
-        } else if (section.name === 'Poll') {
+        if (section.name === 'Poll') {
           const pollHtml = await generatePollSection(campaign.id)
           if (pollHtml) {
             sectionsHtml += pollHtml
-          }
-        } else if (section.name === "Yesterday's Wordle") {
-          const wordleHtml = await generateWordleSection(campaign)
-          if (wordleHtml) {
-            sectionsHtml += wordleHtml
-          }
-        } else if (section.name === 'Minnesota Getaways') {
-          const getawaysHtml = await generateMinnesotaGetawaysSection(campaign)
-          if (getawaysHtml) {
-            sectionsHtml += getawaysHtml
           }
         } else if (section.name === 'Dining Deals') {
           const diningHtml = await generateDiningDealsSection(campaign)
@@ -360,7 +342,7 @@ export class MailerLiteService {
     } else {
       // Fallback to default order if no sections configured
       console.log('MailerLite - No sections found, using default order')
-      sectionsHtml = generateLocalScoopSection(activeArticles, campaign.date) + await generateLocalEventsSection(campaign)
+      sectionsHtml = ''
     }
 
     // Combine using the SAME template structure as preview
