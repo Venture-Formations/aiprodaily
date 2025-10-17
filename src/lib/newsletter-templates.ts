@@ -176,7 +176,7 @@ export async function generateNewsletterHeader(formattedDate: string, campaignDa
 
   return `<html>
 <body style='margin:0!important;padding:0!important;background-color:#f7f7f7;'>
-   <div style='width:100%;margin:0 auto;padding:10px;background-color:#f7f7f7;box-sizing:border-box;overflow-x:auto;'>
+   <div style='width:100%;min-height:100vh;background-color:#f7f7f7;padding:10px;box-sizing:border-box;'>
      <div style='width:100%;max-width:750px;margin:0 auto;padding:5px;text-align:right;font-weight:bold;'>
        <a href='{$url}' style='color:#000;text-decoration:underline;'>View Online</a>&nbsp;|&nbsp;
        <a href='${signUpUrl}' style='color:#000;text-decoration:underline;'>Sign Up</a>&nbsp;|&nbsp;
@@ -188,7 +188,6 @@ export async function generateNewsletterHeader(formattedDate: string, campaignDa
          <div style='color:#fff;font-size:16px;font-weight:bold;padding:0 0 5px;'>${formattedDate}</div>
        </div>
      </div>
-   </div>
 <br>`
 }
 
