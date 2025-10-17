@@ -225,7 +225,7 @@ export class AppSelector {
     try {
       const { data } = await supabaseAdmin
         .from('campaign_ai_app_selections')
-        .select('*, app:ai_applications(*)')
+        .select('*, app:ai_apps(*)')
         .eq('campaign_id', campaignId)
         .order('selection_order', { ascending: true })
 
