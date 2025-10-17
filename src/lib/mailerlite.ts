@@ -119,6 +119,31 @@ export class MailerLiteService {
           }
         } catch (scheduleError) {
           console.error('Error scheduling campaign:', scheduleError)
+
+          // Log detailed error information for debugging
+          if (scheduleError && typeof scheduleError === 'object' && 'response' in scheduleError) {
+            const axiosError = scheduleError as any
+            console.error('MailerLite schedule API error response:', {
+              status: axiosError.response?.status,
+              statusText: axiosError.response?.statusText,
+              data: axiosError.response?.data,
+              config: {
+                url: axiosError.config?.url,
+                method: axiosError.config?.method,
+                data: axiosError.config?.data
+              }
+            })
+
+            // Log to database for persistent tracking
+            await this.logError('Failed to schedule review campaign', {
+              campaignId: campaign.id,
+              mailerliteCampaignId: campaignId,
+              scheduleData,
+              errorStatus: axiosError.response?.status,
+              errorData: axiosError.response?.data
+            })
+          }
+
           // Don't fail the whole process if scheduling fails - campaign is still created
         }
 
@@ -527,6 +552,32 @@ export class MailerLiteService {
           }
         } catch (scheduleError) {
           console.error('Error scheduling final campaign:', scheduleError)
+
+          // Log detailed error information for debugging
+          if (scheduleError && typeof scheduleError === 'object' && 'response' in scheduleError) {
+            const axiosError = scheduleError as any
+            console.error('MailerLite final schedule API error response:', {
+              status: axiosError.response?.status,
+              statusText: axiosError.response?.statusText,
+              data: axiosError.response?.data,
+              config: {
+                url: axiosError.config?.url,
+                method: axiosError.config?.method,
+                data: axiosError.config?.data
+              }
+            })
+
+            // Log to database for persistent tracking
+            const finalScheduleData = await this.getFinalScheduleData(campaign.date)
+            await this.logError('Failed to schedule final campaign', {
+              campaignId: campaign.id,
+              mailerliteCampaignId: campaignId,
+              scheduleData: finalScheduleData,
+              errorStatus: axiosError.response?.status,
+              errorData: axiosError.response?.data
+            })
+          }
+
           // Don't fail the whole process if scheduling fails - campaign is still created
         }
 
