@@ -39,7 +39,7 @@ export class MailerLiteService {
       const { data: settings } = await supabaseAdmin
         .from('app_settings')
         .select('key, value')
-        .in('key', ['email_senderName', 'email_fromEmail', 'email_reviewGroupId'])
+        .in('key', ['email_senderName', 'email_fromEmail', 'email_reviewGroupId', 'subject_line_emoji'])
 
       const settingsMap = (settings || []).reduce((acc, setting) => {
         acc[setting.key] = setting.value
@@ -49,6 +49,7 @@ export class MailerLiteService {
       const senderName = settingsMap['email_senderName'] || 'St. Cloud Scoop'
       const fromEmail = settingsMap['email_fromEmail'] || 'scoop@stcscoop.com'
       const reviewGroupId = settingsMap['email_reviewGroupId']
+      const subjectEmoji = settingsMap['subject_line_emoji'] || '🧮'
 
       if (!reviewGroupId) {
         throw new Error('Review Group ID not configured in database settings')
@@ -71,7 +72,7 @@ export class MailerLiteService {
         name: `Review: ${campaign.date}`,
         type: 'regular',
         emails: [{
-          subject: `🍦 ${subjectLine}`,
+          subject: `${subjectEmoji} ${subjectLine}`,
           from_name: senderName,
           from: fromEmail,
           content: emailContent,
@@ -490,7 +491,7 @@ export class MailerLiteService {
       const { data: settings } = await supabaseAdmin
         .from('app_settings')
         .select('key, value')
-        .in('key', ['email_senderName', 'email_fromEmail'])
+        .in('key', ['email_senderName', 'email_fromEmail', 'subject_line_emoji'])
 
       const settingsMap = (settings || []).reduce((acc, setting) => {
         acc[setting.key] = setting.value
@@ -499,6 +500,7 @@ export class MailerLiteService {
 
       const senderName = settingsMap['email_senderName'] || 'St. Cloud Scoop'
       const fromEmail = settingsMap['email_fromEmail'] || 'scoop@stcscoop.com'
+      const subjectEmoji = settingsMap['subject_line_emoji'] || '🧮'
 
       const emailContent = await this.generateEmailHTML(campaign, false) // Not a review
 
@@ -511,7 +513,7 @@ export class MailerLiteService {
         name: `Newsletter: ${campaign.date}`,
         type: 'regular',
         emails: [{
-          subject: `🍦 ${subjectLine}`,
+          subject: `${subjectEmoji} ${subjectLine}`,
           from_name: senderName,
           from: fromEmail,
           content: emailContent,

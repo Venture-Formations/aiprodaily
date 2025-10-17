@@ -3889,6 +3889,7 @@ function BusinessSettings() {
   const [settings, setSettings] = useState({
     newsletter_name: '',
     business_name: '',
+    subject_line_emoji: '🧮',
     primary_color: '#3B82F6',
     secondary_color: '#10B981',
     header_image_url: '',
@@ -4048,6 +4049,24 @@ function BusinessSettings() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g., AI Pros Inc."
             />
+          </div>
+
+          {/* Subject Line Emoji */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Subject Line Emoji
+            </label>
+            <input
+              type="text"
+              value={settings.subject_line_emoji}
+              onChange={(e) => setSettings({ ...settings, subject_line_emoji: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              placeholder="e.g., 🧮"
+              maxLength={2}
+            />
+            <p className="mt-1 text-sm text-gray-500">
+              This emoji will appear at the beginning of all email subject lines
+            </p>
           </div>
 
           {/* Contact Email */}
