@@ -95,6 +95,22 @@ export async function POST(request: NextRequest) {
       console.log('No prompts available for selection')
     }
 
+    // Select AI apps for the campaign
+    console.log('Selecting AI apps for campaign...')
+    const { AppSelector } = await import('@/lib/app-selector')
+    const { data: newsletter } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('slug', 'accounting')
+      .single()
+
+    if (newsletter) {
+      const selectedApps = await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
+      console.log(`Selected ${selectedApps.length} AI applications`)
+    } else {
+      console.warn('Newsletter not found, skipping AI app selection')
+    }
+
     // Process RSS feeds for the specific campaign
     console.log('Starting RSS processing...')
     await rssProcessor.processAllFeedsForCampaign(campaignId)
@@ -216,6 +232,22 @@ export async function GET(request: NextRequest) {
       console.log(`Selected prompt: ${selectedPrompt.title}`)
     } else {
       console.log('No prompts available for selection')
+    }
+
+    // Select AI apps for the campaign
+    console.log('Selecting AI apps for campaign...')
+    const { AppSelector } = await import('@/lib/app-selector')
+    const { data: newsletter } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('slug', 'accounting')
+      .single()
+
+    if (newsletter) {
+      const selectedApps = await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
+      console.log(`Selected ${selectedApps.length} AI applications`)
+    } else {
+      console.warn('Newsletter not found, skipping AI app selection')
     }
 
     // Process RSS feeds for the specific campaign
