@@ -1104,7 +1104,7 @@ export async function generatePromptIdeasSection(campaign: any): Promise<string>
         <tr><td style='padding: 12px 12px 8px; font-size: 20px; font-weight: bold;'>${prompt.title}</td></tr>
         <tr>
           <td style='padding: 0 12px 12px;'>
-            <div style='background-color: #000000; color: #00FF00; padding: 16px; border-radius: 6px; border: 2px solid #333; font-family: "Courier New", Courier, monospace; font-size: 14px; line-height: 22px; white-space: pre-wrap;'>${prompt.prompt_text}</div>
+            <div style='background-color: #000000; color: #00FF00; padding: 16px; border-radius: 6px; border: 2px solid #333; font-family: "Courier New", Courier, monospace; font-size: 14px; line-height: 22px; white-space: pre-wrap; max-width: 550px; margin: 0 auto;'>${prompt.prompt_text}</div>
           </td>
         </tr>
       </table>
