@@ -39,7 +39,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           )
         ),
         manual_articles:manual_articles(*),
-        email_metrics(*)
+        email_metrics(*),
+        campaign_ai_app_selections(
+          *,
+          app:ai_applications(*)
+        )
       `)
       .eq('id', id)
       .single()

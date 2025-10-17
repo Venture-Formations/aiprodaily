@@ -245,6 +245,105 @@ function PromptIdeasSection({ campaign }: { campaign: any }) {
   )
 }
 
+function AIAppsSection({ campaign }: { campaign: any }) {
+  const [aiApps, setAiApps] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchAIApps = async () => {
+      try {
+        // AI apps are already loaded with campaign data
+        if (campaign?.campaign_ai_app_selections) {
+          const sortedApps = [...campaign.campaign_ai_app_selections]
+            .sort((a, b) => a.selection_order - b.selection_order)
+          setAiApps(sortedApps)
+        }
+      } catch (error) {
+        console.error('Failed to load AI apps:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchAIApps()
+  }, [campaign])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
+        <span className="ml-3 text-gray-600">Loading AI Applications...</span>
+      </div>
+    )
+  }
+
+  if (!aiApps || aiApps.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        No AI Applications selected for this campaign
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-6">
+      <div className="grid gap-4">
+        {aiApps.map((selection) => {
+          const app = selection.app
+          if (!app) return null
+
+          return (
+            <div
+              key={selection.id}
+              className={`border rounded-lg p-4 ${
+                selection.is_featured
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 bg-white'
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h4 className="text-lg font-bold text-gray-900">
+                    {app.app_name}
+                    {selection.is_featured && (
+                      <span className="ml-2 text-sm text-blue-600 font-normal">
+                        ⭐ Featured
+                      </span>
+                    )}
+                  </h4>
+                  {app.tagline && (
+                    <p className="text-sm text-gray-600 italic mt-1">
+                      {app.tagline}
+                    </p>
+                  )}
+                  <p className="text-sm text-gray-700 mt-2">
+                    {app.description}
+                  </p>
+                  {app.website_url && (
+                    <a
+                      href={app.website_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-600 hover:underline mt-2 inline-block"
+                    >
+                      Learn more →
+                    </a>
+                  )}
+                </div>
+                {app.category && (
+                  <span className="ml-4 text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                    {app.category}
+                  </span>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function RoadWorkSection({ campaign }: { campaign: any }) {
   const [roadWorkItems, setRoadWorkItems] = useState<any[]>([])
   const [selectedItems, setSelectedItems] = useState<any[]>([])
@@ -866,6 +965,8 @@ function NewsletterSectionComponent({
         return <PollSection campaign={campaign} />
       case 'Prompt Ideas':
         return <PromptIdeasSection campaign={campaign} />
+      case 'AI Apps':
+        return <AIAppsSection campaign={campaign} />
       case 'Breaking News':
         return <BreakingNewsSection campaign={campaign} />
       case 'Beyond the Feed':
