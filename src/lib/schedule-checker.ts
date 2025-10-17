@@ -62,12 +62,13 @@ export class ScheduleChecker {
       const current = this.parseTime(currentTime)
       const scheduled = this.parseTime(scheduledTime)
 
-      // Check if current time matches scheduled time (within 5-minute window)
+      // Check if current time matches scheduled time (within 4-minute window)
+      // This prevents duplicate runs at scheduled time + 5 minutes
       const currentMinutes = current.hours * 60 + current.minutes
       const scheduledMinutes = scheduled.hours * 60 + scheduled.minutes
       const timeDiff = Math.abs(currentMinutes - scheduledMinutes)
 
-      if (timeDiff > 5) {
+      if (timeDiff > 4) {
         console.log(`Time window not matched for ${lastRunKey}: current ${currentTime}, scheduled ${scheduledTime}, diff ${timeDiff} minutes`)
         resolve(false)
         return
@@ -75,53 +76,28 @@ export class ScheduleChecker {
 
       console.log(`Time window matched for ${lastRunKey}: current ${currentTime}, scheduled ${scheduledTime}, diff ${timeDiff} minutes`)
 
-      // Check if this job has already run today at the scheduled time
+      // Allow running multiple times per day for testing purposes
+      // Only check if time window matches, don't prevent multiple runs per day
       try {
         const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
         const centralDate = new Date(nowCentral)
         const today = centralDate.toISOString().split('T')[0]
 
-        // Check the last run timestamp (not just date)
-        const { data: lastRunData } = await supabaseAdmin
-          .from('app_settings')
-          .select('value')
-          .eq('key', lastRunKey)
-          .single()
-
-        if (lastRunData?.value) {
-          const lastRunTimestamp = lastRunData.value
-
-          // Parse the last run timestamp
-          // If it's just a date (YYYY-MM-DD), it's old format - allow running
-          // If it's a full timestamp, check if it was within the last hour
-          if (lastRunTimestamp.includes('T') || lastRunTimestamp.includes(':')) {
-            const lastRun = new Date(lastRunTimestamp)
-            const now = new Date()
-            const hoursSinceLastRun = (now.getTime() - lastRun.getTime()) / (1000 * 60 * 60)
-
-            if (hoursSinceLastRun < 1) {
-              console.log(`${lastRunKey} already ran ${hoursSinceLastRun.toFixed(2)} hours ago - skipping`)
-              resolve(false)
-              return
-            }
-          }
-        }
-
-        // Update the last run timestamp to current time
+        // Update the last run date to today (for logging/tracking purposes only)
         await supabaseAdmin
           .from('app_settings')
           .upsert({
             key: lastRunKey,
-            value: new Date().toISOString(),
-            description: `Last run timestamp for ${lastRunKey}`,
+            value: today,
+            description: `Last run date for ${lastRunKey}`,
             updated_at: new Date().toISOString()
           })
 
-        console.log(`${lastRunKey} running at ${currentTime} (last run timestamp updated)`)
+        console.log(`${lastRunKey} running at ${currentTime} (last run tracking updated to ${today})`)
         resolve(true)
       } catch (error) {
-        console.error(`Error checking/updating last run for ${lastRunKey}:`, error)
-        // On error, allow the run to proceed (fail open)
+        console.error(`Error updating last run for ${lastRunKey}:`, error)
+        // Still allow the run even if tracking update fails
         resolve(true)
       }
     })
