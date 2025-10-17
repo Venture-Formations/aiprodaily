@@ -978,6 +978,96 @@ export async function generateBeyondTheFeedSection(campaign: any): Promise<strin
   }
 }
 
+// ==================== AI APPS ====================
+
+function getAIAppEmoji(appName: string, category: string, description: string): string {
+  const text = (appName + ' ' + category + ' ' + description).toLowerCase()
+
+  // Category-based emojis
+  if (category.toLowerCase().includes('payroll')) return '💵'
+  if (category.toLowerCase().includes('hr')) return '👥'
+  if (category.toLowerCase().includes('accounting')) return '📊'
+  if (category.toLowerCase().includes('finance')) return '💰'
+  if (category.toLowerCase().includes('banking')) return '🏦'
+  if (category.toLowerCase().includes('client management')) return '🤝'
+
+  // Functionality-based emojis
+  if (text.includes('elearning') || text.includes('education') || text.includes('training')) return '🎓'
+  if (text.includes('calendar') || text.includes('schedule')) return '📅'
+  if (text.includes('animation') || text.includes('photo') || text.includes('image')) return '🖼️'
+  if (text.includes('language') || text.includes('translation')) return '🌎'
+  if (text.includes('video') || text.includes('film')) return '🎬'
+  if (text.includes('writing') || text.includes('content')) return '✍️'
+  if (text.includes('voice') || text.includes('audio')) return '🎙️'
+  if (text.includes('design') || text.includes('creative')) return '🎨'
+  if (text.includes('data') || text.includes('analytics')) return '📈'
+  if (text.includes('automation') || text.includes('workflow')) return '⚙️'
+  if (text.includes('communication') || text.includes('chat')) return '💬'
+  if (text.includes('project') || text.includes('task')) return '📋'
+  if (text.includes('productivity')) return '⚡'
+
+  // Default productivity icon
+  return '🔧'
+}
+
+export async function generateAIAppsSection(campaign: any): Promise<string> {
+  try {
+    console.log('Generating AI Apps section for campaign:', campaign?.id)
+
+    // Import AppSelector
+    const { AppSelector } = await import('./app-selector')
+
+    // Fetch colors from business settings
+    const { primaryColor, secondaryColor } = await fetchBusinessColors()
+
+    // Get the selected apps for this campaign
+    const apps = await AppSelector.getAppsForCampaign(campaign.id)
+
+    if (!apps || apps.length === 0) {
+      console.log('No AI apps selected for this campaign, skipping AI Apps section')
+      return ''
+    }
+
+    console.log(`Found ${apps.length} AI apps for campaign`)
+
+    // Generate numbered list HTML
+    const appsHtml = apps.map((app, index) => {
+      const emoji = getAIAppEmoji(app.app_name, app.category || '', app.description || '')
+      const appUrl = app.app_url || '#'
+
+      // Wrap URL with tracking
+      const trackedUrl = appUrl !== '#'
+        ? wrapTrackingUrl(appUrl, 'AI Apps', campaign.date, campaign.mailerlite_campaign_id)
+        : '#'
+
+      // Format: number. emoji Title - Description
+      return `
+      <div style='padding: 12px 0; border-bottom: 1px solid #e0e0e0; font-size: 16px; line-height: 24px;'>
+        <strong>${index + 1}.</strong> ${emoji} <a href='${trackedUrl}' style='color: ${secondaryColor}; text-decoration: none; font-weight: bold;'>${app.app_name}</a> - ${app.description || 'AI-powered application'}
+      </div>`
+    }).join('')
+
+    return `
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff;">
+  <tr>
+    <td style="padding: 5px;">
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">AI Applications</h2>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 0 20px 20px 20px;">
+      ${appsHtml}
+    </td>
+  </tr>
+</table>
+<br>`
+
+  } catch (error) {
+    console.error('Error generating AI Apps section:', error)
+    return ''
+  }
+}
+
 // ==================== PROMPT IDEAS ====================
 
 export async function generatePromptIdeasSection(campaign: any): Promise<string> {

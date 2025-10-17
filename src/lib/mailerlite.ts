@@ -349,6 +349,12 @@ export class MailerLiteService {
           if (promptHtml) {
             sectionsHtml += promptHtml
           }
+        } else if (section.name === 'AI Apps') {
+          const { generateAIAppsSection } = await import('./newsletter-templates')
+          const aiAppsHtml = await generateAIAppsSection(campaign)
+          if (aiAppsHtml) {
+            sectionsHtml += aiAppsHtml
+          }
         }
       }
     } else {

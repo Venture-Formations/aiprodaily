@@ -4426,9 +4426,9 @@ function AIAppsSettings() {
     { key: 'ai_apps_payroll_count', label: 'Payroll', color: 'bg-blue-100 text-blue-800' },
     { key: 'ai_apps_hr_count', label: 'HR', color: 'bg-green-100 text-green-800' },
     { key: 'ai_apps_accounting_count', label: 'Accounting System', color: 'bg-purple-100 text-purple-800' },
-    { key: 'ai_apps_finance_count', label: 'Finance (Filler)', color: 'bg-gray-100 text-gray-800' },
-    { key: 'ai_apps_productivity_count', label: 'Productivity (Filler)', color: 'bg-gray-100 text-gray-800' },
-    { key: 'ai_apps_client_mgmt_count', label: 'Client Management (Filler)', color: 'bg-gray-100 text-gray-800' },
+    { key: 'ai_apps_finance_count', label: 'Finance', color: 'bg-orange-100 text-orange-800' },
+    { key: 'ai_apps_productivity_count', label: 'Productivity', color: 'bg-pink-100 text-pink-800' },
+    { key: 'ai_apps_client_mgmt_count', label: 'Client Management', color: 'bg-indigo-100 text-indigo-800' },
     { key: 'ai_apps_banking_count', label: 'Banking', color: 'bg-yellow-100 text-yellow-800' }
   ]
 
@@ -4492,8 +4492,9 @@ function AIAppsSettings() {
           <li>• Apps are selected automatically when creating a new campaign</li>
           <li>• Categories with count &gt; 0 are "must-have" (always included)</li>
           <li>• Categories with count = 0 are "fillers" (used to reach total apps)</li>
-          <li>• Apps rotate like prompts: each app is used before cycling through again</li>
+          <li>• Apps rotate: each app is used before cycling through again</li>
           <li>• Within each category, unused apps are prioritized</li>
+          <li>• If a category runs out of apps, other categories can provide more to reach the total</li>
         </ul>
       </div>
 

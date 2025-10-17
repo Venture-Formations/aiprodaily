@@ -17,7 +17,8 @@ import {
   generatePollSection,
   generateBreakingNewsSection,
   generateBeyondTheFeedSection,
-  generatePromptIdeasSection
+  generatePromptIdeasSection,
+  generateAIAppsSection
 } from '@/lib/newsletter-templates'
 
 export async function GET(
@@ -244,6 +245,11 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
           const promptHtml = await generatePromptIdeasSection(campaign)
           if (promptHtml) {
             sectionsHtml += promptHtml
+          }
+        } else if (section.name === 'AI Apps') {
+          const aiAppsHtml = await generateAIAppsSection(campaign)
+          if (aiAppsHtml) {
+            sectionsHtml += aiAppsHtml
           }
         }
       }
