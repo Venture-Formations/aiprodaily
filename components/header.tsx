@@ -16,18 +16,6 @@ export function Header() {
             >
               Features
             </a>
-            <a
-              href="#newsletter"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Newsletter
-            </a>
-            <a
-              href="#testimonials"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Testimonials
-            </a>
           </nav>
 
           <Button className="bg-[#1c293d] hover:bg-[#1c293d]/90 text-white">Subscribe</Button>
