@@ -176,8 +176,10 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
     console.log('Formatted date:', formattedDate)
 
     // Generate modular HTML sections with tracking parameters
-    const header = await generateNewsletterHeader(formattedDate, campaign.date, campaign.mailerlite_campaign_id)
-    const footer = await generateNewsletterFooter(campaign.date, campaign.mailerlite_campaign_id)
+    // mailerlite_campaign_id might not exist yet, so it's optional
+    const mailerliteId = (campaign as any).mailerlite_campaign_id || undefined
+    const header = await generateNewsletterHeader(formattedDate, campaign.date, mailerliteId)
+    const footer = await generateNewsletterFooter(campaign.date, mailerliteId)
 
     // Section ID constants (reference IDs from newsletter_sections table)
     // These IDs are stable and won't change even if section names are updated
