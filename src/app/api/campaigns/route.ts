@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authOptions } from '@/lib/auth'
 import { PromptSelector } from '@/lib/prompt-selector'
+import { AppSelector } from '@/lib/app-selector'
 
 // Helper function to initialize AI app selection for a new campaign
 async function initializeAIAppSelection(campaignId: string) {
@@ -21,40 +22,13 @@ async function initializeAIAppSelection(campaignId: string) {
       return
     }
 
-    // Get 5 active AI applications randomly
-    const { data: apps, error } = await supabaseAdmin
-      .from('ai_applications')
-      .select('*')
-      .eq('newsletter_id', newsletter.id)
-      .eq('is_active', true)
-      .order('times_used', { ascending: true }) // Prioritize less-used apps
-      .limit(10) // Get 10 to choose from
+    // Use AppSelector to select apps with proper category rotation logic
+    const selectedApps = await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
 
-    if (error || !apps || apps.length === 0) {
-      console.error('Error fetching AI applications:', error)
-      return
-    }
-
-    // Shuffle and select 5
-    const shuffledApps = [...apps].sort(() => Math.random() - 0.5)
-    const selectedApps = shuffledApps.slice(0, 5)
-
-    // Insert selections
-    const selections = selectedApps.map((app, index) => ({
-      campaign_id: campaignId,
-      app_id: app.id,
-      selection_order: index + 1,
-      is_featured: index === 0 // First app is featured
-    }))
-
-    const { error: insertError } = await supabaseAdmin
-      .from('campaign_ai_app_selections')
-      .insert(selections)
-
-    if (insertError) {
-      console.error('Error inserting AI app selections:', insertError)
-    } else {
+    if (selectedApps.length > 0) {
       console.log(`Successfully selected ${selectedApps.length} AI applications`)
+    } else {
+      console.log('No apps available for selection')
     }
   } catch (error) {
     console.error('Error initializing AI app selection:', error)

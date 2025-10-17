@@ -14,13 +14,16 @@ export default function AIApplicationsPage() {
     app_name: '',
     tagline: '',
     description: '',
-    category: 'Automation',
+    category: 'Payroll',
     app_url: '',
-    pricing: 'Free',
+    tool_type: 'Client',
+    category_priority: 0,
     is_active: true,
     is_featured: false
   })
   const [filterCategory, setFilterCategory] = useState<string>('all')
+  const [uploadingCSV, setUploadingCSV] = useState(false)
+  const [uploadMessage, setUploadMessage] = useState('')
 
   useEffect(() => {
     fetchApps()
@@ -105,9 +108,10 @@ export default function AIApplicationsPage() {
           app_name: '',
           tagline: '',
           description: '',
-          category: 'Automation',
+          category: 'Payroll',
           app_url: '',
-          pricing: 'Free',
+          tool_type: 'Client',
+          category_priority: 0,
           is_active: true,
           is_featured: false
         })
@@ -117,12 +121,42 @@ export default function AIApplicationsPage() {
     }
   }
 
+  const handleCSVUpload = async (file: File) => {
+    setUploadingCSV(true)
+    setUploadMessage('')
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/ai-apps/upload', {
+        method: 'POST',
+        body: formData
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setUploadMessage(`✓ Successfully uploaded ${data.imported} apps${data.errors ? ` (${data.errors.length} errors)` : ''}`)
+        await fetchApps()
+      } else {
+        setUploadMessage(`✗ Error: ${data.error || 'Upload failed'}`)
+      }
+    } catch (error) {
+      setUploadMessage('✗ Error uploading CSV file')
+      console.error('Failed to upload CSV:', error)
+    } finally {
+      setUploadingCSV(false)
+      setTimeout(() => setUploadMessage(''), 5000)
+    }
+  }
+
   const filteredApps = apps.filter(app =>
     filterCategory === 'all' || app.category === filterCategory
   )
 
-  const categories = ['Automation', 'Analysis', 'Writing', 'Research', 'Communication', 'Documentation']
-  const pricingOptions = ['Free', 'Freemium', 'Paid', 'Enterprise']
+  const categories = ['Payroll', 'HR', 'Accounting System', 'Finance', 'Productivity', 'Client Management', 'Banking']
+  const toolTypes = ['Client', 'Firm']
 
   if (loading) {
     return (
@@ -146,13 +180,36 @@ export default function AIApplicationsPage() {
               Manage AI tools and applications for accounting professionals
             </p>
           </div>
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
-          >
-            + Add Application
-          </button>
+          <div className="flex items-center space-x-3">
+            <label className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium cursor-pointer">
+              {uploadingCSV ? 'Uploading...' : '📤 Upload CSV'}
+              <input
+                type="file"
+                accept=".csv"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) handleCSVUpload(file)
+                  e.target.value = ''
+                }}
+                className="hidden"
+                disabled={uploadingCSV}
+              />
+            </label>
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
+            >
+              + Add Application
+            </button>
+          </div>
         </div>
+
+        {/* Upload Message */}
+        {uploadMessage && (
+          <div className={`mb-4 p-3 rounded-lg ${uploadMessage.startsWith('✓') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+            {uploadMessage}
+          </div>
+        )}
 
         {/* Add Form */}
         {showAddForm && (
@@ -203,7 +260,7 @@ export default function AIApplicationsPage() {
                 </label>
                 <select
                   value={addForm.category || ''}
-                  onChange={(e) => setAddForm({ ...addForm, category: e.target.value })}
+                  onChange={(e) => setAddForm({ ...addForm, category: e.target.value as any })}
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 >
                   {categories.map(cat => (
@@ -213,15 +270,15 @@ export default function AIApplicationsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Pricing
+                  Tool Type
                 </label>
                 <select
-                  value={addForm.pricing || ''}
-                  onChange={(e) => setAddForm({ ...addForm, pricing: e.target.value })}
+                  value={addForm.tool_type || 'Client'}
+                  onChange={(e) => setAddForm({ ...addForm, tool_type: e.target.value as any })}
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 >
-                  {pricingOptions.map(price => (
-                    <option key={price} value={price}>{price}</option>
+                  {toolTypes.map(type => (
+                    <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
               </div>
@@ -320,7 +377,7 @@ export default function AIApplicationsPage() {
                   Category
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Pricing
+                  Tool Type
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
@@ -361,7 +418,7 @@ export default function AIApplicationsPage() {
                       <td className="px-6 py-4">
                         <select
                           value={editForm.category || ''}
-                          onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                          onChange={(e) => setEditForm({ ...editForm, category: e.target.value as any })}
                           className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
                         >
                           {categories.map(cat => (
@@ -371,12 +428,12 @@ export default function AIApplicationsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <select
-                          value={editForm.pricing || ''}
-                          onChange={(e) => setEditForm({ ...editForm, pricing: e.target.value })}
+                          value={editForm.tool_type || 'Client'}
+                          onChange={(e) => setEditForm({ ...editForm, tool_type: e.target.value as any })}
                           className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
                         >
-                          {pricingOptions.map(price => (
-                            <option key={price} value={price}>{price}</option>
+                          {toolTypes.map(type => (
+                            <option key={type} value={type}>{type}</option>
                           ))}
                         </select>
                       </td>
@@ -443,7 +500,7 @@ export default function AIApplicationsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                          {app.pricing}
+                          {app.tool_type || 'Client'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">

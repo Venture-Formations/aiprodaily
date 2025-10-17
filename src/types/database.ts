@@ -30,18 +30,22 @@ export interface NewsletterSetting {
 }
 
 // AI Professional Newsletter Features
+export type ToolType = 'Client' | 'Firm'
+export type AIAppCategory = 'Payroll' | 'HR' | 'Accounting System' | 'Finance' | 'Productivity' | 'Client Management' | 'Banking'
+
 export interface AIApplication {
   id: string
   newsletter_id: string
   app_name: string
   tagline: string | null
   description: string
-  category: string | null
+  category: AIAppCategory | null
   app_url: string
   tracked_link: string | null
   logo_url: string | null
   screenshot_url: string | null
-  pricing: string | null
+  tool_type: ToolType | null
+  category_priority: number
   is_featured: boolean
   is_paid_placement: boolean
   is_active: boolean
