@@ -228,7 +228,7 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
           if (promptHtml) {
             sectionsHtml += promptHtml
           }
-        } else if (section.name === 'AI Apps') {
+        } else if (section.name === 'AI Applications' || section.name === 'AI Apps') {
           const aiAppsHtml = await generateAIAppsSection(campaign)
           if (aiAppsHtml) {
             sectionsHtml += aiAppsHtml

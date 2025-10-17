@@ -965,6 +965,7 @@ function NewsletterSectionComponent({
         return <PollSection campaign={campaign} />
       case 'Prompt Ideas':
         return <PromptIdeasSection campaign={campaign} />
+      case 'AI Applications':
       case 'AI Apps':
         return <AIAppsSection campaign={campaign} />
       case 'Breaking News':
