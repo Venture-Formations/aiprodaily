@@ -267,7 +267,7 @@ export async function generatePrimaryArticlesSection(articles: any[], campaignDa
     return `
       <div style='padding: 16px 0; border-bottom: 1px solid #e0e0e0;'>
         <div style='font-size: 18px; font-weight: bold; margin-bottom: 8px;'>
-          ${emoji} <a href='${trackedUrl}' style='color: ${secondaryColor}; text-decoration: none;'>${headline}</a>
+          ${emoji} <a href='${trackedUrl}' style='color: ${secondaryColor}; text-decoration: underline;'>${headline}</a>
         </div>
         <div style='font-size: 16px; line-height: 24px; color: #333;'>${content}</div>
       </div>`
@@ -329,7 +329,7 @@ export async function generateSecondaryArticlesSection(campaign: any, sectionNam
     return `
       <div style='padding: 16px 0; border-bottom: 1px solid #e0e0e0;'>
         <div style='font-size: 18px; font-weight: bold; margin-bottom: 8px;'>
-          ${emoji} <a href='${trackedUrl}' style='color: ${secondaryColor}; text-decoration: none;'>${headline}</a>
+          ${emoji} <a href='${trackedUrl}' style='color: ${secondaryColor}; text-decoration: underline;'>${headline}</a>
         </div>
         <div style='font-size: 16px; line-height: 24px; color: #333;'>${content}</div>
       </div>`
@@ -834,7 +834,7 @@ export async function generateBreakingNewsSection(campaign: any): Promise<string
 <tr class='row'>
   <td class='column' style='padding:8px; vertical-align: top;'>
     <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: Arial, sans-serif; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
-      <tr><td style='padding: 12px 12px 4px; font-size: 20px; font-weight: bold;'>${emoji} <a href='${trackedUrl}' style='color: #000; text-decoration: none;'>${title}</a></td></tr>
+      <tr><td style='padding: 12px 12px 4px; font-size: 20px; font-weight: bold;'>${emoji} <a href='${trackedUrl}' style='color: #000; text-decoration: underline;'>${title}</a></td></tr>
       <tr><td style='padding: 0 12px 20px;'>${summary}</td></tr>
     </table>
   </td>
@@ -911,7 +911,7 @@ export async function generateBeyondTheFeedSection(campaign: any): Promise<strin
 <tr class='row'>
   <td class='column' style='padding:8px; vertical-align: top;'>
     <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: Arial, sans-serif; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
-      <tr><td style='padding: 12px 12px 4px; font-size: 20px; font-weight: bold;'>${emoji} <a href='${trackedUrl}' style='color: #000; text-decoration: none;'>${title}</a></td></tr>
+      <tr><td style='padding: 12px 12px 4px; font-size: 20px; font-weight: bold;'>${emoji} <a href='${trackedUrl}' style='color: #000; text-decoration: underline;'>${title}</a></td></tr>
       <tr><td style='padding: 0 12px 20px;'>${summary}</td></tr>
     </table>
   </td>
@@ -1000,7 +1000,7 @@ export async function generateAIAppsSection(campaign: any): Promise<string> {
       // Format: number. emoji Title - Description
       return `
       <div style='padding: 12px 0; border-bottom: 1px solid #e0e0e0; font-size: 16px; line-height: 24px;'>
-        <strong>${index + 1}.</strong> ${emoji} <a href='${trackedUrl}' style='color: ${secondaryColor}; text-decoration: none; font-weight: bold;'>${app.app_name}</a> - ${app.description || 'AI-powered application'}
+        <strong>${index + 1}.</strong> ${emoji} <a href='${trackedUrl}' style='color: ${secondaryColor}; text-decoration: underline; font-weight: bold;'>${app.app_name}</a> - ${app.description || 'AI-powered application'}
       </div>`
     }).join('')
 
