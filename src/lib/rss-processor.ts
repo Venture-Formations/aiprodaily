@@ -324,13 +324,13 @@ export class RSSProcessor {
     let isNewCampaign = false
 
     if (existing) {
-      console.log(`Campaign already exists for ${today}: ${existing.id}`)
+      console.log(`Campaign already exists for ${campaignDate}: ${existing.id}`)
       campaignId = existing.id
     } else {
       // Create new campaign with processing status
       const { data: newCampaign, error } = await supabaseAdmin
         .from('newsletter_campaigns')
-        .insert([{ date: today, status: 'processing' }])
+        .insert([{ date: campaignDate, status: 'processing' }])
         .select('id')
         .single()
 
@@ -338,7 +338,7 @@ export class RSSProcessor {
         throw new Error('Failed to create campaign')
       }
 
-      console.log(`Created new campaign for ${today}: ${newCampaign.id}`)
+      console.log(`Created new campaign for ${campaignDate}: ${newCampaign.id}`)
       campaignId = newCampaign.id
       isNewCampaign = true
     }
