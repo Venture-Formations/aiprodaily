@@ -19,7 +19,9 @@ const BUSINESS_SETTINGS_KEYS = [
   'twitter_enabled',
   'twitter_url',
   'linkedin_enabled',
-  'linkedin_url'
+  'linkedin_url',
+  'instagram_enabled',
+  'instagram_url'
 ]
 
 export async function GET(request: NextRequest) {

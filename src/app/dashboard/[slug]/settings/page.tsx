@@ -3903,7 +3903,9 @@ function BusinessSettings() {
     twitter_enabled: false,
     twitter_url: '',
     linkedin_enabled: false,
-    linkedin_url: ''
+    linkedin_url: '',
+    instagram_enabled: false,
+    instagram_url: ''
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -4337,6 +4339,32 @@ function BusinessSettings() {
               disabled={!settings.linkedin_enabled}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
               placeholder="https://linkedin.com/company/yourcompany"
+            />
+          </div>
+
+          {/* Instagram */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Instagram
+              </label>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={settings.instagram_enabled}
+                  onChange={(e) => setSettings({ ...settings, instagram_enabled: e.target.checked })}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">Enable</span>
+              </label>
+            </div>
+            <input
+              type="url"
+              value={settings.instagram_url}
+              onChange={(e) => setSettings({ ...settings, instagram_url: e.target.value })}
+              disabled={!settings.instagram_enabled}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+              placeholder="https://instagram.com/yourhandle"
             />
           </div>
         </div>

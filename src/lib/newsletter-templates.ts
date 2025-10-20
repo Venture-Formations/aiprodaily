@@ -1098,11 +1098,17 @@ export async function generateRoadWorkSection(campaign: any): Promise<string> {
 // ==================== FOOTER ====================
 
 export async function generateNewsletterFooter(campaignDate?: string, campaignId?: string): Promise<string> {
-  // Fetch business settings for primary color, newsletter name, business name, and social media URLs
+  // Fetch business settings for primary color, newsletter name, business name, and social media settings
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
     .select('key, value')
-    .in('key', ['primary_color', 'newsletter_name', 'business_name', 'facebook_url', 'linkedin_url', 'instagram_url'])
+    .in('key', [
+      'primary_color', 'newsletter_name', 'business_name',
+      'facebook_enabled', 'facebook_url',
+      'twitter_enabled', 'twitter_url',
+      'linkedin_enabled', 'linkedin_url',
+      'instagram_enabled', 'instagram_url'
+    ])
 
   const settingsMap: Record<string, string> = {}
   settings?.forEach(setting => {
@@ -1112,16 +1118,14 @@ export async function generateNewsletterFooter(campaignDate?: string, campaignId
   const primaryColor = settingsMap.primary_color || '#1877F2'
   const newsletterName = settingsMap.newsletter_name || 'St. Cloud Scoop'
   const businessName = settingsMap.business_name || 'Venture Formations LLC'
-  const facebookUrl = settingsMap.facebook_url || ''
-  const linkedinUrl = settingsMap.linkedin_url || ''
-  const instagramUrl = settingsMap.instagram_url || ''
   const currentYear = new Date().getFullYear()
 
-  // Build social media icons array (only include if URL exists)
+  // Build social media icons array (only include if enabled and URL exists)
   const socialIcons = []
 
-  if (facebookUrl) {
-    const trackedUrl = campaignDate ? wrapTrackingUrl(facebookUrl, 'Footer', campaignDate, campaignId) : facebookUrl
+  // Facebook
+  if (settingsMap.facebook_enabled === 'true' && settingsMap.facebook_url) {
+    const trackedUrl = campaignDate ? wrapTrackingUrl(settingsMap.facebook_url, 'Footer', campaignDate, campaignId) : settingsMap.facebook_url
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
@@ -1130,8 +1134,20 @@ export async function generateNewsletterFooter(campaignDate?: string, campaignId
       </td>`)
   }
 
-  if (linkedinUrl) {
-    const trackedUrl = campaignDate ? wrapTrackingUrl(linkedinUrl, 'Footer', campaignDate, campaignId) : linkedinUrl
+  // Twitter/X
+  if (settingsMap.twitter_enabled === 'true' && settingsMap.twitter_url) {
+    const trackedUrl = campaignDate ? wrapTrackingUrl(settingsMap.twitter_url, 'Footer', campaignDate, campaignId) : settingsMap.twitter_url
+    socialIcons.push(`
+      <td style="padding: 0 8px;">
+        <a href="${trackedUrl}" target="_blank">
+          <img src="https://raw.githubusercontent.com/Venture-Formations/aiprodaily/refs/heads/main/twitter_light.png" alt="Twitter/X" width="24" height="24" style="border: none; display: block;">
+        </a>
+      </td>`)
+  }
+
+  // LinkedIn
+  if (settingsMap.linkedin_enabled === 'true' && settingsMap.linkedin_url) {
+    const trackedUrl = campaignDate ? wrapTrackingUrl(settingsMap.linkedin_url, 'Footer', campaignDate, campaignId) : settingsMap.linkedin_url
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
@@ -1140,8 +1156,9 @@ export async function generateNewsletterFooter(campaignDate?: string, campaignId
       </td>`)
   }
 
-  if (instagramUrl) {
-    const trackedUrl = campaignDate ? wrapTrackingUrl(instagramUrl, 'Footer', campaignDate, campaignId) : instagramUrl
+  // Instagram
+  if (settingsMap.instagram_enabled === 'true' && settingsMap.instagram_url) {
+    const trackedUrl = campaignDate ? wrapTrackingUrl(settingsMap.instagram_url, 'Footer', campaignDate, campaignId) : settingsMap.instagram_url
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
