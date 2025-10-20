@@ -96,24 +96,40 @@ export async function POST(request: NextRequest) {
     }
 
     // Select AI apps for the campaign
-    console.log('Selecting AI apps for campaign...')
-    const { AppSelector } = await import('@/lib/app-selector')
+    console.log('=== SELECTING AI APPS FOR CAMPAIGN ===')
+    try {
+      const { AppSelector } = await import('@/lib/app-selector')
 
-    // Get the first active newsletter (dynamic, not hardcoded to 'accounting')
-    const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
-      .select('id, name, slug')
-      .eq('active', true)
-      .limit(1)
-      .single()
+      // Get the first active newsletter (dynamic, not hardcoded to 'accounting')
+      const { data: newsletter, error: newsletterError } = await supabaseAdmin
+        .from('newsletters')
+        .select('id, name, slug')
+        .eq('active', true)
+        .limit(1)
+        .single()
 
-    if (newsletter) {
-      console.log(`Found newsletter: ${newsletter.name} (${newsletter.slug})`)
-      const selectedApps = await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
-      console.log(`Selected ${selectedApps.length} AI applications`)
-    } else {
-      console.warn('No active newsletter found, skipping AI app selection')
+      if (newsletterError) {
+        console.error('Error fetching newsletter:', newsletterError)
+        throw new Error(`Newsletter fetch error: ${newsletterError.message}`)
+      }
+
+      if (newsletter) {
+        console.log(`Found newsletter: ${newsletter.name} (${newsletter.slug}, ID: ${newsletter.id})`)
+        console.log(`Calling AppSelector.selectAppsForCampaign(${campaignId}, ${newsletter.id})...`)
+
+        const selectedApps = await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
+
+        console.log(`✅ Successfully selected ${selectedApps.length} AI applications`)
+        console.log(`Selected apps:`, selectedApps.map(app => `${app.app_name} (${app.category})`).join(', '))
+      } else {
+        console.warn('⚠️ No active newsletter found, skipping AI app selection')
+      }
+    } catch (appSelectionError) {
+      console.error('❌ CRITICAL ERROR selecting AI apps:', appSelectionError)
+      console.error('Error details:', appSelectionError instanceof Error ? appSelectionError.stack : 'No stack trace')
+      // Don't throw - log error but continue with RSS processing
     }
+    console.log('=== AI APP SELECTION COMPLETE ===\n')
 
     // Process RSS feeds for the specific campaign
     console.log('Starting RSS processing...')
@@ -239,24 +255,40 @@ export async function GET(request: NextRequest) {
     }
 
     // Select AI apps for the campaign
-    console.log('Selecting AI apps for campaign...')
-    const { AppSelector } = await import('@/lib/app-selector')
+    console.log('=== SELECTING AI APPS FOR CAMPAIGN ===')
+    try {
+      const { AppSelector } = await import('@/lib/app-selector')
 
-    // Get the first active newsletter (dynamic, not hardcoded to 'accounting')
-    const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
-      .select('id, name, slug')
-      .eq('active', true)
-      .limit(1)
-      .single()
+      // Get the first active newsletter (dynamic, not hardcoded to 'accounting')
+      const { data: newsletter, error: newsletterError } = await supabaseAdmin
+        .from('newsletters')
+        .select('id, name, slug')
+        .eq('active', true)
+        .limit(1)
+        .single()
 
-    if (newsletter) {
-      console.log(`Found newsletter: ${newsletter.name} (${newsletter.slug})`)
-      const selectedApps = await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
-      console.log(`Selected ${selectedApps.length} AI applications`)
-    } else {
-      console.warn('No active newsletter found, skipping AI app selection')
+      if (newsletterError) {
+        console.error('Error fetching newsletter:', newsletterError)
+        throw new Error(`Newsletter fetch error: ${newsletterError.message}`)
+      }
+
+      if (newsletter) {
+        console.log(`Found newsletter: ${newsletter.name} (${newsletter.slug}, ID: ${newsletter.id})`)
+        console.log(`Calling AppSelector.selectAppsForCampaign(${campaignId}, ${newsletter.id})...`)
+
+        const selectedApps = await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
+
+        console.log(`✅ Successfully selected ${selectedApps.length} AI applications`)
+        console.log(`Selected apps:`, selectedApps.map(app => `${app.app_name} (${app.category})`).join(', '))
+      } else {
+        console.warn('⚠️ No active newsletter found, skipping AI app selection')
+      }
+    } catch (appSelectionError) {
+      console.error('❌ CRITICAL ERROR selecting AI apps:', appSelectionError)
+      console.error('Error details:', appSelectionError instanceof Error ? appSelectionError.stack : 'No stack trace')
+      // Don't throw - log error but continue with RSS processing
     }
+    console.log('=== AI APP SELECTION COMPLETE ===\n')
 
     // Process RSS feeds for the specific campaign
     console.log('Starting RSS processing...')
