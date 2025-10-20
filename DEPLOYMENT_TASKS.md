@@ -1,8 +1,9 @@
 # Post-Deployment Tasks
 **Created:** 2025-10-20
-**Status:** Pending Vercel Platform Recovery
+**Last Updated:** 2025-10-20
+**Status:** Ready for Deployment
 
-## 🚀 Immediate Tasks (Once Vercel is Back Up)
+## 🚀 Immediate Tasks (Once Deployed)
 
 ### 1. Initialize Article Lookback Hours Settings
 **Endpoint:** `https://your-domain.vercel.app/api/debug/add-lookback-columns`
@@ -48,7 +49,31 @@
 
 ---
 
-### 3. Test Criteria Weights Independence
+    "primary_title_created": true,
+    "primary_body_created": true,
+    "secondary_title_created": true,
+    "secondary_body_created": true,
+    "errors": []
+  }
+}
+```
+
+**Defaults Created:**
+- `ai_prompt_primary_article_title`: Generates engaging headlines (6-12 words)
+- `ai_prompt_primary_article_body`: Generates newsletter content (40-75 words)
+- `ai_prompt_secondary_article_title`: Generates engaging headlines (6-12 words)
+- `ai_prompt_secondary_article_body`: Generates newsletter content (75-150 words)
+
+**Verify:** Go to Settings > AI Prompts - should see new prompts (after UI reorganization)
+
+**Note:** Article generation now uses a two-step process:
+1. Generate title first using title prompt
+2. Generate body using body prompt with the generated title
+3. Falls back to legacy single-step articleWriter if needed
+
+---
+
+### 4. Test Criteria Weights Independence
 **Steps:**
 1. Go to Settings > AI Prompts
 2. Find Primary Evaluation Criteria section
@@ -87,6 +112,17 @@
 - [ ] Subject line generation uses database template
 - [ ] `{{articles}}` placeholder gets replaced with article list
 
+### Article Title/Body Prompts
+- [ ] Title/Body prompts initialized (task #3 above)
+- [ ] Four new prompts created in database
+- [ ] Next RSS processing uses two-step generation (title → body)
+- [ ] Primary articles generate with 40-75 word bodies
+- [ ] Secondary articles generate with 75-150 word bodies
+- [ ] Falls back to legacy articleWriter if title/body prompts missing
+- [ ] Generated titles use {{title}} placeholder correctly
+- [ ] Generated bodies use {{headline}} placeholder correctly
+- [ ] Can customize title and body prompts independently
+
 ---
 
 ## 🔍 Testing Recommendations
@@ -106,6 +142,15 @@
 5. Generate a new subject line for a campaign
 6. Verify the change took effect
 
+### Test Article Title/Body Generation
+1. Run RSS processing or manually create articles
+2. Check Vercel function logs for "Generating primary/secondary article title..."
+3. Verify logs show "Generated title:" followed by the headline
+4. Verify logs show "Generated body: X words"
+5. Check that generated articles have engaging, non-generic titles
+6. Confirm article bodies are within word count limits (40-75 or 75-150)
+7. Test fallback: Temporarily rename a prompt in database, verify fallback works
+
 ---
 
 ## 📝 Git Commits Deployed
@@ -114,6 +159,8 @@
 **Commit 2:** `5851b05` - Trigger Vercel redeploy (empty commit for platform error)
 **Commit 3:** `2c7bc80` - Criteria weights independence fix
 **Commit 4:** `130453a` - Subject Line AI Prompt feature
+**Commit 5:** TBD - Article Title/Body Split Feature (two-step generation)
+
 
 ---
 
@@ -127,6 +174,11 @@
    - Existing weights remain as primary weights
    - Secondary weights start at 1.0 (default)
    - You can now customize them independently
+4. **UI Reorganization Completed:** The Settings > AI Prompts page will be reorganized in a future update to:
+   - Settings > AI Prompts page reorganized with new section names
+   - "Primary Article Prompts" section contains Evaluation Criteria and will show Title/Body prompts
+   - "Secondary Article Prompts" section contains Evaluation Criteria and will show Title/Body prompts
+   - New title/body prompts will appear in their respective sections after initialization
 
 ---
 
@@ -138,6 +190,8 @@
 3. ✅ Primary/Secondary criteria weights are independent
 4. ✅ Subject Line prompt editable in AI Prompts page
 5. ✅ Subject line generation uses custom template
+6. ✅ Article Title/Body prompts initialized and generating separately
+7. ✅ Two-step article generation working with proper fallback
 
 ---
 

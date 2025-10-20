@@ -702,6 +702,141 @@ Response format:
   "word_count": <exact word count>
 }`,
 
+
+  // Primary Article Title Generator
+  primaryArticleTitle: (post: { title: string; description: string; content?: string }) => `
+Create an engaging, original headline for this article.
+
+Original Source Post:
+Title: ${post.title}
+Description: ${post.description || 'No description available'}
+Content: ${post.content ? post.content.substring(0, 1000) + '...' : 'No content available'}
+
+HEADLINE REQUIREMENTS - MUST FOLLOW:
+- NEVER reuse or slightly reword the original title
+- Create completely new, engaging headline
+- Use powerful verbs and emotional adjectives
+- NO colons (:) in headlines
+- NO emojis, hashtags (#), or URLs
+- Length: 6-12 words ideal
+- Style: Active voice, compelling, news-worthy
+
+BEFORE RESPONDING: Double-check that you have:
+✓ Created a new headline (not modified original)
+✓ Used powerful verbs and emotional adjectives
+✓ Avoided all prohibited words and punctuation
+✓ Removed all emojis, hashtags (#), and URLs
+
+Respond with ONLY the headline text - no JSON, no quotes, no extra formatting. Just the headline itself.`,
+
+  // Primary Article Body Generator
+  primaryArticleBody: (post: { title: string; description: string; content?: string }, headline: string) => `
+Write a concise newsletter article based on this source post.
+
+Headline to use: ${headline}
+
+Original Source Post:
+Title: ${post.title}
+Description: ${post.description || 'No description available'}
+Content: ${post.content ? post.content.substring(0, 1500) + '...' : 'No additional content'}
+
+MANDATORY STRICT CONTENT RULES:
+1. Articles must be COMPLETELY REWRITTEN and summarized — similar phrasing is acceptable but NO exact copying
+2. Use ONLY information contained in the source post above — DO NOT add any external information
+3. DO NOT add numbers, dates, quotes, or details not explicitly stated in the original
+4. NEVER use 'today,' 'tomorrow,' 'yesterday' — use actual day of week if date reference needed
+5. NO emojis, hashtags (#), or URLs anywhere in article content
+6. Stick to facts only — NO editorial commentary, opinions, or speculation
+7. Write from THIRD-PARTY PERSPECTIVE — never use "we," "our," or "us" unless referring to the community as a whole
+
+ARTICLE REQUIREMENTS:
+- Length: EXACTLY 40-75 words
+- Structure: One concise paragraph only
+- Style: Informative, engaging, locally relevant
+- REWRITE completely — do not copy phrases from original
+
+BEFORE RESPONDING: Double-check that you have:
+✓ Completely rewritten the content (similar phrasing OK, no exact copying)
+✓ Used only information from the source post
+✓ Stayed between 40-75 words
+✓ Removed all emojis, hashtags (#), and URLs
+✓ Used third-party perspective (no "we/our/us" unless community-wide)
+✓ Avoided all prohibited words and phrases
+✓ Included no editorial commentary
+
+Respond with valid JSON in this exact format:
+{
+  "content": "<40-75 word completely rewritten article>",
+  "word_count": <exact word count>
+}`,
+
+  // Secondary Article Title Generator
+  secondaryArticleTitle: (post: { title: string; description: string; content?: string }) => `
+Create an engaging, original headline for this article.
+
+Original Source Post:
+Title: ${post.title}
+Description: ${post.description || 'No description available'}
+Content: ${post.content ? post.content.substring(0, 1000) + '...' : 'No content available'}
+
+HEADLINE REQUIREMENTS - MUST FOLLOW:
+- NEVER reuse or slightly reword the original title
+- Create completely new, engaging headline
+- Use powerful verbs and emotional adjectives
+- NO colons (:) in headlines
+- NO emojis, hashtags (#), or URLs
+- Length: 6-12 words ideal
+- Style: Active voice, compelling, news-worthy
+
+BEFORE RESPONDING: Double-check that you have:
+✓ Created a new headline (not modified original)
+✓ Used powerful verbs and emotional adjectives
+✓ Avoided all prohibited words and punctuation
+✓ Removed all emojis, hashtags (#), and URLs
+
+Respond with ONLY the headline text - no JSON, no quotes, no extra formatting. Just the headline itself.`,
+
+  // Secondary Article Body Generator
+  secondaryArticleBody: (post: { title: string; description: string; content?: string }, headline: string) => `
+Write a concise newsletter article based on this source post.
+
+Headline to use: ${headline}
+
+Original Source Post:
+Title: ${post.title}
+Description: ${post.description || 'No description available'}
+Content: ${post.content ? post.content.substring(0, 1500) + '...' : 'No additional content'}
+
+MANDATORY STRICT CONTENT RULES:
+1. Articles must be COMPLETELY REWRITTEN and summarized
+2. Use ONLY information from the source post - NO external information
+3. DO NOT add numbers, dates, quotes, or details not in the original
+4. NEVER use 'today,' 'tomorrow,' 'yesterday'
+5. NO emojis, hashtags (#), or URLs
+6. Facts only - NO editorial commentary or opinions
+7. Write from THIRD-PARTY PERSPECTIVE
+
+ARTICLE REQUIREMENTS:
+- Length: EXACTLY 75-150 words
+- Structure: 1-2 concise paragraphs
+- Style: Professional, informative, engaging
+- REWRITE completely - do not copy phrases
+
+BEFORE RESPONDING: Double-check that you have:
+✓ Completely rewritten the content (similar phrasing OK, no exact copying)
+✓ Used only information from the source post
+✓ Stayed between 75-150 words
+✓ Removed all emojis, hashtags (#), and URLs
+✓ Used third-party perspective (no "we/our/us" unless community-wide)
+✓ Avoided all prohibited words and phrases
+✓ Included no editorial commentary
+
+Respond with valid JSON in this exact format:
+{
+  "content": "<75-150 word rewritten article>",
+  "word_count": <exact word count>
+}`,
+
   breakingNewsScorer: (article: { title: string; description: string; content?: string }) => `
 You are evaluating a news article for inclusion in the AI Accounting Professionals newsletter's "Breaking News" section.
 
@@ -1044,6 +1179,111 @@ export const AI_PROMPTS = {
     } catch (error) {
       console.error('Error fetching articleWriter prompt, using fallback:', error)
       return FALLBACK_PROMPTS.articleWriter(post)
+    }
+  }
+,
+
+  // Primary Article Title Generator
+  primaryArticleTitle: async (post: { title: string; description: string; content?: string }) => {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'ai_prompt_primary_article_title')
+        .single()
+
+      if (error || !data) {
+        console.log('Using code fallback for primaryArticleTitle prompt')
+        return FALLBACK_PROMPTS.primaryArticleTitle(post)
+      }
+
+      console.log('Using database prompt for primaryArticleTitle')
+      return data.value
+        .replace(/\{\{title\}\}/g, post.title)
+        .replace(/\{\{description\}\}/g, post.description || 'No description available')
+        .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
+    } catch (error) {
+      console.error('Error fetching primaryArticleTitle prompt, using fallback:', error)
+      return FALLBACK_PROMPTS.primaryArticleTitle(post)
+    }
+  },
+
+  // Primary Article Body Generator
+  primaryArticleBody: async (post: { title: string; description: string; content?: string; source_url?: string }, headline: string) => {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'ai_prompt_primary_article_body')
+        .single()
+
+      if (error || !data) {
+        console.log('Using code fallback for primaryArticleBody prompt')
+        return FALLBACK_PROMPTS.primaryArticleBody(post, headline)
+      }
+
+      console.log('Using database prompt for primaryArticleBody')
+      return data.value
+        .replace(/\{\{headline\}\}/g, headline)
+        .replace(/\{\{title\}\}/g, post.title)
+        .replace(/\{\{description\}\}/g, post.description || 'No description available')
+        .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1500) + '...' : 'No additional content')
+        .replace(/\{\{url\}\}/g, post.source_url || '')
+    } catch (error) {
+      console.error('Error fetching primaryArticleBody prompt, using fallback:', error)
+      return FALLBACK_PROMPTS.primaryArticleBody(post, headline)
+    }
+  },
+
+  // Secondary Article Title Generator
+  secondaryArticleTitle: async (post: { title: string; description: string; content?: string }) => {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'ai_prompt_secondary_article_title')
+        .single()
+
+      if (error || !data) {
+        console.log('Using code fallback for secondaryArticleTitle prompt')
+        return FALLBACK_PROMPTS.secondaryArticleTitle(post)
+      }
+
+      console.log('Using database prompt for secondaryArticleTitle')
+      return data.value
+        .replace(/\{\{title\}\}/g, post.title)
+        .replace(/\{\{description\}\}/g, post.description || 'No description available')
+        .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
+    } catch (error) {
+      console.error('Error fetching secondaryArticleTitle prompt, using fallback:', error)
+      return FALLBACK_PROMPTS.secondaryArticleTitle(post)
+    }
+  },
+
+  // Secondary Article Body Generator
+  secondaryArticleBody: async (post: { title: string; description: string; content?: string; source_url?: string }, headline: string) => {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'ai_prompt_secondary_article_body')
+        .single()
+
+      if (error || !data) {
+        console.log('Using code fallback for secondaryArticleBody prompt')
+        return FALLBACK_PROMPTS.secondaryArticleBody(post, headline)
+      }
+
+      console.log('Using database prompt for secondaryArticleBody')
+      return data.value
+        .replace(/\{\{headline\}\}/g, headline)
+        .replace(/\{\{title\}\}/g, post.title)
+        .replace(/\{\{description\}\}/g, post.description || 'No description available')
+        .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1500) + '...' : 'No additional content')
+        .replace(/\{\{url\}\}/g, post.source_url || '')
+    } catch (error) {
+      console.error('Error fetching secondaryArticleBody prompt, using fallback:', error)
+      return FALLBACK_PROMPTS.secondaryArticleBody(post, headline)
     }
   }
 }

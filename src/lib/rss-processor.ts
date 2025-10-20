@@ -1363,7 +1363,7 @@ export class RSSProcessor {
       console.log(`Generating ${section} article for: ${post.title}`)
 
       // Generate newsletter content
-      const content = await this.generateNewsletterContent(post)
+      const content = await this.generateNewsletterContent(post, section)
 
       // Fact-check the content
       const factCheck = await this.factCheckContent(content.content, post.content || post.description || '')
@@ -1410,36 +1410,81 @@ export class RSSProcessor {
     }
   }
 
-  private async generateNewsletterContent(post: RssPost): Promise<NewsletterContent> {
-    // Check if articleWriter prompt exists in database, fallback to newsletterWriter
-    let prompt: string
+  private async generateNewsletterContent(post: RssPost, section: 'primary' | 'secondary' = 'primary'): Promise<NewsletterContent> {
+    const postData = {
+      title: post.title,
+      description: post.description || '',
+      content: post.content || '',
+      source_url: post.source_url || ''
+    }
+
     try {
-      // First try articleWriter for accounting newsletter
-      prompt = await AI_PROMPTS.articleWriter({
-        title: post.title,
-        description: post.description || '',
-        content: post.content || '',
-        source_url: post.source_url || ''
-      })
-      console.log('Using articleWriter prompt for article generation')
+      // Step 1: Generate title using new title prompts
+      console.log(`Generating ${section} article title...`)
+      const titlePrompt = section === 'primary' 
+        ? await AI_PROMPTS.primaryArticleTitle(postData)
+        : await AI_PROMPTS.secondaryArticleTitle(postData)
+      
+      const titleResult = await callOpenAI(titlePrompt, 1000, 0.7)
+      
+      // Handle both string and object responses
+      const headline = typeof titleResult === 'string' 
+        ? titleResult.trim()
+        : (titleResult.raw || titleResult.headline || '').trim()
+      
+      if (!headline) {
+        throw new Error('Failed to generate article title')
+      }
+      
+      console.log(`Generated ${section} title: "${headline}"`)
+
+      // Step 2: Generate body using new body prompts with the generated title
+      console.log(`Generating ${section} article body...`)
+      const bodyPrompt = section === 'primary'
+        ? await AI_PROMPTS.primaryArticleBody(postData, headline)
+        : await AI_PROMPTS.secondaryArticleBody(postData, headline)
+      
+      const bodyResult = await callOpenAI(bodyPrompt, 1000, 0.3)
+      
+      if (!bodyResult.content || !bodyResult.word_count) {
+        throw new Error('Invalid article body response')
+      }
+
+      console.log(`Generated ${section} body: ${bodyResult.word_count} words`)
+
+      return {
+        headline,
+        content: bodyResult.content,
+        word_count: bodyResult.word_count
+      }
+
     } catch (error) {
-      // Fallback to newsletterWriter if articleWriter doesn't exist
-      console.log('articleWriter not found, falling back to newsletterWriter')
-      prompt = await AI_PROMPTS.newsletterWriter({
-        title: post.title,
-        description: post.description || '',
-        content: post.content || '',
-        source_url: post.source_url || ''
-      })
+      console.log(`New ${section} title/body generation failed, falling back to legacy articleWriter:`, error)
+      
+      // Fallback to legacy single-step articleWriter
+      try {
+        const prompt = await AI_PROMPTS.articleWriter(postData)
+        console.log('Using articleWriter prompt for article generation')
+        const result = await callOpenAI(prompt)
+
+        if (!result.headline || !result.content || !result.word_count) {
+          throw new Error('Invalid newsletter content response')
+        }
+
+        return result as NewsletterContent
+      } catch (fallbackError) {
+        // Final fallback to newsletterWriter
+        console.log('articleWriter not found, falling back to newsletterWriter')
+        const prompt = await AI_PROMPTS.newsletterWriter(postData)
+        const result = await callOpenAI(prompt)
+
+        if (!result.headline || !result.content || !result.word_count) {
+          throw new Error('Invalid newsletter content response')
+        }
+
+        return result as NewsletterContent
+      }
     }
-
-    const result = await callOpenAI(prompt)
-
-    if (!result.headline || !result.content || !result.word_count) {
-      throw new Error('Invalid newsletter content response')
-    }
-
-    return result as NewsletterContent
   }
 
   private async factCheckContent(newsletterContent: string, originalContent: string): Promise<FactCheckResult> {
