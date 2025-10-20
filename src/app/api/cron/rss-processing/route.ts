@@ -86,53 +86,9 @@ export async function POST(request: NextRequest) {
     const campaignId = newCampaign.id
     console.log('Created new campaign:', campaignId, 'for date:', campaignDate)
 
-    // Select prompt for the campaign immediately after creation
-    console.log('Selecting prompt for campaign...')
-    const selectedPrompt = await PromptSelector.selectPromptForCampaign(campaignId)
-    if (selectedPrompt) {
-      console.log(`Selected prompt: ${selectedPrompt.title}`)
-    } else {
-      console.log('No prompts available for selection')
-    }
-
-    // Select AI apps for the campaign
-    console.log('=== SELECTING AI APPS FOR CAMPAIGN ===')
-    try {
-      const { AppSelector } = await import('@/lib/app-selector')
-
-      // Get the first active newsletter (dynamic, not hardcoded to 'accounting')
-      const { data: newsletter, error: newsletterError } = await supabaseAdmin
-        .from('newsletters')
-        .select('id, name, slug')
-        .eq('active', true)
-        .limit(1)
-        .single()
-
-      if (newsletterError) {
-        console.error('Error fetching newsletter:', newsletterError)
-        throw new Error(`Newsletter fetch error: ${newsletterError.message}`)
-      }
-
-      if (newsletter) {
-        console.log(`Found newsletter: ${newsletter.name} (${newsletter.slug}, ID: ${newsletter.id})`)
-        console.log(`Calling AppSelector.selectAppsForCampaign(${campaignId}, ${newsletter.id})...`)
-
-        const selectedApps = await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
-
-        console.log(`✅ Successfully selected ${selectedApps.length} AI applications`)
-        console.log(`Selected apps:`, selectedApps.map(app => `${app.app_name} (${app.category})`).join(', '))
-      } else {
-        console.warn('⚠️ No active newsletter found, skipping AI app selection')
-      }
-    } catch (appSelectionError) {
-      console.error('❌ CRITICAL ERROR selecting AI apps:', appSelectionError)
-      console.error('Error details:', appSelectionError instanceof Error ? appSelectionError.stack : 'No stack trace')
-      // Don't throw - log error but continue with RSS processing
-    }
-    console.log('=== AI APP SELECTION COMPLETE ===\n')
-
     // Process RSS feeds for the specific campaign
-    console.log('Starting RSS processing...')
+    // Note: Prompt and AI app selection happens inside processAllFeedsForCampaign via getOrCreateTodaysCampaign()
+    console.log('Starting RSS processing (includes prompt & app selection)...')
     await rssProcessor.processAllFeedsForCampaign(campaignId)
 
     console.log('=== RSS PROCESSING COMPLETED ===')
