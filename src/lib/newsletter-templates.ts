@@ -1129,7 +1129,7 @@ export async function generateNewsletterFooter(campaignDate?: string, campaignId
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
-          <img src="https://raw.githubusercontent.com/Venture-Formations/aiprodaily/refs/heads/main/facebook_light.png" alt="Facebook" width="24" height="24" style="border: none; display: block;">
+          <img src="https://raw.githubusercontent.com/Venture-Formations/aiprodaily/refs/heads/master/facebook_light.png" alt="Facebook" width="24" height="24" style="border: none; display: block;">
         </a>
       </td>`)
   }
@@ -1140,7 +1140,7 @@ export async function generateNewsletterFooter(campaignDate?: string, campaignId
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
-          <img src="https://raw.githubusercontent.com/Venture-Formations/aiprodaily/refs/heads/main/twitter_light.png" alt="Twitter/X" width="24" height="24" style="border: none; display: block;">
+          <img src="https://raw.githubusercontent.com/Venture-Formations/aiprodaily/refs/heads/master/twitter_light.png" alt="Twitter/X" width="24" height="24" style="border: none; display: block;">
         </a>
       </td>`)
   }
@@ -1151,7 +1151,7 @@ export async function generateNewsletterFooter(campaignDate?: string, campaignId
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
-          <img src="https://raw.githubusercontent.com/Venture-Formations/aiprodaily/refs/heads/main/linkedin_light.png" alt="LinkedIn" width="24" height="24" style="border: none; display: block;">
+          <img src="https://raw.githubusercontent.com/Venture-Formations/aiprodaily/refs/heads/master/linkedin_light.png" alt="LinkedIn" width="24" height="24" style="border: none; display: block;">
         </a>
       </td>`)
   }
@@ -1162,7 +1162,7 @@ export async function generateNewsletterFooter(campaignDate?: string, campaignId
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
-          <img src="https://raw.githubusercontent.com/Venture-Formations/aiprodaily/refs/heads/main/instagram_light.png" alt="Instagram" width="24" height="24" style="border: none; display: block;">
+          <img src="https://raw.githubusercontent.com/Venture-Formations/aiprodaily/refs/heads/master/instagram_light.png" alt="Instagram" width="24" height="24" style="border: none; display: block;">
         </a>
       </td>`)
   }
