@@ -1141,6 +1141,17 @@ export class RSSProcessor {
       }
 
       console.log(`Successfully activated ${sortedArticles.length} articles with ranks 1-${sortedArticles.length}`)
+      // Generate subject line using the top-ranked article
+      console.log('=== GENERATING SUBJECT LINE (After Article Selection) ===')
+      await this.generateSubjectLineForCampaign(campaignId)
+      console.log('=== SUBJECT LINE GENERATION COMPLETED ===')
+
+      console.log('Article selection complete')
+    } catch (error) {
+      console.error('Error selecting top articles:', error)
+    }
+  }
+
 
   private async selectTopSecondaryArticles(campaignId: string) {
     try {

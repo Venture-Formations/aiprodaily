@@ -1151,9 +1151,8 @@ function EmailSettings() {
   useEffect(() => {
     loadSettings()
     loadMaxArticles()
-    loadSettings()
-    loadMaxArticles()
     loadLookbackHours()
+  }, [])
 
   const loadSettings = async () => {
     try {
@@ -1277,8 +1276,6 @@ function EmailSettings() {
     }
   }
 
-  return (
-
   const loadLookbackHours = async () => {
     try {
       const response = await fetch('/api/settings/email')
@@ -1333,7 +1330,9 @@ function EmailSettings() {
       setSavingLookbackHours(false)
     }
   }
-  }
+
+  return (
+    <div className="space-y-6">
       {/* MailerLite Configuration */}
       <div className="bg-white shadow rounded-lg p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4">MailerLite Configuration</h3>
@@ -1998,12 +1997,6 @@ function EmailSettings() {
             </div>
           </div>
           </div>
-            <strong>Current configuration:</strong> Primary Articles: {maxTopArticles}, Secondary Articles: {maxBottomArticles}
-          </p>
-          <p className="text-xs text-blue-700 mt-2">
-            These limits control how many articles can be selected during RSS processing and on the campaign detail page.
-          </p>
-        </div>
       </div>
 
       {/* Save Button */}

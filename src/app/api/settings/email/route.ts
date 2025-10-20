@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       scheduledSendTime: '21:00',  // 9:00 PM CT
       dailyScheduleEnabled: 'false',
       dailyCampaignCreationTime: '04:30',  // 4:30 AM CT
-      dailyScheduledSendTime: '04:55'  // 4:55 AM CT,
+      dailyScheduledSendTime: '04:55',  // 4:55 AM CT
       primary_article_lookback_hours: '72',  // 72 hours for primary RSS
       secondary_article_lookback_hours: '36'  // 36 hours for secondary RSS
     }
