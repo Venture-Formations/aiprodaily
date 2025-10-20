@@ -1,7 +1,7 @@
 # Post-Deployment Tasks
 **Created:** 2025-10-20
 **Last Updated:** 2025-10-20
-**Status:** Ready for Deployment
+**Status:** Waiting for Vercel Platform Recovery
 
 ## 🚀 Immediate Tasks (Once Deployed)
 
@@ -159,7 +159,7 @@
 **Commit 2:** `5851b05` - Trigger Vercel redeploy (empty commit for platform error)
 **Commit 3:** `2c7bc80` - Criteria weights independence fix
 **Commit 4:** `130453a` - Subject Line AI Prompt feature
-**Commit 5:** TBD - Article Title/Body Split Feature (two-step generation)
+**Commit 5:** `f647ab3` - Article Title/Body Split Feature (two-step generation)
 
 
 ---
