@@ -12,7 +12,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { criteriaNumber, weight } = body
+    const { criteriaNumber, weight, type } = body
 
     if (!criteriaNumber || weight === undefined) {
       return NextResponse.json(
@@ -29,8 +29,10 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    // Use shared weight storage for both primary and secondary criteria
-    const key = `criteria_${criteriaNumber}_weight`
+    // Use separate weight storage for primary and secondary criteria
+    const key = type === 'secondary'
+      ? `secondary_criteria_${criteriaNumber}_weight`
+      : `criteria_${criteriaNumber}_weight`
 
     // Check if setting exists
     const { data: existing } = await supabaseAdmin
@@ -57,7 +59,7 @@ export async function PATCH(request: NextRequest) {
         .insert({
           key,
           value: weight.toString(),
-          description: `Default weight for criteria ${criteriaNumber}`
+          description: `Weight for ${type === 'secondary' ? 'secondary ' : ''}criteria ${criteriaNumber}`
         })
 
       if (error) throw error
@@ -65,7 +67,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Weight for criteria ${criteriaNumber} updated to ${weight}`
+      message: `Weight for ${type === 'secondary' ? 'secondary ' : ''}criteria ${criteriaNumber} updated to ${weight}`
     })
 
   } catch (error) {

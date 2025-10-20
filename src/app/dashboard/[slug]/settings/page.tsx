@@ -2211,11 +2211,15 @@ function AIPromptsSettings() {
   const handleWeightSave = async (key: string) => {
     if (!editingWeight || editingWeight.key !== key) return
 
-    // Match both primary and secondary criteria
-    const criteriaMatch = key.match(/ai_prompt_(?:secondary_)?criteria_(\d+)/)
-    if (!criteriaMatch) return
-
-    const criteriaNumber = criteriaMatch[1]
+    // Match both primary and secondary criteria and extract type
+    const secondaryMatch = key.match(/ai_prompt_secondary_criteria_(d+)/)
+    const primaryMatch = key.match(/ai_prompt_criteria_(d+)/)
+    
+    const isSecondary = !!secondaryMatch
+    const criteriaNumber = isSecondary ? secondaryMatch[1] : primaryMatch?.[1]
+    
+    if (!criteriaNumber) return
+    
     setSaving(key)
     setMessage('')
 
@@ -2225,8 +2229,9 @@ function AIPromptsSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           criteriaNumber,
-          weight: parseFloat(editingWeight.value)
-        })
+          weight: parseFloat(editingWeight.value),
+          type: isSecondary ? 'secondary' : 'primary'
+      })
       })
 
       if (response.ok) {
