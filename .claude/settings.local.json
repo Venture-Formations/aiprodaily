@@ -48,7 +48,14 @@
       "Bash(TZ=\"America/Chicago\" date:*)",
       "WebSearch",
       "WebFetch(domain:developers.mailerlite.com)",
-      "WebFetch(domain:aiprodaily.vercel.app)"
+      "WebFetch(domain:aiprodaily.vercel.app)",
+      "Bash(awk 'NR==1280,NR==1334' \"src/app/dashboard/[slug]/settings/page.tsx\")",
+      "Bash(awk 'NR==1300,NR==1340' \"src/app/dashboard/[slug]/settings/page.tsx\")",
+      "Bash(timeout 180 npm run build)",
+      "Bash(timeout 180 npm run build 2)",
+      "Bash(1)",
+      "Bash(npx tsc --noEmit --project .)",
+      "Bash(npx tsc --noEmit)"
     ],
     "deny": [],
     "ask": []
