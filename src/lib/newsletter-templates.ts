@@ -184,9 +184,9 @@ export async function generateNewsletterHeader(formattedDate: string, campaignDa
      </div>
      <div style='width:100%;max-width:750px;margin:0 auto;padding:0px;'>
        <div style='font-family:Arial,sans-serif;background-color:${primaryColor};text-align:center;border-radius:12px;border:1px solid #333;'>
-         <img alt='${newsletterName}' src='${headerImageUrl}' style='width:100%;max-width:500px;height:auto;margin-bottom:2px;'/>
-         <div style='color:#fff;font-size:16px;font-weight:bold;padding:0 0 5px;'>${formattedDate}</div>
+         <img alt='${newsletterName}' src='${headerImageUrl}' style='width:100%;max-width:500px;height:auto;'/>
        </div>
+       <div style='color:${primaryColor};font-size:16px;font-weight:bold;padding:5px 0;text-align:center;'>${formattedDate}</div>
      </div>
 <br>`
 }
