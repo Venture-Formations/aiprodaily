@@ -376,14 +376,17 @@ export class RSSProcessor {
       if (needsApps || needsPrompt) {
         console.log(`Initializing missing content: Apps=${needsApps}, Prompt=${needsPrompt}`)
 
-        // Get accounting newsletter ID
+        // Get the first active newsletter (dynamic, not hardcoded to 'accounting')
         const { data: newsletter } = await supabaseAdmin
           .from('newsletters')
-          .select('id')
-          .eq('slug', 'accounting')
+          .select('id, name, slug')
+          .eq('active', true)
+          .limit(1)
           .single()
 
         if (newsletter) {
+          console.log(`Found newsletter: ${newsletter.name} (${newsletter.slug})`)
+
           // Initialize AI Applications if needed
           if (needsApps) {
             const selectedApps = await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
@@ -402,7 +405,7 @@ export class RSSProcessor {
             console.log('Prompt already selected, skipping')
           }
         } else {
-          console.warn('Accounting newsletter not found, skipping AI content initialization')
+          console.warn('No active newsletter found, skipping AI content initialization')
         }
       } else {
         console.log('Campaign content already initialized, skipping')

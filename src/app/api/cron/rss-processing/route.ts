@@ -98,17 +98,21 @@ export async function POST(request: NextRequest) {
     // Select AI apps for the campaign
     console.log('Selecting AI apps for campaign...')
     const { AppSelector } = await import('@/lib/app-selector')
+
+    // Get the first active newsletter (dynamic, not hardcoded to 'accounting')
     const { data: newsletter } = await supabaseAdmin
       .from('newsletters')
-      .select('id')
-      .eq('slug', 'accounting')
+      .select('id, name, slug')
+      .eq('active', true)
+      .limit(1)
       .single()
 
     if (newsletter) {
+      console.log(`Found newsletter: ${newsletter.name} (${newsletter.slug})`)
       const selectedApps = await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
       console.log(`Selected ${selectedApps.length} AI applications`)
     } else {
-      console.warn('Newsletter not found, skipping AI app selection')
+      console.warn('No active newsletter found, skipping AI app selection')
     }
 
     // Process RSS feeds for the specific campaign
@@ -237,17 +241,21 @@ export async function GET(request: NextRequest) {
     // Select AI apps for the campaign
     console.log('Selecting AI apps for campaign...')
     const { AppSelector } = await import('@/lib/app-selector')
+
+    // Get the first active newsletter (dynamic, not hardcoded to 'accounting')
     const { data: newsletter } = await supabaseAdmin
       .from('newsletters')
-      .select('id')
-      .eq('slug', 'accounting')
+      .select('id, name, slug')
+      .eq('active', true)
+      .limit(1)
       .single()
 
     if (newsletter) {
+      console.log(`Found newsletter: ${newsletter.name} (${newsletter.slug})`)
       const selectedApps = await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
       console.log(`Selected ${selectedApps.length} AI applications`)
     } else {
-      console.warn('Newsletter not found, skipping AI app selection')
+      console.warn('No active newsletter found, skipping AI app selection')
     }
 
     // Process RSS feeds for the specific campaign

@@ -47,7 +47,8 @@
       "Bash(nslookup:*)",
       "Bash(TZ=\"America/Chicago\" date:*)",
       "WebSearch",
-      "WebFetch(domain:developers.mailerlite.com)"
+      "WebFetch(domain:developers.mailerlite.com)",
+      "WebFetch(domain:aiprodaily.vercel.app)"
     ],
     "deny": [],
     "ask": []
