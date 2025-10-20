@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
           .from('campaign_ai_app_selections')
           .select(`
             *,
-            app:ai_applications(id, name, category)
+            app:ai_applications(id, app_name, category)
           `)
           .eq('campaign_id', campaign.id)
           .order('selection_order', { ascending: true })
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
           created_at: campaign.created_at,
           app_count: appSelections?.length || 0,
           apps: appSelections?.map(s => ({
-            name: s.app?.name,
+            name: s.app?.app_name,
             category: s.app?.category,
             order: s.selection_order
           })) || [],
