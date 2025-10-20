@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const { data: settingsRows, error } = await supabaseAdmin
       .from('app_settings')
       .select('key, value')
-      .or('key.like.email_%,key.eq.max_top_articles,key.eq.max_bottom_articles')
+      .or('key.like.email_%,key.eq.max_top_articles,key.eq.max_bottom_articles,key.eq.primary_article_lookback_hours,key.eq.secondary_article_lookback_hours')
 
     if (error) {
       console.error('BACKEND GET: Database error:', error)
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
         const settingKey = row.key.replace('email_', '')
         savedSettings[settingKey] = row.value
       } else {
-        // Keep max_top_articles and max_bottom_articles as-is
+        // Keep max_top_articles, max_bottom_articles, and lookback hours as-is
         savedSettings[row.key] = row.value
       }
     })
@@ -51,7 +51,9 @@ export async function GET(request: NextRequest) {
       scheduledSendTime: '21:00',  // 9:00 PM CT
       dailyScheduleEnabled: 'false',
       dailyCampaignCreationTime: '04:30',  // 4:30 AM CT
-      dailyScheduledSendTime: '04:55'  // 4:55 AM CT
+      dailyScheduledSendTime: '04:55'  // 4:55 AM CT,
+      primary_article_lookback_hours: '72',  // 72 hours for primary RSS
+      secondary_article_lookback_hours: '36'  // 36 hours for secondary RSS
     }
 
     const finalSettings = {
@@ -82,6 +84,48 @@ export async function POST(request: NextRequest) {
 
     const settings = await request.json()
     console.log('BACKEND: Received email settings:', JSON.stringify(settings, null, 2))
+    // Check if this is a lookback hours update request
+    if (settings.primary_article_lookback_hours !== undefined || settings.secondary_article_lookback_hours !== undefined) {
+      const settingsToSave = []
+
+      if (settings.primary_article_lookback_hours !== undefined) {
+        settingsToSave.push({
+          key: 'primary_article_lookback_hours',
+          value: settings.primary_article_lookback_hours.toString()
+        })
+      }
+
+      if (settings.secondary_article_lookback_hours !== undefined) {
+        settingsToSave.push({
+          key: 'secondary_article_lookback_hours',
+          value: settings.secondary_article_lookback_hours.toString()
+        })
+      }
+
+      // Upsert lookback hours settings
+      for (const setting of settingsToSave) {
+        const { error } = await supabaseAdmin
+          .from('app_settings')
+          .upsert({
+            key: setting.key,
+            value: setting.value,
+            description: `Article lookback hours: ${setting.key}`,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'key'
+          })
+
+        if (error) {
+          throw error
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Article lookback hours saved successfully'
+      })
+    }
+
 
     // Check if this is a max articles update request
     if (settings.max_top_articles !== undefined || settings.max_bottom_articles !== undefined) {

@@ -1143,12 +1143,17 @@ function EmailSettings() {
   const [maxTopArticles, setMaxTopArticles] = useState<number>(3)
   const [maxBottomArticles, setMaxBottomArticles] = useState<number>(3)
   const [savingMaxArticles, setSavingMaxArticles] = useState(false)
+  const [primaryLookbackHours, setPrimaryLookbackHours] = useState<number>(72)
+  const [secondaryLookbackHours, setSecondaryLookbackHours] = useState<number>(36)
+  const [savingLookbackHours, setSavingLookbackHours] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
 
   useEffect(() => {
     loadSettings()
     loadMaxArticles()
-  }, [])
+    loadSettings()
+    loadMaxArticles()
+    loadLookbackHours()
 
   const loadSettings = async () => {
     try {
@@ -1273,7 +1278,62 @@ function EmailSettings() {
   }
 
   return (
-    <div className="space-y-6">
+
+  const loadLookbackHours = async () => {
+    try {
+      const response = await fetch('/api/settings/email')
+      if (response.ok) {
+        const data = await response.json()
+
+        if (data.primary_article_lookback_hours) {
+          setPrimaryLookbackHours(parseInt(data.primary_article_lookback_hours))
+        }
+        if (data.secondary_article_lookback_hours) {
+          setSecondaryLookbackHours(parseInt(data.secondary_article_lookback_hours))
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load lookback hours settings:', error)
+    }
+  }
+
+  const saveLookbackHours = async () => {
+    if (primaryLookbackHours < 1 || primaryLookbackHours > 168) {
+      alert('Primary article lookback hours must be between 1 and 168 (1 week)')
+      return
+    }
+    if (secondaryLookbackHours < 1 || secondaryLookbackHours > 168) {
+      alert('Secondary article lookback hours must be between 1 and 168 (1 week)')
+      return
+    }
+
+    setSavingLookbackHours(true)
+    setMessage('')
+
+    try {
+      const response = await fetch('/api/settings/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primary_article_lookback_hours: primaryLookbackHours.toString(),
+          secondary_article_lookback_hours: secondaryLookbackHours.toString()
+        })
+      })
+
+      if (response.ok) {
+        setMessage('Article lookback hours updated successfully!')
+        setTimeout(() => setMessage(''), 3000)
+      } else {
+        throw new Error('Failed to update settings')
+      }
+    } catch (error) {
+      setMessage('Failed to update lookback hours. Please try again.')
+      console.error('Save error:', error)
+    } finally {
+      setSavingLookbackHours(false)
+    }
+  }
+  }
       {/* MailerLite Configuration */}
       <div className="bg-white shadow rounded-lg p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4">MailerLite Configuration</h3>
@@ -1883,7 +1943,61 @@ function EmailSettings() {
         </div>
 
         <div className="mt-4 bg-blue-50 p-4 rounded-lg">
-          <p className="text-sm text-blue-800">
+
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <h4 className="font-medium text-gray-900 mb-4">Article Lookback Time Window</h4>
+            <p className="text-sm text-gray-600 mb-4">
+              The system will ALWAYS search the past X hours for the highest-rated unused articles. This ensures you get the best content available, not just today's articles. Articles already used in sent newsletters are automatically excluded.
+            </p>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <label className="font-medium text-gray-700 w-56">Primary RSS Lookback Hours:</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="168"
+                  value={primaryLookbackHours}
+                  onChange={(e) => setPrimaryLookbackHours(parseInt(e.target.value) || 1)}
+                  className="w-24 px-3 py-2 border border-gray-300 rounded-md"
+                  disabled={savingLookbackHours}
+                />
+                <span className="text-sm text-gray-500">(1-168 hours / 1 week)</span>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <label className="font-medium text-gray-700 w-56">Secondary RSS Lookback Hours:</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="168"
+                  value={secondaryLookbackHours}
+                  onChange={(e) => setSecondaryLookbackHours(parseInt(e.target.value) || 1)}
+                  className="w-24 px-3 py-2 border border-gray-300 rounded-md"
+                  disabled={savingLookbackHours}
+                />
+                <span className="text-sm text-gray-500">(1-168 hours / 1 week)</span>
+              </div>
+
+              <button
+                onClick={saveLookbackHours}
+                disabled={savingLookbackHours}
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-300"
+              >
+                {savingLookbackHours ? 'Saving...' : 'Save Lookback Hours'}
+              </button>
+            </div>
+
+            <div className="mt-4 bg-blue-50 p-4 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Current configuration:</strong> Primary: {primaryLookbackHours} hours ({(primaryLookbackHours/24).toFixed(1)} days), Secondary: {secondaryLookbackHours} hours ({(secondaryLookbackHours/24).toFixed(1)} days)
+              </p>
+              <p className="text-xs text-blue-700 mt-2">
+                The system selects the top-rated articles from all available content in the lookback window, ensuring quality over recency. Already-sent articles are excluded.
+              </p>
+            </div>
+          </div>
+          </div>
             <strong>Current configuration:</strong> Primary Articles: {maxTopArticles}, Secondary Articles: {maxBottomArticles}
           </p>
           <p className="text-xs text-blue-700 mt-2">

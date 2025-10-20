@@ -1041,7 +1041,7 @@ export class RSSProcessor {
 
   private async selectTop5Articles(campaignId: string) {
     try {
-      console.log('Selecting top articles for campaign (dynamic count from settings):', campaignId)
+      console.log('Selecting top articles for campaign (from lookback window):', campaignId)
 
       // Get max_top_articles setting (defaults to 3)
       const { data: maxTopArticlesSetting } = await supabaseAdmin
@@ -1053,65 +1053,98 @@ export class RSSProcessor {
       const finalArticleCount = maxTopArticlesSetting ? parseInt(maxTopArticlesSetting.value) : 3
       console.log(`Max top articles setting: ${finalArticleCount}`)
 
-      // Get all articles for this campaign with their ratings AND fact-check scores
-      // Only select articles that PASSED the fact-check (score >= 15)
-      const { data: articles, error } = await supabaseAdmin
+      // Get lookback hours setting (defaults to 72 hours)
+      const { data: lookbackSetting } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'primary_article_lookback_hours')
+        .single()
+
+      const lookbackHours = lookbackSetting ? parseInt(lookbackSetting.value) : 72
+      const lookbackDate = new Date()
+      lookbackDate.setHours(lookbackDate.getHours() - lookbackHours)
+      const lookbackTimestamp = lookbackDate.toISOString()
+
+      console.log(`Searching past ${lookbackHours} hours (since ${lookbackTimestamp}) for best unused articles`)
+
+      // Query ALL articles from the lookback window that haven't been used in sent newsletters
+      // This gives us the best articles regardless of which campaign they were originally processed for
+      const { data: availableArticles, error } = await supabaseAdmin
         .from('articles')
         .select(`
           id,
+          campaign_id,
           fact_check_score,
+          created_at,
+          final_position,
           rss_post:rss_posts(
             post_rating:post_ratings(total_score)
           )
         `)
-        .eq('campaign_id', campaignId)
+        .gte('created_at', lookbackTimestamp)
         .gte('fact_check_score', 15)
+        .is('final_position', null)  // Only articles NOT used in sent newsletters
 
-      if (error || !articles) {
-        console.error('Failed to fetch articles for top selection:', error)
+      if (error) {
+        console.error('Failed to fetch articles from lookback window:', error)
         return
       }
 
-      // Sort articles by rating (highest first)
-      const sortedArticles = articles
+      if (!availableArticles || availableArticles.length === 0) {
+        console.error(`❌ No unused articles found in ${lookbackHours}-hour lookback window`)
+        return
+      }
+
+      console.log(`Found ${availableArticles.length} unused articles in lookback window`)
+
+      // Sort ALL available articles by rating (highest first) and take the top N
+      const sortedArticles = availableArticles
         .map((article: any) => ({
           id: article.id,
-          score: article.rss_post?.post_rating?.[0]?.total_score || 0
+          current_campaign_id: article.campaign_id,
+          score: article.rss_post?.post_rating?.[0]?.total_score || 0,
+          created_at: article.created_at
         }))
         .sort((a, b) => b.score - a.score)
+        .slice(0, finalArticleCount)
 
-      console.log(`Selecting top ${finalArticleCount} articles from ${sortedArticles.length} total`)
+      console.log(`Selected top ${sortedArticles.length} articles by rating from available pool`)
 
-      // Only activate the top N articles
-      const topArticles = sortedArticles.slice(0, finalArticleCount)
+      if (sortedArticles.length === 0) {
+        console.error('❌ No articles available for selection after filtering')
+        return
+      }
 
-      for (let i = 0; i < topArticles.length; i++) {
-        const article = topArticles[i]
-        await supabaseAdmin
+      if (sortedArticles.length < finalArticleCount) {
+        console.warn(`⚠️ Only found ${sortedArticles.length} articles, less than target of ${finalArticleCount}`)
+      }
+
+      // Update all selected articles to belong to current campaign and activate them
+      for (let i = 0; i < sortedArticles.length; i++) {
+        const article = sortedArticles[i]
+
+        const { error: updateError } = await supabaseAdmin
           .from('articles')
           .update({
+            campaign_id: campaignId,
             is_active: true,
             rank: i + 1  // Rank 1, 2, 3...
           })
           .eq('id', article.id)
+
+        if (updateError) {
+          console.error(`Failed to activate article ${article.id}:`, updateError)
+        } else {
+          const wasFromDifferentCampaign = article.current_campaign_id !== campaignId
+          console.log(`Activated article ${article.id} (score: ${article.score}, rank: ${i + 1})${wasFromDifferentCampaign ? ' - moved from different campaign' : ''}`)
+        }
       }
 
-      console.log(`Activated top ${topArticles.length} articles`)
-
-      // Generate subject line using the top-ranked article
-      console.log('=== GENERATING SUBJECT LINE (After Article Selection) ===')
-      await this.generateSubjectLineForCampaign(campaignId)
-      console.log('=== SUBJECT LINE GENERATION COMPLETED ===')
-
-      console.log('Article selection complete')
-    } catch (error) {
-      console.error('Error selecting top articles:', error)
-    }
-  }
+      console.log(`Successfully activated ${sortedArticles.length} articles with ranks 1-${sortedArticles.length}`)
 
   private async selectTopSecondaryArticles(campaignId: string) {
     try {
-      console.log('Selecting top secondary articles for campaign (dynamic count from settings):', campaignId)
+      console.log('Selecting top secondary articles for campaign (from lookback window):', campaignId)
 
       // Get max_secondary_articles setting (defaults to 3)
       const { data: maxSecondaryArticlesSetting } = await supabaseAdmin
@@ -1123,56 +1156,98 @@ export class RSSProcessor {
       const finalArticleCount = maxSecondaryArticlesSetting ? parseInt(maxSecondaryArticlesSetting.value) : 3
       console.log(`Max secondary articles setting: ${finalArticleCount}`)
 
-      // Get all secondary articles for this campaign with their ratings AND fact-check scores
-      // Only select articles that PASSED the fact-check (score >= 15)
-      const { data: articles, error } = await supabaseAdmin
+      // Get lookback hours setting (defaults to 36 hours for secondary)
+      const { data: lookbackSetting } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'secondary_article_lookback_hours')
+        .single()
+
+      const lookbackHours = lookbackSetting ? parseInt(lookbackSetting.value) : 36
+      const lookbackDate = new Date()
+      lookbackDate.setHours(lookbackDate.getHours() - lookbackHours)
+      const lookbackTimestamp = lookbackDate.toISOString()
+
+      console.log(`Searching past ${lookbackHours} hours (since ${lookbackTimestamp}) for best unused secondary articles`)
+
+      // Query ALL secondary articles from the lookback window that haven't been used in sent newsletters
+      const { data: availableArticles, error } = await supabaseAdmin
         .from('secondary_articles')
         .select(`
           id,
+          campaign_id,
           fact_check_score,
+          created_at,
+          final_position,
           rss_post:rss_posts(
             post_rating:post_ratings(total_score)
           )
         `)
-        .eq('campaign_id', campaignId)
+        .gte('created_at', lookbackTimestamp)
         .gte('fact_check_score', 15)
+        .is('final_position', null)  // Only articles NOT used in sent newsletters
 
-      if (error || !articles) {
-        console.error('Failed to fetch secondary articles for top selection:', error)
+      if (error) {
+        console.error('Failed to fetch secondary articles from lookback window:', error)
         return
       }
 
-      // Sort articles by rating (highest first)
-      const sortedArticles = articles
+      if (!availableArticles || availableArticles.length === 0) {
+        console.error(`❌ No unused secondary articles found in ${lookbackHours}-hour lookback window`)
+        return
+      }
+
+      console.log(`Found ${availableArticles.length} unused secondary articles in lookback window`)
+
+      // Sort ALL available articles by rating (highest first) and take the top N
+      const sortedArticles = availableArticles
         .map((article: any) => ({
           id: article.id,
-          score: article.rss_post?.post_rating?.[0]?.total_score || 0
+          current_campaign_id: article.campaign_id,
+          score: article.rss_post?.post_rating?.[0]?.total_score || 0,
+          created_at: article.created_at
         }))
         .sort((a, b) => b.score - a.score)
+        .slice(0, finalArticleCount)
 
-      console.log(`Selecting top ${finalArticleCount} secondary articles from ${sortedArticles.length} total`)
+      console.log(`Selected top ${sortedArticles.length} secondary articles by rating from available pool`)
 
-      // Only activate the top N articles
-      const topArticles = sortedArticles.slice(0, finalArticleCount)
+      if (sortedArticles.length === 0) {
+        console.error('❌ No secondary articles available for selection after filtering')
+        return
+      }
 
-      for (let i = 0; i < topArticles.length; i++) {
-        const article = topArticles[i]
-        await supabaseAdmin
+      if (sortedArticles.length < finalArticleCount) {
+        console.warn(`⚠️ Only found ${sortedArticles.length} secondary articles, less than target of ${finalArticleCount}`)
+      }
+
+      // Update all selected articles to belong to current campaign and activate them
+      for (let i = 0; i < sortedArticles.length; i++) {
+        const article = sortedArticles[i]
+
+        const { error: updateError } = await supabaseAdmin
           .from('secondary_articles')
           .update({
+            campaign_id: campaignId,
             is_active: true,
             rank: i + 1  // Rank 1, 2, 3...
           })
           .eq('id', article.id)
+
+        if (updateError) {
+          console.error(`Failed to activate secondary article ${article.id}:`, updateError)
+        } else {
+          const wasFromDifferentCampaign = article.current_campaign_id !== campaignId
+          console.log(`Activated secondary article ${article.id} (score: ${article.score}, rank: ${i + 1})${wasFromDifferentCampaign ? ' - moved from different campaign' : ''}`)
+        }
       }
 
-      console.log(`Activated top ${topArticles.length} secondary articles`)
+      console.log(`Successfully activated ${sortedArticles.length} secondary articles with ranks 1-${sortedArticles.length}`)
       console.log('Secondary article selection complete')
     } catch (error) {
       console.error('Error selecting top secondary articles:', error)
     }
   }
-
   private async processArticleImages(campaignId: string) {
     try {
       console.log('=== STARTING IMAGE PROCESSING (GitHub) ===')
