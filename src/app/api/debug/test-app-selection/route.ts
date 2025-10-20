@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     const { data: newsletters, error: newsletterError } = await supabaseAdmin
       .from('newsletters')
       .select('*')
-      .eq('active', true)
+      .eq('is_active', true)
 
     if (newsletterError) {
       return NextResponse.json({ error: newsletterError.message, step: 'newsletters' }, { status: 500 })

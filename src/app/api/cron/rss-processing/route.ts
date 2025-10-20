@@ -219,7 +219,7 @@ export async function GET(request: NextRequest) {
       const { data: newsletter, error: newsletterError } = await supabaseAdmin
         .from('newsletters')
         .select('id, name, slug')
-        .eq('active', true)
+        .eq('is_active', true)
         .limit(1)
         .single()
 
