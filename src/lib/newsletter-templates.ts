@@ -1067,8 +1067,12 @@ export async function generatePromptIdeasSection(campaign: any): Promise<string>
       <table width='100%' cellpadding='0' cellspacing='0' style='font-family: Arial, sans-serif; font-size: 16px; line-height: 26px;'>
         <tr><td style='padding: 12px 12px 8px; font-size: 20px; font-weight: bold; text-align: center;'>${prompt.title}</td></tr>
         <tr>
-          <td style='padding: 0 12px 12px;'>
-            <div style='background-color: #000000; color: #00FF00; padding: 16px; border-radius: 6px; border: 2px solid #333; font-family: "Courier New", Courier, monospace; font-size: 14px; line-height: 22px; text-align: left; max-width: 550px; margin: 0 auto;'>${formattedPromptText}</div>
+          <td align='center' style='padding: 0 12px 12px;'>
+            <table cellpadding='0' cellspacing='0' style='max-width: 550px; margin: 0 auto;'>
+              <tr>
+                <td style='background-color: #000000; color: #00FF00; padding: 16px; border-radius: 6px; border: 2px solid #333; font-family: "Courier New", Courier, monospace; font-size: 14px; line-height: 22px; text-align: left;'>${formattedPromptText}</td>
+              </tr>
+            </table>
           </td>
         </tr>
       </table>
@@ -1094,11 +1098,11 @@ export async function generateRoadWorkSection(campaign: any): Promise<string> {
 // ==================== FOOTER ====================
 
 export async function generateNewsletterFooter(campaignDate?: string, campaignId?: string): Promise<string> {
-  // Fetch business settings for primary color, newsletter name, business name, and Facebook URL
+  // Fetch business settings for primary color, newsletter name, business name, and social media URLs
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
     .select('key, value')
-    .in('key', ['primary_color', 'newsletter_name', 'business_name', 'facebook_url'])
+    .in('key', ['primary_color', 'newsletter_name', 'business_name', 'facebook_url', 'linkedin_url', 'instagram_url'])
 
   const settingsMap: Record<string, string> = {}
   settings?.forEach(setting => {
@@ -1108,20 +1112,60 @@ export async function generateNewsletterFooter(campaignDate?: string, campaignId
   const primaryColor = settingsMap.primary_color || '#1877F2'
   const newsletterName = settingsMap.newsletter_name || 'St. Cloud Scoop'
   const businessName = settingsMap.business_name || 'Venture Formations LLC'
-  const facebookUrl = settingsMap.facebook_url || 'https://www.facebook.com/61578947310955/'
+  const facebookUrl = settingsMap.facebook_url || ''
+  const linkedinUrl = settingsMap.linkedin_url || ''
+  const instagramUrl = settingsMap.instagram_url || ''
   const currentYear = new Date().getFullYear()
 
-  // Add tracking to Facebook link if campaign info available
-  const trackedFacebookUrl = campaignDate
-    ? wrapTrackingUrl(facebookUrl, 'Footer', campaignDate, campaignId)
-    : facebookUrl
+  // Build social media icons array (only include if URL exists)
+  const socialIcons = []
+
+  if (facebookUrl) {
+    const trackedUrl = campaignDate ? wrapTrackingUrl(facebookUrl, 'Footer', campaignDate, campaignId) : facebookUrl
+    socialIcons.push(`
+      <td style="padding: 0 8px;">
+        <a href="${trackedUrl}" target="_blank">
+          <img src="https://raw.githubusercontent.com/Venture-Formations/aiprodaily/refs/heads/main/facebook_light.png" alt="Facebook" width="24" height="24" style="border: none; display: block;">
+        </a>
+      </td>`)
+  }
+
+  if (linkedinUrl) {
+    const trackedUrl = campaignDate ? wrapTrackingUrl(linkedinUrl, 'Footer', campaignDate, campaignId) : linkedinUrl
+    socialIcons.push(`
+      <td style="padding: 0 8px;">
+        <a href="${trackedUrl}" target="_blank">
+          <img src="https://raw.githubusercontent.com/Venture-Formations/aiprodaily/refs/heads/main/linkedin_light.png" alt="LinkedIn" width="24" height="24" style="border: none; display: block;">
+        </a>
+      </td>`)
+  }
+
+  if (instagramUrl) {
+    const trackedUrl = campaignDate ? wrapTrackingUrl(instagramUrl, 'Footer', campaignDate, campaignId) : instagramUrl
+    socialIcons.push(`
+      <td style="padding: 0 8px;">
+        <a href="${trackedUrl}" target="_blank">
+          <img src="https://raw.githubusercontent.com/Venture-Formations/aiprodaily/refs/heads/main/instagram_light.png" alt="Instagram" width="24" height="24" style="border: none; display: block;">
+        </a>
+      </td>`)
+  }
+
+  // Generate social media section (only if at least one icon exists)
+  const socialMediaSection = socialIcons.length > 0 ? `
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width: 750px; margin: 0 auto; background-color: ${primaryColor}; padding: 8px 0;">
+  <tr>
+    <td align="center">
+      <table cellpadding="0" cellspacing="0">
+        <tr>
+          ${socialIcons.join('')}
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>` : ''
 
   return `
-<div style="max-width: 750px; margin: 0 auto; background-color: ${primaryColor}; padding: 8px 0; text-align: center;">
-  <a href="${trackedFacebookUrl}" target="_blank">
-    <img src="https://raw.githubusercontent.com/VFDavid/STCScoop/refs/heads/main/facebook_light.png" alt="Facebook" width="24" height="24" style="border: none; display: inline-block;">
-  </a>
-</div>
+${socialMediaSection}
 <div style="font-family: Arial, sans-serif; font-size: 12px; color: #777; text-align: center; padding: 20px 10px; border-top: 1px solid #ccc; background-color: #ffffff; max-width: 750px; margin: 0 auto ;">
   <p style="margin: 0;text-align: center;">You're receiving this email because you subscribed to <strong>${newsletterName}</strong>.</p>
   <p style="margin: 5px 0 0;text-align: center;">
