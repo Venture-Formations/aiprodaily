@@ -4146,7 +4146,9 @@ function BusinessSettings() {
     linkedin_enabled: false,
     linkedin_url: '',
     instagram_enabled: false,
-    instagram_url: ''
+    instagram_url: '',
+    mailerlite_group_name: '',
+    mailerlite_group_id: ''
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
