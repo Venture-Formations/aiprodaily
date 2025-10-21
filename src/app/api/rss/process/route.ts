@@ -45,6 +45,16 @@ export async function POST(request: NextRequest) {
 
     console.log(`[RSS Processing] Starting full workflow for campaign ${campaign_id}`)
 
+    // Initialize workflow by setting campaign to first pending state
+    const { supabaseAdmin } = await import('@/lib/supabase')
+    await supabaseAdmin
+      .from('newsletter_campaigns')
+      .update({
+        workflow_state: 'pending_archive',
+        workflow_state_started_at: new Date().toISOString()
+      })
+      .eq('id', campaign_id)
+
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
 
     // Define all workflow steps in order
