@@ -15,10 +15,10 @@ export function Header({ logoUrl = "/logo.png" }: HeaderProps) {
 
           <nav className="hidden md:flex items-center gap-8 absolute left-1/2 -translate-x-1/2">
             <a
-              href="#latest"
+              href="/"
               className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
-              Latest
+              Home
             </a>
             <a
               href="/newsletters"
