@@ -91,6 +91,9 @@
     },
     "app/api/cron/cleanup-pending-submissions/route.ts": {
       "maxDuration": 60
+    },
+    "app/api/rss/process/route.ts": {
+      "maxDuration": 300
     }
   }
 }

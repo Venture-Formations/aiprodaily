@@ -2158,10 +2158,10 @@ export class RSSProcessor {
 
       const urls = Array.from(urlToPostMap.keys())
 
-      // Extract articles in batches (5 concurrent)
+      // Extract articles in batches (10 concurrent)
       let extractionResults: Map<string, any>
       try {
-        extractionResults = await this.articleExtractor.extractBatch(urls, 5)
+        extractionResults = await this.articleExtractor.extractBatch(urls, 10)
       } catch (extractError) {
         console.error('⚠️ Article extraction batch failed completely:', extractError)
         console.log('Continuing RSS processing without extracted articles...')
