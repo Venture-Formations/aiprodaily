@@ -22,7 +22,9 @@ const BUSINESS_SETTINGS_KEYS = [
   'linkedin_enabled',
   'linkedin_url',
   'instagram_enabled',
-  'instagram_url'
+  'instagram_url',
+  'mailerlite_group_name',
+  'mailerlite_group_id'
 ]
 
 export async function GET(request: NextRequest) {

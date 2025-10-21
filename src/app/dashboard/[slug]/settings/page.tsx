@@ -4338,6 +4338,40 @@ function BusinessSettings() {
               placeholder="e.g., https://aiaccountingdaily.com"
             />
           </div>
+
+          {/* MailerLite Group Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              MailerLite Group Name
+            </label>
+            <input
+              type="text"
+              value={settings.mailerlite_group_name || ''}
+              onChange={(e) => setSettings({ ...settings, mailerlite_group_name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              placeholder="e.g., AI Accounting Daily"
+            />
+            <p className="mt-1 text-sm text-gray-500">
+              Name of the MailerLite group for website subscribers
+            </p>
+          </div>
+
+          {/* MailerLite Group ID */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              MailerLite Group ID
+            </label>
+            <input
+              type="text"
+              value={settings.mailerlite_group_id || ''}
+              onChange={(e) => setSettings({ ...settings, mailerlite_group_id: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              placeholder="e.g., 168177348986799878"
+            />
+            <p className="mt-1 text-sm text-gray-500">
+              The group ID from MailerLite to add new subscribers to
+            </p>
+          </div>
         </div>
       </div>
 

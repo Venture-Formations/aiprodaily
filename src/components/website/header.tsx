@@ -28,7 +28,9 @@ export function Header({ logoUrl = "/logo.png" }: HeaderProps) {
             </a>
           </nav>
 
-          <Button className="bg-[#1c293d] hover:bg-[#1c293d]/90 text-white">Subscribe</Button>
+          <Button asChild className="bg-[#1c293d] hover:bg-[#1c293d]/90 text-white">
+            <a href="/website">Subscribe</a>
+          </Button>
         </div>
       </div>
     </header>
