@@ -70,17 +70,20 @@ export class RSSProcessor {
     const feedIds = feeds.map(f => f.id)
 
     // Get posts for this campaign from feeds in this section
+    // Limit to 12 most recent posts to avoid timeout
     const { data: posts, error } = await supabaseAdmin
       .from('rss_posts')
       .select('*')
       .eq('campaign_id', campaignId)
       .in('feed_id', feedIds)
+      .order('published_at', { ascending: false })
+      .limit(12)
 
     if (error || !posts) {
       throw new Error(`Failed to fetch ${section} posts for scoring`)
     }
 
-    console.log(`Scoring ${posts.length} ${section} posts`)
+    console.log(`Scoring ${posts.length} ${section} posts (limited to 12 most recent)`)
 
     // Evaluate posts in batches
     const BATCH_SIZE = 3
