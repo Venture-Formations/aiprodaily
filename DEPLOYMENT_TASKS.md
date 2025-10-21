@@ -1,12 +1,25 @@
 # Post-Deployment Tasks
 **Created:** 2025-10-20
-**Last Updated:** 2025-10-20
-**Status:** Waiting for Vercel Platform Recovery
+**Last Updated:** 2025-10-21
+**Status:** Partially Complete - 2 of 3 Endpoints Successful
+
+## ✅ Execution Summary (2025-10-21)
+
+**Endpoints Run:**
+1. ❌ `/api/debug/add-lookback-columns` - FAILED (500 Error)
+2. ✅ `/api/debug/init-subject-line-prompt` - SUCCESS (Created)
+3. ✅ `/api/debug/split-article-prompts` - SUCCESS (4 prompts created)
+
+**Action Required:**
+- Investigate why lookback columns endpoint is failing
+- Verify Subject Line prompt in Settings > AI Prompts
+- Verify Title/Body prompts in Settings > AI Prompts
 
 ## 🚀 Immediate Tasks (Once Deployed)
 
 ### 1. Initialize Article Lookback Hours Settings
-**Endpoint:** `https://your-domain.vercel.app/api/debug/add-lookback-columns`
+**Endpoint:** `https://aiprodaily.vercel.app/api/debug/add-lookback-columns`
+**Status:** ❌ FAILED (500 Error) - Needs investigation
 
 **Purpose:** Creates database settings for article lookback feature
 
@@ -32,7 +45,8 @@
 ---
 
 ### 2. Initialize Subject Line AI Prompt
-**Endpoint:** `https://your-domain.vercel.app/api/debug/init-subject-line-prompt`
+**Endpoint:** `https://aiprodaily.vercel.app/api/debug/init-subject-line-prompt`
+**Status:** ✅ COMPLETED - Prompt created successfully
 
 **Purpose:** Creates editable subject line prompt in database
 
@@ -49,6 +63,18 @@
 
 ---
 
+### 3. Initialize Article Title/Body Prompts
+**Endpoint:** `https://aiprodaily.vercel.app/api/debug/split-article-prompts`
+**Status:** ✅ COMPLETED - All 4 prompts created successfully
+
+**Purpose:** Creates separate title and body prompts for article generation
+
+**Expected Result:**
+```json
+{
+  "success": true,
+  "message": "Created 4 prompts successfully",
+  "results": {
     "primary_title_created": true,
     "primary_body_created": true,
     "secondary_title_created": true,
