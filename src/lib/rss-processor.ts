@@ -543,21 +543,23 @@ export class RSSProcessor {
 
           // Attempt to download and re-host image immediately if it's a Facebook URL
           // But only if images are not blocked for this source
+          // TEMPORARILY DISABLED to debug HTTP 405
           let finalImageUrl = imageUrl
-          if (!blockImages && imageUrl && imageUrl.includes('fbcdn.net')) {
-            console.log(`Attempting to re-host Facebook image immediately: ${imageUrl}`)
-            try {
-              const githubUrl = await this.githubStorage.uploadImage(imageUrl, item.title || 'Untitled')
-              if (githubUrl) {
-                finalImageUrl = githubUrl
-                console.log(`Successfully re-hosted Facebook image: ${githubUrl}`)
-              } else {
-                console.warn(`Failed to re-host Facebook image, keeping original URL: ${imageUrl}`)
-              }
-            } catch (error) {
-              console.warn(`Error re-hosting Facebook image: ${error}`)
-            }
-          }
+          console.log('⚠️ Facebook image re-hosting DISABLED for debugging HTTP 405')
+          // if (!blockImages && imageUrl && imageUrl.includes('fbcdn.net')) {
+          //   console.log(`Attempting to re-host Facebook image immediately: ${imageUrl}`)
+          //   try {
+          //     const githubUrl = await this.githubStorage.uploadImage(imageUrl, item.title || 'Untitled')
+          //     if (githubUrl) {
+          //       finalImageUrl = githubUrl
+          //       console.log(`Successfully re-hosted Facebook image: ${githubUrl}`)
+          //     } else {
+          //       console.warn(`Failed to re-host Facebook image, keeping original URL: ${imageUrl}`)
+          //     }
+          //   } catch (error) {
+          //     console.warn(`Error re-hosting Facebook image: ${error}`)
+          //   }
+          // }
 
           // Block image if source is in excluded list
           if (blockImages) {
@@ -1348,21 +1350,24 @@ export class RSSProcessor {
           }
 
           // Upload image to GitHub
-          const githubUrl = await this.githubStorage.uploadImage(originalImageUrl, rssPost.title)
+          // TEMPORARILY DISABLED to debug HTTP 405
+          console.log(`⚠️ Skipping GitHub image upload for debugging: ${originalImageUrl}`)
+          skipCount++
+          // const githubUrl = await this.githubStorage.uploadImage(originalImageUrl, rssPost.title)
 
-          if (githubUrl) {
-            // Update the RSS post with GitHub URL
-            await supabaseAdmin
-              .from('rss_posts')
-              .update({ image_url: githubUrl })
-              .eq('id', rssPost.id)
+          // if (githubUrl) {
+          //   // Update the RSS post with GitHub URL
+          //   await supabaseAdmin
+          //     .from('rss_posts')
+          //     .update({ image_url: githubUrl })
+          //     .eq('id', rssPost.id)
 
-            console.log(`Successfully uploaded image to GitHub: ${githubUrl}`)
-            downloadCount++
-          } else {
-            console.error(`Failed to upload image to GitHub for article ${article.id}`)
-            errorCount++
-          }
+          //   console.log(`Successfully uploaded image to GitHub: ${githubUrl}`)
+          //   downloadCount++
+          // } else {
+          //   console.error(`Failed to upload image to GitHub for article ${article.id}`)
+          //   errorCount++
+          // }
 
         } catch (error) {
           console.error(`Error processing image for article ${article.id}:`, error)
