@@ -196,16 +196,6 @@ export class RSSProcessor {
         // Don't fail the entire RSS processing if article extraction fails
       }
 
-      // Populate events for this campaign BEFORE processing articles
-      console.log('Populating events for campaign...')
-      try {
-        await this.populateEventsForCampaignSmart(campaignId)
-        console.log('✅ Events populated successfully')
-      } catch (eventError) {
-        console.error('Failed to populate events, but continuing:', eventError)
-        // Don't fail the entire RSS processing if event population fails
-      }
-
       // Process posts with AI for both sections
       await this.processPostsWithAI(campaignId, 'primary')
       await this.processPostsWithAI(campaignId, 'secondary')
