@@ -1533,19 +1533,15 @@ export class RSSProcessor {
 
   private async processPostIntoArticle(post: any, campaignId: string, section: 'primary' | 'secondary' = 'primary') {
     try {
-      console.log(`Generating ${section} article for: ${post.title}`)
-
       // Generate newsletter content
       const content = await this.generateNewsletterContent(post, section)
 
       // Fact-check the content
       const factCheck = await this.factCheckContent(content.content, post.content || post.description || '')
 
-      console.log(`Fact-check result for "${post.title}": ${factCheck.passed ? 'PASSED' : 'FAILED'} (score: ${factCheck.score})`)
-
       // Store ALL articles (both passed and failed) so we can review what's being rejected
       const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
-      const { data, error } = await supabaseAdmin
+      const { error } = await supabaseAdmin
         .from(tableName)
         .insert([{
           post_id: post.id,
@@ -1561,25 +1557,10 @@ export class RSSProcessor {
 
       if (error) {
         console.error(`Error inserting article for post ${post.id}:`, error)
-      } else {
-        const status = factCheck.passed ? 'PASSED' : 'FAILED'
-        console.log(`Successfully stored article (${status}): "${content.headline}"`)
-        await this.logInfo(`Successfully stored article (${status}): "${content.headline}"`, {
-          campaignId,
-          postId: post.id,
-          factCheckPassed: factCheck.passed,
-          factCheckScore: factCheck.score
-        })
       }
 
     } catch (error) {
       console.error(`Error generating article for post ${post.id}:`, error)
-      await this.logError(`Error generating article for post: ${post.title}`, {
-        postId: post.id,
-        campaignId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
-      })
     }
   }
 
@@ -1594,45 +1575,33 @@ export class RSSProcessor {
       source_url: post.source_url || ''
     }
 
-    if (post.full_article_text) {
-      console.log(`Using full article text (${post.full_article_text.length} chars) for: ${post.title}`)
-    } else {
-      console.log(`Using RSS summary for: ${post.title}`)
-    }
-
     try {
       // Step 1: Generate title using new title prompts
-      console.log(`Generating ${section} article title...`)
-      const titlePrompt = section === 'primary' 
+      const titlePrompt = section === 'primary'
         ? await AI_PROMPTS.primaryArticleTitle(postData)
         : await AI_PROMPTS.secondaryArticleTitle(postData)
-      
+
       const titleResult = await callOpenAI(titlePrompt, 1000, 0.7)
-      
+
       // Handle both string and object responses
-      const headline = typeof titleResult === 'string' 
+      const headline = typeof titleResult === 'string'
         ? titleResult.trim()
         : (titleResult.raw || titleResult.headline || '').trim()
-      
+
       if (!headline) {
         throw new Error('Failed to generate article title')
       }
-      
-      console.log(`Generated ${section} title: "${headline}"`)
 
       // Step 2: Generate body using new body prompts with the generated title
-      console.log(`Generating ${section} article body...`)
       const bodyPrompt = section === 'primary'
         ? await AI_PROMPTS.primaryArticleBody(postData, headline)
         : await AI_PROMPTS.secondaryArticleBody(postData, headline)
-      
+
       const bodyResult = await callOpenAI(bodyPrompt, 1000, 0.3)
-      
+
       if (!bodyResult.content || !bodyResult.word_count) {
         throw new Error('Invalid article body response')
       }
-
-      console.log(`Generated ${section} body: ${bodyResult.word_count} words`)
 
       return {
         headline,
@@ -1641,12 +1610,9 @@ export class RSSProcessor {
       }
 
     } catch (error) {
-      console.log(`New ${section} title/body generation failed, falling back to legacy articleWriter:`, error)
-      
       // Fallback to legacy single-step articleWriter
       try {
         const prompt = await AI_PROMPTS.articleWriter(postData)
-        console.log('Using articleWriter prompt for article generation')
         const result = await callOpenAI(prompt)
 
         if (!result.headline || !result.content || !result.word_count) {
@@ -1656,7 +1622,6 @@ export class RSSProcessor {
         return result as NewsletterContent
       } catch (fallbackError) {
         // Final fallback to newsletterWriter
-        console.log('articleWriter not found, falling back to newsletterWriter')
         const prompt = await AI_PROMPTS.newsletterWriter(postData)
         const result = await callOpenAI(prompt)
 

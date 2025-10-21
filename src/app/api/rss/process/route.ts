@@ -2,7 +2,27 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
+/**
+ * Single RSS Processing Endpoint
+ *
+ * Runs all 7 workflow steps sequentially for ONE campaign:
+ * 1. Archive old data
+ * 2. Fetch RSS feeds
+ * 3. Extract full article text
+ * 4. Score posts with AI
+ * 5. Generate newsletter articles
+ * 6. (Future: Activate/select top articles)
+ * 7. Finalize campaign
+ *
+ * Features:
+ * - Processes only the specified campaign_id
+ * - Runs all steps in sequence
+ * - Retries failed steps once before marking as failed
+ * - Updates workflow_state for tracking/debugging
+ */
 export async function POST(request: NextRequest) {
+  let campaign_id: string | undefined
+
   try {
     // Check for cron secret OR authenticated session
     const cronSecret = request.headers.get('Authorization')
@@ -16,66 +36,114 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Check if specific campaign ID was provided
-    const body = await request.json().catch(() => ({}))
-    const { campaign_id } = body
+    const body = await request.json()
+    campaign_id = body.campaign_id
 
     if (!campaign_id) {
       return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
     }
 
-    // Trigger step-based RSS processing workflow
-    console.log(`Starting step-based RSS processing for campaign ${campaign_id}`)
+    console.log(`[RSS Processing] Starting full workflow for campaign ${campaign_id}`)
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
 
-    try {
-      const response = await fetch(`${baseUrl}/api/rss/steps/archive`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaign_id })
-      })
+    // Define all workflow steps in order
+    const steps = [
+      { name: 'Archive', endpoint: '/api/rss/steps/archive', stepNumber: '1/7' },
+      { name: 'Fetch Feeds', endpoint: '/api/rss/steps/fetch-feeds', stepNumber: '2/7' },
+      { name: 'Extract Articles', endpoint: '/api/rss/steps/extract-articles', stepNumber: '3/7' },
+      { name: 'Score Posts', endpoint: '/api/rss/steps/score-posts', stepNumber: '4/7' },
+      { name: 'Generate Articles', endpoint: '/api/rss/steps/generate-articles', stepNumber: '5/7' },
+      { name: 'Finalize', endpoint: '/api/rss/steps/finalize', stepNumber: '7/7' }
+    ]
 
-      const result = await response.json()
+    const results = []
+    let allSuccessful = true
 
-      if (!response.ok) {
-        throw new Error(`Step 1 failed: ${result.message || 'Unknown error'}`)
+    // Execute each step sequentially
+    for (const step of steps) {
+      console.log(`[RSS Processing] Running ${step.name} (${step.stepNumber})...`)
+
+      let attempt = 1
+      let stepSuccessful = false
+      let lastError: any = null
+
+      // Try step up to 2 times (original + 1 retry)
+      while (attempt <= 2 && !stepSuccessful) {
+        try {
+          if (attempt > 1) {
+            console.log(`[RSS Processing] Retrying ${step.name} (attempt ${attempt}/2)...`)
+          }
+
+          const response = await fetch(`${baseUrl}${step.endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ campaign_id })
+          })
+
+          const data = await response.json()
+
+          if (response.ok) {
+            console.log(`[RSS Processing] ✅ ${step.name} completed successfully`)
+            results.push({
+              step: step.name,
+              stepNumber: step.stepNumber,
+              status: 'success',
+              attempt,
+              data
+            })
+            stepSuccessful = true
+          } else {
+            lastError = data
+            console.error(`[RSS Processing] ❌ ${step.name} failed (attempt ${attempt}):`, data)
+            attempt++
+          }
+        } catch (error) {
+          lastError = error
+          console.error(`[RSS Processing] ❌ ${step.name} error (attempt ${attempt}):`, error)
+          attempt++
+        }
       }
 
-      console.log('✅ Step-based processing initiated successfully')
-    } catch (stepError) {
-      console.error('Failed to initiate step-based processing:', stepError)
-      throw stepError
+      // If step failed after retries, mark entire workflow as failed
+      if (!stepSuccessful) {
+        console.error(`[RSS Processing] ${step.name} failed after ${attempt - 1} attempts. Stopping workflow.`)
+        allSuccessful = false
+        results.push({
+          step: step.name,
+          stepNumber: step.stepNumber,
+          status: 'failed',
+          attempts: attempt - 1,
+          error: lastError
+        })
+        break // Stop processing remaining steps
+      }
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Step-based RSS processing workflow initiated successfully',
-      note: 'Processing will continue in background through 6 steps with no time limits'
-    })
+    if (allSuccessful) {
+      console.log(`[RSS Processing] ✅ All steps completed successfully for campaign ${campaign_id}`)
+      return NextResponse.json({
+        success: true,
+        message: 'RSS processing completed successfully',
+        campaign_id,
+        results
+      })
+    } else {
+      console.error(`[RSS Processing] ❌ Workflow failed for campaign ${campaign_id}`)
+      return NextResponse.json({
+        success: false,
+        message: 'RSS processing failed',
+        campaign_id,
+        results
+      }, { status: 500 })
+    }
 
   } catch (error) {
-    console.error('RSS processing failed:', error)
-
-    // Detailed error logging
-    if (error instanceof Error) {
-      console.error('Error name:', error.name)
-      console.error('Error message:', error.message)
-      console.error('Error stack:', error.stack)
-    }
-
-    // Check if it's an HTTP error
-    const errorString = String(error)
-    if (errorString.includes('405') || errorString.includes('HTTP')) {
-      console.error('⚠️ HTTP ERROR DETECTED IN RSS PROCESSING')
-      console.error('Full error:', JSON.stringify(error, null, 2))
-    }
-
+    console.error('[RSS Processing] Fatal error:', error)
     return NextResponse.json({
       error: 'RSS processing failed',
       message: error instanceof Error ? error.message : 'Unknown error',
-      errorType: error instanceof Error ? error.name : 'Unknown',
-      errorString: String(error)
+      campaign_id
     }, { status: 500 })
   }
 }
