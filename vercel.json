@@ -93,7 +93,7 @@
       "maxDuration": 60
     },
     "app/api/rss/process/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 60
     }
   }
 }

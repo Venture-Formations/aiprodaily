@@ -86,20 +86,43 @@ export async function POST(request: NextRequest) {
     const campaignId = newCampaign.id
     console.log('Created new campaign:', campaignId, 'for date:', campaignDate)
 
-    // Process RSS feeds for the specific campaign
-    // Note: Prompt and AI app selection happens inside processAllFeedsForCampaign via getOrCreateTodaysCampaign()
-    console.log('Starting RSS processing (includes prompt & app selection)...')
-    await rssProcessor.processAllFeedsForCampaign(campaignId)
+    // Trigger step-based RSS processing workflow
+    console.log('Starting step-based RSS processing...')
+    console.log('Triggering Step 1: Archive old data')
 
-    console.log('=== RSS PROCESSING COMPLETED ===')
-    console.log('Subject line generation now happens during RSS processing')
+    // Trigger Step 1 (archive) - this will chain through all 6 steps automatically
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
+
+    try {
+      const response = await fetch(`${baseUrl}/api/rss/steps/archive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign_id: campaignId })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(`Step 1 failed: ${result.message || 'Unknown error'}`)
+      }
+
+      console.log('✅ Step 1 (Archive) initiated successfully')
+      console.log('Step-based processing will continue automatically through all 6 steps')
+    } catch (stepError) {
+      console.error('Failed to initiate step-based processing:', stepError)
+      throw stepError
+    }
+
+    console.log('=== RSS PROCESSING WORKFLOW INITIATED ===')
+    console.log('Processing will continue in background through 6 steps:')
+    console.log('1. Archive → 2. Fetch Feeds → 3. Extract Articles → 4. Score Posts → 5. Generate Articles → 6. Finalize')
 
     return NextResponse.json({
       success: true,
-      message: 'RSS processing and subject line generation completed successfully for tomorrow\'s campaign',
+      message: 'Step-based RSS processing workflow initiated successfully',
       campaignId: campaignId,
       campaignDate: campaignDate,
-      note: 'Campaign created for next day delivery with AI subject line',
+      note: 'Processing will continue in background with no time limits',
       timestamp: new Date().toISOString()
     })
 
@@ -246,20 +269,43 @@ export async function GET(request: NextRequest) {
     }
     console.log('=== AI APP SELECTION COMPLETE ===\n')
 
-    // Process RSS feeds for the specific campaign
-    console.log('Starting RSS processing...')
-    const rssProcessor = new RSSProcessor()
-    await rssProcessor.processAllFeedsForCampaign(campaignId)
+    // Trigger step-based RSS processing workflow
+    console.log('Starting step-based RSS processing...')
+    console.log('Triggering Step 1: Archive old data')
 
-    console.log('=== RSS PROCESSING COMPLETED ===')
-    console.log('Subject line generation now happens during RSS processing')
+    // Trigger Step 1 (archive) - this will chain through all 6 steps automatically
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
+
+    try {
+      const response = await fetch(`${baseUrl}/api/rss/steps/archive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign_id: campaignId })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(`Step 1 failed: ${result.message || 'Unknown error'}`)
+      }
+
+      console.log('✅ Step 1 (Archive) initiated successfully')
+      console.log('Step-based processing will continue automatically through all 6 steps')
+    } catch (stepError) {
+      console.error('Failed to initiate step-based processing:', stepError)
+      throw stepError
+    }
+
+    console.log('=== RSS PROCESSING WORKFLOW INITIATED ===')
+    console.log('Processing will continue in background through 6 steps:')
+    console.log('1. Archive → 2. Fetch Feeds → 3. Extract Articles → 4. Score Posts → 5. Generate Articles → 6. Finalize')
 
     return NextResponse.json({
       success: true,
-      message: 'RSS processing and subject line generation completed successfully for tomorrow\'s campaign',
+      message: 'Step-based RSS processing workflow initiated successfully',
       campaignId: campaignId,
       campaignDate: campaignDate,
-      note: 'Campaign created for next day delivery with AI subject line',
+      note: 'Processing will continue in background with no time limits',
       timestamp: new Date().toISOString()
     })
 

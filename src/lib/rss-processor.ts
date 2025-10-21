@@ -35,6 +35,150 @@ export class RSSProcessor {
     this.articleExtractor = new ArticleExtractor()
   }
 
+  /**
+   * Public method to process a single feed - used by step-based processing
+   */
+  async processSingleFeed(feed: RssFeed, campaignId: string, section: 'primary' | 'secondary' = 'primary') {
+    return await this.processFeed(feed, campaignId, section)
+  }
+
+  /**
+   * Public method to extract full article text - used by step-based processing
+   */
+  async extractFullArticleText(campaignId: string) {
+    return await this.enrichRecentPostsWithFullContent(campaignId)
+  }
+
+  /**
+   * Public method to score/evaluate posts - used by step-based processing
+   */
+  async scorePostsForSection(campaignId: string, section: 'primary' | 'secondary' = 'primary') {
+    console.log(`Scoring ${section} posts for campaign ${campaignId}`)
+
+    // Get feeds for this section
+    const { data: feeds, error: feedsError } = await supabaseAdmin
+      .from('rss_feeds')
+      .select('id')
+      .eq('active', true)
+      .eq(section === 'primary' ? 'use_for_primary_section' : 'use_for_secondary_section', true)
+
+    if (feedsError || !feeds || feeds.length === 0) {
+      console.log(`No ${section} feeds found, skipping ${section} scoring`)
+      return { scored: 0, errors: 0 }
+    }
+
+    const feedIds = feeds.map(f => f.id)
+
+    // Get posts for this campaign from feeds in this section
+    const { data: posts, error } = await supabaseAdmin
+      .from('rss_posts')
+      .select('*')
+      .eq('campaign_id', campaignId)
+      .in('feed_id', feedIds)
+
+    if (error || !posts) {
+      throw new Error(`Failed to fetch ${section} posts for scoring`)
+    }
+
+    console.log(`Scoring ${posts.length} ${section} posts`)
+
+    // Evaluate posts in batches
+    const BATCH_SIZE = 3
+    let successCount = 0
+    let errorCount = 0
+
+    for (let i = 0; i < posts.length; i += BATCH_SIZE) {
+      const batch = posts.slice(i, i + BATCH_SIZE)
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1
+      const totalBatches = Math.ceil(posts.length / BATCH_SIZE)
+
+      console.log(`Processing batch ${batchNum}/${totalBatches} (${batch.length} posts)`)
+
+      const batchPromises = batch.map(async (post, index) => {
+        try {
+          const overallIndex = i + index + 1
+          console.log(`Evaluating post ${overallIndex}/${posts.length}: ${post.title}`)
+
+          const evaluation = await this.evaluatePost(post)
+
+          if (typeof evaluation.interest_level !== 'number' ||
+              typeof evaluation.local_relevance !== 'number' ||
+              typeof evaluation.community_impact !== 'number') {
+            console.error(`AI returned non-numeric scores`)
+            throw new Error(`Invalid score types returned by AI`)
+          }
+
+          const ratingRecord: any = {
+            post_id: post.id,
+            interest_level: evaluation.interest_level,
+            local_relevance: evaluation.local_relevance,
+            community_impact: evaluation.community_impact,
+            ai_reasoning: evaluation.reasoning,
+            total_score: (evaluation as any).total_score || ((evaluation.interest_level + evaluation.local_relevance + evaluation.community_impact) / 30 * 100)
+          }
+
+          const criteriaScores = (evaluation as any).criteria_scores
+          if (criteriaScores && Array.isArray(criteriaScores)) {
+            for (let i = 0; i < criteriaScores.length && i < 5; i++) {
+              const criterionNum = i + 1
+              ratingRecord[`criteria_${criterionNum}_score`] = criteriaScores[i].score
+              ratingRecord[`criteria_${criterionNum}_reason`] = criteriaScores[i].reason
+              ratingRecord[`criteria_${criterionNum}_weight`] = criteriaScores[i].weight
+            }
+          }
+
+          const { error: ratingError } = await supabaseAdmin
+            .from('post_ratings')
+            .insert([ratingRecord])
+
+          if (ratingError) {
+            throw new Error(`Rating insert failed: ${ratingError.message}`)
+          }
+
+          console.log(`Successfully evaluated post ${overallIndex}/${posts.length}`)
+          return { success: true, post: post }
+
+        } catch (error) {
+          console.error(`Error evaluating post ${post.id}:`, error)
+          await this.logError(`Failed to evaluate post: ${post.title}`, {
+            postId: post.id,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          })
+          return { success: false, post: post, error }
+        }
+      })
+
+      const batchResults = await Promise.all(batchPromises)
+      const batchSuccess = batchResults.filter(r => r.success).length
+      const batchErrors = batchResults.filter(r => !r.success).length
+
+      successCount += batchSuccess
+      errorCount += batchErrors
+
+      console.log(`Batch ${batchNum} complete: ${batchSuccess} successful, ${batchErrors} errors`)
+
+      if (i + BATCH_SIZE < posts.length) {
+        console.log('Waiting 2 seconds before next batch...')
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      }
+    }
+
+    console.log(`AI scoring complete: ${successCount} successful, ${errorCount} errors`)
+    await this.logInfo(`AI scoring complete: ${successCount} successful, ${errorCount} errors`, { campaignId, successCount, errorCount })
+
+    // Handle duplicates
+    await this.handleDuplicates(posts, campaignId)
+
+    return { scored: successCount, errors: errorCount }
+  }
+
+  /**
+   * Public method to generate newsletter articles - used by step-based processing
+   */
+  async generateArticlesForSection(campaignId: string, section: 'primary' | 'secondary' = 'primary') {
+    return await this.generateNewsletterArticles(campaignId, section)
+  }
+
   async processAllFeeds() {
     console.log('Starting RSS processing for all feeds...')
 

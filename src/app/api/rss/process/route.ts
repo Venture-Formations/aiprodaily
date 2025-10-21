@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { RSSProcessor } from '@/lib/rss-processor'
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,16 +20,38 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}))
     const { campaign_id } = body
 
-    const processor = new RSSProcessor()
-    if (campaign_id) {
-      await processor.processAllFeedsForCampaign(campaign_id)
-    } else {
-      await processor.processAllFeeds()
+    if (!campaign_id) {
+      return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
+    }
+
+    // Trigger step-based RSS processing workflow
+    console.log(`Starting step-based RSS processing for campaign ${campaign_id}`)
+
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
+
+    try {
+      const response = await fetch(`${baseUrl}/api/rss/steps/archive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign_id })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(`Step 1 failed: ${result.message || 'Unknown error'}`)
+      }
+
+      console.log('✅ Step-based processing initiated successfully')
+    } catch (stepError) {
+      console.error('Failed to initiate step-based processing:', stepError)
+      throw stepError
     }
 
     return NextResponse.json({
       success: true,
-      message: 'RSS processing completed successfully'
+      message: 'Step-based RSS processing workflow initiated successfully',
+      note: 'Processing will continue in background through 6 steps with no time limits'
     })
 
   } catch (error) {
@@ -59,29 +80,3 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Manual trigger endpoint (for testing/admin use)
-export async function GET(request: NextRequest) {
-  try {
-    // Check if user is authenticated (for manual testing)
-    const authHeader = request.headers.get('Authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-    }
-
-    const processor = new RSSProcessor()
-    await processor.processAllFeeds()
-
-    return NextResponse.json({
-      success: true,
-      message: 'RSS processing completed successfully'
-    })
-
-  } catch (error) {
-    console.error('RSS processing failed:', error)
-
-    return NextResponse.json({
-      error: 'RSS processing failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
-  }
-}
