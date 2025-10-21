@@ -20,24 +20,27 @@ export async function GET(request: NextRequest) {
 
     const enabledCount = enabledData?.value ? parseInt(enabledData.value) : 3
 
-    // Fetch all criteria names and weights
+    // Fetch all criteria names and weights (both primary and secondary)
     const { data: settingsData } = await supabaseAdmin
       .from('app_settings')
       .select('key, value')
-      .or('key.like.criteria_%_name,key.like.criteria_%_weight')
+      .or('key.like.criteria_%_name,key.like.criteria_%_weight,key.like.secondary_criteria_%_weight')
 
     const criteria = []
     for (let i = 1; i <= 5; i++) {
       const nameKey = `criteria_${i}_name`
       const weightKey = `criteria_${i}_weight`
+      const secondaryWeightKey = `secondary_criteria_${i}_weight`
 
       const nameRecord = settingsData?.find(s => s.key === nameKey)
       const weightRecord = settingsData?.find(s => s.key === weightKey)
+      const secondaryWeightRecord = settingsData?.find(s => s.key === secondaryWeightKey)
 
       criteria.push({
         number: i,
         name: nameRecord?.value || `Criteria ${i}`,
         weight: weightRecord?.value ? parseFloat(weightRecord.value) : 1.0,
+        secondaryWeight: secondaryWeightRecord?.value ? parseFloat(secondaryWeightRecord.value) : 1.0,
         enabled: i <= enabledCount
       })
     }

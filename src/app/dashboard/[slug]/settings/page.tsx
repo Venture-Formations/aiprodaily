@@ -2873,15 +2873,15 @@ function AIPromptsSettings() {
                         </>
                       ) : (
                         <>
-                          <span className="text-sm font-semibold text-brand-primary">{criterion.weight}</span>
+                          <span className="text-sm font-semibold text-brand-primary">{criterion.secondaryWeight || 1.0}</span>
                           <button
-                            onClick={() => handleWeightEdit({ key: promptKey, weight: criterion.weight.toString() })}
+                            onClick={() => handleWeightEdit({ key: promptKey, weight: (criterion.secondaryWeight || 1.0).toString() })}
                             className="text-xs text-blue-600 hover:text-blue-800"
                           >
                             Edit
                           </button>
                           <span className="text-xs text-gray-500">
-                            (Max final score contribution: {(criterion.weight * 10).toFixed(1)} points)
+                            (Max final score contribution: {((criterion.secondaryWeight || 1.0) * 10).toFixed(1)} points)
                           </span>
                         </>
                       )}
