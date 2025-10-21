@@ -60,23 +60,14 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Step 3] Triggering next step: ${nextStepUrl}`)
 
-    try {
-      const response = await fetch(nextStepUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaign_id })
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`[Step 3] Next step returned ${response.status}:`, errorText)
-      } else {
-        const result = await response.json()
-        console.log('[Step 3] Next step triggered successfully:', result)
-      }
-    } catch (error) {
+    // Fire-and-forget: Don't await the next step to avoid deep call stack
+    fetch(nextStepUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaign_id })
+    }).catch(error => {
       console.error('[Step 3] Failed to trigger next step:', error)
-    }
+    })
 
     return NextResponse.json({
       success: true,
