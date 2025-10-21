@@ -187,14 +187,16 @@ export class RSSProcessor {
       }
 
       // Extract full article text from all posts
-      console.log('Extracting full article text from posts...')
-      try {
-        await this.enrichPostsWithFullContent(campaignId)
-        console.log('✅ Article extraction completed successfully')
-      } catch (extractionError) {
-        console.error('Failed to extract full articles, but continuing:', extractionError)
-        // Don't fail the entire RSS processing if article extraction fails
-      }
+      // TEMPORARILY DISABLED to diagnose HTTP 405 errors
+      console.log('⚠️ Article extraction DISABLED for debugging')
+      console.log('Skipping article extraction to isolate HTTP 405 error source...')
+      // try {
+      //   await this.enrichPostsWithFullContent(campaignId)
+      //   console.log('✅ Article extraction completed successfully')
+      // } catch (extractionError) {
+      //   console.error('Failed to extract full articles, but continuing:', extractionError)
+      //   // Don't fail the entire RSS processing if article extraction fails
+      // }
 
       // Process posts with AI for both sections
       await this.processPostsWithAI(campaignId, 'primary')
