@@ -47,13 +47,33 @@ export async function POST(request: NextRequest) {
 
     // Initialize workflow by setting campaign to first pending state
     const { supabaseAdmin } = await import('@/lib/supabase')
-    await supabaseAdmin
+
+    // First, check current state
+    const { data: campaign } = await supabaseAdmin
       .from('newsletter_campaigns')
-      .update({
-        workflow_state: 'pending_archive',
-        workflow_state_started_at: new Date().toISOString()
-      })
+      .select('workflow_state')
       .eq('id', campaign_id)
+      .single()
+
+    // Only set to pending_archive if not already in a workflow state
+    if (!campaign?.workflow_state || campaign.workflow_state === 'processing') {
+      const { error: updateError } = await supabaseAdmin
+        .from('newsletter_campaigns')
+        .update({
+          workflow_state: 'pending_archive',
+          workflow_state_started_at: new Date().toISOString()
+        })
+        .eq('id', campaign_id)
+
+      if (updateError) {
+        console.error('[RSS Processing] Failed to initialize workflow state:', updateError)
+        throw new Error(`Failed to initialize workflow: ${updateError.message}`)
+      }
+
+      console.log(`[RSS Processing] Initialized campaign to pending_archive state`)
+    } else {
+      console.log(`[RSS Processing] Campaign already in workflow state: ${campaign.workflow_state}`)
+    }
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
 
