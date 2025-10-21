@@ -423,6 +423,7 @@ export class RSSProcessor {
 
   private async processFeed(feed: RssFeed, campaignId: string, section: 'primary' | 'secondary' = 'primary') {
     console.log(`=== PROCESSING ${section.toUpperCase()} FEED: ${feed.name} ===`)
+    console.log(`Feed URL: ${feed.url}`)
 
     try {
       // Get excluded RSS sources from settings
@@ -440,7 +441,9 @@ export class RSSProcessor {
         console.log(`Excluded sources: ${excludedSources.join(', ')}`)
       }
 
+      console.log(`Fetching RSS feed from: ${feed.url}`)
       const rssFeed = await parser.parseURL(feed.url)
+      console.log(`Successfully fetched ${rssFeed.items?.length || 0} items from ${feed.name}`)
       const now = new Date()
       const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
@@ -602,7 +605,24 @@ export class RSSProcessor {
         .eq('id', feed.id)
 
     } catch (error) {
-      console.error(`Error parsing RSS feed ${feed.name}:`, error)
+      console.error(`❌ Error parsing RSS feed ${feed.name} (${feed.url}):`, error)
+
+      // Log detailed error information
+      if (error instanceof Error) {
+        console.error(`Error name: ${error.name}`)
+        console.error(`Error message: ${error.message}`)
+        console.error(`Error stack: ${error.stack}`)
+      }
+
+      // Check if it's an HTTP error with status code
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      if (errorMessage.includes('HTTP') || errorMessage.includes('405')) {
+        console.error(`⚠️ HTTP error detected - this feed URL may not support RSS access or requires different headers`)
+        console.error(`Feed URL: ${feed.url}`)
+        console.error(`Feed Name: ${feed.name}`)
+        console.error(`Suggestion: Check if this feed URL is correct and accessible`)
+      }
+
       throw error
     }
   }
