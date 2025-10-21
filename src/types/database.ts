@@ -151,6 +151,7 @@ export interface RssPost {
   title: string
   description: string | null
   content: string | null
+  full_article_text: string | null
   author: string | null
   publication_date: string | null
   source_url: string | null

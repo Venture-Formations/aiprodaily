@@ -4,6 +4,7 @@ import { AI_PROMPTS, callOpenAI } from './openai' // Oct 7 2025 - Cache bust for
 import { ErrorHandler, SlackNotificationService } from './slack'
 import { GitHubImageStorage } from './github-storage'
 import { ArticleArchiveService } from './article-archive'
+import { ArticleExtractor } from './article-extractor'
 import type {
   RssFeed,
   RssPost,
@@ -24,12 +25,14 @@ export class RSSProcessor {
   private slack: SlackNotificationService
   private githubStorage: GitHubImageStorage
   private archiveService: ArticleArchiveService
+  private articleExtractor: ArticleExtractor
 
   constructor() {
     this.errorHandler = new ErrorHandler()
     this.slack = new SlackNotificationService()
     this.githubStorage = new GitHubImageStorage()
     this.archiveService = new ArticleArchiveService()
+    this.articleExtractor = new ArticleExtractor()
   }
 
   async processAllFeeds() {
@@ -181,6 +184,16 @@ export class RSSProcessor {
             })
             .eq('id', feed.id)
         }
+      }
+
+      // Extract full article text from all posts
+      console.log('Extracting full article text from posts...')
+      try {
+        await this.enrichPostsWithFullContent(campaignId)
+        console.log('✅ Article extraction completed successfully')
+      } catch (extractionError) {
+        console.error('Failed to extract full articles, but continuing:', extractionError)
+        // Don't fail the entire RSS processing if article extraction fails
       }
 
       // Populate events for this campaign BEFORE processing articles
@@ -789,10 +802,14 @@ export class RSSProcessor {
 
         // Type assertion to help TypeScript understand this is a function
         const evaluatorFn = evaluator as (post: { title: string; description: string; content?: string }) => Promise<string>
+
+        // Use full article text if available, otherwise fall back to RSS content/description
+        const fullText = post.full_article_text || post.content || post.description || ''
+
         const prompt = await evaluatorFn({
           title: post.title,
           description: post.description || '',
-          content: post.content || ''
+          content: fullText
         })
 
         const result = await callOpenAI(prompt)
@@ -1411,11 +1428,20 @@ export class RSSProcessor {
   }
 
   private async generateNewsletterContent(post: RssPost, section: 'primary' | 'secondary' = 'primary'): Promise<NewsletterContent> {
+    // Use full article text if available, otherwise fall back to RSS content/description
+    const fullText = post.full_article_text || post.content || post.description || ''
+
     const postData = {
       title: post.title,
       description: post.description || '',
-      content: post.content || '',
+      content: fullText, // Use full article text when available
       source_url: post.source_url || ''
+    }
+
+    if (post.full_article_text) {
+      console.log(`Using full article text (${post.full_article_text.length} chars) for: ${post.title}`)
+    } else {
+      console.log(`Using RSS summary for: ${post.title}`)
     }
 
     try {
@@ -2046,6 +2072,108 @@ export class RSSProcessor {
         campaignId,
         error: error instanceof Error ? error.message : 'Unknown error'
       })
+    }
+  }
+
+  /**
+   * Extract full article text from RSS posts using Readability.js
+   * Runs in parallel batches to improve performance
+   */
+  private async enrichPostsWithFullContent(campaignId: string) {
+    try {
+      console.log('Starting full article text extraction for campaign:', campaignId)
+
+      // Get all posts for this campaign that have source URLs
+      const { data: posts, error } = await supabaseAdmin
+        .from('rss_posts')
+        .select('id, source_url, title, full_article_text')
+        .eq('campaign_id', campaignId)
+        .not('source_url', 'is', null)
+
+      if (error) {
+        throw new Error(`Failed to fetch posts for extraction: ${error.message}`)
+      }
+
+      if (!posts || posts.length === 0) {
+        console.log('No posts found with source URLs for extraction')
+        return
+      }
+
+      console.log(`Found ${posts.length} posts to extract full article text from`)
+
+      // Filter posts that need extraction (don't have full_article_text yet)
+      const postsNeedingExtraction = posts.filter(post => !post.full_article_text)
+      const postsAlreadyExtracted = posts.length - postsNeedingExtraction.length
+
+      if (postsAlreadyExtracted > 0) {
+        console.log(`${postsAlreadyExtracted} posts already have full article text, skipping`)
+      }
+
+      if (postsNeedingExtraction.length === 0) {
+        console.log('All posts already have full article text extracted')
+        return
+      }
+
+      console.log(`Extracting ${postsNeedingExtraction.length} articles...`)
+
+      // Build URL to post ID mapping
+      const urlToPostMap = new Map<string, string>()
+      postsNeedingExtraction.forEach(post => {
+        if (post.source_url) {
+          urlToPostMap.set(post.source_url, post.id)
+        }
+      })
+
+      const urls = Array.from(urlToPostMap.keys())
+
+      // Extract articles in batches (5 concurrent)
+      const extractionResults = await this.articleExtractor.extractBatch(urls, 5)
+
+      // Update database with extracted content
+      let successCount = 0
+      let failureCount = 0
+
+      for (const [url, result] of Array.from(extractionResults.entries())) {
+        const postId = urlToPostMap.get(url)
+        if (!postId) continue
+
+        if (result.success && result.fullText) {
+          // Update post with full article text
+          const { error: updateError } = await supabaseAdmin
+            .from('rss_posts')
+            .update({
+              full_article_text: result.fullText
+            })
+            .eq('id', postId)
+
+          if (updateError) {
+            console.error(`Failed to update post ${postId} with full article text:`, updateError)
+            failureCount++
+          } else {
+            successCount++
+          }
+        } else {
+          console.log(`Extraction failed for ${url}: ${result.error || 'Unknown error'}`)
+          failureCount++
+        }
+      }
+
+      console.log(`Article extraction complete: ${successCount} successful, ${failureCount} failed`)
+      await this.logInfo(`Article extraction complete`, {
+        campaignId,
+        totalPosts: posts.length,
+        alreadyExtracted: postsAlreadyExtracted,
+        successfulExtractions: successCount,
+        failedExtractions: failureCount
+      })
+
+    } catch (error) {
+      console.error('Error in enrichPostsWithFullContent:', error)
+      await this.logError('Failed to enrich posts with full article text', {
+        campaignId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
+      throw error
     }
   }
 }
