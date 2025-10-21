@@ -1,25 +1,32 @@
 # Post-Deployment Tasks
 **Created:** 2025-10-20
 **Last Updated:** 2025-10-21
-**Status:** Partially Complete - 2 of 3 Endpoints Successful
+**Status:** ✅ COMPLETE - All 3 Endpoints Successful
 
 ## ✅ Execution Summary (2025-10-21)
 
 **Endpoints Run:**
-1. ❌ `/api/debug/add-lookback-columns` - FAILED (500 Error)
+1. ✅ `/api/debug/add-lookback-columns` - SUCCESS (Created 2 settings after fix)
 2. ✅ `/api/debug/init-subject-line-prompt` - SUCCESS (Created)
 3. ✅ `/api/debug/split-article-prompts` - SUCCESS (4 prompts created)
 
-**Action Required:**
-- Investigate why lookback columns endpoint is failing
-- Verify Subject Line prompt in Settings > AI Prompts
+**Issue Resolution:**
+- Initial 500 error caused by incorrect Supabase client initialization
+- Fixed by switching from `createClient(NEXT_PUBLIC_SUPABASE_URL)` to `supabaseAdmin`
+- Git commit `b7fb0fb` deployed fix successfully
+
+**Next Steps:**
+- ✅ All database settings initialized
+- Verify Subject Line prompt in Settings > AI Prompts > Newsletter
 - Verify Title/Body prompts in Settings > AI Prompts
+- Verify Article Lookback Hours in Settings > Email
+- Test criteria weights independence (Task #4)
 
 ## 🚀 Immediate Tasks (Once Deployed)
 
 ### 1. Initialize Article Lookback Hours Settings
 **Endpoint:** `https://aiprodaily.vercel.app/api/debug/add-lookback-columns`
-**Status:** ❌ FAILED (500 Error) - Needs investigation
+**Status:** ✅ COMPLETED - Created 2 settings successfully (after fix)
 
 **Purpose:** Creates database settings for article lookback feature
 
