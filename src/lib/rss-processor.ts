@@ -2183,7 +2183,8 @@ export class RSSProcessor {
         campaignId,
         error: error instanceof Error ? error.message : 'Unknown error'
       })
-      throw error
+      // Don't throw - article extraction is optional, RSS processing should continue
+      console.log('⚠️ Article extraction failed, but RSS processing will continue with RSS summaries')
     }
   }
 }
