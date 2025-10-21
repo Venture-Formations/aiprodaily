@@ -36,9 +36,25 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('RSS processing failed:', error)
 
+    // Detailed error logging
+    if (error instanceof Error) {
+      console.error('Error name:', error.name)
+      console.error('Error message:', error.message)
+      console.error('Error stack:', error.stack)
+    }
+
+    // Check if it's an HTTP error
+    const errorString = String(error)
+    if (errorString.includes('405') || errorString.includes('HTTP')) {
+      console.error('⚠️ HTTP ERROR DETECTED IN RSS PROCESSING')
+      console.error('Full error:', JSON.stringify(error, null, 2))
+    }
+
     return NextResponse.json({
       error: 'RSS processing failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
+      message: error instanceof Error ? error.message : 'Unknown error',
+      errorType: error instanceof Error ? error.name : 'Unknown',
+      errorString: String(error)
     }, { status: 500 })
   }
 }
