@@ -20,6 +20,12 @@ export default async function WebsiteHome() {
     <main className="min-h-screen">
       <Header logoUrl={headerImageUrl} />
       <Hero />
+      {/* Content area for visual separation */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-[#F5F5F7] min-h-[400px]">
+        <div className="container mx-auto max-w-6xl">
+          {/* Content will go here */}
+        </div>
+      </section>
       <Footer />
     </main>
   )
