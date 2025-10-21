@@ -51,14 +51,27 @@ export async function POST(request: NextRequest) {
 
     // Chain to next step: Finalize campaign
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
+    const nextStepUrl = `${baseUrl}/api/rss/steps/finalize`
 
-    fetch(`${baseUrl}/api/rss/steps/finalize`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaign_id })
-    }).catch(error => {
+    console.log(`[Step 5] Triggering next step: ${nextStepUrl}`)
+
+    try {
+      const response = await fetch(nextStepUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign_id })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`[Step 5] Next step returned ${response.status}:`, errorText)
+      } else {
+        const result = await response.json()
+        console.log('[Step 5] Next step triggered successfully:', result)
+      }
+    } catch (error) {
       console.error('[Step 5] Failed to trigger next step:', error)
-    })
+    }
 
     return NextResponse.json({
       success: true,

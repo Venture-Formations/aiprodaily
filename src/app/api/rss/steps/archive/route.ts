@@ -92,15 +92,33 @@ export async function POST(request: NextRequest) {
 
     // Chain to next step: Fetch RSS feeds
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
+    const nextStepUrl = `${baseUrl}/api/rss/steps/fetch-feeds`
 
-    // Don't await - let it run asynchronously
-    fetch(`${baseUrl}/api/rss/steps/fetch-feeds`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaign_id })
-    }).catch(error => {
+    console.log(`[Step 1] Triggering next step: ${nextStepUrl}`)
+
+    try {
+      const response = await fetch(nextStepUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign_id })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`[Step 1] Next step returned ${response.status}:`, errorText)
+      } else {
+        const result = await response.json()
+        console.log('[Step 1] Next step triggered successfully:', result)
+      }
+    } catch (error) {
       console.error('[Step 1] Failed to trigger next step:', error)
-    })
+      // Log to Slack for visibility
+      await errorHandler.logError('Failed to trigger Step 2 (fetch-feeds)', {
+        campaignId: campaign_id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        url: nextStepUrl
+      }, 'rss_step_1_chain_error')
+    }
 
     return NextResponse.json({
       success: true,
