@@ -60,7 +60,7 @@ export function Features() {
   const [currentPage, setCurrentPage] = useState(1)
   const totalPages = 8
   return (
-    <section id="features" className="py-10 px-4 sm:px-6 lg:px-8 bg-[#F5F5F7]">
+    <section id="latest" className="py-10 px-4 sm:px-6 lg:px-8 bg-[#F5F5F7]">
       <div className="container mx-auto max-w-6xl">
         <div className="text-center space-y-2 mb-8">
           <h2 className="text-2xl sm:text-3xl font-bold text-[#1D1D1F] text-balance">Latest AI Accounting News</h2>
