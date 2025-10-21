@@ -54,7 +54,7 @@
       "maxDuration": 120
     },
     "app/api/cron/rss-processing/route.ts": {
-      "maxDuration": 600
+      "maxDuration": 900
     },
     "app/api/cron/create-campaign/route.ts": {
       "maxDuration": 120
@@ -93,7 +93,7 @@
       "maxDuration": 60
     },
     "app/api/rss/process/route.ts": {
-      "maxDuration": 3000
+      "maxDuration": 900
     },
     "app/api/rss/steps/archive/route.ts": {
       "maxDuration": 120
