@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { ArchiveService } from '@/lib/archive-service'
-import { ErrorHandler } from '@/lib/error-handler'
+import { ArticleArchiveService } from '@/lib/article-archive'
+import { ErrorHandler } from '@/lib/slack'
 
 /**
  * Step 1: Archive old campaign data and clear previous articles/posts
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Step 1/7] Starting: Archive old data for campaign ${campaign_id}`)
 
-    const archiveService = new ArchiveService()
+    const archiveService = new ArticleArchiveService()
     const errorHandler = new ErrorHandler()
 
     // Archive existing articles and posts before clearing (PRESERVES POSITION DATA!)
