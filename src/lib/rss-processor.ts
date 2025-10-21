@@ -550,7 +550,7 @@ export class RSSProcessor {
             .eq('feed_id', feed.id)
             .eq('campaign_id', campaignId)
             .eq('external_id', item.guid || item.link || '')
-            .single()
+            .maybeSingle()
 
           if (existingPost) {
             console.log(`Post already exists for this campaign, skipping: "${item.title}"`)
