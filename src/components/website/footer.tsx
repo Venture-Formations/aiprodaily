@@ -1,16 +1,38 @@
-import { supabaseAdmin } from "@/lib/supabase"
+'use client'
 
-export async function Footer() {
-  // Fetch business settings
-  const { data: settings } = await supabaseAdmin
-    .from('app_settings')
-    .select('key, value')
-    .in('key', ['logo_url', 'newsletter_name', 'business_name'])
+import { useEffect, useState } from 'react'
 
-  const logoUrl = settings?.find(s => s.key === 'logo_url')?.value || '/logo.png'
-  const newsletterName = settings?.find(s => s.key === 'newsletter_name')?.value || 'AI Accounting Daily'
-  const businessName = settings?.find(s => s.key === 'business_name')?.value || 'AI Accounting Daily'
-  const currentYear = new Date().getFullYear()
+interface FooterProps {
+  logoUrl?: string
+  newsletterName?: string
+  businessName?: string
+  currentYear?: number
+}
+
+export function Footer({ 
+  logoUrl: initialLogoUrl, 
+  newsletterName: initialNewsletterName, 
+  businessName: initialBusinessName,
+  currentYear: initialCurrentYear 
+}: FooterProps = {}) {
+  const [logoUrl, setLogoUrl] = useState(initialLogoUrl || '/logo.png')
+  const [newsletterName, setNewsletterName] = useState(initialNewsletterName || 'AI Accounting Daily')
+  const [businessName, setBusinessName] = useState(initialBusinessName || 'AI Accounting Daily')
+  const currentYear = initialCurrentYear || new Date().getFullYear()
+
+  useEffect(() => {
+    // If props weren't provided, fetch from API (for client components)
+    if (!initialLogoUrl || !initialNewsletterName || !initialBusinessName) {
+      fetch('/api/settings/footer')
+        .then(res => res.json())
+        .then(data => {
+          if (data.logoUrl) setLogoUrl(data.logoUrl)
+          if (data.newsletterName) setNewsletterName(data.newsletterName)
+          if (data.businessName) setBusinessName(data.businessName)
+        })
+        .catch(err => console.error('Failed to fetch footer settings:', err))
+    }
+  }, [initialLogoUrl, initialNewsletterName, initialBusinessName])
 
   return (
     <footer className="py-8 px-4 sm:px-6 lg:px-8 bg-[#1c293d] text-white">

@@ -7,14 +7,17 @@ import { supabaseAdmin } from "@/lib/supabase"
 export const dynamic = 'force-dynamic'
 
 export default async function WebsiteHome() {
-  // Fetch header image from settings
+  // Fetch settings from database
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
     .select('key, value')
-    .eq('key', 'website_header_url')
-    .single()
+    .in('key', ['website_header_url', 'logo_url', 'newsletter_name', 'business_name'])
 
-  const headerImageUrl = settings?.value || '/logo.png'
+  const headerImageUrl = settings?.find(s => s.key === 'website_header_url')?.value || '/logo.png'
+  const logoUrl = settings?.find(s => s.key === 'logo_url')?.value || '/logo.png'
+  const newsletterName = settings?.find(s => s.key === 'newsletter_name')?.value || 'AI Accounting Daily'
+  const businessName = settings?.find(s => s.key === 'business_name')?.value || 'AI Accounting Daily'
+  const currentYear = new Date().getFullYear()
 
   return (
     <main className="min-h-screen">
@@ -26,7 +29,7 @@ export default async function WebsiteHome() {
           {/* Content will go here */}
         </div>
       </section>
-      <Footer />
+      <Footer logoUrl={logoUrl} newsletterName={newsletterName} businessName={businessName} currentYear={currentYear} />
     </main>
   )
 }

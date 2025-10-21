@@ -41,14 +41,17 @@ export default async function NewsletterPage({ params }: PageProps) {
     notFound()
   }
 
-  // Fetch header image from settings
+  // Fetch settings from database
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
-    .select('value')
-    .eq('key', 'website_header_url')
-    .single()
+    .select('key, value')
+    .in('key', ['website_header_url', 'logo_url', 'newsletter_name', 'business_name'])
 
-  const headerImageUrl = settings?.value || '/logo.png'
+  const headerImageUrl = settings?.find(s => s.key === 'website_header_url')?.value || '/logo.png'
+  const logoUrl = settings?.find(s => s.key === 'logo_url')?.value || '/logo.png'
+  const newsletterName = settings?.find(s => s.key === 'newsletter_name')?.value || 'AI Accounting Daily'
+  const businessName = settings?.find(s => s.key === 'business_name')?.value || 'AI Accounting Daily'
+  const currentYear = new Date().getFullYear()
 
   const formattedDate = new Date(newsletter.campaign_date).toLocaleDateString('en-US', {
     weekday: 'long',
@@ -202,7 +205,7 @@ export default async function NewsletterPage({ params }: PageProps) {
         </div>
       </section>
 
-      <Footer />
+      <Footer logoUrl={logoUrl} newsletterName={newsletterName} businessName={businessName} currentYear={currentYear} />
     </div>
   )
 }
