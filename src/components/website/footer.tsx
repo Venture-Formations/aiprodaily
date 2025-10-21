@@ -24,7 +24,7 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="#newsletter" className="hover:text-white transition-colors">
+                <a href="/newsletters" className="hover:text-white transition-colors">
                   Newsletter
                 </a>
               </li>
@@ -34,7 +34,7 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-white transition-colors">
+                <a href="/newsletters" className="hover:text-white transition-colors">
                   Archive
                 </a>
               </li>
