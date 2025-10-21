@@ -105,10 +105,10 @@
       "maxDuration": 600
     },
     "app/api/rss/steps/score-posts/route.ts": {
-      "maxDuration": 600
+      "maxDuration": 900
     },
     "app/api/rss/steps/generate-articles/route.ts": {
-      "maxDuration": 600
+      "maxDuration": 900
     },
     "app/api/rss/steps/finalize/route.ts": {
       "maxDuration": 120

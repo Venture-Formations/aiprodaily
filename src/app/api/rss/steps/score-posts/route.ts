@@ -17,21 +17,27 @@ export async function POST(request: NextRequest) {
     console.log(`[Step 4/6] Starting: Score posts for campaign ${campaign_id}`)
 
     const processor = new RSSProcessor()
+    const startTime = Date.now()
 
     // Score primary posts
     console.log('Scoring primary posts...')
+    const primaryStart = Date.now()
     const primaryResults = await processor.scorePostsForSection(campaign_id, 'primary')
-    console.log(`Primary scoring: ${primaryResults.scored} scored, ${primaryResults.errors} errors`)
+    const primaryDuration = ((Date.now() - primaryStart) / 1000).toFixed(1)
+    console.log(`Primary scoring: ${primaryResults.scored} scored, ${primaryResults.errors} errors (${primaryDuration}s)`)
 
     // Score secondary posts
     console.log('Scoring secondary posts...')
+    const secondaryStart = Date.now()
     const secondaryResults = await processor.scorePostsForSection(campaign_id, 'secondary')
-    console.log(`Secondary scoring: ${secondaryResults.scored} scored, ${secondaryResults.errors} errors`)
+    const secondaryDuration = ((Date.now() - secondaryStart) / 1000).toFixed(1)
+    console.log(`Secondary scoring: ${secondaryResults.scored} scored, ${secondaryResults.errors} errors (${secondaryDuration}s)`)
 
     const totalScored = primaryResults.scored + secondaryResults.scored
     const totalErrors = primaryResults.errors + secondaryResults.errors
+    const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1)
 
-    console.log(`[Step 4/6] Complete: Scored ${totalScored} posts with ${totalErrors} errors`)
+    console.log(`[Step 4/6] Complete: Scored ${totalScored} posts with ${totalErrors} errors in ${totalDuration}s`)
 
     // Chain to next step: Generate newsletter articles
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
