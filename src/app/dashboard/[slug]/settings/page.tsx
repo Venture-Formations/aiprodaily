@@ -2212,8 +2212,8 @@ function AIPromptsSettings() {
     if (!editingWeight || editingWeight.key !== key) return
 
     // Match both primary and secondary criteria and extract type
-    const secondaryMatch = key.match(/ai_prompt_secondary_criteria_(d+)/)
-    const primaryMatch = key.match(/ai_prompt_criteria_(d+)/)
+    const secondaryMatch = key.match(/ai_prompt_secondary_criteria_(\d+)/)
+    const primaryMatch = key.match(/ai_prompt_criteria_(\d+)/)
     
     const isSecondary = !!secondaryMatch
     const criteriaNumber = isSecondary ? secondaryMatch[1] : primaryMatch?.[1]
@@ -2394,13 +2394,15 @@ function AIPromptsSettings() {
     !p.key.startsWith('ai_prompt_secondary_criteria_') &&
     !p.key.startsWith('ai_prompt_secondary_') &&
     p.key !== 'ai_prompt_primary_article_title' &&
-    p.key !== 'ai_prompt_primary_article_body'
+    p.key !== 'ai_prompt_primary_article_body' &&
+    p.key !== 'ai_prompt_article_writer' // Deprecated: replaced by title/body prompts
   )
   const secondaryOtherPrompts = prompts.filter(p =>
     p.key.startsWith('ai_prompt_secondary_') &&
     !p.key.startsWith('ai_prompt_secondary_criteria_') &&
     p.key !== 'ai_prompt_secondary_article_title' &&
-    p.key !== 'ai_prompt_secondary_article_body'
+    p.key !== 'ai_prompt_secondary_article_body' &&
+    p.key !== 'ai_prompt_secondary_article_writer' // Deprecated: replaced by title/body prompts
   )
 
   type PromptType = typeof prompts[0]
