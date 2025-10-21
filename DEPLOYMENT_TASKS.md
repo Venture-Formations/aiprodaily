@@ -193,6 +193,10 @@
 **Commit 3:** `2c7bc80` - Criteria weights independence fix
 **Commit 4:** `130453a` - Subject Line AI Prompt feature
 **Commit 5:** `f647ab3` - Article Title/Body Split Feature (two-step generation)
+**Commit 6:** `b7fb0fb` - Fix lookback columns endpoint to use supabaseAdmin
+**Commit 7:** `6437c00` - Update DEPLOYMENT_TASKS with execution results
+**Commit 8:** `2c63d96` - Update DEPLOYMENT_TASKS - All 3 endpoints successful
+**Commit 9:** `47c84d6` - Reorganize AI Prompts layout to show Title/Body prompts in respective sections
 
 
 ---
@@ -207,11 +211,12 @@
    - Existing weights remain as primary weights
    - Secondary weights start at 1.0 (default)
    - You can now customize them independently
-4. **UI Reorganization Completed:** The Settings > AI Prompts page will be reorganized in a future update to:
-   - Settings > AI Prompts page reorganized with new section names
-   - "Primary Article Prompts" section contains Evaluation Criteria and will show Title/Body prompts
-   - "Secondary Article Prompts" section contains Evaluation Criteria and will show Title/Body prompts
-   - New title/body prompts will appear in their respective sections after initialization
+4. **UI Reorganization:** ✅ COMPLETED (Commit `47c84d6`)
+   - Settings > AI Prompts page reorganized with improved layout
+   - "Primary Article Prompts" section now shows Evaluation Criteria + Article Title + Article Body prompts
+   - "Secondary Article Prompts" section now shows Evaluation Criteria + Article Title + Article Body prompts
+   - Eliminated duplicate "Secondary Article Prompts" heading
+   - Title/Body prompts appear in their respective sections as expected
 
 ---
 
