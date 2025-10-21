@@ -83,7 +83,7 @@ export class RSSProcessor {
       throw new Error(`Failed to fetch ${section} posts for scoring`)
     }
 
-    console.log(`Scoring ${posts.length} ${section} posts (limited to 12 most recent, sequential processing)`)
+    console.log(`Scoring ${posts.length} ${section} posts`)
 
     // Evaluate posts in batches
     const BATCH_SIZE = 3
@@ -92,27 +92,16 @@ export class RSSProcessor {
 
     for (let i = 0; i < posts.length; i += BATCH_SIZE) {
       const batch = posts.slice(i, i + BATCH_SIZE)
-      const batchNum = Math.floor(i / BATCH_SIZE) + 1
-      const totalBatches = Math.ceil(posts.length / BATCH_SIZE)
-
-      console.log(`Processing batch ${batchNum}/${totalBatches} (${batch.length} posts)`)
 
       // Process posts sequentially (not in parallel) to avoid memory issues with full article text
-      let batchSuccess = 0
-      let batchErrors = 0
-
       for (let j = 0; j < batch.length; j++) {
         const post = batch[j]
         try {
-          const overallIndex = i + j + 1
-          // console.log(`Evaluating post ${overallIndex}/${posts.length}: ${post.title}`) // Commented to reduce log count
-
           const evaluation = await this.evaluatePost(post)
 
           if (typeof evaluation.interest_level !== 'number' ||
               typeof evaluation.local_relevance !== 'number' ||
               typeof evaluation.community_impact !== 'number') {
-            console.error(`AI returned non-numeric scores`)
             throw new Error(`Invalid score types returned by AI`)
           }
 
@@ -143,8 +132,7 @@ export class RSSProcessor {
             throw new Error(`Rating insert failed: ${ratingError.message}`)
           }
 
-          // console.log(`Successfully evaluated post ${overallIndex}/${posts.length}`) // Commented to reduce log count
-          batchSuccess++
+          successCount++
 
         } catch (error) {
           console.error(`Error evaluating post ${post.id}:`, error)
@@ -152,17 +140,11 @@ export class RSSProcessor {
             postId: post.id,
             error: error instanceof Error ? error.message : 'Unknown error'
           })
-          batchErrors++
+          errorCount++
         }
       }
 
-      successCount += batchSuccess
-      errorCount += batchErrors
-
-      console.log(`Batch ${batchNum} complete: ${batchSuccess} successful, ${batchErrors} errors`)
-
       if (i + BATCH_SIZE < posts.length) {
-        console.log('Waiting 2 seconds before next batch...')
         await new Promise(resolve => setTimeout(resolve, 2000))
       }
     }
