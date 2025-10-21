@@ -4415,7 +4415,7 @@ function BusinessSettings() {
         {/* Header Image */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Header Image
+            Website Header Image
           </label>
           {settings.header_image_url && (
             <div className="mb-2 p-4 rounded border">
