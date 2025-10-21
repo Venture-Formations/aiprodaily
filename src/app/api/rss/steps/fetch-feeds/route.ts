@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Step 2] Triggering next step: ${nextStepUrl}`)
 
-    // Fire-and-forget: Don't await the next step to avoid deep call stack
+    // Trigger next step without awaiting response to avoid deep call stack
     fetch(nextStepUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -103,6 +103,9 @@ export async function POST(request: NextRequest) {
     }).catch(error => {
       console.error('[Step 2] Failed to trigger next step:', error)
     })
+
+    // Small delay to ensure fetch request is sent before function terminates
+    await new Promise(resolve => setTimeout(resolve, 100))
 
     return NextResponse.json({
       success: true,
