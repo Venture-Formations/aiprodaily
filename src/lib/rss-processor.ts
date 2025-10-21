@@ -187,14 +187,17 @@ export class RSSProcessor {
       }
 
       // Extract full article text from all posts
-      console.log('Extracting full article text from posts...')
-      try {
-        await this.enrichPostsWithFullContent(campaignId)
-        console.log('✅ Article extraction completed successfully')
-      } catch (extractionError) {
-        console.error('Failed to extract full articles, but continuing:', extractionError)
-        // Don't fail the entire RSS processing if article extraction fails
-      }
+      // DISABLED: Article extraction causes timeout (504) - takes too long for Vercel's limits
+      // TODO: Move to background job or separate endpoint
+      console.log('⚠️ Article extraction DISABLED - causes timeout with 30-50 articles')
+      // console.log('Extracting full article text from posts...')
+      // try {
+      //   await this.enrichPostsWithFullContent(campaignId)
+      //   console.log('✅ Article extraction completed successfully')
+      // } catch (extractionError) {
+      //   console.error('Failed to extract full articles, but continuing:', extractionError)
+      //   // Don't fail the entire RSS processing if article extraction fails
+      // }
 
       // Process posts with AI for both sections
       await this.processPostsWithAI(campaignId, 'primary')
