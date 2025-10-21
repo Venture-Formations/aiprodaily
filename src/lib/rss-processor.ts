@@ -105,7 +105,7 @@ export class RSSProcessor {
         const post = batch[j]
         try {
           const overallIndex = i + j + 1
-          console.log(`Evaluating post ${overallIndex}/${posts.length}: ${post.title}`)
+          // console.log(`Evaluating post ${overallIndex}/${posts.length}: ${post.title}`) // Commented to reduce log count
 
           const evaluation = await this.evaluatePost(post)
 
@@ -143,7 +143,7 @@ export class RSSProcessor {
             throw new Error(`Rating insert failed: ${ratingError.message}`)
           }
 
-          console.log(`Successfully evaluated post ${overallIndex}/${posts.length}`)
+          // console.log(`Successfully evaluated post ${overallIndex}/${posts.length}`) // Commented to reduce log count
           batchSuccess++
 
         } catch (error) {

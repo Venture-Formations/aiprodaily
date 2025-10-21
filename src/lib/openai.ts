@@ -1402,14 +1402,14 @@ function parseJSONResponse(content: string) {
 
 export async function callOpenAI(prompt: string, maxTokens = 1000, temperature = 0.3) {
   try {
-    console.log('Calling OpenAI API...')
+    // console.log('Calling OpenAI API...') // Commented out to reduce log count
 
     // Add timeout to prevent hanging
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
 
     try {
-      console.log('Using GPT-4o model with improved JSON parsing...')
+      // console.log('Using GPT-4o model with improved JSON parsing...') // Commented out to reduce log count
       const response = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
@@ -1426,7 +1426,7 @@ export async function callOpenAI(prompt: string, maxTokens = 1000, temperature =
         throw new Error('No response from OpenAI')
       }
 
-      console.log('OpenAI response received')
+      // console.log('OpenAI response received') // Commented out to reduce log count
 
       // Try to parse as JSON, fallback to raw content
       try {
@@ -1435,7 +1435,7 @@ export async function callOpenAI(prompt: string, maxTokens = 1000, temperature =
         const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
         if (codeFenceMatch) {
           cleanedContent = codeFenceMatch[1]
-          console.log('Stripped markdown code fences from response')
+          // console.log('Stripped markdown code fences from response') // Commented out to reduce log count
         }
 
         // Clean the content - remove any text before/after JSON (support both objects {} and arrays [])
