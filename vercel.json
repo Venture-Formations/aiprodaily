@@ -104,10 +104,7 @@
     "app/api/rss/steps/extract-articles/route.ts": {
       "maxDuration": 600
     },
-    "app/api/rss/steps/score-primary/route.ts": {
-      "maxDuration": 600
-    },
-    "app/api/rss/steps/score-secondary/route.ts": {
+    "app/api/rss/steps/score-posts/route.ts": {
       "maxDuration": 600
     },
     "app/api/rss/steps/generate-articles/route.ts": {
