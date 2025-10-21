@@ -6,6 +6,9 @@ import { Testimonials } from "@/components/website/testimonials"
 import { Footer } from "@/components/website/footer"
 import { supabaseAdmin } from "@/lib/supabase"
 
+// Force dynamic rendering to fetch fresh data
+export const dynamic = 'force-dynamic'
+
 export default async function WebsiteHome() {
   // Fetch header image from settings
   const { data: settings } = await supabaseAdmin
