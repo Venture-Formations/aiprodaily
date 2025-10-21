@@ -8,9 +8,11 @@ import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/wor
  * Processes both primary and secondary sections
  */
 export async function POST(request: NextRequest) {
+  let campaign_id: string | undefined
+
   try {
     const body = await request.json()
-    const { campaign_id } = body
+    campaign_id = body.campaign_id
 
     if (!campaign_id) {
       return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
@@ -77,10 +79,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[Step 5] Generate articles failed:', error)
 
-    await failWorkflow(
-      body.campaign_id,
-      `Generate articles step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-    )
+    if (campaign_id) {
+      await failWorkflow(
+        campaign_id,
+        `Generate articles step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
+    }
 
     return NextResponse.json({
       error: 'Generate articles step failed',

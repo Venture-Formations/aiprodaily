@@ -8,9 +8,11 @@ import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/wor
  * Updates campaign status to draft and sends Slack notifications
  */
 export async function POST(request: NextRequest) {
+  let campaign_id: string | undefined
+
   try {
     const body = await request.json()
-    const { campaign_id } = body
+    campaign_id = body.campaign_id
 
     if (!campaign_id) {
       return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
@@ -93,10 +95,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[Step 7] Finalize failed:', error)
 
-    await failWorkflow(
-      body.campaign_id,
-      `Finalize step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-    )
+    if (campaign_id) {
+      await failWorkflow(
+        campaign_id,
+        `Finalize step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
+    }
 
     return NextResponse.json({
       error: 'Finalize step failed',

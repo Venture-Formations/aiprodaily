@@ -8,9 +8,11 @@ import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/wor
  * Uses Readability.js to get full content from past 24 hours posts
  */
 export async function POST(request: NextRequest) {
+  let campaign_id: string | undefined
+
   try {
     const body = await request.json()
-    const { campaign_id } = body
+    campaign_id = body.campaign_id
 
     if (!campaign_id) {
       return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
@@ -80,10 +82,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[Step 3] Extract articles failed:', error)
 
-    await failWorkflow(
-      body.campaign_id,
-      `Extract articles step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-    )
+    if (campaign_id) {
+      await failWorkflow(
+        campaign_id,
+        `Extract articles step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
+    }
 
     return NextResponse.json({
       error: 'Extract articles step failed',

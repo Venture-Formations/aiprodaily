@@ -10,9 +10,11 @@ import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/wor
  * Uses state machine pattern - coordinator triggers this when state = 'pending_archive'
  */
 export async function POST(request: NextRequest) {
+  let campaign_id: string | undefined
+
   try {
     const body = await request.json()
-    const { campaign_id } = body
+    campaign_id = body.campaign_id
 
     if (!campaign_id) {
       return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
@@ -117,11 +119,13 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[Step 1] Archive failed:', error)
 
-    // Mark workflow as failed
-    await failWorkflow(
-      body.campaign_id,
-      `Archive step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-    )
+    // Mark workflow as failed if we have campaign_id
+    if (campaign_id) {
+      await failWorkflow(
+        campaign_id,
+        `Archive step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
+    }
 
     return NextResponse.json({
       error: 'Archive step failed',
