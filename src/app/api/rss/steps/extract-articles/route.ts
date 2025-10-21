@@ -54,10 +54,10 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Step 3/7] Complete: Extracted ${extractedCount}/${postsToExtract} articles`)
 
-    // Chain to next step: Generate AI content
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    // Chain to next step: Score posts
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
 
-    fetch(`${baseUrl}/api/rss/steps/generate-content`, {
+    fetch(`${baseUrl}/api/rss/steps/score-posts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ campaign_id })

@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     console.log(`[Step 1/7] Complete: Archived old data and cleared campaign`)
 
     // Chain to next step: Fetch RSS feeds
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
 
     // Don't await - let it run asynchronously
     fetch(`${baseUrl}/api/rss/steps/fetch-feeds`, {

@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     console.log(`[Step 2/7] Complete: Fetched ${totalPosts} posts from ${allFeeds.length} feeds`)
 
     // Chain to next step: Extract full article text
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
 
     fetch(`${baseUrl}/api/rss/steps/extract-articles`, {
       method: 'POST',

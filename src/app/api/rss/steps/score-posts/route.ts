@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     console.log(`[Step 4/6] Complete: Scored ${totalScored} posts with ${totalErrors} errors`)
 
     // Chain to next step: Generate newsletter articles
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
 
     fetch(`${baseUrl}/api/rss/steps/generate-articles`, {
       method: 'POST',
