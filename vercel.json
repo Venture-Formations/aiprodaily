@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/workflow-coordinator",
+      "schedule": "*/2 * * * *"
+    },
+    {
       "path": "/api/cron/populate-events",
       "schedule": "*/5 * * * *"
     },
@@ -50,6 +54,9 @@
     }
   ],
   "functions": {
+    "app/api/cron/workflow-coordinator/route.ts": {
+      "maxDuration": 120
+    },
     "app/api/cron/populate-events/route.ts": {
       "maxDuration": 120
     },

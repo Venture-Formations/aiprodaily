@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { RSSProcessor } from '@/lib/rss-processor'
 import { supabaseAdmin } from '@/lib/supabase'
+import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/workflow-state'
 
 /**
  * Step 5: Generate newsletter articles (title + body + fact check)
@@ -15,7 +16,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
     }
 
-    console.log(`[Step 5/6] Starting: Generate newsletter articles for campaign ${campaign_id}`)
+    console.log(`[Step 5/7] Starting: Generate newsletter articles for campaign ${campaign_id}`)
+
+    const startResult = await startWorkflowStep(campaign_id, 'pending_generate')
+    if (!startResult.success) {
+      console.log(`[Step 5] Skipping - ${startResult.message}`)
+      return NextResponse.json({
+        success: false,
+        message: startResult.message,
+        step: '5/7'
+      }, { status: 409 })
+    }
 
     const processor = new RSSProcessor()
 
@@ -47,46 +58,34 @@ export async function POST(request: NextRequest) {
     const secondaryPassed = secondaryArticles?.filter(a => a.fact_check_score >= 70).length || 0
     const totalPassed = primaryPassed + secondaryPassed
 
-    console.log(`[Step 5/6] Complete: Generated ${totalArticles} articles (${totalPassed} passed fact check)`)
+    console.log(`[Step 5/7] Complete: Generated ${totalArticles} articles (${totalPassed} passed fact check)`)
 
-    // Chain to next step: Finalize campaign
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
-    const nextStepUrl = `${baseUrl}/api/rss/steps/finalize`
-
-    console.log(`[Step 5] Triggering next step: ${nextStepUrl}`)
-
-    // Fire-and-forget: trigger next step without awaiting to avoid deep call stack
-    fetch(nextStepUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaign_id })
-    }).then(response => {
-      console.log(`[Step 5] Next step responded with: ${response.status}`)
-    }).catch(error => {
-      console.error('[Step 5] Failed to trigger next step:', error)
-    })
-
-    // Keep function alive for 1 second to ensure HTTP request is fully sent
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await completeWorkflowStep(campaign_id, 'generating')
 
     return NextResponse.json({
       success: true,
-      message: 'Generate articles step completed, finalize step triggered',
+      message: 'Generate articles step completed',
       campaign_id,
       primary_articles: primaryCount,
       secondary_articles: secondaryCount,
       total_articles: totalArticles,
       fact_check_passed: totalPassed,
-      next_step: 'finalize',
-      step: '5/6'
+      next_state: 'pending_finalize',
+      step: '5/7'
     })
 
   } catch (error) {
     console.error('[Step 5] Generate articles failed:', error)
+
+    await failWorkflow(
+      body.campaign_id,
+      `Generate articles step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    )
+
     return NextResponse.json({
       error: 'Generate articles step failed',
       message: error instanceof Error ? error.message : 'Unknown error',
-      step: '5/6'
+      step: '5/7'
     }, { status: 500 })
   }
 }

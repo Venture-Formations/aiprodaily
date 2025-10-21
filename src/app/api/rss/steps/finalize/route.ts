@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { ErrorHandler, SlackNotificationService } from '@/lib/slack'
+import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/workflow-state'
 
 /**
  * Step 6: Finalize campaign
@@ -15,7 +16,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
     }
 
-    console.log(`[Step 6/6] Starting: Finalize campaign ${campaign_id}`)
+    console.log(`[Step 7/7] Starting: Finalize campaign ${campaign_id}`)
+
+    const startResult = await startWorkflowStep(campaign_id, 'pending_finalize')
+    if (!startResult.success) {
+      console.log(`[Step 7] Skipping - ${startResult.message}`)
+      return NextResponse.json({
+        success: false,
+        message: startResult.message,
+        step: '7/7'
+      }, { status: 409 })
+    }
 
     const errorHandler = new ErrorHandler()
     const slack = new SlackNotificationService()
@@ -64,7 +75,9 @@ export async function POST(request: NextRequest) {
       // Don't fail the entire step if Slack fails
     }
 
-    console.log(`[Step 6/6] Complete: Campaign finalized with ${articleCount} articles`)
+    console.log(`[Step 7/7] Complete: Campaign finalized with ${articleCount} articles`)
+
+    await completeWorkflowStep(campaign_id, 'finalizing')
 
     return NextResponse.json({
       success: true,
@@ -73,15 +86,22 @@ export async function POST(request: NextRequest) {
       article_count: articleCount,
       campaign_date: campaignDate,
       status: 'draft',
-      step: '6/6'
+      workflow_state: 'complete',
+      step: '7/7'
     })
 
   } catch (error) {
-    console.error('[Step 6] Finalize failed:', error)
+    console.error('[Step 7] Finalize failed:', error)
+
+    await failWorkflow(
+      body.campaign_id,
+      `Finalize step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    )
+
     return NextResponse.json({
       error: 'Finalize step failed',
       message: error instanceof Error ? error.message : 'Unknown error',
-      step: '6/6'
+      step: '7/7'
     }, { status: 500 })
   }
 }

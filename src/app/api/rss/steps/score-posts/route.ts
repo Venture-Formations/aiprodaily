@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { RSSProcessor } from '@/lib/rss-processor'
+import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/workflow-state'
 
 /**
  * Step 4: Score/evaluate posts with AI criteria
@@ -15,6 +16,16 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`[Step 4/7] Starting: Score posts for campaign ${campaign_id}`)
+
+    const startResult = await startWorkflowStep(campaign_id, 'pending_score')
+    if (!startResult.success) {
+      console.log(`[Step 4] Skipping - ${startResult.message}`)
+      return NextResponse.json({
+        success: false,
+        message: startResult.message,
+        step: '4/7'
+      }, { status: 409 })
+    }
 
     const processor = new RSSProcessor()
     const overallStartTime = Date.now()
@@ -36,41 +47,29 @@ export async function POST(request: NextRequest) {
     const totalDuration = ((Date.now() - overallStartTime) / 1000).toFixed(1)
     console.log(`[Step 4/7] Complete: Scored ${primaryResults.scored + secondaryResults.scored} posts in ${totalDuration}s`)
 
-    // Chain to next step: Generate newsletter articles
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
-    const nextStepUrl = `${baseUrl}/api/rss/steps/generate-articles`
-
-    console.log(`[Step 4] Triggering next step: ${nextStepUrl}`)
-
-    // Fire-and-forget: trigger next step without awaiting to avoid deep call stack
-    fetch(nextStepUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaign_id })
-    }).then(response => {
-      console.log(`[Step 4] Next step responded with: ${response.status}`)
-    }).catch(error => {
-      console.error('[Step 4] Failed to trigger next step:', error)
-    })
-
-    // Keep function alive for 1 second to ensure HTTP request is fully sent
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await completeWorkflowStep(campaign_id, 'scoring')
 
     return NextResponse.json({
       success: true,
-      message: 'Score posts step completed, generate-articles step triggered',
+      message: 'Score posts step completed',
       campaign_id,
       primary: primaryResults,
       secondary: secondaryResults,
       total_scored: primaryResults.scored + secondaryResults.scored,
       total_errors: primaryResults.errors + secondaryResults.errors,
       duration_seconds: totalDuration,
-      next_step: 'generate-articles',
+      next_state: 'pending_generate',
       step: '4/7'
     })
 
   } catch (error) {
     console.error('[Step 4] Score posts failed:', error)
+
+    await failWorkflow(
+      body.campaign_id,
+      `Score posts step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    )
+
     return NextResponse.json({
       error: 'Score posts step failed',
       message: error instanceof Error ? error.message : 'Unknown error',

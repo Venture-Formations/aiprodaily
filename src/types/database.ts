@@ -107,6 +107,9 @@ export interface NewsletterCampaign {
   last_action_by: string | null
   status_before_send: CampaignStatus | null
   metrics: Record<string, any>
+  workflow_state: string | null
+  workflow_state_started_at: string | null
+  workflow_error: string | null
   created_at: string
   updated_at: string
 }

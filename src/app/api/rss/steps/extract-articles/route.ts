@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { RSSProcessor } from '@/lib/rss-processor'
 import { supabaseAdmin } from '@/lib/supabase'
+import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/workflow-state'
 
 /**
  * Step 3: Extract full article text from URLs
@@ -16,6 +17,16 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`[Step 3/7] Starting: Extract full article text for campaign ${campaign_id}`)
+
+    const startResult = await startWorkflowStep(campaign_id, 'pending_extract')
+    if (!startResult.success) {
+      console.log(`[Step 3] Skipping - ${startResult.message}`)
+      return NextResponse.json({
+        success: false,
+        message: startResult.message,
+        step: '3/7'
+      }, { status: 409 })
+    }
 
     // Get count of posts to extract
     const yesterday = new Date()
@@ -54,38 +65,26 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Step 3/7] Complete: Extracted ${extractedCount}/${postsToExtract} articles`)
 
-    // Chain to next step: Score posts
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
-    const nextStepUrl = `${baseUrl}/api/rss/steps/score-posts`
-
-    console.log(`[Step 3] Triggering next step: ${nextStepUrl}`)
-
-    // Fire-and-forget: trigger next step without awaiting to avoid deep call stack
-    fetch(nextStepUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaign_id })
-    }).then(response => {
-      console.log(`[Step 3] Next step responded with: ${response.status}`)
-    }).catch(error => {
-      console.error('[Step 3] Failed to trigger next step:', error)
-    })
-
-    // Keep function alive for 1 second to ensure HTTP request is fully sent
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await completeWorkflowStep(campaign_id, 'extracting')
 
     return NextResponse.json({
       success: true,
-      message: 'Extract articles step completed, score-posts step triggered',
+      message: 'Extract articles step completed',
       campaign_id,
       posts_to_extract: postsToExtract,
       extracted_count: extractedCount,
-      next_step: 'score-posts',
+      next_state: 'pending_score',
       step: '3/7'
     })
 
   } catch (error) {
     console.error('[Step 3] Extract articles failed:', error)
+
+    await failWorkflow(
+      body.campaign_id,
+      `Extract articles step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    )
+
     return NextResponse.json({
       error: 'Extract articles step failed',
       message: error instanceof Error ? error.message : 'Unknown error',

@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { ArticleArchiveService } from '@/lib/article-archive'
 import { ErrorHandler } from '@/lib/slack'
+import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/workflow-state'
 
 /**
  * Step 1: Archive old campaign data and clear previous articles/posts
- * This is the first step in the RSS processing chain
+ * This is the first step in the RSS processing workflow
+ * Uses state machine pattern - coordinator triggers this when state = 'pending_archive'
  */
 export async function POST(request: NextRequest) {
   try {
@@ -17,6 +19,17 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`[Step 1/7] Starting: Archive old data for campaign ${campaign_id}`)
+
+    // Start workflow step - marks as "archiving" and prevents race conditions
+    const startResult = await startWorkflowStep(campaign_id, 'pending_archive')
+    if (!startResult.success) {
+      console.log(`[Step 1] Skipping - ${startResult.message}`)
+      return NextResponse.json({
+        success: false,
+        message: startResult.message,
+        step: '1/7'
+      }, { status: 409 })
+    }
 
     const archiveService = new ArticleArchiveService()
     const errorHandler = new ErrorHandler()
@@ -90,36 +103,26 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Step 1/7] Complete: Archived old data and cleared campaign`)
 
-    // Chain to next step: Fetch RSS feeds
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
-    const nextStepUrl = `${baseUrl}/api/rss/steps/fetch-feeds`
-
-    console.log(`[Step 1] Triggering next step: ${nextStepUrl}`)
-
-    // Fire-and-forget: trigger next step without awaiting to avoid deep call stack
-    fetch(nextStepUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaign_id })
-    }).then(response => {
-      console.log(`[Step 1] Next step responded with: ${response.status}`)
-    }).catch(error => {
-      console.error('[Step 1] Failed to trigger next step:', error)
-    })
-
-    // Keep function alive for 1 second to ensure HTTP request is fully sent
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    // Complete workflow step - transitions to 'pending_fetch_feeds'
+    await completeWorkflowStep(campaign_id, 'archiving')
 
     return NextResponse.json({
       success: true,
-      message: 'Archive step completed, fetch-feeds step triggered',
+      message: 'Archive step completed',
       campaign_id,
-      next_step: 'fetch-feeds',
+      next_state: 'pending_fetch_feeds',
       step: '1/7'
     })
 
   } catch (error) {
     console.error('[Step 1] Archive failed:', error)
+
+    // Mark workflow as failed
+    await failWorkflow(
+      body.campaign_id,
+      `Archive step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    )
+
     return NextResponse.json({
       error: 'Archive step failed',
       message: error instanceof Error ? error.message : 'Unknown error',

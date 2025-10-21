@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { RSSProcessor } from '@/lib/rss-processor'
 import { supabaseAdmin } from '@/lib/supabase'
+import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/workflow-state'
 
 /**
  * Step 2: Fetch RSS feeds and insert posts from past 24 hours
@@ -16,6 +17,17 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`[Step 2/7] Starting: Fetch RSS feeds for campaign ${campaign_id}`)
+
+    // Start workflow step
+    const startResult = await startWorkflowStep(campaign_id, 'pending_fetch_feeds')
+    if (!startResult.success) {
+      console.log(`[Step 2] Skipping - ${startResult.message}`)
+      return NextResponse.json({
+        success: false,
+        message: startResult.message,
+        step: '2/7'
+      }, { status: 409 })
+    }
 
     // Get active RSS feeds - separate primary and secondary
     const { data: allFeeds, error: feedsError } = await supabaseAdmin
@@ -89,38 +101,27 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Step 2/7] Complete: Fetched ${totalPosts} posts from ${allFeeds.length} feeds`)
 
-    // Chain to next step: Extract full article text
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
-    const nextStepUrl = `${baseUrl}/api/rss/steps/extract-articles`
-
-    console.log(`[Step 2] Triggering next step: ${nextStepUrl}`)
-
-    // Fire-and-forget: trigger next step without awaiting to avoid deep call stack
-    fetch(nextStepUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaign_id })
-    }).then(response => {
-      console.log(`[Step 2] Next step responded with: ${response.status}`)
-    }).catch(error => {
-      console.error('[Step 2] Failed to trigger next step:', error)
-    })
-
-    // Keep function alive for 1 second to ensure HTTP request is fully sent
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    // Complete workflow step
+    await completeWorkflowStep(campaign_id, 'fetching_feeds')
 
     return NextResponse.json({
       success: true,
-      message: 'Fetch feeds step completed, extract-articles step triggered',
+      message: 'Fetch feeds step completed',
       campaign_id,
       posts_count: totalPosts,
       feeds_processed: allFeeds.length,
-      next_step: 'extract-articles',
+      next_state: 'pending_extract',
       step: '2/7'
     })
 
   } catch (error) {
     console.error('[Step 2] Fetch feeds failed:', error)
+
+    await failWorkflow(
+      body.campaign_id,
+      `Fetch feeds step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    )
+
     return NextResponse.json({
       error: 'Fetch feeds step failed',
       message: error instanceof Error ? error.message : 'Unknown error',
