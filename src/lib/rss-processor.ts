@@ -446,16 +446,30 @@ export class RSSProcessor {
       console.log(`Fetching RSS feed from: ${feed.url}`)
       const rssFeed = await parser.parseURL(feed.url)
       console.log(`Successfully fetched ${rssFeed.items?.length || 0} items from ${feed.name}`)
+
       const now = new Date()
       const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
+      console.log(`Filtering for posts between ${yesterday.toISOString()} and ${now.toISOString()}`)
+
       const recentPosts = rssFeed.items.filter(item => {
-        if (!item.pubDate) return false
+        if (!item.pubDate) {
+          console.log(`Skipping post without pubDate: ${item.title}`)
+          return false
+        }
         const pubDate = new Date(item.pubDate)
-        return pubDate >= yesterday && pubDate <= now
+        const isRecent = pubDate >= yesterday && pubDate <= now
+        if (!isRecent) {
+          console.log(`Skipping old post from ${pubDate.toISOString()}: ${item.title}`)
+        }
+        return isRecent
       })
 
-      console.log(`Found ${recentPosts.length} recent posts from ${feed.name}`)
+      console.log(`Found ${recentPosts.length} recent posts from ${feed.name} (out of ${rssFeed.items?.length || 0} total)`)
+      if (recentPosts.length > 0) {
+        const dates = recentPosts.map(p => new Date(p.pubDate!).toISOString()).sort()
+        console.log(`Date range of recent posts: ${dates[0]} to ${dates[dates.length - 1]}`)
+      }
 
       for (const item of recentPosts) {
         try {
