@@ -143,14 +143,22 @@ export class GitHubImageStorage {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
 
-      const response = await fetch(imageUrl, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'StCloudScoop-Newsletter/1.0',
-          'Accept': 'image/*',
-          'Cache-Control': 'no-cache'
-        }
-      })
+      let response
+      try {
+        response = await fetch(imageUrl, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'StCloudScoop-Newsletter/1.0',
+            'Accept': 'image/*',
+            'Cache-Control': 'no-cache'
+          }
+        })
+      } catch (fetchError) {
+        clearTimeout(timeoutId)
+        console.error(`Failed to fetch image - request error: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`)
+        console.error(`Image URL: ${imageUrl}`)
+        return null
+      }
 
       clearTimeout(timeoutId)
 
