@@ -65,7 +65,7 @@ export default async function NewsletterPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-[#F5F5F7]">
-      <Header logoUrl={headerImageUrl} />
+      <Header logoUrl={logoUrl} />
 
       {/* Content */}
       <section className="pt-20 py-10 px-4 sm:px-6 lg:px-8">
