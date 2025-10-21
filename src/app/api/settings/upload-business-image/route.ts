@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData()
     const file = formData.get('file') as File
-    const type = formData.get('type') as string // 'header' or 'logo'
+    const type = formData.get('type') as string // 'header', 'logo', or 'website_header'
 
     console.log('📄 [Upload] File received:', file?.name, 'Type:', type)
 
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    if (!type || !['header', 'logo'].includes(type)) {
+    if (!type || !['header', 'logo', 'website_header'].includes(type)) {
       console.log('❌ [Upload] Invalid type parameter:', type)
       return NextResponse.json({ error: 'Invalid type parameter' }, { status: 400 })
     }
