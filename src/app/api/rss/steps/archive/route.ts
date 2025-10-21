@@ -112,12 +112,6 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       console.error('[Step 1] Failed to trigger next step:', error)
-      // Log to Slack for visibility
-      await errorHandler.logError('Failed to trigger Step 2 (fetch-feeds)', {
-        campaignId: campaign_id,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        url: nextStepUrl
-      }, 'rss_step_1_chain_error')
     }
 
     return NextResponse.json({
