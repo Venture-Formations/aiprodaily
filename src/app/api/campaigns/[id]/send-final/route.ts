@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { MailerLiteService } from '@/lib/mailerlite'
+import { newsletterArchiver } from '@/lib/newsletter-archiver'
 
 interface RouteParams {
   params: Promise<{
@@ -65,6 +66,26 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const result = await mailerLiteService.createFinalCampaign(campaign, mainGroupId)
+
+    // Archive the newsletter for website display
+    try {
+      const archiveResult = await newsletterArchiver.archiveNewsletter({
+        campaignId: campaign.id,
+        campaignDate: campaign.date,
+        subjectLine: campaign.subject_line || 'Newsletter',
+        recipientCount: 0 // Will be updated with actual stats later
+      })
+
+      if (!archiveResult.success) {
+        console.error('Failed to archive newsletter:', archiveResult.error)
+        // Don't fail the send if archiving fails
+      } else {
+        console.log('✓ Newsletter archived successfully for', campaign.date)
+      }
+    } catch (archiveError) {
+      console.error('Error archiving newsletter:', archiveError)
+      // Don't fail the send if archiving fails
+    }
 
     // Log user activity
     if (session.user?.email) {

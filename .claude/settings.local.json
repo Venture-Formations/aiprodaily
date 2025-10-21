@@ -55,7 +55,9 @@
       "Bash(timeout 180 npm run build 2)",
       "Bash(1)",
       "Bash(npx tsc --noEmit --project .)",
-      "Bash(npx tsc --noEmit)"
+      "Bash(npx tsc --noEmit)",
+      "Bash(awk 'NR>=1330 && NR<=1400' src/lib/rss-processor.ts)",
+      "WebFetch(domain:www.aiaccountingdaily.com)"
     ],
     "deny": [],
     "ask": []

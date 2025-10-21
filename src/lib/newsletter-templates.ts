@@ -183,7 +183,7 @@ export async function generateNewsletterHeader(formattedDate: string, campaignDa
        <a href='{$forward}' style='color:#000;text-decoration:underline;'>Share</a>
      </div>
      <div style='width:100%;max-width:750px;margin:0 auto;padding:0px;'>
-       <table width='100%' cellpadding='0' cellspacing='0' style='font-family:Arial,sans-serif;background-color:${primaryColor};border-radius:12px;border:1px solid #333;'>
+       <table width='100%' cellpadding='0' cellspacing='0' style='font-family:Arial,sans-serif;'>
          <tr>
            <td align='center' style='padding:0;'>
              <img alt='${newsletterName}' src='${headerImageUrl}' style='display:block;width:100%;max-width:500px;height:auto;margin:0 auto;'/>

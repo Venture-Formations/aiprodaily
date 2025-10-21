@@ -111,6 +111,22 @@ export interface NewsletterCampaign {
   updated_at: string
 }
 
+export interface ArchivedNewsletter {
+  id: string
+  campaign_id: string
+  campaign_date: string  // Date in YYYY-MM-DD format for URL
+  subject_line: string
+  send_date: string  // Timestamp when sent
+  recipient_count: number
+  html_backup: string | null  // Full HTML for backup/reference
+  metadata: Record<string, any>  // Campaign metadata (settings, etc)
+  articles: any[]  // Array of article data with full content
+  events: any[]  // Array of event data
+  sections: Record<string, any>  // All newsletter sections data
+  created_at: string
+  updated_at: string
+}
+
 export interface RssFeed {
   id: string
   newsletter_id: string | null
