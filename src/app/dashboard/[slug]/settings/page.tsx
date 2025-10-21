@@ -4106,6 +4106,7 @@ function BusinessSettings() {
     primary_color: '#3B82F6',
     secondary_color: '#10B981',
     header_image_url: '',
+    website_header_url: '',
     logo_url: '',
     contact_email: '',
     website_url: '',
@@ -4182,7 +4183,6 @@ function BusinessSettings() {
   }
 
   const handleImageUpload = async (file: File, type: 'header' | 'logo' | 'website_header') => {
-    const setUploading = type === 'header' ? setUploadingHeader : setUploadingLogo
     const setUploading = type === 'header' ? setUploadingHeader : type === 'logo' ? setUploadingLogo : setUploadingWebsiteHeader
     setMessage('')
 
@@ -4206,9 +4206,8 @@ function BusinessSettings() {
       const data = await uploadResponse.json()
 
       // Update settings with new URL
-      const fieldName = type === 'header' ? 'header_image_url' : 'logo_url'
       const fieldName = type === 'header' ? 'header_image_url' : type === 'logo' ? 'logo_url' : 'website_header_url'
-      setMessage(data.message || `${type === 'header' ? 'Header' : 'Logo'} image uploaded successfully!`)
+      setSettings(prev => ({ ...prev, [fieldName]: data.url }))
       setMessage(data.message || `${type === 'header' ? 'Header' : type === 'logo' ? 'Logo' : 'Website Header'} image uploaded successfully!`)
       // Auto-save the settings with the new image URL
       setTimeout(async () => {
@@ -4501,8 +4500,6 @@ function BusinessSettings() {
           </div>
         </div>
       </div>
-      </div>
-
       {/* Social Media */}
       <div className="bg-white shadow rounded-lg p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Social Media Links</h3>
