@@ -70,20 +70,20 @@ export class RSSProcessor {
     const feedIds = feeds.map(f => f.id)
 
     // Get posts for this campaign from feeds in this section
-    // Limit to 6 most recent posts to avoid timeout
+    // Limit to 12 most recent posts (processing sequentially to handle full article text)
     const { data: posts, error } = await supabaseAdmin
       .from('rss_posts')
       .select('*')
       .eq('campaign_id', campaignId)
       .in('feed_id', feedIds)
       .order('processed_at', { ascending: false })
-      .limit(6)
+      .limit(12)
 
     if (error || !posts) {
       throw new Error(`Failed to fetch ${section} posts for scoring`)
     }
 
-    console.log(`Scoring ${posts.length} ${section} posts (limited to 6 most recent)`)
+    console.log(`Scoring ${posts.length} ${section} posts (limited to 12 most recent, sequential processing)`)
 
     // Evaluate posts in batches
     const BATCH_SIZE = 3
@@ -97,9 +97,14 @@ export class RSSProcessor {
 
       console.log(`Processing batch ${batchNum}/${totalBatches} (${batch.length} posts)`)
 
-      const batchPromises = batch.map(async (post, index) => {
+      // Process posts sequentially (not in parallel) to avoid memory issues with full article text
+      let batchSuccess = 0
+      let batchErrors = 0
+
+      for (let j = 0; j < batch.length; j++) {
+        const post = batch[j]
         try {
-          const overallIndex = i + index + 1
+          const overallIndex = i + j + 1
           console.log(`Evaluating post ${overallIndex}/${posts.length}: ${post.title}`)
 
           const evaluation = await this.evaluatePost(post)
@@ -122,11 +127,11 @@ export class RSSProcessor {
 
           const criteriaScores = (evaluation as any).criteria_scores
           if (criteriaScores && Array.isArray(criteriaScores)) {
-            for (let i = 0; i < criteriaScores.length && i < 5; i++) {
-              const criterionNum = i + 1
-              ratingRecord[`criteria_${criterionNum}_score`] = criteriaScores[i].score
-              ratingRecord[`criteria_${criterionNum}_reason`] = criteriaScores[i].reason
-              ratingRecord[`criteria_${criterionNum}_weight`] = criteriaScores[i].weight
+            for (let k = 0; k < criteriaScores.length && k < 5; k++) {
+              const criterionNum = k + 1
+              ratingRecord[`criteria_${criterionNum}_score`] = criteriaScores[k].score
+              ratingRecord[`criteria_${criterionNum}_reason`] = criteriaScores[k].reason
+              ratingRecord[`criteria_${criterionNum}_weight`] = criteriaScores[k].weight
             }
           }
 
@@ -139,7 +144,7 @@ export class RSSProcessor {
           }
 
           console.log(`Successfully evaluated post ${overallIndex}/${posts.length}`)
-          return { success: true, post: post }
+          batchSuccess++
 
         } catch (error) {
           console.error(`Error evaluating post ${post.id}:`, error)
@@ -147,13 +152,9 @@ export class RSSProcessor {
             postId: post.id,
             error: error instanceof Error ? error.message : 'Unknown error'
           })
-          return { success: false, post: post, error }
+          batchErrors++
         }
-      })
-
-      const batchResults = await Promise.all(batchPromises)
-      const batchSuccess = batchResults.filter(r => r.success).length
-      const batchErrors = batchResults.filter(r => !r.success).length
+      }
 
       successCount += batchSuccess
       errorCount += batchErrors
