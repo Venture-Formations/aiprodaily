@@ -76,7 +76,7 @@ export class RSSProcessor {
       .select('*')
       .eq('campaign_id', campaignId)
       .in('feed_id', feedIds)
-      .order('published_at', { ascending: false })
+      .order('processed_at', { ascending: false })
       .limit(12)
 
     if (error || !posts) {
