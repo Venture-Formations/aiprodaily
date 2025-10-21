@@ -94,6 +94,24 @@
     },
     "app/api/rss/process/route.ts": {
       "maxDuration": 60
+    },
+    "app/api/rss/steps/archive/route.ts": {
+      "maxDuration": 120
+    },
+    "app/api/rss/steps/fetch-feeds/route.ts": {
+      "maxDuration": 600
+    },
+    "app/api/rss/steps/extract-articles/route.ts": {
+      "maxDuration": 600
+    },
+    "app/api/rss/steps/score-posts/route.ts": {
+      "maxDuration": 600
+    },
+    "app/api/rss/steps/generate-articles/route.ts": {
+      "maxDuration": 600
+    },
+    "app/api/rss/steps/finalize/route.ts": {
+      "maxDuration": 120
     }
   }
 }
