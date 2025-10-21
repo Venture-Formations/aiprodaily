@@ -2380,14 +2380,27 @@ function AIPromptsSettings() {
   // Filter criteria prompts from other prompts
   const criteriaPrompts = prompts.filter(p => p.key.startsWith('ai_prompt_criteria_') && !p.key.startsWith('ai_prompt_secondary_'))
   const secondaryCriteriaPrompts = prompts.filter(p => p.key.startsWith('ai_prompt_secondary_criteria_'))
+
+  // Filter primary article title/body prompts
+  const primaryTitlePrompt = prompts.find(p => p.key === 'ai_prompt_primary_article_title')
+  const primaryBodyPrompt = prompts.find(p => p.key === 'ai_prompt_primary_article_body')
+
+  // Filter secondary article title/body prompts
+  const secondaryTitlePrompt = prompts.find(p => p.key === 'ai_prompt_secondary_article_title')
+  const secondaryBodyPrompt = prompts.find(p => p.key === 'ai_prompt_secondary_article_body')
+
   const otherPrompts = prompts.filter(p =>
     !p.key.startsWith('ai_prompt_criteria_') &&
     !p.key.startsWith('ai_prompt_secondary_criteria_') &&
-    !p.key.startsWith('ai_prompt_secondary_')
+    !p.key.startsWith('ai_prompt_secondary_') &&
+    p.key !== 'ai_prompt_primary_article_title' &&
+    p.key !== 'ai_prompt_primary_article_body'
   )
   const secondaryOtherPrompts = prompts.filter(p =>
     p.key.startsWith('ai_prompt_secondary_') &&
-    !p.key.startsWith('ai_prompt_secondary_criteria_')
+    !p.key.startsWith('ai_prompt_secondary_criteria_') &&
+    p.key !== 'ai_prompt_secondary_article_title' &&
+    p.key !== 'ai_prompt_secondary_article_body'
   )
 
   type PromptType = typeof prompts[0]
@@ -2734,6 +2747,12 @@ function AIPromptsSettings() {
               </div>
             )
           })}
+
+          {/* Primary Article Title Prompt */}
+          {primaryTitlePrompt && renderPromptCard(primaryTitlePrompt)}
+
+          {/* Primary Article Body Prompt */}
+          {primaryBodyPrompt && renderPromptCard(primaryBodyPrompt)}
         </div>
       </div>
 
@@ -2957,16 +2976,22 @@ function AIPromptsSettings() {
               </div>
             )
           })}
+
+          {/* Secondary Article Title Prompt */}
+          {secondaryTitlePrompt && renderPromptCard(secondaryTitlePrompt)}
+
+          {/* Secondary Article Body Prompt */}
+          {secondaryBodyPrompt && renderPromptCard(secondaryBodyPrompt)}
         </div>
       </div>
 
-      {/* Secondary Other Prompts */}
+      {/* Secondary Other Prompts - Only show if there are prompts besides title/body */}
       {secondaryOtherPrompts.length > 0 && (
         <div className="bg-white shadow rounded-lg">
           <div className="p-6 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Secondary Article Prompts</h3>
+            <h3 className="text-lg font-medium text-gray-900">Other Secondary Prompts</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Additional AI prompts for secondary article processing (content evaluator, article writer, etc.)
+              Additional AI prompts for secondary article processing (content evaluator, etc.)
             </p>
           </div>
           <div className="divide-y divide-gray-200">
