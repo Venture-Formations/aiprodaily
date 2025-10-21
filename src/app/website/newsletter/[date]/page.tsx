@@ -45,7 +45,7 @@ export default async function NewsletterPage({ params }: PageProps) {
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
     .select('value')
-    .eq('key', 'header_image_url')
+    .eq('key', 'website_header_url')
     .single()
 
   const headerImageUrl = settings?.value || '/logo.png'

@@ -4124,6 +4124,7 @@ function BusinessSettings() {
   const [saving, setSaving] = useState(false)
   const [uploadingHeader, setUploadingHeader] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingWebsiteHeader, setUploadingWebsiteHeader] = useState(false)
   const [message, setMessage] = useState('')
 
   const fontOptions = [
@@ -4180,9 +4181,9 @@ function BusinessSettings() {
     }
   }
 
-  const handleImageUpload = async (file: File, type: 'header' | 'logo') => {
+  const handleImageUpload = async (file: File, type: 'header' | 'logo' | 'website_header') => {
     const setUploading = type === 'header' ? setUploadingHeader : setUploadingLogo
-    setUploading(true)
+    const setUploading = type === 'header' ? setUploadingHeader : type === 'logo' ? setUploadingLogo : setUploadingWebsiteHeader
     setMessage('')
 
     try {
@@ -4206,9 +4207,9 @@ function BusinessSettings() {
 
       // Update settings with new URL
       const fieldName = type === 'header' ? 'header_image_url' : 'logo_url'
-      setSettings(prev => ({ ...prev, [fieldName]: data.url }))
+      const fieldName = type === 'header' ? 'header_image_url' : type === 'logo' ? 'logo_url' : 'website_header_url'
       setMessage(data.message || `${type === 'header' ? 'Header' : 'Logo'} image uploaded successfully!`)
-
+      setMessage(data.message || `${type === 'header' ? 'Header' : type === 'logo' ? 'Logo' : 'Website Header'} image uploaded successfully!`)
       // Auto-save the settings with the new image URL
       setTimeout(async () => {
         await handleSave()
@@ -4415,7 +4416,7 @@ function BusinessSettings() {
         {/* Header Image */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Website Header Image
+            Email Header Image
           </label>
           {settings.header_image_url && (
             <div className="mb-2 p-4 rounded border">
@@ -4469,6 +4470,37 @@ function BusinessSettings() {
             {uploadingLogo && <span className="text-sm text-gray-500">Uploading...</span>}
           </div>
         </div>
+
+        {/* Website Header Image */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Website Header Image
+          </label>
+          <p className="text-xs text-gray-500 mb-2">This image appears in the website header navigation.</p>
+          {settings.website_header_url && (
+            <div className="mb-2 p-4 rounded border">
+              <img
+                src={settings.website_header_url}
+                alt="Website header preview"
+                className="max-w-md h-32 object-contain mx-auto"
+              />
+            </div>
+          )}
+          <div className="flex items-center space-x-2">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) handleImageUpload(file, 'website_header')
+              }}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              disabled={uploadingWebsiteHeader}
+            />
+            {uploadingWebsiteHeader && <span className="text-sm text-gray-500">Uploading...</span>}
+          </div>
+        </div>
+      </div>
       </div>
 
       {/* Social Media */}

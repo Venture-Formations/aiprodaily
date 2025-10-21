@@ -11,7 +11,7 @@ export default async function WebsiteHome() {
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
     .select('key, value')
-    .eq('key', 'header_image_url')
+    .eq('key', 'website_header_url')
     .single()
 
   const headerImageUrl = settings?.value || '/logo.png'
