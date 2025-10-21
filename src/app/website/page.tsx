@@ -1,4 +1,5 @@
 import { Header } from "@/components/website/header"
+import { Hero } from "@/components/website/hero"
 import { Footer } from "@/components/website/footer"
 import { supabaseAdmin } from "@/lib/supabase"
 
@@ -16,9 +17,9 @@ export default async function WebsiteHome() {
   const headerImageUrl = settings?.value || '/logo.png'
 
   return (
-    <main className="min-h-screen flex flex-col">
+    <main className="min-h-screen">
       <Header logoUrl={headerImageUrl} />
-      <div className="flex-grow"></div>
+      <Hero />
       <Footer />
     </main>
   )

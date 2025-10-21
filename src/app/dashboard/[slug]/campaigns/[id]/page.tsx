@@ -2286,8 +2286,20 @@ export default function CampaignDetailPage() {
       clearInterval(statusInterval)
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.message || 'Failed to process RSS feeds')
+        let errorMessage = 'Failed to process RSS feeds'
+        try {
+          const data = await response.json()
+          errorMessage = data.message || data.error || errorMessage
+        } catch (e) {
+          // Response is not JSON, try to get text
+          try {
+            const text = await response.text()
+            errorMessage = text || `HTTP ${response.status}: ${response.statusText}`
+          } catch (textError) {
+            errorMessage = `HTTP ${response.status}: ${response.statusText}`
+          }
+        }
+        throw new Error(errorMessage)
       }
 
       setProcessingStatus('Processing complete! Refreshing articles...')
