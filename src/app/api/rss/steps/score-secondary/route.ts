@@ -32,17 +32,18 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Step 4b] Triggering next step: ${nextStepUrl}`)
 
-    // Trigger next step without awaiting response to avoid deep call stack
-    fetch(nextStepUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaign_id })
-    }).catch(error => {
+    // Trigger next step - await the response but don't read the body to avoid deep call stack
+    try {
+      const response = await fetch(nextStepUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign_id })
+      })
+      console.log(`[Step 4b] Next step received response: ${response.status}`)
+      // Don't await response.json() - let it run in background
+    } catch (error) {
       console.error('[Step 4b] Failed to trigger next step:', error)
-    })
-
-    // Small delay to ensure fetch request is sent before function terminates
-    await new Promise(resolve => setTimeout(resolve, 100))
+    }
 
     return NextResponse.json({
       success: true,
