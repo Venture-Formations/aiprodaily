@@ -186,20 +186,19 @@ export class RSSProcessor {
         }
       }
 
-      // Extract full article text from all posts
-      // DISABLED: Article extraction causes timeout (504) - takes too long for Vercel's limits
-      // TODO: Move to background job or separate endpoint
-      console.log('⚠️ Article extraction DISABLED - causes timeout with 30-50 articles')
-      // console.log('Extracting full article text from posts...')
-      // try {
-      //   await this.enrichPostsWithFullContent(campaignId)
-      //   console.log('✅ Article extraction completed successfully')
-      // } catch (extractionError) {
-      //   console.error('Failed to extract full articles, but continuing:', extractionError)
-      //   // Don't fail the entire RSS processing if article extraction fails
-      // }
+      // Extract full article text for posts from past 24 hours (before AI processing)
+      // This gives us full content for better article generation and fact checking
+      console.log('Extracting full article text for posts from past 24 hours...')
+      try {
+        await this.enrichRecentPostsWithFullContent(campaignId)
+        console.log('✅ Article extraction completed successfully')
+      } catch (extractionError) {
+        console.error('Failed to extract full articles, but continuing with RSS summaries:', extractionError)
+        // Don't fail the entire RSS processing if article extraction fails
+      }
 
-      // Process posts with AI for both sections
+      // Process posts with AI for both sections (using full article text if available)
+      // Generates title + content, applies scoring criteria, and fact checks
       await this.processPostsWithAI(campaignId, 'primary')
       await this.processPostsWithAI(campaignId, 'secondary')
 
@@ -2085,6 +2084,122 @@ export class RSSProcessor {
         campaignId,
         error: error instanceof Error ? error.message : 'Unknown error'
       })
+    }
+  }
+
+  /**
+   * Extract full article text ONLY for posts from past 24 hours
+   * This is much faster than processing all posts (typically 5-10 vs 30-50)
+   */
+  private async enrichRecentPostsWithFullContent(campaignId: string) {
+    try {
+      console.log('Starting full article text extraction for recent posts (past 24 hours)...')
+
+      // Calculate 24 hours ago
+      const yesterday = new Date()
+      yesterday.setHours(yesterday.getHours() - 24)
+      const yesterdayTimestamp = yesterday.toISOString()
+
+      // Get posts from past 24 hours that have source URLs and no full_article_text yet
+      const { data: posts, error } = await supabaseAdmin
+        .from('rss_posts')
+        .select('id, source_url, title, full_article_text, processed_at')
+        .eq('campaign_id', campaignId)
+        .not('source_url', 'is', null)
+        .gte('processed_at', yesterdayTimestamp)
+
+      if (error) {
+        throw new Error(`Failed to fetch recent posts for extraction: ${error.message}`)
+      }
+
+      if (!posts || posts.length === 0) {
+        console.log('No recent posts found with source URLs for extraction')
+        return
+      }
+
+      console.log(`Found ${posts.length} recent posts (past 24 hours) to extract full article text from`)
+
+      // Filter posts that need extraction (don't have full_article_text yet)
+      const postsNeedingExtraction = posts.filter(post => !post.full_article_text)
+      const postsAlreadyExtracted = posts.length - postsNeedingExtraction.length
+
+      if (postsAlreadyExtracted > 0) {
+        console.log(`${postsAlreadyExtracted} posts already have full article text, skipping`)
+      }
+
+      if (postsNeedingExtraction.length === 0) {
+        console.log('All recent posts already have full article text extracted')
+        return
+      }
+
+      console.log(`Extracting ${postsNeedingExtraction.length} recent articles...`)
+
+      // Build URL to post ID mapping
+      const urlToPostMap = new Map<string, string>()
+      postsNeedingExtraction.forEach(post => {
+        if (post.source_url) {
+          urlToPostMap.set(post.source_url, post.id)
+        }
+      })
+
+      const urls = Array.from(urlToPostMap.keys())
+
+      // Extract articles in batches (5 concurrent)
+      let extractionResults: Map<string, any>
+      try {
+        extractionResults = await this.articleExtractor.extractBatch(urls, 5)
+      } catch (extractError) {
+        console.error('⚠️ Article extraction batch failed completely:', extractError)
+        console.log('Continuing RSS processing without extracted articles...')
+        return
+      }
+
+      // Update database with extracted content
+      let successCount = 0
+      let failureCount = 0
+
+      for (const [url, result] of Array.from(extractionResults.entries())) {
+        const postId = urlToPostMap.get(url)
+        if (!postId) continue
+
+        if (result.success && result.fullText) {
+          // Update post with full article text
+          const { error: updateError } = await supabaseAdmin
+            .from('rss_posts')
+            .update({
+              full_article_text: result.fullText
+            })
+            .eq('id', postId)
+
+          if (updateError) {
+            console.error(`Failed to update post ${postId} with full article text:`, updateError)
+            failureCount++
+          } else {
+            successCount++
+          }
+        } else {
+          console.log(`Extraction failed for ${url}: ${result.error || 'Unknown error'}`)
+          failureCount++
+        }
+      }
+
+      console.log(`Recent article extraction complete: ${successCount} successful, ${failureCount} failed`)
+      await this.logInfo(`Recent article extraction complete`, {
+        campaignId,
+        totalRecentPosts: posts.length,
+        alreadyExtracted: postsAlreadyExtracted,
+        successfulExtractions: successCount,
+        failedExtractions: failureCount
+      })
+
+    } catch (error) {
+      console.error('Error in enrichRecentPostsWithFullContent:', error)
+      await this.logError('Failed to enrich recent posts with full article text', {
+        campaignId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
+      // Don't throw - article extraction is optional, RSS processing should continue
+      console.log('⚠️ Recent article extraction failed, but RSS processing will continue with RSS summaries')
     }
   }
 
