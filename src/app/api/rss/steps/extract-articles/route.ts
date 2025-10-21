@@ -54,9 +54,9 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Step 3/7] Complete: Extracted ${extractedCount}/${postsToExtract} articles`)
 
-    // Chain to next step: Score posts
+    // Chain to next step: Score primary posts
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
-    const nextStepUrl = `${baseUrl}/api/rss/steps/score-posts`
+    const nextStepUrl = `${baseUrl}/api/rss/steps/score-primary`
 
     console.log(`[Step 3] Triggering next step: ${nextStepUrl}`)
 
@@ -80,11 +80,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Extract articles step completed, score-posts step triggered',
+      message: 'Extract articles step completed, score-primary step triggered',
       campaign_id,
       posts_to_extract: postsToExtract,
       extracted_count: extractedCount,
-      next_step: 'score-posts',
+      next_step: 'score-primary',
       step: '3/7'
     })
 
