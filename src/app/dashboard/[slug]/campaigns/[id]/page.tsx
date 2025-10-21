@@ -1864,6 +1864,39 @@ export default function CampaignDetailPage() {
     }
   }, [params.id])
 
+  // Poll for status updates when campaign is processing
+  useEffect(() => {
+    if (!campaign || campaign.status !== 'processing') {
+      return
+    }
+
+    console.log('🔄 Campaign is processing, starting status polling...')
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/campaigns/${campaign.id}`)
+        if (response.ok) {
+          const data = await response.json()
+          const newStatus = data.campaign.status
+
+          console.log(`📊 Status poll: ${newStatus}`)
+
+          if (newStatus !== 'processing') {
+            console.log('✅ Processing complete! Refreshing campaign data...')
+            clearInterval(pollInterval)
+            // Refresh all campaign data
+            await fetchCampaign(campaign.id)
+            await fetchCampaignEvents(campaign.id)
+          }
+        }
+      } catch (error) {
+        console.error('Status poll error:', error)
+      }
+    }, 3000) // Poll every 3 seconds
+
+    return () => clearInterval(pollInterval)
+  }, [campaign?.status, campaign?.id])
+
   const fetchCampaign = async (id: string) => {
     try {
       const response = await fetch(`/api/campaigns/${id}`)
@@ -2587,6 +2620,7 @@ export default function CampaignDetailPage() {
       case 'changes_made': return 'Changes Made'
       case 'sent': return 'Sent'
       case 'failed': return 'Failed'
+      case 'processing': return 'Processing RSS Feeds...'
       default: return status
     }
   }
@@ -2782,8 +2816,15 @@ export default function CampaignDetailPage() {
                   campaign.status === 'in_review' ? 'bg-yellow-100 text-yellow-800' :
                   campaign.status === 'changes_made' ? 'bg-orange-100 text-orange-800' :
                   campaign.status === 'sent' ? 'bg-green-100 text-green-800' :
+                  campaign.status === 'processing' ? 'bg-blue-100 text-blue-800' :
                   'bg-red-100 text-red-800'
                 }`}>
+                  {campaign.status === 'processing' && (
+                    <svg className="animate-spin -ml-0.5 mr-1.5 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
                   {formatStatus(campaign.status)}
                 </span>
                 <span className="text-sm text-gray-500">
@@ -2794,10 +2835,10 @@ export default function CampaignDetailPage() {
             <div className="flex space-x-2">
               <button
                 onClick={processRSSFeeds}
-                disabled={processing || saving || generatingSubject}
+                disabled={processing || saving || generatingSubject || campaign.status === 'processing'}
                 className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium"
               >
-                {processing ? 'Processing...' : 'Process RSS Feeds'}
+                {(processing || campaign.status === 'processing') ? 'Processing in background...' : 'Process RSS Feeds'}
               </button>
               <button
                 onClick={previewNewsletter}
