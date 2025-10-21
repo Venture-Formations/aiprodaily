@@ -1,5 +1,5 @@
 import { Readability } from '@mozilla/readability'
-import { JSDOM } from 'jsdom'
+import { parseHTML } from 'linkedom'
 
 export interface ArticleExtractionResult {
   success: boolean
@@ -86,9 +86,8 @@ export class ArticleExtractor {
         }
       }
 
-      // Parse with JSDOM
-      const dom = new JSDOM(html, { url })
-      const document = dom.window.document
+      // Parse with linkedom
+      const { document } = parseHTML(html)
 
       // Use Readability to extract article content
       const reader = new Readability(document, {
