@@ -29,7 +29,6 @@ export default function NewslettersPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [headerImageUrl, setHeaderImageUrl] = useState('/logo.png')
-  const [logoUrl, setLogoUrl] = useState('/logo.png')
 
   useEffect(() => {
     fetchNewsletters()
@@ -56,13 +55,6 @@ export default function NewslettersPage() {
       if (response.ok) {
         const data = await response.json()
         setHeaderImageUrl(data.headerImageUrl || '/logo.png')
-      }
-
-      // Fetch logo URL
-      const footerResponse = await fetch('/api/settings/footer')
-      if (footerResponse.ok) {
-        const footerData = await footerResponse.json()
-        setLogoUrl(footerData.logoUrl || '/logo.png')
       }
     } catch (error) {
       console.error('Error fetching header image:', error)
@@ -95,7 +87,7 @@ export default function NewslettersPage() {
 
   return (
     <main className="min-h-screen">
-      <Header logoUrl={logoUrl} />
+      <Header logoUrl={headerImageUrl} />
 
       {/* Content Section */}
       <section id="newsletters" className="pt-20 py-10 px-4 sm:px-6 lg:px-8 bg-[#F5F5F7]">
