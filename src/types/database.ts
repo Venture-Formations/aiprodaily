@@ -124,6 +124,7 @@ export interface ArchivedNewsletter {
   html_backup: string | null  // Full HTML for backup/reference
   metadata: Record<string, any>  // Campaign metadata (settings, etc)
   articles: any[]  // Array of article data with full content
+  secondary_articles?: any[]  // Array of secondary article data
   events: any[]  // Array of event data
   sections: Record<string, any>  // All newsletter sections data
   created_at: string

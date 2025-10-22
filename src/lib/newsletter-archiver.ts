@@ -35,7 +35,6 @@ export class NewsletterArchiver {
             title,
             source_url,
             image_url,
-            author,
             publication_date
           )
         `)
@@ -47,6 +46,28 @@ export class NewsletterArchiver {
         console.error('Error fetching articles:', articlesError)
         return { success: false, error: `Failed to fetch articles: ${articlesError.message}` }
       }
+
+      // Fetch secondary articles
+      const { data: secondaryArticles } = await supabaseAdmin
+        .from('secondary_articles')
+        .select(`
+          id,
+          headline,
+          content,
+          word_count,
+          rank,
+          final_position,
+          created_at,
+          rss_post:rss_posts(
+            title,
+            source_url,
+            image_url,
+            publication_date
+          )
+        `)
+        .eq('campaign_id', campaignId)
+        .eq('is_active', true)
+        .order('rank', { ascending: true })
 
       // 2. Fetch additional sections data
       const sections: Record<string, any> = {}
@@ -124,6 +145,7 @@ export class NewsletterArchiver {
       // 3. Gather metadata
       const metadata = {
         total_articles: articles?.length || 0,
+        total_secondary_articles: secondaryArticles?.length || 0,
         has_road_work: !!roadWork,
         has_ai_apps: !!aiApps && aiApps.length > 0,
         has_poll: !!poll,
@@ -141,6 +163,7 @@ export class NewsletterArchiver {
         html_backup: htmlContent || null,
         metadata,
         articles: articles || [],
+        secondary_articles: secondaryArticles || [],
         events: [], // No events support for AI Accounting Daily
         sections
       }

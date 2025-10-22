@@ -67,6 +67,7 @@ export default async function NewsletterPage({ params }: PageProps) {
   })
 
   const articles = newsletter.articles || []
+  const secondaryArticles = newsletter.secondary_articles || []
   const aiApps = newsletter.sections?.ai_apps || []
   const poll = newsletter.sections?.poll
   const roadWork = newsletter.sections?.road_work
@@ -134,11 +135,48 @@ export default async function NewsletterPage({ params }: PageProps) {
                                 </svg>
                               </a>
                             )}
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              )
+            }
 
-                            {article.rss_post?.author && (
-                              <p className="text-sm text-[#1D1D1F]/60 mt-2">
-                                By {article.rss_post.author}
-                              </p>
+            // Secondary Articles Section (display_order 5)
+            if (section.display_order === 5 && secondaryArticles.length > 0) {
+              return (
+                <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
+                  <h2 className="text-2xl font-bold text-[#1D1D1F] mb-6">{section.name}</h2>
+                  <div className="space-y-8">
+                    {secondaryArticles.map((article: any, index: number) => (
+                      <article key={article.id} className="border-b border-gray-200 last:border-0 pb-8 last:pb-0">
+                        <div className="flex items-start gap-4">
+                          <div className="flex-shrink-0 w-8 h-8 bg-[#1c293d] text-white rounded-full flex items-center justify-center font-bold text-sm">
+                            {index + 1}
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-xl sm:text-2xl font-bold text-[#1D1D1F] mb-3">
+                              {article.headline}
+                            </h3>
+
+                            <div className="text-[#1D1D1F]/80 leading-relaxed mb-4 whitespace-pre-wrap">
+                              {article.content}
+                            </div>
+
+                            {article.rss_post?.source_url && (
+                              <a
+                                href={article.rss_post.source_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[#a855f7] hover:text-[#a855f7]/80 text-sm font-medium inline-flex items-center gap-1"
+                              >
+                                Read full story
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                              </a>
                             )}
                           </div>
                         </div>
@@ -236,20 +274,12 @@ export default async function NewsletterPage({ params }: PageProps) {
             <p className="text-[#1D1D1F]/60 mb-4">
               This is an archived edition of the AI Accounting Daily newsletter.
             </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <Link
-                href="/newsletters"
-                className="text-[#a855f7] hover:text-[#a855f7]/80 font-medium"
-              >
-                View All Newsletters
-              </Link>
-              <Link
-                href="/website"
-                className="text-[#a855f7] hover:text-[#a855f7]/80 font-medium"
-              >
-                Subscribe Today
-              </Link>
-            </div>
+            <Link
+              href="/newsletters"
+              className="text-[#a855f7] hover:text-[#a855f7]/80 font-medium"
+            >
+              View All Newsletters
+            </Link>
           </div>
         </div>
       </section>
