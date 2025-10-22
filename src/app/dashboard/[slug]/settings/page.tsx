@@ -1185,13 +1185,18 @@ function EmailSettings() {
     setSaving(true)
     setMessage('')
 
-    console.log('FRONTEND: Saving email settings:', settings)
+    // Exclude lookback hours from email settings save (they have their own save button)
+    const emailSettings: any = { ...settings }
+    delete emailSettings.primary_article_lookback_hours
+    delete emailSettings.secondary_article_lookback_hours
+
+    console.log('FRONTEND: Saving email settings (excluding lookback hours):', emailSettings)
 
     try {
       const response = await fetch('/api/settings/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings)
+        body: JSON.stringify(emailSettings)
       })
 
       console.log('FRONTEND: Response status:', response.status)
@@ -1896,6 +1901,27 @@ function EmailSettings() {
         </div>
       </div>
 
+      {/* Save Email & Schedule Settings Button */}
+      <div className="flex justify-end">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="bg-brand-primary hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-2 rounded-md font-medium"
+        >
+          {saving ? 'Saving...' : 'Save Email & Schedule Settings'}
+        </button>
+      </div>
+
+      {message && (
+        <div className={`mt-4 p-4 rounded-md ${
+          message.includes('successfully')
+            ? 'bg-green-50 border border-green-200 text-green-800'
+            : 'bg-red-50 border border-red-200 text-red-800'
+        }`}>
+          {message}
+        </div>
+      )}
+
       {/* Article Limit Settings */}
       <div className="bg-white shadow rounded-lg p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Article Limit Settings</h3>
@@ -1998,27 +2024,6 @@ function EmailSettings() {
           </div>
           </div>
       </div>
-
-      {/* Save Button */}
-      <div className="flex justify-end">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="bg-brand-primary hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-2 rounded-md font-medium"
-        >
-          {saving ? 'Saving...' : 'Save Settings'}
-        </button>
-      </div>
-
-      {message && (
-        <div className={`mt-4 p-4 rounded-md ${
-          message.includes('successfully')
-            ? 'bg-green-50 border border-green-200 text-green-800'
-            : 'bg-red-50 border border-red-200 text-red-800'
-        }`}>
-          {message}
-        </div>
-      )}
     </div>
   )
 }
