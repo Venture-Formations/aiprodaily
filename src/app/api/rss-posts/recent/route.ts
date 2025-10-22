@@ -27,8 +27,8 @@ export async function GET(request: NextRequest) {
       }, { status: 404 })
     }
 
-    // Build query with optional section filter
-    let query = supabaseAdmin
+    // Fetch RSS posts with feed information
+    const { data: allPosts, error } = await supabaseAdmin
       .from('rss_posts')
       .select(`
         id,
@@ -41,30 +41,39 @@ export async function GET(request: NextRequest) {
         processed_at,
         campaign_id,
         feed_id,
-        rss_feed:rss_feeds(name, use_for_primary_section, use_for_secondary_section)
+        rss_feed:rss_feeds!inner(name, use_for_primary_section, use_for_secondary_section, newsletter_id)
       `)
-      .eq('rss_feeds.newsletter_id', newsletter.id)
-
-    // Filter by section if specified
-    if (section === 'primary') {
-      query = query.eq('rss_feeds.use_for_primary_section', true)
-    } else if (section === 'secondary') {
-      query = query.eq('rss_feeds.use_for_secondary_section', true)
-    }
-
-    const { data: posts, error } = await query
+      .eq('rss_feed.newsletter_id', newsletter.id)
       .order('processed_at', { ascending: false })
-      .limit(limit)
+      .limit(200) // Fetch more to ensure we have enough after filtering
 
     if (error) {
       console.error('[API] Error fetching RSS posts:', error)
       throw error
     }
 
+    // Filter posts by section in JavaScript
+    let posts = allPosts || []
+
+    if (section === 'primary') {
+      posts = posts.filter(post => {
+        const feed = Array.isArray(post.rss_feed) ? post.rss_feed[0] : post.rss_feed
+        return feed?.use_for_primary_section === true
+      })
+    } else if (section === 'secondary') {
+      posts = posts.filter(post => {
+        const feed = Array.isArray(post.rss_feed) ? post.rss_feed[0] : post.rss_feed
+        return feed?.use_for_secondary_section === true
+      })
+    }
+
+    // Apply limit after filtering
+    posts = posts.slice(0, limit)
+
     return NextResponse.json({
       success: true,
-      posts: posts || [],
-      total: posts?.length || 0
+      posts: posts,
+      total: posts.length
     })
 
   } catch (error: any) {

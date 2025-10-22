@@ -2696,7 +2696,7 @@ function AIPromptsSettings() {
               ) : (
                 primaryRssPosts.map((post) => (
                   <option key={post.id} value={post.id}>
-                    {post.title} ({post.rss_feed?.name})
+                    {post.title} {post.rss_feed?.name ? `(${post.rss_feed.name})` : ''} - {new Date(post.processed_at).toLocaleDateString()}
                   </option>
                 ))
               )}
@@ -2950,7 +2950,7 @@ function AIPromptsSettings() {
               ) : (
                 secondaryRssPosts.map((post) => (
                   <option key={post.id} value={post.id}>
-                    {post.title} ({post.rss_feed?.name})
+                    {post.title} {post.rss_feed?.name ? `(${post.rss_feed.name})` : ''} - {new Date(post.processed_at).toLocaleDateString()}
                   </option>
                 ))
               )}
