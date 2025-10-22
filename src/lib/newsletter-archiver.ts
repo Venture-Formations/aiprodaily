@@ -64,12 +64,9 @@ export class NewsletterArchiver {
             end_date,
             venue,
             address,
-            city,
-            state,
-            zip,
-            event_url,
+            url,
             image_url,
-            category
+            cropped_image_url
           )
         `)
         .eq('campaign_id', campaignId)
