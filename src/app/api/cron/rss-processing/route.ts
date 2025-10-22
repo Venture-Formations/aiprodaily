@@ -4,6 +4,10 @@ import { RSSProcessor } from '@/lib/rss-processor'
 import { ScheduleChecker } from '@/lib/schedule-checker'
 import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 import { PromptSelector } from '@/lib/prompt-selector'
+import { executeStep1 } from '@/app/api/rss/combined-steps/step1-archive-fetch'
+import { executeStep2 } from '@/app/api/rss/combined-steps/step2-extract-score'
+import { executeStep3 } from '@/app/api/rss/combined-steps/step3-generate'
+import { executeStep4 } from '@/app/api/rss/combined-steps/step4-finalize'
 
 export async function POST(request: NextRequest) {
   let campaignId: string | undefined
@@ -88,29 +92,47 @@ export async function POST(request: NextRequest) {
     campaignId = newCampaign.id
     console.log('Created new campaign:', campaignId, 'for date:', campaignDate)
 
-    // Trigger RSS processing workflow (all steps run sequentially in one endpoint)
+    // Execute RSS processing steps directly (no HTTP calls)
     console.log('Starting RSS processing workflow...')
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
+    const steps = [
+      { name: 'Archive+Fetch', fn: () => executeStep1(campaignId!) },
+      { name: 'Extract+Score', fn: () => executeStep2(campaignId!) },
+      { name: 'Generate', fn: () => executeStep3(campaignId!) },
+      { name: 'Finalize', fn: () => executeStep4(campaignId!) }
+    ]
+
+    const results: any[] = []
 
     try {
-      const response = await fetch(`${baseUrl}/api/rss/process`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.CRON_SECRET}`
-        },
-        body: JSON.stringify({ campaign_id: campaignId })
-      })
+      // Execute each step with retry logic
+      for (const step of steps) {
+        let stepSuccessful = false
+        let attempt = 1
 
-      const result = await response.json()
+        while (attempt <= 2 && !stepSuccessful) {
+          try {
+            console.log(`[RSS] Executing ${step.name} (attempt ${attempt}/2)`)
+            const result = await step.fn()
+            results.push({ step: step.name, success: true, ...result })
+            stepSuccessful = true
+          } catch (error) {
+            console.error(`[RSS] ${step.name} failed (attempt ${attempt}/2):`, error)
+            attempt++
 
-      if (!response.ok) {
-        throw new Error(`RSS processing failed: ${result.message || 'Unknown error'}`)
+            if (attempt > 2) {
+              throw new Error(`${step.name} failed after 2 attempts`)
+            }
+          }
+        }
+
+        if (!stepSuccessful) {
+          throw new Error(`Failed to complete ${step.name}`)
+        }
       }
 
       console.log('✅ RSS processing completed successfully')
-      console.log('All steps executed:', result.results?.map((r: any) => r.step).join(' → '))
+      console.log('All steps executed:', results.map(r => r.step).join(' → '))
     } catch (stepError) {
       console.error('Failed to complete RSS processing:', stepError)
 
@@ -129,15 +151,15 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('=== RSS PROCESSING WORKFLOW COMPLETED ===')
-    console.log('All 6 steps completed sequentially:')
-    console.log('Archive → Fetch Feeds → Extract Articles → Score Posts → Generate Articles → Finalize')
+    console.log('All 4 steps completed sequentially:')
+    console.log('Archive+Fetch → Extract+Score → Generate → Finalize')
 
     return NextResponse.json({
       success: true,
-      message: 'Step-based RSS processing workflow initiated successfully',
+      message: 'RSS processing completed successfully',
       campaignId: campaignId,
       campaignDate: campaignDate,
-      note: 'Processing will continue in background with no time limits',
+      steps_completed: results.map(r => r.step),
       timestamp: new Date().toISOString()
     })
 
@@ -300,29 +322,47 @@ export async function GET(request: NextRequest) {
     }
     console.log('=== AI APP SELECTION COMPLETE ===\n')
 
-    // Trigger RSS processing workflow (all steps run sequentially in one endpoint)
+    // Execute RSS processing steps directly (no HTTP calls)
     console.log('Starting RSS processing workflow...')
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
+    const steps = [
+      { name: 'Archive+Fetch', fn: () => executeStep1(campaignId!) },
+      { name: 'Extract+Score', fn: () => executeStep2(campaignId!) },
+      { name: 'Generate', fn: () => executeStep3(campaignId!) },
+      { name: 'Finalize', fn: () => executeStep4(campaignId!) }
+    ]
+
+    const results: any[] = []
 
     try {
-      const response = await fetch(`${baseUrl}/api/rss/process`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.CRON_SECRET}`
-        },
-        body: JSON.stringify({ campaign_id: campaignId })
-      })
+      // Execute each step with retry logic
+      for (const step of steps) {
+        let stepSuccessful = false
+        let attempt = 1
 
-      const result = await response.json()
+        while (attempt <= 2 && !stepSuccessful) {
+          try {
+            console.log(`[RSS] Executing ${step.name} (attempt ${attempt}/2)`)
+            const result = await step.fn()
+            results.push({ step: step.name, success: true, ...result })
+            stepSuccessful = true
+          } catch (error) {
+            console.error(`[RSS] ${step.name} failed (attempt ${attempt}/2):`, error)
+            attempt++
 
-      if (!response.ok) {
-        throw new Error(`RSS processing failed: ${result.message || 'Unknown error'}`)
+            if (attempt > 2) {
+              throw new Error(`${step.name} failed after 2 attempts`)
+            }
+          }
+        }
+
+        if (!stepSuccessful) {
+          throw new Error(`Failed to complete ${step.name}`)
+        }
       }
 
       console.log('✅ RSS processing completed successfully')
-      console.log('All steps executed:', result.results?.map((r: any) => r.step).join(' → '))
+      console.log('All steps executed:', results.map(r => r.step).join(' → '))
     } catch (stepError) {
       console.error('Failed to complete RSS processing:', stepError)
 
@@ -341,15 +381,15 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('=== RSS PROCESSING WORKFLOW COMPLETED ===')
-    console.log('All 6 steps completed sequentially:')
-    console.log('Archive → Fetch Feeds → Extract Articles → Score Posts → Generate Articles → Finalize')
+    console.log('All 4 steps completed sequentially:')
+    console.log('Archive+Fetch → Extract+Score → Generate → Finalize')
 
     return NextResponse.json({
       success: true,
-      message: 'Step-based RSS processing workflow initiated successfully',
+      message: 'RSS processing completed successfully',
       campaignId: campaignId,
       campaignDate: campaignDate,
-      note: 'Processing will continue in background with no time limits',
+      steps_completed: results.map(r => r.step),
       timestamp: new Date().toISOString()
     })
 
