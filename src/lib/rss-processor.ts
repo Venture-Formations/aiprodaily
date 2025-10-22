@@ -744,14 +744,10 @@ export class RSSProcessor {
       const batchNum = Math.floor(i / BATCH_SIZE) + 1
       const totalBatches = Math.ceil(posts.length / BATCH_SIZE)
 
-      console.log(`Processing batch ${batchNum}/${totalBatches} (${batch.length} posts)`)
 
       // Process batch concurrently
       const batchPromises = batch.map(async (post, index) => {
         try {
-          const overallIndex = i + index + 1
-          console.log(`Evaluating post ${overallIndex}/${posts.length}: ${post.title}`)
-
           const evaluation = await this.evaluatePost(post)
 
           // Basic validation: ensure scores exist and are numbers
@@ -793,7 +789,6 @@ export class RSSProcessor {
             throw new Error(`Rating insert failed: ${ratingError.message}`)
           }
 
-          console.log(`Successfully evaluated post ${overallIndex}/${posts.length}`)
           return { success: true, post: post }
 
         } catch (error) {

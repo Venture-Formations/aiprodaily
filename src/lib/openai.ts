@@ -918,7 +918,6 @@ export const AI_PROMPTS = {
         return FALLBACK_PROMPTS.contentEvaluator(post)
       }
 
-      console.log('Using database prompt for contentEvaluator')
       // Database template uses {{}} placeholders
       const imagePenaltyText = post.hasImage
         ? 'This post HAS an image.'
@@ -948,7 +947,6 @@ export const AI_PROMPTS = {
         return FALLBACK_PROMPTS.newsletterWriter(post)
       }
 
-      console.log('Using database prompt for newsletterWriter')
       return data.value
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
@@ -973,7 +971,6 @@ export const AI_PROMPTS = {
         return FALLBACK_PROMPTS.eventSummarizer(event)
       }
 
-      console.log('Using database prompt for eventSummarizer')
       return data.value
         .replace(/\{\{title\}\}/g, event.title)
         .replace(/\{\{description\}\}/g, event.description || 'No description available')
@@ -1025,7 +1022,6 @@ export const AI_PROMPTS = {
         return FALLBACK_PROMPTS.breakingNewsScorer(article)
       }
 
-      console.log('Using database prompt for breakingNewsScorer')
       return data.value
         .replace(/\{\{title\}\}/g, article.title)
         .replace(/\{\{description\}\}/g, article.description || 'No description available')
@@ -1050,7 +1046,6 @@ export const AI_PROMPTS = {
         return FALLBACK_PROMPTS.criteria1Evaluator(post)
       }
 
-      console.log('Using database prompt for criteria1Evaluator')
       return data.value
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
@@ -1074,7 +1069,6 @@ export const AI_PROMPTS = {
         return FALLBACK_PROMPTS.criteria2Evaluator(post)
       }
 
-      console.log('Using database prompt for criteria2Evaluator')
       return data.value
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
@@ -1098,7 +1092,6 @@ export const AI_PROMPTS = {
         return FALLBACK_PROMPTS.criteria3Evaluator(post)
       }
 
-      console.log('Using database prompt for criteria3Evaluator')
       return data.value
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
@@ -1122,7 +1115,6 @@ export const AI_PROMPTS = {
         return FALLBACK_PROMPTS.criteria4Evaluator(post)
       }
 
-      console.log('Using database prompt for criteria4Evaluator')
       return data.value
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
@@ -1146,7 +1138,6 @@ export const AI_PROMPTS = {
         return FALLBACK_PROMPTS.criteria5Evaluator(post)
       }
 
-      console.log('Using database prompt for criteria5Evaluator')
       return data.value
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
@@ -1170,7 +1161,6 @@ export const AI_PROMPTS = {
         return FALLBACK_PROMPTS.articleWriter(post)
       }
 
-      console.log('Using database prompt for articleWriter')
       return data.value
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
@@ -1197,7 +1187,6 @@ export const AI_PROMPTS = {
         return FALLBACK_PROMPTS.primaryArticleTitle(post)
       }
 
-      console.log('Using database prompt for primaryArticleTitle')
       return data.value
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
@@ -1222,7 +1211,6 @@ export const AI_PROMPTS = {
         return FALLBACK_PROMPTS.primaryArticleBody(post, headline)
       }
 
-      console.log('Using database prompt for primaryArticleBody')
       return data.value
         .replace(/\{\{headline\}\}/g, headline)
         .replace(/\{\{title\}\}/g, post.title)
@@ -1249,7 +1237,6 @@ export const AI_PROMPTS = {
         return FALLBACK_PROMPTS.secondaryArticleTitle(post)
       }
 
-      console.log('Using database prompt for secondaryArticleTitle')
       return data.value
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
@@ -1274,7 +1261,6 @@ export const AI_PROMPTS = {
         return FALLBACK_PROMPTS.secondaryArticleBody(post, headline)
       }
 
-      console.log('Using database prompt for secondaryArticleBody')
       return data.value
         .replace(/\{\{headline\}\}/g, headline)
         .replace(/\{\{title\}\}/g, post.title)

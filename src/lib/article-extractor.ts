@@ -33,7 +33,6 @@ export class ArticleExtractor {
         const result = await this.fetchAndExtract(url)
 
         if (result.success) {
-          console.log(`✅ Successfully extracted article: ${url}`)
           return result
         }
 
