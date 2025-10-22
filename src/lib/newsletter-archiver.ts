@@ -48,42 +48,7 @@ export class NewsletterArchiver {
         return { success: false, error: `Failed to fetch articles: ${articlesError.message}` }
       }
 
-      // 2. Fetch all events for this campaign
-      const { data: campaignEvents, error: eventsError } = await supabaseAdmin
-        .from('campaign_events')
-        .select(`
-          id,
-          is_featured,
-          selection_order,
-          event:events(
-            id,
-            title,
-            description,
-            event_summary,
-            start_date,
-            end_date,
-            venue,
-            address,
-            url,
-            image_url,
-            cropped_image_url
-          )
-        `)
-        .eq('campaign_id', campaignId)
-        .order('selection_order', { ascending: true })
-
-      if (eventsError) {
-        console.error('Error fetching events:', eventsError)
-        return { success: false, error: `Failed to fetch events: ${eventsError.message}` }
-      }
-
-      const events = campaignEvents?.map(ce => ({
-        ...ce.event,
-        is_featured: ce.is_featured,
-        selection_order: ce.selection_order
-      })) || []
-
-      // 3. Fetch additional sections data
+      // 2. Fetch additional sections data
       const sections: Record<string, any> = {}
 
       // Road Work section
@@ -136,17 +101,16 @@ export class NewsletterArchiver {
         sections.poll = poll
       }
 
-      // 4. Gather metadata
+      // 3. Gather metadata
       const metadata = {
         total_articles: articles?.length || 0,
-        total_events: events.length,
         has_road_work: !!roadWork,
         has_ai_apps: !!aiApps && aiApps.length > 0,
         has_poll: !!poll,
         archived_at: new Date().toISOString()
       }
 
-      // 5. Create archive record
+      // 4. Create archive record
       const archiveData: Partial<ArchivedNewsletter> = {
         campaign_id: campaignId,
         campaign_date: campaignDate,
@@ -156,7 +120,7 @@ export class NewsletterArchiver {
         html_backup: htmlContent || null,
         metadata,
         articles: articles || [],
-        events,
+        events: [], // No events support for AI Accounting Daily
         sections
       }
 
