@@ -28,11 +28,22 @@
   - Post scoring and evaluation
   - Subject line generation
   - Multi-criteria content assessment
+- **Vercel AI SDK** (Potential Integration):
+  - Streaming text generation
+  - Chat interfaces with useChat hook
+  - Tool calling and function execution
+  - Server actions for LLM integration
 - **MailerLite**:
   - Email campaign delivery
   - Subscriber management
   - Review group campaigns
   - Final campaign scheduling and sending
+
+### Reference Documentation
+When implementing AI features or working with Vercel platform:
+- **Vercel AI SDK**: `docs/vercel-ai-sdk.md` - AI SDK patterns, hooks, streaming, and tool calling
+- **Vercel API**: `docs/vercel-api.md` - Platform API reference for deployments and functions
+- **Project Guide**: `CLAUDE.md` - This file, comprehensive project documentation
 
 ## 🔐 Required Environment Variables
 
@@ -181,6 +192,99 @@ Which approach would you prefer, or would you like me to explain any option in m
 - ✅ When comparing dates, use string comparison on YYYY-MM-DD format without timezone conversion
 
 **Why:** UTC conversion causes dates to shift forward/backward depending on timezone, breaking filters and comparisons.
+
+### AI Feature Implementation Guidelines
+
+**Before implementing any AI-powered feature, ALWAYS:**
+
+1. **Reference Documentation First**
+   - Read the relevant section in `docs/vercel-ai-sdk.md`
+   - Review existing AI implementations in `src/lib/openai.ts`
+   - Check for similar patterns in the codebase
+
+2. **Follow Established Patterns**
+   - Use the exact patterns shown in documentation
+   - Import from recommended packages
+   - Match existing project configurations
+
+3. **Current AI Implementation**
+   - Project uses direct OpenAI API calls via `src/lib/openai.ts`
+   - Custom `callOpenAI()` wrapper for API interactions
+   - JSON response parsing with fallback handling
+   - Multi-criteria evaluation system for content scoring
+
+4. **Potential Migration to Vercel AI SDK**
+   - If migrating features to Vercel AI SDK, consult `docs/vercel-ai-sdk.md`
+   - Maintain backward compatibility with existing AI prompts
+   - Test thoroughly before replacing working implementations
+
+### Common AI Development Tasks
+
+#### Chat Interface (If Needed)
+**Reference**: "useChat hook" in `docs/vercel-ai-sdk.md`
+```typescript
+import { useChat } from 'ai/react'
+
+const { messages, input, handleSubmit } = useChat({
+  api: '/api/chat'
+})
+```
+
+#### Streaming Text Generation
+**Reference**: "streamText" in `docs/vercel-ai-sdk.md`
+```typescript
+import { streamText } from 'ai'
+import { openai } from '@ai-sdk/openai'
+
+const result = await streamText({
+  model: openai('gpt-4-turbo'),
+  prompt: 'Your prompt here',
+})
+```
+
+#### Current Implementation (Non-Streaming)
+**Location**: `src/lib/openai.ts`
+```typescript
+import { callOpenAI } from '@/lib/openai'
+
+// Current pattern used throughout project
+const result = await callOpenAI(prompt, {
+  temperature: 0.7,
+  max_tokens: 1000
+})
+```
+
+#### Tool Calling (Advanced)
+**Reference**: "tools" section in `docs/vercel-ai-sdk.md`
+- Use for complex AI interactions requiring function execution
+- Define tools with zod schemas
+- Handle tool results in streaming responses
+
+### AI Best Practices for This Project
+
+1. **Prompt Engineering**
+   - Store prompts in database (`app_settings` table)
+   - Allow customization via Settings UI
+   - Test prompts before deploying
+   - Use consistent formatting across all prompts
+
+2. **Error Handling**
+   - Wrap AI calls in try-catch blocks
+   - Implement retry logic for transient failures
+   - Log errors with context (campaign_id, prompt type)
+   - Provide fallback behavior when AI fails
+
+3. **Performance**
+   - Batch AI operations with delays (prevent rate limits)
+   - Cache results when appropriate
+   - Monitor token usage
+   - Use appropriate model for task (gpt-4-turbo vs gpt-3.5-turbo)
+
+4. **Testing**
+   - Use `/api/debug/test-ai-prompts` for prompt testing
+   - Test with realistic newsletter data
+   - Verify output format matches expectations
+   - Check edge cases (empty content, very long content)
 
 ## 🔧 Technical Configuration
 
