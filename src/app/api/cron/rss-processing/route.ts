@@ -6,6 +6,8 @@ import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 import { PromptSelector } from '@/lib/prompt-selector'
 
 export async function POST(request: NextRequest) {
+  let campaignId: string | undefined
+
   try {
     // Verify this is a legitimate cron request
     const authHeader = request.headers.get('authorization')
@@ -83,7 +85,7 @@ export async function POST(request: NextRequest) {
       throw new Error(`Failed to create campaign: ${campaignError?.message}`)
     }
 
-    const campaignId = newCampaign.id
+    campaignId = newCampaign.id
     console.log('Created new campaign:', campaignId, 'for date:', campaignDate)
 
     // Trigger RSS processing workflow (all steps run sequentially in one endpoint)
@@ -111,6 +113,18 @@ export async function POST(request: NextRequest) {
       console.log('All steps executed:', result.results?.map((r: any) => r.step).join(' → '))
     } catch (stepError) {
       console.error('Failed to complete RSS processing:', stepError)
+
+      // Mark campaign as failed
+      try {
+        await supabaseAdmin
+          .from('newsletter_campaigns')
+          .update({ status: 'failed' })
+          .eq('id', campaignId)
+        console.log('Campaign marked as failed:', campaignId)
+      } catch (updateError) {
+        console.error('Failed to update campaign status:', updateError)
+      }
+
       throw stepError
     }
 
@@ -131,10 +145,24 @@ export async function POST(request: NextRequest) {
     console.error('=== RSS PROCESSING FAILED ===')
     console.error('Error:', error)
 
+    // Try to mark campaign as failed if campaign_id is available
+    if (campaignId) {
+      try {
+        await supabaseAdmin
+          .from('newsletter_campaigns')
+          .update({ status: 'failed' })
+          .eq('id', campaignId)
+        console.log('Campaign marked as failed:', campaignId)
+      } catch (updateError) {
+        console.error('Failed to update campaign status:', updateError)
+      }
+    }
+
     return NextResponse.json({
       success: false,
       error: 'RSS processing failed',
       message: error instanceof Error ? error.message : 'Unknown error',
+      campaign_id: campaignId,
       timestamp: new Date().toISOString()
     }, { status: 500 })
   }
@@ -142,6 +170,8 @@ export async function POST(request: NextRequest) {
 
 // Handle GET requests from Vercel cron (no auth header, uses URL secret)
 export async function GET(request: NextRequest) {
+  let campaignId: string | undefined
+
   try {
     // For Vercel cron: check secret in URL params, for manual: require secret param
     const searchParams = new URL(request.url).searchParams
@@ -222,12 +252,12 @@ export async function GET(request: NextRequest) {
       throw new Error(`Failed to create campaign: ${campaignError?.message}`)
     }
 
-    const campaignId = newCampaign.id
+    campaignId = newCampaign.id
     console.log('Created new campaign:', campaignId, 'for date:', campaignDate)
 
     // Select prompt for the campaign immediately after creation
     console.log('Selecting prompt for campaign...')
-    const selectedPrompt = await PromptSelector.selectPromptForCampaign(campaignId)
+    const selectedPrompt = await PromptSelector.selectPromptForCampaign(campaignId!)
     if (selectedPrompt) {
       console.log(`Selected prompt: ${selectedPrompt.title}`)
     } else {
@@ -256,7 +286,7 @@ export async function GET(request: NextRequest) {
         console.log(`Found newsletter: ${newsletter.name} (${newsletter.slug}, ID: ${newsletter.id})`)
         console.log(`Calling AppSelector.selectAppsForCampaign(${campaignId}, ${newsletter.id})...`)
 
-        const selectedApps = await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
+        const selectedApps = await AppSelector.selectAppsForCampaign(campaignId!, newsletter.id)
 
         console.log(`✅ Successfully selected ${selectedApps.length} AI applications`)
         console.log(`Selected apps:`, selectedApps.map(app => `${app.app_name} (${app.category})`).join(', '))
@@ -295,6 +325,18 @@ export async function GET(request: NextRequest) {
       console.log('All steps executed:', result.results?.map((r: any) => r.step).join(' → '))
     } catch (stepError) {
       console.error('Failed to complete RSS processing:', stepError)
+
+      // Mark campaign as failed
+      try {
+        await supabaseAdmin
+          .from('newsletter_campaigns')
+          .update({ status: 'failed' })
+          .eq('id', campaignId)
+        console.log('Campaign marked as failed:', campaignId)
+      } catch (updateError) {
+        console.error('Failed to update campaign status:', updateError)
+      }
+
       throw stepError
     }
 
@@ -315,10 +357,24 @@ export async function GET(request: NextRequest) {
     console.error('=== RSS PROCESSING FAILED ===')
     console.error('Error:', error)
 
+    // Try to mark campaign as failed if campaign_id is available
+    if (campaignId) {
+      try {
+        await supabaseAdmin
+          .from('newsletter_campaigns')
+          .update({ status: 'failed' })
+          .eq('id', campaignId)
+        console.log('Campaign marked as failed:', campaignId)
+      } catch (updateError) {
+        console.error('Failed to update campaign status:', updateError)
+      }
+    }
+
     return NextResponse.json({
       success: false,
       error: 'RSS processing failed',
       message: error instanceof Error ? error.message : 'Unknown error',
+      campaign_id: campaignId,
       timestamp: new Date().toISOString()
     }, { status: 500 })
   }
