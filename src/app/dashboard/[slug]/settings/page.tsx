@@ -1229,14 +1229,13 @@ function EmailSettings() {
       const response = await fetch('/api/settings/email')
       if (response.ok) {
         const data = await response.json()
-        const maxTopSetting = data.settings.find((s: any) => s.key === 'max_top_articles')
-        const maxBottomSetting = data.settings.find((s: any) => s.key === 'max_bottom_articles')
 
-        if (maxTopSetting) {
-          setMaxTopArticles(parseInt(maxTopSetting.value))
+        // Data is a flat object, not { settings: [...] }
+        if (data.max_top_articles) {
+          setMaxTopArticles(parseInt(data.max_top_articles))
         }
-        if (maxBottomSetting) {
-          setMaxBottomArticles(parseInt(maxBottomSetting.value))
+        if (data.max_bottom_articles) {
+          setMaxBottomArticles(parseInt(data.max_bottom_articles))
         }
       }
     } catch (error) {
@@ -3703,14 +3702,13 @@ function AdsSettings() {
       const response = await fetch('/api/settings/email')
       if (response.ok) {
         const data = await response.json()
-        const maxTopSetting = data.settings.find((s: any) => s.key === 'max_top_articles')
-        const maxBottomSetting = data.settings.find((s: any) => s.key === 'max_bottom_articles')
 
-        if (maxTopSetting) {
-          setMaxTopArticles(parseInt(maxTopSetting.value))
+        // Data is a flat object, not { settings: [...] }
+        if (data.max_top_articles) {
+          setMaxTopArticles(parseInt(data.max_top_articles))
         }
-        if (maxBottomSetting) {
-          setMaxBottomArticles(parseInt(maxBottomSetting.value))
+        if (data.max_bottom_articles) {
+          setMaxBottomArticles(parseInt(data.max_bottom_articles))
         }
       }
     } catch (error) {
