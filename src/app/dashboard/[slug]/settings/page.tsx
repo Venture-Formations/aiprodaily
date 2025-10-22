@@ -2218,10 +2218,10 @@ function AIPromptsSettings() {
       'ai_prompt_event_summary': 'eventSummarizer',
       'ai_prompt_road_work': 'roadWorkGenerator',
       'ai_prompt_image_analyzer': 'imageAnalyzer',
-      'ai_prompt_primary_article_title': 'newsletterWriter',
-      'ai_prompt_primary_article_body': 'newsletterWriter',
-      'ai_prompt_secondary_article_title': 'newsletterWriter',
-      'ai_prompt_secondary_article_body': 'newsletterWriter'
+      'ai_prompt_primary_article_title': 'primaryArticleTitle',
+      'ai_prompt_primary_article_body': 'primaryArticleBody',
+      'ai_prompt_secondary_article_title': 'secondaryArticleTitle',
+      'ai_prompt_secondary_article_body': 'secondaryArticleBody'
     }
 
     let testType = promptTypeMap[key]

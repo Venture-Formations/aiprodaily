@@ -111,6 +111,88 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Test Primary Article Title
+    if (promptType === 'primaryArticleTitle') {
+      console.log('Testing Primary Article Title...')
+      try {
+        const prompt = await AI_PROMPTS.primaryArticleTitle(testData.newsletterWriter)
+        const response = await callOpenAI(prompt, 200, 0.7)
+        results.primaryArticleTitle = {
+          success: true,
+          response,
+          prompt_length: prompt.length
+        }
+      } catch (error) {
+        results.primaryArticleTitle = {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      }
+    }
+
+    // Test Primary Article Body
+    if (promptType === 'primaryArticleBody') {
+      console.log('Testing Primary Article Body...')
+      try {
+        // First generate a sample headline (or use a test headline)
+        const sampleHeadline = rssPost?.title || 'Sample Test Headline for Article Body'
+        const prompt = await AI_PROMPTS.primaryArticleBody(testData.newsletterWriter, sampleHeadline)
+        const response = await callOpenAI(prompt, 500, 0.7)
+        results.primaryArticleBody = {
+          success: true,
+          response,
+          prompt_length: prompt.length,
+          note: `Using headline: "${sampleHeadline}"`
+        }
+      } catch (error) {
+        results.primaryArticleBody = {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      }
+    }
+
+    // Test Secondary Article Title
+    if (promptType === 'secondaryArticleTitle') {
+      console.log('Testing Secondary Article Title...')
+      try {
+        const prompt = await AI_PROMPTS.secondaryArticleTitle(testData.newsletterWriter)
+        const response = await callOpenAI(prompt, 200, 0.7)
+        results.secondaryArticleTitle = {
+          success: true,
+          response,
+          prompt_length: prompt.length
+        }
+      } catch (error) {
+        results.secondaryArticleTitle = {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      }
+    }
+
+    // Test Secondary Article Body
+    if (promptType === 'secondaryArticleBody') {
+      console.log('Testing Secondary Article Body...')
+      try {
+        // First generate a sample headline (or use a test headline)
+        const sampleHeadline = rssPost?.title || 'Sample Test Headline for Article Body'
+        const prompt = await AI_PROMPTS.secondaryArticleBody(testData.newsletterWriter, sampleHeadline)
+        const response = await callOpenAI(prompt, 500, 0.7)
+        results.secondaryArticleBody = {
+          success: true,
+          response,
+          prompt_length: prompt.length,
+          note: `Using headline: "${sampleHeadline}"`
+        }
+      } catch (error) {
+        results.secondaryArticleBody = {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      }
+    }
+
     // Test Subject Line Generator
     if (promptType === 'all' || promptType === 'subjectLineGenerator') {
       console.log('Testing Subject Line Generator...')
