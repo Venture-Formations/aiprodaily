@@ -1190,7 +1190,7 @@ function EmailSettings() {
     delete emailSettings.primary_article_lookback_hours
     delete emailSettings.secondary_article_lookback_hours
 
-    console.log('FRONTEND: Saving email settings (excluding lookback hours):', emailSettings)
+    console.log('FRONTEND: Saving email settings:', emailSettings)
 
     try {
       const response = await fetch('/api/settings/email', {
