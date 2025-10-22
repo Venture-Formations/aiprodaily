@@ -154,36 +154,26 @@ export default async function NewsletterPage({ params }: PageProps) {
               return (
                 <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
                   <h2 className="text-2xl font-bold text-[#1D1D1F] mb-6">{section.name}</h2>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {aiApps.map((item: any, index: number) => {
                       const app = item.app
                       return (
                         <div
                           key={app.id}
-                          className="border-b border-gray-200 last:border-0 pb-4 last:pb-0"
+                          className="border-b border-gray-200 last:border-0 pb-3 last:pb-0 text-base leading-relaxed"
                         >
-                          <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0 text-[#1D1D1F] font-bold">
-                              {index + 1}.
-                            </div>
-                            <div className="flex-1">
-                              <h3 className="font-bold text-lg text-[#1D1D1F] inline">
-                                {app.app_url ? (
-                                  <a
-                                    href={app.app_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-[#a855f7] hover:text-[#a855f7]/80 underline"
-                                  >
-                                    {app.app_name}
-                                  </a>
-                                ) : (
-                                  app.app_name
-                                )}
-                              </h3>
-                              <span className="text-[#1D1D1F]/80"> - {app.description || app.tagline || 'AI-powered application'}</span>
-                            </div>
-                          </div>
+                          <strong>{index + 1}.</strong> {app.app_url ? (
+                            <a
+                              href={app.app_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[#a855f7] hover:text-[#a855f7]/80 underline font-bold"
+                            >
+                              {app.app_name}
+                            </a>
+                          ) : (
+                            <span className="font-bold">{app.app_name}</span>
+                          )} - {app.description || app.tagline || 'AI-powered application'}
                         </div>
                       )
                     })}
@@ -198,9 +188,11 @@ export default async function NewsletterPage({ params }: PageProps) {
               return (
                 <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
                   <h2 className="text-2xl font-bold text-[#1D1D1F] mb-6">{section.name}</h2>
-                  <div className="bg-black text-green-400 p-4 rounded-lg font-mono text-sm">
-                    <div className="font-bold mb-2">{prompt.title}</div>
-                    <div className="whitespace-pre-wrap">{prompt.prompt_text}</div>
+                  <div className="text-center mb-4">
+                    <div className="text-xl font-bold text-[#1D1D1F]">{prompt.title}</div>
+                  </div>
+                  <div className="bg-black text-green-400 p-4 rounded-md font-mono text-sm leading-relaxed whitespace-pre-wrap border-2 border-gray-800">
+                    {prompt.prompt_text}
                   </div>
                 </div>
               )
@@ -211,8 +203,8 @@ export default async function NewsletterPage({ params }: PageProps) {
               return (
                 <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
                   <h2 className="text-2xl font-bold text-[#1D1D1F] mb-6">{section.name}</h2>
-                  <div className="text-lg font-semibold text-[#1D1D1F] mb-4">{poll.question}</div>
-                  <p className="text-[#1D1D1F]/60 text-sm">
+                  <div className="text-xl font-bold text-center text-[#1D1D1F] mb-4">{poll.question}</div>
+                  <p className="text-[#1D1D1F]/60 text-sm text-center">
                     This poll was available in the email newsletter.
                   </p>
                 </div>
@@ -224,10 +216,10 @@ export default async function NewsletterPage({ params }: PageProps) {
               return (
                 <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
                   <h2 className="text-2xl font-bold text-[#1D1D1F] mb-6">{section.name}</h2>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {roadWork.items && roadWork.items.map((item: any, index: number) => (
-                      <div key={index} className="border-b border-gray-200 last:border-0 pb-4 last:pb-0">
-                        <div className="font-semibold text-[#1D1D1F]">{item.title}</div>
+                      <div key={index} className="border-b border-gray-200 last:border-0 pb-3 last:pb-0">
+                        <div className="font-bold text-[#1D1D1F]">{item.title}</div>
                         <div className="text-[#1D1D1F]/80 text-sm mt-1">{item.description}</div>
                       </div>
                     ))}
