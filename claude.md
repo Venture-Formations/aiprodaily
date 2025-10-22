@@ -34,6 +34,38 @@
   - Review group campaigns
   - Final campaign scheduling and sending
 
+## 🔐 Required Environment Variables
+
+### Core Services
+```bash
+DATABASE_URL=                    # Supabase PostgreSQL connection string
+SUPABASE_SERVICE_ROLE_KEY=       # Supabase admin access key (bypasses RLS)
+OPENAI_API_KEY=                  # ChatGPT API access for content generation
+MAILERLITE_API_KEY=              # Email service API for campaigns
+```
+
+### Authentication & Security
+```bash
+NEXTAUTH_SECRET=                 # NextAuth.js session encryption key
+NEXTAUTH_URL=                    # Application URL for OAuth callbacks
+CRON_SECRET=                     # Vercel cron job authentication token
+```
+
+### Optional Services
+```bash
+SLACK_WEBHOOK_URL=               # Slack notifications for RSS processing
+GITHUB_TOKEN=                    # GitHub API token for image storage
+GITHUB_REPO=                     # Repository name for image storage (e.g., "username/ai-pros-images")
+GITHUB_BRANCH=                   # Branch for image storage (default: "main")
+```
+
+### Payment Processing (if ads enabled)
+```bash
+STRIPE_SECRET_KEY=               # Stripe API key for ad payments
+STRIPE_WEBHOOK_SECRET=           # Stripe webhook signing secret
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=  # Stripe public key (client-side)
+```
+
 ## 🔒 **SAVE POINT - RSS Processing Optimization Complete** (2025-01-22)
 **Git Commit:** `9137c58` - Consolidate evaluation logging to single line format
 **System State:** Fully functional with optimized RSS processing and minimal logging
@@ -176,6 +208,48 @@ Which approach would you prefer, or would you like me to explain any option in m
 - **Email Format**: HTML email templates with responsive design
 - **Article Order**: Sorted by AI score (highest first)
 
+## ⚡ Performance Optimization
+
+### Vercel Function Limits
+- **Timeout**: 600 seconds (10 minutes) for RSS processing routes
+- **Log Size**: 10MB maximum per function execution
+- **Memory**: 1024MB default (configurable in vercel.json)
+- **Response Size**: 4.5MB maximum response body
+
+### Optimization Strategies Implemented
+1. **Minimal Logging**
+   - Removed 100+ console.log statements from RSS processor
+   - Single-line format for evaluation results
+   - Only essential error/status messages logged
+
+2. **Batch Processing**
+   - AI scoring in batches of 3 posts (prevents rate limits)
+   - 2-second delays between batches
+   - Concurrent article extraction (10 at a time)
+
+3. **Direct Function Calls**
+   - Combined steps call methods directly (no HTTP overhead)
+   - Eliminated intermediate API requests
+   - Faster execution (4 steps instead of 7)
+
+4. **Retry Logic**
+   - Each step retries once on transient failures
+   - Prevents full workflow restart on temporary issues
+   - Campaign marked failed only after 2 attempts
+
+5. **Efficient Database Queries**
+   - Select only required fields
+   - Use indexes for campaign_id, feed_id lookups
+   - Batch updates where possible
+
+### Performance Monitoring
+```bash
+# Check function execution times in Vercel dashboard
+# Monitor log sizes to ensure under 10MB limit
+# Watch for timeout warnings (>540 seconds)
+# Review Supabase query performance
+```
+
 ## 🤖 Automated Newsletter Scheduling System
 
 ### Schedule Configuration (Central Time)
@@ -260,6 +334,255 @@ When deleting a campaign, the following tables must be cleaned up:
 - ✅ Smart reset (custom default → code default)
 - ✅ Multi-criteria evaluation system
 
+## 📡 RSS Feed Management
+
+### Feed Structure
+- **Primary Section**: Top 5 articles (highest scores)
+- **Secondary Section**: 3-5 articles (different feeds/perspectives)
+- **Active Feeds**: Toggle on/off in Settings > RSS Feeds
+- **Lookback Window**: 24 hours from campaign date
+- **Section Assignment**: Each feed assigned to primary, secondary, or both
+
+### Adding New RSS Feeds
+1. Navigate to **Settings > RSS Feeds** in dashboard
+2. Click "Add New Feed" button
+3. Enter feed details:
+   - Feed URL (must be valid RSS/Atom feed)
+   - Display name
+   - Section assignment (primary/secondary)
+   - Active status
+4. Test fetch before activating
+5. Monitor first campaign for quality
+
+### Feed Configuration Options
+- **Use for Primary Section**: Include in main article selection
+- **Use for Secondary Section**: Include in secondary article selection
+- **Active**: Enable/disable without deleting
+- **Processing Errors**: Auto-tracked for troubleshooting
+
+### Best Practices
+- ✅ Test new feeds with manual campaign first
+- ✅ Monitor post quality and scoring
+- ✅ Use diverse sources for better coverage
+- ✅ Deactivate low-quality feeds instead of deleting
+- ✅ Review feed errors regularly
+
+## 🎯 Multi-Criteria Scoring System
+
+### Default Scoring Criteria
+The system evaluates each RSS post against customizable criteria:
+
+**Criterion 1: Interest Level** (default weight: 1.5)
+- How engaging is this content for the target audience?
+- Does it grab attention?
+- Is it newsworthy or unique?
+
+**Criterion 2: Professional Relevance** (default weight: 1.5)
+- How relevant is this to accounting professionals?
+- Does it address industry-specific challenges?
+- Is it actionable for readers?
+
+**Criterion 3: Professional Impact** (default weight: 1.0)
+- How significant is this development?
+- Will it affect readers' work?
+- Is it a major trend or minor update?
+
+### How Scoring Works
+1. **Evaluation**: Each post evaluated against enabled criteria (default: 3)
+2. **Scoring**: AI assigns 0-10 score per criterion
+3. **Weighting**: Scores multiplied by criterion weight
+4. **Total Score**: Weighted sum calculated (e.g., 25.5 out of max 40)
+5. **Ranking**: Posts ranked by total_score descending
+6. **Selection**: Top N posts selected for newsletter
+
+### Score Calculation Example
+```
+Criterion 1: 8/10 × weight 1.5 = 12.0
+Criterion 2: 7/10 × weight 1.5 = 10.5
+Criterion 3: 5/10 × weight 1.0 =  5.0
+                    Total Score = 27.5 (max possible: 40)
+```
+
+### Customizing Scoring Criteria
+
+#### Edit Criteria Prompts
+1. Navigate to **Settings > AI Prompts**
+2. Find criteria evaluator prompts (criteria1Evaluator, criteria2Evaluator, etc.)
+3. Click "Edit" to modify prompt
+4. Use "Test Prompt" to verify output
+5. Save changes or "Save as Default"
+
+#### Adjust Criteria Weights
+1. Navigate to **Settings > Scoring Criteria**
+2. Modify weights (higher = more important)
+3. Common patterns:
+   - Equal weights: 1.0, 1.0, 1.0 (all criteria equal)
+   - Emphasis on relevance: 1.0, 2.0, 1.0
+   - Emphasis on impact: 1.0, 1.0, 2.0
+4. Save and apply to future campaigns
+
+#### Enable/Disable Criteria
+- **Criteria Enabled Count**: Set to 2 or 3 (up to 3 supported)
+- Disabled criteria are skipped during evaluation
+- Weights still apply to enabled criteria
+
+### Viewing Scores
+- **Campaign Detail Page**: View scores for all articles
+- **Article Cards**: Display total_score and ranking
+- **Post Ratings Table**: Full breakdown by criterion
+- **Debug Endpoint**: `/api/debug/check-posts?campaign_id=X`
+
+## 🎨 Additional Platform Features
+
+### Secondary Articles System
+- **Purpose**: Provide diverse perspectives or supplementary content
+- **Separate Feeds**: Uses different RSS feeds than primary section
+- **Independent Scoring**: Scored separately with same criteria
+- **Article Count**: Typically 3-5 articles (configurable)
+- **Toggle Active**: Can activate/deactivate individual secondary articles
+- **Reordering**: Drag-and-drop ranking like primary articles
+
+### Advertisement Management (If Enabled)
+- **Ad Submission**: Public form for ad submissions
+- **Review Workflow**: Admin approval before activation
+- **Stripe Integration**: Payment processing for ad purchases
+- **Position Management**: Automatic or manual ad positioning
+- **Ad Pricing**: Configurable pricing tiers
+- **Ad Analytics**: Track ad performance and clicks
+
+### Breaking News
+- **Manual Entry**: Add time-sensitive content outside RSS flow
+- **Priority Display**: Shows above regular articles
+- **Skip RSS**: Manually created content with custom text
+- **Quick Turnaround**: Bypass normal campaign workflow
+
+### Newsletter Polls
+- **Poll Creation**: Create surveys for subscriber engagement
+- **Active Status**: One active poll per campaign
+- **Response Tracking**: View poll results in real-time
+- **Newsletter Integration**: Polls embedded in email campaigns
+
+### Image Management System
+- **Image Database**: Reusable library of newsletter images
+- **GitHub Storage**: Permanent hosting for all images
+- **Facebook Re-hosting**: Automatic conversion of expiring Facebook CDN URLs
+- **Upload Interface**: Manual image uploads for reuse
+- **Reverse Lookup**: Find which campaigns used specific images
+
+### Archived Newsletters
+- **Public Archive**: Past newsletters viewable on website
+- **Search Function**: Find newsletters by date or content
+- **Analytics Tracking**: Track archive page views
+- **Historical Data**: Preserved articles and RSS posts
+
+## 🐛 Common Issues & Solutions
+
+### Issue: Vercel Function Log Overflow
+**Symptom**: RSS processing fails with "Function log limit exceeded" error
+
+**Root Cause**: Excessive console.log statements in processing loops
+
+**Solution**:
+- ✅ Implemented minimal logging (January 2025)
+- Only essential `[RSS]` prefixed messages
+- Single-line evaluation results
+- Silent error handling for non-critical failures
+
+**Prevention**: Avoid console.log in loops, use summary logging
+
+---
+
+### Issue: Subject Line Not Regenerating
+**Symptom**: Subject line becomes outdated after skip/reorder operations
+
+**Root Cause**: Manual regeneration required in older versions
+
+**Solution**:
+- ✅ Automatic regeneration implemented
+- Triggers when #1 article position changes
+- Real-time UI updates without page refresh
+
+**Check**: Verify article skip/reorder triggers regeneration
+
+---
+
+### Issue: Campaign Deletion Fails
+**Symptom**: "Failed to delete campaign" error with 500 status
+
+**Root Cause**: Foreign key constraints from child tables
+
+**Solution**:
+- Delete child tables first in correct order
+- Error tracking shows which tables failed
+- Non-blocking design continues despite some failures
+
+**Tables to Delete** (in order):
+1. articles, secondary_articles
+2. rss_posts (cascades to post_ratings)
+3. user_activities
+4. archived_articles, archived_rss_posts
+5. newsletter_campaigns
+
+---
+
+### Issue: RSS Processing Timeout
+**Symptom**: Function execution exceeds 600 second limit
+
+**Root Cause**: Too many feeds or slow article extraction
+
+**Possible Solutions**:
+- Reduce number of active feeds
+- Increase timeout in vercel.json (max 900s for Pro plan)
+- Disable full article text extraction temporarily
+- Check for slow/unresponsive feed URLs
+
+---
+
+### Issue: Articles Not Scoring
+**Symptom**: Posts fetched but no scores assigned
+
+**Root Cause**: AI API errors or prompt configuration issues
+
+**Troubleshooting Steps**:
+1. Check OpenAI API key validity
+2. Review Vercel function logs for AI errors
+3. Test criteria prompts in Settings > AI Prompts
+4. Verify criteria_enabled_count setting
+5. Check post_ratings table for error messages
+
+---
+
+### Issue: Facebook Images Broken
+**Symptom**: Image URLs showing broken images in newsletter
+
+**Root Cause**: Facebook CDN URLs expire after a few hours
+
+**Solution**:
+- ✅ Automatic GitHub re-hosting implemented
+- Facebook images detected during RSS processing
+- Downloaded and uploaded to permanent GitHub storage
+- Database updated with new GitHub URL
+
+**Prevention**: System now handles automatically
+
+---
+
+### Issue: Date/Time Mismatches
+**Symptom**: Campaigns showing wrong date or articles from wrong day
+
+**Root Cause**: UTC timezone conversion errors
+
+**Solution**:
+- Never use `.toISOString()` for date comparisons
+- Extract date strings directly: `date.split('T')[0]`
+- Use local time for all filtering and sorting
+- Compare dates as YYYY-MM-DD strings
+
+**Example (Correct)**:
+```typescript
+const campaignDate = campaign.date.split('T')[0] // "2025-01-22"
+```
+
 ## 🛠️ Debug Tools & Endpoints
 
 ### Campaign Management
@@ -340,6 +663,118 @@ src/app/dashboard/[slug]/campaigns/page.tsx          # Campaign list
 src/app/dashboard/[slug]/campaigns/[id]/page.tsx     # Campaign detail & editing
 src/app/dashboard/[slug]/settings/page.tsx           # Settings & configuration
 ```
+
+## 🚀 Deployment Checklist
+
+### Pre-Deployment Checks
+Before pushing code or deploying to production:
+
+#### 1. Local Build Verification
+```bash
+npm run build
+```
+- [ ] Build completes without errors
+- [ ] No TypeScript compilation errors
+- [ ] No ESLint warnings (if enforced)
+- [ ] Check for deprecated dependencies
+
+#### 2. Code Review
+- [ ] Review git diff for unexpected changes
+- [ ] Check for hardcoded credentials or secrets
+- [ ] Verify environment variable references
+- [ ] Ensure no debug console.logs in production code
+- [ ] Check for commented-out code to remove
+
+#### 3. Database Considerations
+- [ ] Verify database migrations if schema changed
+- [ ] Check for new required columns
+- [ ] Test with production data structure
+- [ ] Backup database before major changes
+
+#### 4. Critical Path Testing
+- [ ] Test RSS processing flow manually
+- [ ] Generate campaign preview
+- [ ] Test subject line generation
+- [ ] Verify article skip/reorder functionality
+- [ ] Check email preview rendering
+
+#### 5. Documentation
+- [ ] Update CLAUDE.md if major changes
+- [ ] Add comments for complex logic
+- [ ] Update API documentation if endpoints changed
+
+### Deployment Process
+
+#### 1. Git Commit
+```bash
+git add -A
+git status  # Review staged changes
+git commit -m "Descriptive commit message
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+```
+
+#### 2. Push to Repository
+```bash
+git push
+```
+
+#### 3. Monitor Vercel Deployment
+- [ ] Check Vercel dashboard for deployment status
+- [ ] Review build logs for warnings
+- [ ] Verify deployment completes successfully
+- [ ] Note deployment URL and timestamp
+
+### Post-Deployment Verification
+
+#### 1. Production Testing
+- [ ] Visit production URL (www.aiprodaily.com)
+- [ ] Test authentication/login
+- [ ] Navigate to campaign dashboard
+- [ ] Verify settings pages load
+- [ ] Check API endpoints responding
+
+#### 2. Integration Checks
+- [ ] Verify Supabase connection working
+- [ ] Test MailerLite integration
+- [ ] Check OpenAI API calls functioning
+- [ ] Verify GitHub image storage working
+- [ ] Test Slack notifications (if configured)
+
+#### 3. Cron Job Verification
+- [ ] Check vercel.json cron schedules
+- [ ] Verify cron jobs appear in Vercel dashboard
+- [ ] Test manual cron trigger (if needed)
+- [ ] Monitor first automated run
+
+#### 4. Error Monitoring
+- [ ] Review Vercel function logs
+- [ ] Check for new error patterns
+- [ ] Monitor Supabase logs
+- [ ] Review Slack notifications for failures
+
+### Rollback Procedure
+If deployment causes issues:
+
+```bash
+# Find previous working commit
+git log --oneline -10
+
+# Revert to previous commit
+git revert <commit-hash>
+git push
+
+# OR force rollback (use with caution)
+git reset --hard <previous-commit-hash>
+git push --force
+```
+
+### Emergency Contacts
+- **Vercel Support**: Via dashboard or support@vercel.com
+- **Supabase Support**: Via dashboard support chat
+- **OpenAI Status**: status.openai.com
 
 ## 🔄 Content Management Protocol
 
