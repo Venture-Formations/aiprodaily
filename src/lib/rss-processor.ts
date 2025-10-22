@@ -2202,8 +2202,6 @@ export class RSSProcessor {
    */
   private async enrichRecentPostsWithFullContent(campaignId: string) {
     try {
-      console.log('Starting full article text extraction for recent posts (past 24 hours)...')
-
       // Calculate 24 hours ago
       const yesterday = new Date()
       yesterday.setHours(yesterday.getHours() - 24)
@@ -2222,26 +2220,15 @@ export class RSSProcessor {
       }
 
       if (!posts || posts.length === 0) {
-        console.log('No recent posts found with source URLs for extraction')
         return
       }
-
-      console.log(`Found ${posts.length} recent posts (past 24 hours) to extract full article text from`)
 
       // Filter posts that need extraction (don't have full_article_text yet)
       const postsNeedingExtraction = posts.filter(post => !post.full_article_text)
-      const postsAlreadyExtracted = posts.length - postsNeedingExtraction.length
-
-      if (postsAlreadyExtracted > 0) {
-        console.log(`${postsAlreadyExtracted} posts already have full article text, skipping`)
-      }
 
       if (postsNeedingExtraction.length === 0) {
-        console.log('All recent posts already have full article text extracted')
         return
       }
-
-      console.log(`Extracting ${postsNeedingExtraction.length} recent articles...`)
 
       // Build URL to post ID mapping
       const urlToPostMap = new Map<string, string>()
@@ -2258,21 +2245,17 @@ export class RSSProcessor {
       try {
         extractionResults = await this.articleExtractor.extractBatch(urls, 10)
       } catch (extractError) {
-        console.error('⚠️ Article extraction batch failed completely:', extractError)
-        console.log('Continuing RSS processing without extracted articles...')
         return
       }
 
       // Update database with extracted content
       let successCount = 0
-      let failureCount = 0
 
       for (const [url, result] of Array.from(extractionResults.entries())) {
         const postId = urlToPostMap.get(url)
         if (!postId) continue
 
         if (result.success && result.fullText) {
-          // Update post with full article text
           const { error: updateError } = await supabaseAdmin
             .from('rss_posts')
             .update({
@@ -2280,35 +2263,16 @@ export class RSSProcessor {
             })
             .eq('id', postId)
 
-          if (updateError) {
-            console.error(`Failed to update post ${postId} with full article text:`, updateError)
-            failureCount++
-          } else {
+          if (!updateError) {
             successCount++
           }
-        } else {
-          console.log(`Extraction failed for ${url}: ${result.error || 'Unknown error'}`)
-          failureCount++
         }
       }
 
-      console.log(`Recent article extraction complete: ${successCount} successful, ${failureCount} failed`)
-      await this.logInfo(`Recent article extraction complete`, {
-        campaignId,
-        totalRecentPosts: posts.length,
-        alreadyExtracted: postsAlreadyExtracted,
-        successfulExtractions: successCount,
-        failedExtractions: failureCount
-      })
+      console.log(`Extract: ${successCount}/${postsNeedingExtraction.length} ok`)
 
     } catch (error) {
-      console.error('Error in enrichRecentPostsWithFullContent:', error)
-      await this.logError('Failed to enrich recent posts with full article text', {
-        campaignId,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      })
-      // Don't throw - article extraction is optional, RSS processing should continue
-      console.log('⚠️ Recent article extraction failed, but RSS processing will continue with RSS summaries')
+      // Don't throw - article extraction is optional
     }
   }
 
