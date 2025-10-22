@@ -2213,10 +2213,20 @@ function AIPromptsSettings() {
       'ai_prompt_subject_line': 'subjectLineGenerator',
       'ai_prompt_event_summary': 'eventSummarizer',
       'ai_prompt_road_work': 'roadWorkGenerator',
-      'ai_prompt_image_analyzer': 'imageAnalyzer'
+      'ai_prompt_image_analyzer': 'imageAnalyzer',
+      'ai_prompt_primary_article_title': 'newsletterWriter',
+      'ai_prompt_primary_article_body': 'newsletterWriter',
+      'ai_prompt_secondary_article_title': 'newsletterWriter',
+      'ai_prompt_secondary_article_body': 'newsletterWriter'
     }
 
-    const testType = promptTypeMap[key]
+    let testType = promptTypeMap[key]
+
+    // Handle criteria prompts (ai_prompt_criteria_1, ai_prompt_criteria_2, etc.)
+    if (!testType && (key.startsWith('ai_prompt_criteria_') || key.startsWith('ai_prompt_secondary_criteria_'))) {
+      testType = 'contentEvaluator'
+    }
+
     if (!testType) {
       alert('Test not available for this prompt type')
       return
