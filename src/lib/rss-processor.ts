@@ -849,8 +849,6 @@ export class RSSProcessor {
     const enabledCountSetting = criteriaConfig?.find(s => s.key === 'criteria_enabled_count')
     const enabledCount = enabledCountSetting?.value ? parseInt(enabledCountSetting.value) : 3
 
-    console.log(`Evaluating post with ${enabledCount} enabled criteria`)
-
     // Collect enabled criteria with their weights
     const criteria: Array<{ number: number; name: string; weight: number }> = []
     for (let i = 1; i <= enabledCount; i++) {
@@ -869,8 +867,6 @@ export class RSSProcessor {
 
     for (const criterion of criteria) {
       try {
-        console.log(`Evaluating criterion ${criterion.number}: ${criterion.name} (weight: ${criterion.weight})`)
-
         // Call the appropriate criteria evaluator
         const evaluatorKey = `criteria${criterion.number}Evaluator` as keyof typeof AI_PROMPTS
         const evaluator = AI_PROMPTS[evaluatorKey]
@@ -926,8 +922,6 @@ export class RSSProcessor {
           weight: criterion.weight
         })
 
-        console.log(`Criterion ${criterion.number} score: ${score}/10`)
-
       } catch (error) {
         console.error(`Error evaluating criterion ${criterion.number}:`, error)
         throw error
@@ -947,7 +941,9 @@ export class RSSProcessor {
     // But we want the raw weighted sum, not normalized
     const maxPossibleScore = totalWeight * 10
 
-    console.log(`Total weighted score: ${totalWeightedScore} (max possible: ${maxPossibleScore})`)
+    // Combined evaluation logging on one line
+    const criteriaLog = criteriaScores.map((c, i) => `Criterion ${i + 1}: ${c.score}/10`).join('; ')
+    console.log(`${criteriaLog}; Total: ${totalWeightedScore} (max: ${maxPossibleScore})`)
 
     // Return evaluation in legacy format for backward compatibility
     // Store individual criteria scores in post_ratings table
@@ -2192,8 +2188,6 @@ export class RSSProcessor {
           }
         }
       }
-
-      console.log(`Extract: ${successCount}/${postsNeedingExtraction.length} ok`)
 
     } catch (error) {
       // Don't throw - article extraction is optional
