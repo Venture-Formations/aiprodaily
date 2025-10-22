@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { supabaseAdmin } from '@/lib/supabase'
+import nodemailer from 'nodemailer'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
+
+// Gmail SMTP transporter (temporary solution while waiting for DNS)
+const gmailTransporter = process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD
+  ? nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
+      },
+    })
+  : null
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,32 +63,47 @@ export async function POST(request: NextRequest) {
       throw new Error('Failed to store submission')
     }
 
-    // Send email notification via Resend
+    // Send email notification
     try {
-      await resend.emails.send({
-        from: 'AI Accounting Daily <noreply@aiaccountingdaily.com>',
-        to: contactEmail,
-        subject: 'Contact Form - AI Accounting Daily',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #1c293d;">New Contact Form Submission</h2>
+      const emailHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #1c293d;">New Contact Form Submission</h2>
 
-            <div style="background-color: #f5f5f7; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <p style="margin: 10px 0;"><strong>Name:</strong> ${name}</p>
-              <p style="margin: 10px 0;"><strong>Email:</strong> ${email}</p>
-            </div>
-
-            <div style="background-color: #ffffff; padding: 20px; border: 1px solid #e5e5e5; border-radius: 8px;">
-              <p style="margin: 0 0 10px 0;"><strong>Message:</strong></p>
-              <p style="margin: 0; white-space: pre-wrap;">${message}</p>
-            </div>
-
-            <p style="color: #666; font-size: 12px; margin-top: 20px;">
-              This email was sent from the AI Accounting Daily contact form.
-            </p>
+          <div style="background-color: #f5f5f7; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 10px 0;"><strong>Name:</strong> ${name}</p>
+            <p style="margin: 10px 0;"><strong>Email:</strong> ${email}</p>
           </div>
-        `
-      })
+
+          <div style="background-color: #ffffff; padding: 20px; border: 1px solid #e5e5e5; border-radius: 8px;">
+            <p style="margin: 0 0 10px 0;"><strong>Message:</strong></p>
+            <p style="margin: 0; white-space: pre-wrap;">${message}</p>
+          </div>
+
+          <p style="color: #666; font-size: 12px; margin-top: 20px;">
+            This email was sent from the AI Accounting Daily contact form.
+          </p>
+        </div>
+      `
+
+      // Use Gmail SMTP if configured (temporary solution), otherwise use Resend
+      if (gmailTransporter) {
+        console.log('[CONTACT] Using Gmail SMTP to send notification')
+        await gmailTransporter.sendMail({
+          from: `"AI Accounting Daily" <${process.env.GMAIL_USER}>`,
+          to: contactEmail,
+          subject: 'Contact Form - AI Accounting Daily',
+          html: emailHtml,
+          replyTo: email // Allow replying directly to the submitter
+        })
+      } else {
+        console.log('[CONTACT] Using Resend to send notification')
+        await resend.emails.send({
+          from: 'AI Accounting Daily <noreply@aiaccountingdaily.com>',
+          to: contactEmail,
+          subject: 'Contact Form - AI Accounting Daily',
+          html: emailHtml
+        })
+      }
     } catch (emailError: any) {
       console.error('[CONTACT] Failed to send email:', emailError)
       // Don't fail the request if email fails - submission is already stored
