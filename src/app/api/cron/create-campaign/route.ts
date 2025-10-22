@@ -41,6 +41,20 @@ export async function POST(request: NextRequest) {
     console.log('Campaign date calculation: Current CT time + 12 hours =', campaignDate)
     console.log('Creating review campaign for date:', campaignDate)
 
+    // Get accounting newsletter ID
+    const { data: newsletter } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('slug', 'accounting')
+      .single()
+
+    if (!newsletter) {
+      return NextResponse.json({
+        success: false,
+        error: 'Accounting newsletter not found'
+      }, { status: 404 })
+    }
+
     // Find tomorrow's campaign with articles
     const { data: campaign, error: campaignError } = await supabaseAdmin
       .from('newsletter_campaigns')
@@ -55,6 +69,7 @@ export async function POST(request: NextRequest) {
         ),
         manual_articles:manual_articles(*)
       `)
+      .eq('newsletter_id', newsletter.id)
       .eq('date', campaignDate)
       .single()
 
@@ -173,6 +188,20 @@ export async function GET(request: NextRequest) {
     console.log('Campaign date calculation: Current CT time + 12 hours =', campaignDate)
     console.log('Creating review campaign for date:', campaignDate)
 
+    // Get accounting newsletter ID
+    const { data: newsletter } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('slug', 'accounting')
+      .single()
+
+    if (!newsletter) {
+      return NextResponse.json({
+        success: false,
+        error: 'Accounting newsletter not found'
+      }, { status: 404 })
+    }
+
     // Find tomorrow's campaign with articles
     const { data: campaign, error: campaignError } = await supabaseAdmin
       .from('newsletter_campaigns')
@@ -187,6 +216,7 @@ export async function GET(request: NextRequest) {
         ),
         manual_articles:manual_articles(*)
       `)
+      .eq('newsletter_id', newsletter.id)
       .eq('date', campaignDate)
       .single()
 
