@@ -11,25 +11,8 @@ export async function executeStep2(campaignId: string) {
 
   const processor = new RSSProcessor()
 
-  // Get all posts for this campaign
-  const { data: posts } = await supabaseAdmin
-    .from('rss_posts')
-    .select('*')
-    .eq('campaign_id', campaignId)
-    .is('full_article_text', null)
-
-  if (!posts || posts.length === 0) {
-    console.log('[Step 2/4] No posts to extract')
-  } else {
-    // Extract article text (minimal logging)
-    for (const post of posts) {
-      try {
-        await processor.extractFullArticle(post)
-      } catch (error) {
-        // Silent failure, continue
-      }
-    }
-  }
+  // Extract article text
+  await processor.extractFullArticleText(campaignId)
 
   // Score all posts
   await processor.scoreAllPosts(campaignId)
