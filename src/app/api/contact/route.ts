@@ -1,20 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Resend } from 'resend'
 import { supabaseAdmin } from '@/lib/supabase'
 import nodemailer from 'nodemailer'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
-// Gmail SMTP transporter (temporary solution while waiting for DNS)
-const gmailTransporter = process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD
-  ? nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
-      },
-    })
-  : null
+// Gmail SMTP transporter for contact form emails
+const gmailTransporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD,
+  },
+})
 
 export async function POST(request: NextRequest) {
   try {
@@ -85,25 +80,15 @@ export async function POST(request: NextRequest) {
         </div>
       `
 
-      // Use Gmail SMTP if configured (temporary solution), otherwise use Resend
-      if (gmailTransporter) {
-        console.log('[CONTACT] Using Gmail SMTP to send notification')
-        await gmailTransporter.sendMail({
-          from: `"AI Accounting Daily" <${process.env.GMAIL_USER}>`,
-          to: contactEmail,
-          subject: 'Contact Form - AI Accounting Daily',
-          html: emailHtml,
-          replyTo: email // Allow replying directly to the submitter
-        })
-      } else {
-        console.log('[CONTACT] Using Resend to send notification')
-        await resend.emails.send({
-          from: 'AI Accounting Daily <noreply@aiaccountingdaily.com>',
-          to: contactEmail,
-          subject: 'Contact Form - AI Accounting Daily',
-          html: emailHtml
-        })
-      }
+      // Send via Gmail SMTP
+      console.log('[CONTACT] Sending notification via Gmail SMTP')
+      await gmailTransporter.sendMail({
+        from: `"AI Accounting Daily" <${process.env.GMAIL_USER}>`,
+        to: contactEmail,
+        subject: 'Contact Form - AI Accounting Daily',
+        html: emailHtml,
+        replyTo: email // Allow replying directly to the submitter
+      })
     } catch (emailError: any) {
       console.error('[CONTACT] Failed to send email:', emailError)
       // Don't fail the request if email fails - submission is already stored
