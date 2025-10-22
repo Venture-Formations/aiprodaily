@@ -55,16 +55,32 @@ export async function GET(request: NextRequest) {
     // Filter posts by section in JavaScript
     let posts = allPosts || []
 
+    // Debug: Log first post structure to understand the data
+    if (posts.length > 0 && section) {
+      console.log('[API] Sample post structure:', JSON.stringify(posts[0], null, 2))
+      console.log('[API] Section filter:', section)
+    }
+
     if (section === 'primary') {
       posts = posts.filter(post => {
         const feed = Array.isArray(post.rss_feed) ? post.rss_feed[0] : post.rss_feed
-        return feed?.use_for_primary_section === true
+        const isPrimary = feed?.use_for_primary_section === true
+        if (!isPrimary && posts.indexOf(post) < 3) {
+          console.log('[API] Filtering out non-primary post:', post.title, 'feed:', feed)
+        }
+        return isPrimary
       })
+      console.log('[API] After primary filter: found', posts.length, 'posts')
     } else if (section === 'secondary') {
       posts = posts.filter(post => {
         const feed = Array.isArray(post.rss_feed) ? post.rss_feed[0] : post.rss_feed
-        return feed?.use_for_secondary_section === true
+        const isSecondary = feed?.use_for_secondary_section === true
+        if (!isSecondary && posts.indexOf(post) < 3) {
+          console.log('[API] Filtering out non-secondary post:', post.title, 'feed:', feed)
+        }
+        return isSecondary
       })
+      console.log('[API] After secondary filter: found', posts.length, 'posts')
     }
 
     // Apply limit after filtering
