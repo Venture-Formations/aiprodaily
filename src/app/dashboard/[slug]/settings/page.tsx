@@ -2042,6 +2042,10 @@ function AIPromptsSettings() {
   const [rssPosts, setRssPosts] = useState<any[]>([])
   const [selectedRssPost, setSelectedRssPost] = useState<string>('')
   const [loadingRssPosts, setLoadingRssPosts] = useState(false)
+  const [testModalOpen, setTestModalOpen] = useState(false)
+  const [testLoading, setTestLoading] = useState(false)
+  const [testResults, setTestResults] = useState<any>(null)
+  const [testError, setTestError] = useState<string | null>(null)
 
   useEffect(() => {
     loadPrompts()
@@ -2205,7 +2209,7 @@ function AIPromptsSettings() {
     }
   }
 
-  const handleTestPrompt = (key: string) => {
+  const handleTestPrompt = async (key: string) => {
     // Map prompt keys to their test endpoint type parameter
     const promptTypeMap: Record<string, string> = {
       'ai_prompt_content_evaluator': 'contentEvaluator',
@@ -2232,12 +2236,31 @@ function AIPromptsSettings() {
       return
     }
 
-    // Open test endpoint in new tab with selected RSS post
-    let testUrl = `/api/debug/test-ai-prompts?type=${testType}`
-    if (selectedRssPost) {
-      testUrl += `&rssPostId=${selectedRssPost}`
+    // Open modal and fetch results
+    setTestModalOpen(true)
+    setTestLoading(true)
+    setTestError(null)
+    setTestResults(null)
+
+    try {
+      let testUrl = `/api/debug/test-ai-prompts?type=${testType}`
+      if (selectedRssPost) {
+        testUrl += `&rssPostId=${selectedRssPost}`
+      }
+
+      const response = await fetch(testUrl)
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Test failed')
+      }
+
+      setTestResults(data)
+    } catch (error: any) {
+      setTestError(error.message || 'Failed to run test')
+    } finally {
+      setTestLoading(false)
     }
-    window.open(testUrl, '_blank')
   }
 
   const handleWeightEdit = (prompt: any) => {
@@ -3290,6 +3313,112 @@ function AIPromptsSettings() {
           </p>
         </div>
       </div>
+
+      {/* Test Modal */}
+      {testModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Prompt Test Results</h3>
+              <button
+                onClick={() => setTestModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto flex-1">
+              {testLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+                  <span className="ml-4 text-gray-600">Testing prompt...</span>
+                </div>
+              ) : testError ? (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
+                  <strong>Error:</strong> {testError}
+                </div>
+              ) : testResults ? (
+                <div className="space-y-6">
+                  {/* RSS Post Info */}
+                  {testResults.rss_post_used && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="font-medium text-blue-900 mb-2">Test Data:</h4>
+                      <p className="text-sm text-blue-800">
+                        <strong>Post:</strong> {testResults.rss_post_used.title}
+                      </p>
+                      {testResults.rss_post_used.source_url && (
+                        <p className="text-sm text-blue-800 mt-1">
+                          <strong>Source:</strong>{' '}
+                          <a href={testResults.rss_post_used.source_url} target="_blank" rel="noopener noreferrer" className="underline">
+                            {testResults.rss_post_used.source_url}
+                          </a>
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Test Results */}
+                  {Object.entries(testResults.results || {}).map(([key, result]: [string, any]) => (
+                    <div key={key} className="bg-white border border-gray-200 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-900 mb-3 capitalize">
+                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                      </h4>
+
+                      {result.success ? (
+                        <div className="space-y-3">
+                          {typeof result.response === 'string' ? (
+                            <div className="bg-gray-50 rounded p-4 whitespace-pre-wrap font-mono text-sm">
+                              {result.response}
+                            </div>
+                          ) : result.response?.raw ? (
+                            <div className="bg-gray-50 rounded p-4 whitespace-pre-wrap font-mono text-sm">
+                              {result.response.raw}
+                            </div>
+                          ) : (
+                            <div className="bg-gray-50 rounded p-4">
+                              <pre className="whitespace-pre-wrap text-sm">
+                                {JSON.stringify(result.response, null, 2)}
+                              </pre>
+                            </div>
+                          )}
+
+                          {result.character_count && (
+                            <p className="text-sm text-gray-600">
+                              Character count: {result.character_count}
+                            </p>
+                          )}
+                          {result.prompt_length && (
+                            <p className="text-sm text-gray-600">
+                              Prompt length: {result.prompt_length} characters
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="bg-red-50 border border-red-200 rounded p-4 text-red-800">
+                          <strong>Error:</strong> {result.error}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => setTestModalOpen(false)}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

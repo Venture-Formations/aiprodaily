@@ -59,7 +59,8 @@
       "Bash(awk 'NR>=1330 && NR<=1400' src/lib/rss-processor.ts)",
       "WebFetch(domain:www.aiaccountingdaily.com)",
       "Bash(git revert:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(awk:*)"
     ],
     "deny": [],
     "ask": []
