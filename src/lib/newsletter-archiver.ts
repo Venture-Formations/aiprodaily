@@ -101,12 +101,33 @@ export class NewsletterArchiver {
         sections.poll = poll
       }
 
+      // Prompt Ideas section
+      const { data: promptSelection } = await supabaseAdmin
+        .from('campaign_prompt_selections')
+        .select(`
+          selection_order,
+          is_featured,
+          prompt:prompt_ideas(
+            id,
+            title,
+            prompt_text,
+            category
+          )
+        `)
+        .eq('campaign_id', campaignId)
+        .single()
+
+      if (promptSelection && promptSelection.prompt) {
+        sections.prompt = promptSelection.prompt
+      }
+
       // 3. Gather metadata
       const metadata = {
         total_articles: articles?.length || 0,
         has_road_work: !!roadWork,
         has_ai_apps: !!aiApps && aiApps.length > 0,
         has_poll: !!poll,
+        has_prompt: !!promptSelection,
         archived_at: new Date().toISOString()
       }
 
