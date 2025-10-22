@@ -2283,14 +2283,13 @@ function AIPromptsSettings() {
     }
 
     // Determine which RSS post to use based on prompt type
-    let rssPostId = selectedRssPost
-    if (key.startsWith('ai_prompt_primary_') || key.startsWith('ai_prompt_criteria_')) {
-      // Use primary RSS post for primary prompts and primary criteria
-      rssPostId = selectedPrimaryRssPost
-    } else if (key.startsWith('ai_prompt_secondary_')) {
+    let rssPostId = selectedPrimaryRssPost // Default to primary for general prompts
+
+    if (key.startsWith('ai_prompt_secondary_')) {
       // Use secondary RSS post for secondary prompts and secondary criteria
       rssPostId = selectedSecondaryRssPost
     }
+    // Primary, criteria, subject line, newsletter writer, content evaluator, etc. all use primary RSS post
 
     // Open modal and fetch results
     setTestModalOpen(true)
