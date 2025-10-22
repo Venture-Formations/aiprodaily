@@ -53,8 +53,6 @@ export class RSSProcessor {
    * Public method to score/evaluate posts - used by step-based processing
    */
   async scorePostsForSection(campaignId: string, section: 'primary' | 'secondary' = 'primary') {
-    console.log(`Scoring ${section} posts for campaign ${campaignId}`)
-
     // Get feeds for this section
     const { data: feeds, error: feedsError } = await supabaseAdmin
       .from('rss_feeds')
@@ -63,7 +61,6 @@ export class RSSProcessor {
       .eq(section === 'primary' ? 'use_for_primary_section' : 'use_for_secondary_section', true)
 
     if (feedsError || !feeds || feeds.length === 0) {
-      console.log(`No ${section} feeds found, skipping ${section} scoring`)
       return { scored: 0, errors: 0 }
     }
 
@@ -82,8 +79,6 @@ export class RSSProcessor {
     if (error || !posts) {
       throw new Error(`Failed to fetch ${section} posts for scoring`)
     }
-
-    console.log(`Scoring ${posts.length} ${section} posts`)
 
     // Evaluate posts in batches
     const BATCH_SIZE = 3
@@ -135,11 +130,6 @@ export class RSSProcessor {
           successCount++
 
         } catch (error) {
-          console.error(`Error evaluating post ${post.id}:`, error)
-          await this.logError(`Failed to evaluate post: ${post.title}`, {
-            postId: post.id,
-            error: error instanceof Error ? error.message : 'Unknown error'
-          })
           errorCount++
         }
       }
@@ -149,8 +139,6 @@ export class RSSProcessor {
       }
     }
 
-    console.log(`AI scoring complete: ${successCount} successful, ${errorCount} errors`)
-    await this.logInfo(`AI scoring complete: ${successCount} successful, ${errorCount} errors`, { campaignId, successCount, errorCount })
 
     // Handle duplicates
     await this.handleDuplicates(posts, campaignId)
@@ -554,9 +542,6 @@ export class RSSProcessor {
   }
 
   private async processFeed(feed: RssFeed, campaignId: string, section: 'primary' | 'secondary' = 'primary') {
-    console.log(`=== PROCESSING ${section.toUpperCase()} FEED: ${feed.name} ===`)
-    console.log(`Feed URL: ${feed.url}`)
-
     try {
       // Get excluded RSS sources from settings
       const { data: excludedSettings } = await supabaseAdmin
@@ -569,51 +554,24 @@ export class RSSProcessor {
         ? JSON.parse(excludedSettings.value)
         : []
 
-      if (excludedSources.length > 0) {
-        console.log(`Excluded sources: ${excludedSources.join(', ')}`)
-      }
-
-      console.log(`Fetching RSS feed from: ${feed.url}`)
       const rssFeed = await parser.parseURL(feed.url)
-      console.log(`Successfully fetched ${rssFeed.items?.length || 0} items from ${feed.name}`)
 
       const now = new Date()
       const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
-      console.log(`Filtering for posts between ${yesterday.toISOString()} and ${now.toISOString()}`)
-
       const recentPosts = rssFeed.items.filter(item => {
         if (!item.pubDate) {
-          console.log(`Skipping post without pubDate: ${item.title}`)
           return false
         }
         const pubDate = new Date(item.pubDate)
-        const isRecent = pubDate >= yesterday && pubDate <= now
-        if (!isRecent) {
-          console.log(`Skipping old post from ${pubDate.toISOString()}: ${item.title}`)
-        }
-        return isRecent
+        return pubDate >= yesterday && pubDate <= now
       })
-
-      console.log(`Found ${recentPosts.length} recent posts from ${feed.name} (out of ${rssFeed.items?.length || 0} total)`)
-      if (recentPosts.length > 0) {
-        const dates = recentPosts.map(p => new Date(p.pubDate!).toISOString()).sort()
-        console.log(`Date range of recent posts: ${dates[0]} to ${dates[dates.length - 1]}`)
-      }
 
       for (const item of recentPosts) {
         try {
           // Check if author's images should be blocked
           const author = item.creator || (item as any)['dc:creator'] || '(No Author)'
           const blockImages = excludedSources.includes(author)
-          if (blockImages) {
-            console.log(`Blocking images from source: "${author}" - "${item.title}"`)
-          }
-          console.log(`\n=== DEBUGGING ITEM: "${item.title}" ===`)
-          console.log('Raw item keys:', Object.keys(item))
-          console.log('media:content:', JSON.stringify(item['media:content'], null, 2))
-          console.log('Raw content preview:', (item.content || '').substring(0, 200))
-          console.log('Raw contentSnippet:', (item.contentSnippet || '').substring(0, 200))
 
           // Extract image URL with comprehensive methods
           let imageUrl = null
@@ -670,8 +628,6 @@ export class RSSProcessor {
             imageUrl = itemAny.thumbnail || itemAny.image || itemAny['media:thumbnail']?.url || null
           }
 
-          console.log(`Post: "${item.title}" - Image URL: ${imageUrl || 'None found'}`)
-
           // Check if post already exists FOR THIS CAMPAIGN
           // This allows the same RSS post to be used by multiple campaigns
           const { data: existingPost } = await supabaseAdmin
@@ -683,7 +639,6 @@ export class RSSProcessor {
             .maybeSingle()
 
           if (existingPost) {
-            console.log(`Post already exists for this campaign, skipping: "${item.title}"`)
             continue // Skip if already processed for this campaign
           }
 
@@ -691,24 +646,19 @@ export class RSSProcessor {
           // But only if images are not blocked for this source
           let finalImageUrl = imageUrl
           if (!blockImages && imageUrl && imageUrl.includes('fbcdn.net')) {
-            console.log(`Attempting to re-host Facebook image immediately: ${imageUrl}`)
             try {
               const githubUrl = await this.githubStorage.uploadImage(imageUrl, item.title || 'Untitled')
               if (githubUrl) {
                 finalImageUrl = githubUrl
-                console.log(`Successfully re-hosted Facebook image: ${githubUrl}`)
-              } else {
-                console.warn(`Failed to re-host Facebook image, keeping original URL: ${imageUrl}`)
               }
             } catch (error) {
-              console.warn(`Error re-hosting Facebook image: ${error}`)
+              // Silent failure
             }
           }
 
           // Block image if source is in excluded list
           if (blockImages) {
             finalImageUrl = null
-            console.log(`Image blocked for excluded source: ${author}`)
           }
 
           // Insert new post
@@ -730,14 +680,11 @@ export class RSSProcessor {
             .single()
 
           if (postError) {
-            console.error('Error inserting post:', postError)
             continue
           }
 
-          console.log(`Inserted post: ${item.title}`)
-
         } catch (error) {
-          console.error(`Error processing item from ${feed.name}:`, error)
+          // Silent failure, continue processing other items
         }
       }
 
@@ -746,29 +693,12 @@ export class RSSProcessor {
         .from('rss_feeds')
         .update({
           last_processed: now.toISOString(),
-          processing_errors: 0 // Reset error count on success
+          processing_errors: 0
         })
         .eq('id', feed.id)
 
     } catch (error) {
-      console.error(`❌ Error parsing RSS feed ${feed.name} (${feed.url}):`, error)
-
-      // Log detailed error information
-      if (error instanceof Error) {
-        console.error(`Error name: ${error.name}`)
-        console.error(`Error message: ${error.message}`)
-        console.error(`Error stack: ${error.stack}`)
-      }
-
-      // Check if it's an HTTP error with status code
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      if (errorMessage.includes('HTTP') || errorMessage.includes('405')) {
-        console.error(`⚠️ HTTP error detected - this feed URL may not support RSS access or requires different headers`)
-        console.error(`Feed URL: ${feed.url}`)
-        console.error(`Feed Name: ${feed.name}`)
-        console.error(`Suggestion: Check if this feed URL is correct and accessible`)
-      }
-
+      console.error(`Feed ${feed.name} failed`)
       throw error
     }
   }
@@ -889,17 +819,11 @@ export class RSSProcessor {
       successCount += batchSuccess
       errorCount += batchErrors
 
-      console.log(`Batch ${batchNum} complete: ${batchSuccess} successful, ${batchErrors} errors`)
-
       // Add delay between batches to respect rate limits
       if (i + BATCH_SIZE < posts.length) {
-        console.log('Waiting 2 seconds before next batch...')
         await new Promise(resolve => setTimeout(resolve, 2000))
       }
     }
-
-    console.log(`AI evaluation complete: ${successCount} successful, ${errorCount} errors`)
-    await this.logInfo(`AI evaluation complete: ${successCount} successful, ${errorCount} errors`, { campaignId, successCount, errorCount })
 
     // Step 2: Detect and handle duplicates
     await this.handleDuplicates(posts, campaignId)
