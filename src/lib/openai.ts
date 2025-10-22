@@ -1182,17 +1182,25 @@ export const AI_PROMPTS = {
         .eq('key', 'ai_prompt_primary_article_title')
         .single()
 
-      if (error || !data) {
-        console.log('Using code fallback for primaryArticleTitle prompt')
+      if (error) {
+        console.log('[AI] Error fetching primaryArticleTitle prompt:', error.message)
+        console.log('[AI] Using code fallback for primaryArticleTitle prompt')
         return FALLBACK_PROMPTS.primaryArticleTitle(post)
       }
 
+      if (!data || !data.value) {
+        console.log('[AI] No database value found for primaryArticleTitle prompt')
+        console.log('[AI] Using code fallback for primaryArticleTitle prompt')
+        return FALLBACK_PROMPTS.primaryArticleTitle(post)
+      }
+
+      console.log('[AI] Using database prompt for primaryArticleTitle (length:', data.value.length, 'chars)')
       return data.value
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
         .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
     } catch (error) {
-      console.error('Error fetching primaryArticleTitle prompt, using fallback:', error)
+      console.error('[AI] Error fetching primaryArticleTitle prompt, using fallback:', error)
       return FALLBACK_PROMPTS.primaryArticleTitle(post)
     }
   },
