@@ -103,11 +103,22 @@ export async function POST(request: NextRequest) {
     console.log('=== FINAL SEND STARTED (Time Matched) ===')
     console.log('Central Time:', new Date().toLocaleString("en-US", {timeZone: "America/Chicago"}))
 
-    // Get today's campaign that's ready to send (use Central Time for consistency)
-    const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
-    const centralDate = new Date(nowCentral)
-    const today = centralDate.toISOString().split('T')[0]
+    // Get accounting newsletter ID
+    const { data: newsletter } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('slug', 'accounting')
+      .single()
 
+    if (!newsletter) {
+      return NextResponse.json({
+        success: false,
+        error: 'Accounting newsletter not found'
+      }, { status: 404 })
+    }
+
+    // Get the most recent campaign with status 'in_review' (for testing/flexibility)
+    // This allows sending review campaigns immediately instead of waiting for date match
     const { data, error } = await supabaseAdmin
       .from('newsletter_campaigns')
       .select(`
@@ -121,19 +132,23 @@ export async function POST(request: NextRequest) {
         ),
         manual_articles:manual_articles(*)
       `)
-      .eq('date', today)
-      .in('status', ['in_review', 'changes_made'])
+      .eq('newsletter_id', newsletter.id)
+      .eq('status', 'in_review')
+      .order('date', { ascending: false })
+      .limit(1)
       .single()
 
     campaign = data
 
     if (error || !campaign) {
-      console.log('No campaign ready to send for today')
+      console.log('No campaign with in_review status found')
       return NextResponse.json({
-        message: 'No campaign ready to send for today',
+        message: 'No campaign with in_review status found',
         timestamp: new Date().toISOString()
       })
     }
+
+    console.log(`Found campaign: ${campaign.id} (date: ${campaign.date}, status: ${campaign.status})`)
 
     // Check if we have any active articles
     const activeArticles = campaign.articles.filter((article: any) => article.is_active)
@@ -303,11 +318,22 @@ export async function GET(request: NextRequest) {
     console.log('=== FINAL SEND STARTED (Time Matched) ===')
     console.log('Central Time:', new Date().toLocaleString("en-US", {timeZone: "America/Chicago"}))
 
-    // Get today's campaign that's ready to send (use Central Time for consistency)
-    const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
-    const centralDate = new Date(nowCentral)
-    const today = centralDate.toISOString().split('T')[0]
+    // Get accounting newsletter ID
+    const { data: newsletter } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('slug', 'accounting')
+      .single()
 
+    if (!newsletter) {
+      return NextResponse.json({
+        success: false,
+        error: 'Accounting newsletter not found'
+      }, { status: 404 })
+    }
+
+    // Get the most recent campaign with status 'in_review' (for testing/flexibility)
+    // This allows sending review campaigns immediately instead of waiting for date match
     const { data, error } = await supabaseAdmin
       .from('newsletter_campaigns')
       .select(`
@@ -321,19 +347,23 @@ export async function GET(request: NextRequest) {
         ),
         manual_articles:manual_articles(*)
       `)
-      .eq('date', today)
-      .in('status', ['in_review', 'changes_made'])
+      .eq('newsletter_id', newsletter.id)
+      .eq('status', 'in_review')
+      .order('date', { ascending: false })
+      .limit(1)
       .single()
 
     campaign = data
 
     if (error || !campaign) {
-      console.log('No campaign ready to send for today')
+      console.log('No campaign with in_review status found')
       return NextResponse.json({
-        message: 'No campaign ready to send for today',
+        message: 'No campaign with in_review status found',
         timestamp: new Date().toISOString()
       })
     }
+
+    console.log(`Found campaign: ${campaign.id} (date: ${campaign.date}, status: ${campaign.status})`)
 
     // Check if we have any active articles
     const activeArticles = campaign.articles.filter((article: any) => article.is_active)
