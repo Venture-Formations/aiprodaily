@@ -150,19 +150,39 @@ export class MailerLiteService {
         }
 
         // Store MailerLite campaign ID in email_metrics table
-        const { error: metricsError } = await supabaseAdmin
+        // Check if metrics record exists first
+        const { data: existingMetrics } = await supabaseAdmin
           .from('email_metrics')
-          .upsert({
-            campaign_id: campaign.id,
-            mailerlite_campaign_id: campaignId
-          }, {
-            onConflict: 'campaign_id'
-          })
+          .select('id')
+          .eq('campaign_id', campaign.id)
+          .single()
 
-        if (metricsError) {
-          console.error('Failed to store MailerLite campaign ID:', metricsError)
+        if (existingMetrics) {
+          // Update existing record
+          const { error: updateError } = await supabaseAdmin
+            .from('email_metrics')
+            .update({ mailerlite_campaign_id: campaignId })
+            .eq('id', existingMetrics.id)
+
+          if (updateError) {
+            console.error('Failed to update MailerLite campaign ID:', updateError)
+          } else {
+            console.log(`Updated MailerLite campaign ID ${campaignId} in email_metrics`)
+          }
         } else {
-          console.log(`Stored MailerLite campaign ID ${campaignId} in email_metrics table`)
+          // Insert new record
+          const { error: insertError } = await supabaseAdmin
+            .from('email_metrics')
+            .insert({
+              campaign_id: campaign.id,
+              mailerlite_campaign_id: campaignId
+            })
+
+          if (insertError) {
+            console.error('Failed to insert MailerLite campaign ID:', insertError)
+          } else {
+            console.log(`Stored MailerLite campaign ID ${campaignId} in email_metrics`)
+          }
         }
 
         // Update campaign with review sent timestamp
@@ -588,19 +608,39 @@ export class MailerLiteService {
         }
 
         // Store MailerLite campaign ID in email_metrics table
-        const { error: metricsError } = await supabaseAdmin
+        // Check if metrics record exists first
+        const { data: existingMetrics } = await supabaseAdmin
           .from('email_metrics')
-          .upsert({
-            campaign_id: campaign.id,
-            mailerlite_campaign_id: campaignId
-          }, {
-            onConflict: 'campaign_id'
-          })
+          .select('id')
+          .eq('campaign_id', campaign.id)
+          .single()
 
-        if (metricsError) {
-          console.error('Failed to store MailerLite campaign ID:', metricsError)
+        if (existingMetrics) {
+          // Update existing record
+          const { error: updateError } = await supabaseAdmin
+            .from('email_metrics')
+            .update({ mailerlite_campaign_id: campaignId })
+            .eq('id', existingMetrics.id)
+
+          if (updateError) {
+            console.error('Failed to update MailerLite campaign ID:', updateError)
+          } else {
+            console.log(`Updated MailerLite campaign ID ${campaignId} in email_metrics`)
+          }
         } else {
-          console.log(`Stored MailerLite campaign ID ${campaignId} in email_metrics table`)
+          // Insert new record
+          const { error: insertError } = await supabaseAdmin
+            .from('email_metrics')
+            .insert({
+              campaign_id: campaign.id,
+              mailerlite_campaign_id: campaignId
+            })
+
+          if (insertError) {
+            console.error('Failed to insert MailerLite campaign ID:', insertError)
+          } else {
+            console.log(`Stored MailerLite campaign ID ${campaignId} in email_metrics`)
+          }
         }
 
         await this.logInfo('Final campaign created successfully', {
