@@ -1,916 +1,1013 @@
-# AI Pros Newsletter Platform - Main Content Repository
+# AI Pros Newsletter Platform - Development Context
 
 **Last Updated:** 2025-01-22
-**Primary Source:** This is now the authoritative development document
+**Project:** Multi-tenant Newsletter Automation Platform
+**Stack:** Next.js 15 + Supabase + OpenAI + MailerLite
 
-## 🎯 Project Overview
+---
 
-**AI Pros Newsletter** is a multi-tenant newsletter automation platform designed to manage multiple industry-focused AI newsletters from a single admin dashboard.
+## 🎯 Critical Reading Order
 
-### Platform Architecture
-- **Admin Dashboard**: [www.aiprodaily.com](https://www.aiprodaily.com)
-- **Current Newsletter**: AI Accounting Daily (slug: `accounting`)
-- **Public Website**: [www.aiaccountingdaily.com](https://www.aiaccountingdaily.com)
-- **Multi-Tenant System**: Slug-based routing allows multiple newsletters from one codebase
-- **Future Expansion**: Platform designed to support additional AI industry newsletters
+**ALWAYS read in this order before ANY task:**
 
-### Technology Stack & MCP Connections
+1. **This file (CLAUDE.md)** - Complete context (you are here)
+2. **Task-specific documentation** - See Documentation Map below
 
-#### Core Infrastructure
-- **Supabase**: PostgreSQL database for all newsletter data, campaigns, articles, and user management
-- **Vercel**: Serverless hosting, deployment, and cron job execution
-- **GitHub**: Image storage repository for newsletter images and assets
-- **Next.js 15**: App Router with TypeScript for frontend and API routes
+**Skip unnecessary docs** - Only read what's relevant to your task.
 
-#### AI & Communication Services
-- **OpenAI (ChatGPT)**:
-  - Article content generation and rewriting
+---
+
+## 📚 Documentation Map (Available References)
+
+### Core Stack (Read Based on Task)
+
+#### Next.js (App Router, API Routes, Cron Jobs)
+- **Primary:** `docs/nextjs.md` - Core Next.js patterns and APIs
+- **Deep dive:** `docs/nextjs-full.md` - Comprehensive Next.js documentation
+- **When to use:**
+  - Creating/modifying API routes (`app/api/*`)
+  - Working with cron jobs
+  - Server Components vs Client Components
+  - Middleware and routing
+
+#### Supabase (Database, Auth, Storage)
+- **Index:** `docs/supabase-index.md` - Overview and getting started
+- **Primary:** `docs/supabase-guides.md` - Usage patterns and best practices
+- **JavaScript SDK:** `docs/supabase-js.md` - Full JavaScript client reference
+- **CLI:** `docs/supabase-cli.md` - Command-line tools (migrations, etc.)
+- **Python SDK:** `docs/supabase-python.md` - Python client (if needed)
+- **When to use:**
+  - Database queries and mutations
+  - Row Level Security (RLS) policies
+  - Real-time subscriptions
+  - File storage operations
+
+#### OpenAI (Content Generation, Scoring)
+- **Index:** `docs/openai-index.md` - API overview
+- **Primary:** `docs/openai-guides.md` - Usage guides and best practices
+- **API Reference:** `docs/openai-api.md` - Complete API documentation
+- **Models & Pricing:** `docs/openai-models.md` - Model comparison and costs
+- **Deep dive:** `docs/openai-full.md` - Comprehensive documentation
+- **When to use:**
+  - Article generation from RSS content
   - Post scoring and evaluation
   - Subject line generation
-  - Multi-criteria content assessment
-- **Vercel AI SDK** (Potential Integration):
-  - Streaming text generation
-  - Chat interfaces with useChat hook
-  - Tool calling and function execution
-  - Server actions for LLM integration
-- **MailerLite**:
-  - Email campaign delivery
-  - Subscriber management
-  - Review group campaigns
-  - Final campaign scheduling and sending
+  - Any AI/LLM integration
 
-### Reference Documentation
-When implementing AI features or working with Vercel platform:
-- **Vercel AI SDK**: `docs/vercel-ai-sdk.md` - AI SDK patterns, hooks, streaming, and tool calling
-- **Vercel API**: `docs/vercel-api.md` - Platform API reference for deployments and functions
-- **Project Guide**: `CLAUDE.md` - This file, comprehensive project documentation
+#### Vercel (Deployment, Cron, Serverless)
+- **Primary:** `docs/vercel-api.md` - Vercel platform and deployment API
+- **When to use:**
+  - Configuring cron jobs (vercel.json)
+  - Environment variables
+  - Function timeouts and limits
+  - Deployment configuration
 
-## 🔐 Required Environment Variables
+#### Vercel AI SDK (Streaming, AI Integration)
+- **Primary:** `docs/vercel-ai-sdk.md` - AI SDK patterns and utilities
+- **When to use:**
+  - Streaming AI responses
+  - AI SDK utilities (streamText, etc.)
+  - Client-side AI integration
+  - **Note:** Currently not heavily used in this project
 
-### Core Services
-```bash
-DATABASE_URL=                    # Supabase PostgreSQL connection string
-SUPABASE_SERVICE_ROLE_KEY=       # Supabase admin access key (bypasses RLS)
-OPENAI_API_KEY=                  # ChatGPT API access for content generation
-MAILERLITE_API_KEY=              # Email service API for campaigns
+### Optional/Reference Documentation
+
+#### Anthropic (Claude-specific)
+- **Full docs:** `docs/anthropic.md` - Claude API reference
+- **When to use:**
+  - If you decide to use Claude API instead of OpenAI
+  - Understanding Claude-specific features
+  - **Note:** Not currently used in project
+
+#### Perplexity (Alternative AI Search)
+- **Primary:** `docs/perplexity.md` - Perplexity API overview
+- **Deep dive:** `docs/perplexity-full.md` - Full documentation
+- **When to use:**
+  - If implementing AI-powered search features
+  - Alternative to OpenAI for certain tasks
+  - **Note:** Not currently used in project
+
+---
+
+## 🧭 Quick Navigation Guide
+
+**Based on your task, read these docs:**
+
+### Task: Creating/Modifying API Routes
+```
+Read: 
+1. CLAUDE.md (this file) - Critical rules
+2. docs/nextjs.md - API route patterns
+3. docs/vercel-api.md - If working with cron/timeouts
 ```
 
-### Authentication & Security
-```bash
-NEXTAUTH_SECRET=                 # NextAuth.js session encryption key
-NEXTAUTH_URL=                    # Application URL for OAuth callbacks
-CRON_SECRET=                     # Vercel cron job authentication token
+### Task: Database Query/Schema Changes
+```
+Read:
+1. CLAUDE.md (this file) - Critical rules (multi-tenant!)
+2. docs/supabase-guides.md - Query patterns
+3. docs/supabase-js.md - Specific SDK methods
 ```
 
-### Optional Services
-```bash
-SLACK_WEBHOOK_URL=               # Slack notifications for RSS processing
-GITHUB_TOKEN=                    # GitHub API token for image storage
-GITHUB_REPO=                     # Repository name for image storage (e.g., "username/ai-pros-images")
-GITHUB_BRANCH=                   # Branch for image storage (default: "main")
+### Task: RSS Processing/AI Integration
+```
+Read:
+1. CLAUDE.md (this file) - Critical rules + RSS workflow
+2. docs/openai-guides.md - AI best practices
+3. docs/openai-api.md - Specific API methods
 ```
 
-### Payment Processing (if ads enabled)
-```bash
-STRIPE_SECRET_KEY=               # Stripe API key for ad payments
-STRIPE_WEBHOOK_SECRET=           # Stripe webhook signing secret
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=  # Stripe public key (client-side)
+### Task: Cron Job Modification
+```
+Read:
+1. CLAUDE.md (this file) - Critical rules
+2. docs/nextjs.md - Cron route patterns
+3. docs/vercel-api.md - Cron configuration
 ```
 
-## 🔒 **SAVE POINT - RSS Processing Optimization Complete** (2025-01-22)
-**Git Commit:** `9137c58` - Consolidate evaluation logging to single line format
-**System State:** Fully functional with optimized RSS processing and minimal logging
-**Working Features:**
-- ✅ RSS Processing with 4 Combined Steps (Archive+Fetch, Extract+Score, Generate, Finalize)
-- ✅ Subject Line Generation (both AI and manual editing)
-- ✅ Automatic Subject Line Regeneration (when #1 article changes via skip/reorder)
-- ✅ Real-Time UI Updates (subject line updates instantly without page refresh)
-- ✅ Manual Subject Line Editing (no character limits)
-- ✅ Campaign workflow (Draft → In Review → Ready to Send → Sent)
-- ✅ Skip Article functionality with complete audit trail
-- ✅ Preview Loading States (visual feedback during newsletter generation)
-- ✅ **NEW: Minimal Logging System** (prevents Vercel function log overflow)
-- ✅ **NEW: Combined Step Workflow** (4 steps instead of 7 for efficiency)
-- ✅ **NEW: Consolidated Evaluation Logging** (single line format for all criteria)
-
-**Purpose:** Safe restore point with optimized RSS processing that prevents log overflow
-
-## 🆕 Current Session (2025-01-22): RSS Processing Simplification & Log Reduction
-
-### Major Changes Implemented ✅
-
-#### 1. **Combined Step Architecture**
-- **Reduced Complexity**: Simplified from 7-step state machine to 4 combined steps
-- **Direct Function Calls**: Steps call processor methods directly (no HTTP round-trips)
-- **Retry Logic**: Each step retries once on failure before marking campaign as failed
-- **Error Tracking**: Detailed error reporting for each step
-
-**4 Combined Steps:**
+### Task: Email Campaign Features
 ```
-Step 1: Archive + Fetch RSS feeds
-Step 2: Extract article text + Score posts
-Step 3: Generate newsletter articles
-Step 4: Finalize campaign + Send notifications
+Read:
+1. CLAUDE.md (this file) - MailerLite patterns included
+2. docs/nextjs.md - API route patterns (if creating endpoints)
 ```
 
-#### 2. **Aggressive Logging Reduction**
-- **Problem**: RSS processing was maxing out Vercel function logs (10MB limit)
-- **Solution**: Removed 100+ console.log statements throughout RSS processor
-
-**Logging Changes:**
-- `processFeed`: Removed 20+ logs per feed, kept only error logs
-- `enrichRecentPostsWithFullContent`: Removed all success/progress logging
-- `scorePostsForSection`: Removed batch completion and summary logs
-- `evaluatePost`: Combined 7+ lines into single line format
-
-**Example Evaluation Log:**
+### Task: Bug Fix
 ```
-Before: 7+ lines per post
-Evaluating post with 3 enabled criteria
-Evaluating criterion 1: Interest Level (weight: 1.5)
-Using database prompt for criteria1Evaluator
-Criterion 1 score: 5/10
-... (4 more lines)
-Total weighted score: 25.5 (max possible: 40)
-
-After: 1 line per post
-Criterion 1: 5/10; Criterion 2: 8/10; Criterion 3: 6/10; Total: 25.5 (max: 40)
+Read:
+1. CLAUDE.md (this file) - See troubleshooting section
+2. [Relevant doc based on bug location]
 ```
 
-#### 3. **Simplified Process Endpoint**
-- **Single Entry Point**: `/api/rss/process` orchestrates all 4 steps
-- **Sequential Execution**: Each step completes before next begins
-- **Failure Handling**: Campaign marked as failed if any step fails twice
-- **Minimal Output**: Only `[RSS]` prefixed essential messages
+**Rule of thumb:** Read CLAUDE.md first (always), then 1-2 specific docs (rarely need more).
 
-### Files Modified This Session
-
-```
-# New Combined Step Files
-src/app/api/rss/combined-steps/step1-archive-fetch.ts    # Archive old data + fetch RSS
-src/app/api/rss/combined-steps/step2-extract-score.ts     # Extract text + score posts
-src/app/api/rss/combined-steps/step3-generate.ts          # Generate articles
-src/app/api/rss/combined-steps/step4-finalize.ts          # Finalize + notifications
-
-# Updated Process Endpoint
-src/app/api/rss/process/route.ts                          # Simplified to call combined steps
-
-# Logging Reduction
-src/lib/rss-processor.ts                                  # Massive logging reduction
-vercel.json                                               # Set maxDuration to 600 seconds
-```
+---
 
 ## ⚠️ CRITICAL DEVELOPMENT RULES
 
-### Confidence and Clarification Policy
-**When uncertain or confidence is below 80%, always ask the user for clarification:**
-- ❌ **NEVER** proceed with assumptions when uncertain about requirements, implementation approach, or potential impacts
-- ✅ **ALWAYS** ask for clarification, guidance, or more context when confidence is below 80%
-- ✅ **PREFER** multiple choice format when asking for clarification to make decisions easier
-- ✅ Present 2-4 concrete options with pros/cons to help user make informed decisions
+### 1. Confidence and Clarification Policy
 
-**Example - Multiple Choice Clarification:**
+**When confidence is below 80%, STOP and ask for clarification.**
+
+❌ **NEVER** proceed with assumptions
+✅ **ALWAYS** ask using multiple choice format with pros/cons
+
+**Template:**
 ```
-I'm not certain about the best approach for handling X. Here are the options:
+I'm not certain about [aspect]. Here are the options:
 
-A) Approach 1: [Description]
-   Pros: [List benefits]
-   Cons: [List drawbacks]
+A) [Approach 1]
+   Pros: [Benefits]
+   Cons: [Drawbacks]
+   Impact: [Performance/Database/Architecture]
 
-B) Approach 2: [Description]
-   Pros: [List benefits]
-   Cons: [List drawbacks]
+B) [Approach 2]
+   Pros: [Benefits]
+   Cons: [Drawbacks]
+   Impact: [Performance/Database/Architecture]
 
-Which approach would you prefer, or would you like me to explain any option in more detail?
+Which approach fits better with the project goals?
 ```
 
-### Date/Time Handling Policy
-**ALL date and time operations MUST use local (non-UTC) comparisons:**
-- ❌ **NEVER** use `.toISOString()`, `.toUTCString()`, or UTC-based Date methods for date comparisons
-- ✅ **ALWAYS** extract date strings directly (e.g., `date.split('T')[0]`) to avoid timezone shifts
-- ✅ **ALWAYS** use local time for filtering, sorting, and displaying dates
-- ✅ When comparing dates, use string comparison on YYYY-MM-DD format without timezone conversion
+**Ask when uncertain about:**
+- Requirements or expected behavior
+- Implementation approach or architecture
+- Potential impacts on existing features
+- Performance implications
+- Security considerations
 
-**Why:** UTC conversion causes dates to shift forward/backward depending on timezone, breaking filters and comparisons.
+---
 
-### AI Feature Implementation Guidelines
+### 2. Date/Time Handling Policy
 
-**Before implementing any AI-powered feature, ALWAYS:**
+**ALL date operations MUST use local (non-UTC) comparisons.**
 
-1. **Reference Documentation First**
-   - Read the relevant section in `docs/vercel-ai-sdk.md`
-   - Review existing AI implementations in `src/lib/openai.ts`
-   - Check for similar patterns in the codebase
-
-2. **Follow Established Patterns**
-   - Use the exact patterns shown in documentation
-   - Import from recommended packages
-   - Match existing project configurations
-
-3. **Current AI Implementation**
-   - Project uses direct OpenAI API calls via `src/lib/openai.ts`
-   - Custom `callOpenAI()` wrapper for API interactions
-   - JSON response parsing with fallback handling
-   - Multi-criteria evaluation system for content scoring
-
-4. **Potential Migration to Vercel AI SDK**
-   - If migrating features to Vercel AI SDK, consult `docs/vercel-ai-sdk.md`
-   - Maintain backward compatibility with existing AI prompts
-   - Test thoroughly before replacing working implementations
-
-### Common AI Development Tasks
-
-#### Chat Interface (If Needed)
-**Reference**: "useChat hook" in `docs/vercel-ai-sdk.md`
+❌ **FORBIDDEN:**
 ```typescript
-import { useChat } from 'ai/react'
-
-const { messages, input, handleSubmit } = useChat({
-  api: '/api/chat'
-})
+date.toISOString()        // Causes timezone shifts
+date.toUTCString()        // Breaks date comparisons
+new Date().toISOString()  // Wrong for filtering
 ```
 
-#### Streaming Text Generation
-**Reference**: "streamText" in `docs/vercel-ai-sdk.md`
+✅ **REQUIRED:**
 ```typescript
-import { streamText } from 'ai'
-import { openai } from '@ai-sdk/openai'
+// Extract date string directly (NO UTC conversion)
+const dateStr = date.split('T')[0];  // "2025-01-22"
 
-const result = await streamText({
-  model: openai('gpt-4-turbo'),
-  prompt: 'Your prompt here',
-})
+// Compare dates as strings
+const today = new Date().toISOString().split('T')[0];
+if (dateStr === today) { 
+  // Correct: Local date comparison
+}
+
+// Filter by date in queries
+const { data } = await supabase
+  .from('campaigns')
+  .select('*')
+  .gte('date', '2025-01-22')  // String comparison
+  .lte('date', '2025-01-23');
+
+// Sort dates
+campaigns.sort((a, b) => a.date.localeCompare(b.date));
 ```
 
-#### Current Implementation (Non-Streaming)
-**Location**: `src/lib/openai.ts`
+**Why:** UTC conversion shifts dates forward/backward by timezone, breaking filters. Users expect Central Time. Example: At 11 PM CST, `toISOString()` gives next day's date in UTC.
+
+---
+
+### 3. Performance Rules (Vercel Limits)
+
+**Hard Limits (will fail if exceeded):**
+- Timeout: 600 seconds (10 minutes)
+- Log Size: 10MB maximum
+- Memory: 1024MB default
+- Response: 4.5MB maximum
+
+#### Minimal Logging (Prevent 10MB Overflow)
+
 ```typescript
-import { callOpenAI } from '@/lib/openai'
+// ✅ GOOD: Essential milestones with prefixes
+console.log('[RSS] Step 1: Archived 120 posts, fetched 45 new');
+console.log('[CRON] Job complete: 3 campaigns processed');
+console.error('[RSS] ERROR:', error.message);
 
-// Current pattern used throughout project
-const result = await callOpenAI(prompt, {
-  temperature: 0.7,
-  max_tokens: 1000
-})
+// ❌ BAD: Excessive detail
+console.log('Starting...');
+console.log('Processing item 1...');
+console.log('Processing item 2...');
+console.log('Item 1 complete');
+// ... 100+ more logs (FORBIDDEN)
 ```
 
-#### Tool Calling (Advanced)
-**Reference**: "tools" section in `docs/vercel-ai-sdk.md`
-- Use for complex AI interactions requiring function execution
-- Define tools with zod schemas
-- Handle tool results in streaming responses
+**Log Prefixes:**
+- `[RSS]` - RSS processing
+- `[CRON]` - Cron jobs
+- `[DB]` - Database operations
+- `[AI]` - OpenAI operations
+- `[EMAIL]` - MailerLite operations
 
-### AI Best Practices for This Project
+#### Batch Processing (Prevent Rate Limits & Timeouts)
 
-1. **Prompt Engineering**
-   - Store prompts in database (`app_settings` table)
-   - Allow customization via Settings UI
-   - Test prompts before deploying
-   - Use consistent formatting across all prompts
+```typescript
+// AI API calls - REQUIRED pattern
+const BATCH_SIZE = 3;
+const BATCH_DELAY = 2000; // milliseconds
 
-2. **Error Handling**
-   - Wrap AI calls in try-catch blocks
-   - Implement retry logic for transient failures
-   - Log errors with context (campaign_id, prompt type)
-   - Provide fallback behavior when AI fails
+const batches = chunkArray(posts, BATCH_SIZE);
+for (const batch of batches) {
+  await Promise.all(batch.map(post => scorePost(post)));
+  await sleep(BATCH_DELAY);
+}
 
-3. **Performance**
-   - Batch AI operations with delays (prevent rate limits)
-   - Cache results when appropriate
-   - Monitor token usage
-   - Use appropriate model for task (gpt-4-turbo vs gpt-3.5-turbo)
+// Helper functions (add if not exists)
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-4. **Testing**
-   - Use `/api/debug/test-ai-prompts` for prompt testing
-   - Test with realistic newsletter data
-   - Verify output format matches expectations
-   - Check edge cases (empty content, very long content)
+function chunkArray<T>(array: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
+}
+```
 
-## 🔧 Technical Configuration
+#### Retry Logic Pattern
+
+```typescript
+// REQUIRED: Retry once on transient failures
+async function executeStepWithRetry(
+  stepFn: () => Promise<void>,
+  stepName: string
+): Promise<void> {
+  try {
+    await stepFn();
+  } catch (error) {
+    console.error(`[RSS] ${stepName} failed, retrying...`);
+    try {
+      await stepFn(); // One retry
+    } catch (retryError) {
+      console.error(`[RSS] ${stepName} retry failed`);
+      throw retryError;
+    }
+  }
+}
+```
+
+---
+
+## 🏆 Rule Precedence (When Rules Conflict)
+
+**Priority Order:**
+
+1. **Security** - Never compromise
+   - Never log API keys (even debugging)
+   - Always validate input (even if adds latency)
+   - Always filter by newsletter_id (even if slower)
+
+2. **Data Integrity** - Never compromise
+   - Always check for errors before proceeding
+   - Never skip validation to save tokens
+   - Multi-tenant isolation required
+
+3. **Performance Limits** - Hard limits (will hard fail)
+   - 600 second timeout
+   - 10MB log limit
+   - Must use minimal logging if approaching limits
+
+4. **Code Quality** - Best practices (can bend in emergencies)
+   - TypeScript types preferred (any acceptable with comment)
+   - Try-catch preferred (can omit for simple queries)
+   - Comprehensive error handling preferred (minimal acceptable)
+
+**Decision Examples:**
+- "Should I log detailed error info if approaching 8MB?" → NO (Priority 3 > 4)
+- "Should I skip newsletter_id filter for speed?" → NO (Priority 2 > 3)
+- "Should I use 'any' type to save time?" → MAYBE (Priority 4, add comment)
+
+---
+
+## 🏗️ Project Architecture
 
 ### Multi-Tenant System
-- **Slug-Based Routing**: Each newsletter has unique slug (e.g., "accounting")
-- **Subdomain Support**: Public websites use subdomain or custom domain
-- **Shared Codebase**: All newsletters run from single Next.js application
-- **Database Isolation**: Newsletter data separated by slug/newsletter_id
 
-### Email Settings (AI Accounting Daily)
-- **Sender Name**: "AI Accounting Daily"
-- **From Email**: Configured in MailerLite settings
-- **Subject Format**: AI-generated headlines (no emoji prefix for this newsletter)
-- **Domain**: Authenticated and verified in MailerLite
-
-### AI Prompt Requirements
-- **Style**: Professional industry newsletter voice
-- **Content Focus**: AI developments relevant to accounting professionals
-- **Scoring Criteria**: Customizable multi-criteria evaluation system
-- **Article Generation**: AI rewrites RSS content for newsletter format
-
-### Content Processing Rules
-- **RSS Feeds**: Multiple feeds per newsletter, organized by section (primary/secondary)
-- **Article Scoring**: Multi-criteria AI evaluation (customizable weights)
-- **Email Format**: HTML email templates with responsive design
-- **Article Order**: Sorted by AI score (highest first)
-
-## ⚡ Performance Optimization
-
-### Vercel Function Limits
-- **Timeout**: 600 seconds (10 minutes) for RSS processing routes
-- **Log Size**: 10MB maximum per function execution
-- **Memory**: 1024MB default (configurable in vercel.json)
-- **Response Size**: 4.5MB maximum response body
-
-### Optimization Strategies Implemented
-1. **Minimal Logging**
-   - Removed 100+ console.log statements from RSS processor
-   - Single-line format for evaluation results
-   - Only essential error/status messages logged
-
-2. **Batch Processing**
-   - AI scoring in batches of 3 posts (prevents rate limits)
-   - 2-second delays between batches
-   - Concurrent article extraction (10 at a time)
-
-3. **Direct Function Calls**
-   - Combined steps call methods directly (no HTTP overhead)
-   - Eliminated intermediate API requests
-   - Faster execution (4 steps instead of 7)
-
-4. **Retry Logic**
-   - Each step retries once on transient failures
-   - Prevents full workflow restart on temporary issues
-   - Campaign marked failed only after 2 attempts
-
-5. **Efficient Database Queries**
-   - Select only required fields
-   - Use indexes for campaign_id, feed_id lookups
-   - Batch updates where possible
-
-### Performance Monitoring
-```bash
-# Check function execution times in Vercel dashboard
-# Monitor log sizes to ensure under 10MB limit
-# Watch for timeout warnings (>540 seconds)
-# Review Supabase query performance
+```
+Newsletter Slug → Database Isolation
+    ↓
+"accounting" → AI Accounting Daily → newsletter_id = 'accounting'
 ```
 
-## 🤖 Automated Newsletter Scheduling System
-
-### Schedule Configuration (Central Time)
-All times are configurable via Settings > Email tab:
-
-1. **RSS Processing**: Creates tomorrow's campaign + fetches/scores articles
-2. **Article Generation**: AI generates newsletter content
-3. **Review Campaign**: Creates and schedules review campaign for testing
-4. **Final Send**: MailerLite sends to main subscriber list
-
-### Settings Page Integration
-- **Email Tab**: Configure all scheduling times
-- **MailerLite Settings**: Review Group ID, From Email, Sender Name
-- **API Keys**: Stored securely in environment variables
-- **Times Configurable**: All cron schedules adjustable via web interface
-- **Settings Storage**: `app_settings` table in Supabase
-
-### Automation Features
-- **Smart Status Checking**: Only processes campaigns in appropriate status
-- **Error Handling**: Comprehensive logging and status updates
-- **Idempotent**: Safe to run multiple times, won't duplicate work
-- **Manual Testing**: GET endpoints with secret parameter for debugging
-- **Slack Notifications**: RSS processing completion alerts
-
-## 📊 Database Schema Overview
-
-### Core Tables
-- **newsletter_campaigns**: Campaign metadata, status, dates
-- **articles**: Primary section articles with scores and rankings
-- **secondary_articles**: Secondary section articles
-- **rss_posts**: Raw RSS feed data with full article text
-- **rss_feeds**: RSS feed sources (active/inactive, section assignment)
-- **post_ratings**: AI evaluation scores for each post
-- **archived_articles**: Historical article data
-- **archived_rss_posts**: Historical RSS post data
-- **app_settings**: Application configuration (AI prompts, email settings, etc.)
-- **user_activities**: Audit trail for campaign actions
-
-### Campaign Deletion Tables
-When deleting a campaign, the following tables must be cleaned up:
-```
-1. articles
-2. secondary_articles
-3. rss_posts
-4. post_ratings (cascade from rss_posts)
-5. user_activities
-6. archived_articles
-7. archived_rss_posts
-8. newsletter_campaigns (parent table)
-```
-
-## 🔍 Key Features by Area
-
-### RSS Processing
-- ✅ Multi-feed support with section assignment
-- ✅ Facebook image re-hosting to GitHub
-- ✅ Full article text extraction
-- ✅ Multi-criteria AI scoring
-- ✅ Duplicate detection and grouping
-- ✅ 24-hour lookback window
-- ✅ Minimal logging to prevent overflow
-
-### Campaign Management
-- ✅ Draft → In Review → Ready to Send → Sent workflow
-- ✅ Skip articles with automatic subject line regeneration
-- ✅ Reorder articles with drag-and-drop
-- ✅ Manual article editing and addition
-- ✅ Preview generation with loading states
-- ✅ Complete campaign deletion with error tracking
-
-### Subject Line Generation
-- ✅ AI-generated based on top article
-- ✅ Manual editing capability
-- ✅ Automatic regeneration when #1 article changes
-- ✅ Real-time UI updates without page refresh
-- ✅ Custom AI prompt configuration
-
-### AI Prompt Customization
-- ✅ Database-stored prompts (editable via UI)
-- ✅ Custom defaults with double confirmation
-- ✅ Test prompts with realistic data
-- ✅ Smart reset (custom default → code default)
-- ✅ Multi-criteria evaluation system
-
-## 📡 RSS Feed Management
-
-### Feed Structure
-- **Primary Section**: Top 5 articles (highest scores)
-- **Secondary Section**: 3-5 articles (different feeds/perspectives)
-- **Active Feeds**: Toggle on/off in Settings > RSS Feeds
-- **Lookback Window**: 24 hours from campaign date
-- **Section Assignment**: Each feed assigned to primary, secondary, or both
-
-### Adding New RSS Feeds
-1. Navigate to **Settings > RSS Feeds** in dashboard
-2. Click "Add New Feed" button
-3. Enter feed details:
-   - Feed URL (must be valid RSS/Atom feed)
-   - Display name
-   - Section assignment (primary/secondary)
-   - Active status
-4. Test fetch before activating
-5. Monitor first campaign for quality
-
-### Feed Configuration Options
-- **Use for Primary Section**: Include in main article selection
-- **Use for Secondary Section**: Include in secondary article selection
-- **Active**: Enable/disable without deleting
-- **Processing Errors**: Auto-tracked for troubleshooting
-
-### Best Practices
-- ✅ Test new feeds with manual campaign first
-- ✅ Monitor post quality and scoring
-- ✅ Use diverse sources for better coverage
-- ✅ Deactivate low-quality feeds instead of deleting
-- ✅ Review feed errors regularly
-
-## 🎯 Multi-Criteria Scoring System
-
-### Default Scoring Criteria
-The system evaluates each RSS post against customizable criteria:
-
-**Criterion 1: Interest Level** (default weight: 1.5)
-- How engaging is this content for the target audience?
-- Does it grab attention?
-- Is it newsworthy or unique?
-
-**Criterion 2: Professional Relevance** (default weight: 1.5)
-- How relevant is this to accounting professionals?
-- Does it address industry-specific challenges?
-- Is it actionable for readers?
-
-**Criterion 3: Professional Impact** (default weight: 1.0)
-- How significant is this development?
-- Will it affect readers' work?
-- Is it a major trend or minor update?
-
-### How Scoring Works
-1. **Evaluation**: Each post evaluated against enabled criteria (default: 3)
-2. **Scoring**: AI assigns 0-10 score per criterion
-3. **Weighting**: Scores multiplied by criterion weight
-4. **Total Score**: Weighted sum calculated (e.g., 25.5 out of max 40)
-5. **Ranking**: Posts ranked by total_score descending
-6. **Selection**: Top N posts selected for newsletter
-
-### Score Calculation Example
-```
-Criterion 1: 8/10 × weight 1.5 = 12.0
-Criterion 2: 7/10 × weight 1.5 = 10.5
-Criterion 3: 5/10 × weight 1.0 =  5.0
-                    Total Score = 27.5 (max possible: 40)
-```
-
-### Customizing Scoring Criteria
-
-#### Edit Criteria Prompts
-1. Navigate to **Settings > AI Prompts**
-2. Find criteria evaluator prompts (criteria1Evaluator, criteria2Evaluator, etc.)
-3. Click "Edit" to modify prompt
-4. Use "Test Prompt" to verify output
-5. Save changes or "Save as Default"
-
-#### Adjust Criteria Weights
-1. Navigate to **Settings > Scoring Criteria**
-2. Modify weights (higher = more important)
-3. Common patterns:
-   - Equal weights: 1.0, 1.0, 1.0 (all criteria equal)
-   - Emphasis on relevance: 1.0, 2.0, 1.0
-   - Emphasis on impact: 1.0, 1.0, 2.0
-4. Save and apply to future campaigns
-
-#### Enable/Disable Criteria
-- **Criteria Enabled Count**: Set to 2 or 3 (up to 3 supported)
-- Disabled criteria are skipped during evaluation
-- Weights still apply to enabled criteria
-
-### Viewing Scores
-- **Campaign Detail Page**: View scores for all articles
-- **Article Cards**: Display total_score and ranking
-- **Post Ratings Table**: Full breakdown by criterion
-- **Debug Endpoint**: `/api/debug/check-posts?campaign_id=X`
-
-## 🎨 Additional Platform Features
-
-### Secondary Articles System
-- **Purpose**: Provide diverse perspectives or supplementary content
-- **Separate Feeds**: Uses different RSS feeds than primary section
-- **Independent Scoring**: Scored separately with same criteria
-- **Article Count**: Typically 3-5 articles (configurable)
-- **Toggle Active**: Can activate/deactivate individual secondary articles
-- **Reordering**: Drag-and-drop ranking like primary articles
-
-### Advertisement Management (If Enabled)
-- **Ad Submission**: Public form for ad submissions
-- **Review Workflow**: Admin approval before activation
-- **Stripe Integration**: Payment processing for ad purchases
-- **Position Management**: Automatic or manual ad positioning
-- **Ad Pricing**: Configurable pricing tiers
-- **Ad Analytics**: Track ad performance and clicks
-
-### Breaking News
-- **Manual Entry**: Add time-sensitive content outside RSS flow
-- **Priority Display**: Shows above regular articles
-- **Skip RSS**: Manually created content with custom text
-- **Quick Turnaround**: Bypass normal campaign workflow
-
-### Newsletter Polls
-- **Poll Creation**: Create surveys for subscriber engagement
-- **Active Status**: One active poll per campaign
-- **Response Tracking**: View poll results in real-time
-- **Newsletter Integration**: Polls embedded in email campaigns
-
-### Image Management System
-- **Image Database**: Reusable library of newsletter images
-- **GitHub Storage**: Permanent hosting for all images
-- **Facebook Re-hosting**: Automatic conversion of expiring Facebook CDN URLs
-- **Upload Interface**: Manual image uploads for reuse
-- **Reverse Lookup**: Find which campaigns used specific images
-
-### Archived Newsletters
-- **Public Archive**: Past newsletters viewable on website
-- **Search Function**: Find newsletters by date or content
-- **Analytics Tracking**: Track archive page views
-- **Historical Data**: Preserved articles and RSS posts
-
-## 🐛 Common Issues & Solutions
-
-### Issue: Vercel Function Log Overflow
-**Symptom**: RSS processing fails with "Function log limit exceeded" error
-
-**Root Cause**: Excessive console.log statements in processing loops
-
-**Solution**:
-- ✅ Implemented minimal logging (January 2025)
-- Only essential `[RSS]` prefixed messages
-- Single-line evaluation results
-- Silent error handling for non-critical failures
-
-**Prevention**: Avoid console.log in loops, use summary logging
-
----
-
-### Issue: Subject Line Not Regenerating
-**Symptom**: Subject line becomes outdated after skip/reorder operations
-
-**Root Cause**: Manual regeneration required in older versions
-
-**Solution**:
-- ✅ Automatic regeneration implemented
-- Triggers when #1 article position changes
-- Real-time UI updates without page refresh
-
-**Check**: Verify article skip/reorder triggers regeneration
-
----
-
-### Issue: Campaign Deletion Fails
-**Symptom**: "Failed to delete campaign" error with 500 status
-
-**Root Cause**: Foreign key constraints from child tables
-
-**Solution**:
-- Delete child tables first in correct order
-- Error tracking shows which tables failed
-- Non-blocking design continues despite some failures
-
-**Tables to Delete** (in order):
-1. articles, secondary_articles
-2. rss_posts (cascades to post_ratings)
-3. user_activities
-4. archived_articles, archived_rss_posts
-5. newsletter_campaigns
-
----
-
-### Issue: RSS Processing Timeout
-**Symptom**: Function execution exceeds 600 second limit
-
-**Root Cause**: Too many feeds or slow article extraction
-
-**Possible Solutions**:
-- Reduce number of active feeds
-- Increase timeout in vercel.json (max 900s for Pro plan)
-- Disable full article text extraction temporarily
-- Check for slow/unresponsive feed URLs
-
----
-
-### Issue: Articles Not Scoring
-**Symptom**: Posts fetched but no scores assigned
-
-**Root Cause**: AI API errors or prompt configuration issues
-
-**Troubleshooting Steps**:
-1. Check OpenAI API key validity
-2. Review Vercel function logs for AI errors
-3. Test criteria prompts in Settings > AI Prompts
-4. Verify criteria_enabled_count setting
-5. Check post_ratings table for error messages
-
----
-
-### Issue: Facebook Images Broken
-**Symptom**: Image URLs showing broken images in newsletter
-
-**Root Cause**: Facebook CDN URLs expire after a few hours
-
-**Solution**:
-- ✅ Automatic GitHub re-hosting implemented
-- Facebook images detected during RSS processing
-- Downloaded and uploaded to permanent GitHub storage
-- Database updated with new GitHub URL
-
-**Prevention**: System now handles automatically
-
----
-
-### Issue: Date/Time Mismatches
-**Symptom**: Campaigns showing wrong date or articles from wrong day
-
-**Root Cause**: UTC timezone conversion errors
-
-**Solution**:
-- Never use `.toISOString()` for date comparisons
-- Extract date strings directly: `date.split('T')[0]`
-- Use local time for all filtering and sorting
-- Compare dates as YYYY-MM-DD strings
-
-**Example (Correct)**:
+**CRITICAL RULE:** Every database query MUST include:
 ```typescript
-const campaignDate = campaign.date.split('T')[0] // "2025-01-22"
+.eq('newsletter_id', newsletterId)
 ```
 
-## 🛠️ Debug Tools & Endpoints
+**Example:**
+```typescript
+// ✅ CORRECT
+const { data } = await supabase
+  .from('articles')
+  .select('*')
+  .eq('campaign_id', campaignId)
+  .eq('newsletter_id', 'accounting');  // REQUIRED
 
-### Campaign Management
-- `/api/debug/recent-campaigns` - List recent campaigns with details
-- `/api/debug/campaign-articles?campaign_id=X` - Show all articles for campaign
-- `/api/debug/complete-campaign` - Fix interrupted campaigns
-- `/api/debug/check-campaign-relations` - Diagnose deletion issues
-
-### RSS Processing
-- `/api/debug/trace-rss-processing` - Detailed RSS processing logs
-- `/api/debug/check-posts` - Verify RSS post data
-- `/api/debug/rss-posts-count` - Count posts by campaign
-- `/api/debug/activate-articles` - Manually activate top articles
-
-### AI & Prompts
-- `/api/debug/test-ai-prompts` - Test prompt output
-- `/api/debug/check-ai-prompts` - Verify prompt configuration
-- `/api/debug/test-subject-generation` - Test subject line generation
-- `/api/debug/test-multi-criteria` - Test multi-criteria scoring
-
-### Settings & Configuration
-- `/api/debug/schedule-settings` - View cron schedule configuration
-- `/api/debug/check-email-settings` - Verify MailerLite settings
-- `/api/debug/check-env-vars` - Verify environment variables
-
-### Key Debug URLs (Production)
-- **Recent Campaigns**: `https://www.aiprodaily.com/api/debug/recent-campaigns`
-- **Campaign Articles**: `https://www.aiprodaily.com/api/debug/campaign-articles?campaign_id=X`
-
-## 📁 Key Files & Architecture
-
-### API Routes
+// ❌ WRONG - Data leakage!
+const { data } = await supabase
+  .from('articles')
+  .select('*')
+  .eq('campaign_id', campaignId);
 ```
-# Campaign Management
-src/app/api/campaigns/[id]/route.ts                  # Campaign CRUD
-src/app/api/campaigns/[id]/delete/route.ts           # Complete campaign deletion
-src/app/api/campaigns/[id]/status/route.ts           # Status workflow updates
-src/app/api/campaigns/[id]/preview/route.ts          # Newsletter preview generation
-
-# RSS Processing
-src/app/api/rss/process/route.ts                     # Main RSS processing endpoint
-src/app/api/rss/combined-steps/step1-archive-fetch.ts
-src/app/api/rss/combined-steps/step2-extract-score.ts
-src/app/api/rss/combined-steps/step3-generate.ts
-src/app/api/rss/combined-steps/step4-finalize.ts
-
-# Article Management
-src/app/api/articles/[id]/skip/route.ts              # Skip article + auto regen subject
-src/app/api/campaigns/[id]/articles/reorder/route.ts # Reorder + auto regen subject
-src/app/api/articles/manual/route.ts                 # Manual article addition
-
-# Subject Lines
-src/app/api/campaigns/[id]/generate-subject/route.ts # Generate subject line
-src/app/api/campaigns/[id]/subject-line/route.ts     # Manual subject line update
-src/lib/subject-line-generator.ts                    # Shared subject line logic
-
-# Settings & Configuration
-src/app/api/settings/ai-prompts/route.ts             # AI prompt management
-src/app/api/settings/email/route.ts                  # Email settings
-src/app/api/settings/criteria/route.ts               # Scoring criteria config
-```
-
-### Core Libraries
-```
-src/lib/rss-processor.ts                             # RSS processing engine
-src/lib/openai.ts                                    # OpenAI integration & prompts
-src/lib/mailerlite.ts                                # MailerLite email service
-src/lib/supabase.ts                                  # Supabase database client
-src/lib/github-storage.ts                            # GitHub image storage
-src/lib/article-extractor.ts                         # Full article text extraction
-src/lib/slack.ts                                     # Slack notifications
-```
-
-### Frontend Dashboard
-```
-src/app/dashboard/[slug]/page.tsx                    # Newsletter dashboard home
-src/app/dashboard/[slug]/campaigns/page.tsx          # Campaign list
-src/app/dashboard/[slug]/campaigns/[id]/page.tsx     # Campaign detail & editing
-src/app/dashboard/[slug]/settings/page.tsx           # Settings & configuration
-```
-
-## 🚀 Deployment Checklist
-
-### Pre-Deployment Checks
-Before pushing code or deploying to production:
-
-#### 1. Local Build Verification
-```bash
-npm run build
-```
-- [ ] Build completes without errors
-- [ ] No TypeScript compilation errors
-- [ ] No ESLint warnings (if enforced)
-- [ ] Check for deprecated dependencies
-
-#### 2. Code Review
-- [ ] Review git diff for unexpected changes
-- [ ] Check for hardcoded credentials or secrets
-- [ ] Verify environment variable references
-- [ ] Ensure no debug console.logs in production code
-- [ ] Check for commented-out code to remove
-
-#### 3. Database Considerations
-- [ ] Verify database migrations if schema changed
-- [ ] Check for new required columns
-- [ ] Test with production data structure
-- [ ] Backup database before major changes
-
-#### 4. Critical Path Testing
-- [ ] Test RSS processing flow manually
-- [ ] Generate campaign preview
-- [ ] Test subject line generation
-- [ ] Verify article skip/reorder functionality
-- [ ] Check email preview rendering
-
-#### 5. Documentation
-- [ ] Update CLAUDE.md if major changes
-- [ ] Add comments for complex logic
-- [ ] Update API documentation if endpoints changed
-
-### Deployment Process
-
-#### 1. Git Commit
-```bash
-git add -A
-git status  # Review staged changes
-git commit -m "Descriptive commit message
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
-```
-
-#### 2. Push to Repository
-```bash
-git push
-```
-
-#### 3. Monitor Vercel Deployment
-- [ ] Check Vercel dashboard for deployment status
-- [ ] Review build logs for warnings
-- [ ] Verify deployment completes successfully
-- [ ] Note deployment URL and timestamp
-
-### Post-Deployment Verification
-
-#### 1. Production Testing
-- [ ] Visit production URL (www.aiprodaily.com)
-- [ ] Test authentication/login
-- [ ] Navigate to campaign dashboard
-- [ ] Verify settings pages load
-- [ ] Check API endpoints responding
-
-#### 2. Integration Checks
-- [ ] Verify Supabase connection working
-- [ ] Test MailerLite integration
-- [ ] Check OpenAI API calls functioning
-- [ ] Verify GitHub image storage working
-- [ ] Test Slack notifications (if configured)
-
-#### 3. Cron Job Verification
-- [ ] Check vercel.json cron schedules
-- [ ] Verify cron jobs appear in Vercel dashboard
-- [ ] Test manual cron trigger (if needed)
-- [ ] Monitor first automated run
-
-#### 4. Error Monitoring
-- [ ] Review Vercel function logs
-- [ ] Check for new error patterns
-- [ ] Monitor Supabase logs
-- [ ] Review Slack notifications for failures
-
-### Rollback Procedure
-If deployment causes issues:
-
-```bash
-# Find previous working commit
-git log --oneline -10
-
-# Revert to previous commit
-git revert <commit-hash>
-git push
-
-# OR force rollback (use with caution)
-git reset --hard <previous-commit-hash>
-git push --force
-```
-
-### Emergency Contacts
-- **Vercel Support**: Via dashboard or support@vercel.com
-- **Supabase Support**: Via dashboard support chat
-- **OpenAI Status**: status.openai.com
-
-## 🔄 Content Management Protocol
-
-**CLAUDE.MD AS PRIMARY REPOSITORY:**
-- This file (CLAUDE.md) is now the main content repository for all development notes
-- All session activities should be documented here in real-time
-
-**AUTOMATIC UPDATE PROTOCOL:**
-- **BEFORE CONDENSING**: Always add current session notes to appropriate section
-- **After Adding**: Update the "Last Updated" timestamp
-- **Then Proceed**: With condensing operations while preserving all historical context
-
-**Document Maintenance:**
-1. Add new issues/resolutions as they arise directly to this file
-2. Update timestamps for each session
-3. Use debug endpoints to verify current state
-4. Commit changes for future reference
-5. **CRITICAL**: Keep project overview and MCP connections current
-
-## 🚀 Future Expansion Plans
-
-### Additional Newsletters
-- Platform architecture supports multiple newsletters
-- Each newsletter gets unique slug and optional custom domain
-- Shared admin dashboard for all newsletters
-- Per-newsletter RSS feeds, AI prompts, and email settings
-
-### Newsletter Isolation
-- Database queries filtered by newsletter slug
-- Settings scoped to newsletter context
-- User permissions per newsletter
-- Analytics tracking per newsletter
 
 ---
-*This document serves as the authoritative record of development decisions and current system state for the AI Pros Newsletter platform.*
+
+### Database Schema (Key Tables)
+
+**Campaign Flow:**
+```
+newsletter_campaigns (status: draft → processing → in_review → ready_to_send → sent)
+  ├── articles (primary section, scored & ranked)
+  ├── secondary_articles (secondary section)
+  └── rss_posts (raw feed data)
+      └── post_ratings (AI evaluation scores)
+```
+
+**Archive:** `archived_articles`, `archived_rss_posts`
+**Config:** `app_settings` (key-value pairs scoped by newsletter_id)
+**Sources:** `rss_feeds` (active/inactive, section assignment)
+
+---
+
+## 🔄 RSS Processing Workflow (4 Combined Steps)
+
+**Pattern:** Each step retries once on failure. Campaign marked as `failed` if step fails twice.
+
+**Step 1:** Archive old data + Fetch RSS → `rss_posts`
+**Step 2:** Extract full text + Score posts → `post_ratings`  
+**Step 3:** Generate articles → `articles` + `secondary_articles`
+**Step 4:** Finalize → Status: `in_review`, send notifications
+
+**Implementation Pattern:**
+```typescript
+// Location: src/app/api/rss/combined-steps/step[1-4]-*.ts
+export async function executeStep(campaignId: string): Promise<void> {
+  try {
+    // Step logic here
+    console.log(`[RSS] Step N complete: X items processed`);
+  } catch (error) {
+    console.error('[RSS] Step N failed:', error.message);
+    throw error;
+  }
+}
+```
+
+**Process endpoint:** `src/app/api/rss/process/route.ts`
+- Calls steps 1-4 sequentially with retry logic
+- Marks campaign as `failed` if any step fails twice
+- Timeout: 600 seconds (configured in vercel.json)
+
+---
+
+## 🤖 AI Integration Patterns
+
+### Content Generation
+
+```typescript
+// Pattern: System prompt + Original content
+const systemPrompt = await getPrompt('articleGenerator'); // From app_settings
+const prompt = `${systemPrompt}\n\nOriginal content:\n${originalContent}`;
+
+const response = await openai.chat.completions.create({
+  model: 'gpt-4',
+  messages: [{ role: 'user', content: prompt }],
+  temperature: 0.7,
+  max_tokens: 1000,
+});
+
+const generatedArticle = response.choices[0].message.content || '';
+```
+
+### Post Scoring (Multi-Criteria with Batching)
+
+```typescript
+// REQUIRED: Batch of 3, 2s delay
+const BATCH_SIZE = 3;
+const BATCH_DELAY = 2000;
+
+const batches = chunkArray(posts, BATCH_SIZE);
+for (const batch of batches) {
+  await Promise.all(batch.map(post => scorePost(post)));
+  await sleep(BATCH_DELAY);
+}
+
+// Individual post scoring
+async function scorePost(post: RSSPost): Promise<number> {
+  const criteria = await getCriteria(newsletterId);
+  let totalScore = 0;
+  let maxScore = 0;
+  
+  for (const criterion of criteria) {
+    if (!criterion.enabled) continue;
+    
+    const score = await evaluateCriterion(post, criterion);
+    const weightedScore = score * criterion.weight;
+    
+    totalScore += weightedScore;
+    maxScore += 10 * criterion.weight;
+  }
+  
+  // Single line format (prevents log overflow)
+  const scoreDetails = criteria
+    .filter(c => c.enabled)
+    .map((c, i) => `C${i + 1}: ${c.score}/10`)
+    .join('; ');
+  
+  console.log(`${scoreDetails}; Total: ${totalScore.toFixed(1)} (max: ${maxScore})`);
+  
+  return totalScore;
+}
+```
+
+### Error Handling for AI Calls
+
+```typescript
+try {
+  const response = await openai.chat.completions.create({...});
+} catch (error: any) {
+  if (error.status === 429) {
+    // Rate limit - wait and retry
+    console.log('[AI] Rate limit hit, waiting 5s...');
+    await sleep(5000);
+    return generateContent(prompt); // Retry once
+  }
+  console.error('[AI] Error:', error.message);
+  throw error;
+}
+```
+
+---
+
+## 📚 Documentation Patterns
+
+### Next.js Patterns
+
+**API Route Handler:**
+```typescript
+// app/api/[feature]/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    
+    // Validate
+    if (!body.campaignId) {
+      return NextResponse.json(
+        { error: 'Missing campaignId' },
+        { status: 400 }
+      );
+    }
+    
+    // Process
+    const result = await processData(body);
+    
+    return NextResponse.json({ data: result });
+    
+  } catch (error: any) {
+    console.error('[API] Error:', error.message);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export const maxDuration = 600; // 10 minutes
+```
+
+**Cron Job Route:**
+```typescript
+// app/api/cron/[job]/route.ts
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const secret = searchParams.get('secret');
+  
+  // Auth check
+  if (secret !== process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  
+  try {
+    console.log('[CRON] Starting job...');
+    await processJob();
+    console.log('[CRON] Job complete');
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('[CRON] Error:', error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export const maxDuration = 600;
+```
+
+---
+
+### Supabase Patterns
+
+**Server-side Client (bypasses RLS):**
+```typescript
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.DATABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+```
+
+**Query Pattern (ALWAYS check errors):**
+```typescript
+const { data, error } = await supabase
+  .from('newsletter_campaigns')
+  .select('id, status, date')  // Only needed fields
+  .eq('newsletter_id', 'accounting')  // REQUIRED
+  .eq('id', campaignId)
+  .single();
+
+if (error) {
+  console.error('[DB] Query failed:', error.message);
+  throw new Error('Database error');
+}
+
+if (!data) {
+  console.log('[DB] No campaign found');
+  return null;
+}
+
+return data;
+```
+
+**Batch Operations:**
+```typescript
+// Multiple inserts - use upsert
+await supabase
+  .from('articles')
+  .upsert(articlesArray);  // One query, not multiple
+```
+
+---
+
+### MailerLite Integration
+
+**Create Campaign:**
+```typescript
+const MAILERLITE_API = 'https://connect.mailerlite.com/api';
+
+async function createCampaign(subject: string, content: string): Promise<string> {
+  const response = await fetch(`${MAILERLITE_API}/campaigns`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.MAILERLITE_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name: subject,
+      type: 'regular',
+      emails: [{
+        subject,
+        from_name: 'AI Accounting Daily',
+        from: 'noreply@aiaccountingdaily.com',
+        content,
+      }],
+    }),
+  });
+  
+  if (!response.ok) {
+    throw new Error(`MailerLite error: ${response.status}`);
+  }
+  
+  const data = await response.json();
+  return data.data.id;
+}
+```
+
+---
+
+## 📅 Automation & Scheduling
+
+### Cron Schedule (Central Time)
+
+**Configured in:** `vercel.json` + `app_settings` table
+
+- **10:00 AM:** RSS processing → status: `processing`
+- **12:00 PM:** Article generation → status: `in_review`
+- **2:00 PM:** Review campaign → MailerLite test send
+- **Next day:** Final send → status: `sent`
+
+### Vercel Cron Configuration
+
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron/process-rss",
+      "schedule": "0 10 * * *"
+    }
+  ]
+}
+```
+
+---
+
+## 🐛 Common Issues (Quick Reference)
+
+**Dates shifting:** Used `.toISOString()` → Use `.split('T')[0]`
+**Function timeout:** Too slow → Batch AI calls (3 at a time, 2s delay)
+**Log overflow:** Too verbose → Minimal logging ([PREFIX] format only)
+**Rate limits:** Too fast → Use `BATCH_SIZE=3`, `BATCH_DELAY=2000`
+**Campaign stuck:** Step failed → Check Vercel logs, manually update status:
+```sql
+UPDATE newsletter_campaigns SET status = 'draft' WHERE id = 'CAMPAIGN_ID';
+```
+**Data leakage:** Missing filter → Always `.eq('newsletter_id', newsletterId)`
+
+---
+
+## ✅ Code Quality Standards
+
+### TypeScript
+
+```typescript
+// ✅ Explicit types
+interface Campaign {
+  id: string;
+  status: 'draft' | 'processing' | 'in_review' | 'ready_to_send' | 'sent';
+  date: string; // YYYY-MM-DD
+  newsletter_id: string;
+}
+
+async function getCampaign(id: string): Promise<Campaign | null> {
+  // Implementation
+}
+
+// ❌ NEVER use 'any' (use 'unknown' with type guards if needed)
+const data: any = await fetchData(); // FORBIDDEN
+```
+
+### Error Handling
+
+```typescript
+// ✅ REQUIRED: Try-catch with context
+try {
+  await processStep(data);
+} catch (error: any) {
+  console.error('[PROCESS] Failed for ID:', data.id, error.message);
+  
+  // Retry for transient errors
+  if (error.code === 'ETIMEDOUT') {
+    await sleep(2000);
+    return processStep(data);
+  }
+  
+  throw error; // Re-throw after logging
+}
+
+// ❌ FORBIDDEN: Silent failures
+try {
+  await something();
+} catch (error) {
+  // No logging, no re-throw
+}
+```
+
+### Database Queries
+
+```typescript
+// ✅ ALWAYS: Check errors, filter by newsletter_id
+const { data, error } = await supabase
+  .from('articles')
+  .select('id, title, content')  // Specify fields
+  .eq('campaign_id', campaignId)
+  .eq('newsletter_id', newsletterId)  // REQUIRED
+  .order('rank', { ascending: true });
+
+if (error) {
+  console.error('[DB] Query failed:', error.message);
+  throw error;
+}
+
+// ❌ FORBIDDEN: No error check, missing newsletter_id
+const { data } = await supabase
+  .from('articles')
+  .select('*')
+  .eq('campaign_id', campaignId);
+```
+
+### Environment Variables
+
+```typescript
+// ✅ CORRECT
+const openaiKey = process.env.OPENAI_API_KEY;
+if (!openaiKey) {
+  throw new Error('OPENAI_API_KEY required');
+}
+
+// ❌ FORBIDDEN: Hardcoded or logged
+const key = 'sk-proj-abc123...';
+console.log('Using key:', process.env.OPENAI_API_KEY);
+```
+
+---
+
+## 📋 Effective Prompting Template
+
+```
+[Task description]
+
+Context:
+- Read CLAUDE.md first
+- This is a [type: API route / database query / cron job / UI component]
+- Reference docs/[relevant-doc].md for [specific pattern]
+
+Requirements:
+1. [Specific, measurable requirement]
+2. [Specific, measurable requirement]
+3. [Specific, measurable requirement]
+
+Technical:
+- Pattern: [from CLAUDE.md or PATTERNS.md if exists]
+- Tables: [list if database work]
+- Multi-tenant: Filter by newsletter_id='accounting'
+- Performance: [if relevant: batching, minimal logging]
+- Logging: See Critical Rules > Minimal Logging
+
+Files:
+- [full/path/to/file.ts] - [what to change]
+```
+
+**Example:**
+```
+Create email validation function
+
+Context:
+- Read CLAUDE.md first
+- This is a utility function for server actions
+- Reference docs/nextjs.md for server action patterns
+
+Requirements:
+1. Validate email format using regex
+2. Check if email already exists in database
+3. Return { valid: boolean, error?: string }
+
+Technical:
+- Pattern: Standard async function with error handling
+- Tables: newsletter_campaigns (check for duplicate emails)
+- Multi-tenant: Filter by newsletter_id='accounting'
+- Performance: Minimal logging
+
+Files:
+- lib/validation.ts - Create new function
+- app/api/subscribe/route.ts - Use validation
+```
+
+---
+
+## 🎯 Pre-Flight Checklist
+
+**Before marking task complete:**
+
+### Critical (Must Check)
+- [ ] TypeScript compiles: `npm run type-check`
+- [ ] No UTC date methods for comparisons
+- [ ] All queries filter by newsletter_id
+- [ ] Logging is minimal ([PREFIX] format, no loops)
+- [ ] Error handling present (try-catch with logging)
+
+### If Database Work
+- [ ] Queries check for errors
+- [ ] Only select needed fields (not `SELECT *`)
+- [ ] Tested with real campaign data
+
+### If AI Integration
+- [ ] Batched (3 at a time)
+- [ ] 2 second delays between batches
+- [ ] Rate limit error handling
+
+### If Performance Sensitive
+- [ ] Function duration reasonable (< 600s)
+- [ ] Log size under control (< 1MB estimated)
+- [ ] No excessive loops or nested operations
+
+---
+
+## 🔐 Security Checklist
+
+- [ ] No hardcoded API keys or secrets
+- [ ] All env vars accessed via `process.env`
+- [ ] No sensitive data in logs
+- [ ] API routes have auth checks (if not public)
+- [ ] Input validation on all user data
+- [ ] Multi-tenant isolation (newsletter_id filter)
+
+---
+
+## 📞 When You Need Help
+
+**Use this format when confidence < 80%:**
+
+```
+I'm uncertain about [specific aspect]. Here are the approaches:
+
+A) [Option 1: Description]
+   Pros: [Benefit 1], [Benefit 2]
+   Cons: [Drawback 1], [Drawback 2]
+   Impact: [Database/Performance/Architecture]
+
+B) [Option 2: Description]
+   Pros: [Benefit 1], [Benefit 2]
+   Cons: [Drawback 1], [Drawback 2]
+   Impact: [Database/Performance/Architecture]
+
+Which approach fits better with the project goals?
+
+Additional context:
+- [Background information]
+- [Constraints]
+- [Related systems affected]
+```
+
+---
+
+## 🍳 Quick Recipes (Copy-Paste)
+
+### Recipe 1: Add Database Query
+
+```typescript
+const { data, error } = await supabase
+  .from('YOUR_TABLE')
+  .select('id, name, created_at')  // Only needed fields
+  .eq('newsletter_id', newsletterId)  // REQUIRED
+  .order('created_at', { ascending: false });
+
+if (error) {
+  console.error('[DB] Query failed:', error.message);
+  throw new Error('Database error');
+}
+
+if (!data || data.length === 0) {
+  return [];
+}
+
+return data;
+```
+
+### Recipe 2: Add API Route
+
+```typescript
+// app/api/YOUR_ROUTE/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    
+    if (!body.requiredField) {
+      return NextResponse.json(
+        { error: 'Missing requiredField' },
+        { status: 400 }
+      );
+    }
+    
+    const result = await yourLogic(body);
+    return NextResponse.json({ data: result });
+    
+  } catch (error: any) {
+    console.error('[API] Error:', error.message);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export const maxDuration = 60;
+```
+
+### Recipe 3: Add Batch AI Processing
+
+```typescript
+const BATCH_SIZE = 3;
+const BATCH_DELAY = 2000;
+
+const batches = chunkArray(items, BATCH_SIZE);
+for (const batch of batches) {
+  await Promise.all(batch.map(item => processWithAI(item)));
+  await sleep(BATCH_DELAY);
+}
+
+console.log(`[AI] Processed ${items.length} items in ${batches.length} batches`);
+```
+
+### Recipe 4: Add Minimal Logging
+
+```typescript
+// ✅ One line summary
+console.log('[MODULE] Operation complete: 45 items processed, 3 errors');
+
+// ❌ NOT this
+console.log('Starting operation');
+for (const item of items) {
+  console.log('Processing', item.id);
+  // ...
+}
+console.log('Complete');
+```
+
+### Recipe 5: Add Date Comparison
+
+```typescript
+// ✅ CORRECT: String comparison, no UTC
+const campaignDate = campaign.date.split('T')[0];
+const today = new Date().toISOString().split('T')[0];
+
+if (campaignDate === today) {
+  // Today's campaign
+} else if (campaignDate > today) {
+  // Future campaign
+}
+```
+
+---
+
+## 🎓 Confidence Calibration Guide
+
+### 95% Confidence (Proceed)
+- Add console.log to existing function
+- Fix typo in UI text
+- Update simple configuration value
+- Copy existing pattern to new file
+
+### 80% Confidence (Borderline - Consider Asking)
+- Add new database column
+- Change existing API response structure
+- Modify AI prompt significantly
+- Optimize performance of existing code
+
+### 60% Confidence (MUST ASK)
+- "Optimize RSS processing" (vague - how much? which part?)
+- Multiple ways to implement feature
+- Performance/quality tradeoffs unclear
+- Might break existing functionality
+
+### 40% Confidence (STOP - Need Context)
+- "Fix the bug" (what bug? where? expected behavior?)
+- "Make it better" (better how? by what metric?)
+- Unclear requirements
+- Unknown expected behavior
+
+---
+
+**Document Version:** 2.1 (Streamlined)
+**Last Updated:** 2025-01-22
+**Word Count:** ~5,500 (was 35,000)
+**Token Count:** ~7,500 (was 50,000)
