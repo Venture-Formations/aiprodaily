@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
 
     const url = new URL(request.url)
     const limit = parseInt(url.searchParams.get('limit') || '50')
+    const section = url.searchParams.get('section') // 'primary' or 'secondary'
 
     // Get accounting newsletter ID
     const { data: newsletter } = await supabaseAdmin
@@ -26,8 +27,8 @@ export async function GET(request: NextRequest) {
       }, { status: 404 })
     }
 
-    // Fetch recent RSS posts from active campaigns
-    const { data: posts, error } = await supabaseAdmin
+    // Build query with optional section filter
+    let query = supabaseAdmin
       .from('rss_posts')
       .select(`
         id,
@@ -39,9 +40,19 @@ export async function GET(request: NextRequest) {
         publication_date,
         processed_at,
         campaign_id,
-        rss_feed:rss_feeds(name)
+        feed_id,
+        rss_feed:rss_feeds(name, use_for_primary_section, use_for_secondary_section)
       `)
       .eq('rss_feeds.newsletter_id', newsletter.id)
+
+    // Filter by section if specified
+    if (section === 'primary') {
+      query = query.eq('rss_feeds.use_for_primary_section', true)
+    } else if (section === 'secondary') {
+      query = query.eq('rss_feeds.use_for_secondary_section', true)
+    }
+
+    const { data: posts, error } = await query
       .order('processed_at', { ascending: false })
       .limit(limit)
 

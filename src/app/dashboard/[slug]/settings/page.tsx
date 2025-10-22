@@ -2042,6 +2042,12 @@ function AIPromptsSettings() {
   const [rssPosts, setRssPosts] = useState<any[]>([])
   const [selectedRssPost, setSelectedRssPost] = useState<string>('')
   const [loadingRssPosts, setLoadingRssPosts] = useState(false)
+  const [primaryRssPosts, setPrimaryRssPosts] = useState<any[]>([])
+  const [selectedPrimaryRssPost, setSelectedPrimaryRssPost] = useState<string>('')
+  const [loadingPrimaryRssPosts, setLoadingPrimaryRssPosts] = useState(false)
+  const [secondaryRssPosts, setSecondaryRssPosts] = useState<any[]>([])
+  const [selectedSecondaryRssPost, setSelectedSecondaryRssPost] = useState<string>('')
+  const [loadingSecondaryRssPosts, setLoadingSecondaryRssPosts] = useState(false)
   const [testModalOpen, setTestModalOpen] = useState(false)
   const [testLoading, setTestLoading] = useState(false)
   const [testResults, setTestResults] = useState<any>(null)
@@ -2051,6 +2057,8 @@ function AIPromptsSettings() {
     loadPrompts()
     loadCriteria()
     loadRssPosts()
+    loadPrimaryRssPosts()
+    loadSecondaryRssPosts()
   }, [])
 
   const loadPrompts = async () => {
@@ -2097,6 +2105,44 @@ function AIPromptsSettings() {
       console.error('Failed to load RSS posts:', error)
     } finally {
       setLoadingRssPosts(false)
+    }
+  }
+
+  const loadPrimaryRssPosts = async () => {
+    setLoadingPrimaryRssPosts(true)
+    try {
+      const response = await fetch('/api/rss-posts/recent?limit=50&section=primary')
+      if (response.ok) {
+        const data = await response.json()
+        setPrimaryRssPosts(data.posts || [])
+        // Select first post by default if available
+        if (data.posts && data.posts.length > 0) {
+          setSelectedPrimaryRssPost(data.posts[0].id)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load primary RSS posts:', error)
+    } finally {
+      setLoadingPrimaryRssPosts(false)
+    }
+  }
+
+  const loadSecondaryRssPosts = async () => {
+    setLoadingSecondaryRssPosts(true)
+    try {
+      const response = await fetch('/api/rss-posts/recent?limit=50&section=secondary')
+      if (response.ok) {
+        const data = await response.json()
+        setSecondaryRssPosts(data.posts || [])
+        // Select first post by default if available
+        if (data.posts && data.posts.length > 0) {
+          setSelectedSecondaryRssPost(data.posts[0].id)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load secondary RSS posts:', error)
+    } finally {
+      setLoadingSecondaryRssPosts(false)
     }
   }
 
@@ -2236,6 +2282,16 @@ function AIPromptsSettings() {
       return
     }
 
+    // Determine which RSS post to use based on prompt type
+    let rssPostId = selectedRssPost
+    if (key.startsWith('ai_prompt_primary_') || key.startsWith('ai_prompt_criteria_')) {
+      // Use primary RSS post for primary prompts and primary criteria
+      rssPostId = selectedPrimaryRssPost
+    } else if (key.startsWith('ai_prompt_secondary_')) {
+      // Use secondary RSS post for secondary prompts and secondary criteria
+      rssPostId = selectedSecondaryRssPost
+    }
+
     // Open modal and fetch results
     setTestModalOpen(true)
     setTestLoading(true)
@@ -2244,8 +2300,8 @@ function AIPromptsSettings() {
 
     try {
       let testUrl = `/api/debug/test-ai-prompts?type=${testType}`
-      if (selectedRssPost) {
-        testUrl += `&rssPostId=${selectedRssPost}`
+      if (rssPostId) {
+        testUrl += `&rssPostId=${rssPostId}`
       }
 
       const response = await fetch(testUrl)
@@ -2654,6 +2710,33 @@ function AIPromptsSettings() {
               </button>
             </div>
           </div>
+          {/* RSS Post Selector for Testing */}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              RSS Post for Testing Primary Prompts
+            </label>
+            <select
+              value={selectedPrimaryRssPost}
+              onChange={(e) => setSelectedPrimaryRssPost(e.target.value)}
+              disabled={loadingPrimaryRssPosts}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            >
+              {loadingPrimaryRssPosts ? (
+                <option>Loading posts...</option>
+              ) : primaryRssPosts.length === 0 ? (
+                <option>No primary RSS posts available</option>
+              ) : (
+                primaryRssPosts.map((post) => (
+                  <option key={post.id} value={post.id}>
+                    {post.title} ({post.rss_feed?.name})
+                  </option>
+                ))
+              )}
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              Only showing posts from feeds assigned to Primary section
+            </p>
+          </div>
         </div>
         <div className="divide-y divide-gray-200">
           {criteria.filter(c => c.enabled).map((criterion) => {
@@ -2880,6 +2963,33 @@ function AIPromptsSettings() {
                 {saving === 'remove_criteria' ? 'Removing...' : 'Remove Criteria'}
               </button>
             </div>
+          </div>
+          {/* RSS Post Selector for Testing */}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              RSS Post for Testing Secondary Prompts
+            </label>
+            <select
+              value={selectedSecondaryRssPost}
+              onChange={(e) => setSelectedSecondaryRssPost(e.target.value)}
+              disabled={loadingSecondaryRssPosts}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            >
+              {loadingSecondaryRssPosts ? (
+                <option>Loading posts...</option>
+              ) : secondaryRssPosts.length === 0 ? (
+                <option>No secondary RSS posts available</option>
+              ) : (
+                secondaryRssPosts.map((post) => (
+                  <option key={post.id} value={post.id}>
+                    {post.title} ({post.rss_feed?.name})
+                  </option>
+                ))
+              )}
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              Only showing posts from feeds assigned to Secondary section
+            </p>
           </div>
         </div>
         <div className="divide-y divide-gray-200">
