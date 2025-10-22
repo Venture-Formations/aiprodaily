@@ -94,7 +94,10 @@ export async function POST(request: NextRequest) {
     try {
       const response = await fetch(`${baseUrl}/api/rss/process`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.CRON_SECRET}`
+        },
         body: JSON.stringify({ campaign_id: campaignId })
       })
 
@@ -275,7 +278,10 @@ export async function GET(request: NextRequest) {
     try {
       const response = await fetch(`${baseUrl}/api/rss/process`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.CRON_SECRET}`
+        },
         body: JSON.stringify({ campaign_id: campaignId })
       })
 
