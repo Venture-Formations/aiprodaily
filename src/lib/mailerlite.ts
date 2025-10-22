@@ -35,6 +35,16 @@ export class MailerLiteService {
     try {
       console.log(`Creating review campaign for ${campaign.date}`)
 
+      // Get newsletter slug for campaign naming
+      const { data: dbCampaign } = await supabaseAdmin
+        .from('newsletter_campaigns')
+        .select('newsletters(slug)')
+        .eq('id', campaign.id)
+        .single()
+
+      const newsletterSlug = (dbCampaign as any)?.newsletters?.slug || 'accounting'
+      const newsletterName = newsletterSlug.charAt(0).toUpperCase() + newsletterSlug.slice(1)
+
       // Get sender and group settings from database
       const { data: settings } = await supabaseAdmin
         .from('app_settings')
@@ -69,7 +79,7 @@ export class MailerLiteService {
       console.log('Final subject line being sent to MailerLite:', subjectLine)
 
       const campaignData = {
-        name: `Review: ${campaign.date}`,
+        name: `${newsletterName} Review: ${campaign.date}`,
         type: 'regular',
         emails: [{
           subject: `${subjectEmoji} ${subjectLine}`,
@@ -518,6 +528,16 @@ export class MailerLiteService {
     try {
       console.log(`Creating final campaign for ${campaign.date}`)
 
+      // Get newsletter slug for campaign naming
+      const { data: dbCampaign } = await supabaseAdmin
+        .from('newsletter_campaigns')
+        .select('newsletters(slug)')
+        .eq('id', campaign.id)
+        .single()
+
+      const newsletterSlug = (dbCampaign as any)?.newsletters?.slug || 'accounting'
+      const newsletterName = newsletterSlug.charAt(0).toUpperCase() + newsletterSlug.slice(1)
+
       // Get sender settings
       const { data: settings } = await supabaseAdmin
         .from('app_settings')
@@ -541,7 +561,7 @@ export class MailerLiteService {
       console.log('Using sender settings:', { senderName, fromEmail })
 
       const campaignData = {
-        name: `Newsletter: ${campaign.date}`,
+        name: `${newsletterName} Newsletter: ${campaign.date}`,
         type: 'regular',
         emails: [{
           subject: `${subjectEmoji} ${subjectLine}`,
