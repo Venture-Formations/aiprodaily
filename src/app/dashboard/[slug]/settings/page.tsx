@@ -2644,38 +2644,6 @@ function AIPromptsSettings() {
           Use <code className="bg-gray-100 px-1 rounded text-xs">{'{{}}'}</code> placeholders for dynamic content.
         </p>
 
-        {/* RSS Post Selector for Testing */}
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <label htmlFor="rss-post-selector" className="block text-sm font-medium text-gray-700 mb-2">
-            RSS Post for Testing
-            <span className="ml-2 text-xs text-gray-500 font-normal">
-              (Select a real RSS post to use when testing prompts)
-            </span>
-          </label>
-          <select
-            id="rss-post-selector"
-            value={selectedRssPost}
-            onChange={(e) => setSelectedRssPost(e.target.value)}
-            disabled={loadingRssPosts}
-            className="block w-full max-w-2xl rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm"
-          >
-            {loadingRssPosts ? (
-              <option>Loading RSS posts...</option>
-            ) : rssPosts.length === 0 ? (
-              <option>No RSS posts available</option>
-            ) : (
-              rssPosts.map((post) => (
-                <option key={post.id} value={post.id}>
-                  {post.title} {post.rss_feed?.name ? `(${post.rss_feed.name})` : ''} - {new Date(post.processed_at).toLocaleDateString()}
-                </option>
-              ))
-            )}
-          </select>
-          <p className="mt-1 text-xs text-gray-500">
-            When you click "Test Prompt", the selected RSS post's data will be used instead of sample data.
-          </p>
-        </div>
-
         {message && (
           <div className={`mt-4 p-3 rounded ${message.includes('Error') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
             {message}
