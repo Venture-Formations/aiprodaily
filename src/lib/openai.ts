@@ -1393,9 +1393,8 @@ function parseJSONResponse(content: string) {
       return JSON.parse(content.trim())
     }
   } catch (parseError) {
-    console.warn('Failed to parse OpenAI response as JSON. Content length:', content.length)
-    console.warn('Content preview:', content.substring(0, 200))
-    console.warn('Parse error:', parseError instanceof Error ? parseError.message : parseError)
+    // Not an error - many prompts return plain text, not JSON
+    // Wrap in { raw: content } for calling code to extract
     return { raw: content }
   }
 }
@@ -1453,9 +1452,8 @@ export async function callOpenAI(prompt: string, maxTokens = 1000, temperature =
           return JSON.parse(cleanedContent.trim())
         }
       } catch (parseError) {
-        console.warn('Failed to parse OpenAI response as JSON. Content length:', content.length)
-        console.warn('Content preview:', content.substring(0, 200))
-        console.warn('Parse error:', parseError instanceof Error ? parseError.message : parseError)
+        // Not an error - many prompts return plain text, not JSON
+        // Wrap in { raw: content } for calling code to extract
         return { raw: content }
       }
     } catch (error) {
