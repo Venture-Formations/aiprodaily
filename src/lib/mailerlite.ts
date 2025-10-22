@@ -342,6 +342,12 @@ export class MailerLiteService {
 </table>
 <br>` : ''
 
+    // Section ID constants (stable across name changes) - SAME AS PREVIEW
+    const SECTION_IDS = {
+      AI_APPLICATIONS: '853f8d0b-bc76-473a-bfc6-421418266222',
+      PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b'
+    }
+
     // Generate sections in order based on database configuration - SAME AS PREVIEW
     let sectionsHtml = ''
     if (sections && sections.length > 0) {
@@ -358,7 +364,24 @@ export class MailerLiteService {
           const secondaryHtml = await generateSecondaryArticlesSection(campaign, section.name)
           sectionsHtml += secondaryHtml
         }
-        if (section.name === 'Poll') {
+        // Use section ID for AI Applications (stable across name changes)
+        else if (section.id === SECTION_IDS.AI_APPLICATIONS) {
+          const { generateAIAppsSection } = await import('./newsletter-templates')
+          const aiAppsHtml = await generateAIAppsSection(campaign)
+          if (aiAppsHtml) {
+            sectionsHtml += aiAppsHtml
+          }
+        }
+        // Use section ID for Prompt Ideas (stable across name changes)
+        else if (section.id === SECTION_IDS.PROMPT_IDEAS) {
+          const { generatePromptIdeasSection } = await import('./newsletter-templates')
+          const promptHtml = await generatePromptIdeasSection(campaign)
+          if (promptHtml) {
+            sectionsHtml += promptHtml
+          }
+        }
+        // Legacy name-based matching for other sections
+        else if (section.name === 'Poll') {
           const pollHtml = await generatePollSection(campaign.id)
           if (pollHtml) {
             sectionsHtml += pollHtml
@@ -389,18 +412,6 @@ export class MailerLiteService {
           const spotlightHtml = await generateCommunityBusinessSpotlightSection(campaign, !isReview) // Record usage for final campaigns only
           if (spotlightHtml) {
             sectionsHtml += spotlightHtml
-          }
-        } else if (section.name === 'Prompt Ideas') {
-          const { generatePromptIdeasSection } = await import('./newsletter-templates')
-          const promptHtml = await generatePromptIdeasSection(campaign)
-          if (promptHtml) {
-            sectionsHtml += promptHtml
-          }
-        } else if (section.name === 'AI Apps') {
-          const { generateAIAppsSection } = await import('./newsletter-templates')
-          const aiAppsHtml = await generateAIAppsSection(campaign)
-          if (aiAppsHtml) {
-            sectionsHtml += aiAppsHtml
           }
         }
       }
