@@ -116,11 +116,13 @@ export async function GET(request: NextRequest) {
       console.log('Testing Primary Article Title...')
       try {
         const prompt = await AI_PROMPTS.primaryArticleTitle(testData.newsletterWriter)
+        console.log('[TEST] Prompt preview (first 500 chars):', prompt.substring(0, 500))
         const response = await callOpenAI(prompt, 200, 0.7)
         results.primaryArticleTitle = {
           success: true,
           response,
-          prompt_length: prompt.length
+          prompt_length: prompt.length,
+          prompt_preview: prompt.substring(0, 300) + '...'
         }
       } catch (error) {
         results.primaryArticleTitle = {
