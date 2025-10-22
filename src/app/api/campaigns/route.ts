@@ -118,12 +118,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Date is required' }, { status: 400 })
     }
 
+    // Get accounting newsletter ID
+    const { data: newsletter } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('slug', 'accounting')
+      .single()
+
+    if (!newsletter) {
+      return NextResponse.json({
+        error: 'Accounting newsletter not found'
+      }, { status: 404 })
+    }
+
     // Create new campaign (duplicate dates are now allowed)
     const { data: campaign, error } = await supabaseAdmin
       .from('newsletter_campaigns')
       .insert([{
         date,
-        status: 'draft'
+        status: 'draft',
+        newsletter_id: newsletter.id
       }])
       .select('*')
       .single()
