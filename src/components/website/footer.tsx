@@ -56,32 +56,12 @@ export function Footer({
                   Home
                 </a>
               </li>
-              <li>
-                <a href="/newsletters" className="hover:text-white transition-colors">
-                  Newsletter
-                </a>
-              </li>
-              <li>
-                <a href="/newsletters" className="hover:text-white transition-colors">
-                  Archive
-                </a>
-              </li>
             </ul>
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold mb-3">Legal</h3>
+            <h3 className="text-sm font-semibold mb-3">Contact</h3>
             <ul className="space-y-1.5 text-sm text-white/70">
-              <li>
-                <a href="#" className="hover:text-white transition-colors">
-                  Privacy Policy
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-white transition-colors">
-                  Terms of Service
-                </a>
-              </li>
               <li>
                 <a href="#" className="hover:text-white transition-colors">
                   Contact Us

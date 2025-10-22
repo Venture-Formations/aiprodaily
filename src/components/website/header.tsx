@@ -21,10 +21,10 @@ export function Header({ logoUrl = "/logo.png" }: HeaderProps) {
               Home
             </a>
             <a
-              href="/newsletters"
+              href="/contactus"
               className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
-              Newsletter
+              Contact Us
             </a>
           </nav>
 
