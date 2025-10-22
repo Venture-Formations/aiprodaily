@@ -14,8 +14,9 @@ export async function executeStep2(campaignId: string) {
   // Extract article text
   await processor.extractFullArticleText(campaignId)
 
-  // Score all posts
-  await processor.scoreAllPosts(campaignId)
+  // Score posts for both sections
+  await processor.scorePostsForSection(campaignId, 'primary')
+  await processor.scorePostsForSection(campaignId, 'secondary')
 
   const { data: scoredPosts } = await supabaseAdmin
     .from('rss_posts')
