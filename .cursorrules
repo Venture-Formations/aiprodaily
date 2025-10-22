@@ -1,0 +1,174 @@
+# AI Pros Newsletter - Development Guidelines
+
+## Project Overview
+Multi-tenant newsletter automation platform for AI industry newsletters.
+- Admin Dashboard: www.aiprodaily.com
+- Current Newsletter: AI Accounting Daily (slug: accounting)
+- Public Website: www.aiaccountingdaily.com
+
+## Documentation
+- **Project Documentation**: CLAUDE.md (comprehensive guide)
+- **Vercel AI SDK**: docs/vercel-ai-sdk.md
+- **Vercel API**: docs/vercel-api.md
+
+## Technology Stack
+- **Frontend**: Next.js 15 (App Router) with TypeScript
+- **Database**: Supabase (PostgreSQL)
+- **Hosting**: Vercel (serverless functions, cron jobs)
+- **AI**: OpenAI (ChatGPT) for content generation and scoring
+- **Email**: MailerLite for campaign delivery
+- **Storage**: GitHub for image hosting
+
+## Required Environment Variables
+```bash
+# Core Services
+DATABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+OPENAI_API_KEY=
+MAILERLITE_API_KEY=
+
+# Authentication
+NEXTAUTH_SECRET=
+NEXTAUTH_URL=
+CRON_SECRET=
+
+# Optional
+SLACK_WEBHOOK_URL=
+GITHUB_TOKEN=
+GITHUB_REPO=
+```
+
+## Vercel AI SDK Patterns
+
+### Streaming Responses
+```typescript
+import { streamText } from 'ai'
+import { openai } from '@ai-sdk/openai'
+
+const result = await streamText({
+  model: openai('gpt-4-turbo'),
+  prompt: 'Your prompt here',
+})
+```
+
+### Server Actions
+```typescript
+'use server'
+
+export async function generateContent(prompt: string) {
+  const result = await streamText({
+    model: openai('gpt-4-turbo'),
+    prompt,
+  })
+  return result.text
+}
+```
+
+## Critical Development Rules
+
+### Date/Time Handling
+❌ **NEVER** use `.toISOString()` or `.toUTCString()` for date comparisons
+✅ **ALWAYS** extract date strings directly: `date.split('T')[0]`
+✅ Use local time for filtering, sorting, displaying dates
+
+### Logging
+❌ **AVOID** console.log in loops or batch operations
+✅ Use minimal logging (single-line summaries only)
+✅ Prefix essential logs with `[RSS]`, `[Campaign]`, etc.
+
+### Performance
+- RSS processing timeout: 600 seconds (10 minutes)
+- Log size limit: 10MB per function
+- Batch AI operations with delays (2 seconds between batches)
+- Use direct function calls (no HTTP overhead)
+
+## Database Queries
+- Always filter by `campaign_id` or newsletter slug
+- Select only required fields
+- Use indexes for lookups
+- Batch updates where possible
+
+## RSS Processing Flow
+1. **Step 1**: Archive old data + Fetch RSS feeds
+2. **Step 2**: Extract article text + Score posts
+3. **Step 3**: Generate newsletter articles
+4. **Step 4**: Finalize campaign + Send notifications
+
+## Campaign Workflow
+Draft → In Review → Ready to Send → Sent
+
+## Common Patterns
+
+### Multi-Criteria Scoring
+```typescript
+// Each post evaluated against 3 criteria (0-10 each)
+// Weighted sum calculated
+// Posts ranked by total_score
+// Top N selected for newsletter
+```
+
+### Subject Line Regeneration
+- Automatic when #1 article changes (skip/reorder)
+- Real-time UI updates without page refresh
+- Based on top-ranked article
+
+### Image Handling
+- Facebook images auto-rehosted to GitHub
+- Permanent URLs stored in database
+- Prevents expiring CDN links
+
+## Testing Checklist
+- [ ] Run `npm run build` before committing
+- [ ] Test RSS processing manually
+- [ ] Generate campaign preview
+- [ ] Verify subject line generation
+- [ ] Check email rendering
+
+## Debug Endpoints
+- `/api/debug/recent-campaigns` - List campaigns
+- `/api/debug/campaign-articles?campaign_id=X` - Show articles
+- `/api/debug/test-ai-prompts` - Test AI prompts
+- `/api/debug/check-posts` - Verify RSS posts
+
+## Git Workflow
+```bash
+git add -A
+npm run build  # Verify build works
+git commit -m "Descriptive message
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+git push
+```
+
+## When Using Claude Code
+- Claude Code has access to all project files
+- Reference CLAUDE.md for comprehensive documentation
+- Use docs/ folder for Vercel API patterns
+- Follow examples in documentation
+
+## Error Handling
+- Implement retry logic for transient failures
+- Log errors with context (campaign_id, step name)
+- Don't fail entire workflow for non-critical errors
+- Use try-catch with graceful degradation
+
+## Code Style
+- TypeScript strict mode
+- No unused variables or imports
+- Async/await for all promises
+- Clear function/variable names
+- Comments for complex logic only
+
+## Deployment
+- All deployments via git push (Vercel auto-deploys)
+- Monitor Vercel dashboard for deployment status
+- Check function logs for errors
+- Verify cron jobs in Vercel dashboard
+
+## Support Resources
+- Vercel Dashboard: vercel.com/dashboard
+- Supabase Dashboard: supabase.com/dashboard
+- OpenAI Status: status.openai.com
+- Project Docs: CLAUDE.md

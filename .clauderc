@@ -1,0 +1,8 @@
+{
+  "context": [
+    "docs/vercel-ai-sdk.md",
+    "docs/vercel-api.md",
+    "CLAUDE.md"
+  ],
+  "instructions": "When working with Vercel AI SDK or Vercel APIs, reference the documentation in the docs folder. Follow Vercel's recommended patterns for deployment and API usage. Refer to CLAUDE.md for project-specific architecture, troubleshooting, and development guidelines for the AI Pros Newsletter platform."
+}
