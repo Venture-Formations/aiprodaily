@@ -1127,7 +1127,10 @@ export const AI_PROMPTS = {
 
       // Check if structured JSON prompt
       try {
-        const promptConfig = JSON.parse(data.value) as StructuredPromptConfig
+        // If data.value is already an object (JSONB column), use it directly. Otherwise, parse it.
+        const promptConfig = (typeof data.value === 'string'
+          ? JSON.parse(data.value)
+          : data.value) as StructuredPromptConfig
 
         if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
           console.log('[AI] Detected structured JSON prompt for welcomeSection')
