@@ -1125,22 +1125,9 @@ export const AI_PROMPTS = {
         .map((article, index) => `${index + 1}. ${article.headline}\n   ${article.content.substring(0, 200)}...`)
         .join('\n\n')
 
-      // After migration, data.value is always a JSONB string
-      // We need to parse it to get the actual content
-      let promptValue: string | StructuredPromptConfig
-
+      // Same pattern as factChecker: try to parse as JSON (structured), fallback to plain text
       try {
-        // Parse the JSONB string to get the original value
-        promptValue = typeof data.value === 'string' ? JSON.parse(data.value) : data.value
-      } catch (parseError) {
-        // If parsing fails, use as-is (shouldn't happen after migration)
-        console.log('[AI] Could not parse JSONB value, using as-is')
-        promptValue = data.value as string
-      }
-
-      // Check if it's a structured prompt (has messages array)
-      if (typeof promptValue === 'object' && promptValue !== null && 'messages' in promptValue) {
-        const promptConfig = promptValue as StructuredPromptConfig
+        const promptConfig = JSON.parse(data.value) as StructuredPromptConfig
 
         if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
           console.log('[AI] Using structured JSON prompt for welcomeSection')
@@ -1149,12 +1136,13 @@ export const AI_PROMPTS = {
           }
           return await callWithStructuredPrompt(promptConfig, placeholders)
         }
+      } catch (jsonError) {
+        // Not JSON, treat as plain text prompt
+        console.log('[AI] Using plain text prompt for welcomeSection')
       }
 
-      // Plain text prompt - promptValue should be a string
-      console.log('[AI] Using plain text prompt for welcomeSection')
-      const promptText = typeof promptValue === 'string' ? promptValue : String(promptValue)
-      return promptText.replace(/\{\{articles\}\}/g, articlesText)
+      // Plain text prompt
+      return data.value.replace(/\{\{articles\}\}/g, articlesText)
     } catch (error) {
       console.error('[AI] Error fetching welcomeSection prompt, using fallback:', error)
       return FALLBACK_PROMPTS.welcomeSection(articles)
