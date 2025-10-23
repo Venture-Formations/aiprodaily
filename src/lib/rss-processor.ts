@@ -1618,6 +1618,15 @@ export class RSSProcessor {
       // Generate welcome text using AI
       const promptOrResult = await AI_PROMPTS.welcomeSection(allArticles)
 
+      // DEBUG: Log what we received
+      console.log('[RSS] promptOrResult type:', typeof promptOrResult)
+      console.log('[RSS] promptOrResult is object:', typeof promptOrResult === 'object' && promptOrResult !== null)
+      if (typeof promptOrResult === 'object' && promptOrResult !== null) {
+        console.log('[RSS] promptOrResult keys:', Object.keys(promptOrResult))
+        console.log('[RSS] has intro:', 'intro' in promptOrResult)
+        console.log('[RSS] has raw:', 'raw' in promptOrResult)
+      }
+
       // Parse JSON response to extract intro, tagline, and summary
       let welcomeIntro = ''
       let welcomeTagline = ''
@@ -1632,12 +1641,18 @@ export class RSSProcessor {
           welcomeIntro = (promptOrResult as any).intro || ''
           welcomeTagline = (promptOrResult as any).tagline || ''
           welcomeSummary = (promptOrResult as any).summary || ''
-        } else {
-          // Handle other formats (plain text prompt or raw response)
-          const welcomeText = (typeof promptOrResult === 'object' && promptOrResult !== null && 'raw' in promptOrResult)
-            ? (typeof promptOrResult.raw === 'string' ? promptOrResult.raw : promptOrResult.raw?.text || '')
-            : await callOpenAI(promptOrResult as string, 500, 0.8)
-
+        } else if (typeof promptOrResult === 'object' && promptOrResult !== null && 'raw' in promptOrResult) {
+          // Got {raw: content} - need to parse the raw JSON string
+          console.log('[RSS] Parsing raw JSON response')
+          const rawContent = (promptOrResult as any).raw
+          const welcomeJson = JSON.parse(rawContent)
+          welcomeIntro = welcomeJson.intro || ''
+          welcomeTagline = welcomeJson.tagline || ''
+          welcomeSummary = welcomeJson.summary || ''
+        } else if (typeof promptOrResult === 'string') {
+          // Plain text prompt - need to call OpenAI
+          console.log('[RSS] Calling OpenAI with plain text prompt')
+          const welcomeText = await callOpenAI(promptOrResult, 500, 0.8)
           const finalWelcomeText = typeof welcomeText === 'string'
             ? welcomeText.trim()
             : (welcomeText.text || welcomeText.raw || '').trim()
@@ -1649,11 +1664,16 @@ export class RSSProcessor {
           welcomeIntro = welcomeJson.intro || ''
           welcomeTagline = welcomeJson.tagline || ''
           welcomeSummary = welcomeJson.summary || ''
+        } else {
+          throw new Error('Unexpected promptOrResult format')
         }
 
         console.log('[RSS] Parsed welcome JSON - intro:', welcomeIntro.length, 'tagline:', welcomeTagline.length, 'summary:', welcomeSummary.length)
       } catch (parseError) {
-        console.error('[RSS] Failed to parse welcome JSON, using fallback:', parseError)
+        console.error('[RSS] Failed to parse welcome JSON:', parseError)
+        console.error('[RSS] promptOrResult preview:', typeof promptOrResult === 'string'
+          ? promptOrResult.substring(0, 200)
+          : JSON.stringify(promptOrResult).substring(0, 200))
         // Fallback: use entire text as summary if JSON parsing fails
         welcomeSummary = typeof promptOrResult === 'string' ? promptOrResult : JSON.stringify(promptOrResult)
       }
