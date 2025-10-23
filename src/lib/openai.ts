@@ -1045,30 +1045,54 @@ export const AI_PROMPTS = {
 
       console.log('[AI] Using database prompt for factChecker')
 
-      // Check if the prompt is JSON (structured format) or plain text
-      try {
-        const promptConfig = JSON.parse(data.value) as StructuredPromptConfig
-
-        if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
-          console.log('[AI] Detected structured JSON prompt for factChecker')
-
-          // Support both camelCase and snake_case placeholders for backward compatibility
-          const placeholders = {
-            newsletterContent,
-            newsletter_content: newsletterContent,
-            originalContent: originalContent.substring(0, 2000),
-            original_content: originalContent.substring(0, 2000)
-          }
-
-          return await callWithStructuredPrompt(promptConfig, placeholders)
+      // Check if value is already an object (JSONB auto-parsed) or needs parsing
+      let promptConfig: any
+      if (typeof data.value === 'string') {
+        // String value - try to parse as JSON
+        try {
+          promptConfig = JSON.parse(data.value)
+        } catch (jsonError) {
+          // Not JSON, treat as plain text prompt
+          console.log('[AI] Using plain text prompt for factChecker')
+          return data.value
+            .replace(/\{\{newsletterContent\}\}/g, newsletterContent)
+            .replace(/\{\{newsletter_content\}\}/g, newsletterContent)
+            .replace(/\{\{originalContent\}\}/g, originalContent.substring(0, 2000))
+            .replace(/\{\{original_content\}\}/g, originalContent.substring(0, 2000))
         }
-      } catch (jsonError) {
-        // Not JSON, treat as plain text prompt
-        console.log('[AI] Using plain text prompt for factChecker')
+      } else if (typeof data.value === 'object' && data.value !== null) {
+        // Already an object (JSONB was auto-parsed)
+        promptConfig = data.value
+      } else {
+        // Unknown format, use as plain text
+        console.log('[AI] Unknown value format for factChecker, treating as plain text')
+        const valueStr = String(data.value)
+        return valueStr
+          .replace(/\{\{newsletterContent\}\}/g, newsletterContent)
+          .replace(/\{\{newsletter_content\}\}/g, newsletterContent)
+          .replace(/\{\{originalContent\}\}/g, originalContent.substring(0, 2000))
+          .replace(/\{\{original_content\}\}/g, originalContent.substring(0, 2000))
+      }
+
+      // Check if it's a structured prompt
+      if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
+        console.log('[AI] Detected structured JSON prompt for factChecker')
+
+        // Support both camelCase and snake_case placeholders for backward compatibility
+        const placeholders = {
+          newsletterContent,
+          newsletter_content: newsletterContent,
+          originalContent: originalContent.substring(0, 2000),
+          original_content: originalContent.substring(0, 2000)
+        }
+
+        return await callWithStructuredPrompt(promptConfig, placeholders)
       }
 
       // Plain text prompt - support both placeholder formats
-      return data.value
+      console.log('[AI] Using plain text prompt for factChecker')
+      const configStr = String(promptConfig)
+      return configStr
         .replace(/\{\{newsletterContent\}\}/g, newsletterContent)
         .replace(/\{\{newsletter_content\}\}/g, newsletterContent)
         .replace(/\{\{originalContent\}\}/g, originalContent.substring(0, 2000))
@@ -1125,24 +1149,38 @@ export const AI_PROMPTS = {
         .map((article, index) => `${index + 1}. ${article.headline}\n   ${article.content.substring(0, 200)}...`)
         .join('\n\n')
 
-      // Same pattern as factChecker: try to parse as JSON (structured), fallback to plain text
-      try {
-        const promptConfig = JSON.parse(data.value) as StructuredPromptConfig
-
-        if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
-          console.log('[AI] Using structured JSON prompt for welcomeSection')
-          const placeholders = {
-            articles: articlesText
-          }
-          return await callWithStructuredPrompt(promptConfig, placeholders)
+      // Check if value is already an object (JSONB auto-parsed) or needs parsing
+      let promptConfig: any
+      if (typeof data.value === 'string') {
+        // String value - try to parse as JSON
+        try {
+          promptConfig = JSON.parse(data.value)
+        } catch (jsonError) {
+          // Not JSON, treat as plain text prompt
+          console.log('[AI] Using plain text prompt for welcomeSection')
+          return data.value.replace(/\{\{articles\}\}/g, articlesText)
         }
-      } catch (jsonError) {
-        // Not JSON, treat as plain text prompt
-        console.log('[AI] Using plain text prompt for welcomeSection')
+      } else if (typeof data.value === 'object' && data.value !== null) {
+        // Already an object (JSONB was auto-parsed)
+        promptConfig = data.value
+      } else {
+        // Unknown format, use as plain text
+        console.log('[AI] Unknown value format for welcomeSection, treating as plain text')
+        return String(data.value).replace(/\{\{articles\}\}/g, articlesText)
+      }
+
+      // Check if it's a structured prompt
+      if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
+        console.log('[AI] Using structured JSON prompt for welcomeSection')
+        const placeholders = {
+          articles: articlesText
+        }
+        return await callWithStructuredPrompt(promptConfig, placeholders)
       }
 
       // Plain text prompt
-      return data.value.replace(/\{\{articles\}\}/g, articlesText)
+      console.log('[AI] Using plain text prompt for welcomeSection')
+      return String(promptConfig).replace(/\{\{articles\}\}/g, articlesText)
     } catch (error) {
       console.error('[AI] Error fetching welcomeSection prompt, using fallback:', error)
       return FALLBACK_PROMPTS.welcomeSection(articles)
