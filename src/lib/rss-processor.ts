@@ -1618,32 +1618,44 @@ export class RSSProcessor {
       // Generate welcome text using AI
       const promptOrResult = await AI_PROMPTS.welcomeSection(allArticles)
 
-      // Handle both prompt strings and structured prompt results
-      const welcomeText = (typeof promptOrResult === 'object' && promptOrResult !== null && 'raw' in promptOrResult)
-        ? (typeof promptOrResult.raw === 'string' ? promptOrResult.raw : promptOrResult.raw?.text || '')
-        : await callOpenAI(promptOrResult as string, 500, 0.8)
-
-      const finalWelcomeText = typeof welcomeText === 'string'
-        ? welcomeText.trim()
-        : (welcomeText.text || welcomeText.raw || '').trim()
-
-      console.log('[RSS] Welcome section generated (length:', finalWelcomeText.length, ')')
-
       // Parse JSON response to extract intro, tagline, and summary
       let welcomeIntro = ''
       let welcomeTagline = ''
       let welcomeSummary = ''
 
       try {
-        const welcomeJson = JSON.parse(finalWelcomeText)
-        welcomeIntro = welcomeJson.intro || ''
-        welcomeTagline = welcomeJson.tagline || ''
-        welcomeSummary = welcomeJson.summary || ''
+        // Check if promptOrResult is already a parsed JSON object with intro/tagline/summary
+        if (typeof promptOrResult === 'object' && promptOrResult !== null &&
+            ('intro' in promptOrResult || 'tagline' in promptOrResult || 'summary' in promptOrResult)) {
+          // Already parsed JSON from structured prompt
+          console.log('[RSS] Using structured prompt result directly')
+          welcomeIntro = (promptOrResult as any).intro || ''
+          welcomeTagline = (promptOrResult as any).tagline || ''
+          welcomeSummary = (promptOrResult as any).summary || ''
+        } else {
+          // Handle other formats (plain text prompt or raw response)
+          const welcomeText = (typeof promptOrResult === 'object' && promptOrResult !== null && 'raw' in promptOrResult)
+            ? (typeof promptOrResult.raw === 'string' ? promptOrResult.raw : promptOrResult.raw?.text || '')
+            : await callOpenAI(promptOrResult as string, 500, 0.8)
+
+          const finalWelcomeText = typeof welcomeText === 'string'
+            ? welcomeText.trim()
+            : (welcomeText.text || welcomeText.raw || '').trim()
+
+          console.log('[RSS] Welcome section generated (length:', finalWelcomeText.length, ')')
+
+          // Parse JSON from the text response
+          const welcomeJson = JSON.parse(finalWelcomeText)
+          welcomeIntro = welcomeJson.intro || ''
+          welcomeTagline = welcomeJson.tagline || ''
+          welcomeSummary = welcomeJson.summary || ''
+        }
+
         console.log('[RSS] Parsed welcome JSON - intro:', welcomeIntro.length, 'tagline:', welcomeTagline.length, 'summary:', welcomeSummary.length)
       } catch (parseError) {
         console.error('[RSS] Failed to parse welcome JSON, using fallback:', parseError)
         // Fallback: use entire text as summary if JSON parsing fails
-        welcomeSummary = finalWelcomeText
+        welcomeSummary = typeof promptOrResult === 'string' ? promptOrResult : JSON.stringify(promptOrResult)
       }
 
       // Save all 3 parts to campaign
