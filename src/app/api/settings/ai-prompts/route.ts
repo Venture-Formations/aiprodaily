@@ -169,6 +169,8 @@ export async function POST(request: NextRequest) {
 
     // Handle "Save as Default" action
     if (action === 'save_as_default') {
+      console.log('[SAVE_DEFAULT] Starting save as default for key:', key)
+
       // Get current value
       const { data: current, error: fetchError } = await supabaseAdmin
         .from('app_settings')
@@ -176,12 +178,30 @@ export async function POST(request: NextRequest) {
         .eq('key', key)
         .single()
 
-      if (fetchError || !current) {
+      console.log('[SAVE_DEFAULT] Fetch result:', {
+        hasData: !!current,
+        hasError: !!fetchError,
+        errorMessage: fetchError?.message,
+        errorCode: fetchError?.code
+      })
+
+      if (fetchError) {
+        console.error('[SAVE_DEFAULT] Database error fetching prompt:', fetchError)
         return NextResponse.json(
-          { error: 'Prompt not found' },
+          { error: `Database error: ${fetchError.message}` },
+          { status: 500 }
+        )
+      }
+
+      if (!current) {
+        console.error('[SAVE_DEFAULT] Prompt not found in database:', key)
+        return NextResponse.json(
+          { error: 'Prompt not found. Please save the prompt first before setting it as default.' },
           { status: 404 }
         )
       }
+
+      console.log('[SAVE_DEFAULT] Current value length:', current.value?.length || 0)
 
       // Save current value as custom default
       const { error: updateError } = await supabaseAdmin
@@ -192,7 +212,12 @@ export async function POST(request: NextRequest) {
         })
         .eq('key', key)
 
-      if (updateError) throw updateError
+      if (updateError) {
+        console.error('[SAVE_DEFAULT] Update error:', updateError)
+        throw updateError
+      }
+
+      console.log('[SAVE_DEFAULT] Successfully saved custom default for:', key)
 
       return NextResponse.json({
         success: true,
