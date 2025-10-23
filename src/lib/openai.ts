@@ -1576,14 +1576,25 @@ export async function callWithStructuredPrompt(
   promptConfig: StructuredPromptConfig,
   placeholders: Record<string, string> = {}
 ): Promise<any> {
+  // Debug: Check message content types
+  console.log('[AI] Processing structured prompt with', promptConfig.messages.length, 'messages')
+  promptConfig.messages.forEach((msg, i) => {
+    console.log(`[AI] Message ${i} role: ${msg.role}, content type: ${typeof msg.content}`)
+  })
+
   // Replace placeholders in all message contents
-  const processedMessages = promptConfig.messages.map(msg => ({
-    ...msg,
-    content: Object.entries(placeholders).reduce(
-      (content, [key, value]) => content.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value),
-      msg.content
-    )
-  }))
+  const processedMessages = promptConfig.messages.map(msg => {
+    // Ensure content is a string
+    const contentStr = typeof msg.content === 'string' ? msg.content : String(msg.content)
+
+    return {
+      ...msg,
+      content: Object.entries(placeholders).reduce(
+        (content, [key, value]) => content.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value),
+        contentStr
+      )
+    }
+  })
 
   // Extract system prompt, examples, and user prompt
   const systemPrompt = processedMessages.find(m => m.role === 'system')?.content
