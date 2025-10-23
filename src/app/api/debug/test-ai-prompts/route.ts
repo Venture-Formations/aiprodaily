@@ -322,16 +322,28 @@ export async function GET(request: NextRequest) {
     // Test Fact Checker
     if (promptType === 'all' || promptType === 'factChecker') {
       console.log('Testing Fact Checker...')
+      console.log('[DEBUG] Newsletter content:', testData.factChecker.newsletterContent.substring(0, 100))
+      console.log('[DEBUG] Original content:', testData.factChecker.originalContent.substring(0, 100))
       try {
         const prompt = await AI_PROMPTS.factChecker(
           testData.factChecker.newsletterContent,
           testData.factChecker.originalContent
         )
+        console.log('[DEBUG] Generated prompt length:', prompt.length)
+        console.log('[DEBUG] Prompt preview (first 500 chars):', prompt.substring(0, 500))
+
         const response = await callOpenAI(prompt, 1000, 0.3)
+        console.log('[DEBUG] OpenAI response:', typeof response === 'string' ? response.substring(0, 200) : response)
+
         results.factChecker = {
           success: true,
           response,
-          prompt_length: prompt.length
+          prompt_length: prompt.length,
+          prompt_preview: prompt.substring(0, 800) + '...',
+          test_data_used: {
+            newsletter_length: testData.factChecker.newsletterContent.length,
+            original_length: testData.factChecker.originalContent.length
+          }
         }
       } catch (error) {
         results.factChecker = {
