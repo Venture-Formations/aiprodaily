@@ -1651,6 +1651,13 @@ export async function callOpenAIStructured(options: OpenAICallOptions) {
       if (presencePenalty !== undefined) requestOptions.presence_penalty = presencePenalty
       if (frequencyPenalty !== undefined) requestOptions.frequency_penalty = frequencyPenalty
 
+      // Debug: Log what we're actually sending to OpenAI
+      console.log('[AI] Sending to OpenAI - messages count:', messages.length)
+      messages.forEach((msg, i) => {
+        console.log(`[AI] Final message ${i} - role: ${msg.role}, content type: ${typeof msg.content}, content preview:`,
+          typeof msg.content === 'string' ? msg.content.substring(0, 50) : JSON.stringify(msg.content).substring(0, 50))
+      })
+
       const response = await openai.chat.completions.create(requestOptions, {
         signal: controller.signal
       })
