@@ -27,7 +27,9 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 
 // Section Components
-function WelcomeSection({ campaign }: { campaign: any }) {
+function WelcomeSection({ campaign, onRegenerate }: { campaign: any; onRegenerate?: () => void }) {
+  const [regenerating, setRegenerating] = useState(false)
+
   if (!campaign) {
     return (
       <div className="text-center py-8 text-gray-500">
@@ -38,14 +40,50 @@ function WelcomeSection({ campaign }: { campaign: any }) {
 
   const hasContent = campaign.welcome_intro || campaign.welcome_tagline || campaign.welcome_summary
 
+  const handleRegenerate = async () => {
+    if (!campaign?.id) return
+
+    setRegenerating(true)
+    try {
+      const response = await fetch(`/api/campaigns/${campaign.id}/regenerate-welcome`, {
+        method: 'POST'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to regenerate welcome section')
+      }
+
+      // Refresh campaign data
+      if (onRegenerate) {
+        onRegenerate()
+      }
+    } catch (error) {
+      console.error('Error regenerating welcome:', error)
+      alert('Failed to regenerate welcome section')
+    } finally {
+      setRegenerating(false)
+    }
+  }
+
   if (!hasContent) {
     return (
-      <div className="text-center py-8 text-gray-500">
-        Welcome section has not been generated yet.
-        <br />
-        <span className="text-sm text-gray-400">
-          This will be automatically generated during RSS processing.
-        </span>
+      <div className="p-6">
+        <div className="text-center py-8 text-gray-500">
+          Welcome section has not been generated yet.
+          <br />
+          <span className="text-sm text-gray-400">
+            This will be automatically generated during RSS processing.
+          </span>
+        </div>
+        <div className="text-center mt-4">
+          <button
+            onClick={handleRegenerate}
+            disabled={regenerating}
+            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium"
+          >
+            {regenerating ? 'Generating...' : 'Generate Welcome Section'}
+          </button>
+        </div>
       </div>
     )
   }
@@ -68,6 +106,18 @@ function WelcomeSection({ campaign }: { campaign: any }) {
             {campaign.welcome_summary}
           </div>
         )}
+      </div>
+      <div className="text-center mt-4">
+        <button
+          onClick={handleRegenerate}
+          disabled={regenerating}
+          className="bg-gray-200 hover:bg-gray-300 disabled:opacity-50 text-gray-800 px-4 py-2 rounded text-sm font-medium"
+        >
+          {regenerating ? 'Regenerating...' : 'Regenerate Welcome Section'}
+        </button>
+        <p className="text-xs text-gray-500 mt-2">
+          Regenerate to reflect current article selection
+        </p>
       </div>
     </div>
   )
@@ -1002,7 +1052,17 @@ function NewsletterSectionComponent({
     // Legacy name-based matching for other sections
     switch (section.name) {
       case 'Welcome':
-        return <WelcomeSection campaign={campaign} />
+        return <WelcomeSection campaign={campaign} onRegenerate={() => {
+          // Refresh campaign data after regenerating
+          if (campaign?.id) {
+            fetch(`/api/campaigns/${campaign.id}`)
+              .then(res => res.json())
+              .then(data => {
+                // Update campaign state with fresh data
+                window.location.reload() // Simple solution - reload the page
+              })
+          }
+        }} />
       case 'Yesterday\'s Wordle':
         return <WordleSection campaign={campaign} />
       case 'Minnesota Getaways':

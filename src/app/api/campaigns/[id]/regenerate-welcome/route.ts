@@ -82,16 +82,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Generate welcome text using AI
     const promptOrResult = await AI_PROMPTS.welcomeSection(allArticles)
 
-    // Handle both prompt strings and structured prompt results
-    const welcomeText = (typeof promptOrResult === 'object' && promptOrResult !== null && 'raw' in promptOrResult)
-      ? (typeof promptOrResult.raw === 'string' ? promptOrResult.raw : promptOrResult.raw?.text || '')
-      : await callOpenAI(promptOrResult as string, 500, 0.8)
-
-    const finalWelcomeText = typeof welcomeText === 'string'
-      ? welcomeText.trim()
-      : (welcomeText.text || welcomeText.raw || '').trim()
-
-    console.log('[API] Welcome section generated (length:', finalWelcomeText.length, ')')
+    console.log('[API] promptOrResult type:', typeof promptOrResult)
 
     // Parse JSON response to extract intro, tagline, and summary
     let welcomeIntro = ''
@@ -99,15 +90,49 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     let welcomeSummary = ''
 
     try {
-      const welcomeJson = JSON.parse(finalWelcomeText)
-      welcomeIntro = welcomeJson.intro || ''
-      welcomeTagline = welcomeJson.tagline || ''
-      welcomeSummary = welcomeJson.summary || ''
+      // Check if promptOrResult is already a parsed JSON object with intro/tagline/summary
+      if (typeof promptOrResult === 'object' && promptOrResult !== null &&
+          ('intro' in promptOrResult || 'tagline' in promptOrResult || 'summary' in promptOrResult)) {
+        // Already parsed JSON from structured prompt
+        console.log('[API] Using structured prompt result directly')
+        welcomeIntro = (promptOrResult as any).intro || ''
+        welcomeTagline = (promptOrResult as any).tagline || ''
+        welcomeSummary = (promptOrResult as any).summary || ''
+      } else if (typeof promptOrResult === 'object' && promptOrResult !== null && 'raw' in promptOrResult) {
+        // Got {raw: content} - need to parse the raw JSON string
+        console.log('[API] Parsing raw JSON response')
+        const rawContent = (promptOrResult as any).raw
+        const welcomeJson = JSON.parse(rawContent)
+        welcomeIntro = welcomeJson.intro || ''
+        welcomeTagline = welcomeJson.tagline || ''
+        welcomeSummary = welcomeJson.summary || ''
+      } else if (typeof promptOrResult === 'string') {
+        // Plain text prompt - need to call OpenAI
+        console.log('[API] Calling OpenAI with plain text prompt')
+        const welcomeText = await callOpenAI(promptOrResult, 500, 0.8)
+        const finalWelcomeText = typeof welcomeText === 'string'
+          ? welcomeText.trim()
+          : (welcomeText.text || welcomeText.raw || '').trim()
+
+        console.log('[API] Welcome section generated (length:', finalWelcomeText.length, ')')
+
+        // Parse JSON from the text response
+        const welcomeJson = JSON.parse(finalWelcomeText)
+        welcomeIntro = welcomeJson.intro || ''
+        welcomeTagline = welcomeJson.tagline || ''
+        welcomeSummary = welcomeJson.summary || ''
+      } else {
+        throw new Error('Unexpected promptOrResult format')
+      }
+
       console.log('[API] Parsed welcome JSON - intro:', welcomeIntro.length, 'tagline:', welcomeTagline.length, 'summary:', welcomeSummary.length)
     } catch (parseError) {
-      console.error('[API] Failed to parse welcome JSON, using fallback:', parseError)
+      console.error('[API] Failed to parse welcome JSON:', parseError)
+      console.error('[API] promptOrResult preview:', typeof promptOrResult === 'string'
+        ? promptOrResult.substring(0, 200)
+        : JSON.stringify(promptOrResult).substring(0, 200))
       // Fallback: use entire text as summary if JSON parsing fails
-      welcomeSummary = finalWelcomeText
+      welcomeSummary = typeof promptOrResult === 'string' ? promptOrResult : JSON.stringify(promptOrResult)
     }
 
     // Save all 3 parts to campaign
@@ -142,7 +167,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             action: 'welcome_regenerated',
             details: {
               article_count: allArticles.length,
-              welcome_length: finalWelcomeText.length
+              welcome_intro_length: welcomeIntro.length,
+              welcome_tagline_length: welcomeTagline.length,
+              welcome_summary_length: welcomeSummary.length
             }
           }])
       }
