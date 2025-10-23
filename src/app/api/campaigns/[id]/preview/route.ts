@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import {
   generateNewsletterHeader,
   generateNewsletterFooter,
+  generateWelcomeSection,
   generatePrimaryArticlesSection,
   generateSecondaryArticlesSection,
   generateCommunityBusinessSpotlightSection,
@@ -181,6 +182,9 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
     const header = await generateNewsletterHeader(formattedDate, campaign.date, mailerliteId)
     const footer = await generateNewsletterFooter(campaign.date, mailerliteId)
 
+    // Generate welcome section (if it exists)
+    const welcomeHtml = await generateWelcomeSection(campaign.welcome_section || '')
+
     // Section ID constants (reference IDs from newsletter_sections table)
     // These IDs are stable and won't change even if section names are updated
     const SECTION_IDS = {
@@ -255,8 +259,8 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
       sectionsHtml = ''
     }
 
-    // Combine all sections
-    const html = header + sectionsHtml + footer
+    // Combine all sections (welcome section goes after header, before all other sections)
+    const html = header + welcomeHtml + sectionsHtml + footer
 
     console.log('HTML template generated successfully, length:', html.length)
     return html

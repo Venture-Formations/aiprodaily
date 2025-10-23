@@ -5,6 +5,7 @@ import type { CampaignWithArticles, CampaignWithEvents, Article } from '@/types/
 import {
   generateNewsletterHeader,
   generateNewsletterFooter,
+  generateWelcomeSection,
   generateDiningDealsSection,
   generateRoadWorkSection,
   generatePollSection,
@@ -338,6 +339,9 @@ export class MailerLiteService {
     const header = await generateNewsletterHeader(formattedDate, campaign.date, mailerliteId)
     const footer = await generateNewsletterFooter(campaign.date, mailerliteId)
 
+    // Generate welcome section (if it exists)
+    const welcomeHtml = await generateWelcomeSection(campaign.welcome_section || '')
+
     // Review banner for review campaigns
     const reviewBanner = isReview ? `
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin: 10px auto; max-width: 750px; background-color: #FEF3C7; font-family: Arial, sans-serif;">
@@ -431,8 +435,8 @@ export class MailerLiteService {
       sectionsHtml = ''
     }
 
-    // Combine using the SAME template structure as preview
-    return reviewBanner + header + sectionsHtml + footer
+    // Combine using the SAME template structure as preview (welcome section goes after header)
+    return reviewBanner + header + welcomeHtml + sectionsHtml + footer
   }
 
 
