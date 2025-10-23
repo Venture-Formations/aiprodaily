@@ -1492,11 +1492,15 @@ export class RSSProcessor {
 
     try {
       // Step 1: Generate title using new title prompts
-      const titlePrompt = section === 'primary'
+      const titlePromptOrResult = section === 'primary'
         ? await AI_PROMPTS.primaryArticleTitle(postData)
         : await AI_PROMPTS.secondaryArticleTitle(postData)
 
-      const titleResult = await callOpenAI(titlePrompt, 1000, 0.7)
+      // If we got an object with 'raw' property, it's already the result (structured prompt was used)
+      // Otherwise, it's a prompt string that needs to be sent to OpenAI
+      const titleResult = (typeof titlePromptOrResult === 'object' && titlePromptOrResult !== null && 'raw' in titlePromptOrResult)
+        ? titlePromptOrResult
+        : await callOpenAI(titlePromptOrResult as string, 1000, 0.7)
 
       // Handle both string and object responses
       const headline = typeof titleResult === 'string'

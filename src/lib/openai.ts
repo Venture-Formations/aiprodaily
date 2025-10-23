@@ -1194,7 +1194,30 @@ export const AI_PROMPTS = {
         return FALLBACK_PROMPTS.primaryArticleTitle(post)
       }
 
-      console.log('[AI] Using database prompt for primaryArticleTitle (length:', data.value.length, 'chars)')
+      // Check if the prompt is JSON (structured format) or plain text
+      try {
+        const promptConfig = JSON.parse(data.value) as StructuredPromptConfig
+
+        // If it has a messages array, it's a structured prompt
+        if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
+          console.log('[AI] Using structured database prompt for primaryArticleTitle')
+
+          // Prepare placeholders
+          const placeholders = {
+            title: post.title,
+            description: post.description || 'No description available',
+            content: post.content ? post.content.substring(0, 1000) + '...' : 'No content available'
+          }
+
+          // Call with structured format
+          return await callWithStructuredPrompt(promptConfig, placeholders)
+        }
+      } catch (jsonError) {
+        // Not JSON, treat as plain text prompt (fallthrough to below)
+      }
+
+      // Plain text prompt - use old format
+      console.log('[AI] Using plain text database prompt for primaryArticleTitle (length:', data.value.length, 'chars)')
       return data.value
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
@@ -1393,6 +1416,155 @@ function parseJSONResponse(content: string) {
   }
 }
 
+// Enhanced OpenAI call with support for structured prompts (system + examples + user)
+export interface OpenAICallOptions {
+  systemPrompt?: string
+  examples?: Array<{ role: 'assistant', content: string }>
+  userPrompt?: string
+  maxTokens?: number
+  temperature?: number
+  topP?: number
+  presencePenalty?: number
+  frequencyPenalty?: number
+}
+
+// Interface for structured prompt stored in database
+export interface StructuredPromptConfig {
+  model?: string
+  temperature?: number
+  top_p?: number
+  presence_penalty?: number
+  frequency_penalty?: number
+  messages: Array<{
+    role: 'system' | 'assistant' | 'user'
+    content: string
+  }>
+}
+
+// Helper function to call OpenAI with structured prompt from database
+export async function callWithStructuredPrompt(
+  promptConfig: StructuredPromptConfig,
+  placeholders: Record<string, string> = {}
+): Promise<any> {
+  // Replace placeholders in all message contents
+  const processedMessages = promptConfig.messages.map(msg => ({
+    ...msg,
+    content: Object.entries(placeholders).reduce(
+      (content, [key, value]) => content.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value),
+      msg.content
+    )
+  }))
+
+  // Extract system prompt, examples, and user prompt
+  const systemPrompt = processedMessages.find(m => m.role === 'system')?.content
+  const examples = processedMessages.filter(m => m.role === 'assistant').map(m => ({
+    role: 'assistant' as const,
+    content: m.content
+  }))
+  const userPrompt = processedMessages.find(m => m.role === 'user')?.content
+
+  // Call with structured format
+  return callOpenAIStructured({
+    systemPrompt,
+    examples,
+    userPrompt,
+    temperature: promptConfig.temperature,
+    topP: promptConfig.top_p,
+    presencePenalty: promptConfig.presence_penalty,
+    frequencyPenalty: promptConfig.frequency_penalty
+  })
+}
+
+export async function callOpenAIStructured(options: OpenAICallOptions) {
+  try {
+    const {
+      systemPrompt,
+      examples = [],
+      userPrompt,
+      maxTokens = 1000,
+      temperature = 0.3,
+      topP,
+      presencePenalty,
+      frequencyPenalty
+    } = options
+
+    // Build messages array
+    const messages: Array<{ role: 'system' | 'assistant' | 'user', content: string }> = []
+
+    if (systemPrompt) {
+      messages.push({ role: 'system', content: systemPrompt })
+    }
+
+    // Add few-shot examples
+    examples.forEach(example => {
+      messages.push(example)
+    })
+
+    if (userPrompt) {
+      messages.push({ role: 'user', content: userPrompt })
+    }
+
+    // Add timeout to prevent hanging
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
+    try {
+      const requestOptions: any = {
+        model: 'gpt-4o',
+        messages,
+        max_tokens: maxTokens,
+        temperature
+      }
+
+      // Add optional parameters if provided
+      if (topP !== undefined) requestOptions.top_p = topP
+      if (presencePenalty !== undefined) requestOptions.presence_penalty = presencePenalty
+      if (frequencyPenalty !== undefined) requestOptions.frequency_penalty = frequencyPenalty
+
+      const response = await openai.chat.completions.create(requestOptions, {
+        signal: controller.signal
+      })
+
+      clearTimeout(timeoutId)
+
+      const content = response.choices[0]?.message?.content
+      if (!content) {
+        throw new Error('No response from OpenAI')
+      }
+
+      // Try to parse as JSON, fallback to raw content
+      try {
+        let cleanedContent = content
+        const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+        if (codeFenceMatch) {
+          cleanedContent = codeFenceMatch[1]
+        }
+
+        const objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
+        const arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
+
+        if (arrayMatch) {
+          return JSON.parse(arrayMatch[0])
+        } else if (objectMatch) {
+          return JSON.parse(objectMatch[0])
+        } else {
+          return JSON.parse(cleanedContent.trim())
+        }
+      } catch (parseError) {
+        // Return plain text wrapped in object
+        return { raw: content }
+      }
+    } catch (error) {
+      clearTimeout(timeoutId)
+      throw error
+    }
+  } catch (error) {
+    console.error('OpenAI API error (structured):', error)
+    throw error
+  }
+}
+
+// Original function - kept for backward compatibility
 export async function callOpenAI(prompt: string, maxTokens = 1000, temperature = 0.3) {
   try {
     // console.log('Calling OpenAI API...') // Commented out to reduce log count
