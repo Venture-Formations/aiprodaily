@@ -77,37 +77,66 @@ export async function GET(request: NextRequest) {
     // Test Content Evaluator
     if (promptType === 'all' || promptType === 'contentEvaluator') {
       console.log('Testing Content Evaluator...')
+      console.log('[DEBUG] Received promptKey:', promptKey)
+      console.log('[DEBUG] Received promptType:', promptType)
+
       try {
         let prompt: string
+        let promptSource = 'default'
 
         // If testing a specific criteria prompt, fetch that prompt directly
-        if (promptKey && (promptKey.startsWith('ai_prompt_criteria_') || promptKey.startsWith('ai_prompt_secondary_criteria_'))) {
+        const isCriteriaPrompt = promptKey && (promptKey.startsWith('ai_prompt_criteria_') || promptKey.startsWith('ai_prompt_secondary_criteria_'))
+        console.log('[DEBUG] Is criteria prompt?', isCriteriaPrompt)
+
+        if (isCriteriaPrompt) {
+          console.log('[DEBUG] Fetching criteria prompt from database:', promptKey)
+
           const { data, error } = await supabaseAdmin
             .from('app_settings')
             .select('value')
             .eq('key', promptKey)
             .single()
 
+          console.log('[DEBUG] Database query result:', { hasData: !!data, error: error?.message })
+
           if (error || !data) {
-            throw new Error(`Failed to fetch prompt: ${promptKey}`)
+            const errorMsg = `Failed to fetch prompt: ${promptKey} - ${error?.message || 'No data returned'}`
+            console.error('[DEBUG]', errorMsg)
+            throw new Error(errorMsg)
           }
+
+          console.log('[DEBUG] Retrieved prompt length:', data.value?.length || 0)
+          console.log('[DEBUG] Prompt preview (first 200 chars):', data.value?.substring(0, 200))
 
           // Replace placeholders in the criteria prompt
           prompt = data.value
             .replace(/\{\{title\}\}/g, testData.contentEvaluator.title)
             .replace(/\{\{description\}\}/g, testData.contentEvaluator.description || 'No description available')
             .replace(/\{\{content\}\}/g, testData.contentEvaluator.content || testData.contentEvaluator.description || 'No content available')
+
+          promptSource = `database:${promptKey}`
+          console.log('[DEBUG] After placeholder replacement, prompt length:', prompt.length)
         } else {
+          console.log('[DEBUG] Using standard contentEvaluator prompt from AI_PROMPTS')
           // Use the standard contentEvaluator prompt
           prompt = await AI_PROMPTS.contentEvaluator(testData.contentEvaluator)
+          promptSource = 'AI_PROMPTS.contentEvaluator'
         }
 
+        console.log('[DEBUG] Final prompt preview (first 300 chars):', prompt.substring(0, 300))
+        console.log('[DEBUG] Calling OpenAI with prompt length:', prompt.length)
+
         const response = await callOpenAI(prompt, 1000, 0.3)
+
+        console.log('[DEBUG] OpenAI response received:', typeof response === 'string' ? response.substring(0, 200) : response)
+
         results.contentEvaluator = {
           success: true,
           response,
           prompt_length: prompt.length,
-          prompt_key_used: promptKey || 'ai_prompt_content_evaluator'
+          prompt_key_used: promptKey || 'ai_prompt_content_evaluator',
+          prompt_source: promptSource,
+          prompt_preview: prompt.substring(0, 500) + '...'
         }
       } catch (error) {
         results.contentEvaluator = {
