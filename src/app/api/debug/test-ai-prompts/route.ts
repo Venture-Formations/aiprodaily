@@ -6,6 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const promptType = searchParams.get('type') || 'all'
+    const promptKey = searchParams.get('promptKey')
     const rssPostId = searchParams.get('rssPostId')
 
     const results: Record<string, any> = {}
@@ -77,12 +78,36 @@ export async function GET(request: NextRequest) {
     if (promptType === 'all' || promptType === 'contentEvaluator') {
       console.log('Testing Content Evaluator...')
       try {
-        const prompt = await AI_PROMPTS.contentEvaluator(testData.contentEvaluator)
+        let prompt: string
+
+        // If testing a specific criteria prompt, fetch that prompt directly
+        if (promptKey && (promptKey.startsWith('ai_prompt_criteria_') || promptKey.startsWith('ai_prompt_secondary_criteria_'))) {
+          const { data, error } = await supabaseAdmin
+            .from('app_settings')
+            .select('value')
+            .eq('key', promptKey)
+            .single()
+
+          if (error || !data) {
+            throw new Error(`Failed to fetch prompt: ${promptKey}`)
+          }
+
+          // Replace placeholders in the criteria prompt
+          prompt = data.value
+            .replace(/\{\{title\}\}/g, testData.contentEvaluator.title)
+            .replace(/\{\{description\}\}/g, testData.contentEvaluator.description || 'No description available')
+            .replace(/\{\{content\}\}/g, testData.contentEvaluator.content || testData.contentEvaluator.description || 'No content available')
+        } else {
+          // Use the standard contentEvaluator prompt
+          prompt = await AI_PROMPTS.contentEvaluator(testData.contentEvaluator)
+        }
+
         const response = await callOpenAI(prompt, 1000, 0.3)
         results.contentEvaluator = {
           success: true,
           response,
-          prompt_length: prompt.length
+          prompt_length: prompt.length,
+          prompt_key_used: promptKey || 'ai_prompt_content_evaluator'
         }
       } catch (error) {
         results.contentEvaluator = {

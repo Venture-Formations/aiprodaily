@@ -2298,7 +2298,7 @@ function AIPromptsSettings() {
     setTestResults(null)
 
     try {
-      let testUrl = `/api/debug/test-ai-prompts?type=${testType}`
+      let testUrl = `/api/debug/test-ai-prompts?type=${testType}&promptKey=${key}`
       if (rssPostId) {
         testUrl += `&rssPostId=${rssPostId}`
       }
