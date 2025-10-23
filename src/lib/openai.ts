@@ -1119,6 +1119,8 @@ export const AI_PROMPTS = {
       }
 
       console.log('[AI] Using database prompt for welcomeSection')
+      console.log('[AI] data.value type:', typeof data.value)
+      console.log('[AI] data.value preview:', JSON.stringify(data.value).substring(0, 100))
 
       // Format articles for the prompt
       const articlesText = articles
@@ -1132,14 +1134,20 @@ export const AI_PROMPTS = {
           ? JSON.parse(data.value)
           : data.value) as StructuredPromptConfig
 
+        console.log('[AI] promptConfig has messages?', !!promptConfig.messages)
+        console.log('[AI] messages is array?', Array.isArray(promptConfig.messages))
+
         if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
           console.log('[AI] Detected structured JSON prompt for welcomeSection')
           const placeholders = {
             articles: articlesText
           }
           return await callWithStructuredPrompt(promptConfig, placeholders)
+        } else {
+          console.log('[AI] Not a structured prompt - missing or invalid messages array')
         }
       } catch (jsonError) {
+        console.log('[AI] Error parsing welcomeSection prompt:', jsonError instanceof Error ? jsonError.message : 'Unknown error')
         console.log('[AI] Using plain text prompt for welcomeSection')
       }
 
