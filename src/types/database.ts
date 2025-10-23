@@ -100,6 +100,7 @@ export interface NewsletterCampaign {
   date: string
   status: CampaignStatus
   subject_line: string | null
+  welcome_section: string | null
   review_sent_at: string | null
   final_sent_at: string | null
   last_action: 'changes_made' | 'approved' | null
