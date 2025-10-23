@@ -226,6 +226,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle "Reset to Default" action
+    console.log('[RESET_DEFAULT] Starting reset to default for key:', key)
+
     // First check if there's a custom default
     const { data: settings, error: fetchError } = await supabaseAdmin
       .from('app_settings')
@@ -233,23 +235,33 @@ export async function POST(request: NextRequest) {
       .eq('key', key)
       .single()
 
+    console.log('[RESET_DEFAULT] Fetch result:', {
+      hasCustomDefault: !!settings?.custom_default,
+      customDefaultLength: settings?.custom_default?.length || 0,
+      hasError: !!fetchError
+    })
+
     let defaultValue: string
 
     if (!fetchError && settings?.custom_default) {
       // Use custom default if available
+      console.log('[RESET_DEFAULT] Using custom default (length:', settings.custom_default.length, ')')
       defaultValue = settings.custom_default
     } else {
       // Fall back to code default
+      console.log('[RESET_DEFAULT] No custom default found, using code default')
       const defaultPrompts = await getDefaultPrompts()
       const defaultPrompt = defaultPrompts.find(p => p.key === key)
 
       if (!defaultPrompt) {
+        console.error('[RESET_DEFAULT] Code default not found for key:', key)
         return NextResponse.json(
           { error: 'Default prompt not found' },
           { status: 404 }
         )
       }
 
+      console.log('[RESET_DEFAULT] Using code default (length:', defaultPrompt.value.length, ')')
       defaultValue = defaultPrompt.value
     }
 
@@ -262,9 +274,13 @@ export async function POST(request: NextRequest) {
       })
       .eq('key', key)
 
-    if (updateError) throw updateError
+    if (updateError) {
+      console.error('[RESET_DEFAULT] Update error:', updateError)
+      throw updateError
+    }
 
     const usedCustomDefault = settings?.custom_default ? true : false
+    console.log('[RESET_DEFAULT] Successfully reset. Used custom default:', usedCustomDefault)
 
     return NextResponse.json({
       success: true,
