@@ -320,6 +320,9 @@ export class RSSProcessor {
       await this.processPostsWithAI(campaignId, 'primary')
       await this.processPostsWithAI(campaignId, 'secondary')
 
+      // Generate welcome section after all articles are processed
+      await this.generateWelcomeSection(campaignId)
+
       // Campaign remains in 'draft' status for MailerLite cron to process
       // Status will be updated to 'in_review' by create-campaign cron after MailerLite send
 
@@ -1567,6 +1570,82 @@ export class RSSProcessor {
     }
 
     return result as FactCheckResult
+  }
+
+  async generateWelcomeSection(campaignId: string): Promise<string> {
+    console.log('[RSS] Generating welcome section...')
+
+    try {
+      // Fetch ALL active PRIMARY articles for this campaign
+      const { data: primaryArticles, error: primaryError } = await supabaseAdmin
+        .from('articles')
+        .select('headline, content')
+        .eq('campaign_id', campaignId)
+        .eq('is_active', true)
+        .order('rank', { ascending: true })
+
+      if (primaryError) {
+        console.error('[RSS] Error fetching primary articles for welcome:', primaryError)
+        throw primaryError
+      }
+
+      // Fetch ALL active SECONDARY articles for this campaign
+      const { data: secondaryArticles, error: secondaryError } = await supabaseAdmin
+        .from('secondary_articles')
+        .select('headline, content')
+        .eq('campaign_id', campaignId)
+        .eq('is_active', true)
+        .order('rank', { ascending: true })
+
+      if (secondaryError) {
+        console.error('[RSS] Error fetching secondary articles for welcome:', secondaryError)
+        throw secondaryError
+      }
+
+      // Combine ALL articles (primary first, then secondary)
+      const allArticles = [
+        ...(primaryArticles || []),
+        ...(secondaryArticles || [])
+      ]
+
+      if (allArticles.length === 0) {
+        console.log('[RSS] No articles found, skipping welcome section')
+        return ''
+      }
+
+      console.log(`[RSS] Generating welcome from ${primaryArticles?.length || 0} primary and ${secondaryArticles?.length || 0} secondary articles`)
+
+      // Generate welcome text using AI
+      const promptOrResult = await AI_PROMPTS.welcomeSection(allArticles)
+
+      // Handle both prompt strings and structured prompt results
+      const welcomeText = (typeof promptOrResult === 'object' && promptOrResult !== null && 'raw' in promptOrResult)
+        ? (typeof promptOrResult.raw === 'string' ? promptOrResult.raw : promptOrResult.raw?.text || '')
+        : await callOpenAI(promptOrResult as string, 300, 0.8)
+
+      const finalWelcomeText = typeof welcomeText === 'string'
+        ? welcomeText.trim()
+        : (welcomeText.text || welcomeText.raw || '').trim()
+
+      console.log('[RSS] Welcome section generated (length:', finalWelcomeText.length, ')')
+
+      // Save to campaign
+      const { error: updateError } = await supabaseAdmin
+        .from('newsletter_campaigns')
+        .update({ welcome_section: finalWelcomeText })
+        .eq('id', campaignId)
+
+      if (updateError) {
+        console.error('[RSS] Error saving welcome section:', updateError)
+        throw updateError
+      }
+
+      return finalWelcomeText
+    } catch (error) {
+      console.error('[RSS] Failed to generate welcome section:', error)
+      // Don't fail the entire process if welcome fails
+      return ''
+    }
   }
 
   private async logInfo(message: string, context: Record<string, any> = {}) {

@@ -260,6 +260,34 @@ CREATIVITY REQUIREMENT: Each generation should produce a unique headline variati
 
 Respond with ONLY the headline text - no JSON, no quotes, no extra formatting. Just the headline itself.`,
 
+  welcomeSection: (articles: Array<{ headline: string; content: string }>) => {
+    const articlesText = articles
+      .map((article, index) => `${index + 1}. ${article.headline}\n   ${article.content.substring(0, 200)}...`)
+      .join('\n\n')
+
+    return `You are writing a welcoming introduction for a local St. Cloud, Minnesota newsletter.
+
+STYLE:
+- Conversational and friendly tone
+- Start with "Hey, Central Minnesota!"
+- Include tagline: "Welcome back to your daily local news roundup."
+- Weave in 3-5 key stories from today's newsletter in a flowing, natural sentence
+- Natural, engaging language that creates curiosity
+- End smoothly (no abrupt cutoffs)
+
+GUIDELINES:
+- Use "Today, we've got..." or "Today, we're covering..." format
+- Connect stories with commas and "and" for the last item
+- Each story should be a brief phrase (not full headlines)
+- Focus on the most interesting angle of each story
+- Keep total length to 3-4 sentences
+
+ARTICLES TO SUMMARIZE:
+${articlesText}
+
+Return ONLY the welcome text (no additional formatting or explanation).`
+  },
+
   roadWorkGenerator: (campaignDate: string) => `
 Find CURRENT and ACTIVE road, lane, or bridge closures, detours, or traffic restrictions in effect on ${campaignDate} within 10 miles of ZIP code 56303 (St. Cloud, MN metro area).
 
@@ -1074,6 +1102,49 @@ export const AI_PROMPTS = {
     } catch (error) {
       console.error('Error fetching breakingNewsScorer prompt, using fallback:', error)
       return FALLBACK_PROMPTS.breakingNewsScorer(article)
+    }
+  },
+
+  welcomeSection: async (articles: Array<{ headline: string; content: string }>) => {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'ai_prompt_welcome_section')
+        .single()
+
+      if (error || !data) {
+        console.log('[AI] Using fallback for welcomeSection prompt')
+        return FALLBACK_PROMPTS.welcomeSection(articles)
+      }
+
+      console.log('[AI] Using database prompt for welcomeSection')
+
+      // Format articles for the prompt
+      const articlesText = articles
+        .map((article, index) => `${index + 1}. ${article.headline}\n   ${article.content.substring(0, 200)}...`)
+        .join('\n\n')
+
+      // Check if structured JSON prompt
+      try {
+        const promptConfig = JSON.parse(data.value) as StructuredPromptConfig
+
+        if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
+          console.log('[AI] Detected structured JSON prompt for welcomeSection')
+          const placeholders = {
+            articles: articlesText
+          }
+          return await callWithStructuredPrompt(promptConfig, placeholders)
+        }
+      } catch (jsonError) {
+        console.log('[AI] Using plain text prompt for welcomeSection')
+      }
+
+      // Plain text prompt
+      return data.value.replace(/\{\{articles\}\}/g, articlesText)
+    } catch (error) {
+      console.error('[AI] Error fetching welcomeSection prompt, using fallback:', error)
+      return FALLBACK_PROMPTS.welcomeSection(articles)
     }
   },
 
