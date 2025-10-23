@@ -71,7 +71,11 @@ export async function GET(request: NextRequest) {
         venue: 'Lake George Amphitheater'
       },
       roadWorkGenerator: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      imageAnalyzer: 'Image analysis requires actual image input - use the image ingest endpoint instead'
+      imageAnalyzer: 'Image analysis requires actual image input - use the image ingest endpoint instead',
+      factChecker: {
+        newsletterContent: 'New tax rules for small businesses will take effect in January 2025. The IRS announced sweeping changes to deduction limits and reporting requirements that will affect firms with under 50 employees.',
+        originalContent: 'The Internal Revenue Service announced today that significant changes to small business taxation will be implemented starting January 1, 2025. These changes will impact businesses with fewer than 50 employees, particularly in terms of expense deduction limits and quarterly reporting requirements. The new rules aim to simplify compliance while ensuring accurate tax collection.'
+      }
     }
 
     // Test Content Evaluator
@@ -312,6 +316,28 @@ export async function GET(request: NextRequest) {
       results.imageAnalyzer = {
         success: true,
         note: 'Image analysis requires actual image input. Use POST /api/images/ingest with an image to test.'
+      }
+    }
+
+    // Test Fact Checker
+    if (promptType === 'all' || promptType === 'factChecker') {
+      console.log('Testing Fact Checker...')
+      try {
+        const prompt = await AI_PROMPTS.factChecker(
+          testData.factChecker.newsletterContent,
+          testData.factChecker.originalContent
+        )
+        const response = await callOpenAI(prompt, 1000, 0.3)
+        results.factChecker = {
+          success: true,
+          response,
+          prompt_length: prompt.length
+        }
+      } catch (error) {
+        results.factChecker = {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
       }
     }
 

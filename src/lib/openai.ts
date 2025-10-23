@@ -1003,7 +1003,26 @@ export const AI_PROMPTS = {
     return FALLBACK_PROMPTS.topicDeduper(posts)
   },
   factChecker: async (newsletterContent: string, originalContent: string) => {
-    return FALLBACK_PROMPTS.factChecker(newsletterContent, originalContent)
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'ai_prompt_fact_checker')
+        .single()
+
+      if (error || !data) {
+        console.log('[AI] Using fallback for factChecker prompt')
+        return FALLBACK_PROMPTS.factChecker(newsletterContent, originalContent)
+      }
+
+      console.log('[AI] Using database prompt for factChecker')
+      return data.value
+        .replace(/\{\{newsletterContent\}\}/g, newsletterContent)
+        .replace(/\{\{originalContent\}\}/g, originalContent.substring(0, 2000))
+    } catch (error) {
+      console.error('[AI] Error fetching factChecker prompt, using fallback:', error)
+      return FALLBACK_PROMPTS.factChecker(newsletterContent, originalContent)
+    }
   },
   roadWorkValidator: async (roadWorkItems: any[], date: string) => {
     return FALLBACK_PROMPTS.roadWorkValidator(roadWorkItems, date)
