@@ -1,13 +1,19 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { SlackNotificationService } from '@/lib/slack'
+import { RSSProcessor } from '@/lib/rss-processor'
 
 /**
  * Combined Step 4: Finalize
+ * - Generate welcome section
  * - Update campaign status to draft
  * - Send completion notifications
  */
 export async function executeStep4(campaignId: string) {
   console.log(`[Step 4/4] Finalize for campaign ${campaignId}`)
+
+  // Generate welcome section (after articles are ready)
+  const processor = new RSSProcessor()
+  await processor.generateWelcomeSection(campaignId)
 
   // Update campaign status
   await supabaseAdmin
