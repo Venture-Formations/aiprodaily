@@ -1621,7 +1621,7 @@ export class RSSProcessor {
       // Handle both prompt strings and structured prompt results
       const welcomeText = (typeof promptOrResult === 'object' && promptOrResult !== null && 'raw' in promptOrResult)
         ? (typeof promptOrResult.raw === 'string' ? promptOrResult.raw : promptOrResult.raw?.text || '')
-        : await callOpenAI(promptOrResult as string, 300, 0.8)
+        : await callOpenAI(promptOrResult as string, 500, 0.8)
 
       const finalWelcomeText = typeof welcomeText === 'string'
         ? welcomeText.trim()

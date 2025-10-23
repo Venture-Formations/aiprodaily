@@ -384,7 +384,7 @@ export async function GET(request: NextRequest) {
         const prompt = await AI_PROMPTS.welcomeSection(testArticles)
         console.log('[TEST] Prompt type:', typeof prompt === 'string' ? 'string' : 'structured')
 
-        const response = await callOpenAI(prompt, 300, 0.8)
+        const response = await callOpenAI(prompt, 500, 0.8)
 
         results.welcomeSection = {
           success: true,
