@@ -69,7 +69,21 @@ export async function POST(request: NextRequest) {
     console.log('Debug: Central date today:', centralDate)
     console.log('Debug: Central tomorrow:', campaignDate)
 
-    // STEP 1: Create new campaign for tomorrow (allow duplicate dates)
+    // STEP 1: Get newsletter ID first (required for campaign creation)
+    const { data: newsletter, error: newsletterError } = await supabaseAdmin
+      .from('newsletters')
+      .select('id, name, slug')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (newsletterError || !newsletter) {
+      throw new Error(`Failed to fetch newsletter: ${newsletterError?.message || 'No active newsletter found'}`)
+    }
+
+    console.log(`Found newsletter: ${newsletter.name} (${newsletter.slug}, ID: ${newsletter.id})`)
+
+    // STEP 2: Create new campaign for tomorrow (allow duplicate dates)
     console.log('Creating new campaign for tomorrow...')
 
     // Initialize RSS processor
@@ -80,7 +94,8 @@ export async function POST(request: NextRequest) {
       .from('newsletter_campaigns')
       .insert([{
         date: campaignDate,
-        status: 'processing'
+        status: 'processing',
+        newsletter_id: newsletter.id
       }])
       .select()
       .single()
@@ -90,7 +105,7 @@ export async function POST(request: NextRequest) {
     }
 
     campaignId = newCampaign.id
-    console.log('Created new campaign:', campaignId, 'for date:', campaignDate)
+    console.log('Created new campaign:', campaignId, 'for date:', campaignDate, 'newsletter_id:', newsletter.id)
 
     // Execute RSS processing steps directly (no HTTP calls)
     console.log('Starting RSS processing workflow...')
@@ -254,7 +269,21 @@ export async function GET(request: NextRequest) {
     console.log('Debug: Central date today:', centralDate)
     console.log('Debug: Central tomorrow:', campaignDate)
 
-    // STEP 1: Create new campaign for tomorrow (allow duplicate dates)
+    // STEP 1: Get newsletter ID first (required for campaign creation)
+    const { data: newsletter, error: newsletterError } = await supabaseAdmin
+      .from('newsletters')
+      .select('id, name, slug')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (newsletterError || !newsletter) {
+      throw new Error(`Failed to fetch newsletter: ${newsletterError?.message || 'No active newsletter found'}`)
+    }
+
+    console.log(`Found newsletter: ${newsletter.name} (${newsletter.slug}, ID: ${newsletter.id})`)
+
+    // STEP 2: Create new campaign for tomorrow (allow duplicate dates)
     console.log('Creating new campaign for tomorrow...')
 
     // Always create a new campaign (duplicate dates are now allowed)
@@ -264,6 +293,7 @@ export async function GET(request: NextRequest) {
         date: campaignDate,
         subject_line: '', // Will be generated later
         status: 'processing',
+        newsletter_id: newsletter.id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }])
@@ -275,7 +305,7 @@ export async function GET(request: NextRequest) {
     }
 
     campaignId = newCampaign.id
-    console.log('Created new campaign:', campaignId, 'for date:', campaignDate)
+    console.log('Created new campaign:', campaignId, 'for date:', campaignDate, 'newsletter_id:', newsletter.id)
 
     // Select prompt for the campaign immediately after creation
     console.log('Selecting prompt for campaign...')
@@ -286,35 +316,16 @@ export async function GET(request: NextRequest) {
       console.log('No prompts available for selection')
     }
 
-    // Select AI apps for the campaign
+    // Select AI apps for the campaign (using newsletter fetched earlier)
     console.log('=== SELECTING AI APPS FOR CAMPAIGN ===')
     try {
       const { AppSelector } = await import('@/lib/app-selector')
 
-      // Get the first active newsletter (dynamic, not hardcoded to 'accounting')
-      const { data: newsletter, error: newsletterError } = await supabaseAdmin
-        .from('newsletters')
-        .select('id, name, slug')
-        .eq('is_active', true)
-        .limit(1)
-        .single()
+      console.log(`Calling AppSelector.selectAppsForCampaign(${campaignId}, ${newsletter.id})...`)
+      const selectedApps = await AppSelector.selectAppsForCampaign(campaignId!, newsletter.id)
 
-      if (newsletterError) {
-        console.error('Error fetching newsletter:', newsletterError)
-        throw new Error(`Newsletter fetch error: ${newsletterError.message}`)
-      }
-
-      if (newsletter) {
-        console.log(`Found newsletter: ${newsletter.name} (${newsletter.slug}, ID: ${newsletter.id})`)
-        console.log(`Calling AppSelector.selectAppsForCampaign(${campaignId}, ${newsletter.id})...`)
-
-        const selectedApps = await AppSelector.selectAppsForCampaign(campaignId!, newsletter.id)
-
-        console.log(`✅ Successfully selected ${selectedApps.length} AI applications`)
-        console.log(`Selected apps:`, selectedApps.map(app => `${app.app_name} (${app.category})`).join(', '))
-      } else {
-        console.warn('⚠️ No active newsletter found, skipping AI app selection')
-      }
+      console.log(`✅ Successfully selected ${selectedApps.length} AI applications`)
+      console.log(`Selected apps:`, selectedApps.map(app => `${app.app_name} (${app.category})`).join(', '))
     } catch (appSelectionError) {
       console.error('❌ CRITICAL ERROR selecting AI apps:', appSelectionError)
       console.error('Error details:', appSelectionError instanceof Error ? appSelectionError.stack : 'No stack trace')
