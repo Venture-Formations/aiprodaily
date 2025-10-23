@@ -611,7 +611,6 @@ export interface NewsletterContent {
 export interface FactCheckResult {
   score: number
   details: string
-  passed: boolean
 }
 
 export interface SubjectLineGeneration {

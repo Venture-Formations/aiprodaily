@@ -1565,7 +1565,7 @@ export class RSSProcessor {
       ? promptOrResult
       : await callOpenAI(promptOrResult as string)
 
-    if (typeof result.score !== 'number' || typeof result.passed !== 'boolean') {
+    if (typeof result.score !== 'number' || typeof result.details !== 'string') {
       throw new Error('Invalid fact-check response')
     }
 

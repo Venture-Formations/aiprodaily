@@ -108,7 +108,7 @@ export async function GET() {
 
     console.log('Fact-check result:', factCheckResult)
 
-    if (typeof factCheckResult.score !== 'number' || typeof factCheckResult.passed !== 'boolean') {
+    if (typeof factCheckResult.score !== 'number' || typeof factCheckResult.details !== 'string') {
       return NextResponse.json({
         success: false,
         error: 'Invalid fact-check response',
@@ -117,7 +117,7 @@ export async function GET() {
       }, { status: 500 })
     }
 
-    console.log('Fact-check passed:', factCheckResult.passed, 'Score:', factCheckResult.score)
+    console.log('Fact-check score:', factCheckResult.score, 'Details:', factCheckResult.details)
 
     return NextResponse.json({
       success: true,
@@ -133,8 +133,8 @@ export async function GET() {
         word_count: newsletterResult.word_count
       },
       fact_check: {
-        passed: factCheckResult.passed,
         score: factCheckResult.score,
+        details: factCheckResult.details,
         accuracy_score: factCheckResult.accuracy_score,
         timeliness_score: factCheckResult.timeliness_score,
         explanation: factCheckResult.explanation
