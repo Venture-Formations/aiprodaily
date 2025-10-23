@@ -1554,8 +1554,13 @@ export class RSSProcessor {
   }
 
   private async factCheckContent(newsletterContent: string, originalContent: string): Promise<FactCheckResult> {
-    const prompt = await AI_PROMPTS.factChecker(newsletterContent, originalContent)
-    const result = await callOpenAI(prompt)
+    const promptOrResult = await AI_PROMPTS.factChecker(newsletterContent, originalContent)
+
+    // If we got an object with 'raw' property, it's already the result from structured prompt
+    // Otherwise, it's a prompt string that needs to be sent to OpenAI
+    const result = (typeof promptOrResult === 'object' && promptOrResult !== null && 'raw' in promptOrResult)
+      ? promptOrResult
+      : await callOpenAI(promptOrResult as string)
 
     if (typeof result.score !== 'number' || typeof result.passed !== 'boolean') {
       throw new Error('Invalid fact-check response')

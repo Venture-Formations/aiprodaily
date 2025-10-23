@@ -1016,9 +1016,35 @@ export const AI_PROMPTS = {
       }
 
       console.log('[AI] Using database prompt for factChecker')
+
+      // Check if the prompt is JSON (structured format) or plain text
+      try {
+        const promptConfig = JSON.parse(data.value) as StructuredPromptConfig
+
+        if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
+          console.log('[AI] Detected structured JSON prompt for factChecker')
+
+          // Support both camelCase and snake_case placeholders for backward compatibility
+          const placeholders = {
+            newsletterContent,
+            newsletter_content: newsletterContent,
+            originalContent: originalContent.substring(0, 2000),
+            original_content: originalContent.substring(0, 2000)
+          }
+
+          return await callWithStructuredPrompt(promptConfig, placeholders)
+        }
+      } catch (jsonError) {
+        // Not JSON, treat as plain text prompt
+        console.log('[AI] Using plain text prompt for factChecker')
+      }
+
+      // Plain text prompt - support both placeholder formats
       return data.value
         .replace(/\{\{newsletterContent\}\}/g, newsletterContent)
+        .replace(/\{\{newsletter_content\}\}/g, newsletterContent)
         .replace(/\{\{originalContent\}\}/g, originalContent.substring(0, 2000))
+        .replace(/\{\{original_content\}\}/g, originalContent.substring(0, 2000))
     } catch (error) {
       console.error('[AI] Error fetching factChecker prompt, using fallback:', error)
       return FALLBACK_PROMPTS.factChecker(newsletterContent, originalContent)
