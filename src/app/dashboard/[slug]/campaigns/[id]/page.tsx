@@ -27,6 +27,52 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 
 // Section Components
+function WelcomeSection({ campaign }: { campaign: any }) {
+  if (!campaign) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        No campaign data available
+      </div>
+    )
+  }
+
+  const hasContent = campaign.welcome_intro || campaign.welcome_tagline || campaign.welcome_summary
+
+  if (!hasContent) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        Welcome section has not been generated yet.
+        <br />
+        <span className="text-sm text-gray-400">
+          This will be automatically generated during RSS processing.
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-6">
+      <div className="border border-gray-200 rounded-lg bg-white shadow-sm p-6 space-y-3">
+        {campaign.welcome_intro && (
+          <div className="text-gray-700">
+            {campaign.welcome_intro}
+          </div>
+        )}
+        {campaign.welcome_tagline && (
+          <div className="text-gray-700 font-bold">
+            {campaign.welcome_tagline}
+          </div>
+        )}
+        {campaign.welcome_summary && (
+          <div className="text-gray-700">
+            {campaign.welcome_summary}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function WordleSection({ campaign }: { campaign: any }) {
   const [wordleData, setWordleData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -955,6 +1001,8 @@ function NewsletterSectionComponent({
 
     // Legacy name-based matching for other sections
     switch (section.name) {
+      case 'Welcome':
+        return <WelcomeSection campaign={campaign} />
       case 'Yesterday\'s Wordle':
         return <WordleSection campaign={campaign} />
       case 'Minnesota Getaways':
