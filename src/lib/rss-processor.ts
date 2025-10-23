@@ -1673,7 +1673,8 @@ export class RSSProcessor {
         throw updateError
       }
 
-      return finalWelcomeText
+      // Return combined welcome text for logging/debugging
+      return `${welcomeIntro} ${welcomeTagline} ${welcomeSummary}`.trim()
     } catch (error) {
       console.error('[RSS] Failed to generate welcome section:', error)
       // Don't fail the entire process if welcome fails
