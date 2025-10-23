@@ -340,7 +340,11 @@ export class MailerLiteService {
     const footer = await generateNewsletterFooter(campaign.date, mailerliteId)
 
     // Generate welcome section (if it exists)
-    const welcomeHtml = await generateWelcomeSection(campaign.welcome_section || '')
+    const welcomeHtml = await generateWelcomeSection(
+      campaign.welcome_intro || null,
+      campaign.welcome_tagline || null,
+      campaign.welcome_summary || null
+    )
 
     // Review banner for review campaigns
     const reviewBanner = isReview ? `

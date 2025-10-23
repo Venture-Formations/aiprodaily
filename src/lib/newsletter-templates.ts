@@ -251,23 +251,38 @@ async function fetchBusinessColors(): Promise<{ primaryColor: string; secondaryC
 
 // ==================== WELCOME SECTION ====================
 
-export async function generateWelcomeSection(welcomeText: string): Promise<string> {
-  if (!welcomeText || welcomeText.trim() === '') {
+export async function generateWelcomeSection(
+  intro: string | null,
+  tagline: string | null,
+  summary: string | null
+): Promise<string> {
+  // Skip if all 3 parts are empty
+  if ((!intro || intro.trim() === '') &&
+      (!tagline || tagline.trim() === '') &&
+      (!summary || summary.trim() === '')) {
     return ''
   }
 
-  const { primaryColor } = await fetchBusinessColors()
+  // Build HTML for each part (only include non-empty parts)
+  const introPart = intro && intro.trim()
+    ? `<div style="font-size: 16px; line-height: 24px; color: #333; font-family: Arial, sans-serif; margin-bottom: 8px;">${intro.replace(/\n/g, '<br>')}</div>`
+    : ''
 
-  // Convert line breaks to <br> tags for email compatibility
-  const formattedText = welcomeText.replace(/\n/g, '<br>')
+  const taglinePart = tagline && tagline.trim()
+    ? `<div style="font-size: 16px; line-height: 24px; color: #333; font-family: Arial, sans-serif; font-weight: bold; margin-bottom: 8px;">${tagline.replace(/\n/g, '<br>')}</div>`
+    : ''
+
+  const summaryPart = summary && summary.trim()
+    ? `<div style="font-size: 16px; line-height: 24px; color: #333; font-family: Arial, sans-serif;">${summary.replace(/\n/g, '<br>')}</div>`
+    : ''
 
   return `
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff;">
   <tr>
     <td style="padding: 20px;">
-      <div style="font-size: 16px; line-height: 24px; color: #333; font-family: Arial, sans-serif;">
-        ${formattedText}
-      </div>
+      ${introPart}
+      ${taglinePart}
+      ${summaryPart}
     </td>
   </tr>
 </table>

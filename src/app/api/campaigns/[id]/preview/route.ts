@@ -183,7 +183,11 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
     const footer = await generateNewsletterFooter(campaign.date, mailerliteId)
 
     // Generate welcome section (if it exists)
-    const welcomeHtml = await generateWelcomeSection(campaign.welcome_section || '')
+    const welcomeHtml = await generateWelcomeSection(
+      campaign.welcome_intro || null,
+      campaign.welcome_tagline || null,
+      campaign.welcome_summary || null
+    )
 
     // Section ID constants (reference IDs from newsletter_sections table)
     // These IDs are stable and won't change even if section names are updated

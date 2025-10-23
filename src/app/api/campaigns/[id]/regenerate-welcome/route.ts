@@ -93,10 +93,31 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     console.log('[API] Welcome section generated (length:', finalWelcomeText.length, ')')
 
-    // Save to campaign
+    // Parse JSON response to extract intro, tagline, and summary
+    let welcomeIntro = ''
+    let welcomeTagline = ''
+    let welcomeSummary = ''
+
+    try {
+      const welcomeJson = JSON.parse(finalWelcomeText)
+      welcomeIntro = welcomeJson.intro || ''
+      welcomeTagline = welcomeJson.tagline || ''
+      welcomeSummary = welcomeJson.summary || ''
+      console.log('[API] Parsed welcome JSON - intro:', welcomeIntro.length, 'tagline:', welcomeTagline.length, 'summary:', welcomeSummary.length)
+    } catch (parseError) {
+      console.error('[API] Failed to parse welcome JSON, using fallback:', parseError)
+      // Fallback: use entire text as summary if JSON parsing fails
+      welcomeSummary = finalWelcomeText
+    }
+
+    // Save all 3 parts to campaign
     const { error: updateError } = await supabaseAdmin
       .from('newsletter_campaigns')
-      .update({ welcome_section: finalWelcomeText })
+      .update({
+        welcome_intro: welcomeIntro,
+        welcome_tagline: welcomeTagline,
+        welcome_summary: welcomeSummary
+      })
       .eq('id', campaignId)
 
     if (updateError) {
@@ -129,7 +150,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({
       success: true,
-      welcome_section: finalWelcomeText,
+      welcome_intro: welcomeIntro,
+      welcome_tagline: welcomeTagline,
+      welcome_summary: welcomeSummary,
       article_count: allArticles.length
     })
 
