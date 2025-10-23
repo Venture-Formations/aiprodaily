@@ -1119,40 +1119,42 @@ export const AI_PROMPTS = {
       }
 
       console.log('[AI] Using database prompt for welcomeSection')
-      console.log('[AI] data.value type:', typeof data.value)
-      console.log('[AI] data.value preview:', JSON.stringify(data.value).substring(0, 100))
 
       // Format articles for the prompt
       const articlesText = articles
         .map((article, index) => `${index + 1}. ${article.headline}\n   ${article.content.substring(0, 200)}...`)
         .join('\n\n')
 
-      // Check if structured JSON prompt
-      try {
-        // If data.value is already an object (JSONB column), use it directly. Otherwise, parse it.
-        const promptConfig = (typeof data.value === 'string'
-          ? JSON.parse(data.value)
-          : data.value) as StructuredPromptConfig
+      // After migration, data.value is always a JSONB string
+      // We need to parse it to get the actual content
+      let promptValue: string | StructuredPromptConfig
 
-        console.log('[AI] promptConfig has messages?', !!promptConfig.messages)
-        console.log('[AI] messages is array?', Array.isArray(promptConfig.messages))
+      try {
+        // Parse the JSONB string to get the original value
+        promptValue = typeof data.value === 'string' ? JSON.parse(data.value) : data.value
+      } catch (parseError) {
+        // If parsing fails, use as-is (shouldn't happen after migration)
+        console.log('[AI] Could not parse JSONB value, using as-is')
+        promptValue = data.value as string
+      }
+
+      // Check if it's a structured prompt (has messages array)
+      if (typeof promptValue === 'object' && promptValue !== null && 'messages' in promptValue) {
+        const promptConfig = promptValue as StructuredPromptConfig
 
         if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
-          console.log('[AI] Detected structured JSON prompt for welcomeSection')
+          console.log('[AI] Using structured JSON prompt for welcomeSection')
           const placeholders = {
             articles: articlesText
           }
           return await callWithStructuredPrompt(promptConfig, placeholders)
-        } else {
-          console.log('[AI] Not a structured prompt - missing or invalid messages array')
         }
-      } catch (jsonError) {
-        console.log('[AI] Error parsing welcomeSection prompt:', jsonError instanceof Error ? jsonError.message : 'Unknown error')
-        console.log('[AI] Using plain text prompt for welcomeSection')
       }
 
-      // Plain text prompt
-      return data.value.replace(/\{\{articles\}\}/g, articlesText)
+      // Plain text prompt - promptValue should be a string
+      console.log('[AI] Using plain text prompt for welcomeSection')
+      const promptText = typeof promptValue === 'string' ? promptValue : String(promptValue)
+      return promptText.replace(/\{\{articles\}\}/g, articlesText)
     } catch (error) {
       console.error('[AI] Error fetching welcomeSection prompt, using fallback:', error)
       return FALLBACK_PROMPTS.welcomeSection(articles)
