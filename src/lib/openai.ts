@@ -1431,6 +1431,7 @@ export interface OpenAICallOptions {
 // Interface for structured prompt stored in database
 export interface StructuredPromptConfig {
   model?: string
+  max_tokens?: number
   temperature?: number
   top_p?: number
   presence_penalty?: number
@@ -1468,6 +1469,7 @@ export async function callWithStructuredPrompt(
     systemPrompt,
     examples,
     userPrompt,
+    maxTokens: promptConfig.max_tokens,
     temperature: promptConfig.temperature,
     topP: promptConfig.top_p,
     presencePenalty: promptConfig.presence_penalty,
