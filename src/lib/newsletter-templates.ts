@@ -249,6 +249,31 @@ async function fetchBusinessColors(): Promise<{ primaryColor: string; secondaryC
   }
 }
 
+// ==================== WELCOME SECTION ====================
+
+export async function generateWelcomeSection(welcomeText: string): Promise<string> {
+  if (!welcomeText || welcomeText.trim() === '') {
+    return ''
+  }
+
+  const { primaryColor } = await fetchBusinessColors()
+
+  // Convert line breaks to <br> tags for email compatibility
+  const formattedText = welcomeText.replace(/\n/g, '<br>')
+
+  return `
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff;">
+  <tr>
+    <td style="padding: 20px;">
+      <div style="font-size: 16px; line-height: 24px; color: #333; font-family: Arial, sans-serif;">
+        ${formattedText}
+      </div>
+    </td>
+  </tr>
+</table>
+<br>`
+}
+
 // ==================== PRIMARY ARTICLES SECTION ====================
 
 export async function generatePrimaryArticlesSection(articles: any[], campaignDate: string, campaignId: string | undefined, sectionName: string): Promise<string> {

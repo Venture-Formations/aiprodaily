@@ -353,6 +353,54 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Test Welcome Section
+    if (promptType === 'all' || promptType === 'welcomeSection') {
+      console.log('Testing Welcome Section...')
+      try {
+        // Fetch sample articles for testing
+        const testArticles = [
+          {
+            headline: 'AI Tool Revolutionizes Tax Preparation for CPAs',
+            content: 'A new AI-powered tax software is helping accounting firms reduce preparation time by 60% while improving accuracy. The tool uses machine learning to identify deductions and flag potential issues before filing.'
+          },
+          {
+            headline: 'AICPA Issues New Guidelines on AI Use in Auditing',
+            content: 'The American Institute of CPAs released comprehensive guidelines for using artificial intelligence in audit procedures, emphasizing the need for human oversight and validation of AI-generated insights.'
+          },
+          {
+            headline: 'Cloud Accounting Platform Adds Real-Time Anomaly Detection',
+            content: 'QuickBooks announced a new feature that uses AI to detect unusual transactions in real-time, alerting accountants to potential fraud or errors before they become major issues.'
+          },
+          {
+            headline: 'Study Shows 78% of Accounting Firms Plan AI Adoption',
+            content: 'A recent survey reveals that the majority of accounting firms are planning to adopt AI tools within the next 18 months, primarily for automation of routine tasks and enhanced data analysis.'
+          },
+          {
+            headline: 'New IRS Ruling Addresses AI-Generated Tax Forms',
+            content: 'The Internal Revenue Service has issued guidance on the use of AI-generated tax documents, clarifying requirements for review and validation by licensed professionals.'
+          }
+        ]
+
+        const prompt = await AI_PROMPTS.welcomeSection(testArticles)
+        console.log('[TEST] Prompt type:', typeof prompt === 'string' ? 'string' : 'structured')
+
+        const response = await callOpenAI(prompt, 300, 0.8)
+
+        results.welcomeSection = {
+          success: true,
+          response,
+          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
+          prompt_preview: typeof prompt === 'string' ? prompt.substring(0, 500) + '...' : 'Structured JSON prompt',
+          test_articles_count: testArticles.length
+        }
+      } catch (error) {
+        results.welcomeSection = {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: 'AI Prompts Test Results',
