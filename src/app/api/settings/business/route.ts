@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth'
 const BUSINESS_SETTINGS_KEYS = [
   'newsletter_name',
   'business_name',
+  'subject_line_emoji',
   'primary_color',
   'secondary_color',
   'header_image_url',
