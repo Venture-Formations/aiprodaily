@@ -31,8 +31,8 @@ export function Hero() {
       const data = await response.json()
 
       if (response.ok) {
-        // Redirect to personalization form
-        window.location.href = 'https://lunar-beneficial-spruce.heyflow.site/ai-accounting-daily-personalization-'
+        // Redirect to personalization form with email parameter
+        window.location.href = `https://lunar-beneficial-spruce.heyflow.site/ai-accounting-daily-personalization-?email=${encodeURIComponent(email)}`
       } else {
         setError(data.error || 'Subscription failed. Please try again.')
         setIsSubmitting(false)
