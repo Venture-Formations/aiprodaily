@@ -1,6 +1,78 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AppSelector } from '@/lib/app-selector'
+import type { AIApplication } from '@/types/database'
+
+/**
+ * Simulate app selection without updating database
+ * This replicates the core selection logic for dry-run testing
+ */
+async function simulateAppSelection(campaignId: string, newsletterId: string): Promise<AIApplication[]> {
+  // Get settings
+  const { data: settings } = await supabaseAdmin
+    .from('app_settings')
+    .select('key, value')
+    .or('key.like.ai_apps_%,key.eq.affiliate_cooldown_days')
+
+  const settingsMap = new Map(settings?.map(s => [s.key, parseInt(s.value || '0')]) || [])
+  const totalApps = settingsMap.get('ai_apps_per_newsletter') || 6
+  const affiliateCooldownDays = settingsMap.get('affiliate_cooldown_days') || 7
+
+  // Get all active apps
+  const { data: allApps } = await supabaseAdmin
+    .from('ai_applications')
+    .select('*')
+    .eq('newsletter_id', newsletterId)
+    .eq('is_active', true)
+
+  if (!allApps || allApps.length === 0) return []
+
+  // Simple random selection with affiliate weighting and cooldown
+  const eligibleApps = allApps.filter(app => {
+    if (!app.is_affiliate) return true // Non-affiliates always eligible
+
+    if (!app.last_used_date) return true // Never used, eligible
+
+    const daysSinceLastUsed = Math.floor(
+      (Date.now() - new Date(app.last_used_date).getTime()) / (1000 * 60 * 60 * 24)
+    )
+
+    return daysSinceLastUsed >= affiliateCooldownDays // Affiliate eligible if past cooldown
+  })
+
+  // Create weighted pool (affiliates 3x)
+  const weightedPool: AIApplication[] = []
+  for (const app of eligibleApps) {
+    if (app.is_affiliate) {
+      weightedPool.push(app, app, app) // 3x weight
+    } else {
+      weightedPool.push(app) // 1x weight
+    }
+  }
+
+  // Random select up to totalApps
+  const selected: AIApplication[] = []
+  const selectedIds = new Set<string>()
+
+  while (selected.length < totalApps && weightedPool.length > 0) {
+    const randomIndex = Math.floor(Math.random() * weightedPool.length)
+    const selectedApp = weightedPool[randomIndex]
+
+    if (!selectedIds.has(selectedApp.id)) {
+      selected.push(selectedApp)
+      selectedIds.add(selectedApp.id)
+    }
+
+    // Remove all instances of this app from pool
+    for (let i = weightedPool.length - 1; i >= 0; i--) {
+      if (weightedPool[i].id === selectedApp.id) {
+        weightedPool.splice(i, 1)
+      }
+    }
+  }
+
+  return selected
+}
 
 /**
  * GET /api/debug/test-affiliate-selection
@@ -10,12 +82,14 @@ import { AppSelector } from '@/lib/app-selector'
  * Query params:
  * - campaignId: (optional) Use existing campaign, or creates test campaign
  * - reset: (optional) Set to 'true' to clear existing selections first
+ * - dryRun: (optional) Set to 'true' to simulate without updating database
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const campaignId = searchParams.get('campaignId')
     const reset = searchParams.get('reset') === 'true'
+    const dryRun = searchParams.get('dryRun') === 'true'
 
     let testCampaignId = campaignId
 
@@ -95,7 +169,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to get or create campaign' }, { status: 500 })
     }
 
-    const selectedApps = await AppSelector.selectAppsForCampaign(testCampaignId, newsletter.id)
+    let selectedApps
+    if (dryRun) {
+      // Dry run: Simulate selection without updating database
+      selectedApps = await simulateAppSelection(testCampaignId, newsletter.id)
+    } else {
+      // Real run: Actually select and update database
+      selectedApps = await AppSelector.selectAppsForCampaign(testCampaignId, newsletter.id)
+    }
 
     // Get detailed info about all apps for comparison
     const affiliateCooldownDays = parseInt(settingsMap.affiliate_cooldown_days || '7')
@@ -131,6 +212,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      dry_run: dryRun,
       campaign_id: testCampaignId,
       settings: {
         total_apps: settingsMap.ai_apps_per_newsletter || '6',
