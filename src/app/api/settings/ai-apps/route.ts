@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     const { data: settings } = await supabaseAdmin
       .from('app_settings')
       .select('key, value, description')
-      .like('key', 'ai_apps_%')
+      .or('key.like.ai_apps_%,key.eq.affiliate_cooldown_days')
       .order('key')
 
     // Convert to object for easier access
@@ -49,7 +49,8 @@ export async function PATCH(request: NextRequest) {
 
     // Update each setting
     for (const [key, value] of Object.entries(settings)) {
-      if (!key.startsWith('ai_apps_')) {
+      // Only update ai_apps_ settings and affiliate_cooldown_days
+      if (!key.startsWith('ai_apps_') && key !== 'affiliate_cooldown_days') {
         continue // Skip non-AI-app settings
       }
 
