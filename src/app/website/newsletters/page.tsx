@@ -20,10 +20,10 @@ export default async function NewslettersPage() {
   const primaryColor = settings?.find(s => s.key === 'primary_color')?.value || '#1c293d'
   const currentYear = new Date().getFullYear()
 
-  // Fetch newsletters
+  // Fetch newsletters with articles data for images
   const { data: newsletters } = await supabaseAdmin
     .from('archived_newsletters')
-    .select('id, campaign_date, subject_line, send_date, metadata')
+    .select('id, campaign_date, subject_line, send_date, metadata, articles')
     .order('campaign_date', { ascending: false })
 
   return (

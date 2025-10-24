@@ -20,6 +20,14 @@ interface Newsletter {
     has_ai_apps?: boolean
     has_poll?: boolean
   }
+  articles?: Array<{
+    id: string
+    headline: string
+    rss_post?: {
+      image_url?: string
+      title?: string
+    }
+  }>
 }
 
 interface NewslettersListProps {
@@ -85,16 +93,35 @@ export function NewslettersList({ newsletters }: NewslettersListProps) {
             const metadata = newsletter.metadata || {}
             const totalArticles = (metadata.total_articles || 0) + (metadata.total_secondary_articles || 0)
 
+            // Get first article's image
+            const firstArticle = newsletter.articles?.[0]
+            const imageUrl = firstArticle?.rss_post?.image_url
+            const placeholderSvg = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600"%3E%3Crect width="800" height="600" fill="%23e5e7eb"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="24" fill="%239ca3af"%3EAI Accounting Daily%3C/text%3E%3C/svg%3E'
+
             return (
               <Link key={newsletter.id} href={`/website/newsletter/${newsletter.campaign_date}`}>
-                <Card className="group cursor-pointer hover:shadow-lg transition-shadow overflow-hidden p-0 bg-white border-border h-full">
-                  <div className="px-4 pt-4 pb-4">
+                <Card className="group cursor-pointer hover:shadow-lg transition-shadow overflow-hidden p-0 bg-white border-border h-full flex flex-col">
+                  {/* Image */}
+                  <div className="relative w-full h-48 bg-gray-100 overflow-hidden">
+                    <img
+                      src={imageUrl || placeholderSvg}
+                      alt={firstArticle?.headline || newsletter.subject_line}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        // Fallback to placeholder if image fails to load
+                        e.currentTarget.src = placeholderSvg
+                      }}
+                    />
+                  </div>
+
+                  {/* Content */}
+                  <div className="px-4 pt-4 pb-4 flex-1 flex flex-col">
                     <div className="flex items-center gap-2 text-xs text-[#1D1D1F]/60 mb-1.5">
                       <Calendar className="w-3.5 h-3.5" />
                       <span>{formatDate(newsletter.send_date)}</span>
                     </div>
 
-                    <h3 className="text-base font-bold text-[#1D1D1F] mb-2 group-hover:text-[#a855f7] transition-colors leading-tight">
+                    <h3 className="text-base font-bold text-[#1D1D1F] mb-2 group-hover:text-[#a855f7] transition-colors leading-tight flex-1">
                       {newsletter.subject_line}
                     </h3>
 
