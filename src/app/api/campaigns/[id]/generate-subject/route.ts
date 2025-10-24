@@ -110,7 +110,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Generate subject line using AI with just the top article
     // Add timestamp to prompt for variation each time
-    const variationPrompt = await AI_PROMPTS.subjectLineGenerator([topArticle]) +
+    const variationPrompt = await AI_PROMPTS.subjectLineGenerator(topArticle) +
       `\n\nGeneration timestamp: ${new Date().toISOString()} - Create a fresh, unique headline variation.`
 
     console.log('=== FULL PROMPT BEING SENT TO AI ===')

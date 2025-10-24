@@ -1781,7 +1781,7 @@ export class RSSProcessor {
 
       // Generate subject line using AI
       const timestamp = new Date().toISOString()
-      const subjectPrompt = await AI_PROMPTS.subjectLineGenerator([topArticle]) + `\n\nTimestamp: ${timestamp}`
+      const subjectPrompt = await AI_PROMPTS.subjectLineGenerator(topArticle) + `\n\nTimestamp: ${timestamp}`
 
       console.log('Generating AI subject line...')
       const aiResponse = await callOpenAI(subjectPrompt, 100, 0.8)

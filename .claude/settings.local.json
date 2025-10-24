@@ -60,7 +60,8 @@
       "WebFetch(domain:www.aiaccountingdaily.com)",
       "Bash(git revert:*)",
       "Bash(npm uninstall:*)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Bash(default:\"Accounting Pro\"}!\" to welcome section intro\n- Implement cleanMergeTags() helper to strip merge tags for website display\n- Email subscribers see personalized name, website visitors see default\n- Greeting prepended in both newsletter-templates.ts and newsletter-archiver.ts\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []

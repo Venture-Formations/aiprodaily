@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     console.log(`Generating subject line based on #1 ranked article: "${topArticle.headline}" (rank: ${topArticle.rank || 'unranked'}, score: ${topArticle.rss_post?.post_rating?.[0]?.total_score || 0})`)
 
     // Generate subject line using AI with just the top article
-    const prompt = await AI_PROMPTS.subjectLineGenerator([topArticle])
+    const prompt = await AI_PROMPTS.subjectLineGenerator(topArticle)
     const result = await callOpenAI(prompt, 1000, 0.8)
 
     if (!result.subject_line) {

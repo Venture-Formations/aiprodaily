@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
 
       if (activeArticles.length > 0) {
         const topArticle = activeArticles[0]
-        const subjectPrompt = await AI_PROMPTS.subjectLineGenerator([topArticle]) + `\n\nTimestamp: ${new Date().toISOString()}`
+        const subjectPrompt = await AI_PROMPTS.subjectLineGenerator(topArticle) + `\n\nTimestamp: ${new Date().toISOString()}`
 
         try {
           const aiResponse = await callOpenAI(subjectPrompt, 100, 0.8)
