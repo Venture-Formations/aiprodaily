@@ -263,9 +263,13 @@ export async function generateWelcomeSection(
     return ''
   }
 
+  // Prepend personalized greeting to intro
+  const greeting = 'Hey, {$name|default:"Accounting Pro"}!'
+  const fullIntro = intro && intro.trim() ? `${greeting} ${intro.trim()}` : greeting
+
   // Build HTML for each part (only include non-empty parts)
-  const introPart = intro && intro.trim()
-    ? `<div style="font-size: 16px; line-height: 24px; color: #333; font-family: Arial, sans-serif; margin-bottom: 8px;">${intro.replace(/\n/g, '<br>')}</div>`
+  const introPart = fullIntro
+    ? `<div style="font-size: 16px; line-height: 24px; color: #333; font-family: Arial, sans-serif; margin-bottom: 8px;">${fullIntro.replace(/\n/g, '<br>')}</div>`
     : ''
 
   const taglinePart = tagline && tagline.trim()

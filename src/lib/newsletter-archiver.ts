@@ -86,8 +86,13 @@ export class NewsletterArchiver {
 
       // Welcome section
       if (campaign && (campaign.welcome_intro || campaign.welcome_tagline || campaign.welcome_summary)) {
+        // Prepend personalized greeting to intro for email
+        const greeting = 'Hey, {$name|default:"Accounting Pro"}!'
+        const intro = campaign.welcome_intro || ''
+        const fullIntro = intro.trim() ? `${greeting} ${intro.trim()}` : greeting
+
         sections.welcome = {
-          intro: campaign.welcome_intro || '',
+          intro: fullIntro,
           tagline: campaign.welcome_tagline || '',
           summary: campaign.welcome_summary || ''
         }

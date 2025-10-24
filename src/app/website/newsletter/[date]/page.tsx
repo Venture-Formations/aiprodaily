@@ -11,6 +11,14 @@ interface PageProps {
   params: Promise<{ date: string }>
 }
 
+// Helper function to clean MailerLite merge tags for website display
+function cleanMergeTags(text: string): string {
+  // Replace {$name|default:"Accounting Pro"} with "Accounting Pro"
+  return text.replace(/\{\$name\|default:"([^"]+)"\}/g, '$1')
+    // Handle other merge tag patterns if needed
+    .replace(/\{\$[^}]+\}/g, '') // Remove any other merge tags
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { date } = await params
   const newsletter = await newsletterArchiver.getArchivedNewsletter(date)
@@ -110,17 +118,17 @@ export default async function NewsletterPage({ params }: PageProps) {
                   <div className="space-y-3">
                     {welcome.intro && (
                       <div className="text-[#1D1D1F] leading-relaxed whitespace-pre-wrap">
-                        {welcome.intro}
+                        {cleanMergeTags(welcome.intro)}
                       </div>
                     )}
                     {welcome.tagline && (
                       <div className="text-[#1D1D1F] leading-relaxed font-bold whitespace-pre-wrap">
-                        {welcome.tagline}
+                        {cleanMergeTags(welcome.tagline)}
                       </div>
                     )}
                     {welcome.summary && (
                       <div className="text-[#1D1D1F] leading-relaxed whitespace-pre-wrap">
-                        {welcome.summary}
+                        {cleanMergeTags(welcome.summary)}
                       </div>
                     )}
                   </div>
