@@ -94,7 +94,7 @@ export async function generateSubjectLine(campaignId: string, userEmail?: string
     console.log(`Auto-generating subject line based on current #1 article: "${topArticle.headline}" (rank: ${topArticle.rank || 'unranked'})`)
 
     // Generate subject line using AI
-    const variationPrompt = await AI_PROMPTS.subjectLineGenerator([topArticle]) +
+    const variationPrompt = await AI_PROMPTS.subjectLineGenerator(topArticle) +
       `\n\nGeneration timestamp: ${new Date().toISOString()} - Create a fresh, unique headline variation.`
 
     const result = await callOpenAI(variationPrompt, 1000, 0.8)

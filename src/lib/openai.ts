@@ -234,11 +234,12 @@ Respond with valid JSON in this exact format:
   "word_count": <exact word count>
 }`,
 
-  subjectLineGenerator: (articles: Array<{ headline: string; content: string }>) => `
-Craft a front-page newspaper headline for the next-day edition based on the most interesting article.
+  subjectLineGenerator: (top_article: { headline: string; content: string }) => `
+Craft a front-page newspaper headline for the next-day edition based on the top-ranked article.
 
-Articles in this newsletter:
-${articles.map((article, i) => `${i + 1}. ${article.headline}\n   ${article.content.substring(0, 100)}...`).join('\n\n')}
+Top Article (Rank #1):
+Headline: ${top_article.headline}
+Content: ${top_article.content.substring(0, 200)}...
 
 HARD RULES:
 - ≤ 40 characters (count every space and punctuation) - this allows room for ice cream emoji prefix
@@ -1009,9 +1010,9 @@ export const AI_PROMPTS = {
     }
   },
 
-  subjectLineGenerator: async (articles: Array<{ headline: string; content: string }>) => {
+  subjectLineGenerator: async (top_article: { headline: string; content: string }) => {
     // subjectLineGenerator doesn't support database templates - always use fallback
-    return FALLBACK_PROMPTS.subjectLineGenerator(articles)
+    return FALLBACK_PROMPTS.subjectLineGenerator(top_article)
   },
 
   roadWorkGenerator: async (campaignDate: string) => {
