@@ -120,6 +120,7 @@ export interface NewsletterCampaign {
 export interface ArchivedNewsletter {
   id: string
   campaign_id: string
+  newsletter_id: string
   campaign_date: string  // Date in YYYY-MM-DD format for URL
   subject_line: string
   send_date: string  // Timestamp when sent

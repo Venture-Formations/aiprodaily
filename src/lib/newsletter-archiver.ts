@@ -20,10 +20,10 @@ export class NewsletterArchiver {
 
       console.log(`Archiving newsletter for campaign ${campaignId} (${campaignDate})...`)
 
-      // 1. Fetch campaign data (including welcome section)
+      // 1. Fetch campaign data (including welcome section and newsletter_id)
       const { data: campaign, error: campaignError } = await supabaseAdmin
         .from('newsletter_campaigns')
-        .select('welcome_intro, welcome_tagline, welcome_summary')
+        .select('newsletter_id, welcome_intro, welcome_tagline, welcome_summary')
         .eq('id', campaignId)
         .single()
 
@@ -178,6 +178,7 @@ export class NewsletterArchiver {
       // 5. Create archive record
       const archiveData: Partial<ArchivedNewsletter> = {
         campaign_id: campaignId,
+        newsletter_id: campaign.newsletter_id,
         campaign_date: campaignDate,
         subject_line: subjectLine,
         send_date: new Date().toISOString(),
