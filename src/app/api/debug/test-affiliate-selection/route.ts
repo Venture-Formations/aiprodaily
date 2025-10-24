@@ -91,6 +91,10 @@ export async function GET(request: NextRequest) {
       .order('app_name')
 
     // Run selection logic
+    if (!testCampaignId) {
+      return NextResponse.json({ error: 'Failed to get or create campaign' }, { status: 500 })
+    }
+
     const selectedApps = await AppSelector.selectAppsForCampaign(testCampaignId, newsletter.id)
 
     // Get detailed info about all apps for comparison
