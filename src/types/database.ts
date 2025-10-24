@@ -48,6 +48,7 @@ export interface AIApplication {
   category_priority: number
   is_featured: boolean
   is_paid_placement: boolean
+  is_affiliate: boolean
   is_active: boolean
   display_order: number | null
   last_used_date: string | null

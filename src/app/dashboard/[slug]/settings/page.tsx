@@ -5095,6 +5095,26 @@ function AIAppsSettings() {
         <p className="text-sm text-gray-500 mt-1">Default: 6 apps</p>
       </div>
 
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Affiliate App Cooldown (Days)
+        </label>
+        <input
+          type="number"
+          min="1"
+          max="90"
+          value={settings.affiliate_cooldown_days || 7}
+          onChange={(e) => handleChange('affiliate_cooldown_days', parseInt(e.target.value) || 7)}
+          className="w-32 border border-gray-300 rounded px-3 py-2"
+        />
+        <p className="text-sm text-gray-500 mt-1">
+          Days before the same affiliate app can appear again. Default: 7 days
+        </p>
+        <p className="text-sm text-gray-400 mt-1">
+          Non-affiliate apps cycle through all before repeating (no cooldown)
+        </p>
+      </div>
+
       <div className="space-y-4 mb-6">
         <h3 className="text-lg font-semibold text-gray-900">Category Counts</h3>
         {categories.map(({ key, label, color }) => (
@@ -5125,7 +5145,9 @@ function AIAppsSettings() {
           <li>• Apps are selected automatically when creating a new campaign</li>
           <li>• Categories with count &gt; 0 are "must-have" (always included)</li>
           <li>• Categories with count = 0 are "fillers" (used to reach total apps)</li>
-          <li>• Apps rotate: each app is used before cycling through again</li>
+          <li>• <strong>Affiliate apps have 3x higher selection priority</strong> (more likely to appear)</li>
+          <li>• Affiliate apps cannot repeat within cooldown period (configurable above)</li>
+          <li>• Non-affiliate apps rotate: each app is used before cycling through again</li>
           <li>• Within each category, unused apps are prioritized</li>
           <li>• If a category runs out of apps, other categories can provide more to reach the total</li>
         </ul>

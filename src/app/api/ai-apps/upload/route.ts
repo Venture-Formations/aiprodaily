@@ -6,15 +6,16 @@ import type { AIAppCategory, ToolType } from '@/types/database'
  * POST /api/ai-apps/upload - Upload CSV file with AI applications
  *
  * CSV Format:
- * Tool Name, Category, Tool Type, Home Page, Description, Tagline
+ * Tool Name, Category, Tool Type, Link, Description, Tagline, Affiliate
  *
  * Column Mappings:
  * - Tool Name → app_name
  * - Category → category (must match: Payroll, HR, Accounting System, Finance, Productivity, Client Management, Banking)
  * - Tool Type → tool_type (must be: Client or Firm)
- * - Home Page → app_url
+ * - Link → app_url (also accepts: Home Page, URL)
  * - Description → description
  * - Tagline → tagline
+ * - Affiliate → is_affiliate (optional: yes/true/1 = affiliate, anything else = non-affiliate)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -79,17 +80,21 @@ export async function POST(request: NextRequest) {
         })
 
         // Map CSV columns to database fields
+        const affiliateValue = row['Affiliate']?.trim()?.toLowerCase() || ''
+        const isAffiliate = ['yes', 'true', '1', 'y'].includes(affiliateValue)
+
         const app: any = {
           newsletter_id: newsletter.id,
           app_name: row['Tool Name']?.trim() || row['tool name']?.trim() || row['App Name']?.trim() || null,
           category: row['Category']?.trim() || null,
           tool_type: row['Tool Type']?.trim() || row['tool type']?.trim() || 'Client',
-          app_url: row['Home Page']?.trim() || row['home page']?.trim() || row['URL']?.trim() || null,
+          app_url: row['Link']?.trim() || row['link']?.trim() || row['Home Page']?.trim() || row['home page']?.trim() || row['URL']?.trim() || null,
           description: row['Description']?.trim() || null,
           tagline: row['Tagline']?.trim() || null,
           is_active: true,
           is_featured: false,
           is_paid_placement: false,
+          is_affiliate: isAffiliate,
           category_priority: 0,
           times_used: 0
         }
@@ -101,7 +106,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (!app.app_url) {
-          errors.push(`Row ${i + 1}: Missing app URL (Home Page)`)
+          errors.push(`Row ${i + 1}: Missing app URL (Link column)`)
           continue
         }
 

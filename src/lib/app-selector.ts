@@ -13,16 +13,19 @@ export class AppSelector {
   private static async getAppSettings(): Promise<{
     totalApps: number
     categoryCounts: CategoryCount[]
+    affiliateCooldownDays: number
   }> {
     try {
       const { data: settings } = await supabaseAdmin
         .from('app_settings')
         .select('key, value')
         .like('key', 'ai_apps_%')
+        .or('key.like.ai_apps_%,key.eq.affiliate_cooldown_days')
 
       const settingsMap = new Map(settings?.map(s => [s.key, parseInt(s.value || '0')]) || [])
 
       const totalApps = settingsMap.get('ai_apps_per_newsletter') || 6
+      const affiliateCooldownDays = settingsMap.get('affiliate_cooldown_days') || 7
 
       const categoryCounts: CategoryCount[] = [
         { category: 'Payroll', count: settingsMap.get('ai_apps_payroll_count') || 0 },
@@ -34,12 +37,13 @@ export class AppSelector {
         { category: 'Banking', count: settingsMap.get('ai_apps_banking_count') || 0 },
       ]
 
-      return { totalApps, categoryCounts }
+      return { totalApps, categoryCounts, affiliateCooldownDays }
     } catch (error) {
       console.error('Error fetching app settings:', error)
       // Return defaults
       return {
         totalApps: 6,
+        affiliateCooldownDays: 7,
         categoryCounts: [
           { category: 'Payroll', count: 2 },
           { category: 'HR', count: 1 },
@@ -75,11 +79,53 @@ export class AppSelector {
   }
 
   /**
-   * Select random app from array
+   * Check if an affiliate app is within cooldown period
    */
-  private static selectRandomApp(apps: AIApplication[]): AIApplication | null {
+  private static isInCooldown(app: AIApplication, cooldownDays: number): boolean {
+    if (!app.is_affiliate || !app.last_used_date) {
+      return false
+    }
+
+    const lastUsed = new Date(app.last_used_date)
+    const now = new Date()
+    const daysSinceLastUsed = Math.floor((now.getTime() - lastUsed.getTime()) / (1000 * 60 * 60 * 24))
+
+    return daysSinceLastUsed < cooldownDays
+  }
+
+  /**
+   * Select random app from array with affiliate priority weighting
+   * Affiliates have 3x higher chance of being selected
+   */
+  private static selectRandomApp(
+    apps: AIApplication[],
+    cooldownDays: number = 0
+  ): AIApplication | null {
     if (apps.length === 0) return null
-    return apps[Math.floor(Math.random() * apps.length)]
+
+    // Filter out affiliates in cooldown if cooldownDays is specified
+    const eligibleApps = cooldownDays > 0
+      ? apps.filter(app => !this.isInCooldown(app, cooldownDays))
+      : apps
+
+    if (eligibleApps.length === 0) {
+      // If all are in cooldown, fall back to non-affiliates only
+      const nonAffiliates = apps.filter(app => !app.is_affiliate)
+      if (nonAffiliates.length === 0) return null
+      return nonAffiliates[Math.floor(Math.random() * nonAffiliates.length)]
+    }
+
+    // Create weighted selection: affiliates appear 3x in the pool
+    const weightedPool: AIApplication[] = []
+    for (const app of eligibleApps) {
+      if (app.is_affiliate) {
+        weightedPool.push(app, app, app) // Add 3 times for 3x weight
+      } else {
+        weightedPool.push(app) // Add once
+      }
+    }
+
+    return weightedPool[Math.floor(Math.random() * weightedPool.length)]
   }
 
   /**
@@ -100,7 +146,7 @@ export class AppSelector {
       }
 
       // Get selection settings
-      const { totalApps, categoryCounts } = await this.getAppSettings()
+      const { totalApps, categoryCounts, affiliateCooldownDays } = await this.getAppSettings()
 
       // Get all active apps for this newsletter
       const { data: allApps } = await supabaseAdmin
@@ -135,7 +181,7 @@ export class AppSelector {
 
         for (let i = 0; i < count; i++) {
           const availableApps = unusedApps.filter(app => !selectedAppIds.has(app.id))
-          const selectedApp = this.selectRandomApp(availableApps)
+          const selectedApp = this.selectRandomApp(availableApps, affiliateCooldownDays)
 
           if (selectedApp) {
             selectedApps.push(selectedApp)
@@ -156,7 +202,7 @@ export class AppSelector {
 
           const unusedApps = await this.getUnusedAppsForCategory(category, allApps, usedAppIds)
           const availableApps = unusedApps.filter(app => !selectedAppIds.has(app.id))
-          const selectedApp = this.selectRandomApp(availableApps)
+          const selectedApp = this.selectRandomApp(availableApps, affiliateCooldownDays)
 
           if (selectedApp) {
             selectedApps.push(selectedApp)
@@ -172,7 +218,7 @@ export class AppSelector {
       // 3. If still need more, grab any unused apps
       while (selectedApps.length < totalApps && selectedApps.length < allApps.length) {
         const availableApps = allApps.filter(app => !selectedAppIds.has(app.id))
-        const selectedApp = this.selectRandomApp(availableApps)
+        const selectedApp = this.selectRandomApp(availableApps, affiliateCooldownDays)
 
         if (selectedApp) {
           selectedApps.push(selectedApp)

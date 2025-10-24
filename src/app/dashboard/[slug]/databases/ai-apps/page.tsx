@@ -19,7 +19,8 @@ export default function AIApplicationsPage() {
     tool_type: 'Client',
     category_priority: 0,
     is_active: true,
-    is_featured: false
+    is_featured: false,
+    is_affiliate: false
   })
   const [filterCategory, setFilterCategory] = useState<string>('all')
   const [uploadingCSV, setUploadingCSV] = useState(false)
@@ -325,6 +326,15 @@ export default function AIApplicationsPage() {
                   />
                   <span className="text-sm font-medium text-gray-700">Featured</span>
                 </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={addForm.is_affiliate}
+                    onChange={(e) => setAddForm({ ...addForm, is_affiliate: e.target.checked })}
+                    className="mr-2"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Affiliate</span>
+                </label>
               </div>
             </div>
             <div className="flex justify-end space-x-3 mt-6">
@@ -456,6 +466,15 @@ export default function AIApplicationsPage() {
                           />
                           Featured
                         </label>
+                        <label className="flex items-center text-sm mt-1">
+                          <input
+                            type="checkbox"
+                            checked={editForm.is_affiliate}
+                            onChange={(e) => setEditForm({ ...editForm, is_affiliate: e.target.checked })}
+                            className="mr-1"
+                          />
+                          Affiliate
+                        </label>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <button
@@ -511,6 +530,9 @@ export default function AIApplicationsPage() {
                         )}
                         {app.is_featured && (
                           <span className="block text-yellow-600 text-xs">★ Featured</span>
+                        )}
+                        {app.is_affiliate && (
+                          <span className="block text-blue-600 text-xs font-semibold">$ Affiliate</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
