@@ -3,115 +3,65 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export async function GET() {
   try {
-    console.log('[MIGRATION] Adding newsletter_id column to archived_newsletters...')
+    console.log('[MIGRATION] Checking if newsletter_id column exists...')
 
-    // Check if column already exists
-    const { data: columns, error: checkError } = await supabaseAdmin
-      .rpc('exec_sql', {
-        sql: `
-          SELECT column_name
-          FROM information_schema.columns
-          WHERE table_name = 'archived_newsletters'
-          AND column_name = 'newsletter_id';
-        `
-      })
+    // Try to select the newsletter_id column to check if it exists
+    const { data: testData, error: testError } = await supabaseAdmin
+      .from('archived_newsletters')
+      .select('newsletter_id')
+      .limit(1)
 
-    if (columns && columns.length > 0) {
+    // If no error, column exists
+    if (!testError) {
+      console.log('[MIGRATION] Column already exists')
       return NextResponse.json({
         success: true,
         message: 'Column already exists',
-        note: 'newsletter_id column is already present in archived_newsletters table'
+        note: 'newsletter_id column is already present in archived_newsletters table. You can now run the archive script.'
       })
     }
 
-    // Add newsletter_id column
-    const { error: addColumnError } = await supabaseAdmin
-      .rpc('exec_sql', {
-        sql: `
-          ALTER TABLE archived_newsletters
-          ADD COLUMN newsletter_id TEXT;
-        `
-      })
+    // Column doesn't exist - provide manual migration instructions
+    console.log('[MIGRATION] Column does not exist. Manual migration required.')
 
-    if (addColumnError) {
-      throw new Error(`Failed to add column: ${addColumnError.message}`)
-    }
+    const migrationSQL = `-- Add newsletter_id column to archived_newsletters table
+ALTER TABLE archived_newsletters
+ADD COLUMN IF NOT EXISTS newsletter_id TEXT;
 
-    console.log('[MIGRATION] Column added, setting default values...')
+-- Set default value for existing records (AI Accounting Daily)
+UPDATE archived_newsletters
+SET newsletter_id = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+WHERE newsletter_id IS NULL;
 
-    // Get the accounting newsletter ID
-    const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('newsletters')
-      .select('id')
-      .eq('slug', 'accounting')
-      .single()
+-- Make the column NOT NULL
+ALTER TABLE archived_newsletters
+ALTER COLUMN newsletter_id SET NOT NULL;
 
-    if (newsletterError || !newsletter) {
-      throw new Error('Failed to find accounting newsletter')
-    }
-
-    // Update existing records with the newsletter_id
-    const { error: updateError } = await supabaseAdmin
-      .from('archived_newsletters')
-      .update({ newsletter_id: newsletter.id })
-      .is('newsletter_id', null)
-
-    if (updateError) {
-      throw new Error(`Failed to update existing records: ${updateError.message}`)
-    }
-
-    console.log('[MIGRATION] Setting NOT NULL constraint...')
-
-    // Make the column NOT NULL
-    const { error: notNullError } = await supabaseAdmin
-      .rpc('exec_sql', {
-        sql: `
-          ALTER TABLE archived_newsletters
-          ALTER COLUMN newsletter_id SET NOT NULL;
-        `
-      })
-
-    if (notNullError) {
-      console.warn('[MIGRATION] Could not set NOT NULL constraint:', notNullError.message)
-      // Continue anyway - the column is added and populated
-    }
-
-    console.log('[MIGRATION] Creating index...')
-
-    // Create index
-    const { error: indexError } = await supabaseAdmin
-      .rpc('exec_sql', {
-        sql: `
-          CREATE INDEX IF NOT EXISTS idx_archived_newsletters_newsletter_id
-          ON archived_newsletters(newsletter_id);
-        `
-      })
-
-    if (indexError) {
-      console.warn('[MIGRATION] Could not create index:', indexError.message)
-      // Continue anyway - the column is working
-    }
-
-    console.log('[MIGRATION] Migration complete!')
+-- Create index for efficient queries
+CREATE INDEX IF NOT EXISTS idx_archived_newsletters_newsletter_id
+ON archived_newsletters(newsletter_id);`
 
     return NextResponse.json({
-      success: true,
-      message: 'Migration completed successfully',
-      details: {
-        newsletter_id: newsletter.id,
-        column_added: true,
-        records_updated: true,
-        index_created: !indexError
-      }
-    })
+      success: false,
+      error: 'Migration required',
+      message: 'The newsletter_id column does not exist and must be added manually',
+      instructions: [
+        '1. Go to Supabase Dashboard > SQL Editor',
+        '2. Create a new query',
+        '3. Paste the SQL below',
+        '4. Click "Run"',
+        '5. Return here and run this endpoint again to verify'
+      ],
+      sql: migrationSQL,
+      note: 'This is required because Supabase does not allow ALTER TABLE via the JavaScript client for security reasons'
+    }, { status: 400 })
 
   } catch (error: any) {
     console.error('[MIGRATION] Error:', error)
     return NextResponse.json({
       success: false,
-      error: 'Migration failed',
-      details: error.message,
-      note: 'You may need to run the migration SQL manually in Supabase SQL Editor'
+      error: 'Migration check failed',
+      details: error.message
     }, { status: 500 })
   }
 }
