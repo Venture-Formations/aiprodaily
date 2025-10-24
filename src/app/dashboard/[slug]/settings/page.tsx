@@ -2269,7 +2269,8 @@ function AIPromptsSettings() {
       'ai_prompt_secondary_article_title': 'secondaryArticleTitle',
       'ai_prompt_secondary_article_body': 'secondaryArticleBody',
       'ai_prompt_fact_checker': 'factChecker',
-      'ai_prompt_welcome_section': 'welcomeSection'
+      'ai_prompt_welcome_section': 'welcomeSection',
+      'ai_prompt_topic_deduper': 'topicDeduper'
     }
 
     let testType = promptTypeMap[key]

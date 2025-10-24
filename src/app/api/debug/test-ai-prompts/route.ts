@@ -75,7 +75,29 @@ export async function GET(request: NextRequest) {
       factChecker: {
         newsletterContent: 'New tax rules for small businesses will take effect in January 2025. The IRS announced sweeping changes to deduction limits and reporting requirements that will affect firms with under 50 employees.',
         originalContent: 'The Internal Revenue Service announced today that significant changes to small business taxation will be implemented starting January 1, 2025. These changes will impact businesses with fewer than 50 employees, particularly in terms of expense deduction limits and quarterly reporting requirements. The new rules aim to simplify compliance while ensuring accurate tax collection.'
-      }
+      },
+      topicDeduper: [
+        {
+          title: 'AI Tool Revolutionizes Tax Preparation for CPAs',
+          description: 'A new AI-powered tax software is helping accounting firms reduce preparation time by 60% while improving accuracy.'
+        },
+        {
+          title: 'New AI Software Transforms Tax Filing Process',
+          description: 'Accounting professionals are adopting AI technology that cuts tax prep time in half and boosts accuracy rates.'
+        },
+        {
+          title: 'AICPA Issues New Guidelines on AI Use in Auditing',
+          description: 'The American Institute of CPAs released comprehensive guidelines for using artificial intelligence in audit procedures.'
+        },
+        {
+          title: 'Cloud Accounting Platform Adds Real-Time Anomaly Detection',
+          description: 'QuickBooks announced a new feature that uses AI to detect unusual transactions in real-time.'
+        },
+        {
+          title: 'QuickBooks Launches AI-Powered Fraud Detection',
+          description: 'The popular accounting software now includes artificial intelligence to flag suspicious transactions automatically.'
+        }
+      ]
     }
 
     // Test Content Evaluator
@@ -395,6 +417,34 @@ export async function GET(request: NextRequest) {
         }
       } catch (error) {
         results.welcomeSection = {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      }
+    }
+
+    // Test Topic Deduper
+    if (promptType === 'all' || promptType === 'topicDeduper') {
+      console.log('Testing Topic Deduper...')
+      try {
+        const prompt = await AI_PROMPTS.topicDeduper(testData.topicDeduper)
+        console.log('[TEST] Prompt length:', prompt.length)
+        console.log('[TEST] Prompt preview (first 500 chars):', prompt.substring(0, 500))
+
+        const response = await callOpenAI(prompt, 1000, 0.3)
+        console.log('[TEST] Response type:', typeof response)
+        console.log('[TEST] Response:', JSON.stringify(response, null, 2))
+
+        results.topicDeduper = {
+          success: true,
+          response,
+          prompt_length: prompt.length,
+          prompt_preview: prompt.substring(0, 800) + '...',
+          test_posts_count: testData.topicDeduper.length,
+          expected_duplicates: 'Posts 0+1 (tax software), Posts 3+4 (QuickBooks fraud detection)'
+        }
+      } catch (error) {
+        results.topicDeduper = {
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error'
         }

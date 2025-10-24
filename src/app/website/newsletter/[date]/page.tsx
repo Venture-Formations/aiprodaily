@@ -71,6 +71,7 @@ export default async function NewsletterPage({ params }: PageProps) {
   const aiApps = newsletter.sections?.ai_apps || []
   const poll = newsletter.sections?.poll
   const roadWork = newsletter.sections?.road_work
+  const welcome = newsletter.sections?.welcome
 
   // Section IDs for stable matching
   const SECTION_IDS = {
@@ -101,6 +102,32 @@ export default async function NewsletterPage({ params }: PageProps) {
 
           {/* Render sections in database order */}
           {sections && sections.map((section: any) => {
+            // Welcome Section
+            if (section.name === 'Welcome' && welcome && (welcome.intro || welcome.tagline || welcome.summary)) {
+              return (
+                <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
+                  <h2 className="text-2xl font-bold text-[#1D1D1F] mb-6">{section.name}</h2>
+                  <div className="space-y-3">
+                    {welcome.intro && (
+                      <div className="text-[#1D1D1F] leading-relaxed whitespace-pre-wrap">
+                        {welcome.intro}
+                      </div>
+                    )}
+                    {welcome.tagline && (
+                      <div className="text-[#1D1D1F] leading-relaxed font-bold whitespace-pre-wrap">
+                        {welcome.tagline}
+                      </div>
+                    )}
+                    {welcome.summary && (
+                      <div className="text-[#1D1D1F] leading-relaxed whitespace-pre-wrap">
+                        {welcome.summary}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            }
+
             // Primary Articles Section (display_order 3)
             if (section.display_order === 3 && articles.length > 0) {
               return (

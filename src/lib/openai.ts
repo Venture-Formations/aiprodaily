@@ -1026,9 +1026,61 @@ export const AI_PROMPTS = {
     )
   },
 
-  // Non-editable prompts (not stored in database)
   topicDeduper: async (posts: Array<{ title: string; description: string }>) => {
-    return FALLBACK_PROMPTS.topicDeduper(posts)
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'ai_prompt_topic_deduper')
+        .single()
+
+      if (error || !data) {
+        console.log('[AI] Using fallback for topicDeduper prompt')
+        return FALLBACK_PROMPTS.topicDeduper(posts)
+      }
+
+      console.log('[AI] Using database prompt for topicDeduper')
+
+      // Format articles list for the prompt
+      const articlesText = posts.map((post, i) =>
+        `${i}. ${post.title}\n   ${post.description || 'No description'}`
+      ).join('\n\n')
+
+      // Check if value is already an object (JSONB auto-parsed) or needs parsing
+      let promptConfig: any
+      if (typeof data.value === 'string') {
+        // String value - try to parse as JSON
+        try {
+          promptConfig = JSON.parse(data.value)
+        } catch (jsonError) {
+          // Not JSON, treat as plain text prompt
+          console.log('[AI] Using plain text prompt for topicDeduper')
+          return data.value.replace(/\{\{articles\}\}/g, articlesText)
+        }
+      } else if (typeof data.value === 'object' && data.value !== null) {
+        // Already an object (JSONB was auto-parsed)
+        promptConfig = data.value
+      } else {
+        console.log('[AI] Unknown value format for topicDeduper, treating as plain text')
+        return String(data.value).replace(/\{\{articles\}\}/g, articlesText)
+      }
+
+      // Check if it's a structured prompt
+      if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
+        console.log('[AI] Using structured JSON prompt for topicDeduper')
+        const placeholders = { articles: articlesText }
+        return await callWithStructuredPrompt(promptConfig, placeholders)
+      }
+
+      // Fallback to plain text
+      console.log('[AI] Using plain text format for topicDeduper')
+      const promptText = typeof promptConfig === 'string' ? promptConfig : JSON.stringify(promptConfig)
+      return promptText.replace(/\{\{articles\}\}/g, articlesText)
+
+    } catch (error) {
+      console.error('[AI] Error loading topicDeduper prompt:', error)
+      return FALLBACK_PROMPTS.topicDeduper(posts)
+    }
   },
   factChecker: async (newsletterContent: string, originalContent: string) => {
     try {

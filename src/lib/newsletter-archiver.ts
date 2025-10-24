@@ -20,7 +20,19 @@ export class NewsletterArchiver {
 
       console.log(`Archiving newsletter for campaign ${campaignId} (${campaignDate})...`)
 
-      // 1. Fetch all articles for this campaign
+      // 1. Fetch campaign data (including welcome section)
+      const { data: campaign, error: campaignError } = await supabaseAdmin
+        .from('newsletter_campaigns')
+        .select('welcome_intro, welcome_tagline, welcome_summary')
+        .eq('id', campaignId)
+        .single()
+
+      if (campaignError) {
+        console.error('Error fetching campaign:', campaignError)
+        return { success: false, error: `Failed to fetch campaign: ${campaignError.message}` }
+      }
+
+      // 2. Fetch all articles for this campaign
       const { data: articles, error: articlesError } = await supabaseAdmin
         .from('articles')
         .select(`
@@ -69,8 +81,17 @@ export class NewsletterArchiver {
         .eq('is_active', true)
         .order('rank', { ascending: true })
 
-      // 2. Fetch additional sections data
+      // 3. Fetch additional sections data
       const sections: Record<string, any> = {}
+
+      // Welcome section
+      if (campaign && (campaign.welcome_intro || campaign.welcome_tagline || campaign.welcome_summary)) {
+        sections.welcome = {
+          intro: campaign.welcome_intro || '',
+          tagline: campaign.welcome_tagline || '',
+          summary: campaign.welcome_summary || ''
+        }
+      }
 
       // Road Work section
       const { data: roadWork } = await supabaseAdmin
@@ -142,10 +163,11 @@ export class NewsletterArchiver {
         sections.prompt = promptSelection.prompt
       }
 
-      // 3. Gather metadata
+      // 4. Gather metadata
       const metadata = {
         total_articles: articles?.length || 0,
         total_secondary_articles: secondaryArticles?.length || 0,
+        has_welcome: !!(campaign?.welcome_intro || campaign?.welcome_tagline || campaign?.welcome_summary),
         has_road_work: !!roadWork,
         has_ai_apps: !!aiApps && aiApps.length > 0,
         has_poll: !!poll,
@@ -153,7 +175,7 @@ export class NewsletterArchiver {
         archived_at: new Date().toISOString()
       }
 
-      // 4. Create archive record
+      // 5. Create archive record
       const archiveData: Partial<ArchivedNewsletter> = {
         campaign_id: campaignId,
         campaign_date: campaignDate,
