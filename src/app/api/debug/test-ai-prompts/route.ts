@@ -50,17 +50,13 @@ export async function GET(request: NextRequest) {
         content: 'The 25,000 square foot facility at 715 2nd Ave S will serve as a hub for community activities, offering fitness classes, youth programs, and event rentals. Mayor Rick Miller said the center will "bring people together" and provide year-round recreational opportunities.',
         source_url: 'https://example.com/article'
       },
-      subjectLineGenerator: rssPost ? [
-        {
-          headline: rssPost.title,
-          content: rssPost.content || rssPost.description || ''
-        }
-      ] : [
-        {
-          headline: 'Sartell Bridge Construction Begins Monday',
-          content: 'The Minnesota Department of Transportation will close the Sartell Bridge for major repairs starting Monday morning. The project is expected to last six weeks.'
-        }
-      ],
+      subjectLineGenerator: rssPost ? {
+        headline: rssPost.title,
+        content: rssPost.content || rssPost.description || ''
+      } : {
+        headline: 'Sartell Bridge Construction Begins Monday',
+        content: 'The Minnesota Department of Transportation will close the Sartell Bridge for major repairs starting Monday morning. The project is expected to last six weeks.'
+      },
       eventSummarizer: rssPost ? {
         title: rssPost.title,
         description: rssPost.description || rssPost.content || '',
