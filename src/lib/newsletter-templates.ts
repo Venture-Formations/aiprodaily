@@ -264,7 +264,7 @@ export async function generateWelcomeSection(
   }
 
   // Prepend personalized greeting to intro
-  const greeting = 'Hey, {$name|default('Accounting Pro')}!'
+  const greeting = `Hey, {$name|default('Accounting Pro')}!`
   const fullIntro = intro && intro.trim() ? `${greeting} ${intro.trim()}` : greeting
 
   // Build HTML for each part (only include non-empty parts)
