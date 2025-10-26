@@ -13,7 +13,7 @@ interface PageProps {
 
 // Helper function to clean MailerLite merge tags for website display
 function cleanMergeTags(text: string): string {
-  // Replace {$name|default:"Accounting Pro"} with "Accounting Pro"
+  // Replace {$name|default:'Accounting Pro'} with "Accounting Pro"
   return text.replace(/\{\$name\|default:"([^"]+)"\}/g, '$1')
     // Handle other merge tag patterns if needed
     .replace(/\{\$[^}]+\}/g, '') // Remove any other merge tags
