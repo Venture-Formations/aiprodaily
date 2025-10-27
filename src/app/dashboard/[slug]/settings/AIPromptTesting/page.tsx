@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import Layout from '@/components/Layout'
 
 type Provider = 'openai' | 'claude'
@@ -60,6 +61,7 @@ const CLAUDE_MODELS = [
 export default function AIPromptTestingPage() {
   const params = useParams()
   const slug = params.slug as string
+  const { data: session, status } = useSession()
 
   // Form state
   const [provider, setProvider] = useState<Provider>('openai')
@@ -81,10 +83,12 @@ export default function AIPromptTestingPage() {
   const [currentResponse, setCurrentResponse] = useState<TestResult | null>(null)
   const [savedPromptInfo, setSavedPromptInfo] = useState<SavedPrompt | null>(null)
 
-  // Load recent RSS posts on mount
+  // Load recent RSS posts when authenticated
   useEffect(() => {
-    loadRecentPosts()
-  }, [slug])
+    if (status === 'authenticated') {
+      loadRecentPosts()
+    }
+  }, [slug, status])
 
   // Update model when provider changes
   useEffect(() => {
@@ -366,7 +370,9 @@ export default function AIPromptTestingPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Sample RSS Post
                 </label>
-                {loadingPosts ? (
+                {status === 'loading' ? (
+                  <p className="text-gray-500 text-sm">Authenticating...</p>
+                ) : loadingPosts ? (
                   <p className="text-gray-500 text-sm">Loading posts...</p>
                 ) : recentPosts.length === 0 ? (
                   <div className="text-gray-500 text-sm bg-yellow-50 border border-yellow-200 rounded p-3">
