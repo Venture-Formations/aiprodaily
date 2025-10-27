@@ -25,7 +25,7 @@ interface TestResult {
   response: string
   tokensUsed?: number
   duration: number
-  processedPrompt?: string // The exact prompt sent to the API
+  apiRequest?: any // The exact API request sent
 }
 
 interface SavedPrompt {
@@ -277,7 +277,7 @@ export default function AIPromptTestingPage() {
           response: data.response,
           tokensUsed: data.tokensUsed,
           duration: data.duration,
-          processedPrompt: data.processedPrompt
+          apiRequest: data.apiRequest
         }
 
         setCurrentResponse(result)
@@ -623,9 +623,13 @@ export default function AIPromptTestingPage() {
                 </button>
                 {showPromptDetails && (
                   <div className="p-4 bg-white">
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">Prompt Sent to API:</h4>
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">
+                      Exact API Request Sent to {currentResponse.provider.toUpperCase()}:
+                    </h4>
                     <pre className="bg-gray-50 rounded p-4 overflow-x-auto text-xs font-mono whitespace-pre-wrap">
-                      {currentResponse.processedPrompt || 'No prompt details available'}
+                      {currentResponse.apiRequest
+                        ? JSON.stringify(currentResponse.apiRequest, null, 2)
+                        : 'No API request details available'}
                     </pre>
                   </div>
                 )}

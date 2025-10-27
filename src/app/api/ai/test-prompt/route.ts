@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
     const startTime = Date.now()
     let response: string
     let tokensUsed: number | undefined
+    let apiRequest: any // Store the exact API request
 
     if (provider === 'openai') {
       // OpenAI API call
@@ -71,18 +72,26 @@ export async function POST(request: NextRequest) {
       if (presencePenalty !== undefined && presencePenalty !== 0) requestParams.presence_penalty = presencePenalty
       if (frequencyPenalty !== undefined && frequencyPenalty !== 0) requestParams.frequency_penalty = frequencyPenalty
 
+      // Store the exact API request for display
+      apiRequest = requestParams
+
       const completion = await openai.chat.completions.create(requestParams)
 
       response = completion.choices[0]?.message?.content || 'No response'
       tokensUsed = completion.usage?.total_tokens
     } else if (provider === 'claude') {
       // Claude API call - Note: Claude doesn't support top_p, presence_penalty, or frequency_penalty
-      const completion = await anthropic.messages.create({
+      const requestParams = {
         model,
         max_tokens: maxTokens ?? 1000,
         temperature: temperature ?? 0.7,
-        messages: [{ role: 'user', content: processedPrompt }],
-      })
+        messages: [{ role: 'user' as const, content: processedPrompt }],
+      }
+
+      // Store the exact API request for display
+      apiRequest = requestParams
+
+      const completion = await anthropic.messages.create(requestParams)
 
       // Extract text from Claude response
       const textContent = completion.content.find(c => c.type === 'text')
@@ -104,7 +113,7 @@ export async function POST(request: NextRequest) {
       duration,
       provider,
       model,
-      processedPrompt, // Return the exact prompt that was sent to the API
+      apiRequest, // Return the exact API request object
     })
   } catch (error) {
     console.error('[AI Test] Error:', error)
