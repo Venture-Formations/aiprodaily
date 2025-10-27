@@ -96,19 +96,25 @@ export default function AIPromptTestingPage() {
   async function loadRecentPosts() {
     setLoadingPosts(true)
     try {
+      console.log('[Frontend] Fetching posts for newsletter:', slug)
       const res = await fetch(`/api/rss/recent-posts?newsletter_id=${slug}&limit=50`)
       const data = await res.json()
 
+      console.log('[Frontend] Response status:', res.status, 'data:', data)
+
       if (data.success) {
+        console.log('[Frontend] Successfully loaded', data.posts.length, 'posts')
         setRecentPosts(data.posts)
         if (data.posts.length > 0) {
           setSelectedPostId(data.posts[0].id)
         }
       } else {
-        console.error('Failed to load posts:', data.error)
+        console.error('[Frontend] Failed to load posts:', data.error, data.details || data.message)
+        alert(`Failed to load RSS posts: ${data.error}`)
       }
     } catch (error) {
-      console.error('Failed to load posts:', error)
+      console.error('[Frontend] Exception loading posts:', error)
+      alert('Error loading RSS posts. Check console for details.')
     } finally {
       setLoadingPosts(false)
     }

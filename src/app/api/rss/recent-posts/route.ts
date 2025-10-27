@@ -6,13 +6,19 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
+
+    console.log('[API] Session check:', session ? 'Authenticated' : 'Not authenticated')
+
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      console.log('[API] No session found, returning 401')
+      return NextResponse.json({ error: 'Unauthorized - Please log in' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
     const newsletterId = searchParams.get('newsletter_id')
     const limit = parseInt(searchParams.get('limit') || '50')
+
+    console.log('[API] Fetching posts for newsletter:', newsletterId, 'limit:', limit)
 
     if (!newsletterId) {
       return NextResponse.json(
@@ -32,10 +38,12 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('[API] Error fetching recent posts:', error)
       return NextResponse.json(
-        { error: 'Failed to fetch recent posts' },
+        { error: 'Failed to fetch recent posts', details: error.message },
         { status: 500 }
       )
     }
+
+    console.log('[API] Found', posts?.length || 0, 'posts')
 
     return NextResponse.json({
       success: true,
