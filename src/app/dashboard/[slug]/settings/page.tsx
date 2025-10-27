@@ -1146,12 +1146,16 @@ function EmailSettings() {
   const [primaryLookbackHours, setPrimaryLookbackHours] = useState<number>(72)
   const [secondaryLookbackHours, setSecondaryLookbackHours] = useState<number>(36)
   const [savingLookbackHours, setSavingLookbackHours] = useState(false)
+  const [dedupLookbackDays, setDedupLookbackDays] = useState<number>(3)
+  const [dedupStrictnessThreshold, setDedupStrictnessThreshold] = useState<number>(0.80)
+  const [savingDedupSettings, setSavingDedupSettings] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
 
   useEffect(() => {
     loadSettings()
     loadMaxArticles()
     loadLookbackHours()
+    loadDedupSettings()
   }, [])
 
   const loadSettings = async () => {
@@ -1332,6 +1336,61 @@ function EmailSettings() {
       console.error('Save error:', error)
     } finally {
       setSavingLookbackHours(false)
+    }
+  }
+
+  const loadDedupSettings = async () => {
+    try {
+      const response = await fetch('/api/settings/email')
+      if (response.ok) {
+        const data = await response.json()
+
+        if (data.dedup_historical_lookback_days) {
+          setDedupLookbackDays(parseInt(data.dedup_historical_lookback_days))
+        }
+        if (data.dedup_strictness_threshold) {
+          setDedupStrictnessThreshold(parseFloat(data.dedup_strictness_threshold))
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load deduplication settings:', error)
+    }
+  }
+
+  const saveDedupSettings = async () => {
+    if (dedupLookbackDays < 1 || dedupLookbackDays > 14) {
+      alert('Historical lookback days must be between 1 and 14')
+      return
+    }
+    if (dedupStrictnessThreshold < 0.5 || dedupStrictnessThreshold > 1.0) {
+      alert('Strictness threshold must be between 0.5 and 1.0')
+      return
+    }
+
+    setSavingDedupSettings(true)
+    setMessage('')
+
+    try {
+      const response = await fetch('/api/settings/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dedup_historical_lookback_days: dedupLookbackDays.toString(),
+          dedup_strictness_threshold: dedupStrictnessThreshold.toString()
+        })
+      })
+
+      if (response.ok) {
+        setMessage('Deduplication settings updated successfully!')
+        setTimeout(() => setMessage(''), 3000)
+      } else {
+        throw new Error('Failed to update settings')
+      }
+    } catch (error) {
+      setMessage('Failed to update deduplication settings. Please try again.')
+      console.error('Save error:', error)
+    } finally {
+      setSavingDedupSettings(false)
     }
   }
 
@@ -2018,6 +2077,61 @@ function EmailSettings() {
               </p>
               <p className="text-xs text-blue-700 mt-2">
                 The system selects the top-rated articles from all available content in the lookback window, ensuring quality over recency. Already-sent articles are excluded.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <h4 className="font-medium text-gray-900 mb-4">Deduplication Settings</h4>
+            <p className="text-sm text-gray-600 mb-4">
+              Configure how the system detects and prevents duplicate articles from appearing in your newsletters. The system uses a 4-stage detection process: historical checking, exact content matching, title similarity, and AI semantic analysis.
+            </p>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <label className="font-medium text-gray-700 w-56">Historical Lookback Days:</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="14"
+                  value={dedupLookbackDays}
+                  onChange={(e) => setDedupLookbackDays(parseInt(e.target.value) || 1)}
+                  className="w-24 px-3 py-2 border border-gray-300 rounded-md"
+                  disabled={savingDedupSettings}
+                />
+                <span className="text-sm text-gray-500">(1-14 days)</span>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <label className="font-medium text-gray-700 w-56">Strictness Threshold:</label>
+                <input
+                  type="number"
+                  min="0.5"
+                  max="1.0"
+                  step="0.05"
+                  value={dedupStrictnessThreshold}
+                  onChange={(e) => setDedupStrictnessThreshold(parseFloat(e.target.value) || 0.8)}
+                  className="w-24 px-3 py-2 border border-gray-300 rounded-md"
+                  disabled={savingDedupSettings}
+                />
+                <span className="text-sm text-gray-500">(0.5-1.0, lower = stricter)</span>
+              </div>
+
+              <button
+                onClick={saveDedupSettings}
+                disabled={savingDedupSettings}
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-300"
+              >
+                {savingDedupSettings ? 'Saving...' : 'Save Deduplication Settings'}
+              </button>
+            </div>
+
+            <div className="mt-4 bg-blue-50 p-4 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Current configuration:</strong> Checking {dedupLookbackDays} days of past newsletters with {Math.round(dedupStrictnessThreshold * 100)}% similarity threshold
+              </p>
+              <p className="text-xs text-blue-700 mt-2">
+                <strong>How it works:</strong> Stage 1 checks against articles used in the last {dedupLookbackDays} sent newsletters. Stages 2-4 check exact content matches (100% similarity), title similarity (&gt;{Math.round(dedupStrictnessThreshold * 100)}%), and AI semantic analysis (&gt;{Math.round(dedupStrictnessThreshold * 100)}%) within the current campaign's articles.
               </p>
             </div>
           </div>
