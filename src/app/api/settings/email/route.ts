@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const { data: settingsRows, error } = await supabaseAdmin
       .from('app_settings')
       .select('key, value')
-      .or('key.like.email_%,key.eq.max_top_articles,key.eq.max_bottom_articles,key.eq.primary_article_lookback_hours,key.eq.secondary_article_lookback_hours')
+      .or('key.like.email_%,key.eq.max_top_articles,key.eq.max_bottom_articles,key.eq.primary_article_lookback_hours,key.eq.secondary_article_lookback_hours,key.eq.dedup_historical_lookback_days,key.eq.dedup_strictness_threshold')
 
     if (error) {
       console.error('BACKEND GET: Database error:', error)
@@ -53,7 +53,9 @@ export async function GET(request: NextRequest) {
       dailyCampaignCreationTime: '04:30',  // 4:30 AM CT
       dailyScheduledSendTime: '04:55',  // 4:55 AM CT
       primary_article_lookback_hours: '72',  // 72 hours for primary RSS
-      secondary_article_lookback_hours: '36'  // 36 hours for secondary RSS
+      secondary_article_lookback_hours: '36',  // 36 hours for secondary RSS
+      dedup_historical_lookback_days: '3',  // 3 days of historical checking
+      dedup_strictness_threshold: '0.80'  // 80% similarity threshold
     }
 
     const finalSettings = {
@@ -126,6 +128,49 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Check if this is a deduplication settings update request
+    if (settings.dedup_historical_lookback_days !== undefined || settings.dedup_strictness_threshold !== undefined) {
+      const settingsToSave = []
+
+      if (settings.dedup_historical_lookback_days !== undefined) {
+        settingsToSave.push({
+          key: 'dedup_historical_lookback_days',
+          value: settings.dedup_historical_lookback_days.toString()
+        })
+      }
+
+      if (settings.dedup_strictness_threshold !== undefined) {
+        settingsToSave.push({
+          key: 'dedup_strictness_threshold',
+          value: settings.dedup_strictness_threshold.toString()
+        })
+      }
+
+      // Upsert deduplication settings
+      for (const setting of settingsToSave) {
+        const { error } = await supabaseAdmin
+          .from('app_settings')
+          .upsert({
+            key: setting.key,
+            value: setting.value,
+            description: setting.key === 'dedup_historical_lookback_days'
+              ? 'Number of days of sent newsletters to check for duplicate articles'
+              : 'Similarity threshold for all deduplication checks (0.0-1.0)',
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'key'
+          })
+
+        if (error) {
+          throw error
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Deduplication settings saved successfully'
+      })
+    }
 
     // Check if this is a max articles update request
     if (settings.max_top_articles !== undefined || settings.max_bottom_articles !== undefined) {
