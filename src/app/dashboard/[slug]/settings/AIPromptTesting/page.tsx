@@ -434,6 +434,7 @@ export default function AIPromptTestingPage() {
                 value={promptType}
                 onChange={(e) => setPromptType(e.target.value as PromptType)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                aria-label="Prompt Type"
               >
                 <optgroup label="Primary Section">
                   <option value="primary-title">Primary Article Title</option>
@@ -472,6 +473,7 @@ export default function AIPromptTestingPage() {
                       value={selectedPostId}
                       onChange={(e) => setSelectedPostId(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
+                      aria-label="Sample RSS Post"
                     >
                       {recentPosts.map(post => (
                         <option key={post.id} value={post.id}>
