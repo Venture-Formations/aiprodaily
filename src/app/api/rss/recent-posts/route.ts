@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const newsletterId = searchParams.get('newsletter_id')
     const limit = parseInt(searchParams.get('limit') || '50')
 
-    console.log('[API] Fetching posts for newsletter:', newsletterId, 'limit:', limit)
+    console.log('[API] Fetching posts for newsletter slug:', newsletterId, 'limit:', limit)
 
     if (!newsletterId) {
       return NextResponse.json(
@@ -27,11 +27,28 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // First get recent campaigns for this newsletter
+    // First, look up the newsletter UUID from the slug
+    const { data: newsletter, error: newsletterError } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('slug', newsletterId)
+      .single()
+
+    if (newsletterError || !newsletter) {
+      console.error('[API] Newsletter not found for slug:', newsletterId, newsletterError)
+      return NextResponse.json(
+        { error: 'Newsletter not found' },
+        { status: 404 }
+      )
+    }
+
+    console.log('[API] Found newsletter UUID:', newsletter.id)
+
+    // Get recent campaigns for this newsletter
     const { data: campaigns, error: campaignsError } = await supabaseAdmin
       .from('newsletter_campaigns')
       .select('id')
-      .eq('newsletter_id', newsletterId)
+      .eq('newsletter_id', newsletter.id)
       .order('date', { ascending: false })
       .limit(10) // Get last 10 campaigns
 
