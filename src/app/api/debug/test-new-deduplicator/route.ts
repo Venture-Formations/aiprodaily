@@ -44,9 +44,24 @@ export async function GET(request: Request) {
 
     console.log(`[TEST-DEDUP] Found ${posts.length} posts`)
 
-    // Run deduplication
-    const deduplicator = new Deduplicator()
-    const result = await deduplicator.detectAllDuplicates(posts)
+    // Load deduplication settings
+    const { data: settings } = await supabaseAdmin
+      .from('app_settings')
+      .select('key, value')
+      .in('key', ['dedup_historical_lookback_days', 'dedup_strictness_threshold'])
+
+    const settingsMap = new Map(settings?.map(s => [s.key, s.value]) || [])
+    const historicalLookbackDays = parseInt(settingsMap.get('dedup_historical_lookback_days') || '3')
+    const strictnessThreshold = parseFloat(settingsMap.get('dedup_strictness_threshold') || '0.80')
+
+    console.log(`[TEST-DEDUP] Config: ${historicalLookbackDays} days lookback, ${Math.round(strictnessThreshold * 100)}% threshold`)
+
+    // Run deduplication with config
+    const deduplicator = new Deduplicator({
+      historicalLookbackDays,
+      strictnessThreshold
+    })
+    const result = await deduplicator.detectAllDuplicates(posts, campaignId)
 
     // Format results for display
     const groupDetails = result.groups.map(group => {
@@ -87,9 +102,14 @@ export async function GET(request: Request) {
       already_deduplicated: existingGroups && existingGroups.length > 0,
       existing_groups: existingGroups || [],
       stage_breakdown: {
+        stage_0_historical: result.stats.historical_duplicates,
         stage_1_exact: result.stats.exact_duplicates,
         stage_2_title: result.stats.title_duplicates,
         stage_3_semantic: result.stats.semantic_duplicates
+      },
+      config: {
+        historical_lookback_days: historicalLookbackDays,
+        strictness_threshold: strictnessThreshold
       }
     }
 

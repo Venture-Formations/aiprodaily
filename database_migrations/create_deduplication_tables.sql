@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS duplicate_posts (
 
   -- Constraint: detection_method must be one of the valid methods
   CONSTRAINT check_detection_method
-    CHECK (detection_method IN ('content_hash', 'title_similarity', 'ai_semantic'))
+    CHECK (detection_method IN ('historical_match', 'content_hash', 'title_similarity', 'ai_semantic'))
 );
 
 -- Create indexes for performance

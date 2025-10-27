@@ -1,10 +1,12 @@
 import crypto from 'crypto'
 import type { RssPost } from '@/types/database'
 import { AI_PROMPTS, callOpenAI } from './openai'
+import { supabaseAdmin } from './supabase'
 
 /**
  * Multi-Stage Deduplication System
  *
+ * Stage 0: Historical article check (against sent newsletters)
  * Stage 1: Exact content hash matching (deterministic)
  * Stage 2: Title similarity matching using Jaccard (deterministic)
  * Stage 3: AI semantic analysis (contextual)
@@ -14,7 +16,7 @@ export interface DuplicateGroup {
   topic_signature: string
   primary_post_index: number
   duplicate_indices: number[]
-  detection_method: 'content_hash' | 'title_similarity' | 'ai_semantic'
+  detection_method: 'historical_match' | 'content_hash' | 'title_similarity' | 'ai_semantic'
   similarity_score: number
   explanation?: string
 }
@@ -25,26 +27,40 @@ export interface DeduplicationResult {
     total_posts: number
     unique_posts: number
     duplicate_posts: number
+    historical_duplicates: number
     exact_duplicates: number
     title_duplicates: number
     semantic_duplicates: number
   }
 }
 
+export interface DeduplicationConfig {
+  strictnessThreshold: number  // 0.0-1.0, default 0.80
+  historicalLookbackDays: number  // Default 3
+}
+
 export class Deduplicator {
-  private readonly TITLE_SIMILARITY_THRESHOLD = 0.80
+  private readonly config: DeduplicationConfig
+
+  constructor(config?: Partial<DeduplicationConfig>) {
+    this.config = {
+      strictnessThreshold: config?.strictnessThreshold ?? 0.80,
+      historicalLookbackDays: config?.historicalLookbackDays ?? 3
+    }
+  }
 
   /**
-   * Main orchestrator - runs all 3 stages
+   * Main orchestrator - runs all 4 stages (0-3)
    */
-  async detectAllDuplicates(posts: RssPost[]): Promise<DeduplicationResult> {
-    if (posts.length < 2) {
+  async detectAllDuplicates(posts: RssPost[], campaignId: string): Promise<DeduplicationResult> {
+    if (posts.length === 0) {
       return {
         groups: [],
         stats: {
-          total_posts: posts.length,
-          unique_posts: posts.length,
+          total_posts: 0,
+          unique_posts: 0,
           duplicate_posts: 0,
+          historical_duplicates: 0,
           exact_duplicates: 0,
           title_duplicates: 0,
           semantic_duplicates: 0
@@ -52,12 +68,40 @@ export class Deduplicator {
       }
     }
 
-    console.log(`[DEDUP] Starting 3-stage deduplication for ${posts.length} posts`)
+    console.log(`[DEDUP] Starting 4-stage deduplication for ${posts.length} posts`)
 
     const allGroups: DuplicateGroup[] = []
     const markedAsDuplicate = new Set<number>()
 
-    // Stage 1: Exact content hash
+    // Stage 0: Historical article check
+    const historicalGroups = await this.detectHistoricalDuplicates(posts, campaignId)
+    console.log(`[DEDUP] Stage 0: Found ${historicalGroups.length} historical matches (vs last ${this.config.historicalLookbackDays} days)`)
+
+    for (const group of historicalGroups) {
+      allGroups.push(group)
+      group.duplicate_indices.forEach(idx => markedAsDuplicate.add(idx))
+    }
+
+    // Stage 1: Exact content hash (only remaining posts)
+    const remainingAfterHistorical = posts.map((post, idx) => ({ post, idx }))
+      .filter(({ idx }) => !markedAsDuplicate.has(idx))
+
+    if (remainingAfterHistorical.length === 0) {
+      const totalDuplicates = markedAsDuplicate.size
+      return {
+        groups: allGroups,
+        stats: {
+          total_posts: posts.length,
+          unique_posts: posts.length - totalDuplicates,
+          duplicate_posts: totalDuplicates,
+          historical_duplicates: historicalGroups.reduce((sum, g) => sum + g.duplicate_indices.length, 0),
+          exact_duplicates: 0,
+          title_duplicates: 0,
+          semantic_duplicates: 0
+        }
+      }
+    }
+
     const exactGroups = await this.detectExactDuplicates(posts)
     console.log(`[DEDUP] Stage 1: Found ${exactGroups.length} exact content matches`)
 
@@ -109,6 +153,7 @@ export class Deduplicator {
         total_posts: posts.length,
         unique_posts: posts.length - totalDuplicates,
         duplicate_posts: totalDuplicates,
+        historical_duplicates: historicalGroups.reduce((sum, g) => sum + g.duplicate_indices.length, 0),
         exact_duplicates: exactGroups.reduce((sum, g) => sum + g.duplicate_indices.length, 0),
         title_duplicates: allGroups
           .filter(g => g.detection_method === 'title_similarity')
@@ -117,6 +162,123 @@ export class Deduplicator {
           .filter(g => g.detection_method === 'ai_semantic')
           .reduce((sum, g) => sum + g.duplicate_indices.length, 0)
       }
+    }
+  }
+
+  /**
+   * Stage 0: Check against articles from recently sent newsletters
+   */
+  private async detectHistoricalDuplicates(posts: RssPost[], campaignId: string): Promise<DuplicateGroup[]> {
+    try {
+      // Get sent campaigns from last N days
+      const cutoffDate = new Date()
+      cutoffDate.setDate(cutoffDate.getDate() - this.config.historicalLookbackDays)
+      const cutoffDateStr = cutoffDate.toISOString().split('T')[0]
+
+      const { data: recentCampaigns, error: campaignsError } = await supabaseAdmin
+        .from('newsletter_campaigns')
+        .select('id')
+        .eq('status', 'sent')
+        .gte('date', cutoffDateStr)
+        .neq('id', campaignId) // Exclude current campaign
+
+      if (campaignsError || !recentCampaigns || recentCampaigns.length === 0) {
+        return []
+      }
+
+      const campaignIds = recentCampaigns.map(c => c.id)
+
+      // Get all articles from those campaigns (only active ones that were included)
+      const { data: historicalArticles, error: articlesError } = await supabaseAdmin
+        .from('articles')
+        .select('id, post_id, headline')
+        .in('campaign_id', campaignIds)
+        .eq('is_active', true)
+        .eq('skipped', false)
+
+      const { data: historicalSecondaryArticles } = await supabaseAdmin
+        .from('secondary_articles')
+        .select('id, post_id, headline')
+        .in('campaign_id', campaignIds)
+        .eq('is_active', true)
+        .eq('skipped', false)
+
+      const { data: historicalManualArticles } = await supabaseAdmin
+        .from('manual_articles')
+        .select('id, title, content')
+        .in('campaign_id', campaignIds)
+        .eq('is_active', true)
+
+      if (articlesError) {
+        console.error('[DEDUP] Error fetching historical articles:', articlesError)
+        return []
+      }
+
+      // Get the RSS posts for historical articles
+      const historicalPostIds = [
+        ...(historicalArticles?.map(a => a.post_id).filter(Boolean) || []),
+        ...(historicalSecondaryArticles?.map(a => a.post_id).filter(Boolean) || [])
+      ]
+
+      if (historicalPostIds.length === 0 && (!historicalManualArticles || historicalManualArticles.length === 0)) {
+        return []
+      }
+
+      const { data: historicalPosts, error: postsError } = await supabaseAdmin
+        .from('rss_posts')
+        .select('id, title, content, full_article_text')
+        .in('id', historicalPostIds)
+
+      if (postsError) {
+        console.error('[DEDUP] Error fetching historical posts:', postsError)
+        return []
+      }
+
+      // Create hash map of historical content
+      const historicalHashes = new Map<string, string>() // hash -> title for logging
+
+      // Hash RSS posts
+      for (const post of historicalPosts || []) {
+        const hash = this.createContentHash(post as any)
+        historicalHashes.set(hash, post.title)
+      }
+
+      // Hash manual articles
+      for (const article of historicalManualArticles || []) {
+        const hash = crypto.createHash('md5')
+          .update((article.content || article.title).toLowerCase().replace(/\s+/g, ' '))
+          .digest('hex')
+        historicalHashes.set(hash, article.title)
+      }
+
+      // Check new posts against historical hashes
+      const groups: DuplicateGroup[] = []
+      const matchedIndices = new Set<number>()
+
+      for (let i = 0; i < posts.length; i++) {
+        if (matchedIndices.has(i)) continue
+
+        const postHash = this.createContentHash(posts[i])
+
+        if (historicalHashes.has(postHash)) {
+          const historicalTitle = historicalHashes.get(postHash)!
+          groups.push({
+            topic_signature: `Historical match: Previously published "${historicalTitle.substring(0, 60)}..."`,
+            primary_post_index: i,
+            duplicate_indices: [i], // Mark this post as duplicate
+            detection_method: 'historical_match',
+            similarity_score: 1.0,
+            explanation: `Article was already included in a newsletter within the last ${this.config.historicalLookbackDays} days`
+          })
+          matchedIndices.add(i)
+        }
+      }
+
+      return groups
+
+    } catch (error) {
+      console.error('[DEDUP] Error in historical duplicate detection:', error)
+      return []
     }
   }
 
@@ -178,20 +340,21 @@ export class Deduplicator {
         const title2 = this.normalizeTitle(posts[j].title)
         const similarity = this.calculateJaccardSimilarity(title1, title2)
 
-        if (similarity >= this.TITLE_SIMILARITY_THRESHOLD) {
+        if (similarity >= this.config.strictnessThreshold) {
           duplicates.push(j)
           processed.add(j)
         }
       }
 
       if (duplicates.length > 0) {
+        const thresholdPercent = Math.round(this.config.strictnessThreshold * 100)
         groups.push({
           topic_signature: `Title match: "${posts[i].title}"`,
           primary_post_index: originalIndices[i],
           duplicate_indices: duplicates.map(idx => originalIndices[idx]),
           detection_method: 'title_similarity',
-          similarity_score: 0.85, // Average estimate
-          explanation: `Titles are >80% similar`
+          similarity_score: this.config.strictnessThreshold + 0.05, // Slightly above threshold
+          explanation: `Titles are >${thresholdPercent}% similar`
         })
         processed.add(i)
       }

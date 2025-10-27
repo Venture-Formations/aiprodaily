@@ -966,7 +966,7 @@ export class RSSProcessor {
         .select('*')
         .eq('campaign_id', campaignId)
 
-      if (error || !allPosts || allPosts.length < 2) {
+      if (error || !allPosts || allPosts.length === 0) {
         console.log('[DEDUP] No posts to deduplicate')
         return
       }
@@ -985,9 +985,24 @@ export class RSSProcessor {
         return
       }
 
-      // Run 3-stage deduplication
-      const deduplicator = new Deduplicator()
-      const result = await deduplicator.detectAllDuplicates(allPosts)
+      // Load deduplication settings
+      const { data: settings } = await supabaseAdmin
+        .from('app_settings')
+        .select('key, value')
+        .in('key', ['dedup_historical_lookback_days', 'dedup_strictness_threshold'])
+
+      const settingsMap = new Map(settings?.map(s => [s.key, s.value]) || [])
+      const historicalLookbackDays = parseInt(settingsMap.get('dedup_historical_lookback_days') || '3')
+      const strictnessThreshold = parseFloat(settingsMap.get('dedup_strictness_threshold') || '0.80')
+
+      console.log(`[DEDUP] Config: ${historicalLookbackDays} days lookback, ${Math.round(strictnessThreshold * 100)}% similarity threshold`)
+
+      // Run 4-stage deduplication with config
+      const deduplicator = new Deduplicator({
+        historicalLookbackDays,
+        strictnessThreshold
+      })
+      const result = await deduplicator.detectAllDuplicates(allPosts, campaignId)
 
       // Store results in database
       for (const group of result.groups) {
@@ -1034,7 +1049,7 @@ export class RSSProcessor {
       }
 
       console.log(`[DEDUP] Complete: ${result.stats.duplicate_posts} duplicates marked`)
-      console.log(`[DEDUP] Stats: ${result.stats.exact_duplicates} exact, ${result.stats.title_duplicates} title, ${result.stats.semantic_duplicates} semantic`)
+      console.log(`[DEDUP] Stats: ${result.stats.historical_duplicates} historical, ${result.stats.exact_duplicates} exact, ${result.stats.title_duplicates} title, ${result.stats.semantic_duplicates} semantic`)
 
     } catch (error) {
       console.error('[DEDUP] Error:', error)
