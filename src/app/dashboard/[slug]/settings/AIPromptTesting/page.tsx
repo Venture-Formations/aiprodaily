@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react'
 import Layout from '@/components/Layout'
 
 type Provider = 'openai' | 'claude'
-type PromptType = 'article-title' | 'article-body' | 'post-scorer' | 'subject-line' | 'custom'
+type PromptType = 'primary-title' | 'primary-body' | 'secondary-title' | 'secondary-body' | 'post-scorer' | 'subject-line' | 'custom'
 
 interface RSSPost {
   id: string
@@ -67,7 +67,7 @@ export default function AIPromptTestingPage() {
   // Form state
   const [provider, setProvider] = useState<Provider>('openai')
   const [model, setModel] = useState(OPENAI_MODELS[0])
-  const [promptType, setPromptType] = useState<PromptType>('article-title')
+  const [promptType, setPromptType] = useState<PromptType>('primary-title')
   const [prompt, setPrompt] = useState('')
   const [temperature, setTemperature] = useState(0.7)
   const [maxTokens, setMaxTokens] = useState(1000)
@@ -86,12 +86,19 @@ export default function AIPromptTestingPage() {
   const [showModal, setShowModal] = useState(false)
   const [showPromptDetails, setShowPromptDetails] = useState(false)
 
-  // Load recent RSS posts when authenticated
+  // Helper function to determine section from prompt type
+  const getSection = (type: PromptType): 'primary' | 'secondary' | 'all' => {
+    if (type === 'primary-title' || type === 'primary-body') return 'primary'
+    if (type === 'secondary-title' || type === 'secondary-body') return 'secondary'
+    return 'all' // For post-scorer, subject-line, custom
+  }
+
+  // Load recent RSS posts when authenticated or when prompt type changes
   useEffect(() => {
     if (status === 'authenticated') {
       loadRecentPosts()
     }
-  }, [slug, status])
+  }, [slug, status, promptType])
 
   // Update model when provider changes
   useEffect(() => {
@@ -110,8 +117,9 @@ export default function AIPromptTestingPage() {
   async function loadRecentPosts() {
     setLoadingPosts(true)
     try {
-      console.log('[Frontend] Fetching posts for newsletter:', slug)
-      const res = await fetch(`/api/rss/recent-posts?newsletter_id=${slug}&limit=50`)
+      const section = getSection(promptType)
+      console.log('[Frontend] Fetching posts for newsletter:', slug, 'section:', section)
+      const res = await fetch(`/api/rss/recent-posts?newsletter_id=${slug}&limit=50&section=${section}`)
       const data = await res.json()
 
       console.log('[Frontend] Response status:', res.status, 'data:', data)
@@ -367,11 +375,19 @@ export default function AIPromptTestingPage() {
                 onChange={(e) => setPromptType(e.target.value as PromptType)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="article-title">Article Title Generator</option>
-                <option value="article-body">Article Body Generator</option>
-                <option value="post-scorer">Post Scorer</option>
-                <option value="subject-line">Subject Line Generator</option>
-                <option value="custom">Custom/Freeform</option>
+                <optgroup label="Primary Section">
+                  <option value="primary-title">Primary Article Title</option>
+                  <option value="primary-body">Primary Article Body</option>
+                </optgroup>
+                <optgroup label="Secondary Section">
+                  <option value="secondary-title">Secondary Article Title</option>
+                  <option value="secondary-body">Secondary Article Body</option>
+                </optgroup>
+                <optgroup label="Other">
+                  <option value="post-scorer">Post Scorer/Evaluator</option>
+                  <option value="subject-line">Subject Line Generator</option>
+                  <option value="custom">Custom/Freeform</option>
+                </optgroup>
               </select>
             </div>
 

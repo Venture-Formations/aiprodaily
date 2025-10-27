@@ -26,14 +26,27 @@ export async function POST(request: NextRequest) {
       // Load templates with placeholders (don't inject actual data)
       // Placeholders: {{title}}, {{description}}, {{content}}, {{headline}}, {{url}}
 
-      if (promptType === 'article-title') {
+      if (promptType === 'primary-title') {
         templatePrompt = await AI_PROMPTS.primaryArticleTitle({
           title: '{{title}}',
           description: '{{description}}',
           content: '{{content}}'
         })
-      } else if (promptType === 'article-body') {
+      } else if (promptType === 'primary-body') {
         templatePrompt = await AI_PROMPTS.primaryArticleBody({
+          title: '{{title}}',
+          description: '{{description}}',
+          content: '{{content}}',
+          source_url: '{{url}}'
+        }, '{{headline}}')
+      } else if (promptType === 'secondary-title') {
+        templatePrompt = await AI_PROMPTS.secondaryArticleTitle({
+          title: '{{title}}',
+          description: '{{description}}',
+          content: '{{content}}'
+        })
+      } else if (promptType === 'secondary-body') {
+        templatePrompt = await AI_PROMPTS.secondaryArticleBody({
           title: '{{title}}',
           description: '{{description}}',
           content: '{{content}}',
