@@ -15,6 +15,30 @@ const anthropic = new Anthropic({
 
 export const maxDuration = 60
 
+// Helper function to inject post data into JSON recursively
+function injectPostData(obj: any, post: any): any {
+  if (typeof obj === 'string') {
+    if (!post) return obj
+    return obj
+      .replace(/\{\{title\}\}/g, post.title || '')
+      .replace(/\{\{description\}\}/g, post.description || 'No description available')
+      .replace(/\{\{content\}\}/g, post.full_article_text || 'No content available')
+      .replace(/\{\{headline\}\}/g, post.title || '')
+      .replace(/\{\{url\}\}/g, post.source_url || '')
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => injectPostData(item, post))
+  }
+  if (typeof obj === 'object' && obj !== null) {
+    const result: any = {}
+    for (const key in obj) {
+      result[key] = injectPostData(obj[key], post)
+    }
+    return result
+  }
+  return obj
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -23,75 +47,32 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const {
-      provider,
-      model,
-      prompt,
-      temperature,
-      maxTokens,
-      topP,
-      presencePenalty,
-      frequencyPenalty,
-      post
-    } = body
+    const { provider, promptJson, post } = body
 
-    if (!provider || !model || !prompt) {
+    if (!provider || !promptJson) {
       return NextResponse.json(
-        { error: 'Missing required fields: provider, model, prompt' },
+        { error: 'Missing required fields: provider, promptJson' },
         { status: 400 }
       )
     }
 
-    // Inject post data into placeholders
-    let processedPrompt = prompt
-    if (post) {
-      processedPrompt = prompt
-        .replace(/\{\{title\}\}/g, post.title || '')
-        .replace(/\{\{description\}\}/g, post.description || 'No description available')
-        .replace(/\{\{content\}\}/g, post.full_article_text || 'No content available')
-        .replace(/\{\{headline\}\}/g, post.title || '') // Use title as headline for testing
-        .replace(/\{\{url\}\}/g, post.source_url || '')
-    }
+    // Inject post data into the entire JSON request
+    const processedJson = injectPostData(promptJson, post)
 
     const startTime = Date.now()
     let response: string
     let tokensUsed: number | undefined
-    let apiRequest: any // Store the exact API request
+    const apiRequest = processedJson // Store the exact API request
 
     if (provider === 'openai') {
-      // OpenAI API call
-      const requestParams: any = {
-        model,
-        messages: [{ role: 'user', content: processedPrompt }],
-        temperature: temperature ?? 0.7,
-        max_tokens: maxTokens ?? 1000,
-      }
-
-      // Add optional parameters if provided
-      if (topP !== undefined && topP !== 1.0) requestParams.top_p = topP
-      if (presencePenalty !== undefined && presencePenalty !== 0) requestParams.presence_penalty = presencePenalty
-      if (frequencyPenalty !== undefined && frequencyPenalty !== 0) requestParams.frequency_penalty = frequencyPenalty
-
-      // Store the exact API request for display
-      apiRequest = requestParams
-
-      const completion = await openai.chat.completions.create(requestParams)
+      // OpenAI API call - send the exact JSON
+      const completion = await openai.chat.completions.create(processedJson)
 
       response = completion.choices[0]?.message?.content || 'No response'
       tokensUsed = completion.usage?.total_tokens
     } else if (provider === 'claude') {
-      // Claude API call - Note: Claude doesn't support top_p, presence_penalty, or frequency_penalty
-      const requestParams = {
-        model,
-        max_tokens: maxTokens ?? 1000,
-        temperature: temperature ?? 0.7,
-        messages: [{ role: 'user' as const, content: processedPrompt }],
-      }
-
-      // Store the exact API request for display
-      apiRequest = requestParams
-
-      const completion = await anthropic.messages.create(requestParams)
+      // Claude API call - send the exact JSON
+      const completion = await anthropic.messages.create(processedJson)
 
       // Extract text from Claude response
       const textContent = completion.content.find(c => c.type === 'text')
@@ -112,7 +93,7 @@ export async function POST(request: NextRequest) {
       tokensUsed,
       duration,
       provider,
-      model,
+      model: processedJson.model || 'unknown',
       apiRequest, // Return the exact API request object
     })
   } catch (error) {

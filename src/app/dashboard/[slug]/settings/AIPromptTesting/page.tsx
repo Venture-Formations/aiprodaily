@@ -26,18 +26,13 @@ interface TestResult {
   tokensUsed?: number
   duration: number
   apiRequest?: any // The exact API request sent
+  isMultiple?: boolean // Whether this was a multiple article test
+  responses?: string[] // Array of responses for multiple article tests
 }
 
 interface SavedPrompt {
   id: string
   prompt: string
-  parameters: {
-    temperature?: number
-    maxTokens?: number
-    topP?: number
-    presencePenalty?: number
-    frequencyPenalty?: number
-  }
   updated_at: string
 }
 
@@ -66,14 +61,8 @@ export default function AIPromptTestingPage() {
 
   // Form state
   const [provider, setProvider] = useState<Provider>('openai')
-  const [model, setModel] = useState(OPENAI_MODELS[0])
   const [promptType, setPromptType] = useState<PromptType>('primary-title')
   const [prompt, setPrompt] = useState('')
-  const [temperature, setTemperature] = useState(0.7)
-  const [maxTokens, setMaxTokens] = useState(1000)
-  const [topP, setTopP] = useState(1.0)
-  const [presencePenalty, setPresencePenalty] = useState(0.0)
-  const [frequencyPenalty, setFrequencyPenalty] = useState(0.0)
   const [selectedPostId, setSelectedPostId] = useState<string>('')
 
   // Data state
@@ -100,19 +89,10 @@ export default function AIPromptTestingPage() {
     }
   }, [slug, status, promptType])
 
-  // Update model when provider changes
-  useEffect(() => {
-    if (provider === 'openai') {
-      setModel(OPENAI_MODELS[0])
-    } else {
-      setModel(CLAUDE_MODELS[0])
-    }
-  }, [provider])
-
-  // Load saved prompt or template when provider/model/promptType changes
+  // Load saved prompt or template when provider/promptType changes
   useEffect(() => {
     loadSavedPromptOrTemplate()
-  }, [provider, model, promptType])
+  }, [provider, promptType])
 
   async function loadRecentPosts() {
     setLoadingPosts(true)
@@ -146,7 +126,7 @@ export default function AIPromptTestingPage() {
     // Try to load saved prompt from database first
     try {
       const res = await fetch(
-        `/api/ai/load-prompt?newsletter_id=${slug}&provider=${provider}&model=${model}&prompt_type=${promptType}`
+        `/api/ai/load-prompt?newsletter_id=${slug}&provider=${provider}&prompt_type=${promptType}`
       )
       const data = await res.json()
 
@@ -154,15 +134,6 @@ export default function AIPromptTestingPage() {
         console.log('[Frontend] Loaded saved prompt from database')
         setSavedPromptInfo(data.data)
         setPrompt(data.data.prompt)
-
-        // Restore saved parameters
-        if (data.data.parameters) {
-          if (data.data.parameters.temperature !== undefined) setTemperature(data.data.parameters.temperature)
-          if (data.data.parameters.maxTokens !== undefined) setMaxTokens(data.data.parameters.maxTokens)
-          if (data.data.parameters.topP !== undefined) setTopP(data.data.parameters.topP)
-          if (data.data.parameters.presencePenalty !== undefined) setPresencePenalty(data.data.parameters.presencePenalty)
-          if (data.data.parameters.frequencyPenalty !== undefined) setFrequencyPenalty(data.data.parameters.frequencyPenalty)
-        }
         return
       }
     } catch (error) {
@@ -172,14 +143,28 @@ export default function AIPromptTestingPage() {
     // No saved prompt, clear the info
     setSavedPromptInfo(null)
 
-    // If no saved prompt, load template with placeholders
+    // If no saved prompt, load template
     loadTemplate()
   }
 
   async function loadTemplate() {
-    // Load template with placeholders (post data will be injected at test time)
+    // Load template as complete JSON API request
     if (promptType === 'custom') {
-      setPrompt('')
+      // Provide empty JSON template for custom prompts
+      const template = provider === 'openai'
+        ? {
+            model: 'gpt-4o',
+            messages: [{ role: 'user', content: 'Your prompt here...' }],
+            temperature: 0.7,
+            max_tokens: 1000
+          }
+        : {
+            model: 'claude-sonnet-4-5-20250929',
+            messages: [{ role: 'user', content: 'Your prompt here...' }],
+            temperature: 0.7,
+            max_tokens: 1000
+          }
+      setPrompt(JSON.stringify(template, null, 2))
       return
     }
 
@@ -187,13 +172,27 @@ export default function AIPromptTestingPage() {
       const res = await fetch('/api/ai/load-prompt-template', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ promptType })
+        body: JSON.stringify({ promptType, provider })
       })
 
       const data = await res.json()
 
       if (data.success) {
-        setPrompt(data.prompt)
+        // Wrap the prompt content in a JSON API request format
+        const template = provider === 'openai'
+          ? {
+              model: 'gpt-4o',
+              messages: [{ role: 'user', content: data.prompt }],
+              temperature: 0.7,
+              max_tokens: 1000
+            }
+          : {
+              model: 'claude-sonnet-4-5-20250929',
+              messages: [{ role: 'user', content: data.prompt }],
+              temperature: 0.7,
+              max_tokens: 1000
+            }
+        setPrompt(JSON.stringify(template, null, 2))
         console.log('[Frontend] Loaded template with placeholders for:', promptType)
       } else {
         setPrompt('Error loading prompt template: ' + data.error)
@@ -212,16 +211,8 @@ export default function AIPromptTestingPage() {
         body: JSON.stringify({
           newsletter_id: slug,
           provider,
-          model,
           prompt_type: promptType,
-          prompt: promptText,
-          parameters: {
-            temperature,
-            maxTokens,
-            topP,
-            presencePenalty,
-            frequencyPenalty
-          }
+          prompt: promptText
         })
       })
 
@@ -244,6 +235,15 @@ export default function AIPromptTestingPage() {
       return
     }
 
+    // Validate JSON
+    let promptJson
+    try {
+      promptJson = JSON.parse(prompt)
+    } catch (error) {
+      alert('Invalid JSON format. Please enter a valid JSON API request.')
+      return
+    }
+
     // Get the selected post for placeholder injection
     const selectedPost = recentPosts.find(p => p.id === selectedPostId)
     if (!selectedPost && promptType !== 'custom') {
@@ -263,13 +263,7 @@ export default function AIPromptTestingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           provider,
-          model,
-          prompt,
-          temperature,
-          maxTokens,
-          topP,
-          presencePenalty,
-          frequencyPenalty,
+          promptJson,
           post: selectedPost // Include post data for placeholder injection
         })
       })
@@ -298,6 +292,77 @@ export default function AIPromptTestingPage() {
     } catch (error) {
       console.error('Test failed:', error)
       alert('Failed to test prompt')
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  async function handleTestMultiple() {
+    if (!prompt.trim()) {
+      alert('Please enter a prompt')
+      return
+    }
+
+    // Validate JSON
+    let promptJson
+    try {
+      promptJson = JSON.parse(prompt)
+    } catch (error) {
+      alert('Invalid JSON format. Please enter a valid JSON API request.')
+      return
+    }
+
+    // Check if we have posts
+    if (recentPosts.length === 0) {
+      alert('No posts available for testing')
+      return
+    }
+
+    // Save the prompt for this combination
+    savePrompt(prompt)
+
+    setTesting(true)
+    setCurrentResponse(null)
+
+    try {
+      const res = await fetch('/api/ai/test-prompt-multiple', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider,
+          promptJson,
+          newsletter_id: slug,
+          prompt_type: promptType,
+          limit: 10
+        })
+      })
+
+      const data = await res.json()
+
+      if (data.success) {
+        const result: TestResult = {
+          timestamp: new Date(),
+          provider: data.provider,
+          model: data.model,
+          promptType,
+          response: data.responses[0] || 'No responses',
+          tokensUsed: data.totalTokensUsed,
+          duration: data.totalDuration,
+          apiRequest: data.apiRequest,
+          isMultiple: true,
+          responses: data.responses
+        }
+
+        setCurrentResponse(result)
+        setTestHistory(prev => [result, ...prev])
+        setShowModal(true)
+        setShowPromptDetails(false)
+      } else {
+        alert(`Error: ${data.error}`)
+      }
+    } catch (error) {
+      console.error('Test multiple failed:', error)
+      alert('Failed to test prompt for multiple articles')
     } finally {
       setTesting(false)
     }
@@ -347,22 +412,6 @@ export default function AIPromptTestingPage() {
                   Claude
                 </button>
               </div>
-            </div>
-
-            {/* Model Selector */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Model
-              </label>
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                {(provider === 'openai' ? OPENAI_MODELS : CLAUDE_MODELS).map(m => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
             </div>
 
             {/* Prompt Type Selector */}
@@ -430,92 +479,6 @@ export default function AIPromptTestingPage() {
               </div>
             )}
 
-            {/* Advanced Parameters */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-4">Advanced Parameters</h3>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">
-                    Temperature: {temperature.toFixed(2)}
-                  </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="2"
-                    step="0.1"
-                    value={temperature}
-                    onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                    className="w-full"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Lower = more focused, Higher = more creative</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">
-                    Max Tokens
-                  </label>
-                  <input
-                    type="number"
-                    min="100"
-                    max="4000"
-                    step="100"
-                    value={maxTokens}
-                    onChange={(e) => setMaxTokens(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Maximum length of response</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">
-                    Top P (Nucleus Sampling): {topP.toFixed(2)}
-                  </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={topP}
-                    onChange={(e) => setTopP(parseFloat(e.target.value))}
-                    className="w-full"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Controls diversity via nucleus sampling (1.0 = no filtering)</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">
-                    Presence Penalty: {presencePenalty.toFixed(2)}
-                  </label>
-                  <input
-                    type="range"
-                    min="-2"
-                    max="2"
-                    step="0.1"
-                    value={presencePenalty}
-                    onChange={(e) => setPresencePenalty(parseFloat(e.target.value))}
-                    className="w-full"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Penalize tokens based on whether they appear (positive = less repetition)</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">
-                    Frequency Penalty: {frequencyPenalty.toFixed(2)}
-                  </label>
-                  <input
-                    type="range"
-                    min="-2"
-                    max="2"
-                    step="0.1"
-                    value={frequencyPenalty}
-                    onChange={(e) => setFrequencyPenalty(parseFloat(e.target.value))}
-                    className="w-full"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Penalize tokens based on frequency (positive = less repetition)</p>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Right Column: Prompt & Response */}
@@ -524,7 +487,7 @@ export default function AIPromptTestingPage() {
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-sm font-medium text-gray-700">
-                  Prompt
+                  API Request JSON
                 </label>
                 {savedPromptInfo && (
                   <span className="text-xs text-green-600">
@@ -532,12 +495,16 @@ export default function AIPromptTestingPage() {
                   </span>
                 )}
               </div>
+              <p className="text-xs text-gray-600 mb-3">
+                Enter the complete JSON API request. Model and parameters are included in the JSON.
+                Use placeholders like {'{'}{'{'} title {'}'}{'}'}  or {'{'}{'{'} content {'}'}{'}'} for post data.
+              </p>
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                rows={15}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
-                placeholder="Enter your prompt here..."
+                rows={20}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-xs bg-gray-50"
+                placeholder='{"model": "gpt-4o", "messages": [{"role": "user", "content": "Your prompt..."}], "temperature": 0.7}'
               />
 
               <button
@@ -547,6 +514,19 @@ export default function AIPromptTestingPage() {
               >
                 {testing ? 'Testing...' : 'Test Prompt'}
               </button>
+
+              <button
+                onClick={handleTestMultiple}
+                disabled={testing || !prompt.trim() || promptType === 'custom'}
+                className="mt-2 w-full py-3 px-4 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              >
+                {testing ? 'Testing...' : 'Test Prompt for Multiple (10 articles)'}
+              </button>
+              {promptType === 'custom' && (
+                <p className="text-xs text-gray-500 mt-2 text-center">
+                  Multiple article testing is only available for Primary/Secondary prompt types
+                </p>
+              )}
             </div>
 
             {/* Response */}
@@ -658,12 +638,29 @@ export default function AIPromptTestingPage() {
               {/* Response Section */}
               <div className="border border-gray-200 rounded-lg overflow-hidden">
                 <div className="px-4 py-3 bg-blue-50 border-b border-blue-100">
-                  <h4 className="font-medium text-blue-900">AI Response</h4>
+                  <h4 className="font-medium text-blue-900">
+                    {currentResponse.isMultiple ? 'AI Responses (10 Articles)' : 'AI Response'}
+                  </h4>
                 </div>
                 <div className="p-4 bg-white">
-                  <div className="bg-gray-50 rounded p-4 whitespace-pre-wrap text-sm">
-                    {currentResponse.response}
-                  </div>
+                  {currentResponse.isMultiple && currentResponse.responses ? (
+                    <div className="space-y-4 max-h-96 overflow-y-auto">
+                      {currentResponse.responses.map((response, index) => (
+                        <div key={index} className="border border-gray-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <h5 className="font-medium text-gray-900">Article {index + 1}</h5>
+                          </div>
+                          <div className="bg-gray-50 rounded p-3 whitespace-pre-wrap text-sm">
+                            {response}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 rounded p-4 whitespace-pre-wrap text-sm">
+                      {currentResponse.response}
+                    </div>
+                  )}
                 </div>
               </div>
 
