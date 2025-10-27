@@ -31,7 +31,8 @@ export async function POST(request: NextRequest) {
       maxTokens,
       topP,
       presencePenalty,
-      frequencyPenalty
+      frequencyPenalty,
+      post
     } = body
 
     if (!provider || !model || !prompt) {
@@ -39,6 +40,17 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields: provider, model, prompt' },
         { status: 400 }
       )
+    }
+
+    // Inject post data into placeholders
+    let processedPrompt = prompt
+    if (post) {
+      processedPrompt = prompt
+        .replace(/\{\{title\}\}/g, post.title || '')
+        .replace(/\{\{description\}\}/g, post.description || 'No description available')
+        .replace(/\{\{content\}\}/g, post.full_article_text || 'No content available')
+        .replace(/\{\{headline\}\}/g, post.title || '') // Use title as headline for testing
+        .replace(/\{\{url\}\}/g, post.source_url || '')
     }
 
     const startTime = Date.now()
@@ -49,7 +61,7 @@ export async function POST(request: NextRequest) {
       // OpenAI API call
       const requestParams: any = {
         model,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: 'user', content: processedPrompt }],
         temperature: temperature ?? 0.7,
         max_tokens: maxTokens ?? 1000,
       }
@@ -69,7 +81,7 @@ export async function POST(request: NextRequest) {
         model,
         max_tokens: maxTokens ?? 1000,
         temperature: temperature ?? 0.7,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: 'user', content: processedPrompt }],
       })
 
       // Extract text from Claude response

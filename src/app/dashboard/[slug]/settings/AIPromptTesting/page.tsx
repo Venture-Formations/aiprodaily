@@ -99,10 +99,10 @@ export default function AIPromptTestingPage() {
     }
   }, [provider])
 
-  // Load saved prompt or template when settings change
+  // Load saved prompt or template when provider/model/promptType changes
   useEffect(() => {
     loadSavedPromptOrTemplate()
-  }, [provider, model, promptType, selectedPostId, recentPosts])
+  }, [provider, model, promptType])
 
   async function loadRecentPosts() {
     setLoadingPosts(true)
@@ -161,33 +161,29 @@ export default function AIPromptTestingPage() {
     // No saved prompt, clear the info
     setSavedPromptInfo(null)
 
-    // If no saved prompt, load template
+    // If no saved prompt, load template with placeholders
+    loadTemplate()
+  }
+
+  async function loadTemplate() {
+    // Load template with placeholders (post data will be injected at test time)
     if (promptType === 'custom') {
       setPrompt('')
       return
     }
 
-    const selectedPost = recentPosts.find(p => p.id === selectedPostId)
-    if (!selectedPost) return
-
     try {
       const res = await fetch('/api/ai/load-prompt-template', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          promptType,
-          post: {
-            title: selectedPost.title,
-            description: selectedPost.description,
-            full_article_text: selectedPost.full_article_text
-          }
-        })
+        body: JSON.stringify({ promptType })
       })
 
       const data = await res.json()
 
       if (data.success) {
         setPrompt(data.prompt)
+        console.log('[Frontend] Loaded template with placeholders for:', promptType)
       } else {
         setPrompt('Error loading prompt template: ' + data.error)
       }
@@ -237,6 +233,13 @@ export default function AIPromptTestingPage() {
       return
     }
 
+    // Get the selected post for placeholder injection
+    const selectedPost = recentPosts.find(p => p.id === selectedPostId)
+    if (!selectedPost && promptType !== 'custom') {
+      alert('Please select a post to test with')
+      return
+    }
+
     // Save the prompt for this combination
     savePrompt(prompt)
 
@@ -255,7 +258,8 @@ export default function AIPromptTestingPage() {
           maxTokens,
           topP,
           presencePenalty,
-          frequencyPenalty
+          frequencyPenalty,
+          post: selectedPost // Include post data for placeholder injection
         })
       })
 
