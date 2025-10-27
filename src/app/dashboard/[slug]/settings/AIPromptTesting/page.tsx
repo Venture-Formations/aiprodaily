@@ -27,8 +27,16 @@ interface TestResult {
 }
 
 interface SavedPrompt {
+  id: string
   prompt: string
-  timestamp: number
+  parameters: {
+    temperature?: number
+    maxTokens?: number
+    topP?: number
+    presencePenalty?: number
+    frequencyPenalty?: number
+  }
+  updated_at: string
 }
 
 const OPENAI_MODELS = [
@@ -70,9 +78,7 @@ export default function AIPromptTestingPage() {
   const [testing, setTesting] = useState(false)
   const [testHistory, setTestHistory] = useState<TestResult[]>([])
   const [currentResponse, setCurrentResponse] = useState<TestResult | null>(null)
-
-  // Storage key for saved prompts
-  const getStorageKey = () => `ai-prompt-${provider}-${model}-${promptType}`
+  const [savedPromptInfo, setSavedPromptInfo] = useState<SavedPrompt | null>(null)
 
   // Load recent RSS posts on mount
   useEffect(() => {
@@ -121,12 +127,34 @@ export default function AIPromptTestingPage() {
   }
 
   async function loadSavedPromptOrTemplate() {
-    // Try to load saved prompt from localStorage first
-    const savedPrompt = loadSavedPrompt()
-    if (savedPrompt) {
-      setPrompt(savedPrompt.prompt)
-      return
+    // Try to load saved prompt from database first
+    try {
+      const res = await fetch(
+        `/api/ai/load-prompt?newsletter_id=${slug}&provider=${provider}&model=${model}&prompt_type=${promptType}`
+      )
+      const data = await res.json()
+
+      if (data.success && data.data) {
+        console.log('[Frontend] Loaded saved prompt from database')
+        setSavedPromptInfo(data.data)
+        setPrompt(data.data.prompt)
+
+        // Restore saved parameters
+        if (data.data.parameters) {
+          if (data.data.parameters.temperature !== undefined) setTemperature(data.data.parameters.temperature)
+          if (data.data.parameters.maxTokens !== undefined) setMaxTokens(data.data.parameters.maxTokens)
+          if (data.data.parameters.topP !== undefined) setTopP(data.data.parameters.topP)
+          if (data.data.parameters.presencePenalty !== undefined) setPresencePenalty(data.data.parameters.presencePenalty)
+          if (data.data.parameters.frequencyPenalty !== undefined) setFrequencyPenalty(data.data.parameters.frequencyPenalty)
+        }
+        return
+      }
+    } catch (error) {
+      console.error('[Frontend] Error loading saved prompt:', error)
     }
+
+    // No saved prompt, clear the info
+    setSavedPromptInfo(null)
 
     // If no saved prompt, load template
     if (promptType === 'custom') {
@@ -164,29 +192,37 @@ export default function AIPromptTestingPage() {
     }
   }
 
-  function loadSavedPrompt(): SavedPrompt | null {
+  async function savePrompt(promptText: string) {
     try {
-      const key = getStorageKey()
-      const saved = localStorage.getItem(key)
-      if (saved) {
-        return JSON.parse(saved) as SavedPrompt
-      }
-    } catch (error) {
-      console.error('Failed to load saved prompt:', error)
-    }
-    return null
-  }
+      const res = await fetch('/api/ai/save-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          newsletter_id: slug,
+          provider,
+          model,
+          prompt_type: promptType,
+          prompt: promptText,
+          parameters: {
+            temperature,
+            maxTokens,
+            topP,
+            presencePenalty,
+            frequencyPenalty
+          }
+        })
+      })
 
-  function savePrompt(promptText: string) {
-    try {
-      const key = getStorageKey()
-      const savedPrompt: SavedPrompt = {
-        prompt: promptText,
-        timestamp: Date.now()
+      const data = await res.json()
+
+      if (data.success) {
+        console.log('[Frontend] Prompt saved to database')
+        setSavedPromptInfo(data.data)
+      } else {
+        console.error('[Frontend] Failed to save prompt:', data.error)
       }
-      localStorage.setItem(key, JSON.stringify(savedPrompt))
     } catch (error) {
-      console.error('Failed to save prompt:', error)
+      console.error('[Frontend] Error saving prompt:', error)
     }
   }
 
@@ -254,7 +290,7 @@ export default function AIPromptTestingPage() {
             AI Prompt Testing Playground
           </h1>
           <p className="text-sm text-gray-600">
-            Test AI prompts without affecting live newsletter prompts. Prompts auto-save per provider/model/type combination.
+            Test AI prompts without affecting live newsletter prompts. Prompts auto-save to database (accessible from any device).
           </p>
         </div>
 
@@ -456,9 +492,9 @@ export default function AIPromptTestingPage() {
                 <label className="block text-sm font-medium text-gray-700">
                   Prompt
                 </label>
-                {loadSavedPrompt() && (
+                {savedPromptInfo && (
                   <span className="text-xs text-green-600">
-                    ✓ Loaded saved prompt
+                    ✓ Saved {new Date(savedPromptInfo.updated_at).toLocaleDateString()}
                   </span>
                 )}
               </div>
