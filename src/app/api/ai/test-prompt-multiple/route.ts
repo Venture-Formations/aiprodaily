@@ -74,6 +74,18 @@ export async function POST(request: NextRequest) {
 
     console.log('[AI Test Multiple] Fetching posts for section:', section)
 
+    // Get list of duplicate post IDs to exclude
+    const { data: duplicatePosts, error: duplicatesError } = await supabase
+      .from('duplicate_posts')
+      .select('post_id')
+
+    if (duplicatesError) {
+      console.error('[AI Test Multiple] Error fetching duplicates:', duplicatesError)
+    }
+
+    const duplicatePostIds = duplicatePosts?.map(d => d.post_id) || []
+    console.log('[AI Test Multiple] Excluding', duplicatePostIds.length, 'duplicate posts')
+
     // Fetch posts from the appropriate section
     let query = supabase
       .from('rss_posts')
@@ -81,6 +93,11 @@ export async function POST(request: NextRequest) {
       .eq('newsletter_id', newsletter_id)
       .order('publication_date', { ascending: false })
       .limit(limit)
+
+    // Exclude duplicate posts
+    if (duplicatePostIds.length > 0) {
+      query = query.not('id', 'in', `(${duplicatePostIds.map(id => `'${id}'`).join(',')})`)
+    }
 
     // Filter by section if not 'all'
     if (section !== 'all') {

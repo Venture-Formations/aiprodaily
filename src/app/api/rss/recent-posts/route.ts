@@ -103,11 +103,28 @@ export async function GET(request: NextRequest) {
 
     const campaignIds = campaigns.map(c => c.id)
 
+    // Get list of duplicate post IDs to exclude
+    const { data: duplicatePosts, error: duplicatesError } = await supabaseAdmin
+      .from('duplicate_posts')
+      .select('post_id')
+
+    if (duplicatesError) {
+      console.error('[API] Error fetching duplicates:', duplicatesError)
+    }
+
+    const duplicatePostIds = duplicatePosts?.map(d => d.post_id) || []
+    console.log('[API] Excluding', duplicatePostIds.length, 'duplicate posts')
+
     // Fetch recent RSS posts from these campaigns, filtered by section if specified
     let query = supabaseAdmin
       .from('rss_posts')
       .select('id, title, description, full_article_text, source_url, publication_date')
       .in('campaign_id', campaignIds)
+
+    // Exclude duplicate posts
+    if (duplicatePostIds.length > 0) {
+      query = query.not('id', 'in', `(${duplicatePostIds.map(id => `'${id}'`).join(',')})`)
+    }
 
     // Filter by feed IDs if section is specified
     if (feedIds !== null) {
