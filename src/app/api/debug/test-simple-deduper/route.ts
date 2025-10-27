@@ -9,19 +9,23 @@ export async function GET() {
     const testPosts = [
       {
         title: "🚒🔥 Big shout-out to Rockville Fire Chief Rodney Schaefer and his amazing team of Rockville firefighters! Their dedicat...",
-        description: "🚒🔥 Big shout-out to Rockville Fire Chief Rodney Schaefer and his amazing team of Rockville firefighters!\n Their dedication, teamwork, and heart for the community make them true hometown heroes. \n Ch..."
+        description: "🚒🔥 Big shout-out to Rockville Fire Chief Rodney Schaefer and his amazing team of Rockville firefighters!\n Their dedication, teamwork, and heart for the community make them true hometown heroes. \n Ch...",
+        full_article_text: "Big shout-out to Rockville Fire Chief Rodney Schaefer and his amazing team of Rockville firefighters! Their dedication, teamwork, and heart for the community make them true hometown heroes."
       },
       {
         title: "It's Fire Prevention Week and the City of Sartell Fire Department is hosting an open house on Saturday, October ...",
-        description: "It's Fire Prevention Week and the City of Sartell Fire Department is hosting an open house on Saturday, October 12, 2024, from 10 a.m. to 2 p.m.\n \n \n We'll have lots of fun fire safety activities..."
+        description: "It's Fire Prevention Week and the City of Sartell Fire Department is hosting an open house on Saturday, October 12, 2024, from 10 a.m. to 2 p.m.\n \n \n We'll have lots of fun fire safety activities...",
+        full_article_text: "It's Fire Prevention Week and the City of Sartell Fire Department is hosting an open house on Saturday, October 12, 2024, from 10 a.m. to 2 p.m. We'll have lots of fun fire safety activities for families and children."
       },
       {
         title: "It's Fire Prevention Week, and in honor of that, some local fire stations are holding open house events. St. C...",
-        description: "It's Fire Prevention Week, and in honor of that, some local fire stations are holding open house events.\n St. Cloud Fire Station #2 will be holding theirs on October 12 from 11am to 1pm. There wi..."
+        description: "It's Fire Prevention Week, and in honor of that, some local fire stations are holding open house events.\n St. Cloud Fire Station #2 will be holding theirs on October 12 from 11am to 1pm. There wi...",
+        full_article_text: "It's Fire Prevention Week, and in honor of that, some local fire stations are holding open house events. St. Cloud Fire Station #2 will be holding theirs on October 12 from 11am to 1pm. There will be fire safety demonstrations and activities."
       },
       {
         title: "Sauk Rapids Fire Department will hold a fire prevention week open house on Saturday, October 12, from 10:00 a.m....",
-        description: "Sauk Rapids Fire Department will hold a fire prevention week open house on Saturday, October 12, from 10:00 a.m. to 2:00 p.m. at Sauk Rapids Fire Station 1, located at 525 5th Avenue South. Attende..."
+        description: "Sauk Rapids Fire Department will hold a fire prevention week open house on Saturday, October 12, from 10:00 a.m. to 2:00 p.m. at Sauk Rapids Fire Station 1, located at 525 5th Avenue South. Attende...",
+        full_article_text: "Sauk Rapids Fire Department will hold a fire prevention week open house on Saturday, October 12, from 10:00 a.m. to 2:00 p.m. at Sauk Rapids Fire Station 1, located at 525 5th Avenue South. Attendees can meet firefighters, tour the station, and learn fire safety tips."
       }
     ]
 

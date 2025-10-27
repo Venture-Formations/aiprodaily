@@ -20,6 +20,8 @@ export async function GET(request: Request) {
         id,
         title,
         description,
+        content,
+        full_article_text,
         post_ratings!inner(total_score)
       `)
       .eq('campaign_id', campaignId)
@@ -42,7 +44,8 @@ export async function GET(request: Request) {
     // Prepare post summaries for deduper
     const postSummaries = posts.map(post => ({
       title: post.title,
-      description: post.description || ''
+      description: post.description || '',
+      full_article_text: post.full_article_text || post.content || ''
     }))
 
     console.log('=== TESTING TOPIC DEDUPER ===')

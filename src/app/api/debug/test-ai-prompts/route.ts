@@ -75,23 +75,28 @@ export async function GET(request: NextRequest) {
       topicDeduper: [
         {
           title: 'AI Tool Revolutionizes Tax Preparation for CPAs',
-          description: 'A new AI-powered tax software is helping accounting firms reduce preparation time by 60% while improving accuracy.'
+          description: 'A new AI-powered tax software is helping accounting firms reduce preparation time by 60% while improving accuracy.',
+          full_article_text: 'A new AI-powered tax software is helping accounting firms reduce preparation time by 60% while improving accuracy. The technology uses machine learning to analyze tax documents and identify potential deductions.'
         },
         {
           title: 'New AI Software Transforms Tax Filing Process',
-          description: 'Accounting professionals are adopting AI technology that cuts tax prep time in half and boosts accuracy rates.'
+          description: 'Accounting professionals are adopting AI technology that cuts tax prep time in half and boosts accuracy rates.',
+          full_article_text: 'Accounting professionals are adopting AI technology that cuts tax prep time in half and boosts accuracy rates. The software automates data entry and flags potential errors before submission.'
         },
         {
           title: 'AICPA Issues New Guidelines on AI Use in Auditing',
-          description: 'The American Institute of CPAs released comprehensive guidelines for using artificial intelligence in audit procedures.'
+          description: 'The American Institute of CPAs released comprehensive guidelines for using artificial intelligence in audit procedures.',
+          full_article_text: 'The American Institute of CPAs released comprehensive guidelines for using artificial intelligence in audit procedures. The new standards address data privacy, algorithm transparency, and professional judgment requirements.'
         },
         {
           title: 'Cloud Accounting Platform Adds Real-Time Anomaly Detection',
-          description: 'QuickBooks announced a new feature that uses AI to detect unusual transactions in real-time.'
+          description: 'QuickBooks announced a new feature that uses AI to detect unusual transactions in real-time.',
+          full_article_text: 'QuickBooks announced a new feature that uses AI to detect unusual transactions in real-time. The system monitors account activity and alerts users to potential fraud or data entry errors.'
         },
         {
           title: 'QuickBooks Launches AI-Powered Fraud Detection',
-          description: 'The popular accounting software now includes artificial intelligence to flag suspicious transactions automatically.'
+          description: 'The popular accounting software now includes artificial intelligence to flag suspicious transactions automatically.',
+          full_article_text: 'The popular accounting software now includes artificial intelligence to flag suspicious transactions automatically. QuickBooks fraud detection monitors patterns and identifies anomalies that may indicate fraudulent activity.'
         }
       ]
     }

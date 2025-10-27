@@ -387,6 +387,8 @@ export interface DuplicatePost {
   group_id: string
   post_id: string
   similarity_score: number
+  detection_method?: 'content_hash' | 'title_similarity' | 'ai_semantic'
+  actual_similarity_score?: number
 }
 
 export interface EmailMetrics {

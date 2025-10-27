@@ -5,6 +5,7 @@ import { ErrorHandler, SlackNotificationService } from './slack'
 import { GitHubImageStorage } from './github-storage'
 import { ArticleArchiveService } from './article-archive'
 import { ArticleExtractor } from './article-extractor'
+import { Deduplicator } from './deduplicator'
 import type {
   RssFeed,
   RssPost,
@@ -957,58 +958,86 @@ export class RSSProcessor {
   }
 
   private async handleDuplicates(posts: RssPost[], campaignId: string) {
-    if (posts.length < 2) return
-
-    const postSummaries = posts.map(post => ({
-      title: post.title,
-      description: post.description || ''
-    }))
-
     try {
-      const prompt = await AI_PROMPTS.topicDeduper(postSummaries)
-      const result = await callOpenAI(prompt)
+      // Fetch ALL posts from BOTH sections for cross-section deduplication
+      // This is called from scorePostsForSection but needs to see all posts
+      const { data: allPosts, error } = await supabaseAdmin
+        .from('rss_posts')
+        .select('*')
+        .eq('campaign_id', campaignId)
 
-      console.log('=== TOPIC DEDUPER RESULT ===')
-      console.log('Result type:', typeof result)
-      console.log('Has groups?', !!result.groups)
-      console.log('Groups length:', result.groups?.length || 0)
-      console.log('Full result:', JSON.stringify(result, null, 2))
+      if (error || !allPosts || allPosts.length < 2) {
+        console.log('[DEDUP] No posts to deduplicate')
+        return
+      }
 
-      if (result.groups) {
-        for (const group of result.groups) {
-          const primaryPost = posts[group.primary_article_index]
-          if (!primaryPost) continue
+      console.log(`[DEDUP] Analyzing ${allPosts.length} posts (cross-section)`)
 
-          // Create duplicate group
-          const { data: duplicateGroup } = await supabaseAdmin
-            .from('duplicate_groups')
-            .insert([{
-              campaign_id: campaignId,
-              primary_post_id: primaryPost.id,
-              topic_signature: group.topic_signature
-            }])
-            .select('id')
-            .single()
+      // Check if already deduplicated for this campaign
+      const { data: existingGroups } = await supabaseAdmin
+        .from('duplicate_groups')
+        .select('id')
+        .eq('campaign_id', campaignId)
+        .limit(1)
 
-          if (duplicateGroup) {
-            // Add duplicate posts to group
-            for (const dupIndex of group.duplicate_indices) {
-              const dupPost = posts[dupIndex]
-              if (dupPost && dupPost.id !== primaryPost.id) {
-                await supabaseAdmin
-                  .from('duplicate_posts')
-                  .insert([{
-                    group_id: duplicateGroup.id,
-                    post_id: dupPost.id,
-                    similarity_score: 0.8 // Default similarity
-                  }])
+      if (existingGroups && existingGroups.length > 0) {
+        console.log('[DEDUP] Already deduplicated, skipping')
+        return
+      }
+
+      // Run 3-stage deduplication
+      const deduplicator = new Deduplicator()
+      const result = await deduplicator.detectAllDuplicates(allPosts)
+
+      // Store results in database
+      for (const group of result.groups) {
+        const primaryPost = allPosts[group.primary_post_index]
+        if (!primaryPost) continue
+
+        // Create duplicate group
+        const { data: duplicateGroup, error: groupError } = await supabaseAdmin
+          .from('duplicate_groups')
+          .insert([{
+            campaign_id: campaignId,
+            primary_post_id: primaryPost.id,
+            topic_signature: group.topic_signature
+          }])
+          .select('id')
+          .single()
+
+        if (groupError) {
+          console.error('[DEDUP] Error creating group:', groupError)
+          continue
+        }
+
+        if (duplicateGroup) {
+          // Add duplicate posts to group with metadata
+          for (const dupIndex of group.duplicate_indices) {
+            const dupPost = allPosts[dupIndex]
+            if (dupPost && dupPost.id !== primaryPost.id) {
+              const { error: dupError } = await supabaseAdmin
+                .from('duplicate_posts')
+                .insert([{
+                  group_id: duplicateGroup.id,
+                  post_id: dupPost.id,
+                  similarity_score: group.similarity_score,
+                  detection_method: group.detection_method,
+                  actual_similarity_score: group.similarity_score
+                }])
+
+              if (dupError) {
+                console.error('[DEDUP] Error marking duplicate:', dupError)
               }
             }
           }
         }
       }
+
+      console.log(`[DEDUP] Complete: ${result.stats.duplicate_posts} duplicates marked`)
+      console.log(`[DEDUP] Stats: ${result.stats.exact_duplicates} exact, ${result.stats.title_duplicates} title, ${result.stats.semantic_duplicates} semantic`)
+
     } catch (error) {
-      console.error('Error handling duplicates:', error)
+      console.error('[DEDUP] Error:', error)
     }
   }
 

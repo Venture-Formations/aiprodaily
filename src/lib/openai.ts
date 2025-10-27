@@ -80,7 +80,7 @@ Response format:
   "reasoning": "<detailed explanation of your scoring>"
 }`,
 
-  topicDeduper: (posts: Array<{ title: string; description: string }>) => `
+  topicDeduper: (posts: Array<{ title: string; description: string; full_article_text: string }>) => `
 You are identifying duplicate stories for a LOCAL NEWSLETTER. Your goal is to prevent readers from seeing multiple articles about the SAME TYPE OF EVENT or SIMILAR TOPICS.
 
 CRITICAL DEDUPLICATION RULES:
@@ -89,6 +89,7 @@ CRITICAL DEDUPLICATION RULES:
 3. Group articles about SIMILAR community activities happening in the same time period
 4. Be AGGRESSIVE in identifying duplicates - err on the side of grouping similar topics together
 5. For each group, keep the article with the MOST SPECIFIC details (names, dates, locations)
+6. **NEW**: You now have access to FULL ARTICLE TEXT - use this to make more accurate duplicate decisions
 
 EXAMPLES OF DUPLICATES:
 - "Sartell Fire Dept Open House Oct 12" + "St. Cloud Fire Station Open House Oct 12" + "Sauk Rapids Fire Dept Open House Oct 12" → ALL DUPLICATES (same type of event)
@@ -96,7 +97,11 @@ EXAMPLES OF DUPLICATES:
 - "School district meeting tonight" + "Board to discuss budget tonight" → DUPLICATES (same event)
 
 Articles to analyze (array indices are 0-based - first article is index 0):
-${posts.map((post, i) => `${i}. ${post.title}\n   ${post.description || 'No description'}`).join('\n\n')}
+${posts.map((post, i) => `
+${i}. Title: ${post.title}
+   Description: ${post.description || 'No description'}
+   Full Article: ${post.full_article_text ? post.full_article_text.substring(0, 1000) + (post.full_article_text.length > 1000 ? '...' : '') : 'No full text available'}
+`).join('\n')}
 
 IMPORTANT: Use 0-based indexing (first article = 0, second = 1, etc.)
 
@@ -1027,7 +1032,7 @@ export const AI_PROMPTS = {
     )
   },
 
-  topicDeduper: async (posts: Array<{ title: string; description: string }>) => {
+  topicDeduper: async (posts: Array<{ title: string; description: string; full_article_text: string }>) => {
     try {
       const { data, error } = await supabaseAdmin
         .from('app_settings')
@@ -1042,10 +1047,12 @@ export const AI_PROMPTS = {
 
       console.log('[AI] Using database prompt for topicDeduper')
 
-      // Format articles list for the prompt
-      const articlesText = posts.map((post, i) =>
-        `${i}. ${post.title}\n   ${post.description || 'No description'}`
-      ).join('\n\n')
+      // Format articles list for the prompt with full article text
+      const articlesText = posts.map((post, i) => `
+${i}. Title: ${post.title}
+   Description: ${post.description || 'No description'}
+   Full Article: ${post.full_article_text ? post.full_article_text.substring(0, 1000) + (post.full_article_text.length > 1000 ? '...' : '') : 'No full text available'}
+`).join('\n')
 
       // Check if value is already an object (JSONB auto-parsed) or needs parsing
       let promptConfig: any
