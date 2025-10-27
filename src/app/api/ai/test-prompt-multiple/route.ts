@@ -5,21 +5,6 @@ import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 
-// Initialize AI clients
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-})
-
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.DATABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 export const maxDuration = 300 // 5 minutes for processing multiple articles
 
 // Helper function to inject post data into JSON recursively
@@ -69,6 +54,20 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Initialize clients inside the function to avoid build-time issues
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
+
+    const anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    })
+
+    const supabase = createClient(
+      process.env.DATABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
 
     // Get section based on prompt type
     const section = getSection(prompt_type)
