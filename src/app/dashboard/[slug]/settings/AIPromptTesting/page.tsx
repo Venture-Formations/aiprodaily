@@ -25,6 +25,7 @@ interface TestResult {
   response: string
   tokensUsed?: number
   duration: number
+  processedPrompt?: string // The exact prompt sent to the API
 }
 
 interface SavedPrompt {
@@ -82,6 +83,8 @@ export default function AIPromptTestingPage() {
   const [testHistory, setTestHistory] = useState<TestResult[]>([])
   const [currentResponse, setCurrentResponse] = useState<TestResult | null>(null)
   const [savedPromptInfo, setSavedPromptInfo] = useState<SavedPrompt | null>(null)
+  const [showModal, setShowModal] = useState(false)
+  const [showPromptDetails, setShowPromptDetails] = useState(false)
 
   // Load recent RSS posts when authenticated
   useEffect(() => {
@@ -273,11 +276,14 @@ export default function AIPromptTestingPage() {
           promptType,
           response: data.response,
           tokensUsed: data.tokensUsed,
-          duration: data.duration
+          duration: data.duration,
+          processedPrompt: data.processedPrompt
         }
 
         setCurrentResponse(result)
         setTestHistory(prev => [result, ...prev])
+        setShowModal(true) // Show modal with results
+        setShowPromptDetails(false) // Start with prompt details collapsed
       } else {
         alert(`Error: ${data.error}`)
       }
@@ -578,6 +584,108 @@ export default function AIPromptTestingPage() {
           </div>
         </div>
       </div>
+
+      {/* Test Results Modal */}
+      {showModal && currentResponse && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Test Results</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  {currentResponse.provider.toUpperCase()} • {currentResponse.model} • {currentResponse.duration}ms
+                  {currentResponse.tokensUsed && ` • ${currentResponse.tokensUsed} tokens`}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              {/* API Call Details (Collapsible) */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setShowPromptDetails(!showPromptDetails)}
+                  className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left"
+                >
+                  <span className="font-medium text-gray-900">
+                    {showPromptDetails ? '▼' : '▶'} API Call Details
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    {showPromptDetails ? 'Click to collapse' : 'Click to expand'}
+                  </span>
+                </button>
+                {showPromptDetails && (
+                  <div className="p-4 bg-white">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Prompt Sent to API:</h4>
+                    <pre className="bg-gray-50 rounded p-4 overflow-x-auto text-xs font-mono whitespace-pre-wrap">
+                      {currentResponse.processedPrompt || 'No prompt details available'}
+                    </pre>
+                  </div>
+                )}
+              </div>
+
+              {/* Response Section */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="px-4 py-3 bg-blue-50 border-b border-blue-100">
+                  <h4 className="font-medium text-blue-900">AI Response</h4>
+                </div>
+                <div className="p-4 bg-white">
+                  <div className="bg-gray-50 rounded p-4 whitespace-pre-wrap text-sm">
+                    {currentResponse.response}
+                  </div>
+                </div>
+              </div>
+
+              {/* Metadata */}
+              <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600">Provider:</span>
+                  <span className="ml-2 font-medium">{currentResponse.provider.toUpperCase()}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Model:</span>
+                  <span className="ml-2 font-medium">{currentResponse.model}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Duration:</span>
+                  <span className="ml-2 font-medium">{currentResponse.duration}ms</span>
+                </div>
+                {currentResponse.tokensUsed && (
+                  <div>
+                    <span className="text-gray-600">Tokens:</span>
+                    <span className="ml-2 font-medium">{currentResponse.tokensUsed}</span>
+                  </div>
+                )}
+                <div>
+                  <span className="text-gray-600">Prompt Type:</span>
+                  <span className="ml-2 font-medium capitalize">{currentResponse.promptType.replace('-', ' ')}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Timestamp:</span>
+                  <span className="ml-2 font-medium">{currentResponse.timestamp.toLocaleTimeString()}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   )
 }

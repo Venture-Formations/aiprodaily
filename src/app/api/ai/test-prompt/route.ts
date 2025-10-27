@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
       duration,
       provider,
       model,
+      processedPrompt, // Return the exact prompt that was sent to the API
     })
   } catch (error) {
     console.error('[AI Test] Error:', error)
