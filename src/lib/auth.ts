@@ -22,6 +22,25 @@ export const authOptions: NextAuthOptions = {
       if (account?.provider === 'google') {
         console.log('Processing Google OAuth sign-in for:', user.email)
 
+        // Email validation for production (bypass in staging)
+        if (!shouldBypassAuth()) {
+          const allowedEmails = process.env.ALLOWED_ADMIN_EMAILS?.split(',').map(e => e.trim()) || []
+
+          if (allowedEmails.length === 0) {
+            console.error('[Auth] ALLOWED_ADMIN_EMAILS not configured - blocking all access')
+            return false
+          }
+
+          if (!allowedEmails.includes(user.email!)) {
+            console.log('[Auth] Access denied for email:', user.email)
+            return false
+          }
+
+          console.log('[Auth] Email validated successfully:', user.email)
+        } else {
+          console.log('[Auth] Staging environment - skipping email validation')
+        }
+
         try {
           // Mobile-safe Supabase user creation with retry logic
           let supabaseUserId = null
