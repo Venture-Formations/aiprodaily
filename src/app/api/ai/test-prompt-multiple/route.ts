@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     // Exclude duplicate posts
     if (duplicatePostIds.length > 0) {
-      query = query.not('id', 'in', `(${duplicatePostIds.map(id => `'${id}'`).join(',')})`)
+      query = query.not('id', 'in', `(${duplicatePostIds.join(',')})`)
     }
 
     // Filter by section if not 'all'

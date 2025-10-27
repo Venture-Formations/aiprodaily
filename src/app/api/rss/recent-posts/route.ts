@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
 
     // Exclude duplicate posts
     if (duplicatePostIds.length > 0) {
-      query = query.not('id', 'in', `(${duplicatePostIds.map(id => `'${id}'`).join(',')})`)
+      query = query.not('id', 'in', `(${duplicatePostIds.join(',')})`)
     }
 
     // Filter by feed IDs if section is specified
