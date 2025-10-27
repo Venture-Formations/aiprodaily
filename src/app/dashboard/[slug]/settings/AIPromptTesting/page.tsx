@@ -14,7 +14,7 @@ interface RSSPost {
   description: string | null
   full_article_text: string | null
   source_url: string | null
-  created_at: string
+  publication_date: string | null
 }
 
 interface TestResult {

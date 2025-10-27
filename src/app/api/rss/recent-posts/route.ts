@@ -27,12 +27,39 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Fetch recent RSS posts for this newsletter
+    // First get recent campaigns for this newsletter
+    const { data: campaigns, error: campaignsError } = await supabaseAdmin
+      .from('newsletter_campaigns')
+      .select('id')
+      .eq('newsletter_id', newsletterId)
+      .order('date', { ascending: false })
+      .limit(10) // Get last 10 campaigns
+
+    if (campaignsError) {
+      console.error('[API] Error fetching campaigns:', campaignsError)
+      return NextResponse.json(
+        { error: 'Failed to fetch campaigns', details: campaignsError.message },
+        { status: 500 }
+      )
+    }
+
+    if (!campaigns || campaigns.length === 0) {
+      console.log('[API] No campaigns found for newsletter:', newsletterId)
+      return NextResponse.json({
+        success: true,
+        posts: [],
+        count: 0
+      })
+    }
+
+    const campaignIds = campaigns.map(c => c.id)
+
+    // Fetch recent RSS posts from these campaigns
     const { data: posts, error } = await supabaseAdmin
       .from('rss_posts')
-      .select('id, title, description, full_article_text, source_url, created_at')
-      .eq('newsletter_id', newsletterId)
-      .order('created_at', { ascending: false })
+      .select('id, title, description, full_article_text, source_url, publication_date')
+      .in('campaign_id', campaignIds)
+      .order('publication_date', { ascending: false })
       .limit(limit)
 
     if (error) {
