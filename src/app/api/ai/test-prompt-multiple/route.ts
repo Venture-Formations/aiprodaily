@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
-import { createClient } from '@supabase/supabase-js'
+import { supabaseAdmin } from '@/lib/supabase'
 
 export const maxDuration = 300 // 5 minutes for processing multiple articles
 
@@ -64,13 +64,8 @@ export async function POST(request: NextRequest) {
       apiKey: process.env.ANTHROPIC_API_KEY,
     })
 
-    const supabase = createClient(
-      process.env.DATABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-
     // Look up the newsletter UUID from the slug
-    const { data: newsletter, error: newsletterError } = await supabase
+    const { data: newsletter, error: newsletterError } = await supabaseAdmin
       .from('newsletters')
       .select('id')
       .eq('slug', newsletter_id)
@@ -87,7 +82,7 @@ export async function POST(request: NextRequest) {
     const newsletterUuid = newsletter.id
 
     // Get recent campaigns for this newsletter
-    const { data: campaigns, error: campaignsError } = await supabase
+    const { data: campaigns, error: campaignsError } = await supabaseAdmin
       .from('newsletter_campaigns')
       .select('id')
       .eq('newsletter_id', newsletterUuid)
@@ -118,7 +113,7 @@ export async function POST(request: NextRequest) {
     console.log('[AI Test Multiple] Fetching posts for section:', section)
 
     // Get list of duplicate post IDs to exclude
-    const { data: duplicatePosts, error: duplicatesError } = await supabase
+    const { data: duplicatePosts, error: duplicatesError } = await supabaseAdmin
       .from('duplicate_posts')
       .select('post_id')
 
@@ -130,7 +125,7 @@ export async function POST(request: NextRequest) {
     console.log('[AI Test Multiple] Excluding', duplicatePostIds.length, 'duplicate posts')
 
     // Fetch posts from the appropriate section
-    let query = supabase
+    let query = supabaseAdmin
       .from('rss_posts')
       .select('id, title, description, full_article_text, source_url, publication_date')
       .in('campaign_id', campaignIds)
@@ -144,12 +139,13 @@ export async function POST(request: NextRequest) {
 
     // Filter by section if not 'all'
     if (section !== 'all') {
-      // Get feed IDs for the section
-      const { data: feeds, error: feedsError } = await supabase
+      // Get feed IDs for the section - use proper boolean column names
+      const sectionField = section === 'primary' ? 'use_for_primary_section' : 'use_for_secondary_section'
+      const { data: feeds, error: feedsError } = await supabaseAdmin
         .from('rss_feeds')
         .select('id')
         .eq('newsletter_id', newsletterUuid)
-        .eq('section', section)
+        .eq(sectionField, true)
         .eq('active', true)
 
       if (feedsError) {
