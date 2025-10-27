@@ -205,12 +205,23 @@ export default function AIPromptTestingPage() {
 
   async function savePrompt(promptText: string) {
     try {
+      // Extract model from JSON prompt
+      let model = 'unknown'
+      try {
+        const promptJson = JSON.parse(promptText)
+        model = promptJson.model || 'unknown'
+      } catch {
+        // If not valid JSON, use 'unknown'
+        model = 'unknown'
+      }
+
       const res = await fetch('/api/ai/save-prompt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           newsletter_id: slug,
           provider,
+          model,
           prompt_type: promptType,
           prompt: promptText
         })
