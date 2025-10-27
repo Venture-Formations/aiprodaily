@@ -479,6 +479,96 @@ export default function AIPromptTestingPage() {
               </div>
             )}
 
+            {/* Reference Guide */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Reference Guide</h2>
+
+              {/* Placeholders */}
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">Available Placeholders</h3>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm">
+                  <div className="font-mono">
+                    <span className="text-blue-600">{'{{title}}'}</span>
+                    <span className="text-gray-600 ml-2">- Article title/headline</span>
+                  </div>
+                  <div className="font-mono">
+                    <span className="text-blue-600">{'{{description}}'}</span>
+                    <span className="text-gray-600 ml-2">- Article description/summary</span>
+                  </div>
+                  <div className="font-mono">
+                    <span className="text-blue-600">{'{{content}}'}</span>
+                    <span className="text-gray-600 ml-2">- Full article text</span>
+                  </div>
+                  <div className="font-mono">
+                    <span className="text-blue-600">{'{{url}}'}</span>
+                    <span className="text-gray-600 ml-2">- Article source URL</span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-3">
+                  Use these placeholders in your prompt content. They will be replaced with actual post data when testing.
+                </p>
+              </div>
+
+              {/* Expected Response Formats */}
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">Expected Response Formats</h3>
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <div className="font-semibold text-gray-700 mb-1">Primary/Secondary Title:</div>
+                    <pre className="bg-gray-50 p-2 rounded border border-gray-200 overflow-x-auto">
+{`{
+  "content": "string",
+  "word_count": integer
+}`}
+                    </pre>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-gray-700 mb-1">Primary/Secondary Body:</div>
+                    <pre className="bg-gray-50 p-2 rounded border border-gray-200 overflow-x-auto">
+{`{
+  "content": "string",
+  "word_count": integer
+}`}
+                    </pre>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-gray-700 mb-1">Post Scorer:</div>
+                    <pre className="bg-gray-50 p-2 rounded border border-gray-200 overflow-x-auto">
+{`{
+  "score": integer,
+  "reasoning": "string"
+}`}
+                    </pre>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-gray-700 mb-1">Subject Line:</div>
+                    <pre className="bg-gray-50 p-2 rounded border border-gray-200 overflow-x-auto">
+{`{
+  "subject": "string"
+}`}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+
+              {/* Example */}
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">Example Usage</h3>
+                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-gray-50 rounded p-3 border border-gray-200">
+{`{
+  "model": "gpt-4o",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Summarize this article in 50 words:\\n\\nTitle: {{title}}\\n\\nContent: {{content}}"
+    }
+  ],
+  "temperature": 0.7,
+  "max_tokens": 1000
+}`}
+                </pre>
+              </div>
+            </div>
           </div>
 
           {/* Right Column: Prompt & Response */}
