@@ -69,6 +69,23 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
+    // Look up the newsletter UUID from the slug
+    const { data: newsletter, error: newsletterError } = await supabase
+      .from('newsletters')
+      .select('id')
+      .eq('slug', newsletter_id)
+      .single()
+
+    if (newsletterError || !newsletter) {
+      console.error('[AI Test Multiple] Newsletter not found for slug:', newsletter_id, newsletterError)
+      return NextResponse.json(
+        { error: 'Newsletter not found' },
+        { status: 404 }
+      )
+    }
+
+    const newsletterUuid = newsletter.id
+
     // Get section based on prompt type
     const section = getSection(prompt_type)
 
@@ -90,7 +107,7 @@ export async function POST(request: NextRequest) {
     let query = supabase
       .from('rss_posts')
       .select('id, title, description, full_article_text, source_url, publication_date')
-      .eq('newsletter_id', newsletter_id)
+      .eq('newsletter_id', newsletterUuid)
       .order('publication_date', { ascending: false })
       .limit(limit)
 
@@ -105,7 +122,7 @@ export async function POST(request: NextRequest) {
       const { data: feeds, error: feedsError } = await supabase
         .from('rss_feeds')
         .select('id')
-        .eq('newsletter_id', newsletter_id)
+        .eq('newsletter_id', newsletterUuid)
         .eq('section', section)
         .eq('active', true)
 
