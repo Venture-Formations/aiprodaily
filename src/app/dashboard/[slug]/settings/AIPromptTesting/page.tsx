@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react'
 import Layout from '@/components/Layout'
 
 type Provider = 'openai' | 'claude'
-type PromptType = 'article-generator' | 'post-scorer' | 'subject-line' | 'custom'
+type PromptType = 'article-title' | 'article-body' | 'post-scorer' | 'subject-line' | 'custom'
 
 interface RSSPost {
   id: string
@@ -66,7 +66,7 @@ export default function AIPromptTestingPage() {
   // Form state
   const [provider, setProvider] = useState<Provider>('openai')
   const [model, setModel] = useState(OPENAI_MODELS[0])
-  const [promptType, setPromptType] = useState<PromptType>('article-generator')
+  const [promptType, setPromptType] = useState<PromptType>('article-title')
   const [prompt, setPrompt] = useState('')
   const [temperature, setTemperature] = useState(0.7)
   const [maxTokens, setMaxTokens] = useState(1000)
@@ -357,7 +357,8 @@ export default function AIPromptTestingPage() {
                 onChange={(e) => setPromptType(e.target.value as PromptType)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="article-generator">Article Generator</option>
+                <option value="article-title">Article Title Generator</option>
+                <option value="article-body">Article Body Generator</option>
                 <option value="post-scorer">Post Scorer</option>
                 <option value="subject-line">Subject Line Generator</option>
                 <option value="custom">Custom/Freeform</option>

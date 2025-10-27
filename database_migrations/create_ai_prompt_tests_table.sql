@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS ai_prompt_tests (
   newsletter_id TEXT NOT NULL,
   provider TEXT NOT NULL CHECK (provider IN ('openai', 'claude')),
   model TEXT NOT NULL,
-  prompt_type TEXT NOT NULL CHECK (prompt_type IN ('article-generator', 'post-scorer', 'subject-line', 'custom')),
+  prompt_type TEXT NOT NULL CHECK (prompt_type IN ('article-title', 'article-body', 'post-scorer', 'subject-line', 'custom')),
   prompt TEXT NOT NULL,
   parameters JSONB DEFAULT '{}', -- Store temperature, max_tokens, etc.
   created_at TIMESTAMPTZ DEFAULT NOW(),

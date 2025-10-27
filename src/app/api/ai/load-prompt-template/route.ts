@@ -23,12 +23,20 @@ export async function POST(request: NextRequest) {
     let templatePrompt = ''
 
     try {
-      if (promptType === 'article-generator') {
+      if (promptType === 'article-title') {
         templatePrompt = await AI_PROMPTS.primaryArticleTitle({
           title: post.title,
           description: post.description || '',
           content: post.full_article_text || ''
         })
+      } else if (promptType === 'article-body') {
+        // For body, use the post title as the headline parameter
+        templatePrompt = await AI_PROMPTS.primaryArticleBody({
+          title: post.title,
+          description: post.description || '',
+          content: post.full_article_text || '',
+          source_url: post.source_url || ''
+        }, post.title) // Using post title as headline for testing
       } else if (promptType === 'post-scorer') {
         templatePrompt = await AI_PROMPTS.criteria1Evaluator({
           title: post.title,
