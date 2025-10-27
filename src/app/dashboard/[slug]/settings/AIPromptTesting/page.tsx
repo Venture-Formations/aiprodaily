@@ -562,8 +562,12 @@ export default function AIPromptTestingPage() {
                   {testHistory.map((result, index) => (
                     <div
                       key={index}
-                      className="p-3 bg-gray-50 rounded border border-gray-200 cursor-pointer hover:bg-gray-100"
-                      onClick={() => setCurrentResponse(result)}
+                      className="p-3 bg-gray-50 rounded border border-gray-200 cursor-pointer hover:bg-gray-100 hover:shadow-sm transition-all"
+                      onClick={() => {
+                        setCurrentResponse(result)
+                        setShowModal(true)
+                        setShowPromptDetails(false)
+                      }}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-medium text-gray-900">
