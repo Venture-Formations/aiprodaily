@@ -86,6 +86,32 @@ export async function POST(request: NextRequest) {
 
     const newsletterUuid = newsletter.id
 
+    // Get recent campaigns for this newsletter
+    const { data: campaigns, error: campaignsError } = await supabase
+      .from('newsletter_campaigns')
+      .select('id')
+      .eq('newsletter_id', newsletterUuid)
+      .order('date', { ascending: false })
+      .limit(10) // Get last 10 campaigns
+
+    if (campaignsError) {
+      console.error('[AI Test Multiple] Error fetching campaigns:', campaignsError)
+      return NextResponse.json(
+        { error: 'Failed to fetch campaigns' },
+        { status: 500 }
+      )
+    }
+
+    if (!campaigns || campaigns.length === 0) {
+      console.log('[AI Test Multiple] No campaigns found')
+      return NextResponse.json(
+        { error: 'No campaigns found for this newsletter' },
+        { status: 404 }
+      )
+    }
+
+    const campaignIds = campaigns.map(c => c.id)
+
     // Get section based on prompt type
     const section = getSection(prompt_type)
 
@@ -107,7 +133,7 @@ export async function POST(request: NextRequest) {
     let query = supabase
       .from('rss_posts')
       .select('id, title, description, full_article_text, source_url, publication_date')
-      .eq('newsletter_id', newsletterUuid)
+      .in('campaign_id', campaignIds)
       .order('publication_date', { ascending: false })
       .limit(limit)
 

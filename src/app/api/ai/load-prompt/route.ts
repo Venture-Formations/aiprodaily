@@ -13,26 +13,32 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const newsletter_id = searchParams.get('newsletter_id')
     const provider = searchParams.get('provider')
-    const model = searchParams.get('model')
+    const model = searchParams.get('model') // Optional now
     const prompt_type = searchParams.get('prompt_type')
 
-    if (!newsletter_id || !provider || !model || !prompt_type) {
+    if (!newsletter_id || !provider || !prompt_type) {
       return NextResponse.json(
         { error: 'Missing required parameters' },
         { status: 400 }
       )
     }
 
-    // Load the saved prompt
-    const { data, error } = await supabaseAdmin
+    // Load the saved prompt - if model provided, filter by it, otherwise get most recent
+    let query = supabaseAdmin
       .from('ai_prompt_tests')
       .select('*')
       .eq('user_id', session.user.email)
       .eq('newsletter_id', newsletter_id)
       .eq('provider', provider)
-      .eq('model', model)
       .eq('prompt_type', prompt_type)
-      .single()
+      .order('updated_at', { ascending: false })
+      .limit(1)
+
+    if (model) {
+      query = query.eq('model', model)
+    }
+
+    const { data, error } = await query.maybeSingle()
 
     if (error) {
       // Not found is not an error - just means no saved prompt
