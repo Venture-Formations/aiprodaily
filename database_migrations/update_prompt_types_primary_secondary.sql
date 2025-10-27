@@ -1,7 +1,11 @@
 -- Update ai_prompt_tests to support primary/secondary prompt types
 -- Run this migration to add primary-title, primary-body, secondary-title, secondary-body
 
--- STEP 1: Migrate existing data to new naming convention
+-- STEP 1: Drop the old constraint FIRST (must be done before updating data)
+ALTER TABLE ai_prompt_tests
+  DROP CONSTRAINT IF EXISTS ai_prompt_tests_prompt_type_check;
+
+-- STEP 2: Migrate existing data to new naming convention
 UPDATE ai_prompt_tests
   SET prompt_type = 'primary-title'
   WHERE prompt_type = 'article-title';
@@ -9,10 +13,6 @@ UPDATE ai_prompt_tests
 UPDATE ai_prompt_tests
   SET prompt_type = 'primary-body'
   WHERE prompt_type = 'article-body';
-
--- STEP 2: Drop the old constraint
-ALTER TABLE ai_prompt_tests
-  DROP CONSTRAINT IF EXISTS ai_prompt_tests_prompt_type_check;
 
 -- STEP 3: Add the new constraint with primary/secondary types
 ALTER TABLE ai_prompt_tests
