@@ -18,11 +18,11 @@ export async function GET() {
       })
     }
 
-    // Create the subject line prompt with {{articles}} placeholder
+    // Create the subject line prompt with {{top_article}} placeholder
     const template = `Craft a front-page newspaper headline for the next-day edition based on the most interesting article.
 
-Articles in this newsletter:
-{{articles}}
+Top article in this newsletter:
+{{top_article}}
 
 HARD RULES:
 - ≤ 40 characters (count every space and punctuation) - this allows room for ice cream emoji prefix
@@ -49,7 +49,7 @@ Respond with ONLY the headline text - no JSON, no quotes, no extra formatting. J
       .insert({
         key: 'ai_prompt_subject_line',
         value: template,
-        description: 'AI prompt for generating newsletter subject lines (use {{articles}} placeholder)'
+        description: 'Content Generation - Subject Line Generator: AI prompt for generating newsletter subject lines (use {{top_article}} placeholder)'
       })
 
     if (error) {

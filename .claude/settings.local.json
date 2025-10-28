@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run type-check:*)"
+      "Bash(git commit:*)",
+      "mcp__postgres__query"
     ],
     "deny": [],
     "ask": []
