@@ -282,8 +282,8 @@ async function fetchBusinessSettings(): Promise<{
   return {
     primaryColor: settingsMap.primary_color || '#1877F2',
     secondaryColor: settingsMap.secondary_color || '#10B981',
-    headingFont: settingsMap.heading_font || 'Arial',
-    bodyFont: settingsMap.body_font || 'Arial'
+    headingFont: settingsMap.heading_font || 'Arial, sans-serif',
+    bodyFont: settingsMap.body_font || 'Arial, sans-serif'
   }
 }
 

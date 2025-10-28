@@ -4843,8 +4843,8 @@ function BusinessSettings() {
     logo_url: '',
     contact_email: '',
     website_url: '',
-    heading_font: 'Arial',
-    body_font: 'Arial',
+    heading_font: 'Arial, sans-serif',
+    body_font: 'Arial, sans-serif',
     facebook_enabled: false,
     facebook_url: '',
     twitter_enabled: false,
@@ -4864,7 +4864,7 @@ function BusinessSettings() {
   const [message, setMessage] = useState('')
 
   const fontOptions = [
-    'Arial',
+    'Arial, sans-serif',
     'Helvetica',
     'Georgia',
     'Times New Roman',
