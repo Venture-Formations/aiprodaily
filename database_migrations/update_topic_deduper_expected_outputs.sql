@@ -1,18 +1,12 @@
--- Update Topic Deduplicator expected outputs to reflect actual code usage
--- The code only uses the "groups" array, not "unique_articles"
--- Each group must have: topic_signature, primary_article_index, duplicate_indices, similarity_explanation
+-- Update Topic Deduplicator expected outputs for test result parsing
+-- Simplified to work with parseResponseOutputs function
+-- Both "groups" and "unique_articles" will be shown in test results
+-- Each group contains: topic_signature, primary_article_index, duplicate_indices, similarity_explanation
 
 UPDATE app_settings
 SET expected_outputs = '{
-  "groups": {
-    "type": "array",
-    "items": {
-      "topic_signature": "string",
-      "primary_article_index": "integer",
-      "duplicate_indices": "array",
-      "similarity_explanation": "string"
-    }
-  }
+  "groups": "array",
+  "unique_articles": "array"
 }'::jsonb
 WHERE key = 'ai_prompt_topic_deduper';
 

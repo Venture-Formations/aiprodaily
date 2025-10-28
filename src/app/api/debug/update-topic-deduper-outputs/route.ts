@@ -8,15 +8,8 @@ export async function GET() {
       .from('app_settings')
       .update({
         expected_outputs: {
-          groups: {
-            type: 'array',
-            items: {
-              topic_signature: 'string',
-              primary_article_index: 'integer',
-              duplicate_indices: 'array',
-              similarity_explanation: 'string'
-            }
-          }
+          groups: 'array',
+          unique_articles: 'array'
         }
       })
       .eq('key', 'ai_prompt_topic_deduper')
@@ -40,7 +33,7 @@ export async function GET() {
       success: true,
       message: 'Topic Deduplicator expected outputs updated successfully',
       updated_expected_outputs: updated?.expected_outputs,
-      note: 'Removed unused "unique_articles" field. Only "groups" array is used by the code.'
+      note: 'Simplified structure for test result parsing. Both "groups" and "unique_articles" will display in test results modal.'
     })
 
   } catch (error: any) {

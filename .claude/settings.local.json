@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(git commit:*)",
-      "mcp__postgres__query"
+      "mcp__postgres__query",
+      "Bash(curl:*)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []
