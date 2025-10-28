@@ -225,12 +225,30 @@ export async function GET(request: NextRequest) {
     if (promptType === 'all' || promptType === 'newsletterWriter') {
       console.log('Testing Newsletter Writer...')
       try {
-        const prompt = await AI_PROMPTS.newsletterWriter(testData.newsletterWriter)
+        let prompt: string
+        let promptSource = 'default'
+
+        if (customPromptContent) {
+          console.log('[DEBUG] Using custom prompt content for newsletter writer')
+          prompt = extractPromptContent(customPromptContent)
+          // Replace placeholders
+          prompt = prompt
+            .replace(/\{\{title\}\}/g, testData.newsletterWriter.title)
+            .replace(/\{\{description\}\}/g, testData.newsletterWriter.description || 'No description available')
+            .replace(/\{\{content\}\}/g, testData.newsletterWriter.content || testData.newsletterWriter.description || 'No content available')
+            .replace(/\{\{source_url\}\}/g, testData.newsletterWriter.source_url || '')
+          promptSource = 'custom'
+        } else {
+          prompt = await AI_PROMPTS.newsletterWriter(testData.newsletterWriter)
+          promptSource = 'AI_PROMPTS.newsletterWriter'
+        }
+
         const response = await callOpenAI(prompt, 1000, 0.3)
         results.newsletterWriter = {
           success: true,
           response,
-          prompt_length: prompt.length
+          prompt_length: prompt.length,
+          prompt_source: promptSource
         }
       } catch (error) {
         results.newsletterWriter = {
@@ -283,14 +301,32 @@ export async function GET(request: NextRequest) {
     if (promptType === 'primaryArticleBody') {
       console.log('Testing Primary Article Body...')
       try {
-        // First generate a sample headline (or use a test headline)
+        let prompt: string
+        let promptSource = 'default'
         const sampleHeadline = rssPost?.title || 'Sample Test Headline for Article Body'
-        const prompt = await AI_PROMPTS.primaryArticleBody(testData.newsletterWriter, sampleHeadline)
+
+        if (customPromptContent) {
+          console.log('[DEBUG] Using custom prompt content for primary article body')
+          prompt = extractPromptContent(customPromptContent)
+          // Replace placeholders
+          prompt = prompt
+            .replace(/\{\{title\}\}/g, testData.newsletterWriter.title)
+            .replace(/\{\{description\}\}/g, testData.newsletterWriter.description || 'No description available')
+            .replace(/\{\{content\}\}/g, testData.newsletterWriter.content || testData.newsletterWriter.description || 'No content available')
+            .replace(/\{\{source_url\}\}/g, testData.newsletterWriter.source_url || '')
+            .replace(/\{\{headline\}\}/g, sampleHeadline)
+          promptSource = 'custom'
+        } else {
+          prompt = await AI_PROMPTS.primaryArticleBody(testData.newsletterWriter, sampleHeadline)
+          promptSource = 'AI_PROMPTS.primaryArticleBody'
+        }
+
         const response = await callOpenAI(prompt, 500, 0.7)
         results.primaryArticleBody = {
           success: true,
           response,
           prompt_length: prompt.length,
+          prompt_source: promptSource,
           note: `Using headline: "${sampleHeadline}"`
         }
       } catch (error) {
@@ -305,12 +341,30 @@ export async function GET(request: NextRequest) {
     if (promptType === 'secondaryArticleTitle') {
       console.log('Testing Secondary Article Title...')
       try {
-        const prompt = await AI_PROMPTS.secondaryArticleTitle(testData.newsletterWriter)
+        let prompt: string
+        let promptSource = 'default'
+
+        if (customPromptContent) {
+          console.log('[DEBUG] Using custom prompt content for secondary article title')
+          prompt = extractPromptContent(customPromptContent)
+          // Replace placeholders
+          prompt = prompt
+            .replace(/\{\{title\}\}/g, testData.newsletterWriter.title)
+            .replace(/\{\{description\}\}/g, testData.newsletterWriter.description || 'No description available')
+            .replace(/\{\{content\}\}/g, testData.newsletterWriter.content || testData.newsletterWriter.description || 'No content available')
+            .replace(/\{\{source_url\}\}/g, testData.newsletterWriter.source_url || '')
+          promptSource = 'custom'
+        } else {
+          prompt = await AI_PROMPTS.secondaryArticleTitle(testData.newsletterWriter)
+          promptSource = 'AI_PROMPTS.secondaryArticleTitle'
+        }
+
         const response = await callOpenAI(prompt, 200, 0.7)
         results.secondaryArticleTitle = {
           success: true,
           response,
-          prompt_length: prompt.length
+          prompt_length: prompt.length,
+          prompt_source: promptSource
         }
       } catch (error) {
         results.secondaryArticleTitle = {
@@ -324,14 +378,32 @@ export async function GET(request: NextRequest) {
     if (promptType === 'secondaryArticleBody') {
       console.log('Testing Secondary Article Body...')
       try {
-        // First generate a sample headline (or use a test headline)
+        let prompt: string
+        let promptSource = 'default'
         const sampleHeadline = rssPost?.title || 'Sample Test Headline for Article Body'
-        const prompt = await AI_PROMPTS.secondaryArticleBody(testData.newsletterWriter, sampleHeadline)
+
+        if (customPromptContent) {
+          console.log('[DEBUG] Using custom prompt content for secondary article body')
+          prompt = extractPromptContent(customPromptContent)
+          // Replace placeholders
+          prompt = prompt
+            .replace(/\{\{title\}\}/g, testData.newsletterWriter.title)
+            .replace(/\{\{description\}\}/g, testData.newsletterWriter.description || 'No description available')
+            .replace(/\{\{content\}\}/g, testData.newsletterWriter.content || testData.newsletterWriter.description || 'No content available')
+            .replace(/\{\{source_url\}\}/g, testData.newsletterWriter.source_url || '')
+            .replace(/\{\{headline\}\}/g, sampleHeadline)
+          promptSource = 'custom'
+        } else {
+          prompt = await AI_PROMPTS.secondaryArticleBody(testData.newsletterWriter, sampleHeadline)
+          promptSource = 'AI_PROMPTS.secondaryArticleBody'
+        }
+
         const response = await callOpenAI(prompt, 500, 0.7)
         results.secondaryArticleBody = {
           success: true,
           response,
           prompt_length: prompt.length,
+          prompt_source: promptSource,
           note: `Using headline: "${sampleHeadline}"`
         }
       } catch (error) {
@@ -346,13 +418,29 @@ export async function GET(request: NextRequest) {
     if (promptType === 'all' || promptType === 'subjectLineGenerator') {
       console.log('Testing Subject Line Generator...')
       try {
-        const prompt = await AI_PROMPTS.subjectLineGenerator(testData.subjectLineGenerator)
+        let prompt: string
+        let promptSource = 'default'
+
+        if (customPromptContent) {
+          console.log('[DEBUG] Using custom prompt content for subject line generator')
+          prompt = extractPromptContent(customPromptContent)
+          // Replace placeholders
+          prompt = prompt
+            .replace(/\{\{headline\}\}/g, testData.subjectLineGenerator.headline)
+            .replace(/\{\{content\}\}/g, testData.subjectLineGenerator.content || 'No content available')
+          promptSource = 'custom'
+        } else {
+          prompt = await AI_PROMPTS.subjectLineGenerator(testData.subjectLineGenerator)
+          promptSource = 'AI_PROMPTS.subjectLineGenerator'
+        }
+
         const response = await callOpenAI(prompt, 100, 0.8)
         results.subjectLineGenerator = {
           success: true,
           response,
           character_count: typeof response === 'string' ? response.length : response?.raw?.length || 0,
-          prompt_length: prompt.length
+          prompt_length: prompt.length,
+          prompt_source: promptSource
         }
       } catch (error) {
         results.subjectLineGenerator = {
@@ -366,12 +454,29 @@ export async function GET(request: NextRequest) {
     if (promptType === 'all' || promptType === 'eventSummarizer') {
       console.log('Testing Event Summarizer...')
       try {
-        const prompt = await AI_PROMPTS.eventSummarizer(testData.eventSummarizer)
+        let prompt: string
+        let promptSource = 'default'
+
+        if (customPromptContent) {
+          console.log('[DEBUG] Using custom prompt content for event summarizer')
+          prompt = extractPromptContent(customPromptContent)
+          // Replace placeholders
+          prompt = prompt
+            .replace(/\{\{title\}\}/g, testData.eventSummarizer.title)
+            .replace(/\{\{description\}\}/g, testData.eventSummarizer.description || 'No description available')
+            .replace(/\{\{venue\}\}/g, testData.eventSummarizer.venue || 'No venue specified')
+          promptSource = 'custom'
+        } else {
+          prompt = await AI_PROMPTS.eventSummarizer(testData.eventSummarizer)
+          promptSource = 'AI_PROMPTS.eventSummarizer'
+        }
+
         const response = await callOpenAI(prompt, 200, 0.7)
         results.eventSummarizer = {
           success: true,
           response,
-          prompt_length: prompt.length
+          prompt_length: prompt.length,
+          prompt_source: promptSource
         }
       } catch (error) {
         results.eventSummarizer = {
@@ -414,10 +519,25 @@ export async function GET(request: NextRequest) {
       console.log('[DEBUG] Newsletter content:', testData.factChecker.newsletterContent.substring(0, 100))
       console.log('[DEBUG] Original content:', testData.factChecker.originalContent.substring(0, 100))
       try {
-        const prompt = await AI_PROMPTS.factChecker(
-          testData.factChecker.newsletterContent,
-          testData.factChecker.originalContent
-        )
+        let prompt: string
+        let promptSource = 'default'
+
+        if (customPromptContent) {
+          console.log('[DEBUG] Using custom prompt content for fact checker')
+          prompt = extractPromptContent(customPromptContent)
+          // Replace placeholders
+          prompt = prompt
+            .replace(/\{\{newsletter_content\}\}/g, testData.factChecker.newsletterContent)
+            .replace(/\{\{original_content\}\}/g, testData.factChecker.originalContent)
+          promptSource = 'custom'
+        } else {
+          prompt = await AI_PROMPTS.factChecker(
+            testData.factChecker.newsletterContent,
+            testData.factChecker.originalContent
+          )
+          promptSource = 'AI_PROMPTS.factChecker'
+        }
+
         console.log('[DEBUG] Generated prompt length:', prompt.length)
         console.log('[DEBUG] Prompt preview (first 500 chars):', prompt.substring(0, 500))
 
@@ -428,6 +548,7 @@ export async function GET(request: NextRequest) {
           success: true,
           response,
           prompt_length: prompt.length,
+          prompt_source: promptSource,
           prompt_preview: prompt.substring(0, 800) + '...',
           test_data_used: {
             newsletter_length: testData.factChecker.newsletterContent.length,
@@ -470,7 +591,21 @@ export async function GET(request: NextRequest) {
           }
         ]
 
-        const prompt = await AI_PROMPTS.welcomeSection(testArticles)
+        let prompt: string
+        let promptSource = 'default'
+
+        if (customPromptContent) {
+          console.log('[DEBUG] Using custom prompt content for welcome section')
+          prompt = extractPromptContent(customPromptContent)
+          // Replace placeholder with articles JSON
+          const articlesJson = JSON.stringify(testArticles, null, 2)
+          prompt = prompt.replace(/\{\{articles\}\}/g, articlesJson)
+          promptSource = 'custom'
+        } else {
+          prompt = await AI_PROMPTS.welcomeSection(testArticles)
+          promptSource = 'AI_PROMPTS.welcomeSection'
+        }
+
         console.log('[TEST] Prompt type:', typeof prompt === 'string' ? 'string' : 'structured')
 
         const response = await callOpenAI(prompt, 500, 0.8)
@@ -479,6 +614,7 @@ export async function GET(request: NextRequest) {
           success: true,
           response,
           prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
+          prompt_source: promptSource,
           prompt_preview: typeof prompt === 'string' ? prompt.substring(0, 500) + '...' : 'Structured JSON prompt',
           test_articles_count: testArticles.length
         }
@@ -494,7 +630,21 @@ export async function GET(request: NextRequest) {
     if (promptType === 'all' || promptType === 'topicDeduper') {
       console.log('Testing Topic Deduper...')
       try {
-        const prompt = await AI_PROMPTS.topicDeduper(testData.topicDeduper)
+        let prompt: string
+        let promptSource = 'default'
+
+        if (customPromptContent) {
+          console.log('[DEBUG] Using custom prompt content for topic deduper')
+          prompt = extractPromptContent(customPromptContent)
+          // Replace placeholder with posts JSON
+          const postsJson = JSON.stringify(testData.topicDeduper, null, 2)
+          prompt = prompt.replace(/\{\{posts\}\}/g, postsJson)
+          promptSource = 'custom'
+        } else {
+          prompt = await AI_PROMPTS.topicDeduper(testData.topicDeduper)
+          promptSource = 'AI_PROMPTS.topicDeduper'
+        }
+
         console.log('[TEST] Prompt length:', prompt.length)
         console.log('[TEST] Prompt preview (first 500 chars):', prompt.substring(0, 500))
 
@@ -506,6 +656,7 @@ export async function GET(request: NextRequest) {
           success: true,
           response,
           prompt_length: prompt.length,
+          prompt_source: promptSource,
           prompt_preview: prompt.substring(0, 800) + '...',
           test_posts_count: testData.topicDeduper.length,
           expected_duplicates: 'Posts 0+1 (tax software), Posts 3+4 (QuickBooks fraud detection)'
