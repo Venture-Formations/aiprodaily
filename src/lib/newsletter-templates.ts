@@ -1256,7 +1256,7 @@ export async function generateNewsletterFooter(campaignDate?: string, campaignId
 
   return `
 ${socialMediaSection}
-<div style="font-family: Arial, sans-serif; font-size: 12px; color: #777; text-align: center; padding: 20px 10px; border-top: 1px solid #ccc; background-color: #ffffff; max-width: 750px; margin: 0 auto ;">
+<div style="font-family: Arial, sans-serif; font-size: 12px; color: #777; text-align: center; padding: 20px 10px; border-top: 1px solid #ccc; background-color: #ffffff; max-width: 770px; margin: 0 auto ;">
   <p style="margin: 0;text-align: center;">You're receiving this email because you subscribed to <strong>${newsletterName}</strong>.</p>
   <p style="margin: 5px 0 0;text-align: center;">
     <a href="{$unsubscribe}" style='text-decoration: underline;'>Unsubscribe</a>
