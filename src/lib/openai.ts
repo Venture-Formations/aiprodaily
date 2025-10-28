@@ -95,7 +95,7 @@ BLANK RATING CONDITIONS: Leave all fields blank if:
 
 Article Title: ${post.title}
 Article Description: ${post.description || 'No description available'}
-Article Content: ${post.content ? post.content.substring(0, 1000) + '...' : 'No content available'}
+Article Content: ${post.content || 'No content available'}
 
 IMPORTANT: You must respond with ONLY valid JSON. Do not include any text before or after the JSON.
 The interest_level field MUST be between 1 and 20, NOT between 1 and 10.
@@ -128,7 +128,7 @@ Articles to analyze (array indices are 0-based - first article is index 0):
 ${posts.map((post, i) => `
 ${i}. Title: ${post.title}
    Description: ${post.description || 'No description'}
-   Full Article: ${post.full_article_text ? post.full_article_text.substring(0, 1000) + (post.full_article_text.length > 1000 ? '...' : '') : 'No full text available'}
+   Full Article: ${post.full_article_text ? post.full_article_text.substring(0, 1500) + (post.full_article_text.length > 1500 ? '...' : '') : 'No full text available'}
 `).join('\n')}
 
 IMPORTANT: Use 0-based indexing (first article = 0, second = 1, etc.)
@@ -152,7 +152,7 @@ CRITICAL: You are writing a news article that MUST follow strict content rules. 
 Original Source Post:
 Title: ${post.title}
 Description: ${post.description || 'No description available'}
-Content: ${post.content ? post.content.substring(0, 1500) + '...' : 'No additional content'}
+Content: ${post.content || 'No additional content'}
 
 MANDATORY STRICT CONTENT RULES - FOLLOW EXACTLY:
 1. Articles must be COMPLETELY REWRITTEN and summarized — similar phrasing is acceptable but NO exact copying
@@ -272,7 +272,7 @@ Craft a front-page newspaper headline for the next-day edition based on the top-
 
 Top Article (Rank #1):
 Headline: ${top_article.headline}
-Content: ${top_article.content.substring(0, 200)}...
+Content: ${top_article.content}
 
 HARD RULES:
 - ≤ 40 characters (count every space and punctuation) - this allows room for ice cream emoji prefix
@@ -296,7 +296,7 @@ Respond with ONLY the headline text - no JSON, no quotes, no extra formatting. J
 
   welcomeSection: (articles: Array<{ headline: string; content: string }>) => {
     const articlesText = articles
-      .map((article, index) => `${index + 1}. ${article.headline}\n   ${article.content.substring(0, 200)}...`)
+      .map((article, index) => `${index + 1}. ${article.headline}\n   ${article.content.substring(0, 1000)}${article.content.length > 1000 ? '...' : ''}`)
       .join('\n\n')
 
     return `You are writing a welcoming introduction for a local St. Cloud, Minnesota newsletter.
@@ -596,7 +596,7 @@ LOW SCORES (0-3):
 
 Article Title: ${post.title}
 Article Description: ${post.description || 'No description available'}
-Article Content: ${post.content ? post.content.substring(0, 1000) + '...' : 'No content available'}
+Article Content: ${post.content || 'No content available'}
 
 IMPORTANT: You must respond with ONLY valid JSON. Do not include any text before or after the JSON.
 
@@ -640,7 +640,7 @@ LOW SCORES (0-3):
 
 Article Title: ${post.title}
 Article Description: ${post.description || 'No description available'}
-Article Content: ${post.content ? post.content.substring(0, 1000) + '...' : 'No content available'}
+Article Content: ${post.content || 'No content available'}
 
 IMPORTANT: You must respond with ONLY valid JSON. Do not include any text before or after the JSON.
 
@@ -685,7 +685,7 @@ LOW SCORES (0-3):
 
 Article Title: ${post.title}
 Article Description: ${post.description || 'No description available'}
-Article Content: ${post.content ? post.content.substring(0, 1000) + '...' : 'No content available'}
+Article Content: ${post.content || 'No content available'}
 
 IMPORTANT: You must respond with ONLY valid JSON. Do not include any text before or after the JSON.
 
@@ -702,7 +702,7 @@ Score this article on a scale of 0-10.
 
 Article Title: ${post.title}
 Article Description: ${post.description || 'No description available'}
-Article Content: ${post.content ? post.content.substring(0, 1000) + '...' : 'No content available'}
+Article Content: ${post.content || 'No content available'}
 
 IMPORTANT: You must respond with ONLY valid JSON. Do not include any text before or after the JSON.
 
@@ -719,7 +719,7 @@ Score this article on a scale of 0-10.
 
 Article Title: ${post.title}
 Article Description: ${post.description || 'No description available'}
-Article Content: ${post.content ? post.content.substring(0, 1000) + '...' : 'No content available'}
+Article Content: ${post.content || 'No content available'}
 
 IMPORTANT: You must respond with ONLY valid JSON. Do not include any text before or after the JSON.
 
@@ -735,7 +735,7 @@ CRITICAL: You are writing a newsletter article for accounting professionals that
 Original Source Post:
 Title: ${post.title}
 Description: ${post.description || 'No description available'}
-Content: ${post.content ? post.content.substring(0, 1500) + '...' : 'No additional content'}
+Content: ${post.content || 'No additional content'}
 
 MANDATORY STRICT CONTENT RULES:
 1. Articles must be COMPLETELY REWRITTEN and summarized
@@ -800,7 +800,7 @@ Headline to use: ${headline}
 Original Source Post:
 Title: ${post.title}
 Description: ${post.description || 'No description available'}
-Content: ${post.content ? post.content.substring(0, 1500) + '...' : 'No additional content'}
+Content: ${post.content || 'No additional content'}
 
 MANDATORY STRICT CONTENT RULES:
 1. Articles must be COMPLETELY REWRITTEN and summarized — similar phrasing is acceptable but NO exact copying
@@ -867,7 +867,7 @@ Headline to use: ${headline}
 Original Source Post:
 Title: ${post.title}
 Description: ${post.description || 'No description available'}
-Content: ${post.content ? post.content.substring(0, 1500) + '...' : 'No additional content'}
+Content: ${post.content || 'No additional content'}
 
 MANDATORY STRICT CONTENT RULES:
 1. Articles must be COMPLETELY REWRITTEN and summarized
@@ -1079,7 +1079,7 @@ export const AI_PROMPTS = {
       const articlesText = posts.map((post, i) => `
 ${i}. Title: ${post.title}
    Description: ${post.description || 'No description'}
-   Full Article: ${post.full_article_text ? post.full_article_text.substring(0, 1000) + (post.full_article_text.length > 1000 ? '...' : '') : 'No full text available'}
+   Full Article: ${post.full_article_text ? post.full_article_text.substring(0, 1500) + (post.full_article_text.length > 1500 ? '...' : '') : 'No full text available'}
 `).join('\n')
 
       // Check if value is already an object (JSONB auto-parsed) or needs parsing
@@ -2059,7 +2059,7 @@ export const AI_CALL = {
       FALLBACK_PROMPTS.welcomeSection(articles)
     )
 
-    const articlesJson = JSON.stringify(articles.map(a => ({ headline: a.headline, content: a.content.substring(0, 200) })))
+    const articlesJson = JSON.stringify(articles.map(a => ({ headline: a.headline, content: a.content.substring(0, 1000) + (a.content.length > 1000 ? '...' : '') })))
     const prompt = template.replace(/\{\{articles\}\}/g, articlesJson)
 
     return callAI(prompt, maxTokens, temperature, provider)
