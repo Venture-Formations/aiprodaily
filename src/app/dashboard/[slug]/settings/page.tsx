@@ -2462,9 +2462,14 @@ function AIPromptsSettings() {
         if (results && typeof results === 'object') {
           const firstResult = Object.values(results)[0] as any
           if (firstResult?.response) {
-            responseText = typeof firstResult.response === 'string'
-              ? firstResult.response
-              : JSON.stringify(firstResult.response)
+            // Check if response has a 'raw' property (common for OpenAI responses)
+            if (typeof firstResult.response === 'object' && firstResult.response.raw) {
+              responseText = firstResult.response.raw
+            } else if (typeof firstResult.response === 'string') {
+              responseText = firstResult.response
+            } else {
+              responseText = JSON.stringify(firstResult.response)
+            }
           }
         }
 
