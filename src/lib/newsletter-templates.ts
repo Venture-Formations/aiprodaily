@@ -188,11 +188,24 @@ export async function generateNewsletterHeader(formattedDate: string, campaignDa
 </head>
 <body style='margin:0!important;padding:0!important;background-color:#f7f7f7;'>
      <div class="outer-wrap" style="width:100%; min-height:100vh; background:#f7f7f7; padding:10px; box-sizing:border-box;">
-     <div style='width:100%;max-width:750px;margin:0 auto;padding:5px;text-align:right;font-weight:bold;'>
-       <a href='{$url}' style='color:#000;text-decoration:underline;'>View Online</a>&nbsp;|&nbsp;
-       <a href='${signUpUrl}' style='color:#000;text-decoration:underline;'>Sign Up</a>&nbsp;|&nbsp;
-       <a href='{$forward}' style='color:#000;text-decoration:underline;'>Share</a>
-     </div>
+     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
+       <tr>
+         <td style="font-weight:bold;font-family:Arial,sans-serif;padding:5px 0;">
+           <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+             <tr>
+               <!-- spacer cell -->
+               <td width="10">&nbsp;</td>
+               <!-- content cell -->
+               <td align="right">
+                 <a href="{$url}" style="color:#000;text-decoration:underline;">View Online</a>&nbsp;|&nbsp;
+                 <a href="${signUpUrl}" style="color:#000;text-decoration:underline;">Sign Up</a>&nbsp;|&nbsp;
+                 <a href="{$forward}" style="color:#000;text-decoration:underline;">Share</a>
+               </td>
+             </tr>
+           </table>
+         </td>
+       </tr>
+     </table>
      <div style='width:100%;max-width:750px;margin:0 auto;padding:0px;'>
        <table width='100%' cellpadding='0' cellspacing='0' style='font-family:Arial,sans-serif;'>
          <tr>
@@ -292,7 +305,7 @@ export async function generateWelcomeSection(
     : ''
 
   return `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff;">
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
   <tr>
     <td style="padding: 20px;">
       ${introPart}
@@ -333,7 +346,7 @@ export async function generatePrimaryArticlesSection(articles: any[], campaignDa
   }).join('')
 
   return `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff;">
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
   <tr>
     <td style="padding: 5px;">
       <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">${sectionName}</h2>
@@ -395,7 +408,7 @@ export async function generateSecondaryArticlesSection(campaign: any, sectionNam
   }).join('')
 
   return `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff;">
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
   <tr>
     <td style="padding: 5px;">
       <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">${sectionName}</h2>
@@ -698,7 +711,7 @@ export async function generatePollSection(campaignId: string): Promise<string> {
       <!-- Poll Box -->
       <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"
              style="width:100%; max-width:650px; margin:10px auto; background-color:#E8F0FE;
-                    border:2px solid ${primaryColor}; border-radius:10px; font-family:Arial, sans-serif;">
+                    border:2px solid ${primaryColor}; border-radius:10px; font-family:Arial, sans-serif; box-shadow:0 4px 12px rgba(0,0,0,.15);">
         <tr>
           <td style="padding:14px; color:#1a1a1a; font-size:16px; line-height:1.5; text-align:center;">
 
@@ -1064,7 +1077,7 @@ export async function generateAIAppsSection(campaign: any): Promise<string> {
     }).join('')
 
     return `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff;">
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
   <tr>
     <td style="padding: 5px;">
       <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">AI Applications</h2>
@@ -1111,7 +1124,7 @@ export async function generatePromptIdeasSection(campaign: any): Promise<string>
 
     // Generate HTML with terminal styling (email-safe)
     return `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff;">
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
   <tr>
     <td style="padding: 5px;">
       <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">Prompt Ideas</h2>
