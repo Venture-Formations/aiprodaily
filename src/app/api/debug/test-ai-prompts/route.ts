@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 import { supabaseAdmin } from '@/lib/supabase'
+import OpenAI from 'openai'
+import Anthropic from '@anthropic-ai/sdk'
+
+// Initialize AI clients
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+})
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+})
 
 // Helper function to inject post data into any value (string, object, array) recursively
 // This matches the behavior of AI Prompt Testing Playground
@@ -54,6 +65,26 @@ function processCustomPrompt(customPromptContent: string, postData: any): string
   }
 }
 
+// Helper function to call AI provider (OpenAI or Claude)
+async function callAI(prompt: string, maxTokens: number, temperature: number, provider: 'openai' | 'claude' = 'openai'): Promise<string> {
+  if (provider === 'claude') {
+    // Claude API call
+    const completion = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5-20250929',
+      max_tokens: maxTokens,
+      temperature: temperature,
+      messages: [{ role: 'user', content: prompt }]
+    })
+
+    // Extract text from Claude response
+    const textContent = completion.content.find(c => c.type === 'text')
+    return textContent && 'text' in textContent ? textContent.text : 'No response'
+  } else {
+    // OpenAI API call (default)
+    return callOpenAI(prompt, maxTokens, temperature)
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -61,6 +92,21 @@ export async function GET(request: NextRequest) {
     const promptKey = searchParams.get('promptKey')
     const rssPostId = searchParams.get('rssPostId')
     const customPromptContent = searchParams.get('promptContent') // Custom prompt content for testing
+
+    // Fetch AI provider from database if promptKey is provided
+    let aiProvider: 'openai' | 'claude' = 'openai' // Default to OpenAI
+    if (promptKey) {
+      const { data: promptData } = await supabaseAdmin
+        .from('app_settings')
+        .select('ai_provider')
+        .eq('key', promptKey)
+        .single()
+
+      if (promptData?.ai_provider === 'claude') {
+        aiProvider = 'claude'
+        console.log('[DEBUG] Using Claude provider for prompt:', promptKey)
+      }
+    }
 
     const results: Record<string, any> = {}
 
@@ -226,9 +272,9 @@ export async function GET(request: NextRequest) {
         }
 
         console.log('[DEBUG] Final prompt preview (first 300 chars):', prompt.substring(0, 300))
-        console.log('[DEBUG] Calling OpenAI with prompt length:', prompt.length)
+        console.log('[DEBUG] Calling AI with prompt length:', prompt.length, 'provider:', aiProvider)
 
-        const response = await callOpenAI(prompt, 1000, 0.3)
+        const response = await callAI(prompt, 1000, 0.3, aiProvider)
 
         console.log('[DEBUG] OpenAI response received:', typeof response === 'string' ? response.substring(0, 200) : response)
 
@@ -238,7 +284,8 @@ export async function GET(request: NextRequest) {
           prompt_length: prompt.length,
           prompt_key_used: promptKey || 'ai_prompt_content_evaluator',
           prompt_source: promptSource,
-          prompt_preview: prompt.substring(0, 500) + '...'
+          prompt_preview: prompt.substring(0, 500) + '...',
+          ai_provider: aiProvider
         }
       } catch (error) {
         results.contentEvaluator = {
@@ -271,12 +318,13 @@ export async function GET(request: NextRequest) {
           promptSource = 'AI_PROMPTS.newsletterWriter'
         }
 
-        const response = await callOpenAI(prompt, 1000, 0.3)
+        const response = await callAI(prompt, 1000, 0.3, aiProvider)
         results.newsletterWriter = {
           success: true,
           response,
           prompt_length: prompt.length,
-          prompt_source: promptSource
+          prompt_source: promptSource,
+          ai_provider: aiProvider
         }
       } catch (error) {
         results.newsletterWriter = {
@@ -310,13 +358,14 @@ export async function GET(request: NextRequest) {
         }
 
         console.log('[TEST] Prompt preview (first 500 chars):', prompt.substring(0, 500))
-        const response = await callOpenAI(prompt, 200, 0.7)
+        const response = await callAI(prompt, 200, 0.7, aiProvider)
         results.primaryArticleTitle = {
           success: true,
           response,
           prompt_length: prompt.length,
           prompt_source: promptSource,
-          prompt_preview: prompt.substring(0, 300) + '...'
+          prompt_preview: prompt.substring(0, 300) + '...',
+          ai_provider: aiProvider
         }
       } catch (error) {
         results.primaryArticleTitle = {
@@ -351,13 +400,14 @@ export async function GET(request: NextRequest) {
           promptSource = 'AI_PROMPTS.primaryArticleBody'
         }
 
-        const response = await callOpenAI(prompt, 500, 0.7)
+        const response = await callAI(prompt, 500, 0.7, aiProvider)
         results.primaryArticleBody = {
           success: true,
           response,
           prompt_length: prompt.length,
           prompt_source: promptSource,
-          note: `Using headline: "${sampleHeadline}"`
+          note: `Using headline: "${sampleHeadline}"`,
+          ai_provider: aiProvider
         }
       } catch (error) {
         results.primaryArticleBody = {
@@ -390,12 +440,13 @@ export async function GET(request: NextRequest) {
           promptSource = 'AI_PROMPTS.secondaryArticleTitle'
         }
 
-        const response = await callOpenAI(prompt, 200, 0.7)
+        const response = await callAI(prompt, 200, 0.7, aiProvider)
         results.secondaryArticleTitle = {
           success: true,
           response,
           prompt_length: prompt.length,
-          prompt_source: promptSource
+          prompt_source: promptSource,
+          ai_provider: aiProvider
         }
       } catch (error) {
         results.secondaryArticleTitle = {
@@ -430,13 +481,14 @@ export async function GET(request: NextRequest) {
           promptSource = 'AI_PROMPTS.secondaryArticleBody'
         }
 
-        const response = await callOpenAI(prompt, 500, 0.7)
+        const response = await callAI(prompt, 500, 0.7, aiProvider)
         results.secondaryArticleBody = {
           success: true,
           response,
           prompt_length: prompt.length,
           prompt_source: promptSource,
-          note: `Using headline: "${sampleHeadline}"`
+          note: `Using headline: "${sampleHeadline}"`,
+          ai_provider: aiProvider
         }
       } catch (error) {
         results.secondaryArticleBody = {
@@ -467,13 +519,14 @@ export async function GET(request: NextRequest) {
           promptSource = 'AI_PROMPTS.subjectLineGenerator'
         }
 
-        const response = await callOpenAI(prompt, 100, 0.8)
+        const response = await callAI(prompt, 100, 0.8, aiProvider)
         results.subjectLineGenerator = {
           success: true,
           response,
-          character_count: typeof response === 'string' ? response.length : response?.raw?.length || 0,
+          character_count: typeof response === 'string' ? response.length : 0,
           prompt_length: prompt.length,
-          prompt_source: promptSource
+          prompt_source: promptSource,
+          ai_provider: aiProvider
         }
       } catch (error) {
         results.subjectLineGenerator = {
@@ -504,12 +557,13 @@ export async function GET(request: NextRequest) {
           promptSource = 'AI_PROMPTS.eventSummarizer'
         }
 
-        const response = await callOpenAI(prompt, 200, 0.7)
+        const response = await callAI(prompt, 200, 0.7, aiProvider)
         results.eventSummarizer = {
           success: true,
           response,
           prompt_length: prompt.length,
-          prompt_source: promptSource
+          prompt_source: promptSource,
+          ai_provider: aiProvider
         }
       } catch (error) {
         results.eventSummarizer = {
@@ -574,8 +628,8 @@ export async function GET(request: NextRequest) {
         console.log('[DEBUG] Generated prompt length:', prompt.length)
         console.log('[DEBUG] Prompt preview (first 500 chars):', prompt.substring(0, 500))
 
-        const response = await callOpenAI(prompt, 1000, 0.3)
-        console.log('[DEBUG] OpenAI response:', typeof response === 'string' ? response.substring(0, 200) : response)
+        const response = await callAI(prompt, 1000, 0.3, aiProvider)
+        console.log('[DEBUG] AI response:', typeof response === 'string' ? response.substring(0, 200) : response)
 
         results.factChecker = {
           success: true,
@@ -586,7 +640,8 @@ export async function GET(request: NextRequest) {
           test_data_used: {
             newsletter_length: testData.factChecker.newsletterContent.length,
             original_length: testData.factChecker.originalContent.length
-          }
+          },
+          ai_provider: aiProvider
         }
       } catch (error) {
         results.factChecker = {
@@ -641,7 +696,7 @@ export async function GET(request: NextRequest) {
 
         console.log('[TEST] Prompt type:', typeof prompt === 'string' ? 'string' : 'structured')
 
-        const response = await callOpenAI(prompt, 500, 0.8)
+        const response = await callAI(prompt, 500, 0.8, aiProvider)
 
         results.welcomeSection = {
           success: true,
@@ -649,7 +704,8 @@ export async function GET(request: NextRequest) {
           prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
           prompt_source: promptSource,
           prompt_preview: typeof prompt === 'string' ? prompt.substring(0, 500) + '...' : 'Structured JSON prompt',
-          test_articles_count: testArticles.length
+          test_articles_count: testArticles.length,
+          ai_provider: aiProvider
         }
       } catch (error) {
         results.welcomeSection = {
@@ -681,7 +737,7 @@ export async function GET(request: NextRequest) {
         console.log('[TEST] Prompt length:', prompt.length)
         console.log('[TEST] Prompt preview (first 500 chars):', prompt.substring(0, 500))
 
-        const response = await callOpenAI(prompt, 1000, 0.3)
+        const response = await callAI(prompt, 1000, 0.3, aiProvider)
         console.log('[TEST] Response type:', typeof response)
         console.log('[TEST] Response:', JSON.stringify(response, null, 2))
 
@@ -692,7 +748,8 @@ export async function GET(request: NextRequest) {
           prompt_source: promptSource,
           prompt_preview: prompt.substring(0, 800) + '...',
           test_posts_count: testData.topicDeduper.length,
-          expected_duplicates: 'Posts 0+1 (tax software), Posts 3+4 (QuickBooks fraud detection)'
+          expected_duplicates: 'Posts 0+1 (tax software), Posts 3+4 (QuickBooks fraud detection)',
+          ai_provider: aiProvider
         }
       } catch (error) {
         results.topicDeduper = {
@@ -706,6 +763,7 @@ export async function GET(request: NextRequest) {
       success: true,
       message: 'AI Prompts Test Results',
       prompt_type: promptType,
+      ai_provider: aiProvider,
       test_data: promptType === 'all' ? 'Sample data for all prompts' : testData[promptType as keyof typeof testData],
       rss_post_used: rssPost ? {
         id: rssPost.id,
