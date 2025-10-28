@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase'
-import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
+import { AI_CALL } from '@/lib/openai'
 
 /**
  * Auto-regenerate welcome section for a campaign
@@ -51,8 +51,8 @@ export async function autoRegenerateWelcome(
 
     console.log(`[WELCOME] Generating welcome from ${primaryArticles?.length || 0} primary and ${secondaryArticles?.length || 0} secondary articles`)
 
-    // Generate welcome text using AI
-    const promptOrResult = await AI_PROMPTS.welcomeSection(allArticles)
+    // Generate welcome text using AI_CALL (handles prompt + provider + call)
+    const result = await AI_CALL.welcomeSection(allArticles, 500, 0.8)
 
     // Parse JSON response to extract intro, tagline, and summary
     let welcomeIntro = ''
@@ -60,37 +60,26 @@ export async function autoRegenerateWelcome(
     let welcomeSummary = ''
 
     try {
-      // Check if promptOrResult is already a parsed JSON object with intro/tagline/summary
-      if (typeof promptOrResult === 'object' && promptOrResult !== null &&
-          ('intro' in promptOrResult || 'tagline' in promptOrResult || 'summary' in promptOrResult)) {
-        // Already parsed JSON from structured prompt
-        console.log('[WELCOME] Using structured prompt result directly')
-        welcomeIntro = (promptOrResult as any).intro || ''
-        welcomeTagline = (promptOrResult as any).tagline || ''
-        welcomeSummary = (promptOrResult as any).summary || ''
-      } else if (typeof promptOrResult === 'object' && promptOrResult !== null && 'raw' in promptOrResult) {
-        // Got {raw: content} - need to parse the raw JSON string
-        console.log('[WELCOME] Parsing raw JSON response')
-        const rawContent = (promptOrResult as any).raw
-        const welcomeJson = JSON.parse(rawContent)
+      // Handle response (could be object or string)
+      if (typeof result === 'object' && result !== null) {
+        // Check if it's already parsed JSON
+        if ('intro' in result || 'tagline' in result || 'summary' in result) {
+          welcomeIntro = (result as any).intro || ''
+          welcomeTagline = (result as any).tagline || ''
+          welcomeSummary = (result as any).summary || ''
+        } else {
+          // Try parsing as JSON string
+          const welcomeJson = JSON.parse(JSON.stringify(result))
+          welcomeIntro = welcomeJson.intro || ''
+          welcomeTagline = welcomeJson.tagline || ''
+          welcomeSummary = welcomeJson.summary || ''
+        }
+      } else if (typeof result === 'string') {
+        // Parse JSON from string
+        const welcomeJson = JSON.parse(result)
         welcomeIntro = welcomeJson.intro || ''
         welcomeTagline = welcomeJson.tagline || ''
         welcomeSummary = welcomeJson.summary || ''
-      } else if (typeof promptOrResult === 'string') {
-        // Plain text prompt - need to call OpenAI
-        console.log('[WELCOME] Calling OpenAI with plain text prompt')
-        const welcomeText = await callOpenAI(promptOrResult, 500, 0.8)
-        const finalWelcomeText = typeof welcomeText === 'string'
-          ? welcomeText.trim()
-          : (welcomeText.text || welcomeText.raw || '').trim()
-
-        // Parse JSON from the text response
-        const welcomeJson = JSON.parse(finalWelcomeText)
-        welcomeIntro = welcomeJson.intro || ''
-        welcomeTagline = welcomeJson.tagline || ''
-        welcomeSummary = welcomeJson.summary || ''
-      } else {
-        throw new Error('Unexpected promptOrResult format')
       }
 
       console.log('[WELCOME] Parsed welcome JSON - intro:', welcomeIntro.length, 'tagline:', welcomeTagline.length, 'summary:', welcomeSummary.length)

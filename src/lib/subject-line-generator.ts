@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase'
-import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
+import { AI_CALL } from '@/lib/openai'
 
 export interface SubjectLineResult {
   success: boolean
@@ -93,11 +93,8 @@ export async function generateSubjectLine(campaignId: string, userEmail?: string
     const topArticle = activeArticles[0]
     console.log(`Auto-generating subject line based on current #1 article: "${topArticle.headline}" (rank: ${topArticle.rank || 'unranked'})`)
 
-    // Generate subject line using AI
-    const variationPrompt = await AI_PROMPTS.subjectLineGenerator(topArticle) +
-      `\n\nGeneration timestamp: ${new Date().toISOString()} - Create a fresh, unique headline variation.`
-
-    const result = await callOpenAI(variationPrompt, 1000, 0.8)
+    // Generate subject line using AI_CALL (handles prompt + provider + call)
+    const result = await AI_CALL.subjectLineGenerator(topArticle, 100, 0.8)
 
     // Handle both plain text and JSON responses
     let subjectLine = ''

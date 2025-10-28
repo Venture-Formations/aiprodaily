@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import type { RssPost } from '@/types/database'
-import { AI_PROMPTS, callOpenAI } from './openai'
+import { AI_CALL } from './openai'
 import { supabaseAdmin } from './supabase'
 
 /**
@@ -378,8 +378,8 @@ export class Deduplicator {
         full_article_text: post.full_article_text || post.content || ''
       }))
 
-      const prompt = await AI_PROMPTS.topicDeduper(postSummaries)
-      const result = await callOpenAI(prompt)
+      // Use AI_CALL for deduplication (handles prompt + provider + call)
+      const result = await AI_CALL.topicDeduper(postSummaries, 1000, 0.3)
 
       if (!result.groups || result.groups.length === 0) {
         return []
