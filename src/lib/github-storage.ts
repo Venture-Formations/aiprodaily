@@ -12,7 +12,7 @@ export class GitHubImageStorage {
     this.enabled = !!(process.env.GITHUB_TOKEN && process.env.GITHUB_OWNER && process.env.GITHUB_REPO)
 
     if (!this.enabled) {
-      console.warn('GitHub image storage is disabled - missing GITHUB_TOKEN, GITHUB_OWNER, or GITHUB_REPO environment variables')
+      // GitHub storage disabled
       this.octokit = null
       this.owner = ''
       this.repo = ''
@@ -32,12 +32,12 @@ export class GitHubImageStorage {
 
   async uploadWeatherImage(imageUrl: string, forecastDate: string): Promise<string | null> {
     if (!this.enabled || !this.octokit) {
-      console.warn('GitHub storage not enabled, skipping weather image upload')
+      // GitHub storage not enabled
       return null
     }
 
     try {
-      console.log(`Downloading weather image from: ${imageUrl}`)
+      // Downloading weather image silently
 
       // Download image with timeout
       const controller = new AbortController()
@@ -55,14 +55,12 @@ export class GitHubImageStorage {
       clearTimeout(timeoutId)
 
       if (!response.ok) {
-        console.error(`Failed to download weather image: HTTP ${response.status} ${response.statusText}`)
         return null
       }
 
       // Check content type
       const contentType = response.headers.get('content-type')
       if (!contentType || !contentType.startsWith('image/')) {
-        console.error(`Invalid content type for weather image: ${contentType}`)
         return null
       }
 
@@ -72,7 +70,6 @@ export class GitHubImageStorage {
 
       // Check file size (limit to 5MB)
       if (buffer.length > 5 * 1024 * 1024) {
-        console.error(`Weather image too large: ${buffer.length} bytes (max 5MB)`)
         return null
       }
 
@@ -89,13 +86,12 @@ export class GitHubImageStorage {
         })
 
         if (existingFile && 'download_url' in existingFile && existingFile.download_url) {
-          console.log(`Weather image already exists for ${forecastDate}: ${fileName}`)
           return existingFile.download_url
         }
       } catch (error: any) {
         // File doesn't exist, which is fine - we'll create it
         if (error.status !== 404) {
-          console.error('Error checking existing weather image:', error)
+          // Error checking file
           return null
         }
       }
@@ -113,31 +109,26 @@ export class GitHubImageStorage {
       })
 
       if (uploadResponse.data.content?.download_url) {
-        console.log(`Weather image uploaded to GitHub: ${uploadResponse.data.content.download_url}`)
         return uploadResponse.data.content.download_url
       } else {
-        console.error('Weather image upload successful but no download URL returned')
+        // No download URL
         return null
       }
 
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.error(`Weather image download timeout for: ${imageUrl}`)
-      } else {
-        console.error(`Error uploading weather image to GitHub:`, error)
-      }
+      // Silently fail - weather image upload errors are expected
       return null
     }
   }
 
   async uploadImage(imageUrl: string, articleTitle: string): Promise<string | null> {
     if (!this.enabled || !this.octokit) {
-      console.warn('GitHub storage not enabled, skipping image upload')
+      // GitHub storage not enabled
       return null
     }
 
     try {
-      console.log(`Downloading image from: ${imageUrl}`)
+      // Downloading image silently
 
       // Download image with timeout
       const controller = new AbortController()
@@ -155,29 +146,18 @@ export class GitHubImageStorage {
         })
       } catch (fetchError) {
         clearTimeout(timeoutId)
-        console.error(`Failed to fetch image - request error: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`)
-        console.error(`Image URL: ${imageUrl}`)
         return null
       }
 
       clearTimeout(timeoutId)
 
       if (!response.ok) {
-        console.error(`Failed to download image: HTTP ${response.status} ${response.statusText}`)
-        console.error(`Response headers:`, Object.fromEntries(response.headers.entries()))
-
-        // Log specific error for Facebook URLs
-        if (imageUrl.includes('fbcdn.net')) {
-          console.error(`Facebook CDN URL failed - likely expired or restricted: ${imageUrl}`)
-        }
-
         return null
       }
 
       // Check content type
       const contentType = response.headers.get('content-type')
       if (!contentType || !contentType.startsWith('image/')) {
-        console.error(`Invalid content type for image: ${contentType}`)
         return null
       }
 
@@ -187,7 +167,6 @@ export class GitHubImageStorage {
 
       // Check file size (limit to 5MB)
       if (buffer.length > 5 * 1024 * 1024) {
-        console.error(`Image too large: ${buffer.length} bytes (max 5MB)`)
         return null
       }
 
@@ -206,13 +185,12 @@ export class GitHubImageStorage {
         })
 
         if (existingFile && 'download_url' in existingFile && existingFile.download_url) {
-          console.log(`Image already exists in GitHub: ${fileName}`)
           return existingFile.download_url
         }
       } catch (error: any) {
         // File doesn't exist, which is fine - we'll create it
         if (error.status !== 404) {
-          console.error('Error checking existing file:', error)
+          // Error checking file
           return null
         }
       }
@@ -230,19 +208,14 @@ export class GitHubImageStorage {
       })
 
       if (uploadResponse.data.content?.download_url) {
-        console.log(`Image uploaded to GitHub: ${uploadResponse.data.content.download_url}`)
         return uploadResponse.data.content.download_url
       } else {
-        console.error('Upload successful but no download URL returned')
+        // No download URL
         return null
       }
 
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.error(`Image download timeout for: ${imageUrl}`)
-      } else {
-        console.error(`Error uploading image to GitHub:`, error)
-      }
+      // Silently fail - GitHub upload errors are expected when images are unavailable
       return null
     }
   }
@@ -409,7 +382,7 @@ export class GitHubImageStorage {
       } catch (error: any) {
         // File doesn't exist, which is fine - we'll create it
         if (error.status !== 404) {
-          console.error('Error checking existing file:', error)
+          // Error checking file
           return null
         }
       }
@@ -430,7 +403,7 @@ export class GitHubImageStorage {
         console.log(`Buffer uploaded to GitHub: ${uploadResponse.data.content.download_url}`)
         return uploadResponse.data.content.download_url
       } else {
-        console.error('Upload successful but no download URL returned')
+        // No download URL
         return null
       }
 
