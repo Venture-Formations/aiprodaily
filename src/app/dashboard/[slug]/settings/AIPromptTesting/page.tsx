@@ -796,10 +796,7 @@ export default function AIPromptTestingPage() {
                                   <p className="text-xs font-semibold text-gray-600 mb-1">Full Content:</p>
                                   <div className="bg-gray-50 rounded p-3 max-h-48 overflow-y-auto">
                                     <p className="text-xs text-gray-700 whitespace-pre-wrap">
-                                      {post.content.length > 1000
-                                        ? `${post.content.substring(0, 1000)}... [truncated]`
-                                        : post.content
-                                      }
+                                      {post.content || 'No content'}
                                     </p>
                                   </div>
                                 </div>
