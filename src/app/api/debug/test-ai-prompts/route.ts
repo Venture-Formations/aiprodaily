@@ -66,7 +66,8 @@ function processCustomPrompt(customPromptContent: string, postData: any): string
 }
 
 // Helper function to call AI provider (OpenAI or Claude)
-async function callAI(prompt: string, maxTokens: number, temperature: number, provider: 'openai' | 'claude' = 'openai'): Promise<string> {
+// Returns both the parsed content and the full API response
+async function callAI(prompt: string, maxTokens: number, temperature: number, provider: 'openai' | 'claude' = 'openai'): Promise<{ content: string, fullResponse: any }> {
   if (provider === 'claude') {
     // Claude API call
     const completion = await anthropic.messages.create({
@@ -78,10 +79,52 @@ async function callAI(prompt: string, maxTokens: number, temperature: number, pr
 
     // Extract text from Claude response
     const textContent = completion.content.find(c => c.type === 'text')
-    return textContent && 'text' in textContent ? textContent.text : 'No response'
+    const content = textContent && 'text' in textContent ? textContent.text : 'No response'
+
+    return {
+      content,
+      fullResponse: completion
+    }
   } else {
     // OpenAI API call (default)
-    return callOpenAI(prompt, maxTokens, temperature)
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: maxTokens,
+      temperature: temperature,
+    })
+
+    const content = response.choices[0]?.message?.content || 'No response'
+
+    // Try to parse as JSON, fallback to raw content
+    let parsedContent = content
+    try {
+      // Strip markdown code fences first (```json ... ``` or ``` ... ```)
+      let cleanedContent = content
+      const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+      if (codeFenceMatch) {
+        cleanedContent = codeFenceMatch[1]
+      }
+
+      const objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
+      const arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
+
+      if (arrayMatch) {
+        parsedContent = JSON.parse(arrayMatch[0])
+      } else if (objectMatch) {
+        parsedContent = JSON.parse(objectMatch[0])
+      } else {
+        parsedContent = JSON.parse(cleanedContent.trim())
+      }
+    } catch (parseError) {
+      // Keep as string if not JSON
+      parsedContent = content
+    }
+
+    return {
+      content: parsedContent,
+      fullResponse: response
+    }
   }
 }
 
@@ -274,13 +317,14 @@ export async function GET(request: NextRequest) {
         console.log('[DEBUG] Final prompt preview (first 300 chars):', prompt.substring(0, 300))
         console.log('[DEBUG] Calling AI with prompt length:', prompt.length, 'provider:', aiProvider)
 
-        const response = await callAI(prompt, 1000, 0.3, aiProvider)
+        const { content, fullResponse } = await callAI(prompt, 1000, 0.3, aiProvider)
 
-        console.log('[DEBUG] OpenAI response received:', typeof response === 'string' ? response.substring(0, 200) : response)
+        console.log('[DEBUG] OpenAI response received:', typeof content === 'string' ? content.substring(0, 200) : content)
 
         results.contentEvaluator = {
           success: true,
-          response,
+          response: content,
+          fullResponse: fullResponse,
           prompt_length: prompt.length,
           prompt_key_used: promptKey || 'ai_prompt_content_evaluator',
           prompt_source: promptSource,
@@ -318,10 +362,11 @@ export async function GET(request: NextRequest) {
           promptSource = 'AI_PROMPTS.newsletterWriter'
         }
 
-        const response = await callAI(prompt, 1000, 0.3, aiProvider)
+        const { content, fullResponse } = await callAI(prompt, 1000, 0.3, aiProvider)
         results.newsletterWriter = {
           success: true,
-          response,
+          response: content,
+          fullResponse: fullResponse,
           prompt_length: prompt.length,
           prompt_source: promptSource,
           ai_provider: aiProvider
@@ -358,10 +403,11 @@ export async function GET(request: NextRequest) {
         }
 
         console.log('[TEST] Prompt preview (first 500 chars):', prompt.substring(0, 500))
-        const response = await callAI(prompt, 200, 0.7, aiProvider)
+        const { content, fullResponse } = await callAI(prompt, 200, 0.7, aiProvider)
         results.primaryArticleTitle = {
           success: true,
-          response,
+          response: content,
+          fullResponse: fullResponse,
           prompt_length: prompt.length,
           prompt_source: promptSource,
           prompt_preview: prompt.substring(0, 300) + '...',
@@ -400,10 +446,11 @@ export async function GET(request: NextRequest) {
           promptSource = 'AI_PROMPTS.primaryArticleBody'
         }
 
-        const response = await callAI(prompt, 500, 0.7, aiProvider)
+        const { content, fullResponse } = await callAI(prompt, 500, 0.7, aiProvider)
         results.primaryArticleBody = {
           success: true,
-          response,
+          response: content,
+          fullResponse: fullResponse,
           prompt_length: prompt.length,
           prompt_source: promptSource,
           note: `Using headline: "${sampleHeadline}"`,
@@ -440,10 +487,11 @@ export async function GET(request: NextRequest) {
           promptSource = 'AI_PROMPTS.secondaryArticleTitle'
         }
 
-        const response = await callAI(prompt, 200, 0.7, aiProvider)
+        const { content, fullResponse } = await callAI(prompt, 200, 0.7, aiProvider)
         results.secondaryArticleTitle = {
           success: true,
-          response,
+          response: content,
+          fullResponse: fullResponse,
           prompt_length: prompt.length,
           prompt_source: promptSource,
           ai_provider: aiProvider
@@ -481,10 +529,11 @@ export async function GET(request: NextRequest) {
           promptSource = 'AI_PROMPTS.secondaryArticleBody'
         }
 
-        const response = await callAI(prompt, 500, 0.7, aiProvider)
+        const { content, fullResponse } = await callAI(prompt, 500, 0.7, aiProvider)
         results.secondaryArticleBody = {
           success: true,
-          response,
+          response: content,
+          fullResponse: fullResponse,
           prompt_length: prompt.length,
           prompt_source: promptSource,
           note: `Using headline: "${sampleHeadline}"`,
@@ -519,11 +568,12 @@ export async function GET(request: NextRequest) {
           promptSource = 'AI_PROMPTS.subjectLineGenerator'
         }
 
-        const response = await callAI(prompt, 100, 0.8, aiProvider)
+        const { content, fullResponse } = await callAI(prompt, 100, 0.8, aiProvider)
         results.subjectLineGenerator = {
           success: true,
-          response,
-          character_count: typeof response === 'string' ? response.length : 0,
+          response: content,
+          fullResponse: fullResponse,
+          character_count: typeof content === 'string' ? content.length : 0,
           prompt_length: prompt.length,
           prompt_source: promptSource,
           ai_provider: aiProvider
@@ -557,10 +607,11 @@ export async function GET(request: NextRequest) {
           promptSource = 'AI_PROMPTS.eventSummarizer'
         }
 
-        const response = await callAI(prompt, 200, 0.7, aiProvider)
+        const { content, fullResponse } = await callAI(prompt, 200, 0.7, aiProvider)
         results.eventSummarizer = {
           success: true,
-          response,
+          response: content,
+          fullResponse: fullResponse,
           prompt_length: prompt.length,
           prompt_source: promptSource,
           ai_provider: aiProvider
@@ -628,12 +679,13 @@ export async function GET(request: NextRequest) {
         console.log('[DEBUG] Generated prompt length:', prompt.length)
         console.log('[DEBUG] Prompt preview (first 500 chars):', prompt.substring(0, 500))
 
-        const response = await callAI(prompt, 1000, 0.3, aiProvider)
-        console.log('[DEBUG] AI response:', typeof response === 'string' ? response.substring(0, 200) : response)
+        const { content, fullResponse } = await callAI(prompt, 1000, 0.3, aiProvider)
+        console.log('[DEBUG] AI response:', typeof content === 'string' ? content.substring(0, 200) : content)
 
         results.factChecker = {
           success: true,
-          response,
+          response: content,
+          fullResponse: fullResponse,
           prompt_length: prompt.length,
           prompt_source: promptSource,
           prompt_preview: prompt.substring(0, 800) + '...',
@@ -696,11 +748,12 @@ export async function GET(request: NextRequest) {
 
         console.log('[TEST] Prompt type:', typeof prompt === 'string' ? 'string' : 'structured')
 
-        const response = await callAI(prompt, 500, 0.8, aiProvider)
+        const { content, fullResponse } = await callAI(prompt, 500, 0.8, aiProvider)
 
         results.welcomeSection = {
           success: true,
-          response,
+          response: content,
+          fullResponse: fullResponse,
           prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
           prompt_source: promptSource,
           prompt_preview: typeof prompt === 'string' ? prompt.substring(0, 500) + '...' : 'Structured JSON prompt',
@@ -737,13 +790,14 @@ export async function GET(request: NextRequest) {
         console.log('[TEST] Prompt length:', prompt.length)
         console.log('[TEST] Prompt preview (first 500 chars):', prompt.substring(0, 500))
 
-        const response = await callAI(prompt, 1000, 0.3, aiProvider)
-        console.log('[TEST] Response type:', typeof response)
-        console.log('[TEST] Response:', JSON.stringify(response, null, 2))
+        const { content, fullResponse } = await callAI(prompt, 1000, 0.3, aiProvider)
+        console.log('[TEST] Response type:', typeof content)
+        console.log('[TEST] Response:', JSON.stringify(content, null, 2))
 
         results.topicDeduper = {
           success: true,
-          response,
+          response: content,
+          fullResponse: fullResponse,
           prompt_length: prompt.length,
           prompt_source: promptSource,
           prompt_preview: prompt.substring(0, 800) + '...',

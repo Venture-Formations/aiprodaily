@@ -3854,20 +3854,36 @@ function AIPromptsSettings() {
 
                       {result.success ? (
                         <div className="space-y-3">
-                          {typeof result.response === 'string' ? (
-                            <div className="bg-gray-50 rounded p-4 whitespace-pre-wrap font-mono text-sm">
-                              {result.response}
-                            </div>
-                          ) : result.response?.raw ? (
-                            <div className="bg-gray-50 rounded p-4 whitespace-pre-wrap font-mono text-sm">
-                              {result.response.raw}
-                            </div>
-                          ) : (
-                            <div className="bg-gray-50 rounded p-4">
-                              <pre className="whitespace-pre-wrap text-sm">
-                                {JSON.stringify(result.response, null, 2)}
-                              </pre>
-                            </div>
+                          <div>
+                            <h5 className="text-sm font-semibold text-gray-700 mb-2">Parsed Content:</h5>
+                            {typeof result.response === 'string' ? (
+                              <div className="bg-gray-50 rounded p-4 whitespace-pre-wrap font-mono text-sm">
+                                {result.response}
+                              </div>
+                            ) : result.response?.raw ? (
+                              <div className="bg-gray-50 rounded p-4 whitespace-pre-wrap font-mono text-sm">
+                                {result.response.raw}
+                              </div>
+                            ) : (
+                              <div className="bg-gray-50 rounded p-4">
+                                <pre className="whitespace-pre-wrap text-sm">
+                                  {JSON.stringify(result.response, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+
+                          {result.fullResponse && (
+                            <details className="border border-gray-300 rounded-lg">
+                              <summary className="cursor-pointer px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-t-lg font-medium text-sm text-gray-700">
+                                Full API Response (Click to expand)
+                              </summary>
+                              <div className="bg-white p-4 rounded-b-lg">
+                                <pre className="whitespace-pre-wrap text-xs overflow-x-auto">
+                                  {JSON.stringify(result.fullResponse, null, 2)}
+                                </pre>
+                              </div>
+                            </details>
                           )}
 
                           {result.character_count && (
