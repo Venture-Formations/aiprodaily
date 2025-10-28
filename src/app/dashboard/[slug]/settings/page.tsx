@@ -2150,7 +2150,7 @@ function AIPromptsSettings() {
   const [saving, setSaving] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [expandedPrompt, setExpandedPrompt] = useState<string | null>(null)
-  const [editingPrompt, setEditingPrompt] = useState<{key: string, value: string} | null>(null)
+  const [editingPrompt, setEditingPrompt] = useState<{key: string, value: string, ai_provider: string} | null>(null)
   const [editingWeight, setEditingWeight] = useState<{key: string, value: string} | null>(null)
   const [editingName, setEditingName] = useState<{number: number, value: string} | null>(null)
   const [rssPosts, setRssPosts] = useState<any[]>([])
@@ -2261,7 +2261,8 @@ function AIPromptsSettings() {
   }
 
   const handleEdit = (prompt: any) => {
-    setEditingPrompt({ key: prompt.key, value: prompt.value })
+    const valueStr = typeof prompt.value === 'object' ? JSON.stringify(prompt.value, null, 2) : prompt.value
+    setEditingPrompt({ key: prompt.key, value: valueStr, ai_provider: prompt.ai_provider || 'openai' })
     setExpandedPrompt(prompt.key)
   }
 
@@ -2281,7 +2282,8 @@ function AIPromptsSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           key: editingPrompt.key,
-          value: editingPrompt.value
+          value: editingPrompt.value,
+          ai_provider: editingPrompt.ai_provider
         })
       })
 
@@ -2370,6 +2372,10 @@ function AIPromptsSettings() {
   }
 
   const handleTestPrompt = async (key: string) => {
+    // Get the prompt's expected outputs
+    const prompt = prompts.find(p => p.key === key)
+    const expectedOutputs = prompt?.expected_outputs || null
+
     // Map prompt keys to their test endpoint type parameter
     const promptTypeMap: Record<string, string> = {
       'ai_prompt_content_evaluator': 'contentEvaluator',
@@ -2427,12 +2433,73 @@ function AIPromptsSettings() {
         throw new Error(data.error || 'Test failed')
       }
 
+      // Parse response against expected outputs
+      if (expectedOutputs && data.results) {
+        data.parsedOutputs = parseResponseOutputs(data.results, expectedOutputs)
+      }
+
       setTestResults(data)
     } catch (error: any) {
       setTestError(error.message || 'Failed to run test')
     } finally {
       setTestLoading(false)
     }
+  }
+
+  // Helper function to parse AI response against expected outputs
+  const parseResponseOutputs = (results: any, expectedOutputs: any): any => {
+    const parsed: any = {}
+
+    for (const [fieldName, fieldType] of Object.entries(expectedOutputs)) {
+      try {
+        // Get the response (could be in various formats)
+        let responseText = ''
+        if (results && typeof results === 'object') {
+          const firstResult = Object.values(results)[0] as any
+          if (firstResult?.response) {
+            responseText = typeof firstResult.response === 'string'
+              ? firstResult.response
+              : JSON.stringify(firstResult.response)
+          }
+        }
+
+        // Try JSON parsing first
+        try {
+          const jsonResponse = JSON.parse(responseText)
+          if (fieldName in jsonResponse) {
+            parsed[fieldName] = { value: jsonResponse[fieldName], error: false }
+            continue
+          }
+        } catch (e) {
+          // Not JSON, continue to regex parsing
+        }
+
+        // Fallback to regex parsing
+        const patterns = [
+          new RegExp(`"${fieldName}"\\s*:\\s*([^,}]+)`, 'i'),
+          new RegExp(`${fieldName}\\s*:\\s*(.+?)(?:\\n|$)`, 'i'),
+          new RegExp(`${fieldName}\\s*=\\s*(.+?)(?:\\n|$)`, 'i')
+        ]
+
+        let found = false
+        for (const pattern of patterns) {
+          const match = responseText.match(pattern)
+          if (match && match[1]) {
+            parsed[fieldName] = { value: match[1].trim().replace(/^["']|["']$/g, ''), error: false }
+            found = true
+            break
+          }
+        }
+
+        if (!found) {
+          parsed[fieldName] = { value: null, error: true }
+        }
+      } catch (e) {
+        parsed[fieldName] = { value: null, error: true }
+      }
+    }
+
+    return parsed
   }
 
   const handleWeightEdit = (prompt: any) => {
@@ -2659,7 +2726,18 @@ function AIPromptsSettings() {
       <div key={prompt.key} className="p-6">
         <div className="flex items-start justify-between mb-2">
           <div className="flex-1">
-            <h4 className="text-base font-medium text-gray-900">{prompt.name}</h4>
+            <div className="flex items-center gap-2">
+              <h4 className="text-base font-medium text-gray-900">{prompt.name}</h4>
+              {!isEditing && (
+                <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                  prompt.ai_provider === 'claude'
+                    ? 'bg-purple-100 text-purple-800'
+                    : 'bg-blue-100 text-blue-800'
+                }`}>
+                  {prompt.ai_provider === 'claude' ? 'Claude' : 'OpenAI'}
+                </span>
+              )}
+            </div>
             <p className="text-sm text-gray-600 mt-1">{prompt.description}</p>
           </div>
           <button
@@ -2677,38 +2755,79 @@ function AIPromptsSettings() {
                 Prompt Content
               </label>
               <span className="text-xs text-gray-500">
-                {isEditing ? editingPrompt?.value.length || 0 : prompt.value.length} characters
+                {isEditing
+                  ? editingPrompt?.value.length || 0
+                  : typeof prompt.value === 'object'
+                    ? JSON.stringify(prompt.value).length
+                    : prompt.value.length} characters
               </span>
             </div>
             {isEditing ? (
               <>
+                {/* AI Provider Selector */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    AI Provider
+                  </label>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => editingPrompt && setEditingPrompt({ ...editingPrompt, ai_provider: 'openai' })}
+                      className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
+                        editingPrompt?.ai_provider === 'openai'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                      }`}
+                    >
+                      OpenAI
+                    </button>
+                    <button
+                      onClick={() => editingPrompt && setEditingPrompt({ ...editingPrompt, ai_provider: 'claude' })}
+                      className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
+                        editingPrompt?.ai_provider === 'claude'
+                          ? 'border-purple-500 bg-purple-50 text-purple-700'
+                          : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                      }`}
+                    >
+                      Claude
+                    </button>
+                  </div>
+                </div>
+
                 <textarea
                   value={editingPrompt?.value || ''}
                   onChange={(e) => editingPrompt && setEditingPrompt({ ...editingPrompt, value: e.target.value })}
                   rows={15}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <div className="mt-3 flex items-center justify-end space-x-3">
+                <div className="mt-3 flex items-center justify-between">
                   <button
-                    onClick={handleCancel}
-                    disabled={isSaving}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                    onClick={() => handleTestPrompt(prompt.key)}
+                    className="px-4 py-2 text-sm font-medium text-purple-700 bg-white border border-purple-300 rounded-md hover:bg-purple-50"
                   >
-                    Cancel
+                    Test Prompt
                   </button>
-                  <button
-                    onClick={() => handleSave(prompt.key)}
-                    disabled={isSaving}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {isSaving ? 'Saving...' : 'Save Changes'}
-                  </button>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={handleCancel}
+                      disabled={isSaving}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleSave(prompt.key)}
+                      disabled={isSaving}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {isSaving ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </div>
                 </div>
               </>
             ) : (
               <>
                 <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
-                  {prompt.value}
+                  {typeof prompt.value === 'object' ? JSON.stringify(prompt.value, null, 2) : prompt.value}
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                   <div className="flex items-center space-x-3">
@@ -2728,12 +2847,6 @@ function AIPromptsSettings() {
                     </button>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <button
-                      onClick={() => handleTestPrompt(prompt.key)}
-                      className="px-4 py-2 text-sm font-medium text-purple-700 bg-white border border-purple-300 rounded-md hover:bg-purple-50"
-                    >
-                      Test Prompt
-                    </button>
                     <button
                       onClick={() => handleEdit(prompt)}
                       className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
@@ -2866,6 +2979,15 @@ function AIPromptsSettings() {
                       ) : (
                         <>
                           <h4 className="text-base font-medium text-gray-900">{criterion.name}</h4>
+                          {!isEditing && prompt && (
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                              prompt.ai_provider === 'claude'
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {prompt.ai_provider === 'claude' ? 'Claude' : 'OpenAI'}
+                            </span>
+                          )}
                           <button
                             onClick={() => handleNameEdit(criterion.number, criterion.name)}
                             className="text-xs text-blue-600 hover:text-blue-800"
@@ -2940,38 +3062,79 @@ function AIPromptsSettings() {
                         Prompt Content
                       </label>
                       <span className="text-xs text-gray-500">
-                        {isEditing ? editingPrompt?.value.length || 0 : prompt.value.length} characters
+                        {isEditing
+                          ? editingPrompt?.value.length || 0
+                          : typeof prompt.value === 'object'
+                            ? JSON.stringify(prompt.value).length
+                            : prompt.value.length} characters
                       </span>
                     </div>
                     {isEditing ? (
                       <>
+                        {/* AI Provider Selector */}
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            AI Provider
+                          </label>
+                          <div className="flex gap-4">
+                            <button
+                              onClick={() => editingPrompt && setEditingPrompt({ ...editingPrompt, ai_provider: 'openai' })}
+                              className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
+                                editingPrompt?.ai_provider === 'openai'
+                                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                  : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                              }`}
+                            >
+                              OpenAI
+                            </button>
+                            <button
+                              onClick={() => editingPrompt && setEditingPrompt({ ...editingPrompt, ai_provider: 'claude' })}
+                              className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
+                                editingPrompt?.ai_provider === 'claude'
+                                  ? 'border-purple-500 bg-purple-50 text-purple-700'
+                                  : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                              }`}
+                            >
+                              Claude
+                            </button>
+                          </div>
+                        </div>
+
                         <textarea
                           value={editingPrompt?.value || ''}
                           onChange={(e) => editingPrompt && setEditingPrompt({ ...editingPrompt, value: e.target.value })}
                           rows={15}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
-                        <div className="mt-3 flex items-center justify-end space-x-3">
+                        <div className="mt-3 flex items-center justify-between">
                           <button
-                            onClick={handleCancel}
-                            disabled={isSaving}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                            onClick={() => handleTestPrompt(promptKey)}
+                            className="px-4 py-2 text-sm font-medium text-purple-700 bg-white border border-purple-300 rounded-md hover:bg-purple-50"
                           >
-                            Cancel
+                            Test Prompt
                           </button>
-                          <button
-                            onClick={() => handleSave(promptKey)}
-                            disabled={isSaving}
-                            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
-                          >
-                            {isSaving ? 'Saving...' : 'Save Changes'}
-                          </button>
+                          <div className="flex items-center space-x-3">
+                            <button
+                              onClick={handleCancel}
+                              disabled={isSaving}
+                              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleSave(promptKey)}
+                              disabled={isSaving}
+                              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                            >
+                              {isSaving ? 'Saving...' : 'Save Changes'}
+                            </button>
+                          </div>
                         </div>
                       </>
                     ) : (
                       <>
                         <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
-                          {prompt.value}
+                          {typeof prompt.value === 'object' ? JSON.stringify(prompt.value, null, 2) : prompt.value}
                         </div>
                         <div className="mt-3 flex items-center justify-between">
                           <div className="flex items-center space-x-3">
@@ -2991,12 +3154,6 @@ function AIPromptsSettings() {
                             </button>
                           </div>
                           <div className="flex items-center space-x-3">
-                            <button
-                              onClick={() => handleTestPrompt(promptKey)}
-                              className="px-4 py-2 text-sm font-medium text-purple-700 bg-white border border-purple-300 rounded-md hover:bg-purple-50"
-                            >
-                              Test Prompt
-                            </button>
                             <button
                               onClick={() => handleEdit(prompt)}
                               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
@@ -3122,6 +3279,15 @@ function AIPromptsSettings() {
                       ) : (
                         <>
                           <h4 className="text-base font-medium text-gray-900">{criterion.name}</h4>
+                          {!isEditing && prompt && (
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                              prompt.ai_provider === 'claude'
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {prompt.ai_provider === 'claude' ? 'Claude' : 'OpenAI'}
+                            </span>
+                          )}
                           <button
                             onClick={() => handleNameEdit(criterion.number, criterion.name)}
                             className="text-xs text-blue-600 hover:text-blue-800"
@@ -3196,38 +3362,79 @@ function AIPromptsSettings() {
                         Prompt Content
                       </label>
                       <span className="text-xs text-gray-500">
-                        {isEditing ? editingPrompt?.value.length || 0 : prompt.value.length} characters
+                        {isEditing
+                          ? editingPrompt?.value.length || 0
+                          : typeof prompt.value === 'object'
+                            ? JSON.stringify(prompt.value).length
+                            : prompt.value.length} characters
                       </span>
                     </div>
                     {isEditing ? (
                       <>
+                        {/* AI Provider Selector */}
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            AI Provider
+                          </label>
+                          <div className="flex gap-4">
+                            <button
+                              onClick={() => editingPrompt && setEditingPrompt({ ...editingPrompt, ai_provider: 'openai' })}
+                              className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
+                                editingPrompt?.ai_provider === 'openai'
+                                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                  : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                              }`}
+                            >
+                              OpenAI
+                            </button>
+                            <button
+                              onClick={() => editingPrompt && setEditingPrompt({ ...editingPrompt, ai_provider: 'claude' })}
+                              className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
+                                editingPrompt?.ai_provider === 'claude'
+                                  ? 'border-purple-500 bg-purple-50 text-purple-700'
+                                  : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                              }`}
+                            >
+                              Claude
+                            </button>
+                          </div>
+                        </div>
+
                         <textarea
                           value={editingPrompt?.value || ''}
                           onChange={(e) => editingPrompt && setEditingPrompt({ ...editingPrompt, value: e.target.value })}
                           rows={15}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
-                        <div className="mt-3 flex items-center justify-end space-x-3">
+                        <div className="mt-3 flex items-center justify-between">
                           <button
-                            onClick={handleCancel}
-                            disabled={isSaving}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                            onClick={() => handleTestPrompt(promptKey)}
+                            className="px-4 py-2 text-sm font-medium text-purple-700 bg-white border border-purple-300 rounded-md hover:bg-purple-50"
                           >
-                            Cancel
+                            Test Prompt
                           </button>
-                          <button
-                            onClick={() => handleSave(promptKey)}
-                            disabled={isSaving}
-                            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
-                          >
-                            {isSaving ? 'Saving...' : 'Save Changes'}
-                          </button>
+                          <div className="flex items-center space-x-3">
+                            <button
+                              onClick={handleCancel}
+                              disabled={isSaving}
+                              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleSave(promptKey)}
+                              disabled={isSaving}
+                              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                            >
+                              {isSaving ? 'Saving...' : 'Save Changes'}
+                            </button>
+                          </div>
                         </div>
                       </>
                     ) : (
                       <>
                         <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
-                          {prompt.value}
+                          {typeof prompt.value === 'object' ? JSON.stringify(prompt.value, null, 2) : prompt.value}
                         </div>
                         <div className="mt-3 flex items-center justify-between">
                           <div className="flex items-center space-x-3">
@@ -3247,12 +3454,6 @@ function AIPromptsSettings() {
                             </button>
                           </div>
                           <div className="flex items-center space-x-3">
-                            <button
-                              onClick={() => handleTestPrompt(promptKey)}
-                              className="px-4 py-2 text-sm font-medium text-purple-700 bg-white border border-purple-300 rounded-md hover:bg-purple-50"
-                            >
-                              Test Prompt
-                            </button>
                             <button
                               onClick={() => handleEdit(prompt)}
                               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
@@ -3338,7 +3539,7 @@ function AIPromptsSettings() {
                       ) : (
                         <>
                           <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
-                            {prompt.value}
+                            {typeof prompt.value === 'object' ? JSON.stringify(prompt.value, null, 2) : prompt.value}
                           </div>
                           <div className="mt-3 flex items-center justify-between">
                             <div className="flex items-center space-x-3">
@@ -3448,7 +3649,7 @@ function AIPromptsSettings() {
                       ) : (
                         <>
                           <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
-                            {prompt.value}
+                            {typeof prompt.value === 'object' ? JSON.stringify(prompt.value, null, 2) : prompt.value}
                           </div>
                           <div className="mt-3 flex items-center justify-between">
                             <div className="flex items-center space-x-3">
@@ -3551,6 +3752,40 @@ function AIPromptsSettings() {
                           </a>
                         </p>
                       )}
+                    </div>
+                  )}
+
+                  {/* Parsed Expected Outputs */}
+                  {testResults.parsedOutputs && Object.keys(testResults.parsedOutputs).length > 0 && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <h4 className="font-medium text-green-900 mb-3">Expected Outputs:</h4>
+                      <div className="space-y-2">
+                        {Object.entries(testResults.parsedOutputs).map(([fieldName, fieldData]: [string, any]) => (
+                          <div key={fieldName} className="bg-white border border-gray-200 rounded p-3">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-700 mb-1">{fieldName}:</p>
+                                {fieldData.error ? (
+                                  <p className="text-sm font-bold text-red-600">ERROR</p>
+                                ) : (
+                                  <p className="text-sm text-gray-900 whitespace-pre-wrap break-words">
+                                    {typeof fieldData.value === 'object'
+                                      ? JSON.stringify(fieldData.value, null, 2)
+                                      : fieldData.value}
+                                  </p>
+                                )}
+                              </div>
+                              <span className={`ml-3 px-2 py-1 text-xs font-medium rounded ${
+                                fieldData.error
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-green-100 text-green-800'
+                              }`}>
+                                {fieldData.error ? 'Failed' : 'Parsed'}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 

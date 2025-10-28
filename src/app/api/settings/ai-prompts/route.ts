@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
     const { data: prompts, error } = await supabaseAdmin
       .from('app_settings')
-      .select('key, value, description')
+      .select('key, value, description, ai_provider, expected_outputs')
       .like('key', 'ai_prompt_%')
       .order('key', { ascending: true })
 
@@ -64,7 +64,9 @@ export async function GET(request: NextRequest) {
         name: criteriaName || name || p.key.replace('ai_prompt_', '').replace(/_/g, ' '),
         description: descParts.join(': ') || description,
         value: p.value,
-        weight: weight
+        weight: weight,
+        ai_provider: p.ai_provider || 'openai',
+        expected_outputs: p.expected_outputs || null
       }
     }) || []
 
@@ -104,11 +106,19 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { key, value } = body
+    const { key, value, ai_provider } = body
 
     if (!key || !value) {
       return NextResponse.json(
         { error: 'Key and value are required' },
+        { status: 400 }
+      )
+    }
+
+    // Validate ai_provider if provided
+    if (ai_provider && !['openai', 'claude'].includes(ai_provider)) {
+      return NextResponse.json(
+        { error: 'Invalid AI provider. Must be "openai" or "claude"' },
         { status: 400 }
       )
     }
@@ -120,12 +130,20 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
+    // Build update object
+    const updateData: any = {
+      value,
+      updated_at: new Date().toISOString()
+    }
+
+    // Only update ai_provider if it was explicitly provided
+    if (ai_provider) {
+      updateData.ai_provider = ai_provider
+    }
+
     const { error } = await supabaseAdmin
       .from('app_settings')
-      .update({
-        value,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('key', key)
 
     if (error) {
