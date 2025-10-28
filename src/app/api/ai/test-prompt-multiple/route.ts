@@ -33,7 +33,7 @@ function injectPostData(obj: any, post: any): any {
 
 // Helper function to determine section from prompt type
 function getSection(promptType: string): 'primary' | 'secondary' | 'all' {
-  if (promptType === 'primary-title' || promptType === 'primary-body') return 'primary'
+  if (promptType === 'primary-title' || promptType === 'primary-body' || promptType === 'subject-line') return 'primary'
   if (promptType === 'secondary-title' || promptType === 'secondary-body') return 'secondary'
   return 'all'
 }
