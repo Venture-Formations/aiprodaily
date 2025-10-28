@@ -52,7 +52,17 @@ WHERE key = 'ai_prompt_fact_checker';
 
 -- Step 10: Set expected outputs for topic deduper
 UPDATE app_settings
-SET expected_outputs = '{"groups": "array", "unique_articles": "array"}'::jsonb
+SET expected_outputs = '{
+  "groups": {
+    "type": "array",
+    "items": {
+      "topic_signature": "string",
+      "primary_article_index": "integer",
+      "duplicate_indices": "array",
+      "similarity_explanation": "string"
+    }
+  }
+}'::jsonb
 WHERE key = 'ai_prompt_topic_deduper';
 
 -- Step 11: Set expected outputs for breaking news scorer
