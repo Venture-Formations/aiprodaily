@@ -1189,10 +1189,12 @@ function EmailSettings() {
     setSaving(true)
     setMessage('')
 
-    // Exclude lookback hours from email settings save (they have their own save button)
+    // Exclude lookback hours and dedup settings from email settings save (they have their own save buttons)
     const emailSettings: any = { ...settings }
     delete emailSettings.primary_article_lookback_hours
     delete emailSettings.secondary_article_lookback_hours
+    delete emailSettings.dedup_historical_lookback_days
+    delete emailSettings.dedup_strictness_threshold
 
     console.log('FRONTEND: Saving email settings:', emailSettings)
 
