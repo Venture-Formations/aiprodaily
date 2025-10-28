@@ -177,17 +177,19 @@ export async function generateNewsletterHeader(formattedDate: string, campaignDa
   return `<html>
 <head>
 <style>
-@media (max-width:620px){
-  /* Remove the global gutter on small screens */
-  .outer-wrap { 
-    padding-left:0 !important; 
-    padding-right:0 !important; 
+@media (min-width:621px){
+  /* Add padding on desktop only */
+  .email-wrapper {
+    padding-left:10px !important;
+    padding-right:10px !important;
   }
 }
 </style>
 </head>
 <body style='margin:0!important;padding:0!important;background-color:#f7f7f7;'>
-     <div class="outer-wrap" style="width:100%; min-height:100vh; background:#f7f7f7; padding:10px; box-sizing:border-box;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#f7f7f7" style="background-color:#f7f7f7;">
+  <tr>
+    <td class="email-wrapper" style="padding:0;">
      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
        <tr>
          <td style="font-weight:bold;font-family:Arial,sans-serif;padding:5px 0;">
@@ -1256,16 +1258,20 @@ export async function generateNewsletterFooter(campaignDate?: string, campaignId
 
   return `
 ${socialMediaSection}
-<div style="font-family: Arial, sans-serif; font-size: 12px; color: #777; text-align: center; padding: 20px 10px; border-top: 1px solid #ccc; background-color: #ffffff; max-width: 770px; margin: 0 auto ;">
-  <p style="margin: 0;text-align: center;">You're receiving this email because you subscribed to <strong>${newsletterName}</strong>.</p>
-  <p style="margin: 5px 0 0;text-align: center;">
-    <a href="{$unsubscribe}" style='text-decoration: underline;'>Unsubscribe</a>
-  </p>
-  <p style="margin: 5px;text-align: center;">©${currentYear} ${businessName}, all rights reserved</p>
-</div>
-    </div>
-  </div>
-</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:770px;margin:0 auto;">
+  <tr>
+    <td style="font-family: Arial, sans-serif; font-size: 12px; color: #777; text-align: center; padding: 20px 10px; border-top: 1px solid #ccc; background-color: #ffffff;">
+      <p style="margin: 0;text-align: center;">You're receiving this email because you subscribed to <strong>${newsletterName}</strong>.</p>
+      <p style="margin: 5px 0 0;text-align: center;">
+        <a href="{$unsubscribe}" style='text-decoration: underline;'>Unsubscribe</a>
+      </p>
+      <p style="margin: 5px;text-align: center;">©${currentYear} ${businessName}, all rights reserved</p>
+    </td>
+  </tr>
+</table>
+    </td>
+  </tr>
+</table>
 </body>
 </html>`
 }
