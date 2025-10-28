@@ -214,7 +214,12 @@ export async function generateNewsletterHeader(formattedDate: string, campaignDa
            </td>
          </tr>
        </table>
-       <div style='color:${primaryColor};font-size:16px;font-weight:bold;padding:5px 0;text-align:center;'>${formattedDate}</div>
+       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
+         <tr>
+           <td align="center" style="padding:5px 0;font-family:Arial,sans-serif;font-weight:bold;font-size:16px;color:#1C293D;text-align:center;">${formattedDate}
+          </td>
+         </tr>
+       </table>
      </div>
 <br>`
 }
