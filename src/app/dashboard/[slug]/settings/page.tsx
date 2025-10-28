@@ -2426,6 +2426,11 @@ function AIPromptsSettings() {
         testUrl += `&rssPostId=${rssPostId}`
       }
 
+      // If currently editing this prompt, use the current content from the text box
+      if (editingPrompt?.key === key && editingPrompt?.value) {
+        testUrl += `&promptContent=${encodeURIComponent(editingPrompt.value)}`
+      }
+
       const response = await fetch(testUrl)
       const data = await response.json()
 

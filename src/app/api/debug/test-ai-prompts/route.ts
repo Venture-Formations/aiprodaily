@@ -2,12 +2,42 @@ import { NextRequest, NextResponse } from 'next/server'
 import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 import { supabaseAdmin } from '@/lib/supabase'
 
+// Helper function to extract prompt content from JSON or string format
+function extractPromptContent(promptValue: any): string {
+  if (typeof promptValue === 'string') {
+    return promptValue
+  }
+
+  if (typeof promptValue === 'object') {
+    // Try to parse if it's a stringified JSON
+    try {
+      const parsed = typeof promptValue === 'string' ? JSON.parse(promptValue) : promptValue
+
+      // If it has messages array, extract user message content
+      if (parsed.messages && Array.isArray(parsed.messages)) {
+        const userMessage = parsed.messages.find((m: any) => m.role === 'user')
+        if (userMessage && userMessage.content) {
+          return userMessage.content
+        }
+      }
+
+      // Otherwise return stringified JSON
+      return JSON.stringify(parsed)
+    } catch (e) {
+      return String(promptValue)
+    }
+  }
+
+  return String(promptValue)
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const promptType = searchParams.get('type') || 'all'
     const promptKey = searchParams.get('promptKey')
     const rssPostId = searchParams.get('rssPostId')
+    const customPromptContent = searchParams.get('promptContent') // Custom prompt content for testing
 
     const results: Record<string, any> = {}
 
@@ -111,43 +141,61 @@ export async function GET(request: NextRequest) {
         let prompt: string
         let promptSource = 'default'
 
-        // If testing a specific criteria prompt, fetch that prompt directly
-        const isCriteriaPrompt = promptKey && (promptKey.startsWith('ai_prompt_criteria_') || promptKey.startsWith('ai_prompt_secondary_criteria_'))
-        console.log('[DEBUG] Is criteria prompt?', isCriteriaPrompt)
+        // If custom prompt content is provided, use that directly
+        if (customPromptContent) {
+          console.log('[DEBUG] Using custom prompt content from request')
+          prompt = extractPromptContent(customPromptContent)
 
-        if (isCriteriaPrompt) {
-          console.log('[DEBUG] Fetching criteria prompt from database:', promptKey)
-
-          const { data, error } = await supabaseAdmin
-            .from('app_settings')
-            .select('value')
-            .eq('key', promptKey)
-            .single()
-
-          console.log('[DEBUG] Database query result:', { hasData: !!data, error: error?.message })
-
-          if (error || !data) {
-            const errorMsg = `Failed to fetch prompt: ${promptKey} - ${error?.message || 'No data returned'}`
-            console.error('[DEBUG]', errorMsg)
-            throw new Error(errorMsg)
-          }
-
-          console.log('[DEBUG] Retrieved prompt length:', data.value?.length || 0)
-          console.log('[DEBUG] Prompt preview (first 200 chars):', data.value?.substring(0, 200))
-
-          // Replace placeholders in the criteria prompt
-          prompt = data.value
+          // Replace placeholders in the prompt
+          prompt = prompt
             .replace(/\{\{title\}\}/g, testData.contentEvaluator.title)
             .replace(/\{\{description\}\}/g, testData.contentEvaluator.description || 'No description available')
             .replace(/\{\{content\}\}/g, testData.contentEvaluator.content || testData.contentEvaluator.description || 'No content available')
 
-          promptSource = `database:${promptKey}`
-          console.log('[DEBUG] After placeholder replacement, prompt length:', prompt.length)
+          promptSource = 'custom'
+          console.log('[DEBUG] Using custom prompt, length:', prompt.length)
         } else {
-          console.log('[DEBUG] Using standard contentEvaluator prompt from AI_PROMPTS')
-          // Use the standard contentEvaluator prompt
-          prompt = await AI_PROMPTS.contentEvaluator(testData.contentEvaluator)
-          promptSource = 'AI_PROMPTS.contentEvaluator'
+          // If testing a specific criteria prompt, fetch that prompt directly
+          const isCriteriaPrompt = promptKey && (promptKey.startsWith('ai_prompt_criteria_') || promptKey.startsWith('ai_prompt_secondary_criteria_'))
+          console.log('[DEBUG] Is criteria prompt?', isCriteriaPrompt)
+
+          if (isCriteriaPrompt) {
+            console.log('[DEBUG] Fetching criteria prompt from database:', promptKey)
+
+            const { data, error } = await supabaseAdmin
+              .from('app_settings')
+              .select('value')
+              .eq('key', promptKey)
+              .single()
+
+            console.log('[DEBUG] Database query result:', { hasData: !!data, error: error?.message })
+
+            if (error || !data) {
+              const errorMsg = `Failed to fetch prompt: ${promptKey} - ${error?.message || 'No data returned'}`
+              console.error('[DEBUG]', errorMsg)
+              throw new Error(errorMsg)
+            }
+
+            console.log('[DEBUG] Retrieved prompt length:', data.value?.length || 0)
+            console.log('[DEBUG] Prompt preview (first 200 chars):', JSON.stringify(data.value).substring(0, 200))
+
+            // Extract prompt content from JSON or string format
+            prompt = extractPromptContent(data.value)
+
+            // Replace placeholders in the criteria prompt
+            prompt = prompt
+              .replace(/\{\{title\}\}/g, testData.contentEvaluator.title)
+              .replace(/\{\{description\}\}/g, testData.contentEvaluator.description || 'No description available')
+              .replace(/\{\{content\}\}/g, testData.contentEvaluator.content || testData.contentEvaluator.description || 'No content available')
+
+            promptSource = `database:${promptKey}`
+            console.log('[DEBUG] After placeholder replacement, prompt length:', prompt.length)
+          } else {
+            console.log('[DEBUG] Using standard contentEvaluator prompt from AI_PROMPTS')
+            // Use the standard contentEvaluator prompt
+            prompt = await AI_PROMPTS.contentEvaluator(testData.contentEvaluator)
+            promptSource = 'AI_PROMPTS.contentEvaluator'
+          }
         }
 
         console.log('[DEBUG] Final prompt preview (first 300 chars):', prompt.substring(0, 300))
@@ -196,13 +244,31 @@ export async function GET(request: NextRequest) {
     if (promptType === 'primaryArticleTitle') {
       console.log('Testing Primary Article Title...')
       try {
-        const prompt = await AI_PROMPTS.primaryArticleTitle(testData.newsletterWriter)
+        let prompt: string
+        let promptSource = 'default'
+
+        if (customPromptContent) {
+          console.log('[DEBUG] Using custom prompt content for primary article title')
+          prompt = extractPromptContent(customPromptContent)
+          // Replace placeholders
+          prompt = prompt
+            .replace(/\{\{title\}\}/g, testData.newsletterWriter.title)
+            .replace(/\{\{description\}\}/g, testData.newsletterWriter.description || 'No description available')
+            .replace(/\{\{content\}\}/g, testData.newsletterWriter.content || testData.newsletterWriter.description || 'No content available')
+            .replace(/\{\{source_url\}\}/g, testData.newsletterWriter.source_url || '')
+          promptSource = 'custom'
+        } else {
+          prompt = await AI_PROMPTS.primaryArticleTitle(testData.newsletterWriter)
+          promptSource = 'AI_PROMPTS.primaryArticleTitle'
+        }
+
         console.log('[TEST] Prompt preview (first 500 chars):', prompt.substring(0, 500))
         const response = await callOpenAI(prompt, 200, 0.7)
         results.primaryArticleTitle = {
           success: true,
           response,
           prompt_length: prompt.length,
+          prompt_source: promptSource,
           prompt_preview: prompt.substring(0, 300) + '...'
         }
       } catch (error) {
