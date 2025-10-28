@@ -1141,9 +1141,9 @@ export async function generatePromptIdeasSection(campaign: any): Promise<string>
         <tr><td style='padding: 12px 12px 8px; font-size: 20px; font-weight: bold; text-align: center;'>${prompt.title}</td></tr>
         <tr>
           <td align='center' style='padding: 0 12px 12px;'>
-            <table cellpadding='0' cellspacing='0' style='max-width: 550px; margin: 0 auto;'>
+            <table width="100%" cellpadding='0' cellspacing='0' style='max-width: 550px; margin: 0 auto;'>
               <tr>
-                <td style='background-color: #000000; color: #00FF00; padding: 16px; border-radius: 6px; border: 2px solid #333; font-family: "Courier New", Courier, monospace; font-size: 14px; line-height: 22px; text-align: left;'>${formattedPromptText}</td>
+                <td bgcolor="#000000" style='background-color: #000000; color: #00FF00; padding: 16px; border-radius: 6px; border: 2px solid #333; font-family: Courier New, Courier, monospace; font-size: 14px; line-height: 22px; text-align: left;'>${formattedPromptText}</td>
               </tr>
             </table>
           </td>
