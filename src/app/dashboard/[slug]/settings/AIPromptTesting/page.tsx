@@ -28,6 +28,14 @@ interface TestResult {
   apiRequest?: any // The exact API request sent
   isMultiple?: boolean // Whether this was a multiple article test
   responses?: string[] // Array of responses for multiple article tests
+  sourcePosts?: Array<{ // Source posts used for multiple article tests
+    id: string
+    title: string
+    description: string | null
+    content: string | null
+    source_url: string | null
+    publication_date: string | null
+  }>
 }
 
 interface SavedPrompt {
@@ -74,6 +82,7 @@ export default function AIPromptTestingPage() {
   const [savedPromptInfo, setSavedPromptInfo] = useState<SavedPrompt | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [showPromptDetails, setShowPromptDetails] = useState(false)
+  const [showSourcePosts, setShowSourcePosts] = useState(false)
 
   // Helper function to determine section from prompt type
   const getSection = (type: PromptType): 'primary' | 'secondary' | 'all' => {
@@ -361,7 +370,8 @@ export default function AIPromptTestingPage() {
           duration: data.totalDuration,
           apiRequest: data.apiRequest,
           isMultiple: true,
-          responses: data.responses
+          responses: data.responses,
+          sourcePosts: data.sourcePosts // Include source posts
         }
 
         setCurrentResponse(result)
@@ -737,6 +747,76 @@ export default function AIPromptTestingPage() {
                   </div>
                 )}
               </div>
+
+              {/* Source Posts Section (for multiple article tests) */}
+              {currentResponse.isMultiple && currentResponse.sourcePosts && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setShowSourcePosts(!showSourcePosts)}
+                    className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left"
+                  >
+                    <span className="font-medium text-gray-900">
+                      {showSourcePosts ? '▼' : '▶'} Source Articles Used ({currentResponse.sourcePosts.length} posts)
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      {showSourcePosts ? 'Click to collapse' : 'Click to expand'}
+                    </span>
+                  </button>
+                  {showSourcePosts && (
+                    <div className="p-4 bg-white">
+                      <div className="space-y-4 max-h-96 overflow-y-auto">
+                        {currentResponse.sourcePosts.map((post, index) => (
+                          <div key={post.id} className="border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <h5 className="font-medium text-gray-900">Article {index + 1}</h5>
+                              {post.source_url && (
+                                <a
+                                  href={post.source_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-blue-600 hover:underline"
+                                >
+                                  View Source
+                                </a>
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              <div>
+                                <p className="text-xs font-semibold text-gray-600 mb-1">Title:</p>
+                                <p className="text-sm text-gray-900">{post.title}</p>
+                              </div>
+                              {post.description && (
+                                <div>
+                                  <p className="text-xs font-semibold text-gray-600 mb-1">Description:</p>
+                                  <p className="text-sm text-gray-700">{post.description}</p>
+                                </div>
+                              )}
+                              {post.content && (
+                                <div>
+                                  <p className="text-xs font-semibold text-gray-600 mb-1">Full Content:</p>
+                                  <div className="bg-gray-50 rounded p-3 max-h-48 overflow-y-auto">
+                                    <p className="text-xs text-gray-700 whitespace-pre-wrap">
+                                      {post.content.length > 1000
+                                        ? `${post.content.substring(0, 1000)}... [truncated]`
+                                        : post.content
+                                      }
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                              {post.publication_date && (
+                                <p className="text-xs text-gray-500">
+                                  Published: {new Date(post.publication_date).toLocaleDateString()}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Response Section */}
               <div className="border border-gray-200 rounded-lg overflow-hidden">

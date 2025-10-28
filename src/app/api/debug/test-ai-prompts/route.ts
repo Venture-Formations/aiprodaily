@@ -300,7 +300,7 @@ export async function GET(request: NextRequest) {
       console.log('[DEBUG] Received promptType:', promptType)
 
       try {
-        let prompt: string
+        let prompt: string | any | any
         let promptSource = 'default'
 
         // If custom prompt content is provided, use that directly
@@ -317,7 +317,7 @@ export async function GET(request: NextRequest) {
 
           prompt = processCustomPrompt(customPromptContent, postData)
           promptSource = 'custom'
-          console.log('[DEBUG] Using custom prompt, length:', prompt.length)
+          console.log('[DEBUG] Using custom prompt, length:', typeof prompt === 'string' ? prompt.length : 'N/A (structured)')
         } else {
           // If testing a specific criteria prompt, fetch that prompt directly
           const isCriteriaPrompt = promptKey && (promptKey.startsWith('ai_prompt_criteria_') || promptKey.startsWith('ai_prompt_secondary_criteria_'))
@@ -355,7 +355,7 @@ export async function GET(request: NextRequest) {
             prompt = processCustomPrompt(data.value, postData)
 
             promptSource = `database:${promptKey}`
-            console.log('[DEBUG] After placeholder replacement, prompt length:', prompt.length)
+            console.log('[DEBUG] After placeholder replacement, prompt length:', typeof prompt === 'string' ? prompt.length : 'N/A (structured)')
           } else {
             console.log('[DEBUG] Using standard contentEvaluator prompt from AI_PROMPTS')
             // Use the standard contentEvaluator prompt
@@ -364,8 +364,8 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        console.log('[DEBUG] Final prompt preview (first 300 chars):', prompt.substring(0, 300))
-        console.log('[DEBUG] Calling AI with prompt length:', prompt.length, 'provider:', aiProvider)
+        console.log('[DEBUG] Final prompt preview (first 300 chars):', typeof prompt === 'string' ? prompt.substring(0, 300) : 'Structured JSON prompt')
+        console.log('[DEBUG] Calling AI with prompt length:', typeof prompt === 'string' ? prompt.length : 'N/A (structured)', 'provider:', aiProvider)
 
         const { content, fullResponse } = await callAI(prompt, 1000, 0.3, aiProvider)
 
@@ -375,10 +375,10 @@ export async function GET(request: NextRequest) {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: prompt.length,
+          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
           prompt_key_used: promptKey || 'ai_prompt_content_evaluator',
           prompt_source: promptSource,
-          prompt_preview: prompt.substring(0, 500) + '...',
+          prompt_preview: typeof prompt === 'string' ? prompt.substring(0, 500) + '...' : 'Structured JSON prompt',
           ai_provider: aiProvider
         }
       } catch (error) {
@@ -393,7 +393,7 @@ export async function GET(request: NextRequest) {
     if (promptType === 'all' || promptType === 'newsletterWriter') {
       console.log('Testing Newsletter Writer...')
       try {
-        let prompt: string
+        let prompt: string | any
         let promptSource = 'default'
 
         if (customPromptContent) {
@@ -417,7 +417,7 @@ export async function GET(request: NextRequest) {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: prompt.length,
+          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
           prompt_source: promptSource,
           ai_provider: aiProvider
         }
@@ -433,7 +433,7 @@ export async function GET(request: NextRequest) {
     if (promptType === 'primaryArticleTitle') {
       console.log('Testing Primary Article Title...')
       try {
-        let prompt: string
+        let prompt: string | any | any
         let promptSource = 'default'
 
         if (customPromptContent) {
@@ -452,15 +452,15 @@ export async function GET(request: NextRequest) {
           promptSource = 'AI_PROMPTS.primaryArticleTitle'
         }
 
-        console.log('[TEST] Prompt preview (first 500 chars):', prompt.substring(0, 500))
+        console.log('[TEST] Prompt preview (first 500 chars):', typeof prompt === 'string' ? prompt.substring(0, 500) : 'Structured JSON prompt')
         const { content, fullResponse } = await callAI(prompt, 200, 0.7, aiProvider)
         results.primaryArticleTitle = {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: prompt.length,
+          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
           prompt_source: promptSource,
-          prompt_preview: prompt.substring(0, 300) + '...',
+          prompt_preview: typeof prompt === 'string' ? prompt.substring(0, 300) + '...' : 'Structured JSON prompt',
           ai_provider: aiProvider
         }
       } catch (error) {
@@ -475,7 +475,7 @@ export async function GET(request: NextRequest) {
     if (promptType === 'primaryArticleBody') {
       console.log('Testing Primary Article Body...')
       try {
-        let prompt: string
+        let prompt: string | any
         let promptSource = 'default'
         const sampleHeadline = rssPost?.title || 'Sample Test Headline for Article Body'
 
@@ -501,7 +501,7 @@ export async function GET(request: NextRequest) {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: prompt.length,
+          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
           prompt_source: promptSource,
           note: `Using headline: "${sampleHeadline}"`,
           ai_provider: aiProvider
@@ -518,7 +518,7 @@ export async function GET(request: NextRequest) {
     if (promptType === 'secondaryArticleTitle') {
       console.log('Testing Secondary Article Title...')
       try {
-        let prompt: string
+        let prompt: string | any
         let promptSource = 'default'
 
         if (customPromptContent) {
@@ -542,7 +542,7 @@ export async function GET(request: NextRequest) {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: prompt.length,
+          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
           prompt_source: promptSource,
           ai_provider: aiProvider
         }
@@ -558,7 +558,7 @@ export async function GET(request: NextRequest) {
     if (promptType === 'secondaryArticleBody') {
       console.log('Testing Secondary Article Body...')
       try {
-        let prompt: string
+        let prompt: string | any
         let promptSource = 'default'
         const sampleHeadline = rssPost?.title || 'Sample Test Headline for Article Body'
 
@@ -584,7 +584,7 @@ export async function GET(request: NextRequest) {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: prompt.length,
+          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
           prompt_source: promptSource,
           note: `Using headline: "${sampleHeadline}"`,
           ai_provider: aiProvider
@@ -601,7 +601,7 @@ export async function GET(request: NextRequest) {
     if (promptType === 'all' || promptType === 'subjectLineGenerator') {
       console.log('Testing Subject Line Generator...')
       try {
-        let prompt: string
+        let prompt: string | any
         let promptSource = 'default'
 
         if (customPromptContent) {
@@ -624,7 +624,7 @@ export async function GET(request: NextRequest) {
           response: content,
           fullResponse: fullResponse,
           character_count: typeof content === 'string' ? content.length : 0,
-          prompt_length: prompt.length,
+          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
           prompt_source: promptSource,
           ai_provider: aiProvider
         }
@@ -640,7 +640,7 @@ export async function GET(request: NextRequest) {
     if (promptType === 'all' || promptType === 'eventSummarizer') {
       console.log('Testing Event Summarizer...')
       try {
-        let prompt: string
+        let prompt: string | any
         let promptSource = 'default'
 
         if (customPromptContent) {
@@ -662,7 +662,7 @@ export async function GET(request: NextRequest) {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: prompt.length,
+          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
           prompt_source: promptSource,
           ai_provider: aiProvider
         }
@@ -682,8 +682,8 @@ export async function GET(request: NextRequest) {
         results.roadWorkGenerator = {
           success: true,
           note: 'Prompt generated successfully. Use /api/debug/test-ai-road-work to actually generate road work data.',
-          prompt_preview: prompt.substring(0, 500) + '...',
-          prompt_length: prompt.length
+          prompt_preview: typeof prompt === 'string' ? prompt.substring(0, 500) + '...' : 'Structured JSON prompt',
+          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)'
         }
       } catch (error) {
         results.roadWorkGenerator = {
@@ -707,7 +707,7 @@ export async function GET(request: NextRequest) {
       console.log('[DEBUG] Newsletter content:', testData.factChecker.newsletterContent.substring(0, 100))
       console.log('[DEBUG] Original content:', testData.factChecker.originalContent.substring(0, 100))
       try {
-        let prompt: string
+        let prompt: string | any
         let promptSource = 'default'
 
         if (customPromptContent) {
@@ -726,8 +726,8 @@ export async function GET(request: NextRequest) {
           promptSource = 'AI_PROMPTS.factChecker'
         }
 
-        console.log('[DEBUG] Generated prompt length:', prompt.length)
-        console.log('[DEBUG] Prompt preview (first 500 chars):', prompt.substring(0, 500))
+        console.log('[DEBUG] Generated prompt length:', typeof prompt === 'string' ? prompt.length : 'N/A (structured)')
+        console.log('[DEBUG] Prompt preview (first 500 chars):', typeof prompt === 'string' ? prompt.substring(0, 500) : 'Structured JSON prompt')
 
         const { content, fullResponse } = await callAI(prompt, 1000, 0.3, aiProvider)
         console.log('[DEBUG] AI response:', typeof content === 'string' ? content.substring(0, 200) : content)
@@ -736,9 +736,9 @@ export async function GET(request: NextRequest) {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: prompt.length,
+          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
           prompt_source: promptSource,
-          prompt_preview: prompt.substring(0, 800) + '...',
+          prompt_preview: typeof prompt === 'string' ? prompt.substring(0, 800) + '...' : 'Structured JSON prompt',
           test_data_used: {
             newsletter_length: testData.factChecker.newsletterContent.length,
             original_length: testData.factChecker.originalContent.length
@@ -781,7 +781,7 @@ export async function GET(request: NextRequest) {
           }
         ]
 
-        let prompt: string
+        let prompt: string | any
         let promptSource = 'default'
 
         if (customPromptContent) {
@@ -822,7 +822,7 @@ export async function GET(request: NextRequest) {
     if (promptType === 'all' || promptType === 'topicDeduper') {
       console.log('Testing Topic Deduper...')
       try {
-        let prompt: string
+        let prompt: string | any
         let promptSource = 'default'
 
         if (customPromptContent) {
@@ -837,8 +837,8 @@ export async function GET(request: NextRequest) {
           promptSource = 'AI_PROMPTS.topicDeduper'
         }
 
-        console.log('[TEST] Prompt length:', prompt.length)
-        console.log('[TEST] Prompt preview (first 500 chars):', prompt.substring(0, 500))
+        console.log('[TEST] Prompt length:', typeof prompt === 'string' ? prompt.length : 'N/A (structured)')
+        console.log('[TEST] Prompt preview (first 500 chars):', typeof prompt === 'string' ? prompt.substring(0, 500) : 'Structured JSON prompt')
 
         const { content, fullResponse } = await callAI(prompt, 1000, 0.3, aiProvider)
         console.log('[TEST] Response type:', typeof content)
@@ -848,9 +848,9 @@ export async function GET(request: NextRequest) {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: prompt.length,
+          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
           prompt_source: promptSource,
-          prompt_preview: prompt.substring(0, 800) + '...',
+          prompt_preview: typeof prompt === 'string' ? prompt.substring(0, 800) + '...' : 'Structured JSON prompt',
           test_posts_count: testData.topicDeduper.length,
           expected_duplicates: 'Posts 0+1 (tax software), Posts 3+4 (QuickBooks fraud detection)',
           ai_provider: aiProvider

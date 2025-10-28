@@ -245,6 +245,14 @@ export async function POST(request: NextRequest) {
       provider,
       model: promptJson.model || 'unknown',
       apiRequest: apiRequestForFirstPost, // Only first article's API request
+      sourcePosts: posts.map(post => ({
+        id: post.id,
+        title: post.title,
+        description: post.description,
+        content: post.full_article_text,
+        source_url: post.source_url,
+        publication_date: post.publication_date
+      })), // Include source posts for reference
     })
   } catch (error) {
     console.error('[AI Test Multiple] Error:', error)
