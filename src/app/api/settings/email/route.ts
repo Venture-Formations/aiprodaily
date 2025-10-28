@@ -23,7 +23,8 @@ export async function GET(request: NextRequest) {
       throw error
     }
 
-    console.log('BACKEND GET: Found settings rows:', settingsRows)
+    console.log('BACKEND GET: Found settings rows count:', settingsRows?.length || 0)
+    console.log('BACKEND GET: Email settings keys found:', settingsRows?.filter(r => r.key.startsWith('email_')).map(r => r.key) || [])
 
     // Convert rows to object
     const savedSettings: Record<string, string> = {}
@@ -63,7 +64,21 @@ export async function GET(request: NextRequest) {
       ...savedSettings
     }
 
-    console.log('BACKEND GET: Returning final settings:', finalSettings)
+    console.log('BACKEND GET: Default schedule times:', {
+      rssProcessingTime: defaultSettings.rssProcessingTime,
+      campaignCreationTime: defaultSettings.campaignCreationTime,
+      scheduledSendTime: defaultSettings.scheduledSendTime
+    })
+    console.log('BACKEND GET: Saved schedule times:', {
+      rssProcessingTime: savedSettings.rssProcessingTime,
+      campaignCreationTime: savedSettings.campaignCreationTime,
+      scheduledSendTime: savedSettings.scheduledSendTime
+    })
+    console.log('BACKEND GET: Final schedule times:', {
+      rssProcessingTime: finalSettings.rssProcessingTime,
+      campaignCreationTime: finalSettings.campaignCreationTime,
+      scheduledSendTime: finalSettings.scheduledSendTime
+    })
 
     return NextResponse.json(finalSettings)
 
@@ -249,6 +264,7 @@ export async function POST(request: NextRequest) {
 
     // Upsert each setting
     console.log('BACKEND: Saving settings to database:', settingsToSave)
+    const savedKeys: string[] = []
     for (const setting of settingsToSave) {
       console.log(`BACKEND: Upserting ${setting.key} = ${setting.value}`)
       const { error, data } = await supabaseAdmin
@@ -267,8 +283,10 @@ export async function POST(request: NextRequest) {
         console.error(`BACKEND: Error saving ${setting.key}:`, error)
         throw error
       }
-      console.log(`BACKEND: Successfully saved ${setting.key}:`, data)
+      console.log(`BACKEND: Successfully saved ${setting.key} = ${setting.value}`)
+      savedKeys.push(setting.key)
     }
+    console.log('BACKEND: All settings saved. Keys:', savedKeys)
 
     // Log the settings update
     if (session.user?.email) {
