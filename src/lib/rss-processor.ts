@@ -1,6 +1,6 @@
 import Parser from 'rss-parser'
 import { supabaseAdmin } from './supabase'
-import { AI_PROMPTS, callOpenAI } from './openai' // Oct 7 2025 - Cache bust for 1-20 scale
+import { AI_PROMPTS, callOpenAI, AI_CALL } from './openai' // Oct 7 2025 - Cache bust for 1-20 scale
 import { ErrorHandler, SlackNotificationService } from './slack'
 import { GitHubImageStorage } from './github-storage'
 import { ArticleArchiveService } from './article-archive'
@@ -1538,16 +1538,10 @@ export class RSSProcessor {
     }
 
     try {
-      // Step 1: Generate title using new title prompts
-      const titlePromptOrResult = section === 'primary'
-        ? await AI_PROMPTS.primaryArticleTitle(postData)
-        : await AI_PROMPTS.secondaryArticleTitle(postData)
-
-      // If we got an object with 'raw' property, it's already the result (structured prompt was used)
-      // Otherwise, it's a prompt string that needs to be sent to OpenAI
-      const titleResult = (typeof titlePromptOrResult === 'object' && titlePromptOrResult !== null && 'raw' in titlePromptOrResult)
-        ? titlePromptOrResult
-        : await callOpenAI(titlePromptOrResult as string, 1000, 0.7)
+      // Step 1: Generate title using AI_CALL (handles prompt + provider + call)
+      const titleResult = section === 'primary'
+        ? await AI_CALL.primaryArticleTitle(postData, 200, 0.7)
+        : await AI_CALL.secondaryArticleTitle(postData, 200, 0.7)
 
       // Handle both string and object responses
       const headline = typeof titleResult === 'string'
@@ -1558,12 +1552,10 @@ export class RSSProcessor {
         throw new Error('Failed to generate article title')
       }
 
-      // Step 2: Generate body using new body prompts with the generated title
-      const bodyPrompt = section === 'primary'
-        ? await AI_PROMPTS.primaryArticleBody(postData, headline)
-        : await AI_PROMPTS.secondaryArticleBody(postData, headline)
-
-      const bodyResult = await callOpenAI(bodyPrompt, 1000, 0.3)
+      // Step 2: Generate body using AI_CALL with the generated title
+      const bodyResult = section === 'primary'
+        ? await AI_CALL.primaryArticleBody(postData, headline, 500, 0.7)
+        : await AI_CALL.secondaryArticleBody(postData, headline, 500, 0.7)
 
       if (!bodyResult.content || !bodyResult.word_count) {
         throw new Error('Invalid article body response')

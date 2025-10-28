@@ -1,8 +1,13 @@
 import OpenAI from 'openai'
+import Anthropic from '@anthropic-ai/sdk'
 import { supabaseAdmin } from './supabase'
 
 export const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+})
+
+export const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
 // Helper function to fetch prompt from database with code fallback
@@ -24,6 +29,29 @@ async function getPrompt(key: string, fallback: string): Promise<string> {
   } catch (error) {
     console.error(`Error fetching prompt ${key}, using fallback:`, error)
     return fallback
+  }
+}
+
+// Helper function to fetch prompt AND provider from database
+async function getPromptWithProvider(key: string, fallback: string): Promise<{ prompt: string; provider: 'openai' | 'claude' }> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('app_settings')
+      .select('value, ai_provider')
+      .eq('key', key)
+      .single()
+
+    if (error || !data) {
+      console.log(`Using code fallback for prompt: ${key}`)
+      return { prompt: fallback, provider: 'openai' }
+    }
+
+    const provider = (data.ai_provider === 'claude' ? 'claude' : 'openai') as 'openai' | 'claude'
+    console.log(`Using database prompt: ${key} with provider: ${provider}`)
+    return { prompt: data.value, provider }
+  } catch (error) {
+    console.error(`Error fetching prompt ${key}, using fallback:`, error)
+    return { prompt: fallback, provider: 'openai' }
   }
 }
 
@@ -1873,5 +1901,192 @@ export async function callOpenAI(prompt: string, maxTokens = 1000, temperature =
       console.error('Full error object:', JSON.stringify(error, null, 2))
     }
     throw error
+  }
+}
+
+// Unified AI caller - routes to OpenAI or Claude based on provider
+export async function callAI(prompt: string, maxTokens = 1000, temperature = 0.3, provider: 'openai' | 'claude' = 'openai') {
+  if (provider === 'claude') {
+    // Claude API call
+    try {
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: maxTokens,
+        temperature: temperature,
+        messages: [{ role: 'user', content: prompt }]
+      })
+
+      const textContent = response.content.find(c => c.type === 'text')
+      const content = textContent && 'text' in textContent ? textContent.text : ''
+
+      if (!content) {
+        throw new Error('No response from Claude')
+      }
+
+      // Try to parse as JSON, fallback to raw content (same logic as OpenAI)
+      try {
+        // Strip markdown code fences first
+        let cleanedContent = content
+        const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+        if (codeFenceMatch) {
+          cleanedContent = codeFenceMatch[1]
+        }
+
+        // Clean the content - remove any text before/after JSON
+        const objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
+        const arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
+
+        if (arrayMatch) {
+          return JSON.parse(arrayMatch[0])
+        } else if (objectMatch) {
+          return JSON.parse(objectMatch[0])
+        } else {
+          return JSON.parse(cleanedContent.trim())
+        }
+      } catch (parseError) {
+        // Return raw content wrapped in object
+        return content
+      }
+    } catch (error) {
+      console.error('Claude API error:', error)
+      throw error
+    }
+  } else {
+    // OpenAI API call (default)
+    return callOpenAI(prompt, maxTokens, temperature)
+  }
+}
+
+// Complete AI call interface - fetches prompt+provider, replaces placeholders, calls AI
+export const AI_CALL = {
+  contentEvaluator: async (post: { title: string; description: string; content?: string; hasImage?: boolean }, maxTokens = 1000, temperature = 0.3) => {
+    const { prompt: template, provider } = await getPromptWithProvider(
+      'ai_prompt_content_evaluator',
+      FALLBACK_PROMPTS.contentEvaluator(post)
+    )
+
+    const imagePenaltyText = post.hasImage
+      ? 'This post HAS an image.'
+      : 'This post has NO image - subtract 5 points from interest_level.'
+
+    const prompt = template
+      .replace(/\{\{title\}\}/g, post.title)
+      .replace(/\{\{description\}\}/g, post.description || 'No description available')
+      .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
+      .replace(/\{\{imagePenalty\}\}/g, imagePenaltyText)
+
+    return callAI(prompt, maxTokens, temperature, provider)
+  },
+
+  primaryArticleTitle: async (post: { title: string; description: string; content?: string; source_url?: string }, maxTokens = 200, temperature = 0.7) => {
+    const { prompt: template, provider } = await getPromptWithProvider(
+      'ai_prompt_primary_article_title',
+      FALLBACK_PROMPTS.primaryArticleTitle(post)
+    )
+
+    const prompt = template
+      .replace(/\{\{title\}\}/g, post.title)
+      .replace(/\{\{description\}\}/g, post.description || 'No description available')
+      .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1500) + '...' : 'No additional content')
+      .replace(/\{\{url\}\}/g, post.source_url || '')
+
+    return callAI(prompt, maxTokens, temperature, provider)
+  },
+
+  primaryArticleBody: async (post: { title: string; description: string; content?: string; source_url?: string }, headline: string, maxTokens = 500, temperature = 0.7) => {
+    const { prompt: template, provider } = await getPromptWithProvider(
+      'ai_prompt_primary_article_body',
+      FALLBACK_PROMPTS.primaryArticleBody(post, headline)
+    )
+
+    const prompt = template
+      .replace(/\{\{title\}\}/g, post.title)
+      .replace(/\{\{description\}\}/g, post.description || 'No description available')
+      .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1500) + '...' : 'No additional content')
+      .replace(/\{\{url\}\}/g, post.source_url || '')
+      .replace(/\{\{headline\}\}/g, headline)
+
+    return callAI(prompt, maxTokens, temperature, provider)
+  },
+
+  secondaryArticleTitle: async (post: { title: string; description: string; content?: string; source_url?: string }, maxTokens = 200, temperature = 0.7) => {
+    const { prompt: template, provider } = await getPromptWithProvider(
+      'ai_prompt_secondary_article_title',
+      FALLBACK_PROMPTS.secondaryArticleTitle(post)
+    )
+
+    const prompt = template
+      .replace(/\{\{title\}\}/g, post.title)
+      .replace(/\{\{description\}\}/g, post.description || 'No description available')
+      .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1500) + '...' : 'No additional content')
+      .replace(/\{\{url\}\}/g, post.source_url || '')
+
+    return callAI(prompt, maxTokens, temperature, provider)
+  },
+
+  secondaryArticleBody: async (post: { title: string; description: string; content?: string; source_url?: string }, headline: string, maxTokens = 500, temperature = 0.7) => {
+    const { prompt: template, provider } = await getPromptWithProvider(
+      'ai_prompt_secondary_article_body',
+      FALLBACK_PROMPTS.secondaryArticleBody(post, headline)
+    )
+
+    const prompt = template
+      .replace(/\{\{title\}\}/g, post.title)
+      .replace(/\{\{description\}\}/g, post.description || 'No description available')
+      .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1500) + '...' : 'No additional content')
+      .replace(/\{\{url\}\}/g, post.source_url || '')
+      .replace(/\{\{headline\}\}/g, headline)
+
+    return callAI(prompt, maxTokens, temperature, provider)
+  },
+
+  subjectLineGenerator: async (top_article: { headline: string; content: string }, maxTokens = 100, temperature = 0.8) => {
+    const { prompt: template, provider } = await getPromptWithProvider(
+      'ai_prompt_subject_line',
+      FALLBACK_PROMPTS.subjectLineGenerator(top_article)
+    )
+
+    const prompt = template
+      .replace(/\{\{headline\}\}/g, top_article.headline)
+      .replace(/\{\{content\}\}/g, top_article.content.substring(0, 200) + '...')
+
+    return callAI(prompt, maxTokens, temperature, provider)
+  },
+
+  welcomeSection: async (articles: Array<{ headline: string; content: string }>, maxTokens = 500, temperature = 0.8) => {
+    const { prompt: template, provider} = await getPromptWithProvider(
+      'ai_prompt_welcome_section',
+      FALLBACK_PROMPTS.welcomeSection(articles)
+    )
+
+    const articlesJson = JSON.stringify(articles.map(a => ({ headline: a.headline, content: a.content.substring(0, 200) })))
+    const prompt = template.replace(/\{\{articles\}\}/g, articlesJson)
+
+    return callAI(prompt, maxTokens, temperature, provider)
+  },
+
+  topicDeduper: async (posts: Array<{ title: string; description: string; full_article_text: string }>, maxTokens = 1000, temperature = 0.3) => {
+    const { prompt: template, provider } = await getPromptWithProvider(
+      'ai_prompt_topic_deduper',
+      FALLBACK_PROMPTS.topicDeduper(posts)
+    )
+
+    const postsJson = JSON.stringify(posts)
+    const prompt = template.replace(/\{\{posts\}\}/g, postsJson)
+
+    return callAI(prompt, maxTokens, temperature, provider)
+  },
+
+  factChecker: async (newsletterContent: string, originalContent: string, maxTokens = 1000, temperature = 0.3) => {
+    const { prompt: template, provider } = await getPromptWithProvider(
+      'ai_prompt_fact_checker',
+      FALLBACK_PROMPTS.factChecker(newsletterContent, originalContent)
+    )
+
+    const prompt = template
+      .replace(/\{\{newsletter_content\}\}/g, newsletterContent)
+      .replace(/\{\{original_content\}\}/g, originalContent)
+
+    return callAI(prompt, maxTokens, temperature, provider)
   }
 }
