@@ -45,17 +45,18 @@ function injectPostData(obj: any, post: any): any {
 }
 
 // Helper function to process custom prompt content (JSON or string) with placeholder replacement
-function processCustomPrompt(customPromptContent: string, postData: any): string {
+// Returns either a string prompt or a JSON config object (for structured prompts)
+function processCustomPrompt(customPromptContent: string, postData: any): string | any {
   // Try to parse as JSON (like AI Prompt Testing Playground format)
   try {
     const promptJson = JSON.parse(customPromptContent)
     // Use recursive replacement throughout the entire JSON structure
     const processedJson = injectPostData(promptJson, postData)
 
-    // Extract the prompt string from messages array
+    // If this is a structured prompt with messages array, return the entire config
+    // This allows passing response_format, model, temperature, etc. to the AI
     if (processedJson.messages && Array.isArray(processedJson.messages)) {
-      const userMessage = processedJson.messages.find((m: any) => m.role === 'user')
-      return userMessage?.content || customPromptContent
+      return processedJson // Return the full config object
     } else {
       return JSON.stringify(processedJson)
     }
@@ -67,19 +68,48 @@ function processCustomPrompt(customPromptContent: string, postData: any): string
 
 // Helper function to call AI provider (OpenAI or Claude)
 // Returns both the parsed content and the full API response
-async function callAI(prompt: string, maxTokens: number, temperature: number, provider: 'openai' | 'claude' = 'openai'): Promise<{ content: string, fullResponse: any }> {
+// Supports both simple string prompts and structured JSON prompts with response_format
+async function callAI(
+  promptOrConfig: string | any,
+  maxTokens: number = 1000,
+  temperature: number = 0.7,
+  provider: 'openai' | 'claude' = 'openai'
+): Promise<{ content: any, fullResponse: any }> {
+
+  // Check if prompt is a structured JSON config (has messages array)
+  const isStructuredPrompt = typeof promptOrConfig === 'object' && promptOrConfig.messages
+
   if (provider === 'claude') {
     // Claude API call
+    let messages: any[]
+
+    if (isStructuredPrompt) {
+      // Extract messages from structured prompt
+      messages = promptOrConfig.messages.map((msg: any) => ({
+        role: msg.role === 'system' ? 'user' : msg.role, // Claude doesn't have system role in messages
+        content: msg.content
+      }))
+    } else {
+      messages = [{ role: 'user', content: promptOrConfig as string }]
+    }
+
     const completion = await anthropic.messages.create({
       model: 'claude-sonnet-4-5-20250929',
-      max_tokens: maxTokens,
-      temperature: temperature,
-      messages: [{ role: 'user', content: prompt }]
+      max_tokens: isStructuredPrompt ? promptOrConfig.max_tokens || maxTokens : maxTokens,
+      temperature: isStructuredPrompt ? promptOrConfig.temperature || temperature : temperature,
+      messages: messages
     })
 
     // Extract text from Claude response
     const textContent = completion.content.find(c => c.type === 'text')
-    const content = textContent && 'text' in textContent ? textContent.text : 'No response'
+    let content = textContent && 'text' in textContent ? textContent.text : 'No response'
+
+    // Try to parse as JSON if it looks like JSON
+    try {
+      content = JSON.parse(content)
+    } catch (e) {
+      // Keep as string if not valid JSON
+    }
 
     return {
       content,
@@ -87,19 +117,39 @@ async function callAI(prompt: string, maxTokens: number, temperature: number, pr
     }
   } else {
     // OpenAI API call (default)
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: maxTokens,
-      temperature: temperature,
-    })
+    let apiParams: any
+
+    if (isStructuredPrompt) {
+      // Use structured prompt configuration
+      apiParams = {
+        model: promptOrConfig.model || 'gpt-4o',
+        messages: promptOrConfig.messages,
+        max_tokens: promptOrConfig.max_tokens || maxTokens,
+        temperature: promptOrConfig.temperature !== undefined ? promptOrConfig.temperature : temperature,
+      }
+
+      // Include response_format if specified (for structured outputs)
+      if (promptOrConfig.response_format) {
+        apiParams.response_format = promptOrConfig.response_format
+      }
+    } else {
+      // Simple string prompt
+      apiParams = {
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: promptOrConfig as string }],
+        max_tokens: maxTokens,
+        temperature: temperature,
+      }
+    }
+
+    const response = await openai.chat.completions.create(apiParams)
 
     const content = response.choices[0]?.message?.content || 'No response'
 
-    // Try to parse as JSON, fallback to raw content
-    let parsedContent = content
+    // Try to parse as JSON
+    let parsedContent: any = content
     try {
-      // Strip markdown code fences first (```json ... ``` or ``` ... ```)
+      // Strip markdown code fences first
       let cleanedContent = content
       const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
       if (codeFenceMatch) {
