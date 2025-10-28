@@ -3605,7 +3605,18 @@ function AIPromptsSettings() {
                 <div key={prompt.key} className="p-6">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
-                      <h4 className="text-base font-medium text-gray-900">{prompt.name}</h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-base font-medium text-gray-900">{prompt.name}</h4>
+                        {!isEditing && (
+                          <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                            prompt.ai_provider === 'claude'
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {prompt.ai_provider === 'claude' ? 'Claude' : 'OpenAI'}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-sm text-gray-600 mt-1">{prompt.description}</p>
                     </div>
                     <button
@@ -3623,32 +3634,73 @@ function AIPromptsSettings() {
                           Prompt Content
                         </label>
                         <span className="text-xs text-gray-500">
-                          {isEditing ? editingPrompt?.value.length || 0 : prompt.value.length} characters
+                          {isEditing
+                            ? editingPrompt?.value.length || 0
+                            : typeof prompt.value === 'object'
+                              ? JSON.stringify(prompt.value).length
+                              : prompt.value.length} characters
                         </span>
                       </div>
                       {isEditing ? (
                         <>
+                          {/* AI Provider Selector */}
+                          <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              AI Provider
+                            </label>
+                            <div className="flex gap-4">
+                              <button
+                                onClick={() => editingPrompt && setEditingPrompt({ ...editingPrompt, ai_provider: 'openai' })}
+                                className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
+                                  editingPrompt?.ai_provider === 'openai'
+                                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                    : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                                }`}
+                              >
+                                OpenAI
+                              </button>
+                              <button
+                                onClick={() => editingPrompt && setEditingPrompt({ ...editingPrompt, ai_provider: 'claude' })}
+                                className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
+                                  editingPrompt?.ai_provider === 'claude'
+                                    ? 'border-purple-500 bg-purple-50 text-purple-700'
+                                    : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                                }`}
+                              >
+                                Claude
+                              </button>
+                            </div>
+                          </div>
+
                           <textarea
                             value={editingPrompt?.value || ''}
                             onChange={(e) => editingPrompt && setEditingPrompt({ ...editingPrompt, value: e.target.value })}
                             rows={15}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
-                          <div className="mt-3 flex items-center justify-end space-x-3">
+                          <div className="mt-3 flex items-center justify-between">
                             <button
-                              onClick={handleCancel}
-                              disabled={isSaving}
-                              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                              onClick={() => handleTestPrompt(prompt.key)}
+                              className="px-4 py-2 text-sm font-medium text-purple-700 bg-white border border-purple-300 rounded-md hover:bg-purple-50"
                             >
-                              Cancel
+                              Test Prompt
                             </button>
-                            <button
-                              onClick={() => handleSave(prompt.key)}
-                              disabled={isSaving}
-                              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
-                            >
-                              {isSaving ? 'Saving...' : 'Save Changes'}
-                            </button>
+                            <div className="flex items-center space-x-3">
+                              <button
+                                onClick={handleCancel}
+                                disabled={isSaving}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={() => handleSave(prompt.key)}
+                                disabled={isSaving}
+                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                              >
+                                {isSaving ? 'Saving...' : 'Save Changes'}
+                              </button>
+                            </div>
                           </div>
                         </>
                       ) : (
@@ -3674,12 +3726,6 @@ function AIPromptsSettings() {
                               </button>
                             </div>
                             <div className="flex items-center space-x-3">
-                              <button
-                                onClick={() => handleTestPrompt(prompt.key)}
-                                className="px-4 py-2 text-sm font-medium text-purple-700 bg-white border border-purple-300 rounded-md hover:bg-purple-50"
-                              >
-                                Test Prompt
-                              </button>
                               <button
                                 onClick={() => handleEdit(prompt)}
                                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
