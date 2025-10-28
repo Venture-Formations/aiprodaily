@@ -261,13 +261,18 @@ function getArticleEmoji(headline: string, content: string): string {
   return '📈'
 }
 
-// ==================== HELPER: FETCH COLORS ====================
+// ==================== HELPER: FETCH COLORS & FONTS ====================
 
-async function fetchBusinessColors(): Promise<{ primaryColor: string; secondaryColor: string }> {
+async function fetchBusinessSettings(): Promise<{
+  primaryColor: string;
+  secondaryColor: string;
+  headingFont: string;
+  bodyFont: string;
+}> {
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
     .select('key, value')
-    .in('key', ['primary_color', 'secondary_color'])
+    .in('key', ['primary_color', 'secondary_color', 'heading_font', 'body_font'])
 
   const settingsMap: Record<string, string> = {}
   settings?.forEach(setting => {
@@ -276,7 +281,9 @@ async function fetchBusinessColors(): Promise<{ primaryColor: string; secondaryC
 
   return {
     primaryColor: settingsMap.primary_color || '#1877F2',
-    secondaryColor: settingsMap.secondary_color || '#10B981'
+    secondaryColor: settingsMap.secondary_color || '#10B981',
+    headingFont: settingsMap.heading_font || 'Arial',
+    bodyFont: settingsMap.body_font || 'Arial'
   }
 }
 
@@ -294,21 +301,24 @@ export async function generateWelcomeSection(
     return ''
   }
 
+  // Fetch fonts from business settings
+  const { bodyFont } = await fetchBusinessSettings()
+
   // Prepend personalized greeting to intro
   const greeting = `Hey, {$name|default('Accounting Pro')}!`
   const fullIntro = intro && intro.trim() ? `${greeting} ${intro.trim()}` : greeting
 
   // Build HTML for each part (only include non-empty parts)
   const introPart = greeting
-    ? `<div style="font-size: 16px; line-height: 24px; color: #333; font-family: Arial, sans-serif; margin-bottom: 8px;">${greeting.replace(/\n/g, '<br>')}</div>`
+    ? `<div style="font-size: 16px; line-height: 24px; color: #333; font-family: ${bodyFont}; margin-bottom: 8px;">${greeting.replace(/\n/g, '<br>')}</div>`
     : ''
 
   const taglinePart = tagline && tagline.trim()
-    ? `<div style="font-size: 16px; line-height: 24px; color: #333; font-family: Arial, sans-serif; font-weight: bold; margin-bottom: 8px;">${tagline.replace(/\n/g, '<br>')}</div>`
+    ? `<div style="font-size: 16px; line-height: 24px; color: #333; font-family: ${bodyFont}; font-weight: bold; margin-bottom: 8px;">${tagline.replace(/\n/g, '<br>')}</div>`
     : ''
 
   const summaryPart = summary && summary.trim()
-    ? `<div style="font-size: 16px; line-height: 24px; color: #333; font-family: Arial, sans-serif;">${summary.replace(/\n/g, '<br>')}</div>`
+    ? `<div style="font-size: 16px; line-height: 24px; color: #333; font-family: ${bodyFont};">${summary.replace(/\n/g, '<br>')}</div>`
     : ''
 
   return `
@@ -331,8 +341,8 @@ export async function generatePrimaryArticlesSection(articles: any[], campaignDa
     return ''
   }
 
-  // Fetch colors from business settings
-  const { primaryColor, secondaryColor } = await fetchBusinessColors()
+  // Fetch colors and fonts from business settings
+  const { primaryColor, secondaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
 
   const articlesHtml = articles.map((article) => {
     const headline = article.headline || 'No headline'
@@ -345,10 +355,10 @@ export async function generatePrimaryArticlesSection(articles: any[], campaignDa
 
     return `
       <div style='padding: 16px 0; border-bottom: 1px solid #e0e0e0;'>
-        <div style='font-size: 18px; font-weight: bold; margin-bottom: 8px;'>
+        <div style='font-size: 18px; font-weight: bold; margin-bottom: 8px; font-family: ${bodyFont};'>
           ${emoji} <a href='${trackedUrl}' style='color: ${secondaryColor}; text-decoration: underline;'>${headline}</a>
         </div>
-        <div style='font-size: 16px; line-height: 24px; color: #333;'>${content}</div>
+        <div style='font-size: 16px; line-height: 24px; color: #333; font-family: ${bodyFont};'>${content}</div>
       </div>`
   }).join('')
 
@@ -356,7 +366,7 @@ export async function generatePrimaryArticlesSection(articles: any[], campaignDa
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">${sectionName}</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: ${primaryColor}; margin: 0; padding: 0;">${sectionName}</h2>
     </td>
   </tr>
   <tr>
@@ -392,8 +402,8 @@ export async function generateSecondaryArticlesSection(campaign: any, sectionNam
     return ''
   }
 
-  // Fetch colors from business settings
-  const { primaryColor, secondaryColor } = await fetchBusinessColors()
+  // Fetch colors and fonts from business settings
+  const { primaryColor, secondaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
 
   const articlesHtml = secondaryArticles.map((article) => {
     const headline = article.headline || 'No headline'
@@ -407,10 +417,10 @@ export async function generateSecondaryArticlesSection(campaign: any, sectionNam
 
     return `
       <div style='padding: 16px 0; border-bottom: 1px solid #e0e0e0;'>
-        <div style='font-size: 18px; font-weight: bold; margin-bottom: 8px;'>
+        <div style='font-size: 18px; font-weight: bold; margin-bottom: 8px; font-family: ${bodyFont};'>
           ${emoji} <a href='${trackedUrl}' style='color: ${secondaryColor}; text-decoration: underline;'>${headline}</a>
         </div>
-        <div style='font-size: 16px; line-height: 24px; color: #333;'>${content}</div>
+        <div style='font-size: 16px; line-height: 24px; color: #333; font-family: ${bodyFont};'>${content}</div>
       </div>`
   }).join('')
 
@@ -418,7 +428,7 @@ export async function generateSecondaryArticlesSection(campaign: any, sectionNam
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">${sectionName}</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: ${primaryColor}; margin: 0; padding: 0;">${sectionName}</h2>
     </td>
   </tr>
   <tr>
@@ -435,8 +445,8 @@ export async function generateSecondaryArticlesSection(campaign: any, sectionNam
 export async function generateLocalEventsSection(campaign: any): Promise<string> {
   console.log('Generating Local Events section for campaign:', campaign?.id)
 
-  // Fetch colors from business settings
-  const { primaryColor } = await fetchBusinessColors()
+  // Fetch colors and fonts from business settings
+  const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
 
   // Calculate the 3-day date range in Central Time
   const campaignDate = new Date(campaign.date + 'T00:00:00-05:00')
@@ -577,7 +587,7 @@ export async function generateLocalEventsSection(campaign: any): Promise<string>
 
     return `
 <td class='column' style='padding:8px; vertical-align: top;'>
-  <table width='100%' cellpadding='0' cellspacing='0' style='table-layout: fixed; border: 1px solid #ddd; border-radius: 8px; background: #fff; height: 100%; font-family: Arial, sans-serif; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
+  <table width='100%' cellpadding='0' cellspacing='0' style='table-layout: fixed; border: 1px solid #ddd; border-radius: 8px; background: #fff; height: 100%; font-family: ${bodyFont}; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
     <tr>
       <td style='background: #F8F9FA; padding: 8px; text-align: center; font-weight: normal; font-size: 16px; line-height: 26px; color: #3C4043; border-top-left-radius: 8px; border-top-right-radius: 8px;'>${formatEventDate(date)}</td>
     </tr>
@@ -592,16 +602,16 @@ export async function generateLocalEventsSection(campaign: any): Promise<string>
   const submitEventUrl = wrapTrackingUrl('https://events.stcscoop.com/events/submit', 'Local Events', campaign.date, campaign.mailerlite_campaign_id)
 
   return `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7; font-family: Arial, sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7; font-family: ${bodyFont};">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">Local Events</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: ${primaryColor}; margin: 0; padding: 0;">Local Events</h2>
     </td>
   </tr><tr class="row">${dayColumns}
 </td></table>
 <div style="text-align: center; padding: 20px 10px; max-width: 750px; margin: 0 auto;">
-  <a href="${viewAllEventsUrl}" style="display: inline-block; background-color: ${primaryColor}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 10px; font-family: Arial, sans-serif;">View All Events</a>
-  <a href="${submitEventUrl}" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 10px; font-family: Arial, sans-serif;">Submit Your Event</a>
+  <a href="${viewAllEventsUrl}" style="display: inline-block; background-color: ${primaryColor}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 10px; font-family: ${bodyFont};">View All Events</a>
+  <a href="${submitEventUrl}" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 10px; font-family: ${bodyFont};">Submit Your Event</a>
 </div>
 <br>`
 }
@@ -613,7 +623,7 @@ export async function generateWordleSection(campaign: any): Promise<string> {
     console.log('Generating Wordle section for campaign:', campaign?.id)
 
     // Fetch colors from business settings
-    const { primaryColor } = await fetchBusinessColors()
+    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
 
     // Get yesterday's date from the newsletter date (since this is for "Yesterday's Wordle")
     const newsletterDate = new Date(campaign.date + 'T00:00:00')
@@ -638,7 +648,7 @@ export async function generateWordleSection(campaign: any): Promise<string> {
     console.log('Found Wordle data:', wordleData.word)
 
     // Generate the HTML using the template structure
-    const wordleCard = `<table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 12px; background-color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.15); font-family: Arial, sans-serif; font-size: 16px; color: #333; line-height: 26px;'>
+    const wordleCard = `<table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 12px; background-color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.15); font-family: ${bodyFont}; font-size: 16px; color: #333; line-height: 26px;'>
       <tr><td style='background-color: #F8F9FA; text-align: center; padding: 8px; font-weight: bold; font-size: 24px; color: #3C4043; text-transform: uppercase;'>${wordleData.word}</td></tr>
       <tr><td style='padding: 16px;'>
         <div style='margin-bottom: 12px;'><strong>Definition:</strong> ${wordleData.definition}</div>
@@ -652,7 +662,7 @@ export async function generateWordleSection(campaign: any): Promise<string> {
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7; font-family: Arial, sans-serif;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">Yesterday's Wordle</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: ${primaryColor}; margin: 0; padding: 0;">Yesterday's Wordle</h2>
     </td>
   </tr>
   <tr class="row">${wordleColumn}</tr>
@@ -680,7 +690,7 @@ export async function generatePollSection(campaignId: string): Promise<string> {
 
   try {
     // Fetch colors from business settings
-    const { primaryColor } = await fetchBusinessColors()
+    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
 
     // Get active poll
     const { data: pollData } = await supabaseAdmin
@@ -761,7 +771,7 @@ export async function generateCommunityBusinessSpotlightSection(campaign: any, r
     console.log('Generating Community Business Spotlight section for campaign:', campaign?.id, 'recordUsage:', recordUsage)
 
     // Fetch colors from business settings
-    const { primaryColor } = await fetchBusinessColors()
+    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
 
     // Check if ad already selected for this campaign
     const { data: existingAd } = await supabaseAdmin
@@ -814,12 +824,12 @@ export async function generateCommunityBusinessSpotlightSection(campaign: any, r
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">Community Business Spotlight</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: ${primaryColor}; margin: 0; padding: 0;">Community Business Spotlight</h2>
     </td>
   </tr>
   <tr class='row'>
     <td class='column' style='padding:8px; vertical-align: top;'>
-      <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: Arial, sans-serif; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
+      <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: ${bodyFont}; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
         <tr><td style='padding: 12px 12px 4px; font-size: 20px; font-weight: bold;'>${selectedAd.title}</td></tr>
         ${imageHtml}
         <tr><td style='padding: 0 12px 20px;'>${selectedAd.body}${businessUrl !== '#' ? ` (<a href='${trackedUrl}' style='color: #0080FE; text-decoration: none;'>visit website</a>)` : ''}</td></tr>
@@ -867,7 +877,7 @@ export async function generateBreakingNewsSection(campaign: any): Promise<string
     console.log('Generating Breaking News section for campaign:', campaign?.id)
 
     // Fetch colors from business settings
-    const { primaryColor } = await fetchBusinessColors()
+    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
 
     // Fetch selected Breaking News articles
     const { data: selections } = await supabaseAdmin
@@ -912,7 +922,7 @@ export async function generateBreakingNewsSection(campaign: any): Promise<string
       return `
 <tr class='row'>
   <td class='column' style='padding:8px; vertical-align: top;'>
-    <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: Arial, sans-serif; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
+    <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: ${bodyFont}; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
       <tr><td style='padding: 12px 12px 4px; font-size: 20px; font-weight: bold;'>${emoji} <a href='${trackedUrl}' style='color: #000; text-decoration: underline;'>${title}</a></td></tr>
       <tr><td style='padding: 0 12px 20px;'>${summary}</td></tr>
     </table>
@@ -924,7 +934,7 @@ export async function generateBreakingNewsSection(campaign: any): Promise<string
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">Breaking News</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: ${primaryColor}; margin: 0; padding: 0;">Breaking News</h2>
     </td>
   </tr>
   ${articlesHtml}
@@ -944,7 +954,7 @@ export async function generateBeyondTheFeedSection(campaign: any): Promise<strin
     console.log('Generating Beyond the Feed section for campaign:', campaign?.id)
 
     // Fetch colors from business settings
-    const { primaryColor } = await fetchBusinessColors()
+    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
 
     // Fetch selected Beyond the Feed articles
     const { data: selections } = await supabaseAdmin
@@ -989,7 +999,7 @@ export async function generateBeyondTheFeedSection(campaign: any): Promise<strin
       return `
 <tr class='row'>
   <td class='column' style='padding:8px; vertical-align: top;'>
-    <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: Arial, sans-serif; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
+    <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: ${bodyFont}; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
       <tr><td style='padding: 12px 12px 4px; font-size: 20px; font-weight: bold;'>${emoji} <a href='${trackedUrl}' style='color: #000; text-decoration: underline;'>${title}</a></td></tr>
       <tr><td style='padding: 0 12px 20px;'>${summary}</td></tr>
     </table>
@@ -1001,7 +1011,7 @@ export async function generateBeyondTheFeedSection(campaign: any): Promise<strin
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7;">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">Beyond the Feed</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: ${primaryColor}; margin: 0; padding: 0;">Beyond the Feed</h2>
     </td>
   </tr>
   ${articlesHtml}
@@ -1053,8 +1063,8 @@ export async function generateAIAppsSection(campaign: any): Promise<string> {
     // Import AppSelector
     const { AppSelector } = await import('./app-selector')
 
-    // Fetch colors from business settings
-    const { primaryColor, secondaryColor } = await fetchBusinessColors()
+    // Fetch colors and fonts from business settings
+    const { primaryColor, secondaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
 
     // Get the selected apps for this campaign
     const apps = await AppSelector.getAppsForCampaign(campaign.id)
@@ -1078,7 +1088,7 @@ export async function generateAIAppsSection(campaign: any): Promise<string> {
 
       // Format: number. emoji Title - Description
       return `
-      <div style='padding: 12px 0; border-bottom: 1px solid #e0e0e0; font-size: 16px; line-height: 24px;'>
+      <div style='padding: 12px 0; border-bottom: 1px solid #e0e0e0; font-size: 16px; line-height: 24px; font-family: ${bodyFont};'>
         <strong>${index + 1}.</strong> ${emoji} <a href='${trackedUrl}' style='color: ${secondaryColor}; text-decoration: underline; font-weight: bold;'>${app.app_name}</a> - ${app.description || 'AI-powered application'}
       </div>`
     }).join('')
@@ -1087,7 +1097,7 @@ export async function generateAIAppsSection(campaign: any): Promise<string> {
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">AI Applications</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: ${primaryColor}; margin: 0; padding: 0;">AI Applications</h2>
     </td>
   </tr>
   <tr>
@@ -1114,7 +1124,7 @@ export async function generatePromptIdeasSection(campaign: any): Promise<string>
     const { PromptSelector } = await import('./prompt-selector')
 
     // Fetch colors from business settings
-    const { primaryColor } = await fetchBusinessColors()
+    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
 
     // Get the selected prompt for this campaign
     const prompt = await PromptSelector.getPromptForCampaign(campaign.id)
@@ -1134,12 +1144,12 @@ export async function generatePromptIdeasSection(campaign: any): Promise<string>
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
   <tr>
     <td style="padding: 5px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: Arial, sans-serif; color: ${primaryColor}; margin: 0; padding: 0;">Prompt Ideas</h2>
+      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: ${primaryColor}; margin: 0; padding: 0;">Prompt Ideas</h2>
     </td>
   </tr>
   <tr class='row'>
     <td class='column' style='padding:8px; vertical-align: top;'>
-      <table width='100%' cellpadding='0' cellspacing='0' style='font-family: Arial, sans-serif; font-size: 16px; line-height: 26px;'>
+      <table width='100%' cellpadding='0' cellspacing='0' style='font-family: ${bodyFont}; font-size: 16px; line-height: 26px;'>
         <tr><td style='padding: 12px 12px 8px; font-size: 20px; font-weight: bold; text-align: center;'>${prompt.title}</td></tr>
         <tr>
           <td align='center' style='padding: 0 12px 12px;'>

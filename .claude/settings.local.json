@@ -4,7 +4,10 @@
       "Bash(git commit:*)",
       "mcp__postgres__query",
       "Bash(curl:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(psql:*)"
     ],
     "deny": [],
     "ask": []
