@@ -155,7 +155,7 @@ export class RSSProcessor {
   }
 
   async processAllFeeds() {
-    console.log('Starting RSS processing for all feeds...')
+    // Starting RSS processing
 
     try {
       // Get today's campaign or create one
@@ -172,17 +172,14 @@ export class RSSProcessor {
   }
 
   async processAllFeedsForCampaign(campaignId: string) {
-    console.log(`Starting RSS processing for campaign: ${campaignId}`)
 
     let archiveResult: any = null
 
     try {
       // STEP 0: Archive existing articles and posts before clearing (PRESERVES POSITION DATA!)
-      console.log('Archiving existing articles and posts before clearing...')
 
       try {
         archiveResult = await this.archiveService.archiveCampaignArticles(campaignId, 'rss_processing_clear')
-        console.log(`✅ Archive successful: ${archiveResult.archivedArticlesCount} articles, ${archiveResult.archivedPostsCount} posts, ${archiveResult.archivedRatingsCount} ratings preserved`)
 
         // Log specifically about position data preservation
         if (archiveResult.archivedArticlesCount > 0) {
@@ -198,7 +195,6 @@ export class RSSProcessor {
         }
       } catch (archiveError) {
         // Archive failure shouldn't block RSS processing, but we should log it
-        console.warn('⚠️ Archive failed, but continuing with RSS processing:', archiveError)
         await this.errorHandler.logInfo('Archive failed but RSS processing continuing', {
           campaignId,
           archiveError: archiveError instanceof Error ? archiveError.message : 'Unknown error'
@@ -206,7 +202,6 @@ export class RSSProcessor {
       }
 
       // Clear previous articles and posts for this campaign to allow fresh processing
-      console.log('Clearing previous articles and posts...')
 
       // Delete existing articles for this campaign
       const { error: articlesDeleteError } = await supabaseAdmin
@@ -217,7 +212,6 @@ export class RSSProcessor {
       if (articlesDeleteError) {
         console.warn('Warning: Failed to delete previous articles:', articlesDeleteError)
       } else {
-        console.log('Previous articles cleared successfully')
       }
 
       // Delete existing secondary articles for this campaign
@@ -229,7 +223,6 @@ export class RSSProcessor {
       if (secondaryDeleteError) {
         console.warn('Warning: Failed to delete previous secondary articles:', secondaryDeleteError)
       } else {
-        console.log('Previous secondary articles cleared successfully')
       }
 
       // Delete existing posts for this campaign
@@ -241,7 +234,6 @@ export class RSSProcessor {
       if (postsDeleteError) {
         console.warn('Warning: Failed to delete previous posts:', postsDeleteError)
       } else {
-        console.log('Previous posts cleared successfully')
       }
 
       // Get active RSS feeds - separate primary and secondary
@@ -263,7 +255,6 @@ export class RSSProcessor {
       const primaryFeeds = allFeeds.filter(feed => feed.use_for_primary_section)
       const secondaryFeeds = allFeeds.filter(feed => feed.use_for_secondary_section)
 
-      console.log(`Processing ${primaryFeeds.length} primary feeds and ${secondaryFeeds.length} secondary feeds`)
 
       // Process primary feeds
       for (const feed of primaryFeeds) {
@@ -307,10 +298,8 @@ export class RSSProcessor {
 
       // Extract full article text for posts from past 24 hours (before AI processing)
       // This gives us full content for better article generation and fact checking
-      console.log('Extracting full article text for posts from past 24 hours...')
       try {
         await this.enrichRecentPostsWithFullContent(campaignId)
-        console.log('✅ Article extraction completed successfully')
       } catch (extractionError) {
         console.error('Failed to extract full articles, but continuing with RSS summaries:', extractionError)
         // Don't fail the entire RSS processing if article extraction fails
@@ -438,7 +427,6 @@ export class RSSProcessor {
     centralDate.setHours(centralDate.getHours() + 12)
     const campaignDate = centralDate.toISOString().split('T')[0]
 
-    console.log(`Campaign date calculation: Current CT time + 12 hours = ${campaignDate}`)
 
     // Check if campaign exists for this date
     // Use maybeSingle() to gracefully handle multiple matches
@@ -458,7 +446,6 @@ export class RSSProcessor {
     let isNewCampaign = false
 
     if (existing) {
-      console.log(`Campaign already exists for ${campaignDate}: ${existing.id}`)
       campaignId = existing.id
     } else {
       // Create new campaign with processing status
@@ -472,13 +459,11 @@ export class RSSProcessor {
         throw new Error('Failed to create campaign')
       }
 
-      console.log(`Created new campaign for ${campaignDate}: ${newCampaign.id}`)
       campaignId = newCampaign.id
       isNewCampaign = true
     }
 
     // Initialize AI Applications and Prompt Ideas if not already done
-    console.log('Checking campaign content selections (AI Apps & Prompts)...')
     try {
       const { AppSelector } = await import('./app-selector')
       const { PromptSelector } = await import('./prompt-selector')
@@ -501,7 +486,6 @@ export class RSSProcessor {
       const needsPrompt = !existingPrompt || existingPrompt.length === 0
 
       if (needsApps || needsPrompt) {
-        console.log(`Initializing missing content: Apps=${needsApps}, Prompt=${needsPrompt}`)
 
         // Get the first active newsletter (dynamic, not hardcoded to 'accounting')
         const { data: newsletter } = await supabaseAdmin
@@ -512,30 +496,24 @@ export class RSSProcessor {
           .single()
 
         if (newsletter) {
-          console.log(`Found newsletter: ${newsletter.name} (${newsletter.slug})`)
 
           // Initialize AI Applications if needed
           if (needsApps) {
             const selectedApps = await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
-            console.log(`Selected ${selectedApps.length} AI applications for campaign`)
           } else {
-            console.log('AI Applications already selected, skipping')
           }
 
           // Initialize Prompt Ideas if needed
           if (needsPrompt) {
             const selectedPrompt = await PromptSelector.selectPromptForCampaign(campaignId)
             if (selectedPrompt) {
-              console.log(`Selected prompt: ${selectedPrompt.title}`)
             }
           } else {
-            console.log('Prompt already selected, skipping')
           }
         } else {
           console.warn('No active newsletter found, skipping AI content initialization')
         }
       } else {
-        console.log('Campaign content already initialized, skipping')
       }
     } catch (initError) {
       console.error('Error initializing campaign content:', initError)
@@ -708,7 +686,6 @@ export class RSSProcessor {
   }
 
   private async processPostsWithAI(campaignId: string, section: 'primary' | 'secondary' = 'primary') {
-    console.log(`Starting AI processing of ${section} posts...`)
 
     // Get feeds for this section
     const { data: feeds, error: feedsError } = await supabaseAdmin
@@ -718,7 +695,6 @@ export class RSSProcessor {
       .eq(section === 'primary' ? 'use_for_primary_section' : 'use_for_secondary_section', true)
 
     if (feedsError || !feeds || feeds.length === 0) {
-      console.log(`No ${section} feeds found, skipping ${section} post processing`)
       return
     }
 
@@ -735,7 +711,6 @@ export class RSSProcessor {
       throw new Error(`Failed to fetch ${section} posts for AI processing`)
     }
 
-    console.log(`Processing ${posts.length} ${section} posts with AI`)
 
     // Step 1: Evaluate posts in batches
     const BATCH_SIZE = 3 // Process 3 posts at a time
@@ -967,11 +942,9 @@ export class RSSProcessor {
         .eq('campaign_id', campaignId)
 
       if (error || !allPosts || allPosts.length === 0) {
-        console.log('[DEDUP] No posts to deduplicate')
         return
       }
 
-      console.log(`[DEDUP] Analyzing ${allPosts.length} posts (cross-section)`)
 
       // Check if already deduplicated for this campaign
       const { data: existingGroups } = await supabaseAdmin
@@ -981,7 +954,6 @@ export class RSSProcessor {
         .limit(1)
 
       if (existingGroups && existingGroups.length > 0) {
-        console.log('[DEDUP] Already deduplicated, skipping')
         return
       }
 
@@ -995,7 +967,6 @@ export class RSSProcessor {
       const historicalLookbackDays = parseInt(settingsMap.get('dedup_historical_lookback_days') || '3')
       const strictnessThreshold = parseFloat(settingsMap.get('dedup_strictness_threshold') || '0.80')
 
-      console.log(`[DEDUP] Config: ${historicalLookbackDays} days lookback, ${Math.round(strictnessThreshold * 100)}% similarity threshold`)
 
       // Run 4-stage deduplication with config
       const deduplicator = new Deduplicator({
@@ -1048,8 +1019,6 @@ export class RSSProcessor {
         }
       }
 
-      console.log(`[DEDUP] Complete: ${result.stats.duplicate_posts} duplicates marked`)
-      console.log(`[DEDUP] Stats: ${result.stats.historical_duplicates} historical, ${result.stats.exact_duplicates} exact, ${result.stats.title_duplicates} title, ${result.stats.semantic_duplicates} semantic`)
 
     } catch (error) {
       console.error('[DEDUP] Error:', error)
@@ -1057,7 +1026,6 @@ export class RSSProcessor {
   }
 
   private async generateNewsletterArticles(campaignId: string, section: 'primary' | 'secondary' = 'primary') {
-    console.log(`Starting ${section} newsletter article generation...`)
 
     // Get feeds for this section
     const { data: feeds, error: feedsError } = await supabaseAdmin
@@ -1067,7 +1035,6 @@ export class RSSProcessor {
       .eq(section === 'primary' ? 'use_for_primary_section' : 'use_for_secondary_section', true)
 
     if (feedsError || !feeds || feeds.length === 0) {
-      console.log(`No ${section} feeds found, skipping ${section} article generation`)
       return
     }
 
@@ -1094,7 +1061,6 @@ export class RSSProcessor {
       .eq('group.campaign_id', campaignId)
 
     const duplicatePostIds = new Set(duplicatePosts?.map(d => d.post_id) || [])
-    console.log(`Found ${duplicatePostIds.size} duplicate posts to exclude`)
 
     if (queryError) {
       console.error('Error fetching top posts:', queryError)
@@ -1103,12 +1069,10 @@ export class RSSProcessor {
     }
 
     if (!topPosts || topPosts.length === 0) {
-      console.log('No top posts found for article generation')
       await this.logInfo('No top posts found for article generation', { campaignId })
       return
     }
 
-    console.log(`Found ${topPosts.length} top posts for article generation`)
     await this.logInfo(`Found ${topPosts.length} top posts for article generation`, { campaignId, topPostsCount: topPosts.length })
 
     const postsWithRatings = topPosts
@@ -1120,7 +1084,6 @@ export class RSSProcessor {
       })
       // Generate articles for ALL non-duplicate posts, not just top 12
 
-    console.log(`${postsWithRatings.length} posts have ratings`)
     await this.logInfo(`${postsWithRatings.length} posts have ratings`, { campaignId, postsWithRatings: postsWithRatings.length })
 
     if (postsWithRatings.length === 0) {
@@ -1137,7 +1100,6 @@ export class RSSProcessor {
         .eq('campaign_id', campaignId)
         .not('post_ratings', 'is', null)
 
-      console.log(`Alternative query found ${allRatedPosts?.length || 0} posts with ratings`)
       await this.logInfo(`Alternative query found ${allRatedPosts?.length || 0} posts with ratings`, { campaignId, alternativePostsCount: allRatedPosts?.length || 0 })
 
       if (allRatedPosts && allRatedPosts.length > 0) {
@@ -1159,24 +1121,17 @@ export class RSSProcessor {
 
     // Auto-select top articles based on ratings (only for primary section)
     if (section === 'primary') {
-      console.log('=== ABOUT TO SELECT TOP ARTICLES ===')
       await this.selectTop5Articles(campaignId)
-      console.log('=== TOP ARTICLES SELECTION COMPLETE ===')
     } else {
-      console.log('=== ABOUT TO SELECT SECONDARY ARTICLES ===')
       await this.selectTopSecondaryArticles(campaignId)
-      console.log('=== SECONDARY ARTICLES SELECTION COMPLETE ===')
     }
 
     // Download and store images for selected articles
-    console.log('=== ABOUT TO PROCESS ARTICLE IMAGES ===')
     await this.processArticleImages(campaignId)
-    console.log('=== ARTICLE IMAGE PROCESSING COMPLETE ===')
   }
 
   private async selectTop5Articles(campaignId: string) {
     try {
-      console.log('Selecting top articles for campaign (from lookback window):', campaignId)
 
       // Get max_top_articles setting (defaults to 3)
       const { data: maxTopArticlesSetting } = await supabaseAdmin
@@ -1186,7 +1141,6 @@ export class RSSProcessor {
         .single()
 
       const finalArticleCount = maxTopArticlesSetting ? parseInt(maxTopArticlesSetting.value) : 3
-      console.log(`Max top articles setting: ${finalArticleCount}`)
 
       // Get lookback hours setting (defaults to 72 hours)
       const { data: lookbackSetting } = await supabaseAdmin
@@ -1200,7 +1154,6 @@ export class RSSProcessor {
       lookbackDate.setHours(lookbackDate.getHours() - lookbackHours)
       const lookbackTimestamp = lookbackDate.toISOString()
 
-      console.log(`Searching past ${lookbackHours} hours (since ${lookbackTimestamp}) for best unused articles`)
 
       // Query ALL articles from the lookback window that haven't been used in sent newsletters
       // This gives us the best articles regardless of which campaign they were originally processed for
@@ -1230,7 +1183,6 @@ export class RSSProcessor {
         return
       }
 
-      console.log(`Found ${availableArticles.length} unused articles in lookback window`)
 
       // Sort ALL available articles by rating (highest first) and take the top N
       const sortedArticles = availableArticles
@@ -1243,7 +1195,6 @@ export class RSSProcessor {
         .sort((a, b) => b.score - a.score)
         .slice(0, finalArticleCount)
 
-      console.log(`Selected top ${sortedArticles.length} articles by rating from available pool`)
 
       if (sortedArticles.length === 0) {
         console.error('❌ No articles available for selection after filtering')
@@ -1251,7 +1202,6 @@ export class RSSProcessor {
       }
 
       if (sortedArticles.length < finalArticleCount) {
-        console.warn(`⚠️ Only found ${sortedArticles.length} articles, less than target of ${finalArticleCount}`)
       }
 
       // Update all selected articles to belong to current campaign and activate them
@@ -1271,17 +1221,12 @@ export class RSSProcessor {
           console.error(`Failed to activate article ${article.id}:`, updateError)
         } else {
           const wasFromDifferentCampaign = article.current_campaign_id !== campaignId
-          console.log(`Activated article ${article.id} (score: ${article.score}, rank: ${i + 1})${wasFromDifferentCampaign ? ' - moved from different campaign' : ''}`)
         }
       }
 
-      console.log(`Successfully activated ${sortedArticles.length} articles with ranks 1-${sortedArticles.length}`)
       // Generate subject line using the top-ranked article
-      console.log('=== GENERATING SUBJECT LINE (After Article Selection) ===')
       await this.generateSubjectLineForCampaign(campaignId)
-      console.log('=== SUBJECT LINE GENERATION COMPLETED ===')
 
-      console.log('Article selection complete')
     } catch (error) {
       console.error('Error selecting top articles:', error)
     }
@@ -1314,7 +1259,6 @@ export class RSSProcessor {
       lookbackDate.setHours(lookbackDate.getHours() - lookbackHours)
       const lookbackTimestamp = lookbackDate.toISOString()
 
-      console.log(`Searching past ${lookbackHours} hours (since ${lookbackTimestamp}) for best unused secondary articles`)
 
       // Query ALL secondary articles from the lookback window that haven't been used in sent newsletters
       const { data: availableArticles, error } = await supabaseAdmin
@@ -1343,7 +1287,6 @@ export class RSSProcessor {
         return
       }
 
-      console.log(`Found ${availableArticles.length} unused secondary articles in lookback window`)
 
       // Sort ALL available articles by rating (highest first) and take the top N
       const sortedArticles = availableArticles
@@ -1356,7 +1299,6 @@ export class RSSProcessor {
         .sort((a, b) => b.score - a.score)
         .slice(0, finalArticleCount)
 
-      console.log(`Selected top ${sortedArticles.length} secondary articles by rating from available pool`)
 
       if (sortedArticles.length === 0) {
         console.error('❌ No secondary articles available for selection after filtering')
@@ -1364,7 +1306,6 @@ export class RSSProcessor {
       }
 
       if (sortedArticles.length < finalArticleCount) {
-        console.warn(`⚠️ Only found ${sortedArticles.length} secondary articles, less than target of ${finalArticleCount}`)
       }
 
       // Update all selected articles to belong to current campaign and activate them
@@ -1384,23 +1325,17 @@ export class RSSProcessor {
           console.error(`Failed to activate secondary article ${article.id}:`, updateError)
         } else {
           const wasFromDifferentCampaign = article.current_campaign_id !== campaignId
-          console.log(`Activated secondary article ${article.id} (score: ${article.score}, rank: ${i + 1})${wasFromDifferentCampaign ? ' - moved from different campaign' : ''}`)
         }
       }
 
-      console.log(`Successfully activated ${sortedArticles.length} secondary articles with ranks 1-${sortedArticles.length}`)
-      console.log('Secondary article selection complete')
     } catch (error) {
       console.error('Error selecting top secondary articles:', error)
     }
   }
   private async processArticleImages(campaignId: string) {
     try {
-      console.log('=== STARTING IMAGE PROCESSING (GitHub) ===')
-      console.log('Campaign ID:', campaignId)
 
       // Log that image processing function is running
-      console.log('Image processing function started at:', new Date().toISOString())
 
       // Get active articles with their RSS post image URLs
       const { data: articles, error } = await supabaseAdmin
@@ -1422,12 +1357,10 @@ export class RSSProcessor {
         return
       }
 
-      console.log(`Found ${articles.length} active articles to process images for`)
 
       // Log details about each article
       articles.forEach((article: any, index: number) => {
         const rssPost = Array.isArray(article.rss_post) ? article.rss_post[0] : article.rss_post
-        console.log(`Article ${index + 1}: ID=${article.id}, RSS Post Image URL=${rssPost?.image_url || 'None'}, Title=${rssPost?.title || 'Unknown'}`)
       })
 
       // Process images for each article
@@ -1440,17 +1373,14 @@ export class RSSProcessor {
           const rssPost = Array.isArray(article.rss_post) ? article.rss_post[0] : article.rss_post
 
           if (!rssPost?.image_url) {
-            console.log(`No image URL for article ${article.id}, skipping`)
             skipCount++
             continue
           }
 
           const originalImageUrl = rssPost.image_url
-          console.log(`Processing image for article ${article.id}: ${originalImageUrl}`)
 
           // Skip if already a GitHub URL
           if (originalImageUrl.includes('github.com') || originalImageUrl.includes('githubusercontent.com')) {
-            console.log(`Image already hosted on GitHub: ${originalImageUrl}`)
             skipCount++
             continue
           }
@@ -1465,7 +1395,6 @@ export class RSSProcessor {
               .update({ image_url: githubUrl })
               .eq('id', rssPost.id)
 
-            console.log(`Successfully uploaded image to GitHub: ${githubUrl}`)
             downloadCount++
           } else {
             console.error(`Failed to upload image to GitHub for article ${article.id}`)
@@ -1609,7 +1538,6 @@ export class RSSProcessor {
   }
 
   async generateWelcomeSection(campaignId: string): Promise<string> {
-    console.log('[RSS] Generating welcome section...')
 
     try {
       // Fetch ALL active PRIMARY articles for this campaign
@@ -1645,11 +1573,9 @@ export class RSSProcessor {
       ]
 
       if (allArticles.length === 0) {
-        console.log('[RSS] No articles found, skipping welcome section')
         return ''
       }
 
-      console.log(`[RSS] Generating welcome from ${primaryArticles?.length || 0} primary and ${secondaryArticles?.length || 0} secondary articles`)
 
       // Generate welcome text using AI
       const promptOrResult = await AI_PROMPTS.welcomeSection(allArticles)
@@ -1762,7 +1688,6 @@ export class RSSProcessor {
 
   async generateSubjectLineForCampaign(campaignId: string) {
     try {
-      console.log('Starting subject line generation for campaign:', campaignId)
 
       // Get the campaign with its articles for subject line generation
       const { data: campaignWithArticles, error: campaignError } = await supabaseAdmin
@@ -1819,7 +1744,6 @@ export class RSSProcessor {
       const timestamp = new Date().toISOString()
       const subjectPrompt = await AI_PROMPTS.subjectLineGenerator(topArticle) + `\n\nTimestamp: ${timestamp}`
 
-      console.log('Generating AI subject line...')
       const aiResponse = await callOpenAI(subjectPrompt, 100, 0.8)
 
       // The AI now returns plain text, not JSON
@@ -1937,11 +1861,9 @@ export class RSSProcessor {
       }
 
       if (!availableEvents || availableEvents.length === 0) {
-        console.log('No events found for date range, skipping event population')
         return
       }
 
-      console.log(`Found ${availableEvents.length} available events`)
 
       // Group events by date
       const eventsByDate: Record<string, any[]> = {}
@@ -1962,7 +1884,6 @@ export class RSSProcessor {
         const eventsForDate = eventsByDate[date] || []
         const existingForDate = existingEventsByDate[date] || []
 
-        console.log(`Processing ${date}: ${eventsForDate.length} available events, ${existingForDate.length} already selected`)
 
         if (eventsForDate.length === 0) {
           console.log(`No events available for ${date}`)
@@ -1989,14 +1910,12 @@ export class RSSProcessor {
         const uniqueEvents = availableForSelection.filter(event => {
           const titleKey = event.title.toLowerCase().trim()
           if (seenTitles.has(titleKey)) {
-            console.log(`⚠️ Skipping duplicate event: "${event.title}" (ID: ${event.id})`)
             return false
           }
           seenTitles.add(titleKey)
           return true
         })
 
-        console.log(`After removing duplicates: ${uniqueEvents.length} unique events available for ${date}`)
 
         // Separate events by priority:
         // 1. Featured events (from events.featured=true) - MUST be included and featured
@@ -2099,7 +2018,6 @@ export class RSSProcessor {
         console.log('No new events to insert')
       }
 
-      console.log('Smart event population completed successfully')
 
     } catch (error) {
       console.error('Error in populateEventsForCampaignSmart:', error)
@@ -2157,11 +2075,9 @@ export class RSSProcessor {
       }
 
       if (!availableEvents || availableEvents.length === 0) {
-        console.log('No events found for date range, skipping event population')
         return
       }
 
-      console.log(`Found ${availableEvents.length} available events for population`)
 
       // Clear existing campaign events
       const { error: deleteError } = await supabaseAdmin
@@ -2391,14 +2307,12 @@ export class RSSProcessor {
         return
       }
 
-      console.log(`Found ${posts.length} posts to extract full article text from`)
 
       // Filter posts that need extraction (don't have full_article_text yet)
       const postsNeedingExtraction = posts.filter(post => !post.full_article_text)
       const postsAlreadyExtracted = posts.length - postsNeedingExtraction.length
 
       if (postsAlreadyExtracted > 0) {
-        console.log(`${postsAlreadyExtracted} posts already have full article text, skipping`)
       }
 
       if (postsNeedingExtraction.length === 0) {
@@ -2474,7 +2388,6 @@ export class RSSProcessor {
         error: error instanceof Error ? error.message : 'Unknown error'
       })
       // Don't throw - article extraction is optional, RSS processing should continue
-      console.log('⚠️ Article extraction failed, but RSS processing will continue with RSS summaries')
     }
   }
 }
