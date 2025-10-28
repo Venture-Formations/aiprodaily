@@ -1244,7 +1244,7 @@ export async function generateNewsletterFooter(campaignDate?: string, campaignId
 
   // Generate social media section (only if at least one icon exists)
   const socialMediaSection = socialIcons.length > 0 ? `
-<table width="100%" cellpadding="0" cellspacing="0" style="max-width: 750px; margin: 0 auto; background-color: ${primaryColor}; padding: 8px 0;">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width: 770px; margin: 0 auto; background-color: ${primaryColor}; padding: 8px 0;">
   <tr>
     <td align="center">
       <table cellpadding="0" cellspacing="0">
