@@ -3875,6 +3875,26 @@ function AIPromptsSettings() {
                               Prompt length: {result.prompt_length} characters
                             </p>
                           )}
+                          {result.test_posts_count && (
+                            <p className="text-sm font-medium text-blue-600">
+                              Test articles: {result.test_posts_count} articles analyzed
+                            </p>
+                          )}
+                          {result.expected_duplicates && (
+                            <p className="text-sm text-gray-600 mt-2">
+                              <strong>Expected duplicates:</strong> {result.expected_duplicates}
+                            </p>
+                          )}
+                          {result.test_articles_count && (
+                            <p className="text-sm font-medium text-blue-600">
+                              Test articles: {result.test_articles_count} articles analyzed
+                            </p>
+                          )}
+                          {result.prompt_source && (
+                            <p className="text-sm text-gray-500">
+                              Prompt source: {result.prompt_source}
+                            </p>
+                          )}
                         </div>
                       ) : (
                         <div className="bg-red-50 border border-red-200 rounded p-4 text-red-800">
