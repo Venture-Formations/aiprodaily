@@ -2,33 +2,56 @@ import { NextRequest, NextResponse } from 'next/server'
 import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// Helper function to extract prompt content from JSON or string format
-function extractPromptContent(promptValue: any): string {
-  if (typeof promptValue === 'string') {
-    return promptValue
+// Helper function to inject post data into any value (string, object, array) recursively
+// This matches the behavior of AI Prompt Testing Playground
+function injectPostData(obj: any, post: any): any {
+  if (typeof obj === 'string') {
+    if (!post) return obj
+    return obj
+      .replace(/\{\{title\}\}/g, post.title || '')
+      .replace(/\{\{description\}\}/g, post.description || 'No description available')
+      .replace(/\{\{content\}\}/g, post.content || post.full_article_text || 'No content available')
+      .replace(/\{\{headline\}\}/g, post.title || post.headline || '')
+      .replace(/\{\{url\}\}/g, post.source_url || '')
+      .replace(/\{\{source_url\}\}/g, post.source_url || '')
+      .replace(/\{\{newsletter_content\}\}/g, post.newsletter_content || '')
+      .replace(/\{\{original_content\}\}/g, post.original_content || '')
+      .replace(/\{\{articles\}\}/g, post.articles || '')
+      .replace(/\{\{posts\}\}/g, post.posts || '')
+      .replace(/\{\{venue\}\}/g, post.venue || '')
   }
-
-  if (typeof promptValue === 'object') {
-    // Try to parse if it's a stringified JSON
-    try {
-      const parsed = typeof promptValue === 'string' ? JSON.parse(promptValue) : promptValue
-
-      // If it has messages array, extract user message content
-      if (parsed.messages && Array.isArray(parsed.messages)) {
-        const userMessage = parsed.messages.find((m: any) => m.role === 'user')
-        if (userMessage && userMessage.content) {
-          return userMessage.content
-        }
-      }
-
-      // Otherwise return stringified JSON
-      return JSON.stringify(parsed)
-    } catch (e) {
-      return String(promptValue)
+  if (Array.isArray(obj)) {
+    return obj.map(item => injectPostData(item, post))
+  }
+  if (typeof obj === 'object' && obj !== null) {
+    const result: any = {}
+    for (const key in obj) {
+      result[key] = injectPostData(obj[key], post)
     }
+    return result
   }
+  return obj
+}
 
-  return String(promptValue)
+// Helper function to process custom prompt content (JSON or string) with placeholder replacement
+function processCustomPrompt(customPromptContent: string, postData: any): string {
+  // Try to parse as JSON (like AI Prompt Testing Playground format)
+  try {
+    const promptJson = JSON.parse(customPromptContent)
+    // Use recursive replacement throughout the entire JSON structure
+    const processedJson = injectPostData(promptJson, postData)
+
+    // Extract the prompt string from messages array
+    if (processedJson.messages && Array.isArray(processedJson.messages)) {
+      const userMessage = processedJson.messages.find((m: any) => m.role === 'user')
+      return userMessage?.content || customPromptContent
+    } else {
+      return JSON.stringify(processedJson)
+    }
+  } catch (e) {
+    // Not JSON, treat as plain string and use recursive replacement
+    return injectPostData(customPromptContent, postData)
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -144,14 +167,16 @@ export async function GET(request: NextRequest) {
         // If custom prompt content is provided, use that directly
         if (customPromptContent) {
           console.log('[DEBUG] Using custom prompt content from request')
-          prompt = extractPromptContent(customPromptContent)
 
-          // Replace placeholders in the prompt
-          prompt = prompt
-            .replace(/\{\{title\}\}/g, testData.contentEvaluator.title)
-            .replace(/\{\{description\}\}/g, testData.contentEvaluator.description || 'No description available')
-            .replace(/\{\{content\}\}/g, testData.contentEvaluator.content || testData.contentEvaluator.description || 'No content available')
+          // Build post data object for placeholder replacement
+          const postData = {
+            title: testData.contentEvaluator.title,
+            description: testData.contentEvaluator.description,
+            content: testData.contentEvaluator.content,
+            full_article_text: testData.contentEvaluator.content
+          }
 
+          prompt = processCustomPrompt(customPromptContent, postData)
           promptSource = 'custom'
           console.log('[DEBUG] Using custom prompt, length:', prompt.length)
         } else {
@@ -179,14 +204,16 @@ export async function GET(request: NextRequest) {
             console.log('[DEBUG] Retrieved prompt length:', data.value?.length || 0)
             console.log('[DEBUG] Prompt preview (first 200 chars):', JSON.stringify(data.value).substring(0, 200))
 
-            // Extract prompt content from JSON or string format
-            prompt = extractPromptContent(data.value)
+            // Build post data object for placeholder replacement
+            const postData = {
+              title: testData.contentEvaluator.title,
+              description: testData.contentEvaluator.description,
+              content: testData.contentEvaluator.content,
+              full_article_text: testData.contentEvaluator.content
+            }
 
-            // Replace placeholders in the criteria prompt
-            prompt = prompt
-              .replace(/\{\{title\}\}/g, testData.contentEvaluator.title)
-              .replace(/\{\{description\}\}/g, testData.contentEvaluator.description || 'No description available')
-              .replace(/\{\{content\}\}/g, testData.contentEvaluator.content || testData.contentEvaluator.description || 'No content available')
+            // Use recursive placeholder replacement (handles both JSON and string formats)
+            prompt = processCustomPrompt(data.value, postData)
 
             promptSource = `database:${promptKey}`
             console.log('[DEBUG] After placeholder replacement, prompt length:', prompt.length)
@@ -230,13 +257,14 @@ export async function GET(request: NextRequest) {
 
         if (customPromptContent) {
           console.log('[DEBUG] Using custom prompt content for newsletter writer')
-          prompt = extractPromptContent(customPromptContent)
-          // Replace placeholders
-          prompt = prompt
-            .replace(/\{\{title\}\}/g, testData.newsletterWriter.title)
-            .replace(/\{\{description\}\}/g, testData.newsletterWriter.description || 'No description available')
-            .replace(/\{\{content\}\}/g, testData.newsletterWriter.content || testData.newsletterWriter.description || 'No content available')
-            .replace(/\{\{source_url\}\}/g, testData.newsletterWriter.source_url || '')
+          const postData = {
+            title: testData.newsletterWriter.title,
+            description: testData.newsletterWriter.description,
+            content: testData.newsletterWriter.content,
+            full_article_text: testData.newsletterWriter.content,
+            source_url: testData.newsletterWriter.source_url
+          }
+          prompt = processCustomPrompt(customPromptContent, postData)
           promptSource = 'custom'
         } else {
           prompt = await AI_PROMPTS.newsletterWriter(testData.newsletterWriter)
@@ -267,13 +295,14 @@ export async function GET(request: NextRequest) {
 
         if (customPromptContent) {
           console.log('[DEBUG] Using custom prompt content for primary article title')
-          prompt = extractPromptContent(customPromptContent)
-          // Replace placeholders
-          prompt = prompt
-            .replace(/\{\{title\}\}/g, testData.newsletterWriter.title)
-            .replace(/\{\{description\}\}/g, testData.newsletterWriter.description || 'No description available')
-            .replace(/\{\{content\}\}/g, testData.newsletterWriter.content || testData.newsletterWriter.description || 'No content available')
-            .replace(/\{\{source_url\}\}/g, testData.newsletterWriter.source_url || '')
+          const postData = {
+            title: testData.newsletterWriter.title,
+            description: testData.newsletterWriter.description,
+            content: testData.newsletterWriter.content,
+            full_article_text: testData.newsletterWriter.content,
+            source_url: testData.newsletterWriter.source_url
+          }
+          prompt = processCustomPrompt(customPromptContent, postData)
           promptSource = 'custom'
         } else {
           prompt = await AI_PROMPTS.primaryArticleTitle(testData.newsletterWriter)
@@ -307,14 +336,15 @@ export async function GET(request: NextRequest) {
 
         if (customPromptContent) {
           console.log('[DEBUG] Using custom prompt content for primary article body')
-          prompt = extractPromptContent(customPromptContent)
-          // Replace placeholders
-          prompt = prompt
-            .replace(/\{\{title\}\}/g, testData.newsletterWriter.title)
-            .replace(/\{\{description\}\}/g, testData.newsletterWriter.description || 'No description available')
-            .replace(/\{\{content\}\}/g, testData.newsletterWriter.content || testData.newsletterWriter.description || 'No content available')
-            .replace(/\{\{source_url\}\}/g, testData.newsletterWriter.source_url || '')
-            .replace(/\{\{headline\}\}/g, sampleHeadline)
+          const postData = {
+            title: testData.newsletterWriter.title,
+            description: testData.newsletterWriter.description,
+            content: testData.newsletterWriter.content,
+            full_article_text: testData.newsletterWriter.content,
+            source_url: testData.newsletterWriter.source_url,
+            headline: sampleHeadline
+          }
+          prompt = processCustomPrompt(customPromptContent, postData)
           promptSource = 'custom'
         } else {
           prompt = await AI_PROMPTS.primaryArticleBody(testData.newsletterWriter, sampleHeadline)
@@ -346,13 +376,14 @@ export async function GET(request: NextRequest) {
 
         if (customPromptContent) {
           console.log('[DEBUG] Using custom prompt content for secondary article title')
-          prompt = extractPromptContent(customPromptContent)
-          // Replace placeholders
-          prompt = prompt
-            .replace(/\{\{title\}\}/g, testData.newsletterWriter.title)
-            .replace(/\{\{description\}\}/g, testData.newsletterWriter.description || 'No description available')
-            .replace(/\{\{content\}\}/g, testData.newsletterWriter.content || testData.newsletterWriter.description || 'No content available')
-            .replace(/\{\{source_url\}\}/g, testData.newsletterWriter.source_url || '')
+          const postData = {
+            title: testData.newsletterWriter.title,
+            description: testData.newsletterWriter.description,
+            content: testData.newsletterWriter.content,
+            full_article_text: testData.newsletterWriter.content,
+            source_url: testData.newsletterWriter.source_url
+          }
+          prompt = processCustomPrompt(customPromptContent, postData)
           promptSource = 'custom'
         } else {
           prompt = await AI_PROMPTS.secondaryArticleTitle(testData.newsletterWriter)
@@ -384,14 +415,15 @@ export async function GET(request: NextRequest) {
 
         if (customPromptContent) {
           console.log('[DEBUG] Using custom prompt content for secondary article body')
-          prompt = extractPromptContent(customPromptContent)
-          // Replace placeholders
-          prompt = prompt
-            .replace(/\{\{title\}\}/g, testData.newsletterWriter.title)
-            .replace(/\{\{description\}\}/g, testData.newsletterWriter.description || 'No description available')
-            .replace(/\{\{content\}\}/g, testData.newsletterWriter.content || testData.newsletterWriter.description || 'No content available')
-            .replace(/\{\{source_url\}\}/g, testData.newsletterWriter.source_url || '')
-            .replace(/\{\{headline\}\}/g, sampleHeadline)
+          const postData = {
+            title: testData.newsletterWriter.title,
+            description: testData.newsletterWriter.description,
+            content: testData.newsletterWriter.content,
+            full_article_text: testData.newsletterWriter.content,
+            source_url: testData.newsletterWriter.source_url,
+            headline: sampleHeadline
+          }
+          prompt = processCustomPrompt(customPromptContent, postData)
           promptSource = 'custom'
         } else {
           prompt = await AI_PROMPTS.secondaryArticleBody(testData.newsletterWriter, sampleHeadline)
@@ -423,11 +455,12 @@ export async function GET(request: NextRequest) {
 
         if (customPromptContent) {
           console.log('[DEBUG] Using custom prompt content for subject line generator')
-          prompt = extractPromptContent(customPromptContent)
-          // Replace placeholders
-          prompt = prompt
-            .replace(/\{\{headline\}\}/g, testData.subjectLineGenerator.headline)
-            .replace(/\{\{content\}\}/g, testData.subjectLineGenerator.content || 'No content available')
+          const postData = {
+            headline: testData.subjectLineGenerator.headline,
+            content: testData.subjectLineGenerator.content,
+            full_article_text: testData.subjectLineGenerator.content
+          }
+          prompt = processCustomPrompt(customPromptContent, postData)
           promptSource = 'custom'
         } else {
           prompt = await AI_PROMPTS.subjectLineGenerator(testData.subjectLineGenerator)
@@ -459,12 +492,12 @@ export async function GET(request: NextRequest) {
 
         if (customPromptContent) {
           console.log('[DEBUG] Using custom prompt content for event summarizer')
-          prompt = extractPromptContent(customPromptContent)
-          // Replace placeholders
-          prompt = prompt
-            .replace(/\{\{title\}\}/g, testData.eventSummarizer.title)
-            .replace(/\{\{description\}\}/g, testData.eventSummarizer.description || 'No description available')
-            .replace(/\{\{venue\}\}/g, testData.eventSummarizer.venue || 'No venue specified')
+          const postData = {
+            title: testData.eventSummarizer.title,
+            description: testData.eventSummarizer.description,
+            venue: testData.eventSummarizer.venue
+          }
+          prompt = processCustomPrompt(customPromptContent, postData)
           promptSource = 'custom'
         } else {
           prompt = await AI_PROMPTS.eventSummarizer(testData.eventSummarizer)
@@ -524,11 +557,11 @@ export async function GET(request: NextRequest) {
 
         if (customPromptContent) {
           console.log('[DEBUG] Using custom prompt content for fact checker')
-          prompt = extractPromptContent(customPromptContent)
-          // Replace placeholders
-          prompt = prompt
-            .replace(/\{\{newsletter_content\}\}/g, testData.factChecker.newsletterContent)
-            .replace(/\{\{original_content\}\}/g, testData.factChecker.originalContent)
+          const postData = {
+            newsletter_content: testData.factChecker.newsletterContent,
+            original_content: testData.factChecker.originalContent
+          }
+          prompt = processCustomPrompt(customPromptContent, postData)
           promptSource = 'custom'
         } else {
           prompt = await AI_PROMPTS.factChecker(
@@ -596,10 +629,10 @@ export async function GET(request: NextRequest) {
 
         if (customPromptContent) {
           console.log('[DEBUG] Using custom prompt content for welcome section')
-          prompt = extractPromptContent(customPromptContent)
-          // Replace placeholder with articles JSON
-          const articlesJson = JSON.stringify(testArticles, null, 2)
-          prompt = prompt.replace(/\{\{articles\}\}/g, articlesJson)
+          const postData = {
+            articles: JSON.stringify(testArticles, null, 2)
+          }
+          prompt = processCustomPrompt(customPromptContent, postData)
           promptSource = 'custom'
         } else {
           prompt = await AI_PROMPTS.welcomeSection(testArticles)
@@ -635,10 +668,10 @@ export async function GET(request: NextRequest) {
 
         if (customPromptContent) {
           console.log('[DEBUG] Using custom prompt content for topic deduper')
-          prompt = extractPromptContent(customPromptContent)
-          // Replace placeholder with posts JSON
-          const postsJson = JSON.stringify(testData.topicDeduper, null, 2)
-          prompt = prompt.replace(/\{\{posts\}\}/g, postsJson)
+          const postData = {
+            posts: JSON.stringify(testData.topicDeduper, null, 2)
+          }
+          prompt = processCustomPrompt(customPromptContent, postData)
           promptSource = 'custom'
         } else {
           prompt = await AI_PROMPTS.topicDeduper(testData.topicDeduper)
