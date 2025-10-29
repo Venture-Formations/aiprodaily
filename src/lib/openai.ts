@@ -20,14 +20,15 @@ async function getPrompt(key: string, fallback: string): Promise<string> {
       .single()
 
     if (error || !data) {
-      console.log(`Using code fallback for prompt: ${key}`)
+      console.warn(`⚠️  [AI-PROMPT] FALLBACK USED: ${key} (not found in database)`)
+      console.warn(`⚠️  [AI-PROMPT] Run migration: GET /api/debug/migrate-ai-prompts?dry_run=false`)
       return fallback
     }
 
-    console.log(`Using database prompt: ${key}`)
+    console.log(`✓ [AI-PROMPT] Using database: ${key}`)
     return data.value
   } catch (error) {
-    console.error(`Error fetching prompt ${key}, using fallback:`, error)
+    console.error(`❌ [AI-PROMPT] ERROR fetching ${key}, using fallback:`, error)
     return fallback
   }
 }
@@ -42,15 +43,16 @@ async function getPromptWithProvider(key: string, fallback: string): Promise<{ p
       .single()
 
     if (error || !data) {
-      console.log(`Using code fallback for prompt: ${key}`)
+      console.warn(`⚠️  [AI-PROMPT] FALLBACK USED: ${key} (not found in database)`)
+      console.warn(`⚠️  [AI-PROMPT] Run migration: GET /api/debug/migrate-ai-prompts?dry_run=false`)
       return { prompt: fallback, provider: 'openai' }
     }
 
     const provider = (data.ai_provider === 'claude' ? 'claude' : 'openai') as 'openai' | 'claude'
-    console.log(`Using database prompt: ${key} with provider: ${provider}`)
+    console.log(`✓ [AI-PROMPT] Using database: ${key} (provider: ${provider})`)
     return { prompt: data.value, provider }
   } catch (error) {
-    console.error(`Error fetching prompt ${key}, using fallback:`, error)
+    console.error(`❌ [AI-PROMPT] ERROR fetching ${key}, using fallback:`, error)
     return { prompt: fallback, provider: 'openai' }
   }
 }
@@ -109,20 +111,28 @@ Response format:
 }`,
 
   topicDeduper: (posts: Array<{ title: string; description: string; full_article_text: string }>) => `
-You are identifying duplicate stories for a LOCAL NEWSLETTER. Your goal is to prevent readers from seeing multiple articles about the SAME TYPE OF EVENT or SIMILAR TOPICS.
+You are identifying duplicate stories for a NEWSLETTER. Your goal is to prevent readers from seeing multiple articles about the SAME STORY or EVENT.
 
 CRITICAL DEDUPLICATION RULES:
-1. Group articles about the SAME TYPE of event (e.g., multiple fire department open houses, multiple school events, multiple business openings)
-2. Group articles covering the SAME news story from different sources
-3. Group articles about SIMILAR community activities happening in the same time period
-4. Be AGGRESSIVE in identifying duplicates - err on the side of grouping similar topics together
-5. For each group, keep the article with the MOST SPECIFIC details (names, dates, locations)
-6. **NEW**: You now have access to FULL ARTICLE TEXT - use this to make more accurate duplicate decisions
+1. **SAME STORY = DUPLICATE**: Articles covering the SAME news story from different sources are DUPLICATES
+   - Example: "OpenAI Restructures, Unlocks Capital" + "OpenAI Restructures, Eases Capital Constraints" → DUPLICATES (same OpenAI $500B restructure story)
+
+2. **SHARED KEY FACTS = DUPLICATE**: If articles share 3+ key facts (companies, people, amounts, events), they are DUPLICATES
+   - Example: Both mention "OpenAI", "$500 billion", "Microsoft 27%", "Sam Altman" → DUPLICATES
+
+3. **SAME TYPE OF EVENT = DUPLICATE**: Multiple similar events (fire dept open houses, school meetings, business openings)
+
+4. **BE AGGRESSIVE**: When in doubt, mark as duplicates. Better to show fewer unique stories than repeat the same story.
+
+5. **USE FULL ARTICLE TEXT**: Read the full text to identify shared facts, not just titles
+
+6. **KEEP BEST VERSION**: For each group, keep the article with the MOST SPECIFIC details (names, dates, locations, quotes)
 
 EXAMPLES OF DUPLICATES:
-- "Sartell Fire Dept Open House Oct 12" + "St. Cloud Fire Station Open House Oct 12" + "Sauk Rapids Fire Dept Open House Oct 12" → ALL DUPLICATES (same type of event)
-- "New restaurant opens in St. Cloud" + "Grand opening for local eatery" → DUPLICATES (same story)
-- "School district meeting tonight" + "Board to discuss budget tonight" → DUPLICATES (same event)
+- "OpenAI valued at $500B" + "OpenAI restructures with Microsoft stake" → DUPLICATES (same company restructure story)
+- "Company announces layoffs" + "Employees let go at Company" → DUPLICATES (same layoff event)
+- "Sartell Fire Dept Open House Oct 12" + "St. Cloud Fire Station Open House Oct 12" → DUPLICATES (same type of event)
+- "School board meeting tonight" + "Board to discuss budget tonight" → DUPLICATES (same event)
 
 Articles to analyze (array indices are 0-based - first article is index 0):
 ${posts.map((post, i) => `
@@ -1284,12 +1294,15 @@ ${i}. Title: ${post.title}
         .eq('key', 'ai_prompt_criteria_1')
         .single()
 
-      if (error || !data) {
+      if (error || !data || !data.value) {
         console.log('Using code fallback for criteria1Evaluator prompt')
         return FALLBACK_PROMPTS.criteria1Evaluator(post)
       }
 
-      return data.value
+      // Ensure value is a string (handle JSONB auto-parsing)
+      const valueStr = typeof data.value === 'string' ? data.value : JSON.stringify(data.value)
+
+      return valueStr
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
         .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
@@ -1307,12 +1320,15 @@ ${i}. Title: ${post.title}
         .eq('key', 'ai_prompt_criteria_2')
         .single()
 
-      if (error || !data) {
+      if (error || !data || !data.value) {
         console.log('Using code fallback for criteria2Evaluator prompt')
         return FALLBACK_PROMPTS.criteria2Evaluator(post)
       }
 
-      return data.value
+      // Ensure value is a string (handle JSONB auto-parsing)
+      const valueStr = typeof data.value === 'string' ? data.value : JSON.stringify(data.value)
+
+      return valueStr
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
         .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
@@ -1330,12 +1346,15 @@ ${i}. Title: ${post.title}
         .eq('key', 'ai_prompt_criteria_3')
         .single()
 
-      if (error || !data) {
+      if (error || !data || !data.value) {
         console.log('Using code fallback for criteria3Evaluator prompt')
         return FALLBACK_PROMPTS.criteria3Evaluator(post)
       }
 
-      return data.value
+      // Ensure value is a string (handle JSONB auto-parsing)
+      const valueStr = typeof data.value === 'string' ? data.value : JSON.stringify(data.value)
+
+      return valueStr
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
         .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
@@ -1353,12 +1372,15 @@ ${i}. Title: ${post.title}
         .eq('key', 'ai_prompt_criteria_4')
         .single()
 
-      if (error || !data) {
+      if (error || !data || !data.value) {
         console.log('Using code fallback for criteria4Evaluator prompt')
         return FALLBACK_PROMPTS.criteria4Evaluator(post)
       }
 
-      return data.value
+      // Ensure value is a string (handle JSONB auto-parsing)
+      const valueStr = typeof data.value === 'string' ? data.value : JSON.stringify(data.value)
+
+      return valueStr
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
         .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
@@ -1376,12 +1398,15 @@ ${i}. Title: ${post.title}
         .eq('key', 'ai_prompt_criteria_5')
         .single()
 
-      if (error || !data) {
+      if (error || !data || !data.value) {
         console.log('Using code fallback for criteria5Evaluator prompt')
         return FALLBACK_PROMPTS.criteria5Evaluator(post)
       }
 
-      return data.value
+      // Ensure value is a string (handle JSONB auto-parsing)
+      const valueStr = typeof data.value === 'string' ? data.value : JSON.stringify(data.value)
+
+      return valueStr
         .replace(/\{\{title\}\}/g, post.title)
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
         .replace(/\{\{content\}\}/g, post.content ? post.content.substring(0, 1000) + '...' : 'No content available')
@@ -2071,8 +2096,12 @@ export const AI_CALL = {
       FALLBACK_PROMPTS.topicDeduper(posts)
     )
 
-    const postsJson = JSON.stringify(posts)
-    const prompt = template.replace(/\{\{posts\}\}/g, postsJson)
+    // Format posts the same way as fallback (numbered list, not raw JSON)
+    const postsFormatted = posts.map((post, i) =>
+      `${i}. Title: ${post.title}\n   Description: ${post.description || 'No description'}\n   Full Article: ${post.full_article_text ? post.full_article_text.substring(0, 1500) + (post.full_article_text.length > 1500 ? '...' : '') : 'No full text available'}`
+    ).join('\n\n')
+
+    const prompt = template.replace(/\{\{posts\}\}/g, postsFormatted)
 
     return callAI(prompt, maxTokens, temperature, provider)
   },
