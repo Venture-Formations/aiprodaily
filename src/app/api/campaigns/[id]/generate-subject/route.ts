@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { supabaseAdmin } from '@/lib/supabase'
-import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
+import { AI_CALL } from '@/lib/openai'
 import { authOptions } from '@/lib/auth'
 
 interface RouteParams {
@@ -108,17 +108,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       skipped: topArticle.skipped
     })
 
-    // Generate subject line using AI with just the top article
-    // Add timestamp to prompt for variation each time
-    const variationPrompt = await AI_PROMPTS.subjectLineGenerator(topArticle) +
-      `\n\nGeneration timestamp: ${new Date().toISOString()} - Create a fresh, unique headline variation.`
-
-    console.log('=== FULL PROMPT BEING SENT TO AI ===')
-    console.log(variationPrompt)
-    console.log('=== END PROMPT ===')
-
-    // Use higher temperature for more creative variation
-    const result = await callOpenAI(variationPrompt, 1000, 0.8)
+    // Generate subject line using AI_CALL (handles prompt + provider + call)
+    const result = await AI_CALL.subjectLineGenerator(topArticle, 100, 0.8)
 
     console.log('=== AI RESPONSE ===')
     console.log(result)
@@ -142,12 +133,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (!subjectLine) {
       throw new Error('Empty subject line response from AI')
-    }
-
-    // Enforce character limit
-    if (subjectLine.length > 35) {
-      console.warn(`Subject line too long (${subjectLine.length} chars), truncating to 35`)
-      subjectLine = subjectLine.substring(0, 35).trim()
     }
 
     console.log(`Processed subject line: "${subjectLine}" (${subjectLine.length} chars)`)
