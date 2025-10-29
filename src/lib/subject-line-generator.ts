@@ -116,12 +116,6 @@ export async function generateSubjectLine(campaignId: string, userEmail?: string
       return { success: false, error: 'Empty subject line response from AI' }
     }
 
-    // Enforce character limit
-    if (subjectLine.length > 35) {
-      console.warn(`Subject line too long (${subjectLine.length} chars), truncating to 35`)
-      subjectLine = subjectLine.substring(0, 35).trim()
-    }
-
     // Update campaign with generated subject line
     const { error: updateError } = await supabaseAdmin
       .from('newsletter_campaigns')
