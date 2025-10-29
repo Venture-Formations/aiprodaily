@@ -120,6 +120,7 @@ export async function GET(request: NextRequest) {
       .from('rss_posts')
       .select('id, title, description, full_article_text, source_url, publication_date')
       .in('campaign_id', campaignIds)
+      .not('full_article_text', 'is', null)  // Exclude posts without full text
 
     // Exclude duplicate posts
     if (duplicatePostIds.length > 0) {
