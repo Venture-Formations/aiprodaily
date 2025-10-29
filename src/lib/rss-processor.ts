@@ -180,19 +180,6 @@ export class RSSProcessor {
 
       try {
         archiveResult = await this.archiveService.archiveCampaignArticles(campaignId, 'rss_processing_clear')
-
-        // Log specifically about position data preservation
-        if (archiveResult.archivedArticlesCount > 0) {
-          const { data: articlesWithPositions } = await supabaseAdmin
-            .from('articles')
-            .select('id, review_position, final_position')
-            .eq('campaign_id', campaignId)
-            .or('review_position.not.is.null,final_position.not.is.null')
-
-          if (articlesWithPositions && articlesWithPositions.length > 0) {
-            console.log(`📊 Preserved position data for ${articlesWithPositions.length} articles with tracking information`)
-          }
-        }
       } catch (archiveError) {
         // Archive failure shouldn't block RSS processing, but we should log it
         await this.errorHandler.logInfo('Archive failed but RSS processing continuing', {
@@ -204,37 +191,22 @@ export class RSSProcessor {
       // Clear previous articles and posts for this campaign to allow fresh processing
 
       // Delete existing articles for this campaign
-      const { error: articlesDeleteError } = await supabaseAdmin
+      await supabaseAdmin
         .from('articles')
         .delete()
         .eq('campaign_id', campaignId)
 
-      if (articlesDeleteError) {
-        console.warn('Warning: Failed to delete previous articles:', articlesDeleteError)
-      } else {
-      }
-
       // Delete existing secondary articles for this campaign
-      const { error: secondaryDeleteError } = await supabaseAdmin
+      await supabaseAdmin
         .from('secondary_articles')
         .delete()
         .eq('campaign_id', campaignId)
 
-      if (secondaryDeleteError) {
-        console.warn('Warning: Failed to delete previous secondary articles:', secondaryDeleteError)
-      } else {
-      }
-
       // Delete existing posts for this campaign
-      const { error: postsDeleteError } = await supabaseAdmin
+      await supabaseAdmin
         .from('rss_posts')
         .delete()
         .eq('campaign_id', campaignId)
-
-      if (postsDeleteError) {
-        console.warn('Warning: Failed to delete previous posts:', postsDeleteError)
-      } else {
-      }
 
       // Get active RSS feeds - separate primary and secondary
       const { data: allFeeds, error: feedsError } = await supabaseAdmin
@@ -297,11 +269,9 @@ export class RSSProcessor {
       }
 
       // Extract full article text for posts from past 24 hours (before AI processing)
-      // This gives us full content for better article generation and fact checking
       try {
         await this.enrichRecentPostsWithFullContent(campaignId)
       } catch (extractionError) {
-        console.error('Failed to extract full articles, but continuing with RSS summaries:', extractionError)
         // Don't fail the entire RSS processing if article extraction fails
       }
 
@@ -486,8 +456,6 @@ export class RSSProcessor {
       const needsPrompt = !existingPrompt || existingPrompt.length === 0
 
       if (needsApps || needsPrompt) {
-
-        // Get the first active newsletter (dynamic, not hardcoded to 'accounting')
         const { data: newsletter } = await supabaseAdmin
           .from('newsletters')
           .select('id, name, slug')
@@ -496,24 +464,13 @@ export class RSSProcessor {
           .single()
 
         if (newsletter) {
-
-          // Initialize AI Applications if needed
           if (needsApps) {
-            const selectedApps = await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
-          } else {
+            await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
           }
-
-          // Initialize Prompt Ideas if needed
           if (needsPrompt) {
-            const selectedPrompt = await PromptSelector.selectPromptForCampaign(campaignId)
-            if (selectedPrompt) {
-            }
-          } else {
+            await PromptSelector.selectPromptForCampaign(campaignId)
           }
-        } else {
-          console.warn('No active newsletter found, skipping AI content initialization')
         }
-      } else {
       }
     } catch (initError) {
       console.error('Error initializing campaign content:', initError)
@@ -680,7 +637,6 @@ export class RSSProcessor {
         .eq('id', feed.id)
 
     } catch (error) {
-      console.error(`Feed ${feed.name} failed`)
       throw error
     }
   }
@@ -733,7 +689,6 @@ export class RSSProcessor {
           if (typeof evaluation.interest_level !== 'number' ||
               typeof evaluation.local_relevance !== 'number' ||
               typeof evaluation.community_impact !== 'number') {
-            console.error(`AI returned non-numeric scores: interest=${evaluation.interest_level}, local=${evaluation.local_relevance}, impact=${evaluation.community_impact}`)
             throw new Error(`Invalid score types returned by AI`)
           }
 
@@ -764,21 +719,12 @@ export class RSSProcessor {
             .insert([ratingRecord])
 
           if (ratingError) {
-            console.error(`Failed to insert rating for post ${post.id}:`, ratingError)
             throw new Error(`Rating insert failed: ${ratingError.message}`)
           }
 
           return { success: true, post: post }
 
         } catch (error) {
-          console.error(`Error evaluating post ${post.id}:`, error)
-
-          // Log error to database
-          await this.logError(`Failed to evaluate post: ${post.title}`, {
-            postId: post.id,
-            error: error instanceof Error ? error.message : 'Unknown error'
-          })
-
           return { success: false, post: post, error }
         }
       })
@@ -846,7 +792,6 @@ export class RSSProcessor {
         const evaluator = AI_PROMPTS[evaluatorKey]
 
         if (typeof evaluator !== 'function') {
-          console.error(`No evaluator found for criterion ${criterion.number}`)
           continue
         }
 
@@ -874,7 +819,6 @@ export class RSSProcessor {
             score = parsed.score
             reason = parsed.reason || ''
           } catch (parseError) {
-            console.error(`Failed to parse criterion ${criterion.number} response:`, result.raw)
             throw new Error(`Invalid criterion ${criterion.number} response format`)
           }
         } else if (typeof result.score === 'number') {
@@ -886,7 +830,6 @@ export class RSSProcessor {
 
         // Validate score is a number between 0-10
         if (typeof score !== 'number' || score < 0 || score > 10) {
-          console.error(`Invalid score for criterion ${criterion.number}: ${score}`)
           throw new Error(`Criterion ${criterion.number} score must be between 0-10`)
         }
 
@@ -897,7 +840,6 @@ export class RSSProcessor {
         })
 
       } catch (error) {
-        console.error(`Error evaluating criterion ${criterion.number}:`, error)
         throw error
       }
     }
@@ -913,11 +855,6 @@ export class RSSProcessor {
 
     // For reference: normalized would be (totalWeightedScore / (totalWeight * 10)) * 100
     // But we want the raw weighted sum, not normalized
-    const maxPossibleScore = totalWeight * 10
-
-    // Combined evaluation logging on one line
-    const criteriaLog = criteriaScores.map((c, i) => `Criterion ${i + 1}: ${c.score}/10`).join('; ')
-    console.log(`${criteriaLog}; Total: ${totalWeightedScore} (max: ${maxPossibleScore})`)
 
     // Return evaluation in legacy format for backward compatibility
     // Store individual criteria scores in post_ratings table
@@ -992,7 +929,6 @@ export class RSSProcessor {
           .single()
 
         if (groupError) {
-          console.error('[DEDUP] Error creating group:', groupError)
           continue
         }
 
@@ -1001,7 +937,7 @@ export class RSSProcessor {
           for (const dupIndex of group.duplicate_indices) {
             const dupPost = allPosts[dupIndex]
             if (dupPost && dupPost.id !== primaryPost.id) {
-              const { error: dupError } = await supabaseAdmin
+              await supabaseAdmin
                 .from('duplicate_posts')
                 .insert([{
                   group_id: duplicateGroup.id,
@@ -1010,18 +946,13 @@ export class RSSProcessor {
                   detection_method: group.detection_method,
                   actual_similarity_score: group.similarity_score
                 }])
-
-              if (dupError) {
-                console.error('[DEDUP] Error marking duplicate:', dupError)
-              }
             }
           }
         }
       }
 
-
     } catch (error) {
-      console.error('[DEDUP] Error:', error)
+      // Silent failure
     }
   }
 
@@ -1063,17 +994,12 @@ export class RSSProcessor {
     const duplicatePostIds = new Set(duplicatePosts?.map(d => d.post_id) || [])
 
     if (queryError) {
-      console.error('Error fetching top posts:', queryError)
-      await this.logError('Error fetching top posts for article generation', { campaignId, queryError: queryError.message })
       return
     }
 
     if (!topPosts || topPosts.length === 0) {
-      await this.logInfo('No top posts found for article generation', { campaignId })
       return
     }
-
-    await this.logInfo(`Found ${topPosts.length} top posts for article generation`, { campaignId, topPostsCount: topPosts.length })
 
     const postsWithRatings = topPosts
       .filter(post =>
@@ -1088,12 +1014,7 @@ export class RSSProcessor {
       })
       // Generate articles for ALL non-duplicate posts, not just top 12
 
-    await this.logInfo(`${postsWithRatings.length} posts have ratings`, { campaignId, postsWithRatings: postsWithRatings.length })
-
     if (postsWithRatings.length === 0) {
-      console.log('No posts with ratings found - checking all posts with ratings')
-      await this.logInfo('No posts with ratings found - checking alternative query', { campaignId })
-
       // Try a simpler query to get posts with ratings
       const { data: allRatedPosts } = await supabaseAdmin
         .from('rss_posts')
@@ -1103,8 +1024,6 @@ export class RSSProcessor {
         `)
         .eq('campaign_id', campaignId)
         .not('post_ratings', 'is', null)
-
-      await this.logInfo(`Alternative query found ${allRatedPosts?.length || 0} posts with ratings`, { campaignId, alternativePostsCount: allRatedPosts?.length || 0 })
 
       if (allRatedPosts && allRatedPosts.length > 0) {
         // Use these posts instead, excluding duplicates and posts without full text
@@ -1124,8 +1043,6 @@ export class RSSProcessor {
       await this.processPostIntoArticle(post, campaignId, section)
     }
 
-    console.log(`${section} newsletter article generation complete`)
-
     // Auto-select top articles based on ratings (only for primary section)
     if (section === 'primary') {
       await this.selectTop5Articles(campaignId)
@@ -1139,7 +1056,6 @@ export class RSSProcessor {
 
   private async selectTop5Articles(campaignId: string) {
     try {
-
       // Get max_top_articles setting (defaults to 3)
       const { data: maxTopArticlesSetting } = await supabaseAdmin
         .from('app_settings')
@@ -1161,7 +1077,6 @@ export class RSSProcessor {
       lookbackDate.setHours(lookbackDate.getHours() - lookbackHours)
       const lookbackTimestamp = lookbackDate.toISOString()
 
-
       // Query ALL articles from the lookback window that haven't been used in sent newsletters
       // This gives us the best articles regardless of which campaign they were originally processed for
       const { data: availableArticles, error } = await supabaseAdmin
@@ -1181,15 +1096,12 @@ export class RSSProcessor {
         .is('final_position', null)  // Only articles NOT used in sent newsletters
 
       if (error) {
-        console.error('Failed to fetch articles from lookback window:', error)
         return
       }
 
       if (!availableArticles || availableArticles.length === 0) {
-        console.error(`❌ No unused articles found in ${lookbackHours}-hour lookback window`)
         return
       }
-
 
       // Sort ALL available articles by rating (highest first) and take the top N
       const sortedArticles = availableArticles
@@ -1202,20 +1114,15 @@ export class RSSProcessor {
         .sort((a, b) => b.score - a.score)
         .slice(0, finalArticleCount)
 
-
       if (sortedArticles.length === 0) {
-        console.error('❌ No articles available for selection after filtering')
         return
-      }
-
-      if (sortedArticles.length < finalArticleCount) {
       }
 
       // Update all selected articles to belong to current campaign and activate them
       for (let i = 0; i < sortedArticles.length; i++) {
         const article = sortedArticles[i]
 
-        const { error: updateError } = await supabaseAdmin
+        await supabaseAdmin
           .from('articles')
           .update({
             campaign_id: campaignId,
@@ -1223,12 +1130,6 @@ export class RSSProcessor {
             rank: i + 1  // Rank 1, 2, 3...
           })
           .eq('id', article.id)
-
-        if (updateError) {
-          console.error(`Failed to activate article ${article.id}:`, updateError)
-        } else {
-          const wasFromDifferentCampaign = article.current_campaign_id !== campaignId
-        }
       }
 
       // Generate subject line using the top-ranked article
@@ -1242,8 +1143,6 @@ export class RSSProcessor {
 
   private async selectTopSecondaryArticles(campaignId: string) {
     try {
-      console.log('Selecting top secondary articles for campaign (from lookback window):', campaignId)
-
       // Get max_secondary_articles setting (defaults to 3)
       const { data: maxSecondaryArticlesSetting } = await supabaseAdmin
         .from('app_settings')
@@ -1252,7 +1151,6 @@ export class RSSProcessor {
         .single()
 
       const finalArticleCount = maxSecondaryArticlesSetting ? parseInt(maxSecondaryArticlesSetting.value) : 3
-      console.log(`Max secondary articles setting: ${finalArticleCount}`)
 
       // Get lookback hours setting (defaults to 36 hours for secondary)
       const { data: lookbackSetting } = await supabaseAdmin
@@ -1265,7 +1163,6 @@ export class RSSProcessor {
       const lookbackDate = new Date()
       lookbackDate.setHours(lookbackDate.getHours() - lookbackHours)
       const lookbackTimestamp = lookbackDate.toISOString()
-
 
       // Query ALL secondary articles from the lookback window that haven't been used in sent newsletters
       const { data: availableArticles, error } = await supabaseAdmin
@@ -1285,15 +1182,12 @@ export class RSSProcessor {
         .is('final_position', null)  // Only articles NOT used in sent newsletters
 
       if (error) {
-        console.error('Failed to fetch secondary articles from lookback window:', error)
         return
       }
 
       if (!availableArticles || availableArticles.length === 0) {
-        console.error(`❌ No unused secondary articles found in ${lookbackHours}-hour lookback window`)
         return
       }
-
 
       // Sort ALL available articles by rating (highest first) and take the top N
       const sortedArticles = availableArticles
@@ -1306,20 +1200,15 @@ export class RSSProcessor {
         .sort((a, b) => b.score - a.score)
         .slice(0, finalArticleCount)
 
-
       if (sortedArticles.length === 0) {
-        console.error('❌ No secondary articles available for selection after filtering')
         return
-      }
-
-      if (sortedArticles.length < finalArticleCount) {
       }
 
       // Update all selected articles to belong to current campaign and activate them
       for (let i = 0; i < sortedArticles.length; i++) {
         const article = sortedArticles[i]
 
-        const { error: updateError } = await supabaseAdmin
+        await supabaseAdmin
           .from('secondary_articles')
           .update({
             campaign_id: campaignId,
@@ -1327,12 +1216,6 @@ export class RSSProcessor {
             rank: i + 1  // Rank 1, 2, 3...
           })
           .eq('id', article.id)
-
-        if (updateError) {
-          console.error(`Failed to activate secondary article ${article.id}:`, updateError)
-        } else {
-          const wasFromDifferentCampaign = article.current_campaign_id !== campaignId
-        }
       }
 
     } catch (error) {
@@ -1341,9 +1224,6 @@ export class RSSProcessor {
   }
   private async processArticleImages(campaignId: string) {
     try {
-
-      // Log that image processing function is running
-
       // Get active articles with their RSS post image URLs
       const { data: articles, error } = await supabaseAdmin
         .from('articles')
@@ -1359,28 +1239,15 @@ export class RSSProcessor {
         .eq('is_active', true)
 
       if (error || !articles) {
-        console.error('Failed to fetch active articles for image processing:', error)
-        await this.logError('Failed to fetch active articles for image processing', { campaignId, error: error?.message })
         return
       }
 
-
-      // Log details about each article
-      articles.forEach((article: any, index: number) => {
-        const rssPost = Array.isArray(article.rss_post) ? article.rss_post[0] : article.rss_post
-      })
-
       // Process images for each article
-      let downloadCount = 0
-      let skipCount = 0
-      let errorCount = 0
-
       for (const article of articles) {
         try {
           const rssPost = Array.isArray(article.rss_post) ? article.rss_post[0] : article.rss_post
 
           if (!rssPost?.image_url) {
-            skipCount++
             continue
           }
 
@@ -1388,7 +1255,6 @@ export class RSSProcessor {
 
           // Skip if already a GitHub URL
           if (originalImageUrl.includes('github.com') || originalImageUrl.includes('githubusercontent.com')) {
-            skipCount++
             continue
           }
 
@@ -1401,30 +1267,15 @@ export class RSSProcessor {
               .from('rss_posts')
               .update({ image_url: githubUrl })
               .eq('id', rssPost.id)
-
-            downloadCount++
-          } else {
-            console.error(`Failed to upload image to GitHub for article ${article.id}`)
-            errorCount++
           }
 
         } catch (error) {
-          console.error(`Error processing image for article ${article.id}:`, error)
-          errorCount++
+          // Silent failure
         }
       }
 
-      console.log(`Image processing complete: ${downloadCount} uploaded to GitHub, ${skipCount} skipped (already hosted), ${errorCount} errors`)
-      await this.logInfo(`Image processing complete: ${downloadCount} uploaded to GitHub, ${skipCount} skipped, ${errorCount} errors`, {
-        campaignId,
-        downloadCount,
-        skipCount,
-        errorCount
-      })
-
     } catch (error) {
-      console.error('Error in processArticleImages:', error)
-      await this.logError('Error in processArticleImages', { campaignId, error: error instanceof Error ? error.message : 'Unknown error' })
+      // Silent failure
     }
   }
 
@@ -1453,12 +1304,8 @@ export class RSSProcessor {
           word_count: content.word_count
         }])
 
-      if (error) {
-        console.error(`Error inserting article for post ${post.id}:`, error)
-      }
-
     } catch (error) {
-      console.error(`Error generating article for post ${post.id}:`, error)
+      // Silent failure
     }
   }
 
@@ -1545,7 +1392,6 @@ export class RSSProcessor {
   }
 
   async generateWelcomeSection(campaignId: string): Promise<string> {
-
     try {
       // Fetch ALL active PRIMARY articles for this campaign
       const { data: primaryArticles, error: primaryError } = await supabaseAdmin
@@ -1556,7 +1402,6 @@ export class RSSProcessor {
         .order('rank', { ascending: true })
 
       if (primaryError) {
-        console.error('[RSS] Error fetching primary articles for welcome:', primaryError)
         throw primaryError
       }
 
@@ -1569,7 +1414,6 @@ export class RSSProcessor {
         .order('rank', { ascending: true })
 
       if (secondaryError) {
-        console.error('[RSS] Error fetching secondary articles for welcome:', secondaryError)
         throw secondaryError
       }
 
@@ -1583,18 +1427,8 @@ export class RSSProcessor {
         return ''
       }
 
-
       // Generate welcome text using AI
       const promptOrResult = await AI_PROMPTS.welcomeSection(allArticles)
-
-      // DEBUG: Log what we received
-      console.log('[RSS] promptOrResult type:', typeof promptOrResult)
-      console.log('[RSS] promptOrResult is object:', typeof promptOrResult === 'object' && promptOrResult !== null)
-      if (typeof promptOrResult === 'object' && promptOrResult !== null) {
-        console.log('[RSS] promptOrResult keys:', Object.keys(promptOrResult))
-        console.log('[RSS] has intro:', 'intro' in promptOrResult)
-        console.log('[RSS] has raw:', 'raw' in promptOrResult)
-      }
 
       // Parse JSON response to extract intro, tagline, and summary
       let welcomeIntro = ''
@@ -1605,30 +1439,21 @@ export class RSSProcessor {
         // Check if promptOrResult is already a parsed JSON object with intro/tagline/summary
         if (typeof promptOrResult === 'object' && promptOrResult !== null &&
             ('intro' in promptOrResult || 'tagline' in promptOrResult || 'summary' in promptOrResult)) {
-          // Already parsed JSON from structured prompt
-          console.log('[RSS] Using structured prompt result directly')
           welcomeIntro = (promptOrResult as any).intro || ''
           welcomeTagline = (promptOrResult as any).tagline || ''
           welcomeSummary = (promptOrResult as any).summary || ''
         } else if (typeof promptOrResult === 'object' && promptOrResult !== null && 'raw' in promptOrResult) {
-          // Got {raw: content} - need to parse the raw JSON string
-          console.log('[RSS] Parsing raw JSON response')
           const rawContent = (promptOrResult as any).raw
           const welcomeJson = JSON.parse(rawContent)
           welcomeIntro = welcomeJson.intro || ''
           welcomeTagline = welcomeJson.tagline || ''
           welcomeSummary = welcomeJson.summary || ''
         } else if (typeof promptOrResult === 'string') {
-          // Plain text prompt - need to call OpenAI
-          console.log('[RSS] Calling OpenAI with plain text prompt')
           const welcomeText = await callOpenAI(promptOrResult, 500, 0.8)
           const finalWelcomeText = typeof welcomeText === 'string'
             ? welcomeText.trim()
             : (welcomeText.text || welcomeText.raw || '').trim()
 
-          console.log('[RSS] Welcome section generated (length:', finalWelcomeText.length, ')')
-
-          // Parse JSON from the text response
           const welcomeJson = JSON.parse(finalWelcomeText)
           welcomeIntro = welcomeJson.intro || ''
           welcomeTagline = welcomeJson.tagline || ''
@@ -1636,14 +1461,7 @@ export class RSSProcessor {
         } else {
           throw new Error('Unexpected promptOrResult format')
         }
-
-        console.log('[RSS] Parsed welcome JSON - intro:', welcomeIntro.length, 'tagline:', welcomeTagline.length, 'summary:', welcomeSummary.length)
       } catch (parseError) {
-        console.error('[RSS] Failed to parse welcome JSON:', parseError)
-        console.error('[RSS] promptOrResult preview:', typeof promptOrResult === 'string'
-          ? promptOrResult.substring(0, 200)
-          : JSON.stringify(promptOrResult).substring(0, 200))
-        // Fallback: use entire text as summary if JSON parsing fails
         welcomeSummary = typeof promptOrResult === 'string' ? promptOrResult : JSON.stringify(promptOrResult)
       }
 
@@ -1658,15 +1476,11 @@ export class RSSProcessor {
         .eq('id', campaignId)
 
       if (updateError) {
-        console.error('[RSS] Error saving welcome section:', updateError)
         throw updateError
       }
 
-      // Return combined welcome text for logging/debugging
       return `${welcomeIntro} ${welcomeTagline} ${welcomeSummary}`.trim()
     } catch (error) {
-      console.error('[RSS] Failed to generate welcome section:', error)
-      // Don't fail the entire process if welcome fails
       return ''
     }
   }
@@ -1695,7 +1509,6 @@ export class RSSProcessor {
 
   async generateSubjectLineForCampaign(campaignId: string) {
     try {
-
       // Get the campaign with its articles for subject line generation
       const { data: campaignWithArticles, error: campaignError } = await supabaseAdmin
         .from('newsletter_campaigns')
@@ -1717,13 +1530,11 @@ export class RSSProcessor {
         .single()
 
       if (campaignError || !campaignWithArticles) {
-        console.error('Failed to fetch campaign for subject generation:', campaignError)
         throw new Error(`Campaign not found: ${campaignError?.message}`)
       }
 
       // Check if subject line already exists
       if (campaignWithArticles.subject_line && campaignWithArticles.subject_line.trim()) {
-        console.log('Subject line already exists:', campaignWithArticles.subject_line)
         return
       }
 
@@ -1737,15 +1548,11 @@ export class RSSProcessor {
         }) || []
 
       if (activeArticles.length === 0) {
-        console.log('No active articles found for subject line generation')
         return
       }
 
       // Use the highest scored article for subject line generation
       const topArticle = activeArticles[0] as any
-      console.log(`Using top article for subject line generation:`)
-      console.log(`- Headline: ${topArticle.headline}`)
-      console.log(`- AI Score: ${topArticle.rss_post?.post_rating?.[0]?.total_score || 0}`)
 
       // Generate subject line using AI
       const timestamp = new Date().toISOString()
@@ -1767,7 +1574,6 @@ export class RSSProcessor {
 
       if (generatedSubject && generatedSubject.trim()) {
         generatedSubject = generatedSubject.trim()
-        console.log('Generated subject line:', generatedSubject)
 
         // Update campaign with generated subject line
         const { error: updateError } = await supabaseAdmin
@@ -1779,22 +1585,13 @@ export class RSSProcessor {
           .eq('id', campaignId)
 
         if (updateError) {
-          console.error('Failed to update campaign with subject line:', updateError)
           throw updateError
-        } else {
-          console.log('Successfully updated campaign with AI-generated subject line')
         }
       } else {
-        console.error('AI failed to generate subject line - empty response')
         throw new Error('AI returned empty subject line')
       }
 
     } catch (error) {
-      console.error('Subject line generation failed:', error)
-      await this.logError('Failed to generate subject line for campaign', {
-        campaignId,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      })
       // Don't throw error - continue with RSS processing even if subject generation fails
     }
   }
