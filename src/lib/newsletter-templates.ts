@@ -212,7 +212,7 @@ export async function generateNewsletterHeader(formattedDate: string, campaignDa
      <div style='width:100%;max-width:750px;margin:0 auto;padding:0px;'>
        <table width='100%' cellpadding='0' cellspacing='0' style='font-family:Arial,sans-serif;'>
          <tr>
-           <td align='center' style='padding:0;'>
+           <td align='center' style='padding:0; background:${primaryColor}; border-radius: 10px;'>
              <img alt='${newsletterName}' src='${headerImageUrl}' style='display:block;width:100%;max-width:500px;height:auto;margin:0 auto;'/>
            </td>
          </tr>
