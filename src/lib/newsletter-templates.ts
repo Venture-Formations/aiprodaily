@@ -324,7 +324,7 @@ export async function generateWelcomeSection(
   return `
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
   <tr>
-    <td style="padding: 20px;">
+    <td style="padding: 10px;">
       ${introPart}
       ${taglinePart}
       ${summaryPart}
@@ -370,7 +370,7 @@ export async function generatePrimaryArticlesSection(articles: any[], campaignDa
     </td>
   </tr>
   <tr>
-    <td style="padding: 0 20px 20px 20px;">
+    <td style="padding: 0 10px 10px 10px;">
       ${articlesHtml}
     </td>
   </tr>
@@ -432,7 +432,7 @@ export async function generateSecondaryArticlesSection(campaign: any, sectionNam
     </td>
   </tr>
   <tr>
-    <td style="padding: 0 20px 20px 20px;">
+    <td style="padding: 0 10px 10px 10px;">
       ${articlesHtml}
     </td>
   </tr>
@@ -830,9 +830,9 @@ export async function generateCommunityBusinessSpotlightSection(campaign: any, r
   <tr class='row'>
     <td class='column' style='padding:8px; vertical-align: top;'>
       <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: ${bodyFont}; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
-        <tr><td style='padding: 12px 12px 4px; font-size: 20px; font-weight: bold;'>${selectedAd.title}</td></tr>
+        <tr><td style='padding: 10px 10px 4px; font-size: 20px; font-weight: bold;'>${selectedAd.title}</td></tr>
         ${imageHtml}
-        <tr><td style='padding: 0 12px 20px;'>${selectedAd.body}${businessUrl !== '#' ? ` (<a href='${trackedUrl}' style='color: #0080FE; text-decoration: none;'>visit website</a>)` : ''}</td></tr>
+        <tr><td style='padding: 0 10px 10px;'>${selectedAd.body}${businessUrl !== '#' ? ` (<a href='${trackedUrl}' style='color: #0080FE; text-decoration: none;'>visit website</a>)` : ''}</td></tr>
       </table>
     </td>
   </tr>
@@ -923,8 +923,8 @@ export async function generateBreakingNewsSection(campaign: any): Promise<string
 <tr class='row'>
   <td class='column' style='padding:8px; vertical-align: top;'>
     <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: ${bodyFont}; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
-      <tr><td style='padding: 12px 12px 4px; font-size: 20px; font-weight: bold;'>${emoji} <a href='${trackedUrl}' style='color: #000; text-decoration: underline;'>${title}</a></td></tr>
-      <tr><td style='padding: 0 12px 20px;'>${summary}</td></tr>
+      <tr><td style='padding: 10px 10px 4px; font-size: 20px; font-weight: bold;'>${emoji} <a href='${trackedUrl}' style='color: #000; text-decoration: underline;'>${title}</a></td></tr>
+      <tr><td style='padding: 0 10px 10px;'>${summary}</td></tr>
     </table>
   </td>
 </tr>`
@@ -1000,8 +1000,8 @@ export async function generateBeyondTheFeedSection(campaign: any): Promise<strin
 <tr class='row'>
   <td class='column' style='padding:8px; vertical-align: top;'>
     <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: ${bodyFont}; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
-      <tr><td style='padding: 12px 12px 4px; font-size: 20px; font-weight: bold;'>${emoji} <a href='${trackedUrl}' style='color: #000; text-decoration: underline;'>${title}</a></td></tr>
-      <tr><td style='padding: 0 12px 20px;'>${summary}</td></tr>
+      <tr><td style='padding: 10px 10px 4px; font-size: 20px; font-weight: bold;'>${emoji} <a href='${trackedUrl}' style='color: #000; text-decoration: underline;'>${title}</a></td></tr>
+      <tr><td style='padding: 0 10px 10px;'>${summary}</td></tr>
     </table>
   </td>
 </tr>`
@@ -1101,7 +1101,7 @@ export async function generateAIAppsSection(campaign: any): Promise<string> {
     </td>
   </tr>
   <tr>
-    <td style="padding: 0 20px 20px 20px;">
+    <td style="padding: 0 10px 10px 10px;">
       ${appsHtml}
     </td>
   </tr>
@@ -1150,9 +1150,9 @@ export async function generatePromptIdeasSection(campaign: any): Promise<string>
   <tr class='row'>
     <td class='column' style='padding:8px; vertical-align: top;'>
       <table width='100%' cellpadding='0' cellspacing='0' style='font-family: ${bodyFont}; font-size: 16px; line-height: 26px;'>
-        <tr><td style='padding: 12px 12px 8px; font-size: 20px; font-weight: bold; text-align: center;'>${prompt.title}</td></tr>
+        <tr><td style='padding: 10px 10px 8px; font-size: 20px; font-weight: bold; text-align: center;'>${prompt.title}</td></tr>
         <tr>
-          <td align='center' style='padding: 0 12px 12px;'>
+          <td align='center' style='padding: 0 10px 10px;'>
             <table width="100%" cellpadding='0' cellspacing='0' style='max-width: 550px; margin: 0 auto;'>
               <tr>
                 <td bgcolor="#000000" style='background-color: #000000; color: #00FF00; padding: 16px; border-radius: 6px; border: 2px solid #333; font-family: Courier New, Courier, monospace; font-size: 14px; line-height: 22px; text-align: left;'>${formattedPromptText}</td>
