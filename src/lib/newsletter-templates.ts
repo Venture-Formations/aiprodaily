@@ -366,7 +366,7 @@ export async function generatePrimaryArticlesSection(articles: any[], campaignDa
   return `
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
   <tr>
-    <td style="padding: 16px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+    <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
       <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">${sectionName}</h2>
     </td>
   </tr>
@@ -428,7 +428,7 @@ export async function generateSecondaryArticlesSection(campaign: any, sectionNam
   return `
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
   <tr>
-    <td style="padding: 16px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+    <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
       <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">${sectionName}</h2>
     </td>
   </tr>
@@ -605,7 +605,7 @@ export async function generateLocalEventsSection(campaign: any): Promise<string>
   return `
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7; font-family: ${bodyFont};">
   <tr>
-    <td style="padding: 16px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+    <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
       <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Local Events</h2>
     </td>
   </tr><tr class="row">${dayColumns}
@@ -662,7 +662,7 @@ export async function generateWordleSection(campaign: any): Promise<string> {
     return `
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7; font-family: Arial, sans-serif;">
   <tr>
-    <td style="padding: 16px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+    <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
       <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Yesterday's Wordle</h2>
     </td>
   </tr>
@@ -824,7 +824,7 @@ export async function generateCommunityBusinessSpotlightSection(campaign: any, r
     return `
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7;">
   <tr>
-    <td style="padding: 16px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+    <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
       <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Community Business Spotlight</h2>
     </td>
   </tr>
@@ -934,7 +934,7 @@ export async function generateBreakingNewsSection(campaign: any): Promise<string
     return `
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7;">
   <tr>
-    <td style="padding: 16px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+    <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
       <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Breaking News</h2>
     </td>
   </tr>
@@ -1011,7 +1011,7 @@ export async function generateBeyondTheFeedSection(campaign: any): Promise<strin
     return `
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7;">
   <tr>
-    <td style="padding: 16px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+    <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
       <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Beyond the Feed</h2>
     </td>
   </tr>
@@ -1097,7 +1097,7 @@ export async function generateAIAppsSection(campaign: any): Promise<string> {
     return `
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
   <tr>
-    <td style="padding: 16px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+    <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
       <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">AI Applications</h2>
     </td>
   </tr>
@@ -1144,7 +1144,7 @@ export async function generatePromptIdeasSection(campaign: any): Promise<string>
     return `
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
   <tr>
-    <td style="padding: 16px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+    <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
       <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Prompt Ideas</h2>
     </td>
   </tr>
