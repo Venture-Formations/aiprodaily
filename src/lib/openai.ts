@@ -2048,7 +2048,7 @@ export const AI_CALL = {
 
     const prompt = template
       .replace(/\{\{headline\}\}/g, top_article.headline)
-      .replace(/\{\{content\}\}/g, top_article.content.substring(0, 200) + '...')
+      .replace(/\{\{content\}\}/g, top_article.content)
 
     return callAI(prompt, maxTokens, temperature, provider)
   },
