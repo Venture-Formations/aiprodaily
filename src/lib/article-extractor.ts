@@ -14,7 +14,7 @@ export class ArticleExtractor {
   private readonly USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
   /**
-   * Extract full article text from a URL using Readability.js
+   * Extract full article text from a URL using Readability.js with Jina AI fallback
    * @param url - The article URL to extract content from
    * @param maxRetries - Maximum number of retry attempts (default: 1)
    * @returns ArticleExtractionResult with extracted content or error
@@ -22,10 +22,10 @@ export class ArticleExtractor {
   async extractArticle(url: string, maxRetries: number = 1): Promise<ArticleExtractionResult> {
     let lastError: string | undefined
 
+    // Attempt 1: Try Readability method (fast, works for most sites)
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       if (attempt > 0) {
-        console.log(`Retry attempt ${attempt} for: ${url}`)
-        // Wait 2 seconds before retry
+        console.log(`[Extract] Readability retry ${attempt} for: ${url}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
       }
 
@@ -33,19 +33,38 @@ export class ArticleExtractor {
         const result = await this.fetchAndExtract(url)
 
         if (result.success) {
+          console.log(`[Extract] ✓ Readability succeeded: ${url}`)
           return result
         }
 
         lastError = result.error
       } catch (error) {
         lastError = error instanceof Error ? error.message : 'Unknown error'
-        console.error(`Extraction attempt ${attempt + 1} failed for ${url}:`, lastError)
+        console.error(`[Extract] Readability attempt ${attempt + 1} failed:`, lastError)
       }
+    }
+
+    // Attempt 2: Try Jina AI Reader fallback (handles JS, paywalls)
+    console.log(`[Extract] Readability failed, trying Jina AI fallback: ${url}`)
+    try {
+      const jinaResult = await this.extractWithJina(url)
+
+      if (jinaResult.success) {
+        console.log(`[Extract] ✓ Jina AI succeeded: ${url}`)
+        return jinaResult
+      }
+
+      console.log(`[Extract] Jina AI failed: ${jinaResult.error}`)
+      lastError = `Readability failed, Jina AI failed: ${jinaResult.error}`
+    } catch (error) {
+      const jinaError = error instanceof Error ? error.message : 'Unknown error'
+      console.error(`[Extract] Jina AI error:`, jinaError)
+      lastError = `Readability failed, Jina AI error: ${jinaError}`
     }
 
     return {
       success: false,
-      error: lastError || 'Extraction failed after retries'
+      error: lastError || 'All extraction methods failed'
     }
   }
 
@@ -128,6 +147,85 @@ export class ArticleExtractor {
         return { success: false, error: error.message }
       }
       return { success: false, error: 'Unknown error during extraction' }
+    }
+  }
+
+  /**
+   * Extract article using Jina AI Reader API (fallback method)
+   * Handles JS-rendered content and bypasses some paywalls
+   * @param url - The article URL to extract
+   * @returns ArticleExtractionResult
+   */
+  private async extractWithJina(url: string): Promise<ArticleExtractionResult> {
+    try {
+      // Jina AI Reader: prefix URL with https://r.jina.ai/
+      const jinaUrl = `https://r.jina.ai/${encodeURIComponent(url)}`
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT_MS)
+
+      const response = await fetch(jinaUrl, {
+        signal: controller.signal,
+        headers: {
+          'Accept': 'text/plain',
+          'User-Agent': this.USER_AGENT,
+        }
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: `Jina API HTTP ${response.status}`
+        }
+      }
+
+      // Jina returns markdown text
+      const markdown = await response.text()
+
+      if (!markdown || markdown.length < 200) {
+        return {
+          success: false,
+          error: `Jina returned short content (${markdown.length} chars)`
+        }
+      }
+
+      // Extract title from first line (usually # Title format)
+      const lines = markdown.split('\n')
+      const titleLine = lines.find(line => line.startsWith('# '))
+      const title = titleLine ? titleLine.replace('# ', '').trim() : undefined
+
+      // Remove markdown formatting for plain text
+      const fullText = markdown
+        .replace(/^#+\s+/gm, '') // Remove headers
+        .replace(/\*\*/g, '') // Remove bold
+        .replace(/\*/g, '') // Remove italic
+        .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // Remove links
+        .trim()
+
+      if (!fullText || fullText.length < 200) {
+        return {
+          success: false,
+          error: `Jina text too short after cleanup (${fullText.length} chars)`
+        }
+      }
+
+      return {
+        success: true,
+        fullText,
+        title,
+        excerpt: fullText.substring(0, 200) + '...'
+      }
+
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          return { success: false, error: 'Jina request timeout' }
+        }
+        return { success: false, error: `Jina error: ${error.message}` }
+      }
+      return { success: false, error: 'Jina unknown error' }
     }
   }
 
