@@ -189,7 +189,7 @@ export async function generateNewsletterHeader(formattedDate: string, campaignDa
 <body style='margin:0!important;padding:0!important;background-color:#f7f7f7;'>
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#f7f7f7" style="background-color:#f7f7f7;">
   <tr>
-    <td class="email-wrapper" style="padding:0 2px;">
+    <td align="center" style="padding:0 2px;">
      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
        <tr>
          <td style="font-weight:bold;font-family:Arial,sans-serif;padding:5px 0;">
