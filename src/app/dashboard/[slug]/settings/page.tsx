@@ -2154,7 +2154,8 @@ function AIPromptsSettings() {
   const [expandedPrompt, setExpandedPrompt] = useState<string | null>(null)
   const [editingPrompt, setEditingPrompt] = useState<{key: string, value: string, ai_provider: string} | null>(null)
   const [editingWeight, setEditingWeight] = useState<{key: string, value: string} | null>(null)
-  const [editingName, setEditingName] = useState<{number: number, value: string} | null>(null)
+  const [editingPrimaryName, setEditingPrimaryName] = useState<{number: number, value: string} | null>(null)
+  const [editingSecondaryName, setEditingSecondaryName] = useState<{number: number, value: string} | null>(null)
   const [rssPosts, setRssPosts] = useState<any[]>([])
   const [selectedRssPost, setSelectedRssPost] = useState<string>('')
   const [loadingRssPosts, setLoadingRssPosts] = useState(false)
@@ -2565,16 +2566,17 @@ function AIPromptsSettings() {
     }
   }
 
-  const handleNameEdit = (criteriaNumber: number, currentName: string) => {
-    setEditingName({ number: criteriaNumber, value: currentName })
+  // Primary criteria name handlers
+  const handlePrimaryNameEdit = (criteriaNumber: number, currentName: string) => {
+    setEditingPrimaryName({ number: criteriaNumber, value: currentName })
   }
 
-  const handleNameCancel = () => {
-    setEditingName(null)
+  const handlePrimaryNameCancel = () => {
+    setEditingPrimaryName(null)
   }
 
-  const handleNameSave = async (criteriaNumber: number) => {
-    if (!editingName || editingName.number !== criteriaNumber) return
+  const handlePrimaryNameSave = async (criteriaNumber: number) => {
+    if (!editingPrimaryName || editingPrimaryName.number !== criteriaNumber) return
 
     setSaving(`criteria_${criteriaNumber}_name`)
     setMessage('')
@@ -2586,13 +2588,56 @@ function AIPromptsSettings() {
         body: JSON.stringify({
           action: 'update_name',
           criteriaNumber,
-          name: editingName.value
+          name: editingPrimaryName.value
         })
       })
 
       if (response.ok) {
         setMessage('Criteria name updated successfully!')
-        setEditingName(null)
+        setEditingPrimaryName(null)
+        await loadCriteria()
+        await loadPrompts()
+        setTimeout(() => setMessage(''), 3000)
+      } else {
+        throw new Error('Failed to update name')
+      }
+    } catch (error) {
+      setMessage('Error: Failed to update criteria name')
+      setTimeout(() => setMessage(''), 5000)
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  // Secondary criteria name handlers
+  const handleSecondaryNameEdit = (criteriaNumber: number, currentName: string) => {
+    setEditingSecondaryName({ number: criteriaNumber, value: currentName })
+  }
+
+  const handleSecondaryNameCancel = () => {
+    setEditingSecondaryName(null)
+  }
+
+  const handleSecondaryNameSave = async (criteriaNumber: number) => {
+    if (!editingSecondaryName || editingSecondaryName.number !== criteriaNumber) return
+
+    setSaving(`criteria_${criteriaNumber}_name`)
+    setMessage('')
+
+    try {
+      const response = await fetch('/api/settings/criteria', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_name',
+          criteriaNumber,
+          name: editingSecondaryName.value
+        })
+      })
+
+      if (response.ok) {
+        setMessage('Criteria name updated successfully!')
+        setEditingSecondaryName(null)
         await loadCriteria()
         await loadPrompts()
         setTimeout(() => setMessage(''), 3000)
@@ -2955,7 +3000,7 @@ function AIPromptsSettings() {
             const isEditing = editingPrompt?.key === promptKey
             const isSaving = saving === promptKey
             const isEditingWeight = editingWeight?.key === promptKey
-            const isEditingCriteriaName = editingName?.number === criterion.number
+            const isEditingCriteriaName = editingPrimaryName?.number === criterion.number
 
             return (
               <div key={criterion.number} className="p-6">
@@ -2968,20 +3013,20 @@ function AIPromptsSettings() {
                         <>
                           <input
                             type="text"
-                            value={editingName?.value || ''}
-                            onChange={(e) => setEditingName({ number: criterion.number, value: e.target.value })}
+                            value={editingPrimaryName?.value || ''}
+                            onChange={(e) => setEditingPrimaryName({ number: criterion.number, value: e.target.value })}
                             className="px-2 py-1 border border-gray-300 rounded text-sm flex-1 max-w-xs"
                             placeholder="Enter criteria name"
                           />
                           <button
-                            onClick={() => handleNameSave(criterion.number)}
+                            onClick={() => handlePrimaryNameSave(criterion.number)}
                             disabled={saving === `criteria_${criterion.number}_name`}
                             className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
                           >
                             {saving === `criteria_${criterion.number}_name` ? 'Saving...' : 'Save'}
                           </button>
                           <button
-                            onClick={handleNameCancel}
+                            onClick={handlePrimaryNameCancel}
                             disabled={saving === `criteria_${criterion.number}_name`}
                             className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50"
                           >
@@ -3001,7 +3046,7 @@ function AIPromptsSettings() {
                             </span>
                           )}
                           <button
-                            onClick={() => handleNameEdit(criterion.number, criterion.name)}
+                            onClick={() => handlePrimaryNameEdit(criterion.number, criterion.name)}
                             className="text-xs text-blue-600 hover:text-blue-800"
                           >
                             Edit Name
@@ -3253,7 +3298,7 @@ function AIPromptsSettings() {
             const isEditing = editingPrompt?.key === promptKey
             const isSaving = saving === promptKey
             const isEditingWeight = editingWeight?.key === promptKey
-            const isEditingCriteriaName = editingName?.number === criterion.number
+            const isEditingCriteriaName = editingSecondaryName?.number === criterion.number
 
             if (!prompt) return null
 
@@ -3268,20 +3313,20 @@ function AIPromptsSettings() {
                         <>
                           <input
                             type="text"
-                            value={editingName?.value || ''}
-                            onChange={(e) => setEditingName({ number: criterion.number, value: e.target.value })}
+                            value={editingSecondaryName?.value || ''}
+                            onChange={(e) => setEditingSecondaryName({ number: criterion.number, value: e.target.value })}
                             className="px-2 py-1 border border-gray-300 rounded text-sm flex-1 max-w-xs"
                             placeholder="Enter criteria name"
                           />
                           <button
-                            onClick={() => handleNameSave(criterion.number)}
+                            onClick={() => handleSecondaryNameSave(criterion.number)}
                             disabled={saving === `criteria_${criterion.number}_name`}
                             className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
                           >
                             {saving === `criteria_${criterion.number}_name` ? 'Saving...' : 'Save'}
                           </button>
                           <button
-                            onClick={handleNameCancel}
+                            onClick={handleSecondaryNameCancel}
                             disabled={saving === `criteria_${criterion.number}_name`}
                             className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50"
                           >
@@ -3301,7 +3346,7 @@ function AIPromptsSettings() {
                             </span>
                           )}
                           <button
-                            onClick={() => handleNameEdit(criterion.number, criterion.name)}
+                            onClick={() => handleSecondaryNameEdit(criterion.number, criterion.name)}
                             className="text-xs text-blue-600 hover:text-blue-800"
                           >
                             Edit Name
