@@ -1076,7 +1076,11 @@ export class RSSProcessor {
     await this.logInfo(`Found ${topPosts.length} top posts for article generation`, { campaignId, topPostsCount: topPosts.length })
 
     const postsWithRatings = topPosts
-      .filter(post => post.post_ratings?.[0] && !duplicatePostIds.has(post.id)) // Exclude duplicates
+      .filter(post =>
+        post.post_ratings?.[0] &&
+        !duplicatePostIds.has(post.id) &&
+        post.full_article_text  // Exclude posts without full text
+      )
       .sort((a, b) => {
         const scoreA = a.post_ratings?.[0]?.total_score || 0
         const scoreB = b.post_ratings?.[0]?.total_score || 0
@@ -1103,8 +1107,11 @@ export class RSSProcessor {
       await this.logInfo(`Alternative query found ${allRatedPosts?.length || 0} posts with ratings`, { campaignId, alternativePostsCount: allRatedPosts?.length || 0 })
 
       if (allRatedPosts && allRatedPosts.length > 0) {
-        // Use these posts instead, excluding duplicates
-        const filteredPosts = allRatedPosts.filter(post => !duplicatePostIds.has(post.id))
+        // Use these posts instead, excluding duplicates and posts without full text
+        const filteredPosts = allRatedPosts.filter(post =>
+          !duplicatePostIds.has(post.id) &&
+          post.full_article_text
+        )
         // Generate articles for ALL non-duplicate posts
         for (const post of filteredPosts) {
           await this.processPostIntoArticle(post, campaignId, section)
