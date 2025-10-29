@@ -174,8 +174,9 @@ export async function generateNewsletterHeader(formattedDate: string, campaignDa
     ? wrapTrackingUrl(websiteUrl, 'Header', campaignDate, campaignId)
     : websiteUrl
 
-  return `<html>
+  return `<html style="margin:0;padding:0;background-color:#f7f7f7;">
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 @media (min-width:621px){
   /* Increase padding on desktop */
@@ -186,8 +187,8 @@ export async function generateNewsletterHeader(formattedDate: string, campaignDa
 }
 </style>
 </head>
-<body style='margin:0!important;padding:0!important;background-color:#f7f7f7;'>
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#f7f7f7" style="background-color:#f7f7f7;">
+<body style='margin:0!important;padding:0!important;background-color:#f7f7f7;width:100%!important;min-width:100%!important;'>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#f7f7f7" style="background-color:#f7f7f7;margin:0;padding:0;">
   <tr>
     <td align="center" style="padding:0 2px;">
      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
