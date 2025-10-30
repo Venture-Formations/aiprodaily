@@ -1790,6 +1790,13 @@ export async function callWithStructuredPrompt(
         delete processedRequest.response_format
       }
 
+      // Remove any undefined parameters (Responses API doesn't accept them)
+      Object.keys(processedRequest).forEach(key => {
+        if (processedRequest[key] === undefined) {
+          delete processedRequest[key]
+        }
+      })
+
       console.log('[AI] Sending to OpenAI Responses API with model:', processedRequest.model)
 
       const response = await (openai as any).responses.create(processedRequest, {
