@@ -53,9 +53,10 @@ function processCustomPrompt(customPromptContent: string, postData: any): string
     // Use recursive replacement throughout the entire JSON structure
     const processedJson = injectPostData(promptJson, postData)
 
-    // If this is a structured prompt with messages array, return the entire config
+    // If this is a structured prompt with messages or input array, return the entire config
     // This allows passing response_format, model, temperature, etc. to the AI
-    if (processedJson.messages && Array.isArray(processedJson.messages)) {
+    if ((processedJson.messages && Array.isArray(processedJson.messages)) ||
+        (processedJson.input && Array.isArray(processedJson.input))) {
       return processedJson // Return the full config object
     } else {
       return JSON.stringify(processedJson)
