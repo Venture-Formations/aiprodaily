@@ -32,7 +32,8 @@ export default function MobileMenu({
   // Close menu on route change
   useEffect(() => {
     onClose()
-  }, [pathname, onClose])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
 
   // Close menu on escape key
   useEffect(() => {
@@ -43,7 +44,8 @@ export default function MobileMenu({
     }
     document.addEventListener('keydown', handleEscape)
     return () => document.removeEventListener('keydown', handleEscape)
-  }, [isOpen, onClose])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
 
   // Prevent body scroll when menu is open
   useEffect(() => {

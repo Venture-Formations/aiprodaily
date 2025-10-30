@@ -42,6 +42,25 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching Ads count:', adsError)
     }
 
+    // Articles count (both primary and secondary)
+    const { data: articlesCount, error: articlesError } = await supabaseAdmin
+      .from('articles')
+      .select('id', { count: 'exact' })
+
+    if (articlesError) {
+      console.error('Error fetching articles count:', articlesError)
+    }
+
+    const { data: secondaryArticlesCount, error: secondaryArticlesError } = await supabaseAdmin
+      .from('secondary_articles')
+      .select('id', { count: 'exact' })
+
+    if (secondaryArticlesError) {
+      console.error('Error fetching secondary articles count:', secondaryArticlesError)
+    }
+
+    const totalArticlesCount = (articlesCount?.length || 0) + (secondaryArticlesCount?.length || 0)
+
     const databases = [
       {
         name: 'AI Applications',
@@ -60,6 +79,12 @@ export async function GET(request: NextRequest) {
         description: 'Newsletter advertisement submissions',
         count: adsCount?.length || 0,
         href: '/dashboard/databases/ads'
+      },
+      {
+        name: 'Articles',
+        description: 'Current and past newsletter articles with scoring details',
+        count: totalArticlesCount,
+        href: '/dashboard/databases/articles'
       }
     ]
 
