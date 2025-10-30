@@ -46,7 +46,23 @@ export async function GET(request: NextRequest) {
       criteriaConfig[setting.key] = setting.value;
     });
 
-    // Fetch primary articles
+    // First, get campaigns for this newsletter
+    const { data: campaigns } = await supabase
+      .from('newsletter_campaigns')
+      .select('id, date, newsletter_id')
+      .eq('newsletter_id', newsletterId);
+
+    if (!campaigns || campaigns.length === 0) {
+      console.log('[API] No campaigns found for newsletter:', newsletterId);
+      return NextResponse.json({ data: [] });
+    }
+
+    const campaignIds = campaigns.map(c => c.id);
+    const campaignMap = new Map(campaigns.map(c => [c.id, c]));
+
+    console.log('[API] Found campaigns:', campaignIds.length);
+
+    // Fetch primary articles for these campaigns
     const { data: primaryArticles, error: primaryError } = await supabase
       .from('articles')
       .select(`
@@ -59,14 +75,17 @@ export async function GET(request: NextRequest) {
         fact_check_score,
         word_count,
         created_at
-      `);
+      `)
+      .in('campaign_id', campaignIds);
 
     if (primaryError) {
       console.error('[API] Primary articles error:', primaryError.message);
       throw primaryError;
     }
 
-    // Fetch secondary articles
+    console.log('[API] Found primary articles:', primaryArticles?.length || 0);
+
+    // Fetch secondary articles for these campaigns
     const { data: secondaryArticles, error: secondaryError } = await supabase
       .from('secondary_articles')
       .select(`
@@ -79,27 +98,15 @@ export async function GET(request: NextRequest) {
         fact_check_score,
         word_count,
         created_at
-      `);
+      `)
+      .in('campaign_id', campaignIds);
 
     if (secondaryError) {
       console.error('[API] Secondary articles error:', secondaryError.message);
       throw secondaryError;
     }
 
-    // Get all campaign IDs
-    const allCampaignIds = [
-      ...(primaryArticles || []).map(a => a.campaign_id),
-      ...(secondaryArticles || []).map(a => a.campaign_id)
-    ].filter((id, index, self) => self.indexOf(id) === index);
-
-    // Fetch campaigns
-    const { data: campaigns } = await supabase
-      .from('newsletter_campaigns')
-      .select('id, date, newsletter_id')
-      .eq('newsletter_id', newsletterId)
-      .in('id', allCampaignIds);
-
-    const campaignMap = new Map(campaigns?.map(c => [c.id, c]) || []);
+    console.log('[API] Found secondary articles:', secondaryArticles?.length || 0);
 
     // Get all post IDs
     const allPostIds = [
