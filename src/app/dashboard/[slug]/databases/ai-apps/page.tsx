@@ -25,6 +25,7 @@ export default function AIApplicationsPage() {
   const [filterCategory, setFilterCategory] = useState<string>('all')
   const [uploadingCSV, setUploadingCSV] = useState(false)
   const [uploadMessage, setUploadMessage] = useState('')
+  const [showUploadModal, setShowUploadModal] = useState(false)
 
   useEffect(() => {
     fetchApps()
@@ -125,6 +126,7 @@ export default function AIApplicationsPage() {
   const handleCSVUpload = async (file: File) => {
     setUploadingCSV(true)
     setUploadMessage('')
+    setShowUploadModal(false)
 
     try {
       const formData = new FormData()
@@ -150,6 +152,34 @@ export default function AIApplicationsPage() {
       setUploadingCSV(false)
       setTimeout(() => setUploadMessage(''), 5000)
     }
+  }
+
+  const downloadTemplate = () => {
+    const headers = ['Tool Name', 'Category', 'Tool Type', 'Link', 'Description', 'Tagline', 'Affiliate']
+    const exampleRow = [
+      'QuickBooks AI Assistant',
+      'Accounting System',
+      'Client',
+      'https://example.com',
+      'AI-powered accounting assistant that categorizes transactions automatically and provides intelligent insights for financial decisions.',
+      'Automate your bookkeeping with AI',
+      'yes'
+    ]
+
+    const csvContent = [
+      headers.join(','),
+      exampleRow.map(value => `"${value}"`).join(',')
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', 'ai-apps-template.csv')
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   const filteredApps = apps.filter(app =>
@@ -182,20 +212,13 @@ export default function AIApplicationsPage() {
             </p>
           </div>
           <div className="flex items-center space-x-3">
-            <label className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium cursor-pointer">
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium"
+              disabled={uploadingCSV}
+            >
               {uploadingCSV ? 'Uploading...' : '📤 Upload CSV'}
-              <input
-                type="file"
-                accept=".csv"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) handleCSVUpload(file)
-                  e.target.value = ''
-                }}
-                className="hidden"
-                disabled={uploadingCSV}
-              />
-            </label>
+            </button>
             <button
               onClick={() => setShowAddForm(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
@@ -204,6 +227,112 @@ export default function AIApplicationsPage() {
             </button>
           </div>
         </div>
+
+        {/* Upload Modal */}
+        {showUploadModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <h2 className="text-2xl font-bold text-gray-900">Upload AI Applications CSV</h2>
+                  <button
+                    onClick={() => setShowUploadModal(false)}
+                    className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Required CSV Columns</h3>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="font-semibold text-gray-700">Column Name</div>
+                      <div className="font-semibold text-gray-700">Required</div>
+                      <div className="font-semibold text-gray-700">Description</div>
+                    </div>
+                    <hr className="border-gray-300" />
+
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="font-medium text-gray-900">Tool Name</div>
+                      <div className="text-red-600 font-semibold">Required</div>
+                      <div className="text-gray-600">Name of the AI application</div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="font-medium text-gray-900">Category</div>
+                      <div className="text-blue-600">Optional</div>
+                      <div className="text-gray-600">Must be one of: Payroll, HR, Accounting System, Finance, Productivity, Client Management, Banking</div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="font-medium text-gray-900">Tool Type</div>
+                      <div className="text-blue-600">Optional</div>
+                      <div className="text-gray-600">Must be: Client or Firm (defaults to Client)</div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="font-medium text-gray-900">Link</div>
+                      <div className="text-red-600 font-semibold">Required</div>
+                      <div className="text-gray-600">URL to the application website</div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="font-medium text-gray-900">Description</div>
+                      <div className="text-red-600 font-semibold">Required</div>
+                      <div className="text-gray-600">Brief description (max 200 characters)</div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="font-medium text-gray-900">Tagline</div>
+                      <div className="text-blue-600">Optional</div>
+                      <div className="text-gray-600">Short tagline (max 80 characters)</div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="font-medium text-gray-900">Affiliate</div>
+                      <div className="text-blue-600">Optional</div>
+                      <div className="text-gray-600">Enter "yes", "true", or "1" for affiliate programs</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                  <h4 className="font-semibold text-blue-900 mb-2">💡 Tips:</h4>
+                  <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                    <li>Column names are case-insensitive</li>
+                    <li>Use quotes around values containing commas</li>
+                    <li>Download the template below for correct formatting</li>
+                    <li>All new apps will be set to Active by default</li>
+                  </ul>
+                </div>
+
+                <div className="flex justify-between items-center gap-4">
+                  <button
+                    onClick={downloadTemplate}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium"
+                  >
+                    📥 Download Template CSV
+                  </button>
+
+                  <label className="flex-1 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium cursor-pointer text-center">
+                    📤 Choose CSV File to Upload
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) handleCSVUpload(file)
+                        e.target.value = ''
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Upload Message */}
         {uploadMessage && (
