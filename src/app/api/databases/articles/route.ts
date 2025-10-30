@@ -18,107 +18,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch primary articles with related data
-    const { data: primaryArticles, error: primaryError } = await supabase
-      .from('articles')
-      .select(`
-        id,
-        headline,
-        content,
-        rank,
-        fact_check_score,
-        word_count,
-        created_at,
-        rss_posts!inner (
-          id,
-          title,
-          description,
-          full_article_text,
-          published_date,
-          author,
-          source_url,
-          image_url,
-          criteria_1_score,
-          criteria_1_reason,
-          criteria_2_score,
-          criteria_2_reason,
-          criteria_3_score,
-          criteria_3_reason,
-          criteria_4_score,
-          criteria_4_reason,
-          criteria_5_score,
-          criteria_5_reason,
-          final_priority_score,
-          rss_feeds!inner (
-            id,
-            name,
-            use_for_primary_section
-          )
-        ),
-        newsletter_campaigns!inner (
-          newsletter_id,
-          date
-        )
-      `)
-      .eq('newsletter_campaigns.newsletter_id', newsletterId);
-
-    if (primaryError) {
-      console.error('[API] Primary articles query failed:', primaryError.message);
-      throw primaryError;
-    }
-
-    // Fetch secondary articles with related data
-    const { data: secondaryArticles, error: secondaryError } = await supabase
-      .from('secondary_articles')
-      .select(`
-        id,
-        headline,
-        content,
-        rank,
-        fact_check_score,
-        word_count,
-        created_at,
-        rss_posts!inner (
-          id,
-          title,
-          description,
-          full_article_text,
-          published_date,
-          author,
-          source_url,
-          image_url,
-          criteria_1_score,
-          criteria_1_reason,
-          criteria_2_score,
-          criteria_2_reason,
-          criteria_3_score,
-          criteria_3_reason,
-          criteria_4_score,
-          criteria_4_reason,
-          criteria_5_score,
-          criteria_5_reason,
-          final_priority_score,
-          rss_feeds!inner (
-            id,
-            name,
-            use_for_primary_section,
-            use_for_secondary_section
-          )
-        ),
-        newsletter_campaigns!inner (
-          newsletter_id,
-          date
-        )
-      `)
-      .eq('newsletter_campaigns.newsletter_id', newsletterId);
-
-    if (secondaryError) {
-      console.error('[API] Secondary articles query failed:', secondaryError.message);
-      throw secondaryError;
-    }
-
-    // Get scoring criteria weights and names
-    const { data: criteriaSettings, error: criteriaError } = await supabase
+    // Get scoring criteria settings
+    const { data: criteriaSettings } = await supabase
       .from('app_settings')
       .select('key, value')
       .eq('newsletter_id', newsletterId)
@@ -140,20 +41,121 @@ export async function GET(request: NextRequest) {
         'scoring_criteria_5_enabled'
       ]);
 
-    if (criteriaError) {
-      console.error('[API] Criteria settings query failed:', criteriaError.message);
-    }
-
-    // Parse criteria settings
     const criteriaConfig: Record<string, string> = {};
     criteriaSettings?.forEach(setting => {
       criteriaConfig[setting.key] = setting.value;
     });
 
+    // Fetch primary articles
+    const { data: primaryArticles, error: primaryError } = await supabase
+      .from('articles')
+      .select(`
+        id,
+        post_id,
+        campaign_id,
+        headline,
+        content,
+        rank,
+        fact_check_score,
+        word_count,
+        created_at
+      `);
+
+    if (primaryError) {
+      console.error('[API] Primary articles error:', primaryError.message);
+      throw primaryError;
+    }
+
+    // Fetch secondary articles
+    const { data: secondaryArticles, error: secondaryError } = await supabase
+      .from('secondary_articles')
+      .select(`
+        id,
+        post_id,
+        campaign_id,
+        headline,
+        content,
+        rank,
+        fact_check_score,
+        word_count,
+        created_at
+      `);
+
+    if (secondaryError) {
+      console.error('[API] Secondary articles error:', secondaryError.message);
+      throw secondaryError;
+    }
+
+    // Get all campaign IDs
+    const allCampaignIds = [
+      ...(primaryArticles || []).map(a => a.campaign_id),
+      ...(secondaryArticles || []).map(a => a.campaign_id)
+    ].filter((id, index, self) => self.indexOf(id) === index);
+
+    // Fetch campaigns
+    const { data: campaigns } = await supabase
+      .from('newsletter_campaigns')
+      .select('id, date, newsletter_id')
+      .eq('newsletter_id', newsletterId)
+      .in('id', allCampaignIds);
+
+    const campaignMap = new Map(campaigns?.map(c => [c.id, c]) || []);
+
+    // Get all post IDs
+    const allPostIds = [
+      ...(primaryArticles || []).map(a => a.post_id),
+      ...(secondaryArticles || []).map(a => a.post_id)
+    ].filter((id, index, self) => self.indexOf(id) === index);
+
+    // Fetch RSS posts
+    const { data: rssPosts } = await supabase
+      .from('rss_posts')
+      .select(`
+        id,
+        feed_id,
+        title,
+        description,
+        full_article_text,
+        published_date,
+        author,
+        source_url,
+        image_url,
+        criteria_1_score,
+        criteria_1_reason,
+        criteria_2_score,
+        criteria_2_reason,
+        criteria_3_score,
+        criteria_3_reason,
+        criteria_4_score,
+        criteria_4_reason,
+        criteria_5_score,
+        criteria_5_reason,
+        final_priority_score
+      `)
+      .in('id', allPostIds);
+
+    const postMap = new Map(rssPosts?.map(p => [p.id, p]) || []);
+
+    // Get all feed IDs
+    const allFeedIds = (rssPosts || [])
+      .map(p => p.feed_id)
+      .filter((id, index, self) => id && self.indexOf(id) === index);
+
+    // Fetch RSS feeds
+    const { data: rssFeeds } = await supabase
+      .from('rss_feeds')
+      .select('id, name, use_for_primary_section, use_for_secondary_section')
+      .in('id', allFeedIds);
+
+    const feedMap = new Map(rssFeeds?.map(f => [f.id, f]) || []);
+
     // Transform and combine articles
     const transformArticle = (article: any, isPrimary: boolean) => {
-      const post = article.rss_posts;
-      const feed = post.rss_feeds;
+      const post = postMap.get(article.post_id);
+      const campaign = campaignMap.get(article.campaign_id);
+      const feed = post ? feedMap.get(post.feed_id) : null;
+
+      if (!post || !campaign) return null;
 
       return {
         id: article.id,
@@ -165,37 +167,32 @@ export async function GET(request: NextRequest) {
         sourceUrl: post.source_url || '',
         imageUrl: post.image_url || '',
         feedType: isPrimary ? 'Primary' : 'Secondary',
-        feedName: feed.name || '',
+        feedName: feed?.name || 'Unknown',
 
-        // Criteria 1
         criteria1Score: post.criteria_1_score || null,
         criteria1Weight: parseFloat(criteriaConfig.scoring_criteria_1_weight || '0'),
         criteria1Reasoning: post.criteria_1_reason || '',
         criteria1Name: criteriaConfig.scoring_criteria_1_name || 'Criteria 1',
         criteria1Enabled: criteriaConfig.scoring_criteria_1_enabled === 'true',
 
-        // Criteria 2
         criteria2Score: post.criteria_2_score || null,
         criteria2Weight: parseFloat(criteriaConfig.scoring_criteria_2_weight || '0'),
         criteria2Reasoning: post.criteria_2_reason || '',
         criteria2Name: criteriaConfig.scoring_criteria_2_name || 'Criteria 2',
         criteria2Enabled: criteriaConfig.scoring_criteria_2_enabled === 'true',
 
-        // Criteria 3
         criteria3Score: post.criteria_3_score || null,
         criteria3Weight: parseFloat(criteriaConfig.scoring_criteria_3_weight || '0'),
         criteria3Reasoning: post.criteria_3_reason || '',
         criteria3Name: criteriaConfig.scoring_criteria_3_name || 'Criteria 3',
         criteria3Enabled: criteriaConfig.scoring_criteria_3_enabled === 'true',
 
-        // Criteria 4
         criteria4Score: post.criteria_4_score || null,
         criteria4Weight: parseFloat(criteriaConfig.scoring_criteria_4_weight || '0'),
         criteria4Reasoning: post.criteria_4_reason || '',
         criteria4Name: criteriaConfig.scoring_criteria_4_name || 'Criteria 4',
         criteria4Enabled: criteriaConfig.scoring_criteria_4_enabled === 'true',
 
-        // Criteria 5
         criteria5Score: post.criteria_5_score || null,
         criteria5Weight: parseFloat(criteriaConfig.scoring_criteria_5_weight || '0'),
         criteria5Reasoning: post.criteria_5_reason || '',
@@ -209,33 +206,33 @@ export async function GET(request: NextRequest) {
         wordCount: article.word_count || null,
         finalPosition: article.rank || null,
         createdAt: article.created_at || '',
-        campaignDate: article.newsletter_campaigns?.date || ''
+        campaignDate: campaign.date || ''
       };
     };
 
     const allArticles = [
       ...(primaryArticles || []).map(a => transformArticle(a, true)),
       ...(secondaryArticles || []).map(a => transformArticle(a, false))
-    ];
+    ].filter(a => a !== null);
 
     // Sort by campaign date (most recent first), then by final position
     allArticles.sort((a, b) => {
-      const dateCompare = b.campaignDate.localeCompare(a.campaignDate);
+      const dateCompare = (b?.campaignDate || '').localeCompare(a?.campaignDate || '');
       if (dateCompare !== 0) return dateCompare;
 
-      const posA = a.finalPosition || 999;
-      const posB = b.finalPosition || 999;
+      const posA = a?.finalPosition || 999;
+      const posB = b?.finalPosition || 999;
       return posA - posB;
     });
 
-    console.log(`[API] Articles fetched: ${allArticles.length} total (${primaryArticles?.length || 0} primary, ${secondaryArticles?.length || 0} secondary)`);
+    console.log(`[API] Articles fetched: ${allArticles.length} total`);
 
     return NextResponse.json({ data: allArticles });
 
   } catch (error: any) {
     console.error('[API] Articles fetch error:', error.message);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: error.message },
       { status: 500 }
     );
   }
