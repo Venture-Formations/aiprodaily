@@ -121,18 +121,14 @@ async function callAI(
 
     if (isStructuredPrompt) {
       // Use structured prompt configuration - send EXACTLY as-is
-      apiParams = {
-        input: promptOrConfig.messages
-      }
+      // Just copy everything except messages (which becomes input)
+      apiParams = { ...promptOrConfig }
 
-      // Only add parameters that are explicitly in the prompt
-      if (promptOrConfig.model) apiParams.model = promptOrConfig.model
-      if (promptOrConfig.max_tokens !== undefined) apiParams.max_tokens = promptOrConfig.max_tokens
-      if (promptOrConfig.temperature !== undefined) apiParams.temperature = promptOrConfig.temperature
-      if (promptOrConfig.top_p !== undefined) apiParams.top_p = promptOrConfig.top_p
-      if (promptOrConfig.presence_penalty !== undefined) apiParams.presence_penalty = promptOrConfig.presence_penalty
-      if (promptOrConfig.frequency_penalty !== undefined) apiParams.frequency_penalty = promptOrConfig.frequency_penalty
-      if (promptOrConfig.response_format !== undefined) apiParams.response_format = promptOrConfig.response_format
+      // Rename messages to input (API requirement)
+      if (apiParams.messages) {
+        apiParams.input = apiParams.messages
+        delete apiParams.messages
+      }
 
     } else {
       // Simple string prompt
