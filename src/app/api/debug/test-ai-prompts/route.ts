@@ -46,25 +46,13 @@ function injectPostData(obj: any, post: any): any {
 
 // Helper function to process custom prompt content (JSON or string) with placeholder replacement
 // Returns either a string prompt or a JSON config object (for structured prompts)
-function processCustomPrompt(customPromptContent: string, postData: any): string | any {
-  // Try to parse as JSON (like AI Prompt Testing Playground format)
-  try {
-    const promptJson = JSON.parse(customPromptContent)
-    // Use recursive replacement throughout the entire JSON structure
-    const processedJson = injectPostData(promptJson, postData)
-
-    // If this is a structured prompt with messages or input array, return the entire config
-    // This allows passing response_format, model, temperature, etc. to the AI
-    if ((processedJson.messages && Array.isArray(processedJson.messages)) ||
-        (processedJson.input && Array.isArray(processedJson.input))) {
-      return processedJson // Return the full config object
-    } else {
-      return JSON.stringify(processedJson)
-    }
-  } catch (e) {
-    // Not JSON, treat as plain string and use recursive replacement
-    return injectPostData(customPromptContent, postData)
-  }
+function processCustomPrompt(customPromptContent: string, postData: any): any {
+  // Parse JSON and replace placeholders
+  const promptJson = JSON.parse(customPromptContent)
+  // Use recursive replacement throughout the entire JSON structure
+  const processedJson = injectPostData(promptJson, postData)
+  // Return the object as-is - let the API decide if it's valid
+  return processedJson
 }
 
 // Helper function to call AI provider (OpenAI or Claude)
