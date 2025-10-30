@@ -130,6 +130,8 @@ async function callAI(
         delete apiParams.messages
       }
 
+      console.log('[CALLAI-OPENAI] Sending structured prompt to Responses API:', JSON.stringify(apiParams, null, 2))
+
     } else {
       // Simple string prompt
       apiParams = {
