@@ -52,18 +52,13 @@ export async function GET(request: NextRequest) {
       .select('id, date, newsletter_id')
       .eq('newsletter_id', newsletterId);
 
-    if (!campaigns || campaigns.length === 0) {
-      console.log('[API] No campaigns found for newsletter:', newsletterId);
-      return NextResponse.json({ data: [] });
-    }
+    console.log('[API] Found campaigns:', campaigns?.length || 0);
 
-    const campaignIds = campaigns.map(c => c.id);
-    const campaignMap = new Map(campaigns.map(c => [c.id, c]));
+    const campaignIds = (campaigns || []).map(c => c.id);
+    const campaignMap = new Map((campaigns || []).map(c => [c.id, c]));
 
-    console.log('[API] Found campaigns:', campaignIds.length);
-
-    // Fetch primary articles for these campaigns
-    const { data: primaryArticles, error: primaryError } = await supabase
+    // Fetch primary articles - if we have campaigns, filter by them, otherwise get all
+    let primaryQuery = supabase
       .from('articles')
       .select(`
         id,
@@ -75,8 +70,13 @@ export async function GET(request: NextRequest) {
         fact_check_score,
         word_count,
         created_at
-      `)
-      .in('campaign_id', campaignIds);
+      `);
+
+    if (campaignIds.length > 0) {
+      primaryQuery = primaryQuery.in('campaign_id', campaignIds);
+    }
+
+    const { data: primaryArticles, error: primaryError } = await primaryQuery;
 
     if (primaryError) {
       console.error('[API] Primary articles error:', primaryError.message);
@@ -85,8 +85,8 @@ export async function GET(request: NextRequest) {
 
     console.log('[API] Found primary articles:', primaryArticles?.length || 0);
 
-    // Fetch secondary articles for these campaigns
-    const { data: secondaryArticles, error: secondaryError } = await supabase
+    // Fetch secondary articles - if we have campaigns, filter by them, otherwise get all
+    let secondaryQuery = supabase
       .from('secondary_articles')
       .select(`
         id,
@@ -98,8 +98,13 @@ export async function GET(request: NextRequest) {
         fact_check_score,
         word_count,
         created_at
-      `)
-      .in('campaign_id', campaignIds);
+      `);
+
+    if (campaignIds.length > 0) {
+      secondaryQuery = secondaryQuery.in('campaign_id', campaignIds);
+    }
+
+    const { data: secondaryArticles, error: secondaryError } = await secondaryQuery;
 
     if (secondaryError) {
       console.error('[API] Secondary articles error:', secondaryError.message);
@@ -178,68 +183,65 @@ export async function GET(request: NextRequest) {
       const campaign = campaignMap.get(article.campaign_id);
       const feed = post ? feedMap.get(post.feed_id) : null;
 
-      // Skip if no campaign (required for date)
-      if (!campaign) return null;
-
-      // If no post data, we'll show what we have from the article table
+      // Show article data even if post or campaign is missing
 
       return {
         id: article.id,
-        originalTitle: post.title || '',
-        originalDescription: post.description || '',
-        originalFullText: post.full_article_text || '',
-        publicationDate: post.published_date || '',
-        author: post.author || '',
-        sourceUrl: post.source_url || '',
-        imageUrl: post.image_url || '',
+        originalTitle: post?.title || '',
+        originalDescription: post?.description || '',
+        originalFullText: post?.full_article_text || '',
+        publicationDate: post?.published_date || '',
+        author: post?.author || '',
+        sourceUrl: post?.source_url || '',
+        imageUrl: post?.image_url || '',
         feedType: isPrimary ? 'Primary' : 'Secondary',
         feedName: feed?.name || 'Unknown',
 
-        criteria1Score: post.criteria_1_score || null,
+        criteria1Score: post?.criteria_1_score || null,
         criteria1Weight: parseFloat(criteriaConfig.scoring_criteria_1_weight || '0'),
-        criteria1Reasoning: post.criteria_1_reason || '',
+        criteria1Reasoning: post?.criteria_1_reason || '',
         criteria1Name: criteriaConfig.scoring_criteria_1_name || 'Criteria 1',
         criteria1Enabled: criteriaConfig.scoring_criteria_1_enabled === 'true',
 
-        criteria2Score: post.criteria_2_score || null,
+        criteria2Score: post?.criteria_2_score || null,
         criteria2Weight: parseFloat(criteriaConfig.scoring_criteria_2_weight || '0'),
-        criteria2Reasoning: post.criteria_2_reason || '',
+        criteria2Reasoning: post?.criteria_2_reason || '',
         criteria2Name: criteriaConfig.scoring_criteria_2_name || 'Criteria 2',
         criteria2Enabled: criteriaConfig.scoring_criteria_2_enabled === 'true',
 
-        criteria3Score: post.criteria_3_score || null,
+        criteria3Score: post?.criteria_3_score || null,
         criteria3Weight: parseFloat(criteriaConfig.scoring_criteria_3_weight || '0'),
-        criteria3Reasoning: post.criteria_3_reason || '',
+        criteria3Reasoning: post?.criteria_3_reason || '',
         criteria3Name: criteriaConfig.scoring_criteria_3_name || 'Criteria 3',
         criteria3Enabled: criteriaConfig.scoring_criteria_3_enabled === 'true',
 
-        criteria4Score: post.criteria_4_score || null,
+        criteria4Score: post?.criteria_4_score || null,
         criteria4Weight: parseFloat(criteriaConfig.scoring_criteria_4_weight || '0'),
-        criteria4Reasoning: post.criteria_4_reason || '',
+        criteria4Reasoning: post?.criteria_4_reason || '',
         criteria4Name: criteriaConfig.scoring_criteria_4_name || 'Criteria 4',
         criteria4Enabled: criteriaConfig.scoring_criteria_4_enabled === 'true',
 
-        criteria5Score: post.criteria_5_score || null,
+        criteria5Score: post?.criteria_5_score || null,
         criteria5Weight: parseFloat(criteriaConfig.scoring_criteria_5_weight || '0'),
-        criteria5Reasoning: post.criteria_5_reason || '',
+        criteria5Reasoning: post?.criteria_5_reason || '',
         criteria5Name: criteriaConfig.scoring_criteria_5_name || 'Criteria 5',
         criteria5Enabled: criteriaConfig.scoring_criteria_5_enabled === 'true',
 
-        totalScore: post.final_priority_score || null,
+        totalScore: post?.final_priority_score || null,
         headline: article.headline || '',
         content: article.content || '',
         factCheckScore: article.fact_check_score || null,
         wordCount: article.word_count || null,
         finalPosition: article.rank || null,
         createdAt: article.created_at || '',
-        campaignDate: campaign.date || ''
+        campaignDate: campaign?.date || ''
       };
     };
 
     const allArticles = [
       ...(primaryArticles || []).map(a => transformArticle(a, true)),
       ...(secondaryArticles || []).map(a => transformArticle(a, false))
-    ].filter(a => a !== null);
+    ];
 
     // Sort by campaign date (most recent first), then by final position
     allArticles.sort((a, b) => {
