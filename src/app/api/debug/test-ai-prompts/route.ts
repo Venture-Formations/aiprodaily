@@ -120,18 +120,20 @@ async function callAI(
     let apiParams: any
 
     if (isStructuredPrompt) {
-      // Use structured prompt configuration - convert messages to input
+      // Use structured prompt configuration - send EXACTLY as-is
       apiParams = {
-        model: promptOrConfig.model || 'gpt-4o',
-        input: promptOrConfig.messages,
-        max_tokens: promptOrConfig.max_tokens || maxTokens,
-        temperature: promptOrConfig.temperature !== undefined ? promptOrConfig.temperature : temperature,
+        input: promptOrConfig.messages
       }
 
-      // Include response_format if specified (for structured outputs)
-      if (promptOrConfig.response_format) {
-        apiParams.response_format = promptOrConfig.response_format
-      }
+      // Only add parameters that are explicitly in the prompt
+      if (promptOrConfig.model) apiParams.model = promptOrConfig.model
+      if (promptOrConfig.max_tokens !== undefined) apiParams.max_tokens = promptOrConfig.max_tokens
+      if (promptOrConfig.temperature !== undefined) apiParams.temperature = promptOrConfig.temperature
+      if (promptOrConfig.top_p !== undefined) apiParams.top_p = promptOrConfig.top_p
+      if (promptOrConfig.presence_penalty !== undefined) apiParams.presence_penalty = promptOrConfig.presence_penalty
+      if (promptOrConfig.frequency_penalty !== undefined) apiParams.frequency_penalty = promptOrConfig.frequency_penalty
+      if (promptOrConfig.response_format !== undefined) apiParams.response_format = promptOrConfig.response_format
+
     } else {
       // Simple string prompt
       apiParams = {
