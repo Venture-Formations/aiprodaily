@@ -81,24 +81,14 @@ async function callAI(
 
   if (provider === 'claude') {
     // Claude API call
-    let messages: any[]
-
-    if (isStructuredPrompt) {
-      // Extract messages from structured prompt
-      messages = promptOrConfig.messages.map((msg: any) => ({
-        role: msg.role === 'system' ? 'user' : msg.role, // Claude doesn't have system role in messages
-        content: msg.content
-      }))
-    } else {
-      messages = [{ role: 'user', content: promptOrConfig as string }]
+    if (!isStructuredPrompt) {
+      throw new Error('Prompt must be valid JSON with complete API parameters (model, messages, max_tokens, etc.). No defaults are added.')
     }
 
-    const completion = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: isStructuredPrompt ? promptOrConfig.max_tokens || maxTokens : maxTokens,
-      temperature: isStructuredPrompt ? promptOrConfig.temperature || temperature : temperature,
-      messages: messages
-    })
+    // Send structured prompt EXACTLY as-is with ZERO modifications
+    console.log('[CALLAI-CLAUDE] Sending structured prompt to Claude API:', JSON.stringify(promptOrConfig, null, 2))
+
+    const completion = await anthropic.messages.create(promptOrConfig)
 
     // Extract text from Claude response
     const textContent = completion.content.find(c => c.type === 'text')
@@ -126,13 +116,8 @@ async function callAI(
       console.log('[CALLAI-OPENAI] Sending structured prompt to Responses API:', JSON.stringify(apiParams, null, 2))
 
     } else {
-      // Simple string prompt
-      apiParams = {
-        model: 'gpt-4o',
-        input: [{ role: 'user', content: promptOrConfig as string }],
-        max_tokens: maxTokens,
-        temperature: temperature,
-      }
+      // Reject non-structured prompts - user must provide complete JSON
+      throw new Error('Prompt must be valid JSON with complete API parameters (model, input, etc.). No defaults are added.')
     }
 
     const response = await (openai as any).responses.create(apiParams)
