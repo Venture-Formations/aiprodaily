@@ -160,24 +160,11 @@ export default function AIPromptTestingPage() {
         // Store provider match status
         setLivePromptProviderMatches(data.data.provider_matches || false)
 
-        // Wrap the prompt in JSON API format
-        const promptJson = provider === 'openai'
-          ? {
-              model: 'gpt-4o',
-              messages: [{ role: 'user', content: data.data.prompt }],
-              temperature: 0.7,
-              max_tokens: 1000
-            }
-          : {
-              model: 'claude-sonnet-4-5-20250929',
-              messages: [{ role: 'user', content: data.data.prompt }],
-              temperature: 0.7,
-              max_tokens: 1000
-            }
+        // Use prompt exactly as-is from database
+        const promptToSet = data.data.prompt
 
-        const livePromptJson = JSON.stringify(promptJson, null, 2)
-        setLivePrompt(livePromptJson)
-        setPrompt(livePromptJson)
+        setLivePrompt(promptToSet)
+        setPrompt(promptToSet)
         setSavedPromptInfo(null) // Clear saved prompt info when loading live
         console.log('[Frontend] Live prompt loaded and set')
         return
@@ -215,21 +202,8 @@ export default function AIPromptTestingPage() {
   async function loadTemplate() {
     // Load template as complete JSON API request
     if (promptType === 'custom') {
-      // Provide empty JSON template for custom prompts
-      const template = provider === 'openai'
-        ? {
-            model: 'gpt-4o',
-            messages: [{ role: 'user', content: 'Your prompt here...' }],
-            temperature: 0.7,
-            max_tokens: 1000
-          }
-        : {
-            model: 'claude-sonnet-4-5-20250929',
-            messages: [{ role: 'user', content: 'Your prompt here...' }],
-            temperature: 0.7,
-            max_tokens: 1000
-          }
-      setPrompt(JSON.stringify(template, null, 2))
+      // Empty template - user enters everything
+      setPrompt('')
       return
     }
 
@@ -243,22 +217,9 @@ export default function AIPromptTestingPage() {
       const data = await res.json()
 
       if (data.success) {
-        // Wrap the prompt content in a JSON API request format
-        const template = provider === 'openai'
-          ? {
-              model: 'gpt-4o',
-              messages: [{ role: 'user', content: data.prompt }],
-              temperature: 0.7,
-              max_tokens: 1000
-            }
-          : {
-              model: 'claude-sonnet-4-5-20250929',
-              messages: [{ role: 'user', content: data.prompt }],
-              temperature: 0.7,
-              max_tokens: 1000
-            }
-        setPrompt(JSON.stringify(template, null, 2))
-        console.log('[Frontend] Loaded template with placeholders for:', promptType)
+        // Use prompt exactly as returned - no parsing, no wrapping
+        setPrompt(data.prompt)
+        console.log('[Frontend] Loaded template for:', promptType)
       } else {
         setPrompt('Error loading prompt template: ' + data.error)
       }
@@ -636,22 +597,18 @@ export default function AIPromptTestingPage() {
                 </div>
               </div>
 
-              {/* Example */}
+              {/* Important Note */}
               <div className="border-t pt-4">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">Example Usage</h3>
-                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-gray-50 rounded p-3 border border-gray-200">
-{`{
-  "model": "gpt-4o",
-  "messages": [
-    {
-      "role": "user",
-      "content": "Summarize this article in 50 words:\\n\\nTitle: {{title}}\\n\\nContent: {{content}}"
-    }
-  ],
-  "temperature": 0.7,
-  "max_tokens": 1000
-}`}
-                </pre>
+                <h3 className="text-sm font-medium text-gray-700 mb-3">Important</h3>
+                <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-gray-700">
+                  <p className="font-medium mb-2">Enter complete JSON API request:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>Include all parameters you need (model, messages, temperature, max_output_tokens, response_format, etc.)</li>
+                    <li>Use placeholders like <code className="bg-white px-1 rounded">{'{{title}}'}</code>, <code className="bg-white px-1 rounded">{'{{description}}'}</code>, <code className="bg-white px-1 rounded">{'{{content}}'}</code></li>
+                    <li>JSON is sent to API exactly as-is (only placeholders replaced)</li>
+                    <li>For OpenAI: Use <code className="bg-white px-1 rounded">max_output_tokens</code> (not max_tokens)</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
@@ -698,7 +655,7 @@ export default function AIPromptTestingPage() {
                 onChange={(e) => setPrompt(e.target.value)}
                 rows={20}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-xs bg-gray-50"
-                placeholder='{"model": "gpt-4o", "messages": [{"role": "user", "content": "Your prompt..."}], "temperature": 0.7}'
+                placeholder='Enter complete JSON API request here...'
               />
 
               {/* Reset to Live Prompt Button - Only show when provider matches */}

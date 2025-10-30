@@ -410,79 +410,161 @@ export async function executeStep(campaignId: string): Promise<void> {
 
 ## 🤖 AI Integration Patterns
 
-### Content Generation
+### 🚨 CRITICAL: How AI Prompts Work
 
-```typescript
-// Pattern: System prompt + Original content
-const systemPrompt = await getPrompt('articleGenerator'); // From app_settings
-const prompt = `${systemPrompt}\n\nOriginal content:\n${originalContent}`;
+**ALL AI prompts are stored as complete JSON API requests in the `app_settings` table.**
 
-const response = await openai.chat.completions.create({
-  model: 'gpt-4',
-  messages: [{ role: 'user', content: prompt }],
-  temperature: 0.7,
-  max_tokens: 1000,
-});
+- ✅ **Prompts contain EVERYTHING**: model, messages, temperature, max_output_tokens, response_format, etc.
+- ✅ **NO parameters should be hardcoded** in application code
+- ✅ **Use placeholders** in prompts: `{{title}}`, `{{content}}`, `{{description}}`, `{{url}}`
+- ✅ **Prompts are sent EXACTLY as stored** (only placeholders are replaced)
 
-const generatedArticle = response.choices[0].message.content || '';
+**Database Structure:**
+```sql
+app_settings (
+  key TEXT,               -- e.g. 'ai_prompt_primary_article_title'
+  value JSONB,            -- Complete JSON API request
+  ai_provider TEXT        -- 'openai' or 'claude'
+)
 ```
 
-### Post Scoring (Multi-Criteria with Batching)
+### Standard Pattern: Use callAIWithPrompt()
+
+**✅ CORRECT - Use this pattern for ALL AI calls:**
 
 ```typescript
-// REQUIRED: Batch of 3, 2s delay
-const BATCH_SIZE = 3;
-const BATCH_DELAY = 2000;
+import { callAIWithPrompt } from '@/lib/openai'
 
-const batches = chunkArray(posts, BATCH_SIZE);
-for (const batch of batches) {
-  await Promise.all(batch.map(post => scorePost(post)));
-  await sleep(BATCH_DELAY);
-}
-
-// Individual post scoring
-async function scorePost(post: RSSPost): Promise<number> {
-  const criteria = await getCriteria(newsletterId);
-  let totalScore = 0;
-  let maxScore = 0;
-  
-  for (const criterion of criteria) {
-    if (!criterion.enabled) continue;
-    
-    const score = await evaluateCriterion(post, criterion);
-    const weightedScore = score * criterion.weight;
-    
-    totalScore += weightedScore;
-    maxScore += 10 * criterion.weight;
+// Example: Generate article title
+const result = await callAIWithPrompt(
+  'ai_prompt_primary_article_title',  // Key in app_settings
+  {
+    title: post.title,
+    description: post.description,
+    content: post.full_article_text
   }
-  
-  // Single line format (prevents log overflow)
-  const scoreDetails = criteria
-    .filter(c => c.enabled)
-    .map((c, i) => `C${i + 1}: ${c.score}/10`)
-    .join('; ');
-  
-  console.log(`${scoreDetails}; Total: ${totalScore.toFixed(1)} (max: ${maxScore})`);
-  
-  return totalScore;
+)
+
+// result = { headline: "Your Generated Title" }
+```
+
+**How it works:**
+1. Loads complete JSON from database (model, messages, all parameters)
+2. Replaces placeholders (`{{title}}` → actual title)
+3. Sends to AI API exactly as-is
+4. Returns parsed JSON response
+
+### Example Prompt in Database
+
+**Key:** `ai_prompt_primary_article_title`
+
+**Value (JSONB):**
+```json
+{
+  "model": "gpt-4o",
+  "temperature": 0.7,
+  "max_output_tokens": 500,
+  "response_format": {
+    "type": "json_schema",
+    "json_schema": {
+      "name": "ArticleTitle",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "headline": { "type": "string" }
+        },
+        "required": ["headline"],
+        "additionalProperties": false
+      },
+      "strict": true
+    }
+  },
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a headline writer for a newsletter..."
+    },
+    {
+      "role": "user",
+      "content": "Title: {{title}}\nContent: {{content}}\n\nWrite a headline."
+    }
+  ]
 }
 ```
 
-### Error Handling for AI Calls
+**AI Provider:** `openai`
+
+### Post Scoring with Batching
+
+```typescript
+import { callAIWithPrompt } from '@/lib/openai'
+
+// REQUIRED: Batch of 3, 2s delay
+const BATCH_SIZE = 3
+const BATCH_DELAY = 2000
+
+const batches = chunkArray(posts, BATCH_SIZE)
+for (const batch of batches) {
+  await Promise.all(batch.map(post => scorePost(post)))
+  await sleep(BATCH_DELAY)
+}
+
+async function scorePost(post: RSSPost): Promise<number> {
+  // Prompt is loaded from database with all parameters
+  const result = await callAIWithPrompt(
+    'ai_prompt_post_scorer',
+    {
+      title: post.title,
+      description: post.description || '',
+      content: post.full_article_text || ''
+    }
+  )
+
+  // result = { score: 85, reasoning: "..." }
+  console.log(`[AI] Post scored: ${result.score}`)
+  return result.score
+}
+```
+
+### Error Handling
 
 ```typescript
 try {
-  const response = await openai.chat.completions.create({...});
+  const result = await callAIWithPrompt('ai_prompt_key', placeholders)
+
+  // Process result
+  console.log('[AI] Success:', result)
+
 } catch (error: any) {
   if (error.status === 429) {
     // Rate limit - wait and retry
-    console.log('[AI] Rate limit hit, waiting 5s...');
-    await sleep(5000);
-    return generateContent(prompt); // Retry once
+    console.log('[AI] Rate limit, waiting 5s...')
+    await sleep(5000)
+    return callAIWithPrompt('ai_prompt_key', placeholders) // Retry once
   }
-  console.error('[AI] Error:', error.message);
-  throw error;
+
+  console.error('[AI] Error:', error.message)
+  throw error
 }
+```
+
+### 🚫 DEPRECATED Patterns (Do NOT use)
+
+```typescript
+// ❌ WRONG: Hardcoding parameters
+const response = await openai.responses.create({
+  model: 'gpt-4o',           // ❌ Hardcoded
+  temperature: 0.7,           // ❌ Hardcoded
+  max_output_tokens: 1000,    // ❌ Hardcoded
+  messages: [...]
+})
+
+// ❌ WRONG: Building prompts manually
+const systemPrompt = await getPrompt('key')
+const prompt = `${systemPrompt}\n\n${content}`
+
+// ✅ CORRECT: Use callAIWithPrompt
+const result = await callAIWithPrompt('ai_prompt_key', { content })
 ```
 
 ---

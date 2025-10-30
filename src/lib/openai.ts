@@ -33,8 +33,9 @@ async function getPrompt(key: string, fallback: string): Promise<string> {
   }
 }
 
-// Helper function to fetch prompt AND provider from database
-async function getPromptWithProvider(key: string, fallback: string): Promise<{ prompt: string; provider: 'openai' | 'claude' }> {
+// Helper function to fetch complete JSON API request from database
+// Returns the prompt exactly as stored (complete JSON with model, messages, temperature, etc.)
+async function getPromptJSON(key: string, fallbackText?: string): Promise<any> {
   try {
     const { data, error } = await supabaseAdmin
       .from('app_settings')
@@ -45,14 +46,60 @@ async function getPromptWithProvider(key: string, fallback: string): Promise<{ p
     if (error || !data) {
       console.warn(`⚠️  [AI-PROMPT] FALLBACK USED: ${key} (not found in database)`)
       console.warn(`⚠️  [AI-PROMPT] Run migration: GET /api/debug/migrate-ai-prompts?dry_run=false`)
-      return { prompt: fallback, provider: 'openai' }
+
+      if (!fallbackText) {
+        throw new Error(`Prompt ${key} not found and no fallback provided`)
+      }
+
+      // Wrap fallback text in minimal JSON structure
+      return {
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: fallbackText }],
+        _provider: 'openai'
+      }
     }
 
+    // Value is already complete JSON (from migration), return as-is
+    const promptJSON = typeof data.value === 'string' ? JSON.parse(data.value) : data.value
+
+    // Add provider info for routing
     const provider = (data.ai_provider === 'claude' ? 'claude' : 'openai') as 'openai' | 'claude'
+    promptJSON._provider = provider
+
     console.log(`✓ [AI-PROMPT] Using database: ${key} (provider: ${provider})`)
-    return { prompt: data.value, provider }
+    return promptJSON
   } catch (error) {
-    console.error(`❌ [AI-PROMPT] ERROR fetching ${key}, using fallback:`, error)
+    console.error(`❌ [AI-PROMPT] ERROR fetching ${key}:`, error)
+
+    if (!fallbackText) {
+      throw error
+    }
+
+    // Return fallback wrapped in minimal JSON
+    return {
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: fallbackText }],
+      _provider: 'openai'
+    }
+  }
+}
+
+// Legacy function - DEPRECATED, use getPromptJSON instead
+async function getPromptWithProvider(key: string, fallback: string): Promise<{ prompt: string; provider: 'openai' | 'claude' }> {
+  console.warn(`⚠️  [DEPRECATED] getPromptWithProvider() is deprecated. Use getPromptJSON() instead for ${key}`)
+  try {
+    const promptJSON = await getPromptJSON(key, fallback)
+    const provider = promptJSON._provider || 'openai'
+
+    // Return just the content from first user message for backward compat
+    let promptText = fallback
+    if (promptJSON.messages && promptJSON.messages.length > 0) {
+      const userMsg = promptJSON.messages.find((m: any) => m.role === 'user')
+      promptText = userMsg?.content || fallback
+    }
+
+    return { prompt: promptText, provider }
+  } catch (error) {
     return { prompt: fallback, provider: 'openai' }
   }
 }
@@ -1826,6 +1873,33 @@ export async function callWithStructuredPrompt(
     clearTimeout(timeoutId)
     throw error
   }
+}
+
+/**
+ * Universal AI caller - loads prompt from database and calls AI
+ * This is the NEW standard way to call AI - prompts are complete JSON stored in database
+ *
+ * @param promptKey - Key in app_settings table (e.g. 'ai_prompt_primary_article_title')
+ * @param placeholders - Object with placeholder values (e.g. {title: '...', content: '...'})
+ * @param fallbackText - Optional fallback text if prompt not in database
+ * @returns Parsed JSON response from AI
+ */
+export async function callAIWithPrompt(
+  promptKey: string,
+  placeholders: Record<string, string> = {},
+  fallbackText?: string
+): Promise<any> {
+  // Load complete JSON prompt from database
+  const promptJSON = await getPromptJSON(promptKey, fallbackText)
+
+  // Extract provider info
+  const provider = promptJSON._provider || 'openai'
+
+  // Remove internal fields before sending to API
+  delete promptJSON._provider
+
+  // Call AI with complete structured prompt
+  return await callWithStructuredPrompt(promptJSON, placeholders, provider)
 }
 
 export async function callOpenAIStructured(options: OpenAICallOptions) {
