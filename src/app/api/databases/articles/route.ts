@@ -60,6 +60,9 @@ export async function GET(request: NextRequest) {
       criteriaConfig[setting.key] = setting.value;
     });
 
+    console.log('[API] Criteria settings found:', criteriaSettings?.length || 0);
+    console.log('[API] Criteria config:', JSON.stringify(criteriaConfig, null, 2));
+
     // First, get campaigns for this newsletter
     const { data: campaigns } = await supabase
       .from('newsletter_campaigns')
