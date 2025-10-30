@@ -84,6 +84,10 @@ export default function AIPromptTestingPage() {
   const [showPromptDetails, setShowPromptDetails] = useState(false)
   const [showSourcePosts, setShowSourcePosts] = useState(false)
 
+  // Live prompt tracking
+  const [livePrompt, setLivePrompt] = useState<string | null>(null)
+  const [isModified, setIsModified] = useState(false)
+
   // Helper function to determine section from prompt type
   const getSection = (type: PromptType): 'primary' | 'secondary' | 'all' => {
     if (type === 'primary-title' || type === 'primary-body' || type === 'subject-line') return 'primary'
@@ -102,6 +106,15 @@ export default function AIPromptTestingPage() {
   useEffect(() => {
     loadSavedPromptOrTemplate()
   }, [provider, promptType])
+
+  // Track if current prompt has been modified from live prompt
+  useEffect(() => {
+    if (livePrompt && prompt) {
+      setIsModified(prompt !== livePrompt)
+    } else {
+      setIsModified(false)
+    }
+  }, [prompt, livePrompt])
 
   async function loadRecentPosts() {
     setLoadingPosts(true)
@@ -132,7 +145,43 @@ export default function AIPromptTestingPage() {
   }
 
   async function loadSavedPromptOrTemplate() {
-    // Try to load saved prompt from database first
+    // STEP 1: Try to load LIVE prompt first (from app_settings)
+    try {
+      const res = await fetch(
+        `/api/ai/load-live-prompt?newsletter_id=${slug}&provider=${provider}&prompt_type=${promptType}`
+      )
+      const data = await res.json()
+
+      if (data.success && data.data?.prompt) {
+        console.log('[Frontend] Loaded live prompt from app_settings')
+
+        // Wrap the prompt in JSON API format
+        const promptJson = provider === 'openai'
+          ? {
+              model: 'gpt-4o',
+              messages: [{ role: 'user', content: data.data.prompt }],
+              temperature: 0.7,
+              max_tokens: 1000
+            }
+          : {
+              model: 'claude-sonnet-4-5-20250929',
+              messages: [{ role: 'user', content: data.data.prompt }],
+              temperature: 0.7,
+              max_tokens: 1000
+            }
+
+        const livePromptJson = JSON.stringify(promptJson, null, 2)
+        setLivePrompt(livePromptJson)
+        setPrompt(livePromptJson)
+        setSavedPromptInfo(null) // Clear saved prompt info when loading live
+        console.log('[Frontend] Live prompt loaded and set')
+        return
+      }
+    } catch (error) {
+      console.error('[Frontend] Error loading live prompt:', error)
+    }
+
+    // STEP 2: Try to load saved prompt from database (ai_prompt_tests table)
     try {
       const res = await fetch(
         `/api/ai/load-prompt?newsletter_id=${slug}&provider=${provider}&prompt_type=${promptType}`
@@ -140,19 +189,19 @@ export default function AIPromptTestingPage() {
       const data = await res.json()
 
       if (data.success && data.data) {
-        console.log('[Frontend] Loaded saved prompt from database')
+        console.log('[Frontend] Loaded saved prompt from ai_prompt_tests')
         setSavedPromptInfo(data.data)
         setPrompt(data.data.prompt)
+        setLivePrompt(null) // No live prompt for comparison
         return
       }
     } catch (error) {
       console.error('[Frontend] Error loading saved prompt:', error)
     }
 
-    // No saved prompt, clear the info
+    // STEP 3: No saved prompt or live prompt, clear the info and load template
     setSavedPromptInfo(null)
-
-    // If no saved prompt, load template
+    setLivePrompt(null)
     loadTemplate()
   }
 
@@ -209,6 +258,13 @@ export default function AIPromptTestingPage() {
     } catch (error) {
       console.error('Failed to load prompt template:', error)
       setPrompt('Error loading prompt template')
+    }
+  }
+
+  function resetToLivePrompt() {
+    if (livePrompt) {
+      setPrompt(livePrompt)
+      console.log('[Frontend] Reset to live prompt')
     }
   }
 
@@ -601,11 +657,30 @@ export default function AIPromptTestingPage() {
                 <label className="block text-sm font-medium text-gray-700">
                   API Request JSON
                 </label>
-                {savedPromptInfo && (
-                  <span className="text-xs text-green-600">
-                    ✓ Saved {new Date(savedPromptInfo.updated_at).toLocaleDateString()}
-                  </span>
-                )}
+                <div className="flex items-center gap-3">
+                  {/* Live Prompt Status Indicator */}
+                  {livePrompt && !isModified && (
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      Currently viewing: Live Prompt
+                    </span>
+                  )}
+                  {livePrompt && isModified && (
+                    <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      Modified from live
+                    </span>
+                  )}
+                  {savedPromptInfo && (
+                    <span className="text-xs text-green-600">
+                      ✓ Saved {new Date(savedPromptInfo.updated_at).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
               </div>
               <p className="text-xs text-gray-600 mb-3">
                 Enter the complete JSON API request. Model and parameters are included in the JSON.
@@ -618,6 +693,19 @@ export default function AIPromptTestingPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-xs bg-gray-50"
                 placeholder='{"model": "gpt-4o", "messages": [{"role": "user", "content": "Your prompt..."}], "temperature": 0.7}'
               />
+
+              {/* Reset to Live Prompt Button */}
+              {livePrompt && isModified && (
+                <button
+                  onClick={resetToLivePrompt}
+                  className="mt-3 w-full py-2 px-4 bg-purple-100 text-purple-700 font-medium rounded-lg hover:bg-purple-200 border border-purple-300 transition-colors flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Reset to Live Prompt
+                </button>
+              )}
 
               <button
                 onClick={handleTest}
