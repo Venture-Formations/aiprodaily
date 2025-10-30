@@ -120,10 +120,10 @@ async function callAI(
     let apiParams: any
 
     if (isStructuredPrompt) {
-      // Use structured prompt configuration
+      // Use structured prompt configuration - convert messages to input
       apiParams = {
         model: promptOrConfig.model || 'gpt-4o',
-        messages: promptOrConfig.messages,
+        input: promptOrConfig.messages,
         max_tokens: promptOrConfig.max_tokens || maxTokens,
         temperature: promptOrConfig.temperature !== undefined ? promptOrConfig.temperature : temperature,
       }
@@ -136,15 +136,16 @@ async function callAI(
       // Simple string prompt
       apiParams = {
         model: 'gpt-4o',
-        messages: [{ role: 'user', content: promptOrConfig as string }],
+        input: [{ role: 'user', content: promptOrConfig as string }],
         max_tokens: maxTokens,
         temperature: temperature,
       }
     }
 
-    const response = await openai.chat.completions.create(apiParams)
+    const response = await (openai as any).responses.create(apiParams)
 
-    const content = response.choices[0]?.message?.content || 'No response'
+    // Extract content from Responses API format
+    const content = response.output_text ?? response.output?.[0]?.content?.[0]?.text ?? 'No response'
 
     // Try to parse as JSON
     let parsedContent: any = content

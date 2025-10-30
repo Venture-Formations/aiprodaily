@@ -43,11 +43,11 @@ export async function GET(request: NextRequest) {
 
     // Test OpenAI Vision API
     try {
-      console.log('Calling OpenAI Vision API...')
+      console.log('Calling OpenAI Vision API using Responses API...')
       const imageAnalyzerPrompt = await AI_PROMPTS.imageAnalyzer()
-      const response = await openai.chat.completions.create({
+      const response = await (openai as any).responses.create({
         model: 'gpt-4o',
-        messages: [
+        input: [
           {
             role: 'user',
             content: [
@@ -68,7 +68,8 @@ export async function GET(request: NextRequest) {
         temperature: 0.3
       })
 
-      const content = response.choices[0]?.message?.content
+      // Extract content from Responses API format
+      const content = response.output_text ?? response.output?.[0]?.content?.[0]?.text ?? ""
       console.log('OpenAI response:', content)
 
       if (!content) {

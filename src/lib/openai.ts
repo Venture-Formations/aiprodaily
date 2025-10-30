@@ -1074,7 +1074,7 @@ export const AI_PROMPTS = {
     try {
       const { data, error } = await supabaseAdmin
         .from('app_settings')
-        .select('value')
+        .select('value, ai_provider')
         .eq('key', 'ai_prompt_topic_deduper')
         .single()
 
@@ -1084,6 +1084,7 @@ export const AI_PROMPTS = {
       }
 
       console.log('[AI] Using database prompt for topicDeduper')
+      const provider = (data.ai_provider === 'claude' ? 'claude' : 'openai') as 'openai' | 'claude'
 
       // Format articles list for the prompt with full article text
       const articlesText = posts.map((post, i) => `
@@ -1113,9 +1114,9 @@ ${i}. Title: ${post.title}
 
       // Check if it's a structured prompt
       if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
-        console.log('[AI] Using structured JSON prompt for topicDeduper')
+        console.log('[AI] Using structured JSON prompt for topicDeduper with provider:', provider)
         const placeholders = { articles: articlesText }
-        return await callWithStructuredPrompt(promptConfig, placeholders)
+        return await callWithStructuredPrompt(promptConfig, placeholders, provider)
       }
 
       // Fallback to plain text
@@ -1132,7 +1133,7 @@ ${i}. Title: ${post.title}
     try {
       const { data, error } = await supabaseAdmin
         .from('app_settings')
-        .select('value')
+        .select('value, ai_provider')
         .eq('key', 'ai_prompt_fact_checker')
         .single()
 
@@ -1142,6 +1143,7 @@ ${i}. Title: ${post.title}
       }
 
       console.log('[AI] Using database prompt for factChecker')
+      const provider = (data.ai_provider === 'claude' ? 'claude' : 'openai') as 'openai' | 'claude'
 
       // Check if value is already an object (JSONB auto-parsed) or needs parsing
       let promptConfig: any
@@ -1174,7 +1176,7 @@ ${i}. Title: ${post.title}
 
       // Check if it's a structured prompt
       if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
-        console.log('[AI] Detected structured JSON prompt for factChecker')
+        console.log('[AI] Detected structured JSON prompt for factChecker with provider:', provider)
 
         // Support both camelCase and snake_case placeholders for backward compatibility
         const placeholders = {
@@ -1184,7 +1186,7 @@ ${i}. Title: ${post.title}
           original_content: originalContent.substring(0, 2000)
         }
 
-        return await callWithStructuredPrompt(promptConfig, placeholders)
+        return await callWithStructuredPrompt(promptConfig, placeholders, provider)
       }
 
       // Plain text prompt - support both placeholder formats
@@ -1231,7 +1233,7 @@ ${i}. Title: ${post.title}
     try {
       const { data, error } = await supabaseAdmin
         .from('app_settings')
-        .select('value')
+        .select('value, ai_provider')
         .eq('key', 'ai_prompt_welcome_section')
         .single()
 
@@ -1241,6 +1243,7 @@ ${i}. Title: ${post.title}
       }
 
       console.log('[AI] Using database prompt for welcomeSection')
+      const provider = (data.ai_provider === 'claude' ? 'claude' : 'openai') as 'openai' | 'claude'
 
       // Format articles for the prompt
       const articlesText = articles
@@ -1269,11 +1272,11 @@ ${i}. Title: ${post.title}
 
       // Check if it's a structured prompt
       if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
-        console.log('[AI] Using structured JSON prompt for welcomeSection')
+        console.log('[AI] Using structured JSON prompt for welcomeSection with provider:', provider)
         const placeholders = {
           articles: articlesText
         }
-        return await callWithStructuredPrompt(promptConfig, placeholders)
+        return await callWithStructuredPrompt(promptConfig, placeholders, provider)
       }
 
       // Plain text prompt
@@ -1446,7 +1449,7 @@ ${i}. Title: ${post.title}
     try {
       const { data, error } = await supabaseAdmin
         .from('app_settings')
-        .select('value')
+        .select('value, ai_provider')
         .eq('key', 'ai_prompt_primary_article_title')
         .single()
 
@@ -1462,13 +1465,15 @@ ${i}. Title: ${post.title}
         return FALLBACK_PROMPTS.primaryArticleTitle(post)
       }
 
+      const provider = (data.ai_provider === 'claude' ? 'claude' : 'openai') as 'openai' | 'claude'
+
       // Check if the prompt is JSON (structured format) or plain text
       try {
         const promptConfig = JSON.parse(data.value) as StructuredPromptConfig
 
         // If it has a messages array, it's a structured prompt
         if (promptConfig.messages && Array.isArray(promptConfig.messages)) {
-          console.log('[AI] Using structured database prompt for primaryArticleTitle')
+          console.log('[AI] Using structured database prompt for primaryArticleTitle with provider:', provider)
 
           // Prepare placeholders
           const placeholders = {
@@ -1478,7 +1483,7 @@ ${i}. Title: ${post.title}
           }
 
           // Call with structured format
-          return await callWithStructuredPrompt(promptConfig, placeholders)
+          return await callWithStructuredPrompt(promptConfig, placeholders, provider)
         }
       } catch (jsonError) {
         // Not JSON, treat as plain text prompt (fallthrough to below)
@@ -1704,56 +1709,122 @@ export interface StructuredPromptConfig {
   top_p?: number
   presence_penalty?: number
   frequency_penalty?: number
+  response_format?: any  // Allow any response_format structure
   messages: Array<{
     role: 'system' | 'assistant' | 'user'
     content: string
   }>
 }
 
-// Helper function to call OpenAI with structured prompt from database
+// Helper function to call OpenAI or Claude with structured prompt from database
+// Sends the JSON prompt EXACTLY as-is (with placeholder replacement only)
 export async function callWithStructuredPrompt(
   promptConfig: StructuredPromptConfig,
-  placeholders: Record<string, string> = {}
+  placeholders: Record<string, string> = {},
+  provider: 'openai' | 'claude' = 'openai'
 ): Promise<any> {
-  // Debug: Check message content types
-  console.log('[AI] Processing structured prompt with', promptConfig.messages.length, 'messages')
-  promptConfig.messages.forEach((msg, i) => {
-    console.log(`[AI] Message ${i} role: ${msg.role}, content type: ${typeof msg.content}`)
-  })
+  console.log('[AI] Processing structured prompt with', promptConfig.messages.length, 'messages for provider:', provider)
 
-  // Replace placeholders in all message contents
-  const processedMessages = promptConfig.messages.map(msg => {
-    // Ensure content is a string
-    const contentStr = typeof msg.content === 'string' ? msg.content : String(msg.content)
+  // Deep clone the entire config to avoid mutating the original
+  const apiRequest = JSON.parse(JSON.stringify(promptConfig))
 
-    return {
-      ...msg,
-      content: Object.entries(placeholders).reduce(
-        (content, [key, value]) => content.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value),
-        contentStr
+  // Replace placeholders recursively in the entire object
+  function replacePlaceholders(obj: any): any {
+    if (typeof obj === 'string') {
+      return Object.entries(placeholders).reduce(
+        (str, [key, value]) => str.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value),
+        obj
       )
     }
-  })
+    if (Array.isArray(obj)) {
+      return obj.map(item => replacePlaceholders(item))
+    }
+    if (typeof obj === 'object' && obj !== null) {
+      const result: any = {}
+      for (const key in obj) {
+        result[key] = replacePlaceholders(obj[key])
+      }
+      return result
+    }
+    return obj
+  }
 
-  // Extract system prompt, examples, and user prompt
-  const systemPrompt = processedMessages.find(m => m.role === 'system')?.content
-  const examples = processedMessages.filter(m => m.role === 'assistant').map(m => ({
-    role: 'assistant' as const,
-    content: m.content
-  }))
-  const userPrompt = processedMessages.find(m => m.role === 'user')?.content
+  // Replace all placeholders in the entire config
+  const processedRequest = replacePlaceholders(apiRequest)
 
-  // Call with structured format
-  return callOpenAIStructured({
-    systemPrompt,
-    examples,
-    userPrompt,
-    maxTokens: promptConfig.max_tokens,
-    temperature: promptConfig.temperature,
-    topP: promptConfig.top_p,
-    presencePenalty: promptConfig.presence_penalty,
-    frequencyPenalty: promptConfig.frequency_penalty
-  })
+  // Add timeout
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30000)
+
+  try {
+    let content: string
+
+    if (provider === 'claude') {
+      // Claude API - send exactly as-is (messages stays as messages)
+      console.log('[AI] Sending to Claude with model:', processedRequest.model || 'claude-sonnet-4-5-20250929')
+
+      const response = await anthropic.messages.create(processedRequest, {
+        signal: controller.signal
+      } as any)
+
+      clearTimeout(timeoutId)
+
+      // Extract content from Claude response
+      const textContent = response.content.find((c: any) => c.type === 'text')
+      content = textContent && 'text' in textContent ? textContent.text : ''
+
+      if (!content) {
+        throw new Error('No response from Claude')
+      }
+    } else {
+      // OpenAI Responses API - rename messages to input
+      if (processedRequest.messages) {
+        processedRequest.input = processedRequest.messages
+        delete processedRequest.messages
+      }
+
+      console.log('[AI] Sending to OpenAI Responses API with model:', processedRequest.model)
+
+      const response = await (openai as any).responses.create(processedRequest, {
+        signal: controller.signal
+      })
+
+      clearTimeout(timeoutId)
+
+      // Extract content from Responses API format
+      content = response.output_text ?? response.output?.[0]?.content?.[0]?.text ?? ""
+
+      if (!content) {
+        throw new Error('No response from OpenAI')
+      }
+    }
+
+    // Try to parse as JSON, fallback to raw content (same for both providers)
+    try {
+      let cleanedContent = content
+      const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+      if (codeFenceMatch) {
+        cleanedContent = codeFenceMatch[1]
+      }
+
+      const objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
+      const arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
+
+      if (arrayMatch) {
+        return JSON.parse(arrayMatch[0])
+      } else if (objectMatch) {
+        return JSON.parse(objectMatch[0])
+      } else {
+        return JSON.parse(cleanedContent.trim())
+      }
+    } catch (parseError) {
+      // Return raw content wrapped in object
+      return { raw: content }
+    }
+  } catch (error) {
+    clearTimeout(timeoutId)
+    throw error
+  }
 }
 
 export async function callOpenAIStructured(options: OpenAICallOptions) {
@@ -1809,13 +1880,28 @@ export async function callOpenAIStructured(options: OpenAICallOptions) {
           typeof msg.content === 'string' ? msg.content.substring(0, 50) : JSON.stringify(msg.content).substring(0, 50))
       })
 
-      const response = await openai.chat.completions.create(requestOptions, {
+      // Convert messages format to input format for Responses API
+      const inputMessages = requestOptions.messages.map((msg: any) => ({
+        role: msg.role,
+        content: msg.content
+      }))
+
+      const response = await (openai as any).responses.create({
+        model: requestOptions.model,
+        input: inputMessages,
+        temperature: requestOptions.temperature,
+        max_tokens: requestOptions.max_tokens,
+        ...(requestOptions.top_p !== undefined && { top_p: requestOptions.top_p }),
+        ...(requestOptions.presence_penalty !== undefined && { presence_penalty: requestOptions.presence_penalty }),
+        ...(requestOptions.frequency_penalty !== undefined && { frequency_penalty: requestOptions.frequency_penalty })
+      }, {
         signal: controller.signal
       })
 
       clearTimeout(timeoutId)
 
-      const content = response.choices[0]?.message?.content
+      // Extract content from Responses API format
+      const content = response.output_text ?? response.output?.[0]?.content?.[0]?.text ?? ""
       if (!content) {
         throw new Error('No response from OpenAI')
       }
@@ -1863,9 +1949,9 @@ export async function callOpenAI(prompt: string, maxTokens = 1000, temperature =
 
     try {
       // console.log('Using GPT-4o model with improved JSON parsing...') // Commented out to reduce log count
-      const response = await openai.chat.completions.create({
+      const response = await (openai as any).responses.create({
         model: 'gpt-4o',
-        messages: [{ role: 'user', content: prompt }],
+        input: [{ role: 'user', content: prompt }],
         max_tokens: maxTokens,
         temperature: temperature,
       }, {
@@ -1874,7 +1960,8 @@ export async function callOpenAI(prompt: string, maxTokens = 1000, temperature =
 
       clearTimeout(timeoutId)
 
-      const content = response.choices[0]?.message?.content
+      // Extract content from Responses API format
+      const content = response.output_text ?? response.output?.[0]?.content?.[0]?.text ?? ""
       if (!content) {
         throw new Error('No response from OpenAI')
       }

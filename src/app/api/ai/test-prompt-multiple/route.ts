@@ -209,8 +209,15 @@ export async function POST(request: NextRequest) {
         let tokensUsed = 0
 
         if (provider === 'openai') {
-          const completion = await openai.chat.completions.create(processedJson)
-          response = completion.choices[0]?.message?.content || 'No response'
+          // Convert messages to input format for Responses API
+          const inputMessages = processedJson.messages || [{ role: 'user', content: processedJson.content || '' }]
+          const completion = await (openai as any).responses.create({
+            model: processedJson.model || 'gpt-4o',
+            input: inputMessages,
+            temperature: processedJson.temperature,
+            max_tokens: processedJson.max_tokens
+          })
+          response = completion.output_text ?? completion.output?.[0]?.content?.[0]?.text ?? 'No response'
           tokensUsed = completion.usage?.total_tokens || 0
         } else if (provider === 'claude') {
           const completion = await anthropic.messages.create(processedJson)

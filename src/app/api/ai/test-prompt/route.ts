@@ -65,10 +65,16 @@ export async function POST(request: NextRequest) {
     const apiRequest = processedJson // Store the exact API request
 
     if (provider === 'openai') {
-      // OpenAI API call - send the exact JSON
-      const completion = await openai.chat.completions.create(processedJson)
+      // OpenAI API call - send the exact JSON using Responses API
+      const inputMessages = processedJson.messages || [{ role: 'user', content: processedJson.content || '' }]
+      const completion = await (openai as any).responses.create({
+        model: processedJson.model || 'gpt-4o',
+        input: inputMessages,
+        temperature: processedJson.temperature,
+        max_tokens: processedJson.max_tokens
+      })
 
-      response = completion.choices[0]?.message?.content || 'No response'
+      response = completion.output_text ?? completion.output?.[0]?.content?.[0]?.text ?? 'No response'
       tokensUsed = completion.usage?.total_tokens
     } else if (provider === 'claude') {
       // Claude API call - send the exact JSON

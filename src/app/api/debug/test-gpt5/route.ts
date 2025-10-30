@@ -19,15 +19,16 @@ export async function GET(request: NextRequest) {
     const testPrompt = "Respond with exactly: GPT-5 is working"
 
     try {
-      console.log('Making direct GPT-5 API call...')
-      const response = await openai.chat.completions.create({
+      console.log('Making direct GPT-5 API call using Responses API...')
+      const response = await (openai as any).responses.create({
         model: 'gpt-5',
-        messages: [{ role: 'user', content: testPrompt }],
-        max_completion_tokens: 50, // GPT-5 uses max_completion_tokens instead of max_tokens
+        input: [{ role: 'user', content: testPrompt }],
+        max_tokens: 50,
         temperature: 0.1,
       })
 
-      const content = response.choices[0]?.message?.content
+      // Extract content from Responses API format
+      const content = response.output_text ?? response.output?.[0]?.content?.[0]?.text ?? ""
       console.log('GPT-5 direct test successful:', content)
 
       return NextResponse.json({

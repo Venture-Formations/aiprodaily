@@ -62,14 +62,15 @@ For "${input}", analyze the context and suggest relevant tags from different cat
 
 Return valid JSON array only, no other text.`
 
-    const response = await openai.chat.completions.create({
+    const response = await (openai as any).responses.create({
       model: 'gpt-4o',
-      messages: [{ role: 'user', content: prompt }],
+      input: [{ role: 'user', content: prompt }],
       max_tokens: 1000,
       temperature: 0.3
     })
 
-    const content = response.choices[0]?.message?.content
+    // Extract content from Responses API format
+    const content = response.output_text ?? response.output?.[0]?.content?.[0]?.text ?? ""
     if (!content) {
       return NextResponse.json(
         { error: 'No response from AI' },

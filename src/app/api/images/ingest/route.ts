@@ -39,10 +39,10 @@ export async function POST(request: NextRequest) {
       // Get image analyzer prompt from database
       const imageAnalyzerPrompt = await AI_PROMPTS.imageAnalyzer()
 
-      // Analyze image with OpenAI Vision
-      const response = await openai.chat.completions.create({
+      // Analyze image with OpenAI Vision using Responses API
+      const response = await (openai as any).responses.create({
         model: 'gpt-4o',
-        messages: [
+        input: [
           {
             role: 'user',
             content: [
@@ -63,7 +63,8 @@ export async function POST(request: NextRequest) {
         temperature: 0.3
       })
 
-      const content = response.choices[0]?.message?.content
+      // Extract content from Responses API format
+      const content = response.output_text ?? response.output?.[0]?.content?.[0]?.text ?? ""
       if (!content) {
         throw new Error('No response from OpenAI Vision')
       }
