@@ -706,7 +706,9 @@ export default function AIPromptTestingPage() {
 
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <pre className="whitespace-pre-wrap text-sm text-gray-800 font-sans">
-                    {currentResponse.response}
+                    {typeof currentResponse.response === 'object'
+                      ? JSON.stringify(currentResponse.response, null, 2)
+                      : currentResponse.response}
                   </pre>
                 </div>
               </div>
@@ -883,14 +885,18 @@ export default function AIPromptTestingPage() {
                             <h5 className="font-medium text-gray-900">Article {index + 1}</h5>
                           </div>
                           <div className="bg-gray-50 rounded p-3 whitespace-pre-wrap text-sm">
-                            {response}
+                            {typeof response === 'object'
+                              ? JSON.stringify(response, null, 2)
+                              : response}
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
                     <div className="bg-gray-50 rounded p-4 whitespace-pre-wrap text-sm">
-                      {currentResponse.response}
+                      {typeof currentResponse.response === 'object'
+                        ? JSON.stringify(currentResponse.response, null, 2)
+                        : currentResponse.response}
                     </div>
                   )}
                 </div>
