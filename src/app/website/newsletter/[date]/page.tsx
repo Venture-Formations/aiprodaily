@@ -53,7 +53,7 @@ export default async function NewsletterPage({ params }: PageProps) {
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
     .select('key, value')
-    .in('key', ['website_header_url', 'logo_url', 'newsletter_name', 'business_name'])
+    .in('key', ['website_header_url', 'logo_url', 'newsletter_name', 'business_name', 'primary_color'])
 
   const { data: sections } = await supabaseAdmin
     .from('newsletter_sections')
@@ -65,6 +65,7 @@ export default async function NewsletterPage({ params }: PageProps) {
   const logoUrl = settings?.find(s => s.key === 'logo_url')?.value || '/logo.png'
   const newsletterName = settings?.find(s => s.key === 'newsletter_name')?.value || 'AI Accounting Daily'
   const businessName = settings?.find(s => s.key === 'business_name')?.value || 'AI Accounting Daily'
+  const primaryColor = settings?.find(s => s.key === 'primary_color')?.value || '#1877F2'
   const currentYear = new Date().getFullYear()
 
   const formattedDate = new Date(newsletter.campaign_date).toLocaleDateString('en-US', {
@@ -114,7 +115,7 @@ export default async function NewsletterPage({ params }: PageProps) {
             if (section.name === 'Welcome' && welcome && (welcome.intro || welcome.tagline || welcome.summary)) {
               return (
                 <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
-                  <h2 className="text-2xl font-bold text-[#1D1D1F] mb-6">{section.name}</h2>
+                  <h2 className="text-2xl font-bold mb-6 inline-block px-3 py-1.5 rounded-md text-white" style={{ backgroundColor: primaryColor }}>{section.name}</h2>
                   <div className="space-y-3">
                     {welcome.intro && (
                       <div className="text-[#1D1D1F] leading-relaxed whitespace-pre-wrap">
@@ -140,7 +141,7 @@ export default async function NewsletterPage({ params }: PageProps) {
             if (section.display_order === 3 && articles.length > 0) {
               return (
                 <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
-                  <h2 className="text-2xl font-bold text-[#1D1D1F] mb-6">{section.name}</h2>
+                  <h2 className="text-2xl font-bold mb-6 inline-block px-3 py-1.5 rounded-md text-white" style={{ backgroundColor: primaryColor }}>{section.name}</h2>
                   <div className="space-y-8">
                     {articles.map((article: any, index: number) => (
                       <article key={article.id} className="border-b border-gray-200 last:border-0 pb-8 last:pb-0">
@@ -183,7 +184,7 @@ export default async function NewsletterPage({ params }: PageProps) {
             if (section.display_order === 5 && secondaryArticles.length > 0) {
               return (
                 <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
-                  <h2 className="text-2xl font-bold text-[#1D1D1F] mb-6">{section.name}</h2>
+                  <h2 className="text-2xl font-bold mb-6 inline-block px-3 py-1.5 rounded-md text-white" style={{ backgroundColor: primaryColor }}>{section.name}</h2>
                   <div className="space-y-8">
                     {secondaryArticles.map((article: any, index: number) => (
                       <article key={article.id} className="border-b border-gray-200 last:border-0 pb-8 last:pb-0">
@@ -226,7 +227,7 @@ export default async function NewsletterPage({ params }: PageProps) {
             if (section.id === SECTION_IDS.AI_APPLICATIONS && aiApps.length > 0) {
               return (
                 <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
-                  <h2 className="text-2xl font-bold text-[#1D1D1F] mb-6">{section.name}</h2>
+                  <h2 className="text-2xl font-bold mb-6 inline-block px-3 py-1.5 rounded-md text-white" style={{ backgroundColor: primaryColor }}>{section.name}</h2>
                   <div className="space-y-3">
                     {aiApps.map((item: any, index: number) => {
                       const app = item.app
@@ -260,7 +261,7 @@ export default async function NewsletterPage({ params }: PageProps) {
               const prompt = newsletter.sections.prompt
               return (
                 <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
-                  <h2 className="text-2xl font-bold text-[#1D1D1F] mb-6">{section.name}</h2>
+                  <h2 className="text-2xl font-bold mb-6 inline-block px-3 py-1.5 rounded-md text-white" style={{ backgroundColor: primaryColor }}>{section.name}</h2>
                   <div className="text-center mb-4">
                     <div className="text-xl font-bold text-[#1D1D1F]">{prompt.title}</div>
                   </div>
@@ -275,7 +276,7 @@ export default async function NewsletterPage({ params }: PageProps) {
             if (section.name === 'Poll' && poll) {
               return (
                 <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
-                  <h2 className="text-2xl font-bold text-[#1D1D1F] mb-6">{section.name}</h2>
+                  <h2 className="text-2xl font-bold mb-6 inline-block px-3 py-1.5 rounded-md text-white" style={{ backgroundColor: primaryColor }}>{section.name}</h2>
                   <div className="text-xl font-bold text-center text-[#1D1D1F] mb-4">{poll.question}</div>
                   <p className="text-[#1D1D1F]/60 text-sm text-center">
                     This poll was available in the email newsletter.
@@ -288,7 +289,7 @@ export default async function NewsletterPage({ params }: PageProps) {
             if (section.name === 'Road Work' && roadWork) {
               return (
                 <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
-                  <h2 className="text-2xl font-bold text-[#1D1D1F] mb-6">{section.name}</h2>
+                  <h2 className="text-2xl font-bold mb-6 inline-block px-3 py-1.5 rounded-md text-white" style={{ backgroundColor: primaryColor }}>{section.name}</h2>
                   <div className="space-y-3">
                     {roadWork.items && roadWork.items.map((item: any, index: number) => (
                       <div key={index} className="border-b border-gray-200 last:border-0 pb-3 last:pb-0">
