@@ -9,14 +9,32 @@ export async function GET(request: NextRequest) {
     );
 
     const { searchParams } = new URL(request.url);
-    const newsletterId = searchParams.get('newsletter_id');
+    const newsletterSlug = searchParams.get('newsletter_id'); // Actually a slug, not UUID
 
-    if (!newsletterId) {
+    if (!newsletterSlug) {
       return NextResponse.json(
         { error: 'newsletter_id is required' },
         { status: 400 }
       );
     }
+
+    // Convert slug to UUID (required for database queries)
+    const { data: newsletter, error: newsletterError } = await supabase
+      .from('newsletters')
+      .select('id')
+      .eq('slug', newsletterSlug)
+      .single();
+
+    if (newsletterError || !newsletter) {
+      console.error('[API] Newsletter not found:', newsletterSlug);
+      return NextResponse.json(
+        { error: 'Newsletter not found' },
+        { status: 404 }
+      );
+    }
+
+    const newsletterId = newsletter.id;
+    console.log('[API] Newsletter:', newsletterSlug, '→ UUID:', newsletterId);
 
     // Get scoring criteria settings
     const { data: criteriaSettings } = await supabase
