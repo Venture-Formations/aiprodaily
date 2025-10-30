@@ -104,7 +104,8 @@ async function callAI(
     const response = await (openai as any).responses.create(promptOrConfig)
 
     // Extract content from Responses API format
-    const content = response.output_text ?? response.output?.[0]?.content?.[0]?.text ?? 'No response'
+    // Actual structure: response.output[0].content[0].text
+    const content = response.output?.[0]?.content?.[0]?.text ?? 'No response'
 
     // Try to parse as JSON
     let parsedContent: any = content
