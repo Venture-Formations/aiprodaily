@@ -737,9 +737,9 @@ export default function AIApplicationsPage() {
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-yellow-600">
-              {apps.filter(a => a.is_featured).length}
+              {apps.filter(a => a.is_affiliate).length}
             </div>
-            <div className="text-sm text-gray-600">Featured</div>
+            <div className="text-sm text-gray-600">Affiliates</div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-purple-600">
