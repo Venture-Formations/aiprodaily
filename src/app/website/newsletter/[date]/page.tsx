@@ -117,11 +117,9 @@ export default async function NewsletterPage({ params }: PageProps) {
                 <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
                   <h2 className="text-2xl font-bold mb-6 inline-block px-3 py-1.5 rounded-md text-white" style={{ backgroundColor: primaryColor }}>{section.name}</h2>
                   <div className="space-y-3">
-                    {welcome.intro && (
-                      <div className="text-[#1D1D1F] leading-relaxed whitespace-pre-wrap">
-                        {cleanMergeTags(welcome.intro)}
-                      </div>
-                    )}
+                    <div className="text-[#1D1D1F] leading-relaxed">
+                      Hey, Accounting Pros!
+                    </div>
                     {welcome.tagline && (
                       <div className="text-[#1D1D1F] leading-relaxed font-bold whitespace-pre-wrap">
                         {cleanMergeTags(welcome.tagline)}
