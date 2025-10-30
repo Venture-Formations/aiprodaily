@@ -18,7 +18,8 @@
       "mcp__vercel__getDeployments",
       "Bash(git add:*)",
       "Bash(git push:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "mcp__vercel__getDeploymentEvents"
     ],
     "deny": [],
     "ask": []

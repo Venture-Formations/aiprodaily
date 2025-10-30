@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { use, useEffect, useState } from 'react'
 import Layout from '@/components/Layout'
 import type { EmailMetrics, NewsletterCampaign } from '@/types/database'
 
@@ -30,7 +30,8 @@ interface LinkClickAnalytics {
   dateRange: { start: string; end: string }
 }
 
-export default function AnalyticsPage({ params }: { params: { slug: string } }) {
+export default function AnalyticsPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = use(params)
   const [campaigns, setCampaigns] = useState<CampaignWithMetrics[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -44,12 +45,12 @@ export default function AnalyticsPage({ params }: { params: { slug: string } }) 
     fetchAnalytics()
     fetchFeedbackAnalytics()
     fetchLinkClickAnalytics()
-  }, [selectedTimeframe])
+  }, [selectedTimeframe, slug])
 
   const fetchAnalytics = async () => {
     try {
       const response = await fetch(
-        `/api/campaigns?limit=50&status=sent&newsletter_slug=${params.slug}&days=${selectedTimeframe}`
+        `/api/campaigns?limit=50&status=sent&newsletter_slug=${slug}&days=${selectedTimeframe}`
       )
       if (!response.ok) {
         throw new Error('Failed to fetch analytics data')
