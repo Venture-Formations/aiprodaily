@@ -124,17 +124,10 @@ async function callAI(
       // Just copy everything except messages (which becomes input)
       apiParams = { ...promptOrConfig }
 
-      // Rename messages to input (API requirement)
+      // Rename messages to input (API requirement only)
       if (apiParams.messages) {
         apiParams.input = apiParams.messages
         delete apiParams.messages
-      }
-
-      // Fix: OpenAI Responses API uses max_output_tokens, not max_tokens
-      if (apiParams.max_tokens && !apiParams.max_output_tokens) {
-        apiParams.max_output_tokens = apiParams.max_tokens
-        delete apiParams.max_tokens
-        console.log('[CALLAI-OPENAI] Converted max_tokens to max_output_tokens')
       }
 
       console.log('[CALLAI-OPENAI] Sending structured prompt to Responses API:', JSON.stringify(apiParams, null, 2))
