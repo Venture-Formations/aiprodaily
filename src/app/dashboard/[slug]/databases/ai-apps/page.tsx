@@ -141,7 +141,12 @@ export default function AIApplicationsPage() {
       const data = await response.json()
 
       if (response.ok) {
-        setUploadMessage(`✓ Successfully uploaded ${data.imported} apps${data.errors ? ` (${data.errors.length} errors)` : ''}`)
+        const parts = []
+        if (data.inserted > 0) parts.push(`${data.inserted} added`)
+        if (data.updated > 0) parts.push(`${data.updated} updated`)
+        const summary = parts.length > 0 ? parts.join(', ') : 'No changes'
+        const errorInfo = data.errors ? ` (${data.errors.length} errors)` : ''
+        setUploadMessage(`✓ Successfully processed: ${summary}${errorInfo}`)
         await fetchApps()
       } else {
         setUploadMessage(`✗ Error: ${data.error || 'Upload failed'}`)
@@ -310,6 +315,7 @@ export default function AIApplicationsPage() {
                     <li>Use quotes around values containing commas</li>
                     <li>Download the template below for correct formatting</li>
                     <li>All new apps will be set to Active by default</li>
+                    <li><strong>Duplicate handling:</strong> Apps with matching names will be updated (not duplicated)</li>
                   </ul>
                 </div>
 

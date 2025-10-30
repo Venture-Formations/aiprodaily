@@ -9,13 +9,18 @@ import type { AIAppCategory, ToolType } from '@/types/database'
  * Tool Name, Category, Tool Type, Link, Description, Tagline, Affiliate
  *
  * Column Mappings:
- * - Tool Name → app_name
+ * - Tool Name → app_name (used to match existing apps - case insensitive)
  * - Category → category (must match: Payroll, HR, Accounting System, Finance, Productivity, Client Management, Banking)
  * - Tool Type → tool_type (must be: Client or Firm)
  * - Link → app_url (also accepts: Home Page, URL)
  * - Description → description
  * - Tagline → tagline
  * - Affiliate → is_affiliate (optional: yes/true/1 = affiliate, anything else = non-affiliate)
+ *
+ * Behavior:
+ * - If an app with the same name exists (case-insensitive match), it will be UPDATED with new data
+ * - If an app doesn't exist, it will be INSERTED as a new record
+ * - Returns counts for both inserted and updated apps
  */
 export async function POST(request: NextRequest) {
   try {
@@ -134,28 +139,64 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Insert apps into database
-    let imported = 0
+    // Process apps: update existing or insert new
+    let inserted = 0
+    let updated = 0
+
     if (apps.length > 0) {
-      const { data, error } = await supabaseAdmin
+      // Get all existing apps for this newsletter to check for duplicates
+      const { data: existingApps } = await supabaseAdmin
         .from('ai_applications')
-        .insert(apps)
-        .select()
+        .select('id, app_name, app_url')
+        .eq('newsletter_id', newsletter.id)
 
-      if (error) {
-        console.error('Database insert error:', error)
-        return NextResponse.json(
-          { error: 'Failed to insert apps into database', details: error.message },
-          { status: 500 }
-        )
+      const existingAppMap = new Map(
+        existingApps?.map(app => [app.app_name.toLowerCase(), app]) || []
+      )
+
+      for (const app of apps) {
+        const existingApp = existingAppMap.get(app.app_name.toLowerCase())
+
+        if (existingApp) {
+          // Update existing app
+          const { error } = await supabaseAdmin
+            .from('ai_applications')
+            .update({
+              category: app.category,
+              tool_type: app.tool_type,
+              app_url: app.app_url,
+              description: app.description,
+              tagline: app.tagline,
+              is_affiliate: app.is_affiliate
+            })
+            .eq('id', existingApp.id)
+
+          if (error) {
+            console.error('Error updating app:', app.app_name, error)
+            errors.push(`Failed to update "${app.app_name}": ${error.message}`)
+          } else {
+            updated++
+          }
+        } else {
+          // Insert new app
+          const { error } = await supabaseAdmin
+            .from('ai_applications')
+            .insert(app)
+
+          if (error) {
+            console.error('Error inserting app:', app.app_name, error)
+            errors.push(`Failed to insert "${app.app_name}": ${error.message}`)
+          } else {
+            inserted++
+          }
+        }
       }
-
-      imported = data?.length || 0
     }
 
     return NextResponse.json({
       success: true,
-      imported,
+      inserted,
+      updated,
       total: lines.length - 1,
       errors: errors.length > 0 ? errors : undefined
     })
