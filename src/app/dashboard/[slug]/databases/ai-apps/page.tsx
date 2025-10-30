@@ -23,6 +23,7 @@ export default function AIApplicationsPage() {
     is_affiliate: false
   })
   const [filterCategory, setFilterCategory] = useState<string>('all')
+  const [filterAffiliate, setFilterAffiliate] = useState<string>('all')
   const [uploadingCSV, setUploadingCSV] = useState(false)
   const [uploadMessage, setUploadMessage] = useState('')
   const [showUploadModal, setShowUploadModal] = useState(false)
@@ -190,11 +191,14 @@ export default function AIApplicationsPage() {
 
   const filteredApps = apps.filter(app => {
     const matchesCategory = filterCategory === 'all' || app.category === filterCategory
+    const matchesAffiliate = filterAffiliate === 'all' ||
+      (filterAffiliate === 'affiliates' && app.is_affiliate) ||
+      (filterAffiliate === 'non-affiliates' && !app.is_affiliate)
     const matchesSearch = searchQuery === '' ||
       app.app_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       app.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       app.tagline?.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesCategory && matchesSearch
+    return matchesCategory && matchesAffiliate && matchesSearch
   })
 
   const categories = ['Payroll', 'HR', 'Accounting System', 'Finance', 'Productivity', 'Client Management', 'Banking']
@@ -496,32 +500,45 @@ export default function AIApplicationsPage() {
         )}
 
         {/* Search and Filter */}
-        <div className="mb-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <div className="flex-1 max-w-md">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name, description, or tagline..."
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+        <div className="mb-4 flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+            <div className="flex-1 max-w-md">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name, description, or tagline..."
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="text-sm font-medium text-gray-700">Category:</label>
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2"
+              >
+                <option value="all">All Categories</option>
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+
+              <label className="text-sm font-medium text-gray-700 ml-3">Affiliate:</label>
+              <select
+                value={filterAffiliate}
+                onChange={(e) => setFilterAffiliate(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2"
+              >
+                <option value="all">All</option>
+                <option value="affiliates">Affiliates Only</option>
+                <option value="non-affiliates">Non-Affiliates</option>
+              </select>
+            </div>
+            <span className="text-sm text-gray-600 whitespace-nowrap">
+              Showing {filteredApps.length} of {apps.length} applications
+            </span>
           </div>
-          <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-gray-700">Filter by Category:</label>
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2"
-            >
-              <option value="all">All Categories</option>
-              {categories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-          </div>
-          <span className="text-sm text-gray-600 whitespace-nowrap">
-            Showing {filteredApps.length} of {apps.length} applications
-          </span>
         </div>
 
         {/* Applications Table */}
