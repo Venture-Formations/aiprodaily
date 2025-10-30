@@ -76,8 +76,8 @@ async function callAI(
   provider: 'openai' | 'claude' = 'openai'
 ): Promise<{ content: any, fullResponse: any }> {
 
-  // Check if prompt is a structured JSON config (has messages array)
-  const isStructuredPrompt = typeof promptOrConfig === 'object' && promptOrConfig.messages
+  // Check if prompt is a structured JSON config (has messages or input array)
+  const isStructuredPrompt = typeof promptOrConfig === 'object' && (promptOrConfig.messages || promptOrConfig.input)
 
   if (provider === 'claude') {
     // Claude API call
@@ -120,15 +120,8 @@ async function callAI(
     let apiParams: any
 
     if (isStructuredPrompt) {
-      // Use structured prompt configuration - send EXACTLY as-is
-      // Just copy everything except messages (which becomes input)
+      // Use structured prompt configuration - send EXACTLY as-is with ZERO modifications
       apiParams = { ...promptOrConfig }
-
-      // Rename messages to input (API requirement only)
-      if (apiParams.messages) {
-        apiParams.input = apiParams.messages
-        delete apiParams.messages
-      }
 
       console.log('[CALLAI-OPENAI] Sending structured prompt to Responses API:', JSON.stringify(apiParams, null, 2))
 
