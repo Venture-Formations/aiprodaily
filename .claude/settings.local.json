@@ -21,7 +21,10 @@
       "Bash(npx tsc:*)",
       "mcp__vercel__getDeploymentEvents",
       "Bash(mkdir:*)",
-      "Bash(git ls-tree:*)"
+      "Bash(git ls-tree:*)",
+      "Bash(cat:*)",
+      "Bash(test:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []

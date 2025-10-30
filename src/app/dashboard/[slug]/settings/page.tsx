@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
+import Link from 'next/link'
 import Layout from '@/components/Layout'
 import type { NewsletterSection } from '@/types/database'
 import {
@@ -2170,6 +2172,10 @@ function AIPromptsSettings() {
   const [testResults, setTestResults] = useState<any>(null)
   const [testError, setTestError] = useState<string | null>(null)
 
+  // Get newsletter slug from pathname
+  const pathname = usePathname()
+  const newsletterSlug = pathname ? pathname.match(/^\/dashboard\/([^\/]+)/)?.[1] : null
+
   useEffect(() => {
     loadPrompts()
     loadCriteria()
@@ -3813,6 +3819,18 @@ function AIPromptsSettings() {
           </p>
         </div>
       </div>
+
+      {/* Testing Playground Button */}
+      {newsletterSlug && (
+        <div className="flex justify-center">
+          <Link
+            href={`https://www.aiprodaily.com/dashboard/${newsletterSlug}/settings/AIPromptTesting`}
+            className="px-6 py-3 text-base font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors duration-200 shadow-md hover:shadow-lg"
+          >
+            Testing Playground
+          </Link>
+        </div>
+      )}
 
       {/* Test Modal */}
       {testModalOpen && (
