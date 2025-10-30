@@ -1783,6 +1783,13 @@ export async function callWithStructuredPrompt(
         delete processedRequest.messages
       }
 
+      // Move response_format to text.format if it exists
+      if (processedRequest.response_format) {
+        processedRequest.text = processedRequest.text || {}
+        processedRequest.text.format = processedRequest.response_format
+        delete processedRequest.response_format
+      }
+
       console.log('[AI] Sending to OpenAI Responses API with model:', processedRequest.model)
 
       const response = await (openai as any).responses.create(processedRequest, {
