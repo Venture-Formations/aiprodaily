@@ -209,17 +209,19 @@ export async function POST(request: NextRequest) {
         let tokensUsed = 0
 
         if (provider === 'openai') {
-          // Convert messages to input format for Responses API
-          const inputMessages = processedJson.messages || [{ role: 'user', content: processedJson.content || '' }]
-          const completion = await (openai as any).responses.create({
-            model: processedJson.model || 'gpt-4o',
-            input: inputMessages,
-            temperature: processedJson.temperature,
-            max_tokens: processedJson.max_tokens
-          })
+          // Send EXACTLY as-is, only rename messages to input
+          const apiRequest = { ...processedJson }
+
+          if (apiRequest.messages) {
+            apiRequest.input = apiRequest.messages
+            delete apiRequest.messages
+          }
+
+          const completion = await (openai as any).responses.create(apiRequest)
           response = completion.output_text ?? completion.output?.[0]?.content?.[0]?.text ?? 'No response'
           tokensUsed = completion.usage?.total_tokens || 0
         } else if (provider === 'claude') {
+          // Send EXACTLY as-is
           const completion = await anthropic.messages.create(processedJson)
           const textContent = completion.content.find(c => c.type === 'text')
           response = textContent && 'text' in textContent ? textContent.text : 'No response'

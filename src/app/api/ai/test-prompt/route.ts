@@ -65,14 +65,15 @@ export async function POST(request: NextRequest) {
     const apiRequest = processedJson // Store the exact API request
 
     if (provider === 'openai') {
-      // OpenAI API call - send the exact JSON using Responses API
-      const inputMessages = processedJson.messages || [{ role: 'user', content: processedJson.content || '' }]
-      const completion = await (openai as any).responses.create({
-        model: processedJson.model || 'gpt-4o',
-        input: inputMessages,
-        temperature: processedJson.temperature,
-        max_tokens: processedJson.max_tokens
-      })
+      // OpenAI API call - send EXACTLY as-is, only rename messages to input
+      const apiRequest = { ...processedJson }
+
+      if (apiRequest.messages) {
+        apiRequest.input = apiRequest.messages
+        delete apiRequest.messages
+      }
+
+      const completion = await (openai as any).responses.create(apiRequest)
 
       response = completion.output_text ?? completion.output?.[0]?.content?.[0]?.text ?? 'No response'
       tokensUsed = completion.usage?.total_tokens
