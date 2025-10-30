@@ -73,6 +73,8 @@ export async function POST(request: NextRequest) {
         delete apiRequest.messages
       }
 
+      console.log('[TEST-PROMPT] Full API request being sent to OpenAI:', JSON.stringify(apiRequest, null, 2))
+
       const completion = await (openai as any).responses.create(apiRequest)
 
       response = completion.output_text ?? completion.output?.[0]?.content?.[0]?.text ?? 'No response'
