@@ -64,6 +64,27 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(url.searchParams.get('limit') || '10')
     const offset = parseInt(url.searchParams.get('offset') || '0')
     const status = url.searchParams.get('status')
+    const newsletterSlug = url.searchParams.get('newsletter_slug')
+    const days = url.searchParams.get('days')
+
+    // Get newsletter_id from slug (REQUIRED for multi-tenant isolation)
+    let newsletterId: string | undefined
+    if (newsletterSlug) {
+      const { data: newsletter, error: newsletterError } = await supabaseAdmin
+        .from('newsletters')
+        .select('id')
+        .eq('slug', newsletterSlug)
+        .single()
+
+      if (newsletterError || !newsletter) {
+        console.error('[DB] Newsletter not found:', newsletterSlug)
+        return NextResponse.json({
+          error: 'Newsletter not found'
+        }, { status: 404 })
+      }
+
+      newsletterId = newsletter.id
+    }
 
     let query = supabaseAdmin
       .from('newsletter_campaigns')
@@ -80,13 +101,35 @@ export async function GET(request: NextRequest) {
       .order('date', { ascending: false })
       .range(offset, offset + limit - 1)
 
+    // CRITICAL: Multi-tenant filtering (REQUIRED)
+    if (newsletterId) {
+      query = query.eq('newsletter_id', newsletterId)
+    }
+
     if (status) {
       query = query.eq('status', status)
+    }
+
+    // Timeframe filtering (for analytics)
+    if (days) {
+      const daysNum = parseInt(days)
+      const endDate = new Date()
+      const startDate = new Date()
+      startDate.setDate(startDate.getDate() - daysNum)
+
+      // Use string comparison (NO UTC conversion - per CLAUDE.md)
+      const startDateStr = startDate.toISOString().split('T')[0]
+      const endDateStr = endDate.toISOString().split('T')[0]
+
+      query = query
+        .gte('date', startDateStr)
+        .lte('date', endDateStr)
     }
 
     const { data: campaigns, error } = await query
 
     if (error) {
+      console.error('[DB] Query failed:', error.message)
       throw error
     }
 
@@ -96,7 +139,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Failed to fetch campaigns:', error)
+    console.error('[API] Failed to fetch campaigns:', error)
     return NextResponse.json({
       error: 'Failed to fetch campaigns',
       message: error instanceof Error ? error.message : 'Unknown error'

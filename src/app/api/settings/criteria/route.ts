@@ -24,22 +24,25 @@ export async function GET(request: NextRequest) {
     const { data: settingsData } = await supabaseAdmin
       .from('app_settings')
       .select('key, value')
-      .or('key.like.criteria_%_name,key.like.criteria_%_weight,key.like.secondary_criteria_%_weight')
+      .or('key.like.criteria_%_name,key.like.criteria_%_weight,key.like.secondary_criteria_%_weight,key.like.secondary_criteria_%_name')
 
     const criteria = []
     for (let i = 1; i <= 5; i++) {
       const nameKey = `criteria_${i}_name`
       const weightKey = `criteria_${i}_weight`
+      const secondaryNameKey = `secondary_criteria_${i}_name`
       const secondaryWeightKey = `secondary_criteria_${i}_weight`
 
       const nameRecord = settingsData?.find(s => s.key === nameKey)
       const weightRecord = settingsData?.find(s => s.key === weightKey)
+      const secondaryNameRecord = settingsData?.find(s => s.key === secondaryNameKey)
       const secondaryWeightRecord = settingsData?.find(s => s.key === secondaryWeightKey)
 
       criteria.push({
         number: i,
         name: nameRecord?.value || `Criteria ${i}`,
         weight: weightRecord?.value ? parseFloat(weightRecord.value) : 1.0,
+        secondaryName: secondaryNameRecord?.value || nameRecord?.value || `Criteria ${i}`,
         secondaryWeight: secondaryWeightRecord?.value ? parseFloat(secondaryWeightRecord.value) : 1.0,
         enabled: i <= enabledCount
       })
@@ -72,7 +75,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { action, criteriaNumber, name, enabledCount } = body
+    const { action, criteriaNumber, name, enabledCount, isSecondary } = body
 
     if (action === 'update_name') {
       if (!criteriaNumber || !name) {
@@ -82,7 +85,10 @@ export async function PATCH(request: NextRequest) {
         )
       }
 
-      const key = `criteria_${criteriaNumber}_name`
+      // Use different keys for primary vs secondary criteria
+      const key = isSecondary
+        ? `secondary_criteria_${criteriaNumber}_name`
+        : `criteria_${criteriaNumber}_name`
 
       // Check if setting exists
       const { data: existing } = await supabaseAdmin
@@ -109,7 +115,7 @@ export async function PATCH(request: NextRequest) {
           .insert({
             key,
             value: name,
-            description: `Name for criteria ${criteriaNumber}`
+            description: `Name for ${isSecondary ? 'secondary' : 'primary'} criteria ${criteriaNumber}`
           })
         error = result.error
       }
@@ -119,9 +125,10 @@ export async function PATCH(request: NextRequest) {
         throw error
       }
 
+      const criteriaType = isSecondary ? 'Secondary criteria' : 'Criteria'
       return NextResponse.json({
         success: true,
-        message: `Criteria ${criteriaNumber} name updated to "${name}"`
+        message: `${criteriaType} ${criteriaNumber} name updated to "${name}"`
       })
     }
 

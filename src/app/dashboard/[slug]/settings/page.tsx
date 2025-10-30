@@ -2588,7 +2588,8 @@ function AIPromptsSettings() {
         body: JSON.stringify({
           action: 'update_name',
           criteriaNumber,
-          name: editingPrimaryName.value
+          name: editingPrimaryName.value,
+          isSecondary: false
         })
       })
 
@@ -2631,7 +2632,8 @@ function AIPromptsSettings() {
         body: JSON.stringify({
           action: 'update_name',
           criteriaNumber,
-          name: editingSecondaryName.value
+          name: editingSecondaryName.value,
+          isSecondary: true
         })
       })
 
@@ -3335,7 +3337,7 @@ function AIPromptsSettings() {
                         </>
                       ) : (
                         <>
-                          <h4 className="text-base font-medium text-gray-900">{criterion.name}</h4>
+                          <h4 className="text-base font-medium text-gray-900">{criterion.secondaryName}</h4>
                           {!isEditing && prompt && (
                             <span className={`px-2 py-0.5 text-xs font-medium rounded ${
                               prompt.ai_provider === 'claude'
@@ -3346,7 +3348,7 @@ function AIPromptsSettings() {
                             </span>
                           )}
                           <button
-                            onClick={() => handleSecondaryNameEdit(criterion.number, criterion.name)}
+                            onClick={() => handleSecondaryNameEdit(criterion.number, criterion.secondaryName)}
                             className="text-xs text-blue-600 hover:text-blue-800"
                           >
                             Edit Name

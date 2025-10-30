@@ -313,6 +313,17 @@ CREATE TABLE IF NOT EXISTS link_clicks (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Feedback Responses (section preference tracking)
+CREATE TABLE IF NOT EXISTS feedback_responses (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  campaign_date DATE NOT NULL,
+  subscriber_email TEXT NOT NULL,
+  section_choice TEXT NOT NULL,
+  mailerlite_updated BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(campaign_date, subscriber_email)
+);
+
 -- ============================================
 -- NEWSLETTER SECTIONS & STRUCTURE
 -- ============================================

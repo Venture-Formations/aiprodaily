@@ -30,7 +30,7 @@ interface LinkClickAnalytics {
   dateRange: { start: string; end: string }
 }
 
-export default function AnalyticsPage() {
+export default function AnalyticsPage({ params }: { params: { slug: string } }) {
   const [campaigns, setCampaigns] = useState<CampaignWithMetrics[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -48,7 +48,9 @@ export default function AnalyticsPage() {
 
   const fetchAnalytics = async () => {
     try {
-      const response = await fetch(`/api/campaigns?limit=50&status=sent`)
+      const response = await fetch(
+        `/api/campaigns?limit=50&status=sent&newsletter_slug=${params.slug}&days=${selectedTimeframe}`
+      )
       if (!response.ok) {
         throw new Error('Failed to fetch analytics data')
       }

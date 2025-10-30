@@ -7,7 +7,18 @@
       "Bash(python:*)",
       "Bash(git pull:*)",
       "Bash(git stash:*)",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "Bash(npm run:*)",
+      "mcp__vercel__getDeployment",
+      "Read(//c/**)",
+      "Bash(npm run type-check:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(vercel ls:*)",
+      "mcp__vercel__getDeployments",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []
