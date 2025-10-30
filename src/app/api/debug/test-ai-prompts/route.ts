@@ -76,17 +76,9 @@ async function callAI(
   provider: 'openai' | 'claude' = 'openai'
 ): Promise<{ content: any, fullResponse: any }> {
 
-  // Check if prompt is a structured JSON config (has messages or input array)
-  const isStructuredPrompt = typeof promptOrConfig === 'object' && (promptOrConfig.messages || promptOrConfig.input)
-
   if (provider === 'claude') {
-    // Claude API call
-    if (!isStructuredPrompt) {
-      throw new Error('Prompt must be valid JSON with complete API parameters (model, messages, max_tokens, etc.). No defaults are added.')
-    }
-
-    // Send structured prompt EXACTLY as-is with ZERO modifications
-    console.log('[CALLAI-CLAUDE] Sending structured prompt to Claude API:', JSON.stringify(promptOrConfig, null, 2))
+    // Claude API call - send EXACTLY as-is, let API validate
+    console.log('[CALLAI-CLAUDE] Sending to Claude API:', JSON.stringify(promptOrConfig, null, 2))
 
     const completion = await anthropic.messages.create(promptOrConfig)
 
@@ -106,21 +98,10 @@ async function callAI(
       fullResponse: completion
     }
   } else {
-    // OpenAI API call (default)
-    let apiParams: any
+    // OpenAI API call - send EXACTLY as-is, let API validate
+    console.log('[CALLAI-OPENAI] Sending to Responses API:', JSON.stringify(promptOrConfig, null, 2))
 
-    if (isStructuredPrompt) {
-      // Use structured prompt configuration - send EXACTLY as-is with ZERO modifications
-      apiParams = { ...promptOrConfig }
-
-      console.log('[CALLAI-OPENAI] Sending structured prompt to Responses API:', JSON.stringify(apiParams, null, 2))
-
-    } else {
-      // Reject non-structured prompts - user must provide complete JSON
-      throw new Error('Prompt must be valid JSON with complete API parameters (model, input, etc.). No defaults are added.')
-    }
-
-    const response = await (openai as any).responses.create(apiParams)
+    const response = await (openai as any).responses.create(promptOrConfig)
 
     // Extract content from Responses API format
     const content = response.output_text ?? response.output?.[0]?.content?.[0]?.text ?? 'No response'
