@@ -77,7 +77,12 @@ export async function POST(request: NextRequest) {
 
       const completion = await (openai as any).responses.create(apiRequest)
 
-      response = completion.output?.[0]?.content?.[0]?.text ?? 'No response'
+      response =
+        completion.output?.[0]?.content?.[0]?.json ??
+        completion.output?.[0]?.content?.[0]?.input_json ??
+        completion.output?.[0]?.content?.[0]?.text ??
+        completion.output_text ??
+        'No response'
       tokensUsed = completion.usage?.total_tokens
     } else if (provider === 'claude') {
       // Claude API call - send the exact JSON

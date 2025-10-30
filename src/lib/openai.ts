@@ -1662,7 +1662,7 @@ export async function callOpenAIWithWebSearch(systemPrompt: string, userPrompt: 
       console.log('Full response structure:', JSON.stringify(response, null, 2).substring(0, 1000))
 
       // Extract the response text using the format from the user's example
-      const text = response.output?.[0]?.content?.[0]?.text ?? ""
+      const text = response.output?.[0]?.content?.[0]?.json ?? response.output?.[0]?.content?.[0]?.input_json ?? response.output?.[0]?.content?.[0]?.text ?? ""
 
       if (!text) {
         console.error('No text found in response. Response keys:', Object.keys(response))
@@ -1840,7 +1840,7 @@ export async function callWithStructuredPrompt(
       clearTimeout(timeoutId)
 
       // Extract content from Responses API format
-      content = response.output?.[0]?.content?.[0]?.text ?? ""
+      content = response.output?.[0]?.content?.[0]?.json ?? response.output?.[0]?.content?.[0]?.input_json ?? response.output?.[0]?.content?.[0]?.text ?? ""
 
       if (!content) {
         throw new Error('No response from OpenAI')
@@ -1976,7 +1976,7 @@ export async function callOpenAIStructured(options: OpenAICallOptions) {
       clearTimeout(timeoutId)
 
       // Extract content from Responses API format
-      const content = response.output?.[0]?.content?.[0]?.text ?? ""
+      const content = response.output?.[0]?.content?.[0]?.json ?? response.output?.[0]?.content?.[0]?.input_json ?? response.output?.[0]?.content?.[0]?.text ?? ""
       if (!content) {
         throw new Error('No response from OpenAI')
       }
@@ -2036,7 +2036,7 @@ export async function callOpenAI(prompt: string, maxTokens = 1000, temperature =
       clearTimeout(timeoutId)
 
       // Extract content from Responses API format
-      const content = response.output?.[0]?.content?.[0]?.text ?? ""
+      const content = response.output?.[0]?.content?.[0]?.json ?? response.output?.[0]?.content?.[0]?.input_json ?? response.output?.[0]?.content?.[0]?.text ?? ""
       if (!content) {
         throw new Error('No response from OpenAI')
       }

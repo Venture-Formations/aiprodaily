@@ -218,7 +218,11 @@ export async function POST(request: NextRequest) {
           }
 
           const completion = await (openai as any).responses.create(apiRequest)
-          response = completion.output?.[0]?.content?.[0]?.text ?? 'No response'
+          response =
+            completion.output?.[0]?.content?.[0]?.json ??
+            completion.output?.[0]?.content?.[0]?.input_json ??
+            completion.output?.[0]?.content?.[0]?.text ??
+            'No response'
           tokensUsed = completion.usage?.total_tokens || 0
         } else if (provider === 'claude') {
           // Send EXACTLY as-is

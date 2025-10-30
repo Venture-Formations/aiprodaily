@@ -103,32 +103,41 @@ async function callAI(
 
     const response = await (openai as any).responses.create(promptOrConfig)
 
-    // Extract content from Responses API format
-    // Actual structure: response.output[0].content[0].text
-    const content = response.output?.[0]?.content?.[0]?.text ?? 'No response'
+    // Extract content from Responses API format (multiple possible locations)
+    const content =
+      response.output?.[0]?.content?.[0]?.json ??           // JSON schema response
+      response.output?.[0]?.content?.[0]?.input_json ??     // Alternative JSON location
+      response.output?.[0]?.content?.[0]?.text ??           // Text response
+      response.output_text ??                               // Legacy location
+      'No response'
 
-    // Try to parse as JSON
+    // Try to parse as JSON if it's a string
     let parsedContent: any = content
-    try {
-      // Strip markdown code fences first
-      let cleanedContent = content
-      const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
-      if (codeFenceMatch) {
-        cleanedContent = codeFenceMatch[1]
-      }
+    if (typeof content === 'string') {
+      try {
+        // Strip markdown code fences first
+        let cleanedContent = content
+        const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+        if (codeFenceMatch) {
+          cleanedContent = codeFenceMatch[1]
+        }
 
-      const objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
-      const arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
+        const objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
+        const arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
 
-      if (arrayMatch) {
-        parsedContent = JSON.parse(arrayMatch[0])
-      } else if (objectMatch) {
-        parsedContent = JSON.parse(objectMatch[0])
-      } else {
-        parsedContent = JSON.parse(cleanedContent.trim())
+        if (arrayMatch) {
+          parsedContent = JSON.parse(arrayMatch[0])
+        } else if (objectMatch) {
+          parsedContent = JSON.parse(objectMatch[0])
+        } else {
+          parsedContent = JSON.parse(cleanedContent.trim())
+        }
+      } catch (parseError) {
+        // Keep as string if not JSON
+        parsedContent = content
       }
-    } catch (parseError) {
-      // Keep as string if not JSON
+    } else {
+      // Already an object (from json/input_json fields)
       parsedContent = content
     }
 
