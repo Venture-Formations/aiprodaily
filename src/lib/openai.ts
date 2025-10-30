@@ -1777,25 +1777,11 @@ export async function callWithStructuredPrompt(
         throw new Error('No response from Claude')
       }
     } else {
-      // OpenAI Responses API - rename messages to input
+      // OpenAI Responses API - only rename messages to input (API requirement)
       if (processedRequest.messages) {
         processedRequest.input = processedRequest.messages
         delete processedRequest.messages
       }
-
-      // Move response_format to text.format if it exists
-      if (processedRequest.response_format) {
-        processedRequest.text = processedRequest.text || {}
-        processedRequest.text.format = processedRequest.response_format
-        delete processedRequest.response_format
-      }
-
-      // Remove any undefined parameters (Responses API doesn't accept them)
-      Object.keys(processedRequest).forEach(key => {
-        if (processedRequest[key] === undefined) {
-          delete processedRequest[key]
-        }
-      })
 
       console.log('[AI] Sending to OpenAI Responses API with model:', processedRequest.model)
 
