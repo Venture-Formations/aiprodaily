@@ -26,6 +26,7 @@ export default function AIApplicationsPage() {
   const [uploadingCSV, setUploadingCSV] = useState(false)
   const [uploadMessage, setUploadMessage] = useState('')
   const [showUploadModal, setShowUploadModal] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     fetchApps()
@@ -182,9 +183,14 @@ export default function AIApplicationsPage() {
     document.body.removeChild(link)
   }
 
-  const filteredApps = apps.filter(app =>
-    filterCategory === 'all' || app.category === filterCategory
-  )
+  const filteredApps = apps.filter(app => {
+    const matchesCategory = filterCategory === 'all' || app.category === filterCategory
+    const matchesSearch = searchQuery === '' ||
+      app.app_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      app.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      app.tagline?.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchesCategory && matchesSearch
+  })
 
   const categories = ['Payroll', 'HR', 'Accounting System', 'Finance', 'Productivity', 'Client Management', 'Banking']
   const toolTypes = ['Client', 'Firm']
@@ -483,20 +489,31 @@ export default function AIApplicationsPage() {
           </div>
         )}
 
-        {/* Filter */}
-        <div className="mb-4">
-          <label className="text-sm font-medium text-gray-700 mr-2">Filter by Category:</label>
-          <select
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-            className="border border-gray-300 rounded px-3 py-1"
-          >
-            <option value="all">All Categories</option>
-            {categories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-          <span className="ml-4 text-sm text-gray-600">
+        {/* Search and Filter */}
+        <div className="mb-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="flex-1 max-w-md">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name, description, or tagline..."
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-gray-700">Filter by Category:</label>
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2"
+            >
+              <option value="all">All Categories</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+          <span className="text-sm text-gray-600 whitespace-nowrap">
             Showing {filteredApps.length} of {apps.length} applications
           </span>
         </div>
@@ -537,6 +554,7 @@ export default function AIApplicationsPage() {
                           value={editForm.app_name || ''}
                           onChange={(e) => setEditForm({ ...editForm, app_name: e.target.value })}
                           className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                          placeholder="App Name"
                         />
                         <input
                           type="text"
@@ -544,6 +562,13 @@ export default function AIApplicationsPage() {
                           onChange={(e) => setEditForm({ ...editForm, tagline: e.target.value })}
                           className="w-full border border-gray-300 rounded px-2 py-1 text-xs mt-1"
                           placeholder="Tagline"
+                        />
+                        <input
+                          type="url"
+                          value={editForm.app_url || ''}
+                          onChange={(e) => setEditForm({ ...editForm, app_url: e.target.value })}
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-xs mt-1"
+                          placeholder="App URL"
                         />
                       </td>
                       <td className="px-6 py-4">
