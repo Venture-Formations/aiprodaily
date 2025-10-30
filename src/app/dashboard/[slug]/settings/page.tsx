@@ -2200,8 +2200,10 @@ function AIPromptsSettings() {
   }
 
   const loadCriteria = async () => {
+    if (!newsletterSlug) return
+
     try {
-      const response = await fetch('/api/settings/criteria')
+      const response = await fetch(`/api/settings/criteria?newsletter_id=${newsletterSlug}`)
       if (response.ok) {
         const data = await response.json()
         setCriteria(data.criteria || [])
@@ -2530,17 +2532,17 @@ function AIPromptsSettings() {
   }
 
   const handleWeightSave = async (key: string) => {
-    if (!editingWeight || editingWeight.key !== key) return
+    if (!editingWeight || editingWeight.key !== key || !newsletterSlug) return
 
     // Match both primary and secondary criteria and extract type
     const secondaryMatch = key.match(/ai_prompt_secondary_criteria_(\d+)/)
     const primaryMatch = key.match(/ai_prompt_criteria_(\d+)/)
-    
+
     const isSecondary = !!secondaryMatch
     const criteriaNumber = isSecondary ? secondaryMatch[1] : primaryMatch?.[1]
-    
+
     if (!criteriaNumber) return
-    
+
     setSaving(key)
     setMessage('')
 
@@ -2551,7 +2553,8 @@ function AIPromptsSettings() {
         body: JSON.stringify({
           criteriaNumber,
           weight: parseFloat(editingWeight.value),
-          type: isSecondary ? 'secondary' : 'primary'
+          type: isSecondary ? 'secondary' : 'primary',
+          newsletterSlug
       })
       })
 
@@ -2582,7 +2585,7 @@ function AIPromptsSettings() {
   }
 
   const handlePrimaryNameSave = async (criteriaNumber: number) => {
-    if (!editingPrimaryName || editingPrimaryName.number !== criteriaNumber) return
+    if (!editingPrimaryName || editingPrimaryName.number !== criteriaNumber || !newsletterSlug) return
 
     setSaving(`criteria_${criteriaNumber}_name`)
     setMessage('')
@@ -2595,7 +2598,8 @@ function AIPromptsSettings() {
           action: 'update_name',
           criteriaNumber,
           name: editingPrimaryName.value,
-          isSecondary: false
+          isSecondary: false,
+          newsletterSlug
         })
       })
 
@@ -2626,7 +2630,7 @@ function AIPromptsSettings() {
   }
 
   const handleSecondaryNameSave = async (criteriaNumber: number) => {
-    if (!editingSecondaryName || editingSecondaryName.number !== criteriaNumber) return
+    if (!editingSecondaryName || editingSecondaryName.number !== criteriaNumber || !newsletterSlug) return
 
     setSaving(`criteria_${criteriaNumber}_name`)
     setMessage('')
@@ -2639,7 +2643,8 @@ function AIPromptsSettings() {
           action: 'update_name',
           criteriaNumber,
           name: editingSecondaryName.value,
-          isSecondary: true
+          isSecondary: true,
+          newsletterSlug
         })
       })
 
@@ -2661,6 +2666,8 @@ function AIPromptsSettings() {
   }
 
   const handleAddCriteria = async () => {
+    if (!newsletterSlug) return
+
     if (enabledCount >= 5) {
       setMessage('Maximum of 5 criteria reached')
       setTimeout(() => setMessage(''), 3000)
@@ -2676,7 +2683,8 @@ function AIPromptsSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'set_enabled_count',
-          enabledCount: enabledCount + 1
+          enabledCount: enabledCount + 1,
+          newsletterSlug
         })
       })
 
@@ -2697,6 +2705,8 @@ function AIPromptsSettings() {
   }
 
   const handleRemoveCriteria = async () => {
+    if (!newsletterSlug) return
+
     if (enabledCount <= 1) {
       setMessage('At least 1 criteria must remain enabled')
       setTimeout(() => setMessage(''), 3000)
@@ -2716,7 +2726,8 @@ function AIPromptsSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'set_enabled_count',
-          enabledCount: enabledCount - 1
+          enabledCount: enabledCount - 1,
+          newsletterSlug
         })
       })
 

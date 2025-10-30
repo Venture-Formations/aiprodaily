@@ -11,11 +11,38 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { searchParams } = new URL(request.url)
+    const newsletterSlug = searchParams.get('newsletter_id')
+
+    if (!newsletterSlug) {
+      return NextResponse.json(
+        { error: 'newsletter_id is required' },
+        { status: 400 }
+      )
+    }
+
+    // Convert slug to UUID
+    const { data: newsletter, error: newsletterError } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('slug', newsletterSlug)
+      .single()
+
+    if (newsletterError || !newsletter) {
+      return NextResponse.json(
+        { error: 'Newsletter not found' },
+        { status: 404 }
+      )
+    }
+
+    const newsletterId = newsletter.id
+
     // Fetch criteria enabled count
     const { data: enabledData } = await supabaseAdmin
       .from('app_settings')
       .select('value')
       .eq('key', 'criteria_enabled_count')
+      .eq('newsletter_id', newsletterId)
       .single()
 
     const enabledCount = enabledData?.value ? parseInt(enabledData.value) : 3
@@ -24,6 +51,7 @@ export async function GET(request: NextRequest) {
     const { data: settingsData } = await supabaseAdmin
       .from('app_settings')
       .select('key, value')
+      .eq('newsletter_id', newsletterId)
       .or('key.like.criteria_%_name,key.like.criteria_%_weight,key.like.secondary_criteria_%_weight,key.like.secondary_criteria_%_name')
 
     const criteria = []
@@ -75,7 +103,30 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { action, criteriaNumber, name, enabledCount, isSecondary } = body
+    const { action, criteriaNumber, name, enabledCount, isSecondary, newsletterSlug } = body
+
+    if (!newsletterSlug) {
+      return NextResponse.json(
+        { error: 'newsletterSlug is required' },
+        { status: 400 }
+      )
+    }
+
+    // Convert slug to UUID
+    const { data: newsletter, error: newsletterError } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('slug', newsletterSlug)
+      .single()
+
+    if (newsletterError || !newsletter) {
+      return NextResponse.json(
+        { error: 'Newsletter not found' },
+        { status: 404 }
+      )
+    }
+
+    const newsletterId = newsletter.id
 
     if (action === 'update_name') {
       if (!criteriaNumber || !name) {
@@ -95,6 +146,7 @@ export async function PATCH(request: NextRequest) {
         .from('app_settings')
         .select('key')
         .eq('key', key)
+        .eq('newsletter_id', newsletterId)
         .single()
 
       let error
@@ -107,6 +159,7 @@ export async function PATCH(request: NextRequest) {
             updated_at: new Date().toISOString()
           })
           .eq('key', key)
+          .eq('newsletter_id', newsletterId)
         error = result.error
       } else {
         // Insert new
@@ -115,6 +168,7 @@ export async function PATCH(request: NextRequest) {
           .insert({
             key,
             value: name,
+            newsletter_id: newsletterId,
             description: `Name for ${isSecondary ? 'secondary' : 'primary'} criteria ${criteriaNumber}`
           })
         error = result.error
@@ -145,6 +199,7 @@ export async function PATCH(request: NextRequest) {
         .from('app_settings')
         .select('key')
         .eq('key', 'criteria_enabled_count')
+        .eq('newsletter_id', newsletterId)
         .single()
 
       let error
@@ -157,6 +212,7 @@ export async function PATCH(request: NextRequest) {
             updated_at: new Date().toISOString()
           })
           .eq('key', 'criteria_enabled_count')
+          .eq('newsletter_id', newsletterId)
         error = result.error
       } else {
         // Insert new
@@ -165,6 +221,7 @@ export async function PATCH(request: NextRequest) {
           .insert({
             key: 'criteria_enabled_count',
             value: enabledCount.toString(),
+            newsletter_id: newsletterId,
             description: 'Number of criteria currently enabled (1-5)'
           })
         error = result.error

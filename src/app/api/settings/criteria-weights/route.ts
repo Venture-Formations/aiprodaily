@@ -12,7 +12,14 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { criteriaNumber, weight, type } = body
+    const { criteriaNumber, weight, type, newsletterSlug } = body
+
+    if (!newsletterSlug) {
+      return NextResponse.json(
+        { error: 'newsletterSlug is required' },
+        { status: 400 }
+      )
+    }
 
     if (!criteriaNumber || weight === undefined) {
       return NextResponse.json(
@@ -20,6 +27,22 @@ export async function PATCH(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Convert slug to UUID
+    const { data: newsletter, error: newsletterError } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('slug', newsletterSlug)
+      .single()
+
+    if (newsletterError || !newsletter) {
+      return NextResponse.json(
+        { error: 'Newsletter not found' },
+        { status: 404 }
+      )
+    }
+
+    const newsletterId = newsletter.id
 
     const weightNum = parseFloat(weight)
     if (isNaN(weightNum) || weightNum < 0 || weightNum > 10) {
@@ -39,6 +62,7 @@ export async function PATCH(request: NextRequest) {
       .from('app_settings')
       .select('key')
       .eq('key', key)
+      .eq('newsletter_id', newsletterId)
       .single()
 
     if (existing) {
@@ -50,6 +74,7 @@ export async function PATCH(request: NextRequest) {
           updated_at: new Date().toISOString()
         })
         .eq('key', key)
+        .eq('newsletter_id', newsletterId)
 
       if (error) throw error
     } else {
@@ -59,6 +84,7 @@ export async function PATCH(request: NextRequest) {
         .insert({
           key,
           value: weight.toString(),
+          newsletter_id: newsletterId,
           description: `Weight for ${type === 'secondary' ? 'secondary ' : ''}criteria ${criteriaNumber}`
         })
 
