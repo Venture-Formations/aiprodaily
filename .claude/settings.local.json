@@ -20,7 +20,8 @@
       "Bash(git push:*)",
       "Bash(npx tsc:*)",
       "mcp__vercel__getDeploymentEvents",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(git ls-tree:*)"
     ],
     "deny": [],
     "ask": []
