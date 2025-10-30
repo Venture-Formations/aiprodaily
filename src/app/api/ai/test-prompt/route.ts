@@ -65,24 +65,28 @@ export async function POST(request: NextRequest) {
     const apiRequest = processedJson // Store the exact API request
 
     if (provider === 'openai') {
-      // OpenAI API call - send EXACTLY as-is, only rename messages to input
-      const apiRequest = { ...processedJson }
+      // OpenAI API call - use correct chat.completions.create format
+      console.log('[TEST-PROMPT] Full API request being sent to OpenAI:', JSON.stringify(processedJson, null, 2))
 
-      if (apiRequest.messages) {
-        apiRequest.input = apiRequest.messages
-        delete apiRequest.messages
+      const completion = await openai.chat.completions.create(processedJson)
+
+      // Extract response based on response_format
+      const firstChoice = completion.choices?.[0]
+      if (firstChoice?.message?.content) {
+        // If using JSON schema, parse the JSON
+        if (processedJson.response_format?.type === 'json_schema') {
+          try {
+            response = JSON.parse(firstChoice.message.content)
+          } catch {
+            response = firstChoice.message.content
+          }
+        } else {
+          response = firstChoice.message.content
+        }
+      } else {
+        response = 'No response'
       }
 
-      console.log('[TEST-PROMPT] Full API request being sent to OpenAI:', JSON.stringify(apiRequest, null, 2))
-
-      const completion = await (openai as any).responses.create(apiRequest)
-
-      response =
-        completion.output?.[0]?.content?.[0]?.json ??
-        completion.output?.[0]?.content?.[0]?.input_json ??
-        completion.output?.[0]?.content?.[0]?.text ??
-        completion.output_text ??
-        'No response'
       tokensUsed = completion.usage?.total_tokens
     } else if (provider === 'claude') {
       // Claude API call - send the exact JSON
