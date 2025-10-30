@@ -112,10 +112,17 @@ export async function GET(request: NextRequest) {
     const allPostIds = [
       ...(primaryArticles || []).map(a => a.post_id),
       ...(secondaryArticles || []).map(a => a.post_id)
-    ].filter((id, index, self) => self.indexOf(id) === index);
+    ].filter((id, index, self) => id && self.indexOf(id) === index); // Filter out null/undefined
+
+    console.log('[API] Post IDs to fetch:', allPostIds.length, 'IDs:', allPostIds.slice(0, 5));
+
+    if (allPostIds.length === 0) {
+      console.log('[API] No post IDs found - articles have no post_id references');
+      return NextResponse.json({ data: [] });
+    }
 
     // Fetch RSS posts
-    const { data: rssPosts } = await supabase
+    const { data: rssPosts, error: rssPostsError } = await supabase
       .from('rss_posts')
       .select(`
         id,
@@ -140,6 +147,12 @@ export async function GET(request: NextRequest) {
         final_priority_score
       `)
       .in('id', allPostIds);
+
+    if (rssPostsError) {
+      console.error('[API] RSS posts error:', rssPostsError.message);
+    }
+
+    console.log('[API] Found RSS posts:', rssPosts?.length || 0);
 
     const postMap = new Map(rssPosts?.map(p => [p.id, p]) || []);
 
