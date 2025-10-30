@@ -77,12 +77,28 @@ export async function POST(request: NextRequest) {
 
       const completion = await (openai as any).responses.create(apiRequest)
 
-      response =
+      console.log('[TEST-PROMPT] Raw API response:', JSON.stringify(completion, null, 2))
+
+      // Try multiple response formats
+      let rawResponse =
         completion.output?.[0]?.content?.[0]?.json ??
         completion.output?.[0]?.content?.[0]?.input_json ??
         completion.output?.[0]?.content?.[0]?.text ??
         completion.output_text ??
+        completion.choices?.[0]?.message?.content ??  // Chat completions format
         'No response'
+
+      // If response is a JSON string, parse it
+      if (typeof rawResponse === 'string') {
+        try {
+          response = JSON.parse(rawResponse)
+        } catch {
+          response = rawResponse
+        }
+      } else {
+        response = rawResponse
+      }
+
       tokensUsed = completion.usage?.total_tokens
     } else if (provider === 'claude') {
       // Claude API call - send the exact JSON
