@@ -487,11 +487,11 @@ export default function ArticlesPage() {
                       {expandedRow === article.id && (
                         <tr>
                           <td colSpan={enabledColumns.length + 1} className="px-6 py-4 bg-gray-50">
-                            <div className="space-y-4">
+                            <div className="space-y-4 max-w-full overflow-hidden">
                               {/* Original Content Section */}
                               <div>
                                 <h3 className="text-sm font-semibold text-gray-900 mb-2">Original RSS Content</h3>
-                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                   <div>
                                     <span className="font-medium text-gray-700">Publication Date:</span>
                                     <span className="ml-2 text-gray-600">{formatDate(article.publicationDate)}</span>
@@ -518,11 +518,11 @@ export default function ArticlesPage() {
                                 </div>
                                 <div className="mt-2">
                                   <span className="font-medium text-gray-700">Description:</span>
-                                  <p className="mt-1 text-gray-600">{article.originalDescription}</p>
+                                  <p className="mt-1 text-gray-600 break-words">{article.originalDescription}</p>
                                 </div>
                                 <div className="mt-2">
                                   <span className="font-medium text-gray-700">Full Article Text:</span>
-                                  <p className="mt-1 text-gray-600 max-h-40 overflow-y-auto">
+                                  <p className="mt-1 text-gray-600 max-h-40 overflow-y-auto break-words whitespace-pre-wrap">
                                     {article.originalFullText || 'Not available'}
                                   </p>
                                 </div>
@@ -547,57 +547,57 @@ export default function ArticlesPage() {
                                 <div className="space-y-2">
                                   {article.criteria1Enabled && (
                                     <div className="border-l-4 border-blue-400 pl-3">
-                                      <div className="flex items-center justify-between">
+                                      <div className="flex items-center justify-between flex-wrap gap-2">
                                         <span className="font-medium text-gray-700">{article.criteria1Name}</span>
-                                        <span className="text-gray-900">
+                                        <span className="text-gray-900 whitespace-nowrap">
                                           Score: {article.criteria1Score}/10 (Weight: {article.criteria1Weight})
                                         </span>
                                       </div>
-                                      <p className="text-sm text-gray-600 mt-1">{article.criteria1Reasoning}</p>
+                                      <p className="text-sm text-gray-600 mt-1 break-words">{article.criteria1Reasoning}</p>
                                     </div>
                                   )}
                                   {article.criteria2Enabled && (
                                     <div className="border-l-4 border-green-400 pl-3">
-                                      <div className="flex items-center justify-between">
+                                      <div className="flex items-center justify-between flex-wrap gap-2">
                                         <span className="font-medium text-gray-700">{article.criteria2Name}</span>
-                                        <span className="text-gray-900">
+                                        <span className="text-gray-900 whitespace-nowrap">
                                           Score: {article.criteria2Score}/10 (Weight: {article.criteria2Weight})
                                         </span>
                                       </div>
-                                      <p className="text-sm text-gray-600 mt-1">{article.criteria2Reasoning}</p>
+                                      <p className="text-sm text-gray-600 mt-1 break-words">{article.criteria2Reasoning}</p>
                                     </div>
                                   )}
                                   {article.criteria3Enabled && (
                                     <div className="border-l-4 border-yellow-400 pl-3">
-                                      <div className="flex items-center justify-between">
+                                      <div className="flex items-center justify-between flex-wrap gap-2">
                                         <span className="font-medium text-gray-700">{article.criteria3Name}</span>
-                                        <span className="text-gray-900">
+                                        <span className="text-gray-900 whitespace-nowrap">
                                           Score: {article.criteria3Score}/10 (Weight: {article.criteria3Weight})
                                         </span>
                                       </div>
-                                      <p className="text-sm text-gray-600 mt-1">{article.criteria3Reasoning}</p>
+                                      <p className="text-sm text-gray-600 mt-1 break-words">{article.criteria3Reasoning}</p>
                                     </div>
                                   )}
                                   {article.criteria4Enabled && (
                                     <div className="border-l-4 border-red-400 pl-3">
-                                      <div className="flex items-center justify-between">
+                                      <div className="flex items-center justify-between flex-wrap gap-2">
                                         <span className="font-medium text-gray-700">{article.criteria4Name}</span>
-                                        <span className="text-gray-900">
+                                        <span className="text-gray-900 whitespace-nowrap">
                                           Score: {article.criteria4Score}/10 (Weight: {article.criteria4Weight})
                                         </span>
                                       </div>
-                                      <p className="text-sm text-gray-600 mt-1">{article.criteria4Reasoning}</p>
+                                      <p className="text-sm text-gray-600 mt-1 break-words">{article.criteria4Reasoning}</p>
                                     </div>
                                   )}
                                   {article.criteria5Enabled && (
                                     <div className="border-l-4 border-purple-400 pl-3">
-                                      <div className="flex items-center justify-between">
+                                      <div className="flex items-center justify-between flex-wrap gap-2">
                                         <span className="font-medium text-gray-700">{article.criteria5Name}</span>
-                                        <span className="text-gray-900">
+                                        <span className="text-gray-900 whitespace-nowrap">
                                           Score: {article.criteria5Score}/10 (Weight: {article.criteria5Weight})
                                         </span>
                                       </div>
-                                      <p className="text-sm text-gray-600 mt-1">{article.criteria5Reasoning}</p>
+                                      <p className="text-sm text-gray-600 mt-1 break-words">{article.criteria5Reasoning}</p>
                                     </div>
                                   )}
                                 </div>
@@ -609,16 +609,16 @@ export default function ArticlesPage() {
                                 <div className="space-y-2">
                                   <div>
                                     <span className="font-medium text-gray-700">Headline:</span>
-                                    <p className="mt-1 text-gray-900">{article.headline}</p>
+                                    <p className="mt-1 text-gray-900 break-words">{article.headline}</p>
                                   </div>
                                   <div>
                                     <span className="font-medium text-gray-700">Content:</span>
                                     <div
-                                      className="mt-1 text-gray-600 prose prose-sm max-w-none"
+                                      className="mt-1 text-gray-600 prose prose-sm max-w-none break-words overflow-hidden"
                                       dangerouslySetInnerHTML={{ __html: article.content }}
                                     />
                                   </div>
-                                  <div className="grid grid-cols-3 gap-4 text-sm">
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                                     <div>
                                       <span className="font-medium text-gray-700">Fact Check Score:</span>
                                       <span className="ml-2 text-gray-900">
