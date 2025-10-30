@@ -1954,9 +1954,14 @@ export default function CampaignDetailPage() {
   const [maxSecondaryArticles, setMaxSecondaryArticles] = useState(3)
   const [sectionExpandedStates, setSectionExpandedStates] = useState<{ [key: string]: boolean }>({})
 
-  // Drag and drop sensors
+  // Drag and drop sensors with activation constraints for better mobile experience
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: 250, // 250ms delay before drag starts (better for mobile)
+        tolerance: 5, // Allow 5px of movement before drag starts
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
