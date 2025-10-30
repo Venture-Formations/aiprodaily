@@ -188,7 +188,7 @@ export async function GET(request: NextRequest) {
           criteria_4_reason,
           criteria_5_score,
           criteria_5_reason,
-          final_score
+          total_score
         `)
         .in('post_id', allPostIds);
 
@@ -286,7 +286,7 @@ export async function GET(request: NextRequest) {
         criteria5Name: criteriaConfig.criteria_5_name || 'Criteria 5',
         criteria5Enabled: parseInt(criteriaConfig.criteria_enabled_count || '0') >= 5,
 
-        totalScore: rating?.final_score || null,
+        totalScore: rating?.total_score || null,
         headline: article.headline || '',
         content: article.content || '',
         factCheckScore: article.fact_check_score || null,
