@@ -42,21 +42,17 @@ export async function GET(request: NextRequest) {
       .select('key, value')
       .eq('newsletter_id', newsletterId)
       .in('key', [
-        'scoring_criteria_1_name',
-        'scoring_criteria_1_weight',
-        'scoring_criteria_2_name',
-        'scoring_criteria_2_weight',
-        'scoring_criteria_3_name',
-        'scoring_criteria_3_weight',
-        'scoring_criteria_4_name',
-        'scoring_criteria_4_weight',
-        'scoring_criteria_5_name',
-        'scoring_criteria_5_weight',
-        'scoring_criteria_1_enabled',
-        'scoring_criteria_2_enabled',
-        'scoring_criteria_3_enabled',
-        'scoring_criteria_4_enabled',
-        'scoring_criteria_5_enabled'
+        'criteria_1_name',
+        'criteria_1_weight',
+        'criteria_2_name',
+        'criteria_2_weight',
+        'criteria_3_name',
+        'criteria_3_weight',
+        'criteria_4_name',
+        'criteria_4_weight',
+        'criteria_5_name',
+        'criteria_5_weight',
+        'criteria_enabled_count'
       ]);
 
     const criteriaConfig: Record<string, string> = {};
@@ -156,18 +152,7 @@ export async function GET(request: NextRequest) {
           publication_date,
           author,
           source_url,
-          image_url,
-          criteria_1_score,
-          criteria_1_reason,
-          criteria_2_score,
-          criteria_2_reason,
-          criteria_3_score,
-          criteria_3_reason,
-          criteria_4_score,
-          criteria_4_reason,
-          criteria_5_score,
-          criteria_5_reason,
-          final_priority_score
+          image_url
         `)
         .in('id', allPostIds);
 
@@ -185,6 +170,40 @@ export async function GET(request: NextRequest) {
 
     const postMap = new Map(rssPosts?.map(p => [p.id, p]) || []);
     console.log('[API] Post map size:', postMap.size, 'Keys:', Array.from(postMap.keys()).slice(0, 5));
+
+    // Fetch post ratings (only if we have post IDs)
+    let postRatings: any[] = [];
+    if (allPostIds.length > 0) {
+      const { data, error: ratingsError } = await supabase
+        .from('post_ratings')
+        .select(`
+          post_id,
+          criteria_1_score,
+          criteria_1_reason,
+          criteria_2_score,
+          criteria_2_reason,
+          criteria_3_score,
+          criteria_3_reason,
+          criteria_4_score,
+          criteria_4_reason,
+          criteria_5_score,
+          criteria_5_reason,
+          final_score
+        `)
+        .in('post_id', allPostIds);
+
+      if (ratingsError) {
+        console.error('[API] Post ratings error:', ratingsError.message);
+      }
+      postRatings = data || [];
+      console.log('[API] Found post ratings:', postRatings?.length || 0);
+      if (postRatings && postRatings.length > 0) {
+        console.log('[API] Sample rating:', postRatings[0]);
+      }
+    }
+
+    const ratingsMap = new Map(postRatings?.map(r => [r.post_id, r]) || []);
+    console.log('[API] Ratings map size:', ratingsMap.size);
 
     // Get all feed IDs
     const allFeedIds = (rssPosts || [])
@@ -209,6 +228,7 @@ export async function GET(request: NextRequest) {
       const post = postMap.get(article.post_id);
       const campaign = campaignMap.get(article.campaign_id);
       const feed = post ? feedMap.get(post.feed_id) : null;
+      const rating = ratingsMap.get(article.post_id);
 
       // Log if data is missing
       if (!post) {
@@ -219,6 +239,9 @@ export async function GET(request: NextRequest) {
       }
       if (post && !feed) {
         console.log('[API] Missing feed for post:', post.id, 'feed_id:', post.feed_id);
+      }
+      if (!rating) {
+        console.log('[API] Missing rating for article:', article.id, 'post_id:', article.post_id);
       }
 
       return {
@@ -233,37 +256,37 @@ export async function GET(request: NextRequest) {
         feedType: isPrimary ? 'Primary' : 'Secondary',
         feedName: feed?.name || 'Unknown',
 
-        criteria1Score: post?.criteria_1_score || null,
-        criteria1Weight: parseFloat(criteriaConfig.scoring_criteria_1_weight || '0'),
-        criteria1Reasoning: post?.criteria_1_reason || '',
-        criteria1Name: criteriaConfig.scoring_criteria_1_name || 'Criteria 1',
-        criteria1Enabled: criteriaConfig.scoring_criteria_1_enabled === 'true',
+        criteria1Score: rating?.criteria_1_score || null,
+        criteria1Weight: parseFloat(criteriaConfig.criteria_1_weight || '1.0'),
+        criteria1Reasoning: rating?.criteria_1_reason || '',
+        criteria1Name: criteriaConfig.criteria_1_name || 'Criteria 1',
+        criteria1Enabled: parseInt(criteriaConfig.criteria_enabled_count || '0') >= 1,
 
-        criteria2Score: post?.criteria_2_score || null,
-        criteria2Weight: parseFloat(criteriaConfig.scoring_criteria_2_weight || '0'),
-        criteria2Reasoning: post?.criteria_2_reason || '',
-        criteria2Name: criteriaConfig.scoring_criteria_2_name || 'Criteria 2',
-        criteria2Enabled: criteriaConfig.scoring_criteria_2_enabled === 'true',
+        criteria2Score: rating?.criteria_2_score || null,
+        criteria2Weight: parseFloat(criteriaConfig.criteria_2_weight || '1.0'),
+        criteria2Reasoning: rating?.criteria_2_reason || '',
+        criteria2Name: criteriaConfig.criteria_2_name || 'Criteria 2',
+        criteria2Enabled: parseInt(criteriaConfig.criteria_enabled_count || '0') >= 2,
 
-        criteria3Score: post?.criteria_3_score || null,
-        criteria3Weight: parseFloat(criteriaConfig.scoring_criteria_3_weight || '0'),
-        criteria3Reasoning: post?.criteria_3_reason || '',
-        criteria3Name: criteriaConfig.scoring_criteria_3_name || 'Criteria 3',
-        criteria3Enabled: criteriaConfig.scoring_criteria_3_enabled === 'true',
+        criteria3Score: rating?.criteria_3_score || null,
+        criteria3Weight: parseFloat(criteriaConfig.criteria_3_weight || '1.0'),
+        criteria3Reasoning: rating?.criteria_3_reason || '',
+        criteria3Name: criteriaConfig.criteria_3_name || 'Criteria 3',
+        criteria3Enabled: parseInt(criteriaConfig.criteria_enabled_count || '0') >= 3,
 
-        criteria4Score: post?.criteria_4_score || null,
-        criteria4Weight: parseFloat(criteriaConfig.scoring_criteria_4_weight || '0'),
-        criteria4Reasoning: post?.criteria_4_reason || '',
-        criteria4Name: criteriaConfig.scoring_criteria_4_name || 'Criteria 4',
-        criteria4Enabled: criteriaConfig.scoring_criteria_4_enabled === 'true',
+        criteria4Score: rating?.criteria_4_score || null,
+        criteria4Weight: parseFloat(criteriaConfig.criteria_4_weight || '1.0'),
+        criteria4Reasoning: rating?.criteria_4_reason || '',
+        criteria4Name: criteriaConfig.criteria_4_name || 'Criteria 4',
+        criteria4Enabled: parseInt(criteriaConfig.criteria_enabled_count || '0') >= 4,
 
-        criteria5Score: post?.criteria_5_score || null,
-        criteria5Weight: parseFloat(criteriaConfig.scoring_criteria_5_weight || '0'),
-        criteria5Reasoning: post?.criteria_5_reason || '',
-        criteria5Name: criteriaConfig.scoring_criteria_5_name || 'Criteria 5',
-        criteria5Enabled: criteriaConfig.scoring_criteria_5_enabled === 'true',
+        criteria5Score: rating?.criteria_5_score || null,
+        criteria5Weight: parseFloat(criteriaConfig.criteria_5_weight || '1.0'),
+        criteria5Reasoning: rating?.criteria_5_reason || '',
+        criteria5Name: criteriaConfig.criteria_5_name || 'Criteria 5',
+        criteria5Enabled: parseInt(criteriaConfig.criteria_enabled_count || '0') >= 5,
 
-        totalScore: post?.final_priority_score || null,
+        totalScore: rating?.final_score || null,
         headline: article.headline || '',
         content: article.content || '',
         factCheckScore: article.fact_check_score || null,
