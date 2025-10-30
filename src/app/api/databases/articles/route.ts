@@ -36,10 +36,11 @@ export async function GET(request: NextRequest) {
     const newsletterId = newsletter.id;
     console.log('[API] Newsletter:', newsletterSlug, '→ UUID:', newsletterId);
 
-    // Get scoring criteria settings (these are global, not per-newsletter)
+    // Get scoring criteria settings (newsletter-specific)
     const { data: criteriaSettings } = await supabase
       .from('app_settings')
       .select('key, value')
+      .eq('newsletter_id', newsletterId)
       .in('key', [
         'criteria_1_name',
         'criteria_1_weight',
