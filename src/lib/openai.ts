@@ -1784,6 +1784,7 @@ export async function callWithStructuredPrompt(
       }
 
       console.log('[AI] Sending to OpenAI Responses API with model:', processedRequest.model)
+      console.log('[AI] Full request being sent:', JSON.stringify(processedRequest, null, 2))
 
       const response = await (openai as any).responses.create(processedRequest, {
         signal: controller.signal
