@@ -116,40 +116,39 @@ export async function GET(request: NextRequest) {
 
     console.log('[API] Post IDs to fetch:', allPostIds.length, 'IDs:', allPostIds.slice(0, 5));
 
-    if (allPostIds.length === 0) {
-      console.log('[API] No post IDs found - articles have no post_id references');
-      return NextResponse.json({ data: [] });
-    }
+    // Fetch RSS posts (only if we have post IDs)
+    let rssPosts: any[] = [];
+    if (allPostIds.length > 0) {
+      const { data, error: rssPostsError } = await supabase
+        .from('rss_posts')
+        .select(`
+          id,
+          feed_id,
+          title,
+          description,
+          full_article_text,
+          published_date,
+          author,
+          source_url,
+          image_url,
+          criteria_1_score,
+          criteria_1_reason,
+          criteria_2_score,
+          criteria_2_reason,
+          criteria_3_score,
+          criteria_3_reason,
+          criteria_4_score,
+          criteria_4_reason,
+          criteria_5_score,
+          criteria_5_reason,
+          final_priority_score
+        `)
+        .in('id', allPostIds);
 
-    // Fetch RSS posts
-    const { data: rssPosts, error: rssPostsError } = await supabase
-      .from('rss_posts')
-      .select(`
-        id,
-        feed_id,
-        title,
-        description,
-        full_article_text,
-        published_date,
-        author,
-        source_url,
-        image_url,
-        criteria_1_score,
-        criteria_1_reason,
-        criteria_2_score,
-        criteria_2_reason,
-        criteria_3_score,
-        criteria_3_reason,
-        criteria_4_score,
-        criteria_4_reason,
-        criteria_5_score,
-        criteria_5_reason,
-        final_priority_score
-      `)
-      .in('id', allPostIds);
-
-    if (rssPostsError) {
-      console.error('[API] RSS posts error:', rssPostsError.message);
+      if (rssPostsError) {
+        console.error('[API] RSS posts error:', rssPostsError.message);
+      }
+      rssPosts = data || [];
     }
 
     console.log('[API] Found RSS posts:', rssPosts?.length || 0);
@@ -161,11 +160,15 @@ export async function GET(request: NextRequest) {
       .map(p => p.feed_id)
       .filter((id, index, self) => id && self.indexOf(id) === index);
 
-    // Fetch RSS feeds
-    const { data: rssFeeds } = await supabase
-      .from('rss_feeds')
-      .select('id, name, use_for_primary_section, use_for_secondary_section')
-      .in('id', allFeedIds);
+    // Fetch RSS feeds (only if we have feed IDs)
+    let rssFeeds: any[] = [];
+    if (allFeedIds.length > 0) {
+      const { data } = await supabase
+        .from('rss_feeds')
+        .select('id, name, use_for_primary_section, use_for_secondary_section')
+        .in('id', allFeedIds);
+      rssFeeds = data || [];
+    }
 
     const feedMap = new Map(rssFeeds?.map(f => [f.id, f]) || []);
 
@@ -175,7 +178,10 @@ export async function GET(request: NextRequest) {
       const campaign = campaignMap.get(article.campaign_id);
       const feed = post ? feedMap.get(post.feed_id) : null;
 
-      if (!post || !campaign) return null;
+      // Skip if no campaign (required for date)
+      if (!campaign) return null;
+
+      // If no post data, we'll show what we have from the article table
 
       return {
         id: article.id,
