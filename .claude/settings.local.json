@@ -24,7 +24,8 @@
       "Bash(git ls-tree:*)",
       "Bash(cat:*)",
       "Bash(test:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

@@ -102,6 +102,9 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('[API] Found primary articles:', primaryArticles?.length || 0);
+    if (primaryArticles && primaryArticles.length > 0) {
+      console.log('[API] Sample primary article:', { id: primaryArticles[0].id, post_id: primaryArticles[0].post_id, campaign_id: primaryArticles[0].campaign_id });
+    }
 
     // Fetch secondary articles - if we have campaigns, filter by them, otherwise get all
     let secondaryQuery = supabase
@@ -172,11 +175,16 @@ export async function GET(request: NextRequest) {
         console.error('[API] RSS posts error:', rssPostsError.message);
       }
       rssPosts = data || [];
+      console.log('[API] Found RSS posts:', rssPosts?.length || 0);
+      if (rssPosts && rssPosts.length > 0) {
+        console.log('[API] Sample RSS post:', rssPosts[0]);
+      }
+    } else {
+      console.log('[API] No post IDs to fetch');
     }
 
-    console.log('[API] Found RSS posts:', rssPosts?.length || 0);
-
     const postMap = new Map(rssPosts?.map(p => [p.id, p]) || []);
+    console.log('[API] Post map size:', postMap.size, 'Keys:', Array.from(postMap.keys()).slice(0, 5));
 
     // Get all feed IDs
     const allFeedIds = (rssPosts || [])
@@ -194,6 +202,7 @@ export async function GET(request: NextRequest) {
     }
 
     const feedMap = new Map(rssFeeds?.map(f => [f.id, f]) || []);
+    console.log('[API] Feed map size:', feedMap.size, 'Keys:', Array.from(feedMap.keys()).slice(0, 5));
 
     // Transform and combine articles
     const transformArticle = (article: any, isPrimary: boolean) => {
@@ -201,7 +210,16 @@ export async function GET(request: NextRequest) {
       const campaign = campaignMap.get(article.campaign_id);
       const feed = post ? feedMap.get(post.feed_id) : null;
 
-      // Show article data even if post or campaign is missing
+      // Log if data is missing
+      if (!post) {
+        console.log('[API] Missing post for article:', article.id, 'post_id:', article.post_id);
+      }
+      if (!campaign) {
+        console.log('[API] Missing campaign for article:', article.id, 'campaign_id:', article.campaign_id);
+      }
+      if (post && !feed) {
+        console.log('[API] Missing feed for post:', post.id, 'feed_id:', post.feed_id);
+      }
 
       return {
         id: article.id,
