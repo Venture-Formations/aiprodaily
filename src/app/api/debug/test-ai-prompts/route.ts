@@ -130,6 +130,13 @@ async function callAI(
         delete apiParams.messages
       }
 
+      // Fix: OpenAI Responses API uses max_output_tokens, not max_tokens
+      if (apiParams.max_tokens && !apiParams.max_output_tokens) {
+        apiParams.max_output_tokens = apiParams.max_tokens
+        delete apiParams.max_tokens
+        console.log('[CALLAI-OPENAI] Converted max_tokens to max_output_tokens')
+      }
+
       console.log('[CALLAI-OPENAI] Sending structured prompt to Responses API:', JSON.stringify(apiParams, null, 2))
 
     } else {
