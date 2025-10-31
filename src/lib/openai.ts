@@ -1856,9 +1856,27 @@ export async function callWithStructuredPrompt(
         throw new Error('No response from OpenAI')
       }
 
-      // If rawContent is already a parsed object/array, return it directly
+      // If rawContent is already a parsed object/array, check if it's the actual content or the response wrapper
       if (typeof rawContent === 'object' && rawContent !== null) {
-        return rawContent
+        // If it has properties like 'groups', 'score', 'headline', etc., it's likely the actual AI response content
+        // If it has properties like 'output', 'output_text', 'id', etc., it's the response wrapper - try to extract content
+        if ('output' in rawContent || 'output_text' in rawContent || 'id' in rawContent) {
+          // This is the response wrapper, not the content - try to extract
+          const extracted = rawContent.output_text ?? rawContent.text ?? rawContent
+          if (typeof extracted === 'string') {
+            // Continue to parsing below
+            rawContent = extracted
+          } else if (typeof extracted === 'object' && extracted !== null) {
+            // Extracted content is already an object, use it
+            return extracted
+          } else {
+            // Can't extract, return as-is (might be valid response structure)
+            return rawContent
+          }
+        } else {
+          // Likely the actual AI response content (has 'groups', 'score', etc.)
+          return rawContent
+        }
       }
       
       // Otherwise, it's a string that needs parsing
@@ -2072,9 +2090,27 @@ export async function callOpenAI(prompt: string, maxTokens = 1000, temperature =
         throw new Error('No response from OpenAI')
       }
 
-      // If rawContent is already a parsed object/array, return it directly
+      // If rawContent is already a parsed object/array, check if it's the actual content or the response wrapper
       if (typeof rawContent === 'object' && rawContent !== null) {
-        return rawContent
+        // If it has properties like 'groups', 'score', 'headline', etc., it's likely the actual AI response content
+        // If it has properties like 'output', 'output_text', 'id', etc., it's the response wrapper - try to extract content
+        if ('output' in rawContent || 'output_text' in rawContent || 'id' in rawContent) {
+          // This is the response wrapper, not the content - try to extract
+          const extracted = rawContent.output_text ?? rawContent.text ?? rawContent
+          if (typeof extracted === 'string') {
+            // Continue to parsing below
+            rawContent = extracted
+          } else if (typeof extracted === 'object' && extracted !== null) {
+            // Extracted content is already an object, use it
+            return extracted
+          } else {
+            // Can't extract, return as-is (might be valid response structure)
+            return rawContent
+          }
+        } else {
+          // Likely the actual AI response content (has 'groups', 'score', etc.)
+          return rawContent
+        }
       }
 
       // console.log('OpenAI response received') // Commented out to reduce log count

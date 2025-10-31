@@ -792,11 +792,27 @@ export class RSSProcessor {
 
         // Call AI with structured prompt from database (includes all parameters)
         const promptKey = `ai_prompt_criteria_${criterion.number}`
-        const result = await callAIWithPrompt(promptKey, {
-          title: post.title,
-          description: post.description || '',
-          content: fullText
-        })
+        
+        let result
+        try {
+          result = await callAIWithPrompt(promptKey, {
+            title: post.title,
+            description: post.description || '',
+            content: fullText
+          })
+        } catch (callError) {
+          console.error(`[RSS] AI call failed for criterion ${criterion.number}, post ${post.id}:`, callError)
+          throw new Error(`AI call failed for criterion ${criterion.number}: ${callError instanceof Error ? callError.message : 'Unknown error'}`)
+        }
+
+        // Log result structure for debugging
+        if (!result || typeof result !== 'object') {
+          console.error(`[RSS] Invalid AI response for criterion ${criterion.number}, post ${post.id}:`, {
+            resultType: typeof result,
+            result: result
+          })
+          throw new Error(`Invalid AI response type for criterion ${criterion.number}: expected object, got ${typeof result}`)
+        }
 
         // Parse the AI response
         const score = result.score
@@ -804,7 +820,13 @@ export class RSSProcessor {
 
         // Validate score is a number between 0-10
         if (typeof score !== 'number' || score < 0 || score > 10) {
-          throw new Error(`Criterion ${criterion.number} score must be between 0-10`)
+          console.error(`[RSS] Invalid score for criterion ${criterion.number}, post ${post.id}:`, {
+            score,
+            scoreType: typeof score,
+            resultKeys: Object.keys(result || {}),
+            fullResult: result
+          })
+          throw new Error(`Criterion ${criterion.number} score must be between 0-10, got ${score} (type: ${typeof score})`)
         }
 
         criteriaScores.push({
