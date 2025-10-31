@@ -1486,26 +1486,68 @@ export class RSSProcessor {
       }
 
     } catch (error) {
-      // Fallback to legacy single-step articleWriter
+      // Fallback to legacy single-step articleWriter (use callAIWithPrompt to respect provider setting)
       try {
-        const prompt = await AI_PROMPTS.articleWriter(postData)
-        const result = await callOpenAI(prompt)
+        const result = await callAIWithPrompt('ai_prompt_article_writer', {
+          title: postData.title,
+          description: postData.description || 'No description available',
+          content: postData.content ? postData.content.substring(0, 1500) + '...' : 'No additional content',
+          url: postData.source_url || ''
+        })
 
-        if (!result.headline || !result.content || !result.word_count) {
+        // Handle response with 'raw' property if needed
+        let parsedResult = result
+        if (result && typeof result === 'object' && 'raw' in result && typeof result.raw === 'string') {
+          try {
+            parsedResult = JSON.parse(result.raw)
+          } catch (parseError) {
+            // Try extracting JSON from markdown code fences
+            try {
+              const codeFenceMatch = result.raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+              const cleanedContent = codeFenceMatch && codeFenceMatch[1] ? codeFenceMatch[1] : result.raw
+              parsedResult = JSON.parse(cleanedContent.trim())
+            } catch {
+              throw new Error('Failed to parse article writer response')
+            }
+          }
+        }
+
+        if (!parsedResult.headline || !parsedResult.content || !parsedResult.word_count) {
           throw new Error('Invalid newsletter content response')
         }
 
-        return result as NewsletterContent
+        return parsedResult as NewsletterContent
       } catch (fallbackError) {
-        // Final fallback to newsletterWriter
-        const prompt = await AI_PROMPTS.newsletterWriter(postData)
-        const result = await callOpenAI(prompt)
+        // Final fallback to newsletterWriter (use callAIWithPrompt to respect provider setting)
+        const result = await callAIWithPrompt('ai_prompt_newsletter_writer', {
+          title: postData.title,
+          description: postData.description || 'No description available',
+          content: postData.content ? postData.content.substring(0, 1500) + '...' : 'No additional content',
+          url: postData.source_url || ''
+        })
 
-        if (!result.headline || !result.content || !result.word_count) {
+        // Handle response with 'raw' property if needed
+        let parsedResult = result
+        if (result && typeof result === 'object' && 'raw' in result && typeof result.raw === 'string') {
+          try {
+            parsedResult = JSON.parse(result.raw)
+          } catch (parseError) {
+            // Try extracting JSON from markdown code fences
+            try {
+              const codeFenceMatch = result.raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+              const cleanedContent = codeFenceMatch && codeFenceMatch[1] ? codeFenceMatch[1] : result.raw
+              parsedResult = JSON.parse(cleanedContent.trim())
+            } catch {
+              throw new Error('Failed to parse newsletter writer response')
+            }
+          }
+        }
+
+        if (!parsedResult.headline || !parsedResult.content || !parsedResult.word_count) {
           throw new Error('Invalid newsletter content response')
         }
 
-        return result as NewsletterContent
+        return parsedResult as NewsletterContent
       }
     }
   }
