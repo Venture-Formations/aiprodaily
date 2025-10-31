@@ -1744,22 +1744,31 @@ export class RSSProcessor {
       // Use the highest scored article for subject line generation
       const topArticle = activeArticles[0] as any
 
-      // Generate subject line using AI
-      const timestamp = new Date().toISOString()
-      const subjectPrompt = await AI_PROMPTS.subjectLineGenerator(topArticle) + `\n\nTimestamp: ${timestamp}`
+      // Generate subject line using AI_CALL (uses callAIWithPrompt and respects provider setting)
+      let result
+      try {
+        result = await AI_CALL.subjectLineGenerator(topArticle, 100, 0.8)
+      } catch (callError) {
+        throw new Error(`AI call failed for subject line: ${callError instanceof Error ? callError.message : 'Unknown error'}`)
+      }
 
-      const aiResponse = await callOpenAI(subjectPrompt, 100, 0.8)
-
-      // The AI now returns plain text, not JSON
+      // Handle response - subject line should be plain text
       let generatedSubject = ''
 
-      if (typeof aiResponse === 'string') {
-        generatedSubject = aiResponse
-      } else if (typeof aiResponse === 'object' && aiResponse && 'raw' in aiResponse) {
-        generatedSubject = (aiResponse as any).raw
-      } else if (typeof aiResponse === 'object') {
-        // Fallback: convert to string
-        generatedSubject = JSON.stringify(aiResponse)
+      if (typeof result === 'string') {
+        generatedSubject = result.trim()
+      } else if (typeof result === 'object' && result !== null) {
+        // If result has 'raw' property, try to parse it
+        if ('raw' in result && typeof result.raw === 'string') {
+          generatedSubject = result.raw.trim()
+        } else if ('subject_line' in result) {
+          generatedSubject = String(result.subject_line).trim()
+        } else {
+          // Fallback: convert to string
+          generatedSubject = JSON.stringify(result)
+        }
+      } else {
+        generatedSubject = String(result).trim()
       }
 
       if (generatedSubject && generatedSubject.trim()) {
