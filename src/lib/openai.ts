@@ -2041,17 +2041,73 @@ export async function callOpenAIStructured(options: OpenAICallOptions) {
       clearTimeout(timeoutId)
 
       // Extract content from Responses API format
-      const content = response.output?.[0]?.content?.[0]?.json ?? response.output?.[0]?.content?.[0]?.input_json ?? response.output?.[0]?.content?.[0]?.text ?? ""
-      if (!content) {
+      let rawContent = response.output?.[0]?.content?.[0]?.json ??           // JSON schema response
+        response.output?.[0]?.content?.[0]?.input_json ??     // Alternative JSON location
+        response.output?.[0]?.content?.[0]?.text ??           // Text response
+        response.output_text ??                               // Legacy location
+        response.text ??
+        ""
+      
+      if (!rawContent || (typeof rawContent === 'string' && rawContent === '')) {
+        console.error('[AI] No content found in OpenAI response:', {
+          hasOutput: !!response.output,
+          outputLength: response.output?.length,
+          outputText: response.output_text,
+          responseKeys: Object.keys(response || {})
+        })
         throw new Error('No response from OpenAI')
       }
 
+      // If rawContent is already a parsed object/array (from JSON schema), use it directly
+      if (typeof rawContent === 'object' && rawContent !== null && !Array.isArray(rawContent)) {
+        // Check if it's the response wrapper (has 'output', 'output_text', 'id')
+        if ('output' in rawContent || 'output_text' in rawContent || 'id' in rawContent) {
+          // This is the response wrapper - try to extract actual content
+          const extracted = rawContent.output_text ?? rawContent.text
+          if (extracted && typeof extracted !== 'object') {
+            rawContent = extracted
+          } else if (extracted && typeof extracted === 'object') {
+            return extracted
+          } else {
+            return rawContent
+          }
+        } else {
+          // Already the parsed AI response content (from JSON schema)
+          return rawContent
+        }
+      } else if (Array.isArray(rawContent)) {
+        // Already a parsed array (from JSON schema)
+        return rawContent
+      }
+
+      // Otherwise, it's a string that needs parsing
+      const content = typeof rawContent === 'string' ? rawContent : String(rawContent)
+
       // Try to parse as JSON, fallback to raw content
       try {
-        let cleanedContent = content
-        const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
-        if (codeFenceMatch) {
-          cleanedContent = codeFenceMatch[1]
+        // Validate content is a string
+        if (!content || typeof content !== 'string') {
+          console.error('[AI] Invalid content type for parsing:', typeof content, content)
+          return { raw: content }
+        }
+
+        // Strip markdown code fences first
+        let cleanedContent: string = String(content) // Ensure it's definitely a string
+        try {
+          const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+          if (codeFenceMatch && codeFenceMatch[1] !== undefined) {
+            cleanedContent = codeFenceMatch[1]
+          }
+        } catch (matchError) {
+          // If regex matching fails, use original content
+          console.warn('[AI] Regex match failed in callOpenAIWithStructuredOptions, using original content:', matchError)
+          cleanedContent = String(content)
+        }
+
+        // Validate cleanedContent is still a string
+        if (!cleanedContent || typeof cleanedContent !== 'string') {
+          console.error('[AI] Invalid cleanedContent after code fence removal:', typeof cleanedContent, cleanedContent)
+          return { raw: content }
         }
 
         const objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
