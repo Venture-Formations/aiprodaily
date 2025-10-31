@@ -801,31 +801,17 @@ export class RSSProcessor {
             content: fullText
           })
         } catch (callError) {
-          console.error(`[RSS] AI call failed for criterion ${criterion.number}, post ${post.id}:`, callError)
           throw new Error(`AI call failed for criterion ${criterion.number}: ${callError instanceof Error ? callError.message : 'Unknown error'}`)
         }
 
-        // Log result structure for debugging
         if (!result || typeof result !== 'object') {
-          console.error(`[RSS] Invalid AI response for criterion ${criterion.number}, post ${post.id}:`, {
-            resultType: typeof result,
-            result: result
-          })
           throw new Error(`Invalid AI response type for criterion ${criterion.number}: expected object, got ${typeof result}`)
         }
 
-        // Parse the AI response
         const score = result.score
         const reason = result.reason || ''
 
-        // Validate score is a number between 0-10
         if (typeof score !== 'number' || score < 0 || score > 10) {
-          console.error(`[RSS] Invalid score for criterion ${criterion.number}, post ${post.id}:`, {
-            score,
-            scoreType: typeof score,
-            resultKeys: Object.keys(result || {}),
-            fullResult: result
-          })
           throw new Error(`Criterion ${criterion.number} score must be between 0-10, got ${score} (type: ${typeof score})`)
         }
 
@@ -908,9 +894,7 @@ export class RSSProcessor {
       })
       const result = await deduplicator.detectAllDuplicates(allPosts, campaignId)
 
-      // Validate result structure
       if (!result || !result.groups || !Array.isArray(result.groups)) {
-        console.error('[DEDUP] Invalid deduplication result:', result)
         return
       }
 
@@ -936,9 +920,7 @@ export class RSSProcessor {
 
         if (duplicateGroup) {
           // Add duplicate posts to group with metadata
-          // Validate duplicate_indices is an array before iterating
           if (!Array.isArray(group.duplicate_indices)) {
-            console.warn('[DEDUP] Skipping group with invalid duplicate_indices:', group)
             continue
           }
           
@@ -1606,7 +1588,6 @@ export class RSSProcessor {
 
   async populateEventsForCampaignSmart(campaignId: string) {
     try {
-      console.log('Starting smart event population for campaign:', campaignId)
 
       // Get campaign info to determine the date
       const { data: campaign, error: campaignError } = await supabaseAdmin
@@ -1621,7 +1602,6 @@ export class RSSProcessor {
       }
 
       const campaignDate = campaign.date
-      console.log('Populating events for campaign date:', campaignDate)
 
       // Calculate 3-day range starting from campaign date
       const baseDate = new Date(campaignDate)
@@ -1632,7 +1612,6 @@ export class RSSProcessor {
         dates.push(date.toISOString().split('T')[0])
       }
 
-      console.log('Event date range:', dates)
 
       // Check if events already exist for this campaign
       const { data: existingEvents, error: existingError } = await supabaseAdmin
@@ -1698,7 +1677,6 @@ export class RSSProcessor {
 
 
         if (eventsForDate.length === 0) {
-          console.log(`No events available for ${date}`)
           continue
         }
 
@@ -1712,7 +1690,6 @@ export class RSSProcessor {
         )
 
         if (availableForSelection.length === 0) {
-          console.log(`No new events available for ${date}`)
           continue
         }
 
@@ -1737,7 +1714,6 @@ export class RSSProcessor {
         const paidPlacementEvents = uniqueEvents.filter(e => e.paid_placement && !e.featured)
         const regularEvents = uniqueEvents.filter(e => !e.featured && !e.paid_placement)
 
-        console.log(`Available for ${date}: ${featuredEvents.length} featured, ${paidPlacementEvents.length} paid placement, ${regularEvents.length} regular`)
 
         // Determine how many events we can still add (up to 8 total)
         const maxEventsPerDay = 8
@@ -1745,7 +1721,6 @@ export class RSSProcessor {
         let remainingSlots = maxEventsPerDay - alreadySelected
 
         if (remainingSlots <= 0) {
-          console.log(`Already have enough events for ${date}`)
           continue
         }
 
@@ -1761,7 +1736,6 @@ export class RSSProcessor {
               display_order: displayOrder++
             })
             remainingSlots--
-            console.log(`✨ Featured event MUST be included: "${event.title}" for ${date}`)
           }
         })
 
@@ -1774,7 +1748,6 @@ export class RSSProcessor {
               display_order: displayOrder++
             })
             remainingSlots--
-            console.log(`💰 Paid placement event MUST be included: "${event.title}" for ${date}`)
           }
         })
 
@@ -1794,7 +1767,6 @@ export class RSSProcessor {
             })
           })
 
-          console.log(`Selected ${selectedRegular.length} regular events randomly for ${date}${shouldAutoFeature ? ' (first marked as featured)' : ''}`)
         }
 
         // Add all selected events to campaign_events
@@ -1809,25 +1781,16 @@ export class RSSProcessor {
           })
         })
 
-        console.log(`Total selected for ${date}: ${selectedForDate.length} events (${selectedForDate.filter(s => s.is_featured).length} featured)`)
       }
 
-      // Insert new campaign events
       if (newCampaignEvents.length > 0) {
-        console.log(`Inserting ${newCampaignEvents.length} new campaign events`)
-
         const { error: insertError } = await supabaseAdmin
           .from('campaign_events')
           .insert(newCampaignEvents)
 
         if (insertError) {
-          console.error('Error inserting campaign events:', insertError)
           throw insertError
         }
-
-        console.log('Successfully inserted new campaign events')
-      } else {
-        console.log('No new events to insert')
       }
 
 
@@ -1842,7 +1805,6 @@ export class RSSProcessor {
 
   async populateEventsForCampaign(campaignId: string) {
     try {
-      console.log('Starting automatic event population for campaign:', campaignId)
 
       // Get campaign info
       const { data: campaign, error: campaignError } = await supabaseAdmin
@@ -1867,7 +1829,6 @@ export class RSSProcessor {
         dates.push(date.toISOString().split('T')[0])
       }
 
-      console.log('Event population date range:', dates)
 
       // Get available events for the date range
       const startDate = dates[0]
@@ -1898,7 +1859,6 @@ export class RSSProcessor {
         .eq('campaign_id', campaignId)
 
       if (deleteError) {
-        console.warn('Warning: Failed to clear existing campaign events:', deleteError)
       }
 
       // Group events by date and auto-select events per day
@@ -1923,7 +1883,6 @@ export class RSSProcessor {
           const paidPlacementEvents = eventsForDate.filter(e => e.paid_placement && !e.featured)
           const regularEvents = eventsForDate.filter(e => !e.featured && !e.paid_placement)
 
-          console.log(`${date}: ${featuredEvents.length} featured, ${paidPlacementEvents.length} paid placement, ${regularEvents.length} regular events`)
 
           // Calculate available slots for regular events (target 8 total)
           const guaranteedEvents = [...featuredEvents, ...paidPlacementEvents]
@@ -1941,9 +1900,6 @@ export class RSSProcessor {
             ...selectedRegular
           ]
 
-          if (guaranteedEvents.length > baseSlots) {
-            console.log(`Note: ${guaranteedEvents.length} featured/paid events exceed ${baseSlots} base slots for ${date}. All will be included (total: ${selectedEvents.length}).`)
-          }
 
           eventsByDate[date] = selectedEvents
         }
@@ -1995,12 +1951,9 @@ export class RSSProcessor {
           .insert(campaignEventsData)
 
         if (insertError) {
-          console.error('Failed to insert campaign events:', insertError)
           return
         }
       }
-
-      console.log(`Auto-populated ${totalSelected} events across ${Object.keys(eventsByDate).length} days`)
       await this.logInfo(`Auto-populated ${totalSelected} events for campaign`, {
         campaignId,
         totalSelected,
@@ -2101,7 +2054,6 @@ export class RSSProcessor {
    */
   private async enrichPostsWithFullContent(campaignId: string) {
     try {
-      console.log('Starting full article text extraction for campaign:', campaignId)
 
       // Get all posts for this campaign that have source URLs
       const { data: posts, error } = await supabaseAdmin
@@ -2115,7 +2067,6 @@ export class RSSProcessor {
       }
 
       if (!posts || posts.length === 0) {
-        console.log('No posts found with source URLs for extraction')
         return
       }
 
@@ -2128,11 +2079,8 @@ export class RSSProcessor {
       }
 
       if (postsNeedingExtraction.length === 0) {
-        console.log('All posts already have full article text extracted')
         return
       }
-
-      console.log(`Extracting ${postsNeedingExtraction.length} articles...`)
 
       // Build URL to post ID mapping
       const urlToPostMap = new Map<string, string>()
@@ -2148,10 +2096,7 @@ export class RSSProcessor {
       let extractionResults: Map<string, any>
       try {
         extractionResults = await this.articleExtractor.extractBatch(urls, 5)
-      } catch (extractError) {
-        console.error('⚠️ Article extraction batch failed completely:', extractError)
-        console.log('Continuing RSS processing without extracted articles...')
-        // Return empty map so processing continues
+      } catch {
         return
       }
 
@@ -2172,19 +2117,16 @@ export class RSSProcessor {
             })
             .eq('id', postId)
 
-          if (updateError) {
-            console.error(`Failed to update post ${postId} with full article text:`, updateError)
-            failureCount++
-          } else {
+          if (!updateError) {
             successCount++
+          } else {
+            failureCount++
           }
         } else {
-          console.log(`Extraction failed for ${url}: ${result.error || 'Unknown error'}`)
           failureCount++
         }
       }
 
-      console.log(`Article extraction complete: ${successCount} successful, ${failureCount} failed`)
       await this.logInfo(`Article extraction complete`, {
         campaignId,
         totalPosts: posts.length,
@@ -2194,7 +2136,6 @@ export class RSSProcessor {
       })
 
     } catch (error) {
-      console.error('Error in enrichPostsWithFullContent:', error)
       await this.logError('Failed to enrich posts with full article text', {
         campaignId,
         error: error instanceof Error ? error.message : 'Unknown error'

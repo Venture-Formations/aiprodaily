@@ -68,18 +68,13 @@ export class Deduplicator {
       }
     }
 
-    console.log(`[DEDUP] Starting 4-stage deduplication for ${posts.length} posts`)
-
     const allGroups: DuplicateGroup[] = []
     const markedAsDuplicate = new Set<number>()
 
-    // Stage 0: Historical article check
     const historicalGroups = await this.detectHistoricalDuplicates(posts, campaignId)
-    console.log(`[DEDUP] Stage 0: Found ${historicalGroups.length} historical matches (vs last ${this.config.historicalLookbackDays} days)`)
 
     for (const group of historicalGroups) {
       if (!group || !Array.isArray(group.duplicate_indices)) {
-        console.warn('[DEDUP] Skipping invalid historical group:', group)
         continue
       }
       allGroups.push(group)
@@ -111,11 +106,9 @@ export class Deduplicator {
     }
 
     const exactGroups = await this.detectExactDuplicates(posts)
-    console.log(`[DEDUP] Stage 1: Found ${exactGroups.length} exact content matches`)
 
     for (const group of exactGroups) {
       if (!group || !Array.isArray(group.duplicate_indices)) {
-        console.warn('[DEDUP] Skipping invalid exact duplicate group:', group)
         continue
       }
       allGroups.push(group)
@@ -131,11 +124,9 @@ export class Deduplicator {
         remainingPosts.map(p => p.post),
         remainingPosts.map(p => p.idx)
       )
-      console.log(`[DEDUP] Stage 2: Found ${titleGroups.length} title matches (>80% similar)`)
 
       for (const group of titleGroups) {
         if (!group || !Array.isArray(group.duplicate_indices)) {
-          console.warn('[DEDUP] Skipping invalid title duplicate group:', group)
           continue
         }
         allGroups.push(group)
@@ -152,16 +143,10 @@ export class Deduplicator {
         stillRemaining.map(p => p.post),
         stillRemaining.map(p => p.idx)
       )
-      
-      // Ensure semanticGroups is an array before accessing length
-      if (!Array.isArray(semanticGroups)) {
-        console.error('[DEDUP] Semantic groups is not an array:', typeof semanticGroups, semanticGroups)
-      } else {
-        console.log(`[DEDUP] Stage 3: AI identified ${semanticGroups.length} topic groups`)
 
+      if (Array.isArray(semanticGroups)) {
         for (const group of semanticGroups) {
           if (!group || !Array.isArray(group.duplicate_indices)) {
-            console.warn('[DEDUP] Skipping invalid semantic duplicate group:', group)
             continue
           }
           allGroups.push(group)
@@ -171,7 +156,6 @@ export class Deduplicator {
     }
 
     const totalDuplicates = markedAsDuplicate.size
-    console.log(`[DEDUP] Total: ${allGroups.length} groups, ${totalDuplicates} posts marked as duplicates`)
 
     // Helper function to safely get duplicate_indices length
     const getDuplicateCount = (g: DuplicateGroup): number => {
@@ -402,17 +386,11 @@ export class Deduplicator {
     originalIndices: number[]
   ): Promise<DuplicateGroup[]> {
     try {
-      // Validate inputs
       if (!posts || !Array.isArray(posts) || posts.length === 0) {
-        console.log('[DEDUP] No posts provided for semantic duplicate detection')
         return []
       }
 
       if (!originalIndices || !Array.isArray(originalIndices) || originalIndices.length !== posts.length) {
-        console.error('[DEDUP] Invalid originalIndices array - length mismatch:', {
-          postsLength: posts.length,
-          indicesLength: originalIndices?.length
-        })
         return []
       }
 
@@ -423,82 +401,36 @@ export class Deduplicator {
         full_article_text: post.full_article_text || post.content || ''
       }))
 
-      // Use AI_CALL for deduplication (handles prompt + provider + call)
       const result = await AI_CALL.topicDeduper(postSummaries, 1000, 0.3)
 
-      // Debug: Log the actual AI response structure
-      console.log('[DEDUP] AI response type:', typeof result)
-      console.log('[DEDUP] AI response keys:', result ? Object.keys(result) : 'null')
-      console.log('[DEDUP] AI response sample:', JSON.stringify(result).substring(0, 500))
-
-      // Validate result structure
-      if (!result || typeof result !== 'object') {
-        console.warn('[DEDUP] Invalid AI response - not an object:', result)
+      if (!result || typeof result !== 'object' || !Array.isArray(result.groups)) {
         return []
       }
-
-      // Check for groups array
-      if (!result.groups) {
-        console.log('[DEDUP] No groups property in AI response')
-        return []
-      }
-
-      if (!Array.isArray(result.groups)) {
-        console.warn('[DEDUP] Groups property is not an array:', typeof result.groups, result.groups)
-        return []
-      }
-
-      if (result.groups.length === 0) {
-        console.log('[DEDUP] No groups in AI response')
-        return []
-      }
-
-      console.log('[DEDUP] Processing', result.groups.length, 'groups')
 
       // Map AI result indices back to original post indices
       return result.groups
-        .map((group: any, groupIdx: number) => {
+        .map((group: any) => {
           try {
-            // Validate group structure
-            if (!group || typeof group !== 'object') {
-              console.warn(`[DEDUP] Group ${groupIdx} is not an object:`, group)
+            if (!group || typeof group !== 'object' || !Array.isArray(group.duplicate_indices)) {
               return null
             }
 
-            // Defensive: Check if required properties exist
-            if (!group.duplicate_indices) {
-              console.warn(`[DEDUP] Group ${groupIdx} missing duplicate_indices property:`, JSON.stringify(group))
-              return null
-            }
-
-            if (!Array.isArray(group.duplicate_indices)) {
-              console.warn(`[DEDUP] Group ${groupIdx} duplicate_indices is not an array:`, typeof group.duplicate_indices, group.duplicate_indices)
-              return null
-            }
-
-            // Validate primary_article_index
             const primaryIdx = typeof group.primary_article_index === 'number' 
               ? group.primary_article_index 
               : null
 
             if (primaryIdx === null || primaryIdx < 0 || primaryIdx >= posts.length) {
-              console.warn(`[DEDUP] Group ${groupIdx} has invalid primary_article_index:`, primaryIdx, `(posts length: ${posts.length})`)
               return null
             }
 
-            // Map duplicate indices, filtering out invalid ones
             const mappedDuplicateIndices = group.duplicate_indices
               .map((idx: number) => {
-                // Validate index is a number and within bounds
                 if (typeof idx !== 'number' || idx < 0 || idx >= posts.length) {
-                  console.warn(`[DEDUP] Group ${groupIdx} has invalid duplicate index:`, idx, `(posts length: ${posts.length})`)
                   return null
                 }
                 
-                // Map to original index
                 const originalIdx = originalIndices[idx]
                 if (originalIdx === undefined) {
-                  console.warn(`[DEDUP] Group ${groupIdx} - index ${idx} maps to undefined original index`)
                   return null
                 }
                 
@@ -506,9 +438,7 @@ export class Deduplicator {
               })
               .filter((idx: number | null): idx is number => idx !== null)
 
-            // Skip group if no valid duplicate indices
             if (mappedDuplicateIndices.length === 0) {
-              console.warn(`[DEDUP] Group ${groupIdx} has no valid duplicate indices after mapping`)
               return null
             }
 
@@ -520,15 +450,13 @@ export class Deduplicator {
               similarity_score: 0.8, // Default for AI-detected
               explanation: group.similarity_explanation || ''
             }
-          } catch (groupError) {
-            console.error(`[DEDUP] Error processing group ${groupIdx}:`, groupError)
+          } catch {
             return null
           }
         })
         .filter(Boolean) as DuplicateGroup[]
 
-    } catch (error) {
-      console.error('[DEDUP] Stage 3 AI error:', error)
+    } catch {
       return []
     }
   }
