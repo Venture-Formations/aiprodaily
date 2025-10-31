@@ -192,4 +192,4 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-export const maxDuration = 60
+export const maxDuration = 600

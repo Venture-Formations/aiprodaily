@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 
-export const maxDuration = 60
+export const maxDuration = 600
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)

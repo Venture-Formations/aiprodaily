@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 
-export const maxDuration = 60
+export const maxDuration = 600
 
 export async function GET() {
   try {

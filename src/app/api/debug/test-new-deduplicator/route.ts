@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { Deduplicator } from '@/lib/deduplicator'
 
-export const maxDuration = 60
+export const maxDuration = 600
 
 /**
  * Test endpoint for new 3-stage deduplication system

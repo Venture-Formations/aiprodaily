@@ -13,7 +13,7 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
-export const maxDuration = 60
+export const maxDuration = 600
 
 // Helper function to inject post data into JSON recursively
 function injectPostData(obj: any, post: any): any {

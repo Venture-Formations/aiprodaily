@@ -5,7 +5,7 @@ import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export const maxDuration = 300 // 5 minutes for processing multiple articles
+export const maxDuration = 600 // 10 minutes for processing multiple articles
 
 // Helper function to inject post data into JSON recursively
 function injectPostData(obj: any, post: any): any {

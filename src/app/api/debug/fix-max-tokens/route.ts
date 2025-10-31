@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export const maxDuration = 60
+export const maxDuration = 600
 
 export async function GET(request: NextRequest) {
   try {

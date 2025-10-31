@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export const maxDuration = 60
+export const maxDuration = 600
 
 /**
  * Migration endpoint to populate app_settings with AI prompts from fallbacks

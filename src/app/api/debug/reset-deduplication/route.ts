@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { Deduplicator } from '@/lib/deduplicator'
 
-export const maxDuration = 60
+export const maxDuration = 600
 
 /**
  * Reset deduplication for a campaign and re-run with current prompt

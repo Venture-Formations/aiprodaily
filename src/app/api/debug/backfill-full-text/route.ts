@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { ArticleExtractor } from '@/lib/article-extractor'
 
-export const maxDuration = 300 // 5 minutes for backfill
+export const maxDuration = 600 // 10 minutes for backfill
 
 /**
  * Backfill missing full_article_text using Jina AI

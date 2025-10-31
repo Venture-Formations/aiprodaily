@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export const maxDuration = 60
+export const maxDuration = 600
 
 /**
  * Removes the unused ai_prompt_content_evaluator and ai_prompt_secondary_content_evaluator prompts.

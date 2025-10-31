@@ -51,52 +51,52 @@
   ],
   "functions": {
     "app/api/cron/populate-events/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 600
     },
     "app/api/cron/rss-processing/route.ts": {
       "maxDuration": 600
     },
     "app/api/cron/create-campaign/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 600
     },
     "app/api/cron/send-review/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 600
     },
     "app/api/cron/process-rss/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 600
     },
     "app/api/cron/send-final/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 600
     },
     "app/api/cron/import-metrics/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 600
     },
     "app/api/cron/health-check/route.ts": {
-      "maxDuration": 30
+      "maxDuration": 600
     },
     "app/api/cron/sync-events/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 600
     },
     "app/api/cron/generate-weather/route.ts": {
-      "maxDuration": 180
+      "maxDuration": 600
     },
     "app/api/cron/collect-wordle/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 600
     },
     "app/api/events/sync/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 600
     },
     "app/api/events/manual-sync/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 600
     },
     "app/api/cron/cleanup-pending-submissions/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 600
     },
     "app/api/rss/process/route.ts": {
       "maxDuration": 600
     },
     "app/api/rss/steps/archive/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 600
     },
     "app/api/rss/steps/fetch-feeds/route.ts": {
       "maxDuration": 600
@@ -111,9 +111,15 @@
       "maxDuration": 600
     },
     "app/api/rss/steps/finalize/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 600
     },
     "app/api/ai/test-prompt-multiple/route.ts": {
+      "maxDuration": 600
+    },
+    "app/api/rss/process-phase1/route.ts": {
+      "maxDuration": 600
+    },
+    "app/api/rss/process-phase2/route.ts": {
       "maxDuration": 600
     }
   }
