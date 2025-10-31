@@ -59,40 +59,26 @@ async function getPromptJSON(key: string, fallbackText?: string): Promise<any> {
       }
     }
 
-    // Try to parse value - could be string (JSON) or object (JSONB)
+    // Parse value - must be valid structured JSON
     let promptJSON: any
     if (typeof data.value === 'string') {
       try {
         promptJSON = JSON.parse(data.value)
       } catch (parseError) {
-        // Not JSON - treat as plain text prompt
-        console.log(`[AI-PROMPT] ${key} is plain text, wrapping in structured format`)
-        promptJSON = {
-          model: 'gpt-4o',
-          messages: [{ role: 'user', content: data.value }]
-        }
+        // Not JSON - this is an error, prompt must be structured
+        throw new Error(`Prompt ${key} is not valid JSON. It must be structured JSON with a 'messages' array. Error: ${parseError instanceof Error ? parseError.message : 'Parse failed'}`)
       }
     } else if (typeof data.value === 'object' && data.value !== null) {
       // Already an object (JSONB was auto-parsed)
       promptJSON = data.value
     } else {
-      // Unknown format, treat as plain text
-      console.log(`[AI-PROMPT] ${key} has unknown format, treating as plain text`)
-      promptJSON = {
-        model: 'gpt-4o',
-        messages: [{ role: 'user', content: String(data.value) }]
-      }
+      // Unknown format - this is an error
+      throw new Error(`Prompt ${key} has invalid format. Expected structured JSON with a 'messages' array, got ${typeof data.value}`)
     }
 
-    // Validate structure - ensure it has messages array
+    // Validate structure - must have messages array (same validation as callWithStructuredPrompt)
     if (!promptJSON.messages || !Array.isArray(promptJSON.messages)) {
-      console.log(`[AI-PROMPT] ${key} missing messages array, converting to structured format`)
-      // If it's not structured, wrap the whole thing as a user message
-      const content = promptJSON.content || promptJSON.prompt || JSON.stringify(promptJSON)
-      promptJSON = {
-        model: promptJSON.model || 'gpt-4o',
-        messages: [{ role: 'user', content: content }]
-      }
+      throw new Error(`Prompt ${key} is missing 'messages' array. It must be structured JSON like: { "model": "...", "messages": [...] }`)
     }
 
     // Add provider info for routing

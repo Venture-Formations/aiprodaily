@@ -130,9 +130,43 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    // Build update object
+    // Validate that value is structured JSON with messages array (same validation as RSS processing)
+    let parsedValue: any
+    if (typeof value === 'string') {
+      try {
+        parsedValue = JSON.parse(value)
+      } catch (parseError) {
+        return NextResponse.json(
+          { 
+            error: 'Invalid prompt format. Prompt must be structured JSON with a "messages" array.',
+            details: parseError instanceof Error ? parseError.message : 'Parse failed'
+          },
+          { status: 400 }
+        )
+      }
+    } else if (typeof value === 'object' && value !== null) {
+      parsedValue = value
+    } else {
+      return NextResponse.json(
+        { error: 'Invalid prompt format. Expected structured JSON with a "messages" array.' },
+        { status: 400 }
+      )
+    }
+
+    // Validate structure - must have messages array (same validation as callWithStructuredPrompt)
+    if (!parsedValue.messages || !Array.isArray(parsedValue.messages)) {
+      return NextResponse.json(
+        { 
+          error: 'Invalid prompt structure. Prompt must have a "messages" array.',
+          example: '{ "model": "gpt-4o", "messages": [{ "role": "user", "content": "..." }] }'
+        },
+        { status: 400 }
+      )
+    }
+
+    // Build update object - store as JSON string for consistency
     const updateData: any = {
-      value,
+      value: typeof value === 'string' ? value : JSON.stringify(parsedValue),
       updated_at: new Date().toISOString()
     }
 
