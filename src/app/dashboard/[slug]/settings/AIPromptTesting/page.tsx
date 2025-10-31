@@ -28,7 +28,8 @@ interface TestResult {
   apiRequest?: any // The exact API request sent
   isMultiple?: boolean // Whether this was a multiple article test
   responses?: string[] // Array of responses for multiple article tests
-  fullApiResponses?: any[] // Full API responses for debugging
+  fullApiResponse?: any // Full API response for single test debugging
+  fullApiResponses?: any[] // Full API responses for multiple article tests debugging
   sourcePosts?: Array<{ // Source posts used for multiple article tests
     id: string
     title: string
@@ -327,13 +328,15 @@ export default function AIPromptTestingPage() {
           response: data.response as any, // Can be string or object (with optional raw property)
           tokensUsed: data.tokensUsed,
           duration: data.duration,
-          apiRequest: data.apiRequest
+          apiRequest: data.apiRequest,
+          fullApiResponse: data.fullApiResponse // Include full API response for debugging
         }
 
         setCurrentResponse(result)
         setTestHistory(prev => [result, ...prev])
         setShowModal(true) // Show modal with results
         setShowPromptDetails(false) // Start with prompt details collapsed
+        setShowFullApiResponses(false) // Start with full response collapsed
       } else {
         alert(`Error: ${data.error}`)
       }
@@ -924,6 +927,36 @@ export default function AIPromptTestingPage() {
                   )}
                 </div>
               </div>
+
+              {/* Full API Response Section (for single test) */}
+              {!currentResponse.isMultiple && currentResponse.fullApiResponse && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setShowFullApiResponses(!showFullApiResponses)}
+                    className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left"
+                  >
+                    <span className="font-medium text-gray-900">
+                      {showFullApiResponses ? '▼' : '▶'} Full API Response
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      {showFullApiResponses ? 'Click to collapse' : 'Click to expand'}
+                    </span>
+                  </button>
+                  {showFullApiResponses && (
+                    <div className="p-4 bg-white">
+                      <p className="text-xs text-gray-600 mb-3">
+                        Full API response object returned from {currentResponse.provider.toUpperCase()}. 
+                        This shows the complete response structure even if parsing failed.
+                      </p>
+                      <div className="bg-gray-50 rounded p-3 max-h-96 overflow-y-auto">
+                        <pre className="whitespace-pre-wrap text-xs font-mono overflow-x-auto">
+                          {JSON.stringify(currentResponse.fullApiResponse, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Full API Responses Section (for multiple article tests) */}
               {currentResponse.isMultiple && currentResponse.fullApiResponses && currentResponse.fullApiResponses.length > 0 && (

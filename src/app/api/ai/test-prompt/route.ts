@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
     const startTime = Date.now()
     let response: string
     let tokensUsed: number | undefined
+    let fullApiResponse: any = null // Store full API response for debugging
     const apiRequest = processedJson // Store the exact API request
 
     if (provider === 'openai') {
@@ -76,6 +77,9 @@ export async function POST(request: NextRequest) {
       console.log('[TEST-PROMPT] Full API request being sent to OpenAI:', JSON.stringify(apiRequest, null, 2))
 
       const completion = await (openai as any).responses.create(apiRequest)
+
+      // Store the full API response for debugging
+      fullApiResponse = completion
 
       console.log('[TEST-PROMPT] Raw API response:', JSON.stringify(completion, null, 2))
 
@@ -113,6 +117,9 @@ export async function POST(request: NextRequest) {
       // Claude API call - send the exact JSON
       const completion = await anthropic.messages.create(processedJson)
 
+      // Store the full API response for debugging
+      fullApiResponse = completion
+
       // Extract text from Claude response
       const textContent = completion.content.find(c => c.type === 'text')
       response = textContent && 'text' in textContent ? textContent.text : 'No response'
@@ -134,6 +141,7 @@ export async function POST(request: NextRequest) {
       provider,
       model: processedJson.model || 'unknown',
       apiRequest, // Return the exact API request object
+      fullApiResponse, // Return full API response for debugging
     })
   } catch (error) {
     console.error('[AI Test] Error:', error)
