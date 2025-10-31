@@ -79,13 +79,16 @@ async function processRSSWorkflow(request: NextRequest) {
     console.error('AI app selection failed:', appSelectionError instanceof Error ? appSelectionError.message : 'Unknown error')
   }
 
-  // Construct base URL - prioritize VERCEL_URL (set by Vercel) or NEXTAUTH_URL, fallback to request origin
+  // Construct base URL - use production URL for internal requests
+  // Vercel preview deployments require authentication, so use production URL or NEXTAUTH_URL
   let baseUrl: string
-  if (process.env.VERCEL_URL) {
-    baseUrl = `https://${process.env.VERCEL_URL}`
-  } else if (process.env.NEXTAUTH_URL) {
+  if (process.env.NEXTAUTH_URL) {
     baseUrl = process.env.NEXTAUTH_URL
+  } else if (process.env.VERCEL_URL && !process.env.VERCEL_URL.includes('-')) {
+    // Production deployment (no hash in URL)
+    baseUrl = `https://${process.env.VERCEL_URL}`
   } else {
+    // Fallback to request origin for local development
     baseUrl = new URL(request.url).origin
   }
 
