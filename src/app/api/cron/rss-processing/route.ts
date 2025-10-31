@@ -100,12 +100,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Phase 1: Archive, Fetch+Extract, Score (steps 1-3)
+    if (!campaignId) {
+      throw new Error('campaignId is required but was not set')
+    }
+    
     console.log(`[Cron] Phase 1 starting for campaign: ${campaignId}`)
     
     const phase1Steps = [
-      { name: 'Archive', fn: () => executeStep1(campaignId) },
-      { name: 'Fetch+Extract', fn: () => executeStep2(campaignId) },
-      { name: 'Score', fn: () => executeStep3(campaignId) }
+      { name: 'Archive', fn: () => executeStep1(campaignId!) },
+      { name: 'Fetch+Extract', fn: () => executeStep2(campaignId!) },
+      { name: 'Score', fn: () => executeStep3(campaignId!) }
     ]
 
     const phase1Results = []
@@ -126,11 +130,11 @@ export async function POST(request: NextRequest) {
     console.log(`[Cron] Phase 2 starting for campaign: ${campaignId}`)
     
     const phase2Steps = [
-      { name: 'Deduplicate', fn: () => executeStep4(campaignId) },
-      { name: 'Generate', fn: () => executeStep5(campaignId) },
-      { name: 'Select+Subject', fn: () => executeStep6(campaignId) },
-      { name: 'Welcome', fn: () => executeStep7(campaignId) },
-      { name: 'Finalize', fn: () => executeStep8(campaignId) }
+      { name: 'Deduplicate', fn: () => executeStep4(campaignId!) },
+      { name: 'Generate', fn: () => executeStep5(campaignId!) },
+      { name: 'Select+Subject', fn: () => executeStep6(campaignId!) },
+      { name: 'Welcome', fn: () => executeStep7(campaignId!) },
+      { name: 'Finalize', fn: () => executeStep8(campaignId!) }
     ]
 
     const phase2Results = []
@@ -279,12 +283,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Phase 1: Archive, Fetch+Extract, Score (steps 1-3)
+    if (!campaignId) {
+      throw new Error('campaignId is required but was not set')
+    }
+    
     console.log(`[Cron] Phase 1 starting for campaign: ${campaignId}`)
     
     const phase1Steps = [
-      { name: 'Archive', fn: () => executeStep1(campaignId) },
-      { name: 'Fetch+Extract', fn: () => executeStep2(campaignId) },
-      { name: 'Score', fn: () => executeStep3(campaignId) }
+      { name: 'Archive', fn: () => executeStep1(campaignId!) },
+      { name: 'Fetch+Extract', fn: () => executeStep2(campaignId!) },
+      { name: 'Score', fn: () => executeStep3(campaignId!) }
     ]
 
     const phase1Results = []
@@ -305,11 +313,11 @@ export async function GET(request: NextRequest) {
     console.log(`[Cron] Phase 2 starting for campaign: ${campaignId}`)
     
     const phase2Steps = [
-      { name: 'Deduplicate', fn: () => executeStep4(campaignId) },
-      { name: 'Generate', fn: () => executeStep5(campaignId) },
-      { name: 'Select+Subject', fn: () => executeStep6(campaignId) },
-      { name: 'Welcome', fn: () => executeStep7(campaignId) },
-      { name: 'Finalize', fn: () => executeStep8(campaignId) }
+      { name: 'Deduplicate', fn: () => executeStep4(campaignId!) },
+      { name: 'Generate', fn: () => executeStep5(campaignId!) },
+      { name: 'Select+Subject', fn: () => executeStep6(campaignId!) },
+      { name: 'Welcome', fn: () => executeStep7(campaignId!) },
+      { name: 'Finalize', fn: () => executeStep8(campaignId!) }
     ]
 
     const phase2Results = []
