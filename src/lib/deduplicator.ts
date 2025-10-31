@@ -371,6 +371,20 @@ export class Deduplicator {
     originalIndices: number[]
   ): Promise<DuplicateGroup[]> {
     try {
+      // Validate inputs
+      if (!posts || !Array.isArray(posts) || posts.length === 0) {
+        console.log('[DEDUP] No posts provided for semantic duplicate detection')
+        return []
+      }
+
+      if (!originalIndices || !Array.isArray(originalIndices) || originalIndices.length !== posts.length) {
+        console.error('[DEDUP] Invalid originalIndices array - length mismatch:', {
+          postsLength: posts.length,
+          indicesLength: originalIndices?.length
+        })
+        return []
+      }
+
       // Prepare post summaries with FULL article text
       const postSummaries = posts.map(post => ({
         title: post.title,
@@ -386,7 +400,24 @@ export class Deduplicator {
       console.log('[DEDUP] AI response keys:', result ? Object.keys(result) : 'null')
       console.log('[DEDUP] AI response sample:', JSON.stringify(result).substring(0, 500))
 
-      if (!result || !result.groups || result.groups.length === 0) {
+      // Validate result structure
+      if (!result || typeof result !== 'object') {
+        console.warn('[DEDUP] Invalid AI response - not an object:', result)
+        return []
+      }
+
+      // Check for groups array
+      if (!result.groups) {
+        console.log('[DEDUP] No groups property in AI response')
+        return []
+      }
+
+      if (!Array.isArray(result.groups)) {
+        console.warn('[DEDUP] Groups property is not an array:', typeof result.groups, result.groups)
+        return []
+      }
+
+      if (result.groups.length === 0) {
         console.log('[DEDUP] No groups in AI response')
         return []
       }
@@ -394,22 +425,76 @@ export class Deduplicator {
       console.log('[DEDUP] Processing', result.groups.length, 'groups')
 
       // Map AI result indices back to original post indices
-      return result.groups.map((group: any, groupIdx: number) => {
-        // Defensive: Check if required properties exist
-        if (!group.duplicate_indices || !Array.isArray(group.duplicate_indices)) {
-          console.warn(`[DEDUP] Group ${groupIdx} missing duplicate_indices:`, JSON.stringify(group))
-          return null
-        }
+      return result.groups
+        .map((group: any, groupIdx: number) => {
+          try {
+            // Validate group structure
+            if (!group || typeof group !== 'object') {
+              console.warn(`[DEDUP] Group ${groupIdx} is not an object:`, group)
+              return null
+            }
 
-        return {
-          topic_signature: group.topic_signature || 'unknown',
-          primary_post_index: originalIndices[group.primary_article_index] ?? 0,
-          duplicate_indices: group.duplicate_indices.map((idx: number) => originalIndices[idx]),
-          detection_method: 'ai_semantic' as const,
-          similarity_score: 0.8, // Default for AI-detected
-          explanation: group.similarity_explanation || ''
-        }
-      }).filter(Boolean) as DuplicateGroup[]
+            // Defensive: Check if required properties exist
+            if (!group.duplicate_indices) {
+              console.warn(`[DEDUP] Group ${groupIdx} missing duplicate_indices property:`, JSON.stringify(group))
+              return null
+            }
+
+            if (!Array.isArray(group.duplicate_indices)) {
+              console.warn(`[DEDUP] Group ${groupIdx} duplicate_indices is not an array:`, typeof group.duplicate_indices, group.duplicate_indices)
+              return null
+            }
+
+            // Validate primary_article_index
+            const primaryIdx = typeof group.primary_article_index === 'number' 
+              ? group.primary_article_index 
+              : null
+
+            if (primaryIdx === null || primaryIdx < 0 || primaryIdx >= posts.length) {
+              console.warn(`[DEDUP] Group ${groupIdx} has invalid primary_article_index:`, primaryIdx, `(posts length: ${posts.length})`)
+              return null
+            }
+
+            // Map duplicate indices, filtering out invalid ones
+            const mappedDuplicateIndices = group.duplicate_indices
+              .map((idx: number) => {
+                // Validate index is a number and within bounds
+                if (typeof idx !== 'number' || idx < 0 || idx >= posts.length) {
+                  console.warn(`[DEDUP] Group ${groupIdx} has invalid duplicate index:`, idx, `(posts length: ${posts.length})`)
+                  return null
+                }
+                
+                // Map to original index
+                const originalIdx = originalIndices[idx]
+                if (originalIdx === undefined) {
+                  console.warn(`[DEDUP] Group ${groupIdx} - index ${idx} maps to undefined original index`)
+                  return null
+                }
+                
+                return originalIdx
+              })
+              .filter((idx: number | null): idx is number => idx !== null)
+
+            // Skip group if no valid duplicate indices
+            if (mappedDuplicateIndices.length === 0) {
+              console.warn(`[DEDUP] Group ${groupIdx} has no valid duplicate indices after mapping`)
+              return null
+            }
+
+            return {
+              topic_signature: group.topic_signature || 'unknown',
+              primary_post_index: originalIndices[primaryIdx],
+              duplicate_indices: mappedDuplicateIndices,
+              detection_method: 'ai_semantic' as const,
+              similarity_score: 0.8, // Default for AI-detected
+              explanation: group.similarity_explanation || ''
+            }
+          } catch (groupError) {
+            console.error(`[DEDUP] Error processing group ${groupIdx}:`, groupError)
+            return null
+          }
+        })
+        .filter(Boolean) as DuplicateGroup[]
 
     } catch (error) {
       console.error('[DEDUP] Stage 3 AI error:', error)

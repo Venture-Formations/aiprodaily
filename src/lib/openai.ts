@@ -1838,11 +1838,31 @@ export async function callWithStructuredPrompt(
       clearTimeout(timeoutId)
 
       // Extract content from Responses API format
-      content = response.output?.[0]?.content?.[0]?.json ?? response.output?.[0]?.content?.[0]?.input_json ?? response.output?.[0]?.content?.[0]?.text ?? ""
+      // Try multiple paths: output array, output_text field, or top-level text
+      let rawContent = response.output?.[0]?.content?.[0]?.json 
+        ?? response.output?.[0]?.content?.[0]?.input_json 
+        ?? response.output?.[0]?.content?.[0]?.text 
+        ?? response.output_text
+        ?? response.text
+        ?? ""
 
-      if (!content) {
+      if (!rawContent) {
+        console.error('[AI] No content found in OpenAI response:', {
+          hasOutput: !!response.output,
+          outputLength: response.output?.length,
+          outputText: response.output_text,
+          responseKeys: Object.keys(response || {})
+        })
         throw new Error('No response from OpenAI')
       }
+
+      // If rawContent is already a parsed object/array, return it directly
+      if (typeof rawContent === 'object' && rawContent !== null) {
+        return rawContent
+      }
+      
+      // Otherwise, it's a string that needs parsing
+      content = typeof rawContent === 'string' ? rawContent : String(rawContent)
     }
 
     // Try to parse as JSON, fallback to raw content (same for both providers)
