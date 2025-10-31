@@ -4,10 +4,14 @@ import { RSSProcessor } from '@/lib/rss-processor'
 import { ScheduleChecker } from '@/lib/schedule-checker'
 import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 import { PromptSelector } from '@/lib/prompt-selector'
-import { executeStep1 } from '@/app/api/rss/combined-steps/step1-archive-fetch'
-import { executeStep2 } from '@/app/api/rss/combined-steps/step2-extract-score'
-import { executeStep3 } from '@/app/api/rss/combined-steps/step3-generate'
-import { executeStep4 } from '@/app/api/rss/combined-steps/step4-finalize'
+import { executeStep1 } from '@/app/api/rss/combined-steps/step1-archive'
+import { executeStep2 } from '@/app/api/rss/combined-steps/step2-fetch-extract'
+import { executeStep3 } from '@/app/api/rss/combined-steps/step3-score'
+import { executeStep4 } from '@/app/api/rss/combined-steps/step4-deduplicate'
+import { executeStep5 } from '@/app/api/rss/combined-steps/step5-generate-headlines'
+import { executeStep6 } from '@/app/api/rss/combined-steps/step6-select-subject'
+import { executeStep7 } from '@/app/api/rss/combined-steps/step7-welcome'
+import { executeStep8 } from '@/app/api/rss/combined-steps/step8-finalize'
 
 export async function POST(request: NextRequest) {
   let campaignId: string | undefined
@@ -91,10 +95,14 @@ export async function POST(request: NextRequest) {
     campaignId = newCampaign.id
 
     const steps = [
-      { name: 'Archive+Fetch', fn: () => executeStep1(campaignId!) },
-      { name: 'Extract+Score', fn: () => executeStep2(campaignId!) },
-      { name: 'Generate', fn: () => executeStep3(campaignId!) },
-      { name: 'Finalize', fn: () => executeStep4(campaignId!) }
+      { name: 'Archive', fn: () => executeStep1(campaignId!) },
+      { name: 'Fetch+Extract', fn: () => executeStep2(campaignId!) },
+      { name: 'Score', fn: () => executeStep3(campaignId!) },
+      { name: 'Deduplicate', fn: () => executeStep4(campaignId!) },
+      { name: 'Generate', fn: () => executeStep5(campaignId!) },
+      { name: 'Select+Subject', fn: () => executeStep6(campaignId!) },
+      { name: 'Welcome', fn: () => executeStep7(campaignId!) },
+      { name: 'Finalize', fn: () => executeStep8(campaignId!) }
     ]
 
     const results: any[] = []

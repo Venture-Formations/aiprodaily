@@ -140,9 +140,7 @@ export class RSSProcessor {
       }
     }
 
-
-    // Handle duplicates
-    await this.handleDuplicates(posts, campaignId)
+    // Note: Deduplication moved to separate step
 
     return { scored: successCount, errors: errorCount }
   }
@@ -851,20 +849,36 @@ export class RSSProcessor {
     } as any
   }
 
+  async handleDuplicatesForCampaign(campaignId: string) {
+    const { data: allPosts, error } = await supabaseAdmin
+      .from('rss_posts')
+      .select('*')
+      .eq('campaign_id', campaignId)
+
+    if (error || !allPosts || allPosts.length === 0) {
+      return { groups: 0, duplicates: 0 }
+    }
+
+    await this.handleDuplicates(allPosts, campaignId)
+    
+    const { data: duplicateGroups } = await supabaseAdmin
+      .from('duplicate_groups')
+      .select('id')
+      .eq('campaign_id', campaignId)
+
+    const { data: duplicatePosts } = await supabaseAdmin
+      .from('duplicate_posts')
+      .select('id')
+      .in('group_id', duplicateGroups?.map(g => g.id) || [])
+
+    return { 
+      groups: duplicateGroups ? duplicateGroups.length : 0, 
+      duplicates: duplicatePosts ? duplicatePosts.length : 0 
+    }
+  }
+
   private async handleDuplicates(posts: RssPost[], campaignId: string) {
     try {
-      // Fetch ALL posts from BOTH sections for cross-section deduplication
-      // This is called from scorePostsForSection but needs to see all posts
-      const { data: allPosts, error } = await supabaseAdmin
-        .from('rss_posts')
-        .select('*')
-        .eq('campaign_id', campaignId)
-
-      if (error || !allPosts || allPosts.length === 0) {
-        return
-      }
-
-
       // Check if already deduplicated for this campaign
       const { data: existingGroups } = await supabaseAdmin
         .from('duplicate_groups')
@@ -873,6 +887,15 @@ export class RSSProcessor {
         .limit(1)
 
       if (existingGroups && existingGroups.length > 0) {
+        return
+      }
+
+      const { data: allPosts, error } = await supabaseAdmin
+        .from('rss_posts')
+        .select('*')
+        .eq('campaign_id', campaignId)
+
+      if (error || !allPosts || allPosts.length === 0) {
         return
       }
 
@@ -1033,15 +1056,17 @@ export class RSSProcessor {
       await this.processPostIntoArticle(post, campaignId, section)
     }
 
-    // Auto-select top articles based on ratings (only for primary section)
-    if (section === 'primary') {
-      await this.selectTop5Articles(campaignId)
-    } else {
-      await this.selectTopSecondaryArticles(campaignId)
-    }
-
-    // Download and store images for selected articles
+    // Note: Article selection and subject line generation moved to separate steps
+    // Download and store images for articles
     await this.processArticleImages(campaignId)
+  }
+
+  /**
+   * Public method to select top articles - used by step-based processing
+   */
+  async selectTopArticlesForCampaign(campaignId: string) {
+    await this.selectTop5Articles(campaignId)
+    await this.selectTopSecondaryArticles(campaignId)
   }
 
   private async selectTop5Articles(campaignId: string) {

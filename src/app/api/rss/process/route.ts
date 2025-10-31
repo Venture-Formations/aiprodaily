@@ -1,19 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { executeStep1 } from '../combined-steps/step1-archive-fetch'
-import { executeStep2 } from '../combined-steps/step2-extract-score'
-import { executeStep3 } from '../combined-steps/step3-generate'
-import { executeStep4 } from '../combined-steps/step4-finalize'
+import { executeStep1 } from '../combined-steps/step1-archive'
+import { executeStep2 } from '../combined-steps/step2-fetch-extract'
+import { executeStep3 } from '../combined-steps/step3-score'
+import { executeStep4 } from '../combined-steps/step4-deduplicate'
+import { executeStep5 } from '../combined-steps/step5-generate-headlines'
+import { executeStep6 } from '../combined-steps/step6-select-subject'
+import { executeStep7 } from '../combined-steps/step7-welcome'
+import { executeStep8 } from '../combined-steps/step8-finalize'
 
 /**
- * Simplified RSS Processing Endpoint
+ * RSS Processing Endpoint
  *
- * Runs 4 combined workflow steps sequentially for ONE campaign:
- * 1. Archive + Fetch RSS feeds
- * 2. Extract + Score posts
- * 3. Generate articles
- * 4. Finalize campaign
+ * Runs 8 workflow steps sequentially for ONE campaign:
+ * 1. Archive old data
+ * 2. Fetch RSS feeds and extract full text
+ * 3. Score posts with AI
+ * 4. Deduplicate posts
+ * 5. Generate headlines/bodies
+ * 6. Select articles and generate subject line
+ * 7. Generate welcome section
+ * 8. Finalize (mark draft + notifications)
  *
  * Features:
  * - Minimal logging to prevent log overflow
@@ -45,10 +53,14 @@ export async function POST(request: NextRequest) {
     console.log(`[RSS] Start: ${campaign_id}`)
 
     const steps = [
-      { name: 'Archive+Fetch', fn: () => executeStep1(campaign_id!) },
-      { name: 'Extract+Score', fn: () => executeStep2(campaign_id!) },
-      { name: 'Generate', fn: () => executeStep3(campaign_id!) },
-      { name: 'Finalize', fn: () => executeStep4(campaign_id!) }
+      { name: 'Archive', fn: () => executeStep1(campaign_id!) },
+      { name: 'Fetch+Extract', fn: () => executeStep2(campaign_id!) },
+      { name: 'Score', fn: () => executeStep3(campaign_id!) },
+      { name: 'Deduplicate', fn: () => executeStep4(campaign_id!) },
+      { name: 'Generate', fn: () => executeStep5(campaign_id!) },
+      { name: 'Select+Subject', fn: () => executeStep6(campaign_id!) },
+      { name: 'Welcome', fn: () => executeStep7(campaign_id!) },
+      { name: 'Finalize', fn: () => executeStep8(campaign_id!) }
     ]
 
     const results = []
@@ -107,4 +119,3 @@ export async function POST(request: NextRequest) {
     }, { status: 500 })
   }
 }
-
