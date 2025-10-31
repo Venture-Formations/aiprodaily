@@ -65,22 +65,42 @@ export async function POST(request: NextRequest) {
 
 
 
-    // Always create a new campaign (duplicate dates are now allowed)
-    const { data: newCampaign, error: campaignError } = await supabaseAdmin
+    // Check if a campaign already exists for this date
+    const { data: existingCampaign, error: checkError } = await supabaseAdmin
       .from('newsletter_campaigns')
-      .insert([{
-        date: campaignDate,
-        status: 'processing',
-        newsletter_id: newsletter.id
-      }])
-      .select()
-      .single()
+      .select('id, status')
+      .eq('date', campaignDate)
+      .eq('newsletter_id', newsletter.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-    if (campaignError || !newCampaign) {
-      throw new Error(`Failed to create campaign: ${campaignError?.message}`)
+    if (checkError) {
+      throw new Error(`Failed to check for existing campaign: ${checkError.message}`)
     }
 
-    campaignId = newCampaign.id
+    if (existingCampaign) {
+      console.log(`[Cron] Campaign already exists for date ${campaignDate}, using existing campaign: ${existingCampaign.id}`)
+      campaignId = existingCampaign.id
+    } else {
+      // Create a new campaign only if one doesn't exist
+      const { data: newCampaign, error: campaignError } = await supabaseAdmin
+        .from('newsletter_campaigns')
+        .insert([{
+          date: campaignDate,
+          status: 'processing',
+          newsletter_id: newsletter.id
+        }])
+        .select()
+        .single()
+
+      if (campaignError || !newCampaign) {
+        throw new Error(`Failed to create campaign: ${campaignError?.message}`)
+      }
+
+      campaignId = newCampaign.id
+      console.log(`[Cron] Created new campaign for date ${campaignDate}: ${campaignId}`)
+    }
 
     // Select prompt and AI apps for the campaign
     await PromptSelector.selectPromptForCampaign(campaignId!)
@@ -249,25 +269,45 @@ export async function GET(request: NextRequest) {
     }
 
 
-    // Always create a new campaign (duplicate dates are now allowed)
-    const { data: newCampaign, error: campaignError } = await supabaseAdmin
+    // Check if a campaign already exists for this date
+    const { data: existingCampaign, error: checkError } = await supabaseAdmin
       .from('newsletter_campaigns')
-      .insert([{
-        date: campaignDate,
-        subject_line: '', // Will be generated later
-        status: 'processing',
-        newsletter_id: newsletter.id,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }])
-      .select('id')
-      .single()
+      .select('id, status')
+      .eq('date', campaignDate)
+      .eq('newsletter_id', newsletter.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-    if (campaignError || !newCampaign) {
-      throw new Error(`Failed to create campaign: ${campaignError?.message}`)
+    if (checkError) {
+      throw new Error(`Failed to check for existing campaign: ${checkError.message}`)
     }
 
-    campaignId = newCampaign.id
+    if (existingCampaign) {
+      console.log(`[Cron] Campaign already exists for date ${campaignDate}, using existing campaign: ${existingCampaign.id}`)
+      campaignId = existingCampaign.id
+    } else {
+      // Create a new campaign only if one doesn't exist
+      const { data: newCampaign, error: campaignError } = await supabaseAdmin
+        .from('newsletter_campaigns')
+        .insert([{
+          date: campaignDate,
+          subject_line: '', // Will be generated later
+          status: 'processing',
+          newsletter_id: newsletter.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }])
+        .select('id')
+        .single()
+
+      if (campaignError || !newCampaign) {
+        throw new Error(`Failed to create campaign: ${campaignError?.message}`)
+      }
+
+      campaignId = newCampaign.id
+      console.log(`[Cron] Created new campaign for date ${campaignDate}: ${campaignId}`)
+    }
 
     // Select prompt and AI apps for the campaign
     await PromptSelector.selectPromptForCampaign(campaignId!)
