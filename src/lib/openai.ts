@@ -1802,7 +1802,7 @@ export async function callWithStructuredPrompt(
   const timeoutId = setTimeout(() => controller.abort(), 30000)
 
   try {
-    let content: string
+    let content: string = ''
 
     if (provider === 'claude') {
       // Claude API - send exactly as-is (messages stays as messages)
@@ -1889,18 +1889,28 @@ export async function callWithStructuredPrompt(
 
     // Try to parse as JSON, fallback to raw content (same for both providers)
     try {
+      // Ensure content is defined and is a string (should be set in if/else above)
+      if (typeof content === 'undefined') {
+        console.error('[AI] Content variable is undefined - this should not happen')
+        return { raw: 'Content was undefined' }
+      }
+
       // Validate content is a string
       if (!content || typeof content !== 'string') {
         console.error('[AI] Invalid content type for parsing:', typeof content, content)
         return { raw: content }
       }
 
-      let cleanedContent = content
-      const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
-      if (codeFenceMatch) {
-        // Test endpoint uses codeFenceMatch[1] directly without validation
-        // If it's undefined, cleanedContent will be undefined, but we'll validate below
-        cleanedContent = codeFenceMatch[1] ?? content
+      let cleanedContent: string = String(content) // Ensure it's definitely a string
+      try {
+        const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+        if (codeFenceMatch && codeFenceMatch[1] !== undefined) {
+          cleanedContent = codeFenceMatch[1]
+        }
+      } catch (matchError) {
+        // If regex matching fails, use original content
+        console.warn('[AI] Regex match failed, using original content:', matchError)
+        cleanedContent = String(content)
       }
 
       // Validate cleanedContent is still a string
@@ -2151,13 +2161,16 @@ export async function callOpenAI(prompt: string, maxTokens = 1000, temperature =
 
         // Strip markdown code fences first (```json ... ``` or ``` ... ```)
         // Match test endpoint logic exactly - it doesn't validate codeFenceMatch[1]
-        let cleanedContent = content
-        const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
-        if (codeFenceMatch) {
-          // Test endpoint uses codeFenceMatch[1] directly without validation
-          // If it's undefined, cleanedContent will be undefined, but we'll validate below
-          cleanedContent = codeFenceMatch[1] ?? content
-          // console.log('Stripped markdown code fences from response') // Commented out to reduce log count
+        let cleanedContent: string = String(content) // Ensure it's definitely a string
+        try {
+          const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+          if (codeFenceMatch && codeFenceMatch[1] !== undefined) {
+            cleanedContent = codeFenceMatch[1]
+          }
+        } catch (matchError) {
+          // If regex matching fails, use original content
+          console.warn('[AI] Regex match failed in callOpenAI, using original content:', matchError)
+          cleanedContent = String(content)
         }
 
         // Validate cleanedContent is still a string
