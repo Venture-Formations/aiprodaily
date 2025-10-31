@@ -113,8 +113,18 @@ async function loadPromptJSON(promptKey: string | null, customPromptContent: str
     // Use custom prompt content directly (from text box)
     promptJson = JSON.parse(customPromptContent)
     
-    // Try to get provider from custom prompt if it has one, otherwise default to OpenAI
-    // (Custom prompts may not have provider info, so we'll default to OpenAI)
+    // Still fetch provider from database if promptKey is provided (provider is separate setting)
+    if (promptKey) {
+      const { data } = await supabaseAdmin
+        .from('app_settings')
+        .select('ai_provider')
+        .eq('key', promptKey)
+        .single()
+      
+      if (data?.ai_provider === 'claude') {
+        provider = 'claude'
+      }
+    }
   } else if (promptKey) {
     // Fetch from database
     const { data, error } = await supabaseAdmin
