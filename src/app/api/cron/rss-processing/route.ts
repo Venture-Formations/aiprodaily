@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { ScheduleChecker } from '@/lib/schedule-checker'
 import { PromptSelector } from '@/lib/prompt-selector'
+import { executeStep1 } from '@/app/api/rss/combined-steps/step1-archive'
+import { executeStep2 } from '@/app/api/rss/combined-steps/step2-fetch-extract'
+import { executeStep3 } from '@/app/api/rss/combined-steps/step3-score'
+import { executeStep4 } from '@/app/api/rss/combined-steps/step4-deduplicate'
+import { executeStep5 } from '@/app/api/rss/combined-steps/step5-generate-headlines'
+import { executeStep6 } from '@/app/api/rss/combined-steps/step6-select-subject'
+import { executeStep7 } from '@/app/api/rss/combined-steps/step7-welcome'
+import { executeStep8 } from '@/app/api/rss/combined-steps/step8-finalize'
 
 export async function POST(request: NextRequest) {
   let campaignId: string | undefined
