@@ -1900,12 +1900,12 @@ export async function callWithStructuredPrompt(
         ""
 
       if (!rawContent || (typeof rawContent === 'string' && rawContent === '')) {
-        console.error('[AI] No content found in OpenAI response:', {
+        console.error('[AI] No content found in OpenAI response:', JSON.stringify({
           hasOutput: !!response.output,
           outputLength: response.output?.length,
           outputText: response.output_text,
           responseKeys: Object.keys(response || {})
-        })
+        }, null, 2))
         throw new Error('No response from OpenAI')
       }
 
@@ -2119,12 +2119,12 @@ export async function callOpenAIStructured(options: OpenAICallOptions) {
         ""
       
       if (!rawContent || (typeof rawContent === 'string' && rawContent === '')) {
-        console.error('[AI] No content found in OpenAI response:', {
+        console.error('[AI] No content found in OpenAI response:', JSON.stringify({
           hasOutput: !!response.output,
           outputLength: response.output?.length,
           outputText: response.output_text,
           responseKeys: Object.keys(response || {})
-        })
+        }, null, 2))
         throw new Error('No response from OpenAI')
       }
 
@@ -2255,12 +2255,12 @@ export async function callOpenAI(prompt: string, maxTokens = 1000, temperature =
         ""
 
       if (!rawContent || (typeof rawContent === 'string' && rawContent === '')) {
-        console.error('[AI] No content found in OpenAI response:', {
+        console.error('[AI] No content found in OpenAI response:', JSON.stringify({
           hasOutput: !!response.output,
           outputLength: response.output?.length,
           outputText: response.output_text,
           responseKeys: Object.keys(response || {})
-        })
+        }, null, 2))
         throw new Error('No response from OpenAI')
       }
 

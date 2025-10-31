@@ -251,9 +251,9 @@ export class ArticleExtractor {
 
       await Promise.all(batchPromises)
 
-      // Log batch results
       const batchSuccess = batch.filter(url => results.get(url)?.success).length
       const batchFailed = batch.length - batchSuccess
+      console.log(`[Extract] Batch ${batchNum}/${totalBatches}: ${batchSuccess} succeeded, ${batchFailed} failed`)
 
       // Small delay between batches to be polite to servers
       if (i + batchSize < urls.length) {
