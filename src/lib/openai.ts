@@ -1870,7 +1870,7 @@ export async function callWithStructuredPrompt(
   // Replace all placeholders in the entire config
   const processedRequest = replacePlaceholders(apiRequest)
 
-  // Log subject line API calls (first 20 lines)
+  // Log subject line API calls (full request)
   const isSubjectLine = promptKey === 'ai_prompt_subject_line'
   if (isSubjectLine) {
     try {
@@ -1900,6 +1900,17 @@ export async function callWithStructuredPrompt(
       // Claude API - send exactly as-is (messages stays as messages)
       console.log(`[AI] Using Claude API for prompt (provider: ${provider})`)
 
+      // Log full Claude API call for subject line
+      if (isSubjectLine) {
+        const fullRequestString = JSON.stringify(processedRequest, null, 2)
+        console.log(`[Subject Line API Call] Full Claude API call:`)
+        console.log(`await anthropic.messages.create(`)
+        console.log(fullRequestString)
+        console.log(`, {`)
+        console.log(`  signal: controller.signal`)
+        console.log(`} as any)`)
+      }
+
       const response = await anthropic.messages.create(processedRequest, {
         signal: controller.signal
       } as any)
@@ -1919,6 +1930,17 @@ export async function callWithStructuredPrompt(
       if (processedRequest.messages) {
         processedRequest.input = processedRequest.messages
         delete processedRequest.messages
+      }
+
+      // Log full OpenAI API call for subject line
+      if (isSubjectLine) {
+        const fullRequestString = JSON.stringify(processedRequest, null, 2)
+        console.log(`[Subject Line API Call] Full OpenAI API call:`)
+        console.log(`await (openai as any).responses.create(`)
+        console.log(fullRequestString)
+        console.log(`, {`)
+        console.log(`  signal: controller.signal`)
+        console.log(`})`)
       }
 
       const response = await (openai as any).responses.create(processedRequest, {
