@@ -1939,7 +1939,7 @@ export async function callOpenAIStructured(options: OpenAICallOptions) {
       const requestOptions: any = {
         model: 'gpt-4o',
         messages,
-        max_tokens: maxTokens,
+        max_output_tokens: maxTokens,
         temperature
       }
 
@@ -1965,7 +1965,7 @@ export async function callOpenAIStructured(options: OpenAICallOptions) {
         model: requestOptions.model,
         input: inputMessages,
         temperature: requestOptions.temperature,
-        max_tokens: requestOptions.max_tokens,
+        max_output_tokens: requestOptions.max_output_tokens,
         ...(requestOptions.top_p !== undefined && { top_p: requestOptions.top_p }),
         ...(requestOptions.presence_penalty !== undefined && { presence_penalty: requestOptions.presence_penalty }),
         ...(requestOptions.frequency_penalty !== undefined && { frequency_penalty: requestOptions.frequency_penalty })
