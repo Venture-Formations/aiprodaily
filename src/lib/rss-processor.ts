@@ -1511,13 +1511,16 @@ export class RSSProcessor {
   }
 
   private async factCheckContent(newsletterContent: string, originalContent: string): Promise<FactCheckResult> {
-    const promptOrResult = await AI_PROMPTS.factChecker(newsletterContent, originalContent)
-
-    // If we got an object with 'raw' property, it's already the result from structured prompt
-    // Otherwise, it's a prompt string that needs to be sent to OpenAI
-    let result = (typeof promptOrResult === 'object' && promptOrResult !== null && 'raw' in promptOrResult)
-      ? promptOrResult
-      : await callOpenAI(promptOrResult as string)
+    // Use callAIWithPrompt to handle structured prompts the same way as other AI calls
+    let result
+    try {
+      result = await callAIWithPrompt('ai_prompt_fact_checker', {
+        newsletter_content: newsletterContent,
+        original_content: originalContent
+      })
+    } catch (callError) {
+      throw new Error(`AI call failed for fact-checker: ${callError instanceof Error ? callError.message : 'Unknown error'}`)
+    }
 
     // If result has 'raw' property, try to parse it (JSON parsing failed in callWithStructuredPrompt)
     if (result && typeof result === 'object' && 'raw' in result && typeof result.raw === 'string') {
@@ -1553,6 +1556,10 @@ export class RSSProcessor {
           throw new Error(`Failed to parse fact-check response: ${JSON.stringify({ raw: result.raw.substring(0, 200), parseError: parseError instanceof Error ? parseError.message : String(parseError) })}`)
         }
       }
+    }
+
+    if (!result || typeof result !== 'object') {
+      throw new Error(`Invalid fact-check response type: expected object, got ${typeof result}`)
     }
 
     if (typeof result.score !== 'number' || typeof result.details !== 'string') {
