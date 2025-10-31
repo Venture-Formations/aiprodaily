@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 import { supabaseAdmin } from '@/lib/supabase'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
@@ -13,8 +12,8 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
-// Helper function to inject post data into any value (string, object, array) recursively
-// This matches the behavior of AI Prompt Testing Playground
+// Helper function to inject post data into JSON recursively
+// Matches the behavior of /api/ai/test-prompt
 function injectPostData(obj: any, post: any): any {
   if (typeof obj === 'string') {
     if (!post) return obj
@@ -44,32 +43,48 @@ function injectPostData(obj: any, post: any): any {
   return obj
 }
 
-// Helper function to process custom prompt content (JSON or string) with placeholder replacement
-// Returns either a string prompt or a JSON config object (for structured prompts)
-function processCustomPrompt(customPromptContent: string, postData: any): any {
-  // Parse JSON and replace placeholders
-  const promptJson = JSON.parse(customPromptContent)
-  // Use recursive replacement throughout the entire JSON structure
-  const processedJson = injectPostData(promptJson, postData)
-  // Return the object as-is - let the API decide if it's valid
-  return processedJson
-}
-
-// Helper function to call AI provider (OpenAI or Claude)
-// Returns both the parsed content and the full API response
-// Supports both simple string prompts and structured JSON prompts with response_format
-async function callAI(
-  promptOrConfig: string | any,
-  maxTokens: number = 1000,
-  temperature: number = 0.7,
-  provider: 'openai' | 'claude' = 'openai'
+// Helper to call AI provider (OpenAI or Claude) - matches /api/ai/test-prompt pattern
+async function callAIProvider(
+  promptJson: any,
+  provider: 'openai' | 'claude'
 ): Promise<{ content: any, fullResponse: any }> {
+  if (provider === 'openai') {
+    // OpenAI API call - send EXACTLY as-is, only rename messages to input
+    const apiRequest = { ...promptJson }
 
-  if (provider === 'claude') {
-    // Claude API call - send EXACTLY as-is, let API validate
-    console.log('[CALLAI-CLAUDE] Sending to Claude API:', JSON.stringify(promptOrConfig, null, 2))
+    if (apiRequest.messages) {
+      apiRequest.input = apiRequest.messages
+      delete apiRequest.messages
+    }
 
-    const completion = await anthropic.messages.create(promptOrConfig)
+    const completion = await (openai as any).responses.create(apiRequest)
+
+    // Try multiple response formats (same as /api/ai/test-prompt)
+    let rawResponse =
+      completion.output?.[0]?.content?.[0]?.json ??
+      completion.output?.[0]?.content?.[0]?.input_json ??
+      completion.output?.[0]?.content?.[0]?.text ??
+      completion.output_text ??
+      completion.choices?.[0]?.message?.content ??
+      'No response'
+
+    // If response is a JSON string, parse it
+    let content: any = rawResponse
+    if (typeof rawResponse === 'string') {
+      try {
+        content = JSON.parse(rawResponse)
+      } catch {
+        content = rawResponse
+      }
+    }
+
+    return {
+      content,
+      fullResponse: completion
+    }
+  } else {
+    // Claude API call - send the exact JSON
+    const completion = await anthropic.messages.create(promptJson)
 
     // Extract text from Claude response
     const textContent = completion.content.find(c => c.type === 'text')
@@ -86,55 +101,40 @@ async function callAI(
       content,
       fullResponse: completion
     }
-  } else {
-    // OpenAI API call - send EXACTLY as-is, let API validate
-    console.log('[CALLAI-OPENAI] Sending to Responses API:', JSON.stringify(promptOrConfig, null, 2))
-
-    const response = await (openai as any).responses.create(promptOrConfig)
-
-    // Extract content from Responses API format (multiple possible locations)
-    const content =
-      response.output?.[0]?.content?.[0]?.json ??           // JSON schema response
-      response.output?.[0]?.content?.[0]?.input_json ??     // Alternative JSON location
-      response.output?.[0]?.content?.[0]?.text ??           // Text response
-      response.output_text ??                               // Legacy location
-      'No response'
-
-    // Try to parse as JSON if it's a string
-    let parsedContent: any = content
-    if (typeof content === 'string') {
-      try {
-        // Strip markdown code fences first
-        let cleanedContent = content
-        const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
-        if (codeFenceMatch) {
-          cleanedContent = codeFenceMatch[1]
-        }
-
-        const objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
-        const arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
-
-        if (arrayMatch) {
-          parsedContent = JSON.parse(arrayMatch[0])
-        } else if (objectMatch) {
-          parsedContent = JSON.parse(objectMatch[0])
-        } else {
-          parsedContent = JSON.parse(cleanedContent.trim())
-        }
-      } catch (parseError) {
-        // Keep as string if not JSON
-        parsedContent = content
-      }
-    } else {
-      // Already an object (from json/input_json fields)
-      parsedContent = content
-    }
-
-    return {
-      content: parsedContent,
-      fullResponse: response
-    }
   }
+}
+
+// Helper to load prompt JSON (from custom content or database) and get provider
+async function loadPromptJSON(promptKey: string | null, customPromptContent: string | null): Promise<{ promptJson: any, provider: 'openai' | 'claude' }> {
+  let promptJson: any
+  let provider: 'openai' | 'claude' = 'openai'
+
+  if (customPromptContent) {
+    // Use custom prompt content directly (from text box)
+    promptJson = JSON.parse(customPromptContent)
+    
+    // Try to get provider from custom prompt if it has one, otherwise default to OpenAI
+    // (Custom prompts may not have provider info, so we'll default to OpenAI)
+  } else if (promptKey) {
+    // Fetch from database
+    const { data, error } = await supabaseAdmin
+      .from('app_settings')
+      .select('value, ai_provider')
+      .eq('key', promptKey)
+      .single()
+
+    if (error || !data) {
+      throw new Error(`Failed to fetch prompt: ${promptKey} - ${error?.message || 'No data returned'}`)
+    }
+
+    // Parse the JSON value from database
+    promptJson = typeof data.value === 'string' ? JSON.parse(data.value) : data.value
+    provider = (data.ai_provider === 'claude' ? 'claude' : 'openai')
+  } else {
+    throw new Error('Either promptKey or promptContent must be provided')
+  }
+
+  return { promptJson, provider }
 }
 
 export async function GET(request: NextRequest) {
@@ -144,21 +144,6 @@ export async function GET(request: NextRequest) {
     const promptKey = searchParams.get('promptKey')
     const rssPostId = searchParams.get('rssPostId')
     const customPromptContent = searchParams.get('promptContent') // Custom prompt content for testing
-
-    // Fetch AI provider from database if promptKey is provided
-    let aiProvider: 'openai' | 'claude' = 'openai' // Default to OpenAI
-    if (promptKey) {
-      const { data: promptData } = await supabaseAdmin
-        .from('app_settings')
-        .select('ai_provider')
-        .eq('key', promptKey)
-        .single()
-
-      if (promptData?.ai_provider === 'claude') {
-        aiProvider = 'claude'
-        console.log('[DEBUG] Using Claude provider for prompt:', promptKey)
-      }
-    }
 
     const results: Record<string, any> = {}
 
@@ -254,91 +239,32 @@ export async function GET(request: NextRequest) {
 
     // Test Content Evaluator
     if (promptType === 'all' || promptType === 'contentEvaluator') {
-      console.log('Testing Content Evaluator...')
-      console.log('[DEBUG] Received promptKey:', promptKey)
-      console.log('[DEBUG] Received promptType:', promptType)
-
       try {
-        let prompt: string | any | any
-        let promptSource = 'default'
-
-        // If custom prompt content is provided, use that directly
-        if (customPromptContent) {
-          console.log('[DEBUG] Using custom prompt content from request')
-
-          // Build post data object for placeholder replacement
-          const postData = {
-            title: testData.contentEvaluator.title,
-            description: testData.contentEvaluator.description,
-            content: testData.contentEvaluator.content,
-            full_article_text: testData.contentEvaluator.content
-          }
-
-          prompt = processCustomPrompt(customPromptContent, postData)
-          promptSource = 'custom'
-          console.log('[DEBUG] Using custom prompt, length:', typeof prompt === 'string' ? prompt.length : 'N/A (structured)')
-        } else {
-          // If testing a specific criteria prompt, fetch that prompt directly
-          const isCriteriaPrompt = promptKey && (promptKey.startsWith('ai_prompt_criteria_') || promptKey.startsWith('ai_prompt_secondary_criteria_'))
-          console.log('[DEBUG] Is criteria prompt?', isCriteriaPrompt)
-
-          if (isCriteriaPrompt) {
-            console.log('[DEBUG] Fetching criteria prompt from database:', promptKey)
-
-            const { data, error } = await supabaseAdmin
-              .from('app_settings')
-              .select('value')
-              .eq('key', promptKey)
-              .single()
-
-            console.log('[DEBUG] Database query result:', { hasData: !!data, error: error?.message })
-
-            if (error || !data) {
-              const errorMsg = `Failed to fetch prompt: ${promptKey} - ${error?.message || 'No data returned'}`
-              console.error('[DEBUG]', errorMsg)
-              throw new Error(errorMsg)
-            }
-
-            console.log('[DEBUG] Retrieved prompt length:', data.value?.length || 0)
-            console.log('[DEBUG] Prompt preview (first 200 chars):', JSON.stringify(data.value).substring(0, 200))
-
-            // Build post data object for placeholder replacement
-            const postData = {
-              title: testData.contentEvaluator.title,
-              description: testData.contentEvaluator.description,
-              content: testData.contentEvaluator.content,
-              full_article_text: testData.contentEvaluator.content
-            }
-
-            // Use recursive placeholder replacement (handles both JSON and string formats)
-            prompt = processCustomPrompt(data.value, postData)
-
-            promptSource = `database:${promptKey}`
-            console.log('[DEBUG] After placeholder replacement, prompt length:', typeof prompt === 'string' ? prompt.length : 'N/A (structured)')
-          } else {
-            console.log('[DEBUG] Using standard contentEvaluator prompt from AI_PROMPTS')
-            // Use the standard contentEvaluator prompt
-            prompt = await AI_PROMPTS.contentEvaluator(testData.contentEvaluator)
-            promptSource = 'AI_PROMPTS.contentEvaluator'
-          }
+        // Load prompt JSON (from custom content or database)
+        const testPromptKey = promptKey || 'ai_prompt_content_evaluator'
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        
+        // Build post data for placeholder replacement
+        const postData = {
+          title: testData.contentEvaluator.title,
+          description: testData.contentEvaluator.description,
+          content: testData.contentEvaluator.content,
+          full_article_text: testData.contentEvaluator.content
         }
 
-        console.log('[DEBUG] Final prompt preview (first 300 chars):', typeof prompt === 'string' ? prompt.substring(0, 300) : 'Structured JSON prompt')
-        console.log('[DEBUG] Calling AI with prompt length:', typeof prompt === 'string' ? prompt.length : 'N/A (structured)', 'provider:', aiProvider)
+        // Replace placeholders in the prompt JSON
+        const processedJson = injectPostData(loadedPromptJson, postData)
 
-        const { content, fullResponse } = await callAI(prompt, 1000, 0.3, aiProvider)
-
-        console.log('[DEBUG] OpenAI response received:', typeof content === 'string' ? content.substring(0, 200) : content)
+        // Call AI provider
+        const { content, fullResponse } = await callAIProvider(processedJson, loadedProvider)
 
         results.contentEvaluator = {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
-          prompt_key_used: promptKey || 'ai_prompt_content_evaluator',
-          prompt_source: promptSource,
-          prompt_preview: typeof prompt === 'string' ? prompt.substring(0, 500) + '...' : 'Structured JSON prompt',
-          ai_provider: aiProvider
+          prompt_key_used: testPromptKey,
+          prompt_source: customPromptContent ? 'custom' : 'database',
+          ai_provider: loadedProvider
         }
       } catch (error) {
         results.contentEvaluator = {
@@ -350,35 +276,28 @@ export async function GET(request: NextRequest) {
 
     // Test Newsletter Writer
     if (promptType === 'all' || promptType === 'newsletterWriter') {
-      console.log('Testing Newsletter Writer...')
       try {
-        let prompt: string | any
-        let promptSource = 'default'
-
-        if (customPromptContent) {
-          console.log('[DEBUG] Using custom prompt content for newsletter writer')
-          const postData = {
-            title: testData.newsletterWriter.title,
-            description: testData.newsletterWriter.description,
-            content: testData.newsletterWriter.content,
-            full_article_text: testData.newsletterWriter.content,
-            source_url: testData.newsletterWriter.source_url
-          }
-          prompt = processCustomPrompt(customPromptContent, postData)
-          promptSource = 'custom'
-        } else {
-          prompt = await AI_PROMPTS.newsletterWriter(testData.newsletterWriter)
-          promptSource = 'AI_PROMPTS.newsletterWriter'
+        const testPromptKey = promptKey || 'ai_prompt_newsletter_writer'
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        
+        const postData = {
+          title: testData.newsletterWriter.title,
+          description: testData.newsletterWriter.description,
+          content: testData.newsletterWriter.content,
+          full_article_text: testData.newsletterWriter.content,
+          source_url: testData.newsletterWriter.source_url
         }
 
-        const { content, fullResponse } = await callAI(prompt, 1000, 0.3, aiProvider)
+        const processedJson = injectPostData(loadedPromptJson, postData)
+        const { content, fullResponse } = await callAIProvider(processedJson, loadedProvider)
+
         results.newsletterWriter = {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
-          prompt_source: promptSource,
-          ai_provider: aiProvider
+          prompt_key_used: testPromptKey,
+          prompt_source: customPromptContent ? 'custom' : 'database',
+          ai_provider: loadedProvider
         }
       } catch (error) {
         results.newsletterWriter = {
@@ -390,37 +309,28 @@ export async function GET(request: NextRequest) {
 
     // Test Primary Article Title
     if (promptType === 'primaryArticleTitle') {
-      console.log('Testing Primary Article Title...')
       try {
-        let prompt: string | any | any
-        let promptSource = 'default'
-
-        if (customPromptContent) {
-          console.log('[DEBUG] Using custom prompt content for primary article title')
-          const postData = {
-            title: testData.newsletterWriter.title,
-            description: testData.newsletterWriter.description,
-            content: testData.newsletterWriter.content,
-            full_article_text: testData.newsletterWriter.content,
-            source_url: testData.newsletterWriter.source_url
-          }
-          prompt = processCustomPrompt(customPromptContent, postData)
-          promptSource = 'custom'
-        } else {
-          prompt = await AI_PROMPTS.primaryArticleTitle(testData.newsletterWriter)
-          promptSource = 'AI_PROMPTS.primaryArticleTitle'
+        const testPromptKey = promptKey || 'ai_prompt_primary_article_title'
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        
+        const postData = {
+          title: testData.newsletterWriter.title,
+          description: testData.newsletterWriter.description,
+          content: testData.newsletterWriter.content,
+          full_article_text: testData.newsletterWriter.content,
+          source_url: testData.newsletterWriter.source_url
         }
 
-        console.log('[TEST] Prompt preview (first 500 chars):', typeof prompt === 'string' ? prompt.substring(0, 500) : 'Structured JSON prompt')
-        const { content, fullResponse } = await callAI(prompt, 200, 0.7, aiProvider)
+        const processedJson = injectPostData(loadedPromptJson, postData)
+        const { content, fullResponse } = await callAIProvider(processedJson, loadedProvider)
+
         results.primaryArticleTitle = {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
-          prompt_source: promptSource,
-          prompt_preview: typeof prompt === 'string' ? prompt.substring(0, 300) + '...' : 'Structured JSON prompt',
-          ai_provider: aiProvider
+          prompt_key_used: testPromptKey,
+          prompt_source: customPromptContent ? 'custom' : 'database',
+          ai_provider: loadedProvider
         }
       } catch (error) {
         results.primaryArticleTitle = {
@@ -432,38 +342,31 @@ export async function GET(request: NextRequest) {
 
     // Test Primary Article Body
     if (promptType === 'primaryArticleBody') {
-      console.log('Testing Primary Article Body...')
       try {
-        let prompt: string | any
-        let promptSource = 'default'
+        const testPromptKey = promptKey || 'ai_prompt_primary_article_body'
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        
         const sampleHeadline = rssPost?.title || 'Sample Test Headline for Article Body'
-
-        if (customPromptContent) {
-          console.log('[DEBUG] Using custom prompt content for primary article body')
-          const postData = {
-            title: testData.newsletterWriter.title,
-            description: testData.newsletterWriter.description,
-            content: testData.newsletterWriter.content,
-            full_article_text: testData.newsletterWriter.content,
-            source_url: testData.newsletterWriter.source_url,
-            headline: sampleHeadline
-          }
-          prompt = processCustomPrompt(customPromptContent, postData)
-          promptSource = 'custom'
-        } else {
-          prompt = await AI_PROMPTS.primaryArticleBody(testData.newsletterWriter, sampleHeadline)
-          promptSource = 'AI_PROMPTS.primaryArticleBody'
+        const postData = {
+          title: testData.newsletterWriter.title,
+          description: testData.newsletterWriter.description,
+          content: testData.newsletterWriter.content,
+          full_article_text: testData.newsletterWriter.content,
+          source_url: testData.newsletterWriter.source_url,
+          headline: sampleHeadline
         }
 
-        const { content, fullResponse } = await callAI(prompt, 500, 0.7, aiProvider)
+        const processedJson = injectPostData(loadedPromptJson, postData)
+        const { content, fullResponse } = await callAIProvider(processedJson, loadedProvider)
+
         results.primaryArticleBody = {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
-          prompt_source: promptSource,
+          prompt_key_used: testPromptKey,
+          prompt_source: customPromptContent ? 'custom' : 'database',
           note: `Using headline: "${sampleHeadline}"`,
-          ai_provider: aiProvider
+          ai_provider: loadedProvider
         }
       } catch (error) {
         results.primaryArticleBody = {
@@ -475,35 +378,28 @@ export async function GET(request: NextRequest) {
 
     // Test Secondary Article Title
     if (promptType === 'secondaryArticleTitle') {
-      console.log('Testing Secondary Article Title...')
       try {
-        let prompt: string | any
-        let promptSource = 'default'
-
-        if (customPromptContent) {
-          console.log('[DEBUG] Using custom prompt content for secondary article title')
-          const postData = {
-            title: testData.newsletterWriter.title,
-            description: testData.newsletterWriter.description,
-            content: testData.newsletterWriter.content,
-            full_article_text: testData.newsletterWriter.content,
-            source_url: testData.newsletterWriter.source_url
-          }
-          prompt = processCustomPrompt(customPromptContent, postData)
-          promptSource = 'custom'
-        } else {
-          prompt = await AI_PROMPTS.secondaryArticleTitle(testData.newsletterWriter)
-          promptSource = 'AI_PROMPTS.secondaryArticleTitle'
+        const testPromptKey = promptKey || 'ai_prompt_secondary_article_title'
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        
+        const postData = {
+          title: testData.newsletterWriter.title,
+          description: testData.newsletterWriter.description,
+          content: testData.newsletterWriter.content,
+          full_article_text: testData.newsletterWriter.content,
+          source_url: testData.newsletterWriter.source_url
         }
 
-        const { content, fullResponse } = await callAI(prompt, 200, 0.7, aiProvider)
+        const processedJson = injectPostData(loadedPromptJson, postData)
+        const { content, fullResponse } = await callAIProvider(processedJson, loadedProvider)
+
         results.secondaryArticleTitle = {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
-          prompt_source: promptSource,
-          ai_provider: aiProvider
+          prompt_key_used: testPromptKey,
+          prompt_source: customPromptContent ? 'custom' : 'database',
+          ai_provider: loadedProvider
         }
       } catch (error) {
         results.secondaryArticleTitle = {
@@ -515,38 +411,31 @@ export async function GET(request: NextRequest) {
 
     // Test Secondary Article Body
     if (promptType === 'secondaryArticleBody') {
-      console.log('Testing Secondary Article Body...')
       try {
-        let prompt: string | any
-        let promptSource = 'default'
+        const testPromptKey = promptKey || 'ai_prompt_secondary_article_body'
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        
         const sampleHeadline = rssPost?.title || 'Sample Test Headline for Article Body'
-
-        if (customPromptContent) {
-          console.log('[DEBUG] Using custom prompt content for secondary article body')
-          const postData = {
-            title: testData.newsletterWriter.title,
-            description: testData.newsletterWriter.description,
-            content: testData.newsletterWriter.content,
-            full_article_text: testData.newsletterWriter.content,
-            source_url: testData.newsletterWriter.source_url,
-            headline: sampleHeadline
-          }
-          prompt = processCustomPrompt(customPromptContent, postData)
-          promptSource = 'custom'
-        } else {
-          prompt = await AI_PROMPTS.secondaryArticleBody(testData.newsletterWriter, sampleHeadline)
-          promptSource = 'AI_PROMPTS.secondaryArticleBody'
+        const postData = {
+          title: testData.newsletterWriter.title,
+          description: testData.newsletterWriter.description,
+          content: testData.newsletterWriter.content,
+          full_article_text: testData.newsletterWriter.content,
+          source_url: testData.newsletterWriter.source_url,
+          headline: sampleHeadline
         }
 
-        const { content, fullResponse } = await callAI(prompt, 500, 0.7, aiProvider)
+        const processedJson = injectPostData(loadedPromptJson, postData)
+        const { content, fullResponse } = await callAIProvider(processedJson, loadedProvider)
+
         results.secondaryArticleBody = {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
-          prompt_source: promptSource,
+          prompt_key_used: testPromptKey,
+          prompt_source: customPromptContent ? 'custom' : 'database',
           note: `Using headline: "${sampleHeadline}"`,
-          ai_provider: aiProvider
+          ai_provider: loadedProvider
         }
       } catch (error) {
         results.secondaryArticleBody = {
@@ -558,34 +447,27 @@ export async function GET(request: NextRequest) {
 
     // Test Subject Line Generator
     if (promptType === 'all' || promptType === 'subjectLineGenerator') {
-      console.log('Testing Subject Line Generator...')
       try {
-        let prompt: string | any
-        let promptSource = 'default'
-
-        if (customPromptContent) {
-          console.log('[DEBUG] Using custom prompt content for subject line generator')
-          const postData = {
-            headline: testData.subjectLineGenerator.headline,
-            content: testData.subjectLineGenerator.content,
-            full_article_text: testData.subjectLineGenerator.content
-          }
-          prompt = processCustomPrompt(customPromptContent, postData)
-          promptSource = 'custom'
-        } else {
-          prompt = await AI_PROMPTS.subjectLineGenerator(testData.subjectLineGenerator)
-          promptSource = 'AI_PROMPTS.subjectLineGenerator'
+        const testPromptKey = promptKey || 'ai_prompt_subject_line'
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        
+        const postData = {
+          headline: testData.subjectLineGenerator.headline,
+          content: testData.subjectLineGenerator.content,
+          full_article_text: testData.subjectLineGenerator.content
         }
 
-        const { content, fullResponse } = await callAI(prompt, 100, 0.8, aiProvider)
+        const processedJson = injectPostData(loadedPromptJson, postData)
+        const { content, fullResponse } = await callAIProvider(processedJson, loadedProvider)
+
         results.subjectLineGenerator = {
           success: true,
           response: content,
           fullResponse: fullResponse,
           character_count: typeof content === 'string' ? content.length : 0,
-          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
-          prompt_source: promptSource,
-          ai_provider: aiProvider
+          prompt_key_used: testPromptKey,
+          prompt_source: customPromptContent ? 'custom' : 'database',
+          ai_provider: loadedProvider
         }
       } catch (error) {
         results.subjectLineGenerator = {
@@ -597,33 +479,26 @@ export async function GET(request: NextRequest) {
 
     // Test Event Summarizer
     if (promptType === 'all' || promptType === 'eventSummarizer') {
-      console.log('Testing Event Summarizer...')
       try {
-        let prompt: string | any
-        let promptSource = 'default'
-
-        if (customPromptContent) {
-          console.log('[DEBUG] Using custom prompt content for event summarizer')
-          const postData = {
-            title: testData.eventSummarizer.title,
-            description: testData.eventSummarizer.description,
-            venue: testData.eventSummarizer.venue
-          }
-          prompt = processCustomPrompt(customPromptContent, postData)
-          promptSource = 'custom'
-        } else {
-          prompt = await AI_PROMPTS.eventSummarizer(testData.eventSummarizer)
-          promptSource = 'AI_PROMPTS.eventSummarizer'
+        const testPromptKey = promptKey || 'ai_prompt_event_summary'
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        
+        const postData = {
+          title: testData.eventSummarizer.title,
+          description: testData.eventSummarizer.description,
+          venue: testData.eventSummarizer.venue
         }
 
-        const { content, fullResponse } = await callAI(prompt, 200, 0.7, aiProvider)
+        const processedJson = injectPostData(loadedPromptJson, postData)
+        const { content, fullResponse } = await callAIProvider(processedJson, loadedProvider)
+
         results.eventSummarizer = {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
-          prompt_source: promptSource,
-          ai_provider: aiProvider
+          prompt_key_used: testPromptKey,
+          prompt_source: customPromptContent ? 'custom' : 'database',
+          ai_provider: loadedProvider
         }
       } catch (error) {
         results.eventSummarizer = {
@@ -633,22 +508,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Test Road Work Generator (just show prompt, don't call AI)
+    // Test Road Work Generator - skip (requires special handling)
     if (promptType === 'all' || promptType === 'roadWorkGenerator') {
-      console.log('Testing Road Work Generator (prompt only)...')
-      try {
-        const prompt = await AI_PROMPTS.roadWorkGenerator(testData.roadWorkGenerator)
-        results.roadWorkGenerator = {
-          success: true,
-          note: 'Prompt generated successfully. Use /api/debug/test-ai-road-work to actually generate road work data.',
-          prompt_preview: typeof prompt === 'string' ? prompt.substring(0, 500) + '...' : 'Structured JSON prompt',
-          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)'
-        }
-      } catch (error) {
-        results.roadWorkGenerator = {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }
+      results.roadWorkGenerator = {
+        success: true,
+        note: 'Road Work Generator requires special handling. Use /api/debug/test-ai-road-work to actually generate road work data.'
       }
     }
 
@@ -662,47 +526,29 @@ export async function GET(request: NextRequest) {
 
     // Test Fact Checker
     if (promptType === 'all' || promptType === 'factChecker') {
-      console.log('Testing Fact Checker...')
-      console.log('[DEBUG] Newsletter content:', testData.factChecker.newsletterContent.substring(0, 100))
-      console.log('[DEBUG] Original content:', testData.factChecker.originalContent.substring(0, 100))
       try {
-        let prompt: string | any
-        let promptSource = 'default'
-
-        if (customPromptContent) {
-          console.log('[DEBUG] Using custom prompt content for fact checker')
-          const postData = {
-            newsletter_content: testData.factChecker.newsletterContent,
-            original_content: testData.factChecker.originalContent
-          }
-          prompt = processCustomPrompt(customPromptContent, postData)
-          promptSource = 'custom'
-        } else {
-          prompt = await AI_PROMPTS.factChecker(
-            testData.factChecker.newsletterContent,
-            testData.factChecker.originalContent
-          )
-          promptSource = 'AI_PROMPTS.factChecker'
+        const testPromptKey = promptKey || 'ai_prompt_fact_checker'
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        
+        const postData = {
+          newsletter_content: testData.factChecker.newsletterContent,
+          original_content: testData.factChecker.originalContent
         }
 
-        console.log('[DEBUG] Generated prompt length:', typeof prompt === 'string' ? prompt.length : 'N/A (structured)')
-        console.log('[DEBUG] Prompt preview (first 500 chars):', typeof prompt === 'string' ? prompt.substring(0, 500) : 'Structured JSON prompt')
-
-        const { content, fullResponse } = await callAI(prompt, 1000, 0.3, aiProvider)
-        console.log('[DEBUG] AI response:', typeof content === 'string' ? content.substring(0, 200) : content)
+        const processedJson = injectPostData(loadedPromptJson, postData)
+        const { content, fullResponse } = await callAIProvider(processedJson, loadedProvider)
 
         results.factChecker = {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
-          prompt_source: promptSource,
-          prompt_preview: typeof prompt === 'string' ? prompt.substring(0, 800) + '...' : 'Structured JSON prompt',
+          prompt_key_used: testPromptKey,
+          prompt_source: customPromptContent ? 'custom' : 'database',
           test_data_used: {
             newsletter_length: testData.factChecker.newsletterContent.length,
             original_length: testData.factChecker.originalContent.length
           },
-          ai_provider: aiProvider
+          ai_provider: loadedProvider
         }
       } catch (error) {
         results.factChecker = {
@@ -714,9 +560,10 @@ export async function GET(request: NextRequest) {
 
     // Test Welcome Section
     if (promptType === 'all' || promptType === 'welcomeSection') {
-      console.log('Testing Welcome Section...')
       try {
-        // Fetch sample articles for testing
+        const testPromptKey = promptKey || 'ai_prompt_welcome_section'
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        
         const testArticles = [
           {
             headline: 'AI Tool Revolutionizes Tax Preparation for CPAs',
@@ -740,34 +587,21 @@ export async function GET(request: NextRequest) {
           }
         ]
 
-        let prompt: string | any
-        let promptSource = 'default'
-
-        if (customPromptContent) {
-          console.log('[DEBUG] Using custom prompt content for welcome section')
-          const postData = {
-            articles: JSON.stringify(testArticles, null, 2)
-          }
-          prompt = processCustomPrompt(customPromptContent, postData)
-          promptSource = 'custom'
-        } else {
-          prompt = await AI_PROMPTS.welcomeSection(testArticles)
-          promptSource = 'AI_PROMPTS.welcomeSection'
+        const postData = {
+          articles: JSON.stringify(testArticles, null, 2)
         }
 
-        console.log('[TEST] Prompt type:', typeof prompt === 'string' ? 'string' : 'structured')
-
-        const { content, fullResponse } = await callAI(prompt, 500, 0.8, aiProvider)
+        const processedJson = injectPostData(loadedPromptJson, postData)
+        const { content, fullResponse } = await callAIProvider(processedJson, loadedProvider)
 
         results.welcomeSection = {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
-          prompt_source: promptSource,
-          prompt_preview: typeof prompt === 'string' ? prompt.substring(0, 500) + '...' : 'Structured JSON prompt',
+          prompt_key_used: testPromptKey,
+          prompt_source: customPromptContent ? 'custom' : 'database',
           test_articles_count: testArticles.length,
-          ai_provider: aiProvider
+          ai_provider: loadedProvider
         }
       } catch (error) {
         results.welcomeSection = {
@@ -779,40 +613,27 @@ export async function GET(request: NextRequest) {
 
     // Test Topic Deduper
     if (promptType === 'all' || promptType === 'topicDeduper') {
-      console.log('Testing Topic Deduper...')
       try {
-        let prompt: string | any
-        let promptSource = 'default'
-
-        if (customPromptContent) {
-          console.log('[DEBUG] Using custom prompt content for topic deduper')
-          const postData = {
-            posts: JSON.stringify(testData.topicDeduper, null, 2)
-          }
-          prompt = processCustomPrompt(customPromptContent, postData)
-          promptSource = 'custom'
-        } else {
-          prompt = await AI_PROMPTS.topicDeduper(testData.topicDeduper)
-          promptSource = 'AI_PROMPTS.topicDeduper'
+        const testPromptKey = promptKey || 'ai_prompt_topic_deduper'
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        
+        const postData = {
+          posts: JSON.stringify(testData.topicDeduper, null, 2),
+          articles: JSON.stringify(testData.topicDeduper, null, 2) // Support both {{posts}} and {{articles}}
         }
 
-        console.log('[TEST] Prompt length:', typeof prompt === 'string' ? prompt.length : 'N/A (structured)')
-        console.log('[TEST] Prompt preview (first 500 chars):', typeof prompt === 'string' ? prompt.substring(0, 500) : 'Structured JSON prompt')
-
-        const { content, fullResponse } = await callAI(prompt, 1000, 0.3, aiProvider)
-        console.log('[TEST] Response type:', typeof content)
-        console.log('[TEST] Response:', JSON.stringify(content, null, 2))
+        const processedJson = injectPostData(loadedPromptJson, postData)
+        const { content, fullResponse } = await callAIProvider(processedJson, loadedProvider)
 
         results.topicDeduper = {
           success: true,
           response: content,
           fullResponse: fullResponse,
-          prompt_length: typeof prompt === 'string' ? prompt.length : 'N/A (structured)',
-          prompt_source: promptSource,
-          prompt_preview: typeof prompt === 'string' ? prompt.substring(0, 800) + '...' : 'Structured JSON prompt',
+          prompt_key_used: testPromptKey,
+          prompt_source: customPromptContent ? 'custom' : 'database',
           test_posts_count: testData.topicDeduper.length,
           expected_duplicates: 'Posts 0+1 (tax software), Posts 3+4 (QuickBooks fraud detection)',
-          ai_provider: aiProvider
+          ai_provider: loadedProvider
         }
       } catch (error) {
         results.topicDeduper = {
@@ -826,7 +647,6 @@ export async function GET(request: NextRequest) {
       success: true,
       message: 'AI Prompts Test Results',
       prompt_type: promptType,
-      ai_provider: aiProvider,
       test_data: promptType === 'all' ? 'Sample data for all prompts' : testData[promptType as keyof typeof testData],
       rss_post_used: rssPost ? {
         id: rssPost.id,
@@ -834,7 +654,7 @@ export async function GET(request: NextRequest) {
         source_url: rssPost.source_url
       } : null,
       results,
-      usage_note: 'Add ?type=promptName to test individual prompts. Add &rssPostId=UUID to use real RSS post data instead of sample data.',
+      usage_note: 'Add ?type=promptName to test individual prompts. Add &promptKey=KEY to test a specific prompt from database. Add &promptContent=JSON to test custom prompt. Add &rssPostId=UUID to use real RSS post data instead of sample data.',
       timestamp: new Date().toISOString()
     })
 
