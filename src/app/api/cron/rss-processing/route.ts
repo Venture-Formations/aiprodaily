@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Phase 1: Archive, Fetch+Extract, Score (steps 1-3)
-    const phase1Response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/rss/process-phase1`, {
+    const phase1Response = await fetch(`${process.env.NEXTAUTH_URL}/api/rss/process-phase1`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     console.log(`[Cron] Phase 1 completed for campaign: ${campaignId}`)
 
     // Phase 2: Deduplicate, Generate, Select+Subject, Welcome, Finalize (steps 4-8)
-    const phase2Response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/rss/process-phase2`, {
+    const phase2Response = await fetch(`${process.env.NEXTAUTH_URL}/api/rss/process-phase2`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -259,7 +259,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Phase 1: Archive, Fetch+Extract, Score (steps 1-3)
-    const phase1Response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/rss/process-phase1`, {
+    const phase1Response = await fetch(`${process.env.NEXTAUTH_URL}/api/rss/process-phase1`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -277,7 +277,7 @@ export async function GET(request: NextRequest) {
     console.log(`[Cron] Phase 1 completed for campaign: ${campaignId}`)
 
     // Phase 2: Deduplicate, Generate, Select+Subject, Welcome, Finalize (steps 4-8)
-    const phase2Response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/rss/process-phase2`, {
+    const phase2Response = await fetch(`${process.env.NEXTAUTH_URL}/api/rss/process-phase2`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
