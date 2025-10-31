@@ -1768,6 +1768,14 @@ export async function callWithStructuredPrompt(
   placeholders: Record<string, string> = {},
   provider: 'openai' | 'claude' = 'openai'
 ): Promise<any> {
+  // Validate promptConfig structure
+  if (!promptConfig || typeof promptConfig !== 'object') {
+    throw new Error('Invalid promptConfig: must be an object')
+  }
+  if (!promptConfig.messages || !Array.isArray(promptConfig.messages)) {
+    throw new Error('Invalid promptConfig: messages must be an array')
+  }
+  
   console.log('[AI] Processing structured prompt with', promptConfig.messages.length, 'messages for provider:', provider)
 
   // Deep clone the entire config to avoid mutating the original
@@ -1919,13 +1927,31 @@ export async function callWithStructuredPrompt(
         return { raw: content }
       }
 
-      const objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
-      const arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
+      // Ensure cleanedContent is still a valid string before calling .match()
+      if (!cleanedContent || typeof cleanedContent !== 'string') {
+        console.error('[AI] cleanedContent is not a string before regex matching:', typeof cleanedContent, cleanedContent)
+        return { raw: content }
+      }
+
+      let objectMatch: RegExpMatchArray | null = null
+      let arrayMatch: RegExpMatchArray | null = null
+      
+      try {
+        objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
+      } catch (matchError) {
+        console.warn('[AI] Object match failed:', matchError)
+      }
+      
+      try {
+        arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
+      } catch (matchError) {
+        console.warn('[AI] Array match failed:', matchError)
+      }
 
       // Match test endpoint logic exactly - check both match and [0] exists
-      if (arrayMatch && arrayMatch[0]) {
+      if (arrayMatch && Array.isArray(arrayMatch) && arrayMatch[0]) {
         return JSON.parse(arrayMatch[0])
-      } else if (objectMatch && objectMatch[0]) {
+      } else if (objectMatch && Array.isArray(objectMatch) && objectMatch[0]) {
         return JSON.parse(objectMatch[0])
       } else {
         return JSON.parse(cleanedContent.trim())
@@ -2110,12 +2136,30 @@ export async function callOpenAIStructured(options: OpenAICallOptions) {
           return { raw: content }
         }
 
-        const objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
-        const arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
+        // Ensure cleanedContent is still a valid string before calling .match()
+        if (!cleanedContent || typeof cleanedContent !== 'string') {
+          console.error('[AI] cleanedContent is not a string before regex matching in callOpenAI:', typeof cleanedContent, cleanedContent)
+          return { raw: content }
+        }
 
-        if (arrayMatch) {
+        let objectMatch: RegExpMatchArray | null = null
+        let arrayMatch: RegExpMatchArray | null = null
+        
+        try {
+          objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
+        } catch (matchError) {
+          console.warn('[AI] Object match failed in callOpenAI:', matchError)
+        }
+        
+        try {
+          arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
+        } catch (matchError) {
+          console.warn('[AI] Array match failed in callOpenAI:', matchError)
+        }
+
+        if (arrayMatch && Array.isArray(arrayMatch) && arrayMatch[0]) {
           return JSON.parse(arrayMatch[0])
-        } else if (objectMatch) {
+        } else if (objectMatch && Array.isArray(objectMatch) && objectMatch[0]) {
           return JSON.parse(objectMatch[0])
         } else {
           return JSON.parse(cleanedContent.trim())
@@ -2237,13 +2281,31 @@ export async function callOpenAI(prompt: string, maxTokens = 1000, temperature =
 
         // Clean the content - remove any text before/after JSON (support both objects {} and arrays [])
         // Match test endpoint logic exactly
-        const objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
-        const arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
+        // Ensure cleanedContent is still a valid string before calling .match()
+        if (!cleanedContent || typeof cleanedContent !== 'string') {
+          console.error('[AI] cleanedContent is not a string before regex matching:', typeof cleanedContent, cleanedContent)
+          return { raw: content }
+        }
 
-        if (arrayMatch && arrayMatch[0]) {
+        let objectMatch: RegExpMatchArray | null = null
+        let arrayMatch: RegExpMatchArray | null = null
+        
+        try {
+          objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
+        } catch (matchError) {
+          console.warn('[AI] Object match failed in callWithStructuredPrompt:', matchError)
+        }
+        
+        try {
+          arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
+        } catch (matchError) {
+          console.warn('[AI] Array match failed in callWithStructuredPrompt:', matchError)
+        }
+
+        if (arrayMatch && Array.isArray(arrayMatch) && arrayMatch[0]) {
           // Prefer array match for prompts that expect arrays (like road work)
           return JSON.parse(arrayMatch[0])
-        } else if (objectMatch && objectMatch[0]) {
+        } else if (objectMatch && Array.isArray(objectMatch) && objectMatch[0]) {
           // Use object match for other prompts
           return JSON.parse(objectMatch[0])
         } else {
@@ -2295,27 +2357,61 @@ export async function callAI(prompt: string, maxTokens = 1000, temperature = 0.3
 
       // Try to parse as JSON, fallback to raw content (same logic as OpenAI)
       try {
-        // Strip markdown code fences first
-        let cleanedContent = content
-        const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
-        if (codeFenceMatch) {
-          cleanedContent = codeFenceMatch[1]
+        // Validate content is a string
+        if (!content || typeof content !== 'string') {
+          console.error('[AI] Invalid content type for parsing in callAI (Claude):', typeof content, content)
+          return { raw: content }
         }
 
-        // Clean the content - remove any text before/after JSON
-        const objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
-        const arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
+        // Strip markdown code fences first
+        let cleanedContent: string = String(content) // Ensure it's definitely a string
+        try {
+          const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+          if (codeFenceMatch && codeFenceMatch[1] !== undefined) {
+            cleanedContent = codeFenceMatch[1]
+          }
+        } catch (matchError) {
+          console.warn('[AI] Regex match failed in callAI (Claude), using original content:', matchError)
+          cleanedContent = String(content)
+        }
 
-        if (arrayMatch) {
+        // Validate cleanedContent is still a string
+        if (!cleanedContent || typeof cleanedContent !== 'string') {
+          console.error('[AI] Invalid cleanedContent after code fence removal in callAI (Claude):', typeof cleanedContent, cleanedContent)
+          return { raw: content }
+        }
+
+        // Ensure cleanedContent is still a valid string before calling .match()
+        if (!cleanedContent || typeof cleanedContent !== 'string') {
+          console.error('[AI] cleanedContent is not a string before regex matching in callAI (Claude):', typeof cleanedContent, cleanedContent)
+          return { raw: content }
+        }
+
+        let objectMatch: RegExpMatchArray | null = null
+        let arrayMatch: RegExpMatchArray | null = null
+        
+        try {
+          objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
+        } catch (matchError) {
+          console.warn('[AI] Object match failed in callAI (Claude):', matchError)
+        }
+        
+        try {
+          arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
+        } catch (matchError) {
+          console.warn('[AI] Array match failed in callAI (Claude):', matchError)
+        }
+
+        if (arrayMatch && Array.isArray(arrayMatch) && arrayMatch[0]) {
           return JSON.parse(arrayMatch[0])
-        } else if (objectMatch) {
+        } else if (objectMatch && Array.isArray(objectMatch) && objectMatch[0]) {
           return JSON.parse(objectMatch[0])
         } else {
           return JSON.parse(cleanedContent.trim())
         }
       } catch (parseError) {
         // Return raw content wrapped in object
-        return content
+        return { raw: content }
       }
     } catch (error) {
       console.error('Claude API error:', error)
