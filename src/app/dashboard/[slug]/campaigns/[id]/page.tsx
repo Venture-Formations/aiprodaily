@@ -2416,10 +2416,13 @@ export default function CampaignDetailPage() {
         throw new Error(errorMessage)
       }
 
+      const phase1Data = await phase1Response.json()
+      console.log('[Client] Phase 1 completed:', phase1Data)
       setProcessingStatus('Phase 1 complete! Starting Phase 2...')
 
       // Phase 2: Deduplicate, Generate, Select, Welcome, Finalize (steps 4-8)
       setProcessingStatus('Phase 2: Generating articles and finalizing...')
+      console.log('[Client] Starting Phase 2 for campaign:', campaign.id)
       const phase2Response = await fetch('/api/rss/process-phase2', {
         method: 'POST',
         headers: {
@@ -2438,9 +2441,12 @@ export default function CampaignDetailPage() {
         } catch (e) {
           errorMessage = `HTTP ${phase2Response.status}: ${phase2Response.statusText}`
         }
+        console.error('[Client] Phase 2 failed:', errorMessage)
         throw new Error(errorMessage)
       }
 
+      const phase2Data = await phase2Response.json()
+      console.log('[Client] Phase 2 completed:', phase2Data)
       setProcessingStatus('Processing complete! Refreshing articles...')
 
       // Refresh the campaign data to show new articles
