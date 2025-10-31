@@ -78,6 +78,10 @@ export class Deduplicator {
     console.log(`[DEDUP] Stage 0: Found ${historicalGroups.length} historical matches (vs last ${this.config.historicalLookbackDays} days)`)
 
     for (const group of historicalGroups) {
+      if (!group || !Array.isArray(group.duplicate_indices)) {
+        console.warn('[DEDUP] Skipping invalid historical group:', group)
+        continue
+      }
       allGroups.push(group)
       group.duplicate_indices.forEach(idx => markedAsDuplicate.add(idx))
     }
@@ -88,13 +92,17 @@ export class Deduplicator {
 
     if (remainingAfterHistorical.length === 0) {
       const totalDuplicates = markedAsDuplicate.size
+      // Helper function to safely get duplicate_indices length
+      const getDuplicateCount = (g: DuplicateGroup): number => {
+        return Array.isArray(g?.duplicate_indices) ? g.duplicate_indices.length : 0
+      }
       return {
         groups: allGroups,
         stats: {
           total_posts: posts.length,
           unique_posts: posts.length - totalDuplicates,
           duplicate_posts: totalDuplicates,
-          historical_duplicates: historicalGroups.reduce((sum, g) => sum + g.duplicate_indices.length, 0),
+          historical_duplicates: historicalGroups.reduce((sum, g) => sum + getDuplicateCount(g), 0),
           exact_duplicates: 0,
           title_duplicates: 0,
           semantic_duplicates: 0
@@ -106,6 +114,10 @@ export class Deduplicator {
     console.log(`[DEDUP] Stage 1: Found ${exactGroups.length} exact content matches`)
 
     for (const group of exactGroups) {
+      if (!group || !Array.isArray(group.duplicate_indices)) {
+        console.warn('[DEDUP] Skipping invalid exact duplicate group:', group)
+        continue
+      }
       allGroups.push(group)
       group.duplicate_indices.forEach(idx => markedAsDuplicate.add(idx))
     }
@@ -122,6 +134,10 @@ export class Deduplicator {
       console.log(`[DEDUP] Stage 2: Found ${titleGroups.length} title matches (>80% similar)`)
 
       for (const group of titleGroups) {
+        if (!group || !Array.isArray(group.duplicate_indices)) {
+          console.warn('[DEDUP] Skipping invalid title duplicate group:', group)
+          continue
+        }
         allGroups.push(group)
         group.duplicate_indices.forEach(idx => markedAsDuplicate.add(idx))
       }
@@ -136,16 +152,31 @@ export class Deduplicator {
         stillRemaining.map(p => p.post),
         stillRemaining.map(p => p.idx)
       )
-      console.log(`[DEDUP] Stage 3: AI identified ${semanticGroups.length} topic groups`)
+      
+      // Ensure semanticGroups is an array before accessing length
+      if (!Array.isArray(semanticGroups)) {
+        console.error('[DEDUP] Semantic groups is not an array:', typeof semanticGroups, semanticGroups)
+      } else {
+        console.log(`[DEDUP] Stage 3: AI identified ${semanticGroups.length} topic groups`)
 
-      for (const group of semanticGroups) {
-        allGroups.push(group)
-        group.duplicate_indices.forEach(idx => markedAsDuplicate.add(idx))
+        for (const group of semanticGroups) {
+          if (!group || !Array.isArray(group.duplicate_indices)) {
+            console.warn('[DEDUP] Skipping invalid semantic duplicate group:', group)
+            continue
+          }
+          allGroups.push(group)
+          group.duplicate_indices.forEach(idx => markedAsDuplicate.add(idx))
+        }
       }
     }
 
     const totalDuplicates = markedAsDuplicate.size
     console.log(`[DEDUP] Total: ${allGroups.length} groups, ${totalDuplicates} posts marked as duplicates`)
+
+    // Helper function to safely get duplicate_indices length
+    const getDuplicateCount = (g: DuplicateGroup): number => {
+      return Array.isArray(g?.duplicate_indices) ? g.duplicate_indices.length : 0
+    }
 
     return {
       groups: allGroups,
@@ -153,14 +184,14 @@ export class Deduplicator {
         total_posts: posts.length,
         unique_posts: posts.length - totalDuplicates,
         duplicate_posts: totalDuplicates,
-        historical_duplicates: historicalGroups.reduce((sum, g) => sum + g.duplicate_indices.length, 0),
-        exact_duplicates: exactGroups.reduce((sum, g) => sum + g.duplicate_indices.length, 0),
+        historical_duplicates: historicalGroups.reduce((sum, g) => sum + getDuplicateCount(g), 0),
+        exact_duplicates: exactGroups.reduce((sum, g) => sum + getDuplicateCount(g), 0),
         title_duplicates: allGroups
           .filter(g => g.detection_method === 'title_similarity')
-          .reduce((sum, g) => sum + g.duplicate_indices.length, 0),
+          .reduce((sum, g) => sum + getDuplicateCount(g), 0),
         semantic_duplicates: allGroups
           .filter(g => g.detection_method === 'ai_semantic')
-          .reduce((sum, g) => sum + g.duplicate_indices.length, 0)
+          .reduce((sum, g) => sum + getDuplicateCount(g), 0)
       }
     }
   }

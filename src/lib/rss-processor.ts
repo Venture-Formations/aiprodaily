@@ -886,6 +886,12 @@ export class RSSProcessor {
       })
       const result = await deduplicator.detectAllDuplicates(allPosts, campaignId)
 
+      // Validate result structure
+      if (!result || !result.groups || !Array.isArray(result.groups)) {
+        console.error('[DEDUP] Invalid deduplication result:', result)
+        return
+      }
+
       // Store results in database
       for (const group of result.groups) {
         const primaryPost = allPosts[group.primary_post_index]
@@ -908,6 +914,12 @@ export class RSSProcessor {
 
         if (duplicateGroup) {
           // Add duplicate posts to group with metadata
+          // Validate duplicate_indices is an array before iterating
+          if (!Array.isArray(group.duplicate_indices)) {
+            console.warn('[DEDUP] Skipping group with invalid duplicate_indices:', group)
+            continue
+          }
+          
           for (const dupIndex of group.duplicate_indices) {
             const dupPost = allPosts[dupIndex]
             if (dupPost && dupPost.id !== primaryPost.id) {
