@@ -85,9 +85,13 @@ export class RSSProcessor {
     const BATCH_SIZE = 3
     let successCount = 0
     let errorCount = 0
+    const totalBatches = Math.ceil(posts.length / BATCH_SIZE)
 
     for (let i = 0; i < posts.length; i += BATCH_SIZE) {
       const batch = posts.slice(i, i + BATCH_SIZE)
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1
+      let batchSuccess = 0
+      let batchErrors = 0
 
       // Process posts sequentially (not in parallel) to avoid memory issues with full article text
       for (let j = 0; j < batch.length; j++) {
@@ -129,11 +133,16 @@ export class RSSProcessor {
           }
 
           successCount++
+          batchSuccess++
 
         } catch (error) {
           errorCount++
+          batchErrors++
         }
       }
+
+      // Log batch completion
+      console.log(`[Score] Batch ${batchNum}/${totalBatches} (${section}): ${batchSuccess} succeeded, ${batchErrors} failed`)
 
       if (i + BATCH_SIZE < posts.length) {
         await new Promise(resolve => setTimeout(resolve, 2000))
