@@ -1368,7 +1368,13 @@ export class RSSProcessor {
         }])
 
     } catch (error) {
-      // Silent failure
+      // Log fact-check errors to help debug [object Object] issues
+      const errorMsg = error instanceof Error 
+        ? error.message 
+        : typeof error === 'object' && error !== null
+          ? JSON.stringify(error, null, 2)
+          : String(error)
+      console.error(`[Fact-Check] Failed for post ${post.id}:`, errorMsg)
     }
   }
 
@@ -1448,7 +1454,7 @@ export class RSSProcessor {
       : await callOpenAI(promptOrResult as string)
 
     if (typeof result.score !== 'number' || typeof result.details !== 'string') {
-      throw new Error('Invalid fact-check response')
+      throw new Error(`Invalid fact-check response: ${JSON.stringify({ score: result.score, details: result.details, resultKeys: Object.keys(result || {}) })}`)
     }
 
     return result as FactCheckResult

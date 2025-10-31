@@ -351,7 +351,12 @@ export class ErrorHandler {
       )
     }
 
-    console.error(`Error in ${context.source}:`, error)
+    const errorDetails = error instanceof Error 
+      ? error.message 
+      : typeof error === 'object' && error !== null
+        ? JSON.stringify(error, null, 2)
+        : String(error)
+    console.error(`Error in ${context.source}:`, errorDetails)
   }
 
   private isCriticalError(source: string, message: string): boolean {
