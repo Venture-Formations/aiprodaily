@@ -76,9 +76,26 @@ async function getPromptJSON(key: string, fallbackText?: string): Promise<any> {
       throw new Error(`Prompt ${key} has invalid format. Expected structured JSON with a 'messages' array, got ${typeof data.value}`)
     }
 
-    // Validate structure - must have messages array (same validation as callWithStructuredPrompt)
-    if (!promptJSON.messages || !Array.isArray(promptJSON.messages)) {
-      throw new Error(`Prompt ${key} is missing 'messages' array. It must be structured JSON like: { "model": "...", "messages": [...] }`)
+    // Validate structure - must have messages OR input array (OpenAI Responses API uses 'input', we normalize to 'messages')
+    // Check for both 'messages' (standard format) and 'input' (OpenAI Responses API format)
+    if (!promptJSON.messages && !promptJSON.input) {
+      throw new Error(`Prompt ${key} is missing 'messages' or 'input' array. It must be structured JSON like: { "model": "...", "messages": [...] } or { "model": "...", "input": [...] }`)
+    }
+
+    if (promptJSON.messages && !Array.isArray(promptJSON.messages)) {
+      throw new Error(`Prompt ${key} has 'messages' but it's not an array. It must be an array of message objects.`)
+    }
+
+    if (promptJSON.input && !Array.isArray(promptJSON.input)) {
+      throw new Error(`Prompt ${key} has 'input' but it's not an array. It must be an array of message objects.`)
+    }
+
+    // Normalize: If it has 'input' but not 'messages', convert 'input' to 'messages' for internal use
+    // This allows database to store either format (Settings saves with 'input', but we use 'messages' internally)
+    if (promptJSON.input && !promptJSON.messages) {
+      console.log(`[AI-PROMPT] Converting 'input' to 'messages' for ${key}`)
+      promptJSON.messages = promptJSON.input
+      // Don't delete 'input' - keep it so it can be used directly if needed
     }
 
     // Add provider info for routing
@@ -1774,10 +1791,15 @@ export interface StructuredPromptConfig {
   temperature?: number
   top_p?: number
   response_format?: any  // Allow any response_format structure
-  messages: Array<{
+  text?: any  // OpenAI Responses API format (for JSON schema, etc.)
+  messages?: Array<{
     role: 'system' | 'assistant' | 'user'
-    content: string
+    content: string | any  // Allow string or array (Responses API format)
   }>
+  input?: Array<{
+    role: 'system' | 'assistant' | 'user'
+    content: string | any  // Responses API uses content as array
+  }>  // OpenAI Responses API uses 'input' instead of 'messages'
 }
 
 // Helper function to call OpenAI or Claude with structured prompt from database
@@ -1791,11 +1813,21 @@ export async function callWithStructuredPrompt(
   if (!promptConfig || typeof promptConfig !== 'object') {
     throw new Error('Invalid promptConfig: must be an object')
   }
-  if (!promptConfig.messages || !Array.isArray(promptConfig.messages)) {
-    throw new Error('Invalid promptConfig: messages must be an array')
+  
+  // Accept either 'input' (Responses API format) or 'messages' (standard format)
+  // Normalize to 'messages' internally for processing
+  const messagesArray = promptConfig.messages || promptConfig.input
+  if (!messagesArray || !Array.isArray(messagesArray)) {
+    throw new Error('Invalid promptConfig: must have either "messages" or "input" array')
   }
   
-  console.log('[AI] Processing structured prompt with', promptConfig.messages.length, 'messages for provider:', provider)
+  // If promptConfig has 'input' but not 'messages', normalize it to 'messages' for internal use
+  // We'll convert back to 'input' when sending to Responses API if needed
+  if (!promptConfig.messages && promptConfig.input) {
+    promptConfig.messages = promptConfig.input
+  }
+  
+  console.log('[AI] Processing structured prompt with', messagesArray.length, 'messages for provider:', provider)
 
   // Deep clone the entire config to avoid mutating the original
   const apiRequest = JSON.parse(JSON.stringify(promptConfig))
