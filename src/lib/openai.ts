@@ -2568,9 +2568,10 @@ export const AI_CALL = {
     ).join('\n\n')
 
     // Use callAIWithPrompt to load complete config from database
-    // Note: Database prompt uses {{articles}} placeholder (not {{posts}})
+    // Support both {{articles}} and {{posts}} placeholders for compatibility
     return callAIWithPrompt('ai_prompt_topic_deduper', {
-      articles: postsFormatted
+      articles: postsFormatted,
+      posts: postsFormatted  // Also support {{posts}} placeholder
     })
   },
 
