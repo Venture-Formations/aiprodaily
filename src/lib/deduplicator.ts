@@ -381,19 +381,35 @@ export class Deduplicator {
       // Use AI_CALL for deduplication (handles prompt + provider + call)
       const result = await AI_CALL.topicDeduper(postSummaries, 1000, 0.3)
 
-      if (!result.groups || result.groups.length === 0) {
+      // Debug: Log the actual AI response structure
+      console.log('[DEDUP] AI response type:', typeof result)
+      console.log('[DEDUP] AI response keys:', result ? Object.keys(result) : 'null')
+      console.log('[DEDUP] AI response sample:', JSON.stringify(result).substring(0, 500))
+
+      if (!result || !result.groups || result.groups.length === 0) {
+        console.log('[DEDUP] No groups in AI response')
         return []
       }
 
+      console.log('[DEDUP] Processing', result.groups.length, 'groups')
+
       // Map AI result indices back to original post indices
-      return result.groups.map((group: any) => ({
-        topic_signature: group.topic_signature,
-        primary_post_index: originalIndices[group.primary_article_index],
-        duplicate_indices: group.duplicate_indices.map((idx: number) => originalIndices[idx]),
-        detection_method: 'ai_semantic' as const,
-        similarity_score: 0.8, // Default for AI-detected
-        explanation: group.similarity_explanation
-      }))
+      return result.groups.map((group: any, groupIdx: number) => {
+        // Defensive: Check if required properties exist
+        if (!group.duplicate_indices || !Array.isArray(group.duplicate_indices)) {
+          console.warn(`[DEDUP] Group ${groupIdx} missing duplicate_indices:`, JSON.stringify(group))
+          return null
+        }
+
+        return {
+          topic_signature: group.topic_signature || 'unknown',
+          primary_post_index: originalIndices[group.primary_article_index] ?? 0,
+          duplicate_indices: group.duplicate_indices.map((idx: number) => originalIndices[idx]),
+          detection_method: 'ai_semantic' as const,
+          similarity_score: 0.8, // Default for AI-detected
+          explanation: group.similarity_explanation || ''
+        }
+      }).filter(Boolean) as DuplicateGroup[]
 
     } catch (error) {
       console.error('[DEDUP] Stage 3 AI error:', error)
