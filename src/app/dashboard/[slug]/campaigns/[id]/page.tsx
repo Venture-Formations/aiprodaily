@@ -2456,6 +2456,49 @@ export default function CampaignDetailPage() {
     }
   }
 
+  const processRSSFeedsPhase2 = async () => {
+    if (!campaign) return
+
+    setProcessing(true)
+    setProcessingStatus('Phase 2: Deduplicate, Generate, Select, Welcome, Finalize...')
+
+    try {
+      setProcessingStatus('Phase 2: Generating articles and finalizing...')
+      const phase2Response = await fetch('/api/rss/process-phase2', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          campaign_id: campaign.id
+        })
+      })
+
+      if (!phase2Response.ok) {
+        let errorMessage = 'Phase 2 failed'
+        try {
+          const data = await phase2Response.json()
+          errorMessage = data.message || data.error || errorMessage
+        } catch (e) {
+          errorMessage = `HTTP ${phase2Response.status}: ${phase2Response.statusText}`
+        }
+        throw new Error(errorMessage)
+      }
+
+      setProcessingStatus('Phase 2 complete! Refreshing articles...')
+
+      // Refresh the campaign data to show new articles
+      await fetchCampaign(campaign.id)
+
+      setProcessingStatus('Done!')
+      setTimeout(() => setProcessingStatus(''), 2000)
+    } catch (error) {
+      setProcessingStatus('')
+      alert('Failed to process Phase 2: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    } finally {
+      setProcessing(false)
+    }
+  }
 
   const generateSubjectLine = async () => {
     if (!campaign) return
@@ -2947,6 +2990,14 @@ export default function CampaignDetailPage() {
                 {(processing || campaign.status === 'processing') ? 'Processing in background...' : 'Process RSS Feeds'}
               </button>
               <button
+                onClick={processRSSFeedsPhase2}
+                disabled={processing || saving || generatingSubject || campaign.status === 'processing'}
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium"
+                title="Run Phase 2 only (Deduplicate, Generate, Select, Welcome, Finalize). Requires Phase 1 to be completed first."
+              >
+                {processing ? 'Processing...' : 'Run Phase 2'}
+              </button>
+              <button
                 onClick={previewNewsletter}
                 disabled={saving || generatingSubject || previewLoading}
                 className="bg-gray-200 hover:bg-gray-300 disabled:opacity-50 text-gray-800 px-4 py-2 rounded text-sm font-medium flex items-center space-x-2"
@@ -3105,13 +3156,23 @@ export default function CampaignDetailPage() {
               {campaign.articles.length === 0 ? (
               <div className="p-6 text-center text-gray-500">
                 <p className="mb-4">No articles generated yet. Run RSS processing to generate articles.</p>
-                <button
-                  onClick={processRSSFeeds}
-                  disabled={processing}
-                  className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium"
-                >
-                  {processing ? 'Processing...' : 'Process RSS Feeds'}
-                </button>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={processRSSFeeds}
+                    disabled={processing}
+                    className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium"
+                  >
+                    {processing ? 'Processing...' : 'Process RSS Feeds'}
+                  </button>
+                  <button
+                    onClick={processRSSFeedsPhase2}
+                    disabled={processing}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium"
+                    title="Run Phase 2 only (Deduplicate, Generate, Select, Welcome, Finalize). Requires Phase 1 to be completed first."
+                  >
+                    {processing ? 'Processing...' : 'Run Phase 2'}
+                  </button>
+                </div>
               </div>
             ) : (
               <DndContext
