@@ -1751,11 +1751,9 @@ export interface OpenAICallOptions {
 // Interface for structured prompt stored in database
 export interface StructuredPromptConfig {
   model?: string
-  max_tokens?: number
+  max_output_tokens?: number
   temperature?: number
   top_p?: number
-  presence_penalty?: number
-  frequency_penalty?: number
   response_format?: any  // Allow any response_format structure
   messages: Array<{
     role: 'system' | 'assistant' | 'user'
