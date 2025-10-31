@@ -1821,7 +1821,8 @@ export interface StructuredPromptConfig {
 export async function callWithStructuredPrompt(
   promptConfig: StructuredPromptConfig,
   placeholders: Record<string, string> = {},
-  provider: 'openai' | 'claude' = 'openai'
+  provider: 'openai' | 'claude' = 'openai',
+  promptKey?: string
 ): Promise<any> {
   // Validate promptConfig structure
   if (!promptConfig || typeof promptConfig !== 'object') {
@@ -1868,6 +1869,25 @@ export async function callWithStructuredPrompt(
 
   // Replace all placeholders in the entire config
   const processedRequest = replacePlaceholders(apiRequest)
+
+  // Log subject line API calls (first 20 lines)
+  const isSubjectLine = promptKey === 'ai_prompt_subject_line'
+  if (isSubjectLine) {
+    try {
+      const requestString = JSON.stringify(processedRequest, null, 2)
+      const lines = requestString.split('\n')
+      const first20Lines = lines.slice(0, 20).join('\n')
+      const remainingLines = lines.length - 20
+      console.log(`[Subject Line API Request] Provider: ${provider}, Prompt Key: ${promptKey}`)
+      console.log(`[Subject Line API Request] First 20 lines (${remainingLines > 0 ? `${remainingLines} more lines...` : 'complete'}):`)
+      console.log(first20Lines)
+      if (remainingLines > 0) {
+        console.log(`[Subject Line API Request] ... (${remainingLines} more lines)`)
+      }
+    } catch (logError) {
+      console.error('[Subject Line API Request] Failed to log request:', logError)
+    }
+  }
 
   // Add timeout
   const controller = new AbortController()
@@ -2058,8 +2078,8 @@ export async function callAIWithPrompt(
   // Remove internal fields before sending to API
   delete promptJSON._provider
 
-  // Call AI with complete structured prompt
-  return await callWithStructuredPrompt(promptJSON, placeholders, provider)
+  // Call AI with complete structured prompt (pass promptKey for subject line logging)
+  return await callWithStructuredPrompt(promptJSON, placeholders, provider, promptKey)
 }
 
 export async function callOpenAIStructured(options: OpenAICallOptions) {

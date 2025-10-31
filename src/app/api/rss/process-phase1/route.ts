@@ -84,58 +84,26 @@ export async function POST(request: NextRequest) {
 
     console.log(`[RSS Phase 1] All steps completed successfully for campaign: ${campaign_id}`)
 
-    // Prepare Phase 2 trigger BEFORE returning response
-    // This ensures the fetch is initiated before the function terminates
-    let baseUrl: string
-    if (process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes('-venture-formations')) {
-      baseUrl = process.env.NEXTAUTH_URL
-    } else if (process.env.PRODUCTION_URL && !process.env.PRODUCTION_URL.includes('-venture-formations')) {
-      baseUrl = process.env.PRODUCTION_URL
-    } else {
-      baseUrl = 'https://aiprodaily.vercel.app'
-    }
-    const phase2Url = `${baseUrl}/api/rss/process-phase2`
-    
-    console.log(`[RSS Phase 1] Preparing Phase 2 trigger for campaign: ${campaign_id}`)
-    console.log(`[RSS Phase 1] Phase 2 URL: ${phase2Url}`)
-    console.log(`[RSS Phase 1] CRON_SECRET present: ${!!process.env.CRON_SECRET}`)
+    // Update campaign status to indicate Phase 1 is complete
+    // The calling code (cron job) will then trigger Phase 2
+    const { supabaseAdmin } = await import('@/lib/supabase')
+    await supabaseAdmin
+      .from('newsletter_campaigns')
+      .update({ 
+        status: 'draft',
+        workflow_state: 'pending_deduplicate'
+      })
+      .eq('id', campaign_id)
 
-    // Start the fetch immediately (before returning) to ensure it initiates
-    // Fire and forget - don't await, let Phase 2 run independently
-    const fetchInitiated = fetch(phase2Url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.CRON_SECRET}`
-      },
-      body: JSON.stringify({ campaign_id })
-    }).then(response => {
-      console.log(`[RSS Phase 1] Phase 2 trigger response received: status=${response.status}`)
-      if (!response.ok) {
-        const statusText = response.statusText
-        console.error(`[RSS Phase 1] Phase 2 trigger returned error status: ${response.status} ${statusText}`)
-      } else {
-        console.log(`[RSS Phase 1] Phase 2 trigger succeeded: status=${response.status}`)
-      }
-      return response
-    }).catch(error => {
-      // Log but don't fail Phase 1 if Phase 2 trigger fails
-      console.error(`[RSS Phase 1] Failed to trigger Phase 2:`, error instanceof Error ? error.message : 'Unknown error')
-      console.error(`[RSS Phase 1] Phase 2 error details:`, error instanceof Error ? error.stack : 'No stack trace')
-    })
-    
-    console.log(`[RSS Phase 1] Phase 2 fetch initiated (fire-and-forget) for campaign: ${campaign_id}`)
-    
-    // Mark as fire-and-forget to prevent any potential await
-    void fetchInitiated
+    console.log(`[RSS Phase 1] Campaign status updated - ready for Phase 2: ${campaign_id}`)
 
-    // Return Phase 1 response - Phase 2 fetch is already initiated
+    // Return Phase 1 response
     return NextResponse.json({
       success: true,
-      message: 'RSS processing phase 1 completed - phase 2 triggered automatically',
+      message: 'RSS processing phase 1 completed - ready for phase 2',
       campaign_id,
       results,
-      phase2_triggered: true
+      ready_for_phase2: true
     })
 
   } catch (error) {
