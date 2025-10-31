@@ -1455,100 +1455,33 @@ export class RSSProcessor {
       source_url: post.source_url || ''
     }
 
-    try {
-      // Step 1: Generate title using AI_CALL (handles prompt + provider + call)
-      const titleResult = section === 'primary'
-        ? await AI_CALL.primaryArticleTitle(postData, 200, 0.7)
-        : await AI_CALL.secondaryArticleTitle(postData, 200, 0.7)
+    // Step 1: Generate title using AI_CALL (handles prompt + provider + call)
+    const titleResult = section === 'primary'
+      ? await AI_CALL.primaryArticleTitle(postData, 200, 0.7)
+      : await AI_CALL.secondaryArticleTitle(postData, 200, 0.7)
 
-      // Handle both string and object responses
-      const headline = typeof titleResult === 'string'
-        ? titleResult.trim()
-        : (titleResult.raw || titleResult.headline || '').trim()
+    // Handle both string and object responses
+    const headline = typeof titleResult === 'string'
+      ? titleResult.trim()
+      : (titleResult.raw || titleResult.headline || '').trim()
 
-      if (!headline) {
-        throw new Error('Failed to generate article title')
-      }
+    if (!headline) {
+      throw new Error('Failed to generate article title')
+    }
 
-      // Step 2: Generate body using AI_CALL with the generated title
-      const bodyResult = section === 'primary'
-        ? await AI_CALL.primaryArticleBody(postData, headline, 500, 0.7)
-        : await AI_CALL.secondaryArticleBody(postData, headline, 500, 0.7)
+    // Step 2: Generate body using AI_CALL with the generated title
+    const bodyResult = section === 'primary'
+      ? await AI_CALL.primaryArticleBody(postData, headline, 500, 0.7)
+      : await AI_CALL.secondaryArticleBody(postData, headline, 500, 0.7)
 
-      if (!bodyResult.content || !bodyResult.word_count) {
-        throw new Error('Invalid article body response')
-      }
+    if (!bodyResult.content || !bodyResult.word_count) {
+      throw new Error('Invalid article body response')
+    }
 
-      return {
-        headline,
-        content: bodyResult.content,
-        word_count: bodyResult.word_count
-      }
-
-    } catch (error) {
-      // Fallback to legacy single-step articleWriter (use callAIWithPrompt to respect provider setting)
-      try {
-        const result = await callAIWithPrompt('ai_prompt_article_writer', {
-          title: postData.title,
-          description: postData.description || 'No description available',
-          content: postData.content ? postData.content.substring(0, 1500) + '...' : 'No additional content',
-          url: postData.source_url || ''
-        })
-
-        // Handle response with 'raw' property if needed
-        let parsedResult = result
-        if (result && typeof result === 'object' && 'raw' in result && typeof result.raw === 'string') {
-          try {
-            parsedResult = JSON.parse(result.raw)
-          } catch (parseError) {
-            // Try extracting JSON from markdown code fences
-            try {
-              const codeFenceMatch = result.raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
-              const cleanedContent = codeFenceMatch && codeFenceMatch[1] ? codeFenceMatch[1] : result.raw
-              parsedResult = JSON.parse(cleanedContent.trim())
-            } catch {
-              throw new Error('Failed to parse article writer response')
-            }
-          }
-        }
-
-        if (!parsedResult.headline || !parsedResult.content || !parsedResult.word_count) {
-          throw new Error('Invalid newsletter content response')
-        }
-
-        return parsedResult as NewsletterContent
-      } catch (fallbackError) {
-        // Final fallback to newsletterWriter (use callAIWithPrompt to respect provider setting)
-        const result = await callAIWithPrompt('ai_prompt_newsletter_writer', {
-          title: postData.title,
-          description: postData.description || 'No description available',
-          content: postData.content ? postData.content.substring(0, 1500) + '...' : 'No additional content',
-          url: postData.source_url || ''
-        })
-
-        // Handle response with 'raw' property if needed
-        let parsedResult = result
-        if (result && typeof result === 'object' && 'raw' in result && typeof result.raw === 'string') {
-          try {
-            parsedResult = JSON.parse(result.raw)
-          } catch (parseError) {
-            // Try extracting JSON from markdown code fences
-            try {
-              const codeFenceMatch = result.raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
-              const cleanedContent = codeFenceMatch && codeFenceMatch[1] ? codeFenceMatch[1] : result.raw
-              parsedResult = JSON.parse(cleanedContent.trim())
-            } catch {
-              throw new Error('Failed to parse newsletter writer response')
-            }
-          }
-        }
-
-        if (!parsedResult.headline || !parsedResult.content || !parsedResult.word_count) {
-          throw new Error('Invalid newsletter content response')
-        }
-
-        return parsedResult as NewsletterContent
-      }
+    return {
+      headline,
+      content: bodyResult.content,
+      word_count: bodyResult.word_count
     }
   }
 
