@@ -1,6 +1,6 @@
 import Parser from 'rss-parser'
 import { supabaseAdmin } from './supabase'
-import { AI_PROMPTS, callOpenAI, AI_CALL, callAIWithPrompt } from './openai' // Oct 7 2025 - Cache bust for 1-20 scale
+import { AI_CALL, callAIWithPrompt, AI_PROMPTS, callOpenAI } from './openai'
 import { ErrorHandler, SlackNotificationService } from './slack'
 import { GitHubImageStorage } from './github-storage'
 import { ArticleArchiveService } from './article-archive'
@@ -1605,8 +1605,13 @@ export class RSSProcessor {
         return ''
       }
 
-      // Generate welcome text using AI
-      const promptOrResult = await AI_PROMPTS.welcomeSection(allArticles)
+      // Generate welcome text using AI_CALL (uses callAIWithPrompt like other prompts)
+      let result
+      try {
+        result = await AI_CALL.welcomeSection(allArticles, 500, 0.8)
+      } catch (callError) {
+        throw new Error(`AI call failed for welcome section: ${callError instanceof Error ? callError.message : 'Unknown error'}`)
+      }
 
       // Parse JSON response to extract intro, tagline, and summary
       let welcomeIntro = ''
@@ -1614,33 +1619,40 @@ export class RSSProcessor {
       let welcomeSummary = ''
 
       try {
-        // Check if promptOrResult is already a parsed JSON object with intro/tagline/summary
-        if (typeof promptOrResult === 'object' && promptOrResult !== null &&
-            ('intro' in promptOrResult || 'tagline' in promptOrResult || 'summary' in promptOrResult)) {
-          welcomeIntro = (promptOrResult as any).intro || ''
-          welcomeTagline = (promptOrResult as any).tagline || ''
-          welcomeSummary = (promptOrResult as any).summary || ''
-        } else if (typeof promptOrResult === 'object' && promptOrResult !== null && 'raw' in promptOrResult) {
-          const rawContent = (promptOrResult as any).raw
-          const welcomeJson = JSON.parse(rawContent)
-          welcomeIntro = welcomeJson.intro || ''
-          welcomeTagline = welcomeJson.tagline || ''
-          welcomeSummary = welcomeJson.summary || ''
-        } else if (typeof promptOrResult === 'string') {
-          const welcomeText = await callOpenAI(promptOrResult, 500, 0.8)
-          const finalWelcomeText = typeof welcomeText === 'string'
-            ? welcomeText.trim()
-            : (welcomeText.text || welcomeText.raw || '').trim()
+        // If result has 'raw' property, try to parse it (JSON parsing failed in callWithStructuredPrompt)
+        if (result && typeof result === 'object' && 'raw' in result && typeof result.raw === 'string') {
+          try {
+            // Try to parse the raw string content
+            const parsed = JSON.parse(result.raw)
+            result = parsed
+          } catch (parseError) {
+            // If parsing fails, try extracting JSON from markdown code fences
+            try {
+              const codeFenceMatch = result.raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+              const cleanedContent = codeFenceMatch && codeFenceMatch[1] ? codeFenceMatch[1] : result.raw
+              const objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
+              if (objectMatch && objectMatch[0]) {
+                result = JSON.parse(objectMatch[0])
+              } else {
+                result = JSON.parse(cleanedContent.trim())
+              }
+            } catch (fallbackError) {
+              throw new Error(`Failed to parse welcome section response: ${JSON.stringify({ raw: result.raw.substring(0, 200), parseError: parseError instanceof Error ? parseError.message : String(parseError) })}`)
+            }
+          }
+        }
 
-          const welcomeJson = JSON.parse(finalWelcomeText)
-          welcomeIntro = welcomeJson.intro || ''
-          welcomeTagline = welcomeJson.tagline || ''
-          welcomeSummary = welcomeJson.summary || ''
+        // Check if result is already a parsed JSON object with intro/tagline/summary
+        if (typeof result === 'object' && result !== null &&
+            ('intro' in result || 'tagline' in result || 'summary' in result)) {
+          welcomeIntro = (result as any).intro || ''
+          welcomeTagline = (result as any).tagline || ''
+          welcomeSummary = (result as any).summary || ''
         } else {
-          throw new Error('Unexpected promptOrResult format')
+          throw new Error(`Invalid welcome section response: expected object with intro/tagline/summary, got ${typeof result}`)
         }
       } catch (parseError) {
-        welcomeSummary = typeof promptOrResult === 'string' ? promptOrResult : JSON.stringify(promptOrResult)
+        throw new Error(`Failed to parse welcome section response: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`)
       }
 
       // Save all 3 parts to campaign
