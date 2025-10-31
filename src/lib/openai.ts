@@ -1695,7 +1695,19 @@ export async function callOpenAIWithWebSearch(systemPrompt: string, userPrompt: 
       console.log('Full response structure:', JSON.stringify(response, null, 2).substring(0, 1000))
 
       // Extract the response text using the format from the user's example
-      const text = response.output?.[0]?.content?.[0]?.json ?? response.output?.[0]?.content?.[0]?.input_json ?? response.output?.[0]?.content?.[0]?.text ?? ""
+      // For GPT-5 (reasoning model), search for json_schema content item explicitly
+      // since reasoning block may be first item (empty, redacted)
+      const outputArray = response.output?.[0]?.content
+      const jsonSchemaItem = outputArray?.find((c: any) => c.type === "json_schema")
+      const textItem = outputArray?.find((c: any) => c.type === "text")
+
+      const text = jsonSchemaItem?.json ??                         // JSON schema response (GPT-5 compatible)
+        jsonSchemaItem?.input_json ??                             // Alternative JSON location
+        response.output?.[0]?.content?.[0]?.json ??              // Fallback: first content item (GPT-4o)
+        response.output?.[0]?.content?.[0]?.input_json ??         // Fallback: first input_json
+        textItem?.text ??                                         // Text from text content item
+        response.output?.[0]?.content?.[0]?.text ??              // Fallback: first text
+        ""
 
       if (!text) {
         console.error('No text found in response. Response keys:', Object.keys(response))
@@ -1896,12 +1908,19 @@ export async function callWithStructuredPrompt(
       clearTimeout(timeoutId)
 
       // Extract content from Responses API format
-      // Try multiple paths: output array, output_text field, or top-level text
-      // IMPORTANT: Match the test endpoint's extraction logic exactly
-      let rawContent = response.output?.[0]?.content?.[0]?.json ??           // JSON schema response
-        response.output?.[0]?.content?.[0]?.input_json ??     // Alternative JSON location
-        response.output?.[0]?.content?.[0]?.text ??           // Text response
-        response.output_text ??                               // Legacy location
+      // For GPT-5 (reasoning model), search for json_schema content item explicitly
+      // since reasoning block may be first item (empty, redacted)
+      const outputArray = response.output?.[0]?.content
+      const jsonSchemaItem = outputArray?.find((c: any) => c.type === "json_schema")
+      const textItem = outputArray?.find((c: any) => c.type === "text")
+
+      let rawContent = jsonSchemaItem?.json ??                    // JSON schema response (GPT-5 compatible)
+        jsonSchemaItem?.input_json ??                             // Alternative JSON location
+        response.output?.[0]?.content?.[0]?.json ??              // Fallback: first content item (GPT-4o)
+        response.output?.[0]?.content?.[0]?.input_json ??        // Fallback: first input_json
+        textItem?.text ??                                         // Text from text content item
+        response.output?.[0]?.content?.[0]?.text ??              // Fallback: first text
+        response.output_text ??                                   // Legacy location
         response.text ??
         ""
 
@@ -2117,10 +2136,19 @@ export async function callOpenAIStructured(options: OpenAICallOptions) {
       clearTimeout(timeoutId)
 
       // Extract content from Responses API format
-      let rawContent = response.output?.[0]?.content?.[0]?.json ??           // JSON schema response
-        response.output?.[0]?.content?.[0]?.input_json ??     // Alternative JSON location
-        response.output?.[0]?.content?.[0]?.text ??           // Text response
-        response.output_text ??                               // Legacy location
+      // For GPT-5 (reasoning model), search for json_schema content item explicitly
+      // since reasoning block may be first item (empty, redacted)
+      const outputArray = response.output?.[0]?.content
+      const jsonSchemaItem = outputArray?.find((c: any) => c.type === "json_schema")
+      const textItem = outputArray?.find((c: any) => c.type === "text")
+
+      let rawContent = jsonSchemaItem?.json ??                    // JSON schema response (GPT-5 compatible)
+        jsonSchemaItem?.input_json ??                             // Alternative JSON location
+        response.output?.[0]?.content?.[0]?.json ??              // Fallback: first content item (GPT-4o)
+        response.output?.[0]?.content?.[0]?.input_json ??        // Fallback: first input_json
+        textItem?.text ??                                         // Text from text content item
+        response.output?.[0]?.content?.[0]?.text ??              // Fallback: first text
+        response.output_text ??                                   // Legacy location
         response.text ??
         ""
       
@@ -2256,12 +2284,19 @@ export async function callOpenAI(prompt: string, maxTokens = 1000, temperature =
       clearTimeout(timeoutId)
 
       // Extract content from Responses API format
-      // Try multiple paths: output array, output_text field, or top-level text
-      // IMPORTANT: Match the test endpoint's extraction logic exactly
-      let rawContent = response.output?.[0]?.content?.[0]?.json ??           // JSON schema response
-        response.output?.[0]?.content?.[0]?.input_json ??     // Alternative JSON location
-        response.output?.[0]?.content?.[0]?.text ??           // Text response
-        response.output_text ??                               // Legacy location
+      // For GPT-5 (reasoning model), search for json_schema content item explicitly
+      // since reasoning block may be first item (empty, redacted)
+      const outputArray = response.output?.[0]?.content
+      const jsonSchemaItem = outputArray?.find((c: any) => c.type === "json_schema")
+      const textItem = outputArray?.find((c: any) => c.type === "text")
+
+      let rawContent = jsonSchemaItem?.json ??                    // JSON schema response (GPT-5 compatible)
+        jsonSchemaItem?.input_json ??                             // Alternative JSON location
+        response.output?.[0]?.content?.[0]?.json ??              // Fallback: first content item (GPT-4o)
+        response.output?.[0]?.content?.[0]?.input_json ??        // Fallback: first input_json
+        textItem?.text ??                                         // Text from text content item
+        response.output?.[0]?.content?.[0]?.text ??              // Fallback: first text
+        response.output_text ??                                   // Legacy location
         response.text ??
         ""
 

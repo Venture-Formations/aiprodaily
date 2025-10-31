@@ -218,10 +218,20 @@ export async function POST(request: NextRequest) {
           }
 
           const completion = await (openai as any).responses.create(apiRequest)
+          
+          // For GPT-5 (reasoning model), search for json_schema content item explicitly
+          // since reasoning block may be first item (empty, redacted)
+          const outputArray = completion.output?.[0]?.content
+          const jsonSchemaItem = outputArray?.find((c: any) => c.type === "json_schema")
+          const textItem = outputArray?.find((c: any) => c.type === "text")
+          
           response =
-            completion.output?.[0]?.content?.[0]?.json ??
-            completion.output?.[0]?.content?.[0]?.input_json ??
-            completion.output?.[0]?.content?.[0]?.text ??
+            jsonSchemaItem?.json ??                                    // JSON schema response (GPT-5 compatible)
+            jsonSchemaItem?.input_json ??                             // Alternative JSON location
+            completion.output?.[0]?.content?.[0]?.json ??              // Fallback: first content item (GPT-4o)
+            completion.output?.[0]?.content?.[0]?.input_json ??        // Fallback: first input_json
+            textItem?.text ??                                         // Text from text content item
+            completion.output?.[0]?.content?.[0]?.text ??              // Fallback: first text
             'No response'
           tokensUsed = completion.usage?.total_tokens || 0
         } else if (provider === 'claude') {
