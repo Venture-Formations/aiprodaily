@@ -128,11 +128,15 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
   }
 
   console.log(`[Cron] Phase 1 completed for campaign: ${campaignId}`)
+  console.log(`[Cron] Phase 1 result:`, JSON.stringify(phase1Result).substring(0, 200))
 
   // Phase 2: Deduplicate, Generate, Select+Subject, Welcome, Finalize (steps 4-8)
   console.log(`[Cron] Phase 2 starting for campaign: ${campaignId}`)
+  console.log(`[Cron] Preparing Phase 2 request...`)
   
   const phase2Url = `${baseUrl}/api/rss/process-phase2`
+  console.log(`[Cron] Phase 2 URL: ${phase2Url}`)
+  console.log(`[Cron] Making Phase 2 fetch request...`)
   const phase2Response = await fetch(phase2Url, {
     method: 'POST',
     headers: {
@@ -141,6 +145,7 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
     },
     body: JSON.stringify({ campaign_id: campaignId })
   })
+  console.log(`[Cron] Phase 2 response received: status=${phase2Response.status}`)
 
   // Check if response is JSON or HTML (error page)
   const contentType2 = phase2Response.headers.get('content-type') || ''
