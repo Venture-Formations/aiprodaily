@@ -59,8 +59,41 @@ async function getPromptJSON(key: string, fallbackText?: string): Promise<any> {
       }
     }
 
-    // Value is already complete JSON (from migration), return as-is
-    const promptJSON = typeof data.value === 'string' ? JSON.parse(data.value) : data.value
+    // Try to parse value - could be string (JSON) or object (JSONB)
+    let promptJSON: any
+    if (typeof data.value === 'string') {
+      try {
+        promptJSON = JSON.parse(data.value)
+      } catch (parseError) {
+        // Not JSON - treat as plain text prompt
+        console.log(`[AI-PROMPT] ${key} is plain text, wrapping in structured format`)
+        promptJSON = {
+          model: 'gpt-4o',
+          messages: [{ role: 'user', content: data.value }]
+        }
+      }
+    } else if (typeof data.value === 'object' && data.value !== null) {
+      // Already an object (JSONB was auto-parsed)
+      promptJSON = data.value
+    } else {
+      // Unknown format, treat as plain text
+      console.log(`[AI-PROMPT] ${key} has unknown format, treating as plain text`)
+      promptJSON = {
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: String(data.value) }]
+      }
+    }
+
+    // Validate structure - ensure it has messages array
+    if (!promptJSON.messages || !Array.isArray(promptJSON.messages)) {
+      console.log(`[AI-PROMPT] ${key} missing messages array, converting to structured format`)
+      // If it's not structured, wrap the whole thing as a user message
+      const content = promptJSON.content || promptJSON.prompt || JSON.stringify(promptJSON)
+      promptJSON = {
+        model: promptJSON.model || 'gpt-4o',
+        messages: [{ role: 'user', content: content }]
+      }
+    }
 
     // Add provider info for routing
     const provider = (data.ai_provider === 'claude' ? 'claude' : 'openai') as 'openai' | 'claude'

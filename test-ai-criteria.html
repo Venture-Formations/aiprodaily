@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test AI Criteria Endpoint</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .section { margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 5px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #0070f3; color: white; border: none; border-radius: 5px; }
+        button:hover { background: #0051cc; }
+        pre { background: #000; color: #0f0; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        input, textarea { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 3px; }
+        label { font-weight: bold; display: block; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Test AI Criteria Endpoint</h1>
+    
+    <div class="section">
+        <h2>Quick Test (GET - Uses Sample Data)</h2>
+        <button onclick="testGet()">Test Criterion 1 (GET)</button>
+        <div id="getResult"></div>
+    </div>
+
+    <div class="section">
+        <h2>Custom Test (POST - Your Data)</h2>
+        <label>Criterion Number:</label>
+        <input type="number" id="criterion" value="1" min="1" max="10">
+        
+        <label>Title:</label>
+        <input type="text" id="title" value="OpenAI now sells extra Sora credits for $4, plans to reduce free gens in the future">
+        
+        <label>Description:</label>
+        <textarea id="description" rows="2">OpenAI is looking to turn Sora into a moneymaker, first by selling extra credits, later with licensing options.</textarea>
+        
+        <label>Content:</label>
+        <textarea id="content" rows="10">OpenAI has started selling power users extra credits for its Sora AI video generation tool. An extra 10 video gens will retail for $4 through Apple's App Store. The company currently has a limit of 30 free gens per day, a rate that will likely decrease as OpenAI starts to monetize the offering. Bill Peebles, who heads OpenAI's Sora, posted on X about the changes."Eventually we will need to bring the free gens down to accommodate growth (we won't have enough gpus to do it otherwise!), but we'll be transparent as it happens," he said.Peebles also said that OpenAI plans to monetize by letting entities essentially license out their copyrighted material, either their artwork, characters or likenesses. "We imagine a world where rightsholders have the option to charge extra for cameos of beloved characters and people," he wrote. Although making the cameo feature a core part of the monetization while the company is being sued by Cameo for trademark infringement is certainly a bold choice. And that's just the latest in a series of dodgy actions tied to OpenAI's text-to-video AI app.</textarea>
+        
+        <button onclick="testPost()">Test with Custom Data (POST)</button>
+        <div id="postResult"></div>
+    </div>
+
+    <script>
+        // Update this URL to your deployed domain or localhost:3000
+        const API_URL = window.location.hostname === 'localhost' 
+            ? 'http://localhost:3000/api/debug/test-ai-criteria'
+            : 'https://www.aiprodaily.com/api/debug/test-ai-criteria';
+
+        async function testGet() {
+            const resultDiv = document.getElementById('getResult');
+            resultDiv.innerHTML = '<p>Testing... (this may take 10-30 seconds)</p>';
+            
+            try {
+                const response = await fetch(`${API_URL}?criterion=1`);
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <h3>Response:</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function testPost() {
+            const resultDiv = document.getElementById('postResult');
+            resultDiv.innerHTML = '<p>Testing... (this may take 10-30 seconds)</p>';
+            
+            const data = {
+                criterion: parseInt(document.getElementById('criterion').value),
+                title: document.getElementById('title').value,
+                description: document.getElementById('description').value,
+                content: document.getElementById('content').value
+            };
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <h3>Response (Status: ${response.status}):</h3>
+                    <pre>${JSON.stringify(result, null, 2)}</pre>
+                    ${result.success ? 
+                        `<h3>✅ Success!</h3>
+                         <p><strong>Score:</strong> ${result.parsed?.score ?? 'N/A'}</p>
+                         <p><strong>Reason:</strong> ${result.parsed?.reason ?? 'N/A'}</p>` :
+                        `<h3>❌ Error:</h3>
+                         <p style="color: red;">${result.error || 'Unknown error'}</p>`
+                    }
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
+
