@@ -1,6 +1,6 @@
 import Parser from 'rss-parser'
 import { supabaseAdmin } from './supabase'
-import { AI_PROMPTS, callOpenAI, AI_CALL } from './openai' // Oct 7 2025 - Cache bust for 1-20 scale
+import { AI_PROMPTS, callOpenAI, AI_CALL, callAIWithPrompt } from './openai' // Oct 7 2025 - Cache bust for 1-20 scale
 import { ErrorHandler, SlackNotificationService } from './slack'
 import { GitHubImageStorage } from './github-storage'
 import { ArticleArchiveService } from './article-archive'
@@ -787,46 +787,20 @@ export class RSSProcessor {
 
     for (const criterion of criteria) {
       try {
-        // Call the appropriate criteria evaluator
-        const evaluatorKey = `criteria${criterion.number}Evaluator` as keyof typeof AI_PROMPTS
-        const evaluator = AI_PROMPTS[evaluatorKey]
-
-        if (typeof evaluator !== 'function') {
-          continue
-        }
-
-        // Type assertion to help TypeScript understand this is a function
-        const evaluatorFn = evaluator as (post: { title: string; description: string; content?: string }) => Promise<string>
-
         // Use full article text if available, otherwise fall back to RSS content/description
         const fullText = post.full_article_text || post.content || post.description || ''
 
-        const prompt = await evaluatorFn({
+        // Call AI with structured prompt from database (includes all parameters)
+        const promptKey = `ai_prompt_criteria_${criterion.number}`
+        const result = await callAIWithPrompt(promptKey, {
           title: post.title,
           description: post.description || '',
           content: fullText
         })
 
-        const result = await callOpenAI(prompt)
-
         // Parse the AI response
-        let score: number
-        let reason: string
-
-        if (result.raw && typeof result.raw === 'string') {
-          try {
-            const parsed = JSON.parse(result.raw)
-            score = parsed.score
-            reason = parsed.reason || ''
-          } catch (parseError) {
-            throw new Error(`Invalid criterion ${criterion.number} response format`)
-          }
-        } else if (typeof result.score === 'number') {
-          score = result.score
-          reason = result.reason || ''
-        } else {
-          throw new Error(`Invalid criterion ${criterion.number} response format`)
-        }
+        const score = result.score
+        const reason = result.reason || ''
 
         // Validate score is a number between 0-10
         if (typeof score !== 'number' || score < 0 || score > 10) {
