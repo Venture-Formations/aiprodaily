@@ -2025,7 +2025,7 @@ export async function callOpenAI(prompt: string, maxTokens = 1000, temperature =
       const response = await (openai as any).responses.create({
         model: 'gpt-4o',
         input: [{ role: 'user', content: prompt }],
-        max_tokens: maxTokens,
+        max_output_tokens: maxTokens,
         temperature: temperature,
       }, {
         signal: controller.signal
