@@ -105,17 +105,35 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
   let phase1Response: Response
   try {
     console.log(`[Cron] Making Phase 1 fetch request at ${new Date().toISOString()}`)
-    phase1Response = await fetch(phase1Url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.CRON_SECRET}`
-      },
-      body: JSON.stringify({ campaign_id: campaignId })
-    })
-    console.log(`[Cron] Phase 1 fetch completed at ${new Date().toISOString()}, status=${phase1Response.status}`)
+    // Use AbortController with a 10-minute timeout (600 seconds) to match Vercel function timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 600000) // 10 minutes
+    
+    try {
+      phase1Response = await fetch(phase1Url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.CRON_SECRET}`
+        },
+        body: JSON.stringify({ campaign_id: campaignId }),
+        signal: controller.signal
+      })
+      clearTimeout(timeoutId)
+      console.log(`[Cron] Phase 1 fetch completed at ${new Date().toISOString()}, status=${phase1Response.status}`)
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId)
+      if (fetchError.name === 'AbortError') {
+        console.error(`[Cron] Phase 1 fetch timed out after 10 minutes`)
+        throw new Error('Phase 1 fetch timed out after 10 minutes')
+      }
+      throw fetchError
+    }
   } catch (fetchError) {
     console.error(`[Cron] Phase 1 fetch failed:`, fetchError instanceof Error ? fetchError.message : 'Unknown error')
+    if (fetchError instanceof Error && fetchError.stack) {
+      console.error(`[Cron] Phase 1 fetch error stack:`, fetchError.stack)
+    }
     throw new Error(`Phase 1 fetch failed: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`)
   }
 
@@ -156,17 +174,36 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
   
   let phase2Response: Response
   try {
-    phase2Response = await fetch(phase2Url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.CRON_SECRET}`
-      },
-      body: JSON.stringify({ campaign_id: campaignId })
-    })
-    console.log(`[Cron] Phase 2 response received at ${new Date().toISOString()}: status=${phase2Response.status}`)
+    console.log(`[Cron] Making Phase 2 fetch request at ${new Date().toISOString()}`)
+    // Use AbortController with a 10-minute timeout (600 seconds) to match Vercel function timeout
+    const controller2 = new AbortController()
+    const timeoutId2 = setTimeout(() => controller2.abort(), 600000) // 10 minutes
+    
+    try {
+      phase2Response = await fetch(phase2Url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.CRON_SECRET}`
+        },
+        body: JSON.stringify({ campaign_id: campaignId }),
+        signal: controller2.signal
+      })
+      clearTimeout(timeoutId2)
+      console.log(`[Cron] Phase 2 response received at ${new Date().toISOString()}: status=${phase2Response.status}`)
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId2)
+      if (fetchError.name === 'AbortError') {
+        console.error(`[Cron] Phase 2 fetch timed out after 10 minutes`)
+        throw new Error('Phase 2 fetch timed out after 10 minutes')
+      }
+      throw fetchError
+    }
   } catch (fetchError) {
     console.error(`[Cron] Phase 2 fetch failed:`, fetchError instanceof Error ? fetchError.message : 'Unknown error')
+    if (fetchError instanceof Error && fetchError.stack) {
+      console.error(`[Cron] Phase 2 fetch error stack:`, fetchError.stack)
+    }
     throw new Error(`Phase 2 fetch failed: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`)
   }
 

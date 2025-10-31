@@ -85,7 +85,6 @@ export async function POST(request: NextRequest) {
     console.log(`[RSS Phase 1] All steps completed successfully for campaign: ${campaign_id}`)
 
     // Update campaign status to indicate Phase 1 is complete
-    // The calling code (cron job) will then trigger Phase 2
     const { supabaseAdmin } = await import('@/lib/supabase')
     await supabaseAdmin
       .from('newsletter_campaigns')
@@ -97,13 +96,54 @@ export async function POST(request: NextRequest) {
 
     console.log(`[RSS Phase 1] Campaign status updated - ready for Phase 2: ${campaign_id}`)
 
-    // Return Phase 1 response
+    // Trigger Phase 2 the same way cron job triggers Phase 1 (fire-and-forget HTTP call)
+    const baseUrl = process.env.NEXTAUTH_URL || 
+                   (process.env.PRODUCTION_URL && !process.env.PRODUCTION_URL.includes('-venture-formations')) 
+                     ? process.env.PRODUCTION_URL 
+                     : 'https://www.aiprodaily.com'
+    const phase2Url = `${baseUrl}/api/rss/process-phase2`
+    
+    console.log(`[RSS Phase 1] Triggering Phase 2 for campaign: ${campaign_id}`)
+    console.log(`[RSS Phase 1] Phase 2 URL: ${phase2Url}`)
+    
+    // Fire-and-forget: trigger Phase 2 but don't wait for it to complete
+    // Use AbortController with 10-minute timeout to match Vercel function limit
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 600000) // 10 minutes
+    
+    fetch(phase2Url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.CRON_SECRET}`
+      },
+      body: JSON.stringify({ campaign_id: campaign_id }),
+      signal: controller.signal
+    }).then(response => {
+      clearTimeout(timeoutId)
+      console.log(`[RSS Phase 1] Phase 2 trigger response: status=${response.status}`)
+      if (!response.ok) {
+        console.error(`[RSS Phase 1] Phase 2 trigger returned error status: ${response.status}`)
+      }
+    }).catch(error => {
+      clearTimeout(timeoutId)
+      if (error.name === 'AbortError') {
+        console.error(`[RSS Phase 1] Phase 2 trigger timed out after 10 minutes`)
+      } else {
+        console.error(`[RSS Phase 1] Failed to trigger Phase 2:`, error instanceof Error ? error.message : 'Unknown error')
+      }
+      // Don't fail Phase 1 if Phase 2 trigger fails
+    })
+    
+    console.log(`[RSS Phase 1] Phase 2 trigger initiated (fire-and-forget)`)
+
+    // Return Phase 1 response immediately - Phase 2 is starting independently
     return NextResponse.json({
       success: true,
-      message: 'RSS processing phase 1 completed - ready for phase 2',
+      message: 'RSS processing phase 1 completed - phase 2 triggered automatically',
       campaign_id,
       results,
-      ready_for_phase2: true
+      phase2_triggered: true
     })
 
   } catch (error) {
