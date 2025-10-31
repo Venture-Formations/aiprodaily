@@ -1737,7 +1737,12 @@ export async function callOpenAIWithWebSearch(systemPrompt: string, userPrompt: 
       throw error
     }
   } catch (error) {
-    console.error('OpenAI Responses API error:', error)
+    const errorMsg = error instanceof Error 
+      ? error.message 
+      : typeof error === 'object' && error !== null
+        ? JSON.stringify(error, null, 2)
+        : String(error)
+    console.error('OpenAI Responses API error:', errorMsg)
     if (error instanceof Error) {
       console.error('Error details:', error.message)
       console.error('Error name:', error.name)
@@ -2217,7 +2222,12 @@ export async function callOpenAIStructured(options: OpenAICallOptions) {
       throw error
     }
   } catch (error) {
-    console.error('OpenAI API error (structured):', error)
+    const errorMsg = error instanceof Error 
+      ? error.message 
+      : typeof error === 'object' && error !== null
+        ? JSON.stringify(error, null, 2)
+        : String(error)
+    console.error('OpenAI API error (structured):', errorMsg)
     throw error
   }
 }
@@ -2458,7 +2468,12 @@ export async function callAI(prompt: string, maxTokens = 1000, temperature = 0.3
         return { raw: content }
       }
     } catch (error) {
-      console.error('Claude API error:', error)
+      const errorMsg = error instanceof Error 
+        ? error.message 
+        : typeof error === 'object' && error !== null
+          ? JSON.stringify(error, null, 2)
+          : String(error)
+      console.error('Claude API error:', errorMsg)
       throw error
     }
   } else {

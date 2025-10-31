@@ -1458,12 +1458,35 @@ export class RSSProcessor {
 
     // If we got an object with 'raw' property, it's already the result from structured prompt
     // Otherwise, it's a prompt string that needs to be sent to OpenAI
-    const result = (typeof promptOrResult === 'object' && promptOrResult !== null && 'raw' in promptOrResult)
+    let result = (typeof promptOrResult === 'object' && promptOrResult !== null && 'raw' in promptOrResult)
       ? promptOrResult
       : await callOpenAI(promptOrResult as string)
 
+    // If result has 'raw' property, try to parse it (JSON parsing failed in callWithStructuredPrompt)
+    if (result && typeof result === 'object' && 'raw' in result && typeof result.raw === 'string') {
+      try {
+        // Try to parse the raw string content
+        const parsed = JSON.parse(result.raw)
+        result = parsed
+      } catch (parseError) {
+        // If parsing fails, try extracting JSON from markdown code fences
+        try {
+          const codeFenceMatch = result.raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+          const cleanedContent = codeFenceMatch && codeFenceMatch[1] ? codeFenceMatch[1] : result.raw
+          const objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
+          if (objectMatch && objectMatch[0]) {
+            result = JSON.parse(objectMatch[0])
+          } else {
+            result = JSON.parse(cleanedContent.trim())
+          }
+        } catch (fallbackError) {
+          throw new Error(`Failed to parse fact-check response: ${JSON.stringify({ raw: result.raw.substring(0, 200), parseError: parseError instanceof Error ? parseError.message : String(parseError) })}`)
+        }
+      }
+    }
+
     if (typeof result.score !== 'number' || typeof result.details !== 'string') {
-      throw new Error(`Invalid fact-check response: ${JSON.stringify({ score: result.score, details: result.details, resultKeys: Object.keys(result || {}) })}`)
+      throw new Error(`Invalid fact-check response: ${JSON.stringify({ score: result.score, details: result.details, resultKeys: Object.keys(result || {}), resultType: typeof result })}`)
     }
 
     return result as FactCheckResult
