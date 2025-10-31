@@ -3,22 +3,27 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { ScheduleChecker } from '@/lib/schedule-checker'
 import { PromptSelector } from '@/lib/prompt-selector'
 
-async function processRSSWorkflow(request: NextRequest) {
+async function processRSSWorkflow(request: NextRequest, force: boolean = false) {
   let campaignId: string | undefined
 
   // Check if it's time to run RSS processing based on database settings
-  const shouldRun = await ScheduleChecker.shouldRunRSSProcessing()
+  // Allow bypassing the schedule check with force=true parameter
+  if (!force) {
+    const shouldRun = await ScheduleChecker.shouldRunRSSProcessing()
 
-  if (!shouldRun) {
-    return {
-      skipped: true,
-      response: NextResponse.json({
-        success: true,
-        message: 'Not time to run RSS processing or already ran today',
+    if (!shouldRun) {
+      return {
         skipped: true,
-        timestamp: new Date().toISOString()
-      })
+        response: NextResponse.json({
+          success: true,
+          message: 'Not time to run RSS processing or already ran today',
+          skipped: true,
+          timestamp: new Date().toISOString()
+        })
+      }
     }
+  } else {
+    console.log('[Cron] Force mode enabled - bypassing schedule check')
   }
 
   // Get tomorrow's date for campaign creation (RSS processing is for next day)
@@ -79,17 +84,15 @@ async function processRSSWorkflow(request: NextRequest) {
     console.error('AI app selection failed:', appSelectionError instanceof Error ? appSelectionError.message : 'Unknown error')
   }
 
-  // Construct base URL - use production URL for internal requests
-  // Vercel preview deployments require authentication, so use production URL or NEXTAUTH_URL
+  // Construct base URL - always use production URL for internal requests
+  // Preview deployments require authentication, so we use the production domain
   let baseUrl: string
-  if (process.env.NEXTAUTH_URL) {
+  if (process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes('-venture-formations')) {
+    // NEXTAUTH_URL set and not a preview URL
     baseUrl = process.env.NEXTAUTH_URL
-  } else if (process.env.VERCEL_URL && !process.env.VERCEL_URL.includes('-')) {
-    // Production deployment (no hash in URL)
-    baseUrl = `https://${process.env.VERCEL_URL}`
   } else {
-    // Fallback to request origin for local development
-    baseUrl = new URL(request.url).origin
+    // Default to production domain (hardcoded to avoid preview auth issues)
+    baseUrl = process.env.PRODUCTION_URL || 'https://aiprodaily.vercel.app'
   }
 
   // Phase 1: Archive, Fetch+Extract, Score (steps 1-3)
@@ -183,7 +186,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const result = await processRSSWorkflow(request)
+    // Check for force parameter in URL or body
+    const searchParams = new URL(request.url).searchParams
+    const forceParam = searchParams.get('force')
+    const force = forceParam === 'true'
+
+    const result = await processRSSWorkflow(request, force)
     if (result.skipped) {
       return result.response
     }
@@ -233,7 +241,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const result = await processRSSWorkflow(request)
+    // Check for force parameter to bypass schedule check
+    const forceParam = searchParams.get('force')
+    const force = forceParam === 'true'
+
+    const result = await processRSSWorkflow(request, force)
     if (result.skipped) {
       return result.response
     }
