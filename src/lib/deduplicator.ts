@@ -408,6 +408,10 @@ export class Deduplicator {
       }
 
       // Map AI result indices back to original post indices
+      // IMPORTANT: AI returns indices relative to the filtered subset (stillRemaining)
+      // originalIndices maps: subset_index -> original_full_array_index
+      // Example: If subset is [post_5, post_12, post_20], then originalIndices = [5, 12, 20]
+      // If AI returns index 1, that means post_12, and we map to originalIndices[1] = 12
       return result.groups
         .map((group: any) => {
           try {
@@ -419,18 +423,25 @@ export class Deduplicator {
               ? group.primary_article_index 
               : null
 
-            if (primaryIdx === null || primaryIdx < 0 || primaryIdx >= posts.length) {
+            // Validate primary index is within the filtered subset bounds
+            if (primaryIdx === null || primaryIdx < 0 || primaryIdx >= originalIndices.length) {
+              console.error(`[DEDUP] Invalid primary_article_index: ${primaryIdx} (subset length: ${originalIndices.length})`)
               return null
             }
 
+            // Map duplicate indices - must be within the filtered subset bounds
             const mappedDuplicateIndices = group.duplicate_indices
               .map((idx: number) => {
-                if (typeof idx !== 'number' || idx < 0 || idx >= posts.length) {
+                // Check bounds relative to the filtered subset (originalIndices length)
+                if (typeof idx !== 'number' || idx < 0 || idx >= originalIndices.length) {
+                  console.error(`[DEDUP] Invalid duplicate index: ${idx} (subset length: ${originalIndices.length})`)
                   return null
                 }
                 
+                // Map from subset index to original full array index
                 const originalIdx = originalIndices[idx]
-                if (originalIdx === undefined) {
+                if (originalIdx === undefined || typeof originalIdx !== 'number') {
+                  console.error(`[DEDUP] Failed to map duplicate index ${idx} to original index`)
                   return null
                 }
                 
@@ -439,18 +450,27 @@ export class Deduplicator {
               .filter((idx: number | null): idx is number => idx !== null)
 
             if (mappedDuplicateIndices.length === 0) {
+              console.error(`[DEDUP] No valid duplicate indices after mapping for group: ${group.topic_signature}`)
+              return null
+            }
+
+            // Map primary index from subset to original full array index
+            const mappedPrimaryIdx = originalIndices[primaryIdx]
+            if (mappedPrimaryIdx === undefined || typeof mappedPrimaryIdx !== 'number') {
+              console.error(`[DEDUP] Failed to map primary index ${primaryIdx} to original index`)
               return null
             }
 
             return {
               topic_signature: group.topic_signature || 'unknown',
-              primary_post_index: originalIndices[primaryIdx],
+              primary_post_index: mappedPrimaryIdx,
               duplicate_indices: mappedDuplicateIndices,
               detection_method: 'ai_semantic' as const,
               similarity_score: 0.8, // Default for AI-detected
               explanation: group.similarity_explanation || ''
             }
-          } catch {
+          } catch (error) {
+            console.error(`[DEDUP] Error mapping semantic duplicate group:`, error)
             return null
           }
         })
