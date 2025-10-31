@@ -24,6 +24,8 @@ export async function executeStep5(campaignId: string) {
 
   const articlesCount = articles ? articles.length : 0
   const secondaryCount = secondaryArticles ? secondaryArticles.length : 0
+  
+  // Log batch stats if available from processor
   console.log(`[Step 5/8] Complete: ${articlesCount} primary articles, ${secondaryCount} secondary articles`)
   return { articlesCount, secondaryCount }
 }

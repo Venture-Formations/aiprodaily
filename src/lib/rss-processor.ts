@@ -1025,7 +1025,7 @@ export class RSSProcessor {
         const scoreB = b.post_ratings?.[0]?.total_score || 0
         return scoreB - scoreA
       })
-      // Generate articles for ALL non-duplicate posts, not just top 12
+      .slice(0, 12) // Limit to top 12 posts per section to prevent timeout (each article = 3 AI calls)
 
     if (postsWithRatings.length === 0) {
       // Try a simpler query to get posts with ratings
@@ -1040,20 +1040,68 @@ export class RSSProcessor {
 
       if (allRatedPosts && allRatedPosts.length > 0) {
         // Use these posts instead, excluding duplicates and posts without full text
-        const filteredPosts = allRatedPosts.filter(post =>
-          !duplicatePostIds.has(post.id) &&
-          post.full_article_text
-        )
-        // Generate articles for ALL non-duplicate posts
-        for (const post of filteredPosts) {
-          await this.processPostIntoArticle(post, campaignId, section)
+        const filteredPosts = allRatedPosts
+          .filter(post =>
+            !duplicatePostIds.has(post.id) &&
+            post.full_article_text
+          )
+          .sort((a, b) => {
+            const scoreA = a.post_ratings?.[0]?.total_score || 0
+            const scoreB = b.post_ratings?.[0]?.total_score || 0
+            return scoreB - scoreA
+          })
+          .slice(0, 12) // Limit to top 12 posts per section
+        
+        // Process articles in batches (limit to top 12 to prevent timeout)
+        const limitedPosts = filteredPosts
+        const BATCH_SIZE = 2
+        for (let i = 0; i < limitedPosts.length; i += BATCH_SIZE) {
+          const batch = limitedPosts.slice(i, i + BATCH_SIZE)
+          const batchPromises = batch.map(async (post) => {
+            try {
+              await this.processPostIntoArticle(post, campaignId, section)
+            } catch (error) {
+              // Silent failure
+            }
+          })
+          await Promise.all(batchPromises)
+          
+          if (i + BATCH_SIZE < limitedPosts.length) {
+            await new Promise(resolve => setTimeout(resolve, 3000))
+          }
         }
       }
       return
     }
 
-    for (const post of postsWithRatings) {
-      await this.processPostIntoArticle(post, campaignId, section)
+    // Process articles in batches to avoid overwhelming AI API and prevent timeouts
+    // Each article = 3 AI calls (headline + body + fact-check), so smaller batches
+    const BATCH_SIZE = 2 // Process 2 articles at a time (6 AI calls per batch)
+    let processedCount = 0
+    let errorCount = 0
+
+    for (let i = 0; i < postsWithRatings.length; i += BATCH_SIZE) {
+      const batch = postsWithRatings.slice(i, i + BATCH_SIZE)
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1
+      const totalBatches = Math.ceil(postsWithRatings.length / BATCH_SIZE)
+
+      // Process batch concurrently (headline → body → fact check is sequential within each post)
+      const batchPromises = batch.map(async (post) => {
+        try {
+          await this.processPostIntoArticle(post, campaignId, section)
+          processedCount++
+        } catch (error) {
+          errorCount++
+        }
+      })
+
+      await Promise.all(batchPromises)
+
+      // Longer delay between batches to prevent rate limits and reduce load
+      // This also helps spread work over time to stay under 10-minute limit
+      if (i + BATCH_SIZE < postsWithRatings.length) {
+        await new Promise(resolve => setTimeout(resolve, 3000)) // Increased from 2s to 3s
+      }
     }
 
     // Note: Article selection and subject line generation moved to separate steps
