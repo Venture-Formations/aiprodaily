@@ -130,7 +130,16 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({ campaign_id: campaignId })
     })
 
-    const phase2Result = await phase2Response.json()
+    // Check if response is JSON or HTML (error page)
+    const contentType2 = phase2Response.headers.get('content-type') || ''
+    let phase2Result: any
+    
+    if (contentType2.includes('application/json')) {
+      phase2Result = await phase2Response.json()
+    } else {
+      const text = await phase2Response.text()
+      throw new Error(`Phase 2 returned non-JSON response (${phase2Response.status}): ${text.substring(0, 200)}`)
+    }
 
     if (!phase2Response.ok) {
       throw new Error(`Phase 2 failed: ${phase2Result.message || JSON.stringify(phase2Result)}`)
@@ -308,7 +317,16 @@ export async function GET(request: NextRequest) {
       body: JSON.stringify({ campaign_id: campaignId })
     })
 
-    const phase2Result = await phase2Response.json()
+    // Check if response is JSON or HTML (error page)
+    const contentType2 = phase2Response.headers.get('content-type') || ''
+    let phase2Result: any
+    
+    if (contentType2.includes('application/json')) {
+      phase2Result = await phase2Response.json()
+    } else {
+      const text = await phase2Response.text()
+      throw new Error(`Phase 2 returned non-JSON response (${phase2Response.status}): ${text.substring(0, 200)}`)
+    }
 
     if (!phase2Response.ok) {
       throw new Error(`Phase 2 failed: ${phase2Result.message || JSON.stringify(phase2Result)}`)
