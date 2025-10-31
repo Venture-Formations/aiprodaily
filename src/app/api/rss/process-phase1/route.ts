@@ -84,9 +84,8 @@ export async function POST(request: NextRequest) {
 
     console.log(`[RSS Phase 1] All steps completed successfully for campaign: ${campaign_id}`)
 
-    // Automatically trigger Phase 2 immediately in the background (fire and forget)
-    // This prevents the cron job from timing out waiting for Phase 1
-    // Phase 2 runs independently with its own 600-second timeout
+    // Prepare Phase 2 trigger BEFORE returning response
+    // This ensures the fetch is initiated before the function terminates
     let baseUrl: string
     if (process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes('-venture-formations')) {
       baseUrl = process.env.NEXTAUTH_URL
@@ -97,13 +96,13 @@ export async function POST(request: NextRequest) {
     }
     const phase2Url = `${baseUrl}/api/rss/process-phase2`
     
-    console.log(`[RSS Phase 1] Triggering Phase 2 immediately in background for campaign: ${campaign_id}`)
+    console.log(`[RSS Phase 1] Preparing Phase 2 trigger for campaign: ${campaign_id}`)
     console.log(`[RSS Phase 1] Phase 2 URL: ${phase2Url}`)
     console.log(`[RSS Phase 1] CRON_SECRET present: ${!!process.env.CRON_SECRET}`)
-    
+
+    // Start the fetch immediately (before returning) to ensure it initiates
     // Fire and forget - don't await, let Phase 2 run independently
-    // Use void to explicitly mark as fire-and-forget
-    const phase2Promise = fetch(phase2Url, {
+    const fetchInitiated = fetch(phase2Url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -125,10 +124,12 @@ export async function POST(request: NextRequest) {
       console.error(`[RSS Phase 1] Phase 2 error details:`, error instanceof Error ? error.stack : 'No stack trace')
     })
     
-    // Explicitly mark as fire-and-forget to prevent any potential await
-    void phase2Promise
+    console.log(`[RSS Phase 1] Phase 2 fetch initiated (fire-and-forget) for campaign: ${campaign_id}`)
+    
+    // Mark as fire-and-forget to prevent any potential await
+    void fetchInitiated
 
-    // Return Phase 1 response immediately - Phase 2 is already starting
+    // Return Phase 1 response - Phase 2 fetch is already initiated
     return NextResponse.json({
       success: true,
       message: 'RSS processing phase 1 completed - phase 2 triggered automatically',
