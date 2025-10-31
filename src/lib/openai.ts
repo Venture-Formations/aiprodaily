@@ -1866,6 +1866,7 @@ export async function callWithStructuredPrompt(
 
     if (provider === 'claude') {
       // Claude API - send exactly as-is (messages stays as messages)
+      console.log(`[AI] Using Claude API for prompt (provider: ${provider})`)
 
       const response = await anthropic.messages.create(processedRequest, {
         signal: controller.signal
@@ -1882,11 +1883,11 @@ export async function callWithStructuredPrompt(
       }
     } else {
       // OpenAI Responses API - only rename messages to input (API requirement)
+      console.log(`[AI] Using OpenAI API for prompt (provider: ${provider})`)
       if (processedRequest.messages) {
         processedRequest.input = processedRequest.messages
         delete processedRequest.messages
       }
-
 
       const response = await (openai as any).responses.create(processedRequest, {
         signal: controller.signal
