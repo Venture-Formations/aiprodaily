@@ -102,28 +102,43 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
   const phase1Url = `${baseUrl}/api/rss/process-phase1`
   console.log(`[Cron] Calling: ${phase1Url}`)
   
-  const phase1Response = await fetch(phase1Url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.CRON_SECRET}`
-    },
-    body: JSON.stringify({ campaign_id: campaignId })
-  })
+  let phase1Response: Response
+  try {
+    console.log(`[Cron] Making Phase 1 fetch request at ${new Date().toISOString()}`)
+    phase1Response = await fetch(phase1Url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.CRON_SECRET}`
+      },
+      body: JSON.stringify({ campaign_id: campaignId })
+    })
+    console.log(`[Cron] Phase 1 fetch completed at ${new Date().toISOString()}, status=${phase1Response.status}`)
+  } catch (fetchError) {
+    console.error(`[Cron] Phase 1 fetch failed:`, fetchError instanceof Error ? fetchError.message : 'Unknown error')
+    throw new Error(`Phase 1 fetch failed: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`)
+  }
 
   // Check if response is JSON or HTML (error page)
   const contentType = phase1Response.headers.get('content-type') || ''
   let phase1Result: any
   
-  if (contentType.includes('application/json')) {
-    phase1Result = await phase1Response.json()
-  } else {
-    const text = await phase1Response.text()
-    console.error(`[Cron] Phase 1 returned HTML instead of JSON (status: ${phase1Response.status}):`, text.substring(0, 500))
-    throw new Error(`Phase 1 returned non-JSON response (${phase1Response.status}): ${text.substring(0, 200)}`)
+  try {
+    if (contentType.includes('application/json')) {
+      phase1Result = await phase1Response.json()
+      console.log(`[Cron] Phase 1 JSON parsed successfully`)
+    } else {
+      const text = await phase1Response.text()
+      console.error(`[Cron] Phase 1 returned HTML instead of JSON (status: ${phase1Response.status}):`, text.substring(0, 500))
+      throw new Error(`Phase 1 returned non-JSON response (${phase1Response.status}): ${text.substring(0, 200)}`)
+    }
+  } catch (parseError) {
+    console.error(`[Cron] Failed to parse Phase 1 response:`, parseError instanceof Error ? parseError.message : 'Unknown error')
+    throw new Error(`Phase 1 response parsing failed: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`)
   }
 
   if (!phase1Response.ok) {
+    console.error(`[Cron] Phase 1 returned error status:`, phase1Result)
     throw new Error(`Phase 1 failed: ${phase1Result.message || JSON.stringify(phase1Result)}`)
   }
 
