@@ -2,14 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { ScheduleChecker } from '@/lib/schedule-checker'
 import { PromptSelector } from '@/lib/prompt-selector'
-import { executeStep1 } from '@/app/api/rss/combined-steps/step1-archive'
-import { executeStep2 } from '@/app/api/rss/combined-steps/step2-fetch-extract'
-import { executeStep3 } from '@/app/api/rss/combined-steps/step3-score'
-import { executeStep4 } from '@/app/api/rss/combined-steps/step4-deduplicate'
-import { executeStep5 } from '@/app/api/rss/combined-steps/step5-generate-headlines'
-import { executeStep6 } from '@/app/api/rss/combined-steps/step6-select-subject'
-import { executeStep7 } from '@/app/api/rss/combined-steps/step7-welcome'
-import { executeStep8 } from '@/app/api/rss/combined-steps/step8-finalize'
 
 export async function POST(request: NextRequest) {
   let campaignId: string | undefined
@@ -99,29 +91,29 @@ export async function POST(request: NextRequest) {
       console.error('AI app selection failed:', appSelectionError instanceof Error ? appSelectionError.message : 'Unknown error')
     }
 
-    // Phase 1: Archive, Fetch+Extract, Score (steps 1-3)
     if (!campaignId) {
       throw new Error('campaignId is required but was not set')
     }
-    
+
+    // Construct base URL from the request URL
+    const baseUrl = new URL(request.url).origin
+
+    // Phase 1: Archive, Fetch+Extract, Score (steps 1-3)
     console.log(`[Cron] Phase 1 starting for campaign: ${campaignId}`)
     
-    const phase1Steps = [
-      { name: 'Archive', fn: () => executeStep1(campaignId!) },
-      { name: 'Fetch+Extract', fn: () => executeStep2(campaignId!) },
-      { name: 'Score', fn: () => executeStep3(campaignId!) }
-    ]
+    const phase1Response = await fetch(`${baseUrl}/api/rss/process-phase1`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.CRON_SECRET}`
+      },
+      body: JSON.stringify({ campaign_id: campaignId })
+    })
 
-    const phase1Results = []
-    for (const step of phase1Steps) {
-      try {
-        const result = await step.fn()
-        phase1Results.push({ step: step.name, status: 'success', data: result })
-      } catch (error) {
-        console.error(`[Cron] Phase 1 failed at ${step.name}:`, error)
-        phase1Results.push({ step: step.name, status: 'failed', error: error instanceof Error ? error.message : 'Unknown error' })
-        throw new Error(`Phase 1 failed at ${step.name}: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      }
+    const phase1Result = await phase1Response.json()
+
+    if (!phase1Response.ok) {
+      throw new Error(`Phase 1 failed: ${phase1Result.message || JSON.stringify(phase1Result)}`)
     }
 
     console.log(`[Cron] Phase 1 completed for campaign: ${campaignId}`)
@@ -129,24 +121,19 @@ export async function POST(request: NextRequest) {
     // Phase 2: Deduplicate, Generate, Select+Subject, Welcome, Finalize (steps 4-8)
     console.log(`[Cron] Phase 2 starting for campaign: ${campaignId}`)
     
-    const phase2Steps = [
-      { name: 'Deduplicate', fn: () => executeStep4(campaignId!) },
-      { name: 'Generate', fn: () => executeStep5(campaignId!) },
-      { name: 'Select+Subject', fn: () => executeStep6(campaignId!) },
-      { name: 'Welcome', fn: () => executeStep7(campaignId!) },
-      { name: 'Finalize', fn: () => executeStep8(campaignId!) }
-    ]
+    const phase2Response = await fetch(`${baseUrl}/api/rss/process-phase2`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.CRON_SECRET}`
+      },
+      body: JSON.stringify({ campaign_id: campaignId })
+    })
 
-    const phase2Results = []
-    for (const step of phase2Steps) {
-      try {
-        const result = await step.fn()
-        phase2Results.push({ step: step.name, status: 'success', data: result })
-      } catch (error) {
-        console.error(`[Cron] Phase 2 failed at ${step.name}:`, error)
-        phase2Results.push({ step: step.name, status: 'failed', error: error instanceof Error ? error.message : 'Unknown error' })
-        throw new Error(`Phase 2 failed at ${step.name}: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      }
+    const phase2Result = await phase2Response.json()
+
+    if (!phase2Response.ok) {
+      throw new Error(`Phase 2 failed: ${phase2Result.message || JSON.stringify(phase2Result)}`)
     }
 
     console.log(`[Cron] Phase 2 completed for campaign: ${campaignId}`)
@@ -156,8 +143,8 @@ export async function POST(request: NextRequest) {
       message: 'Full RSS processing workflow completed successfully',
       campaignId: campaignId,
       campaignDate: campaignDate,
-      phase1_results: phase1Results,
-      phase2_results: phase2Results,
+      phase1_results: phase1Result.results,
+      phase2_results: phase2Result.results,
       timestamp: new Date().toISOString()
     })
 
@@ -282,29 +269,29 @@ export async function GET(request: NextRequest) {
       console.error('AI app selection failed:', appSelectionError instanceof Error ? appSelectionError.message : 'Unknown error')
     }
 
-    // Phase 1: Archive, Fetch+Extract, Score (steps 1-3)
     if (!campaignId) {
       throw new Error('campaignId is required but was not set')
     }
-    
+
+    // Construct base URL from the request URL
+    const baseUrl = new URL(request.url).origin
+
+    // Phase 1: Archive, Fetch+Extract, Score (steps 1-3)
     console.log(`[Cron] Phase 1 starting for campaign: ${campaignId}`)
     
-    const phase1Steps = [
-      { name: 'Archive', fn: () => executeStep1(campaignId!) },
-      { name: 'Fetch+Extract', fn: () => executeStep2(campaignId!) },
-      { name: 'Score', fn: () => executeStep3(campaignId!) }
-    ]
+    const phase1Response = await fetch(`${baseUrl}/api/rss/process-phase1`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.CRON_SECRET}`
+      },
+      body: JSON.stringify({ campaign_id: campaignId })
+    })
 
-    const phase1Results = []
-    for (const step of phase1Steps) {
-      try {
-        const result = await step.fn()
-        phase1Results.push({ step: step.name, status: 'success', data: result })
-      } catch (error) {
-        console.error(`[Cron] Phase 1 failed at ${step.name}:`, error)
-        phase1Results.push({ step: step.name, status: 'failed', error: error instanceof Error ? error.message : 'Unknown error' })
-        throw new Error(`Phase 1 failed at ${step.name}: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      }
+    const phase1Result = await phase1Response.json()
+
+    if (!phase1Response.ok) {
+      throw new Error(`Phase 1 failed: ${phase1Result.message || JSON.stringify(phase1Result)}`)
     }
 
     console.log(`[Cron] Phase 1 completed for campaign: ${campaignId}`)
@@ -312,24 +299,19 @@ export async function GET(request: NextRequest) {
     // Phase 2: Deduplicate, Generate, Select+Subject, Welcome, Finalize (steps 4-8)
     console.log(`[Cron] Phase 2 starting for campaign: ${campaignId}`)
     
-    const phase2Steps = [
-      { name: 'Deduplicate', fn: () => executeStep4(campaignId!) },
-      { name: 'Generate', fn: () => executeStep5(campaignId!) },
-      { name: 'Select+Subject', fn: () => executeStep6(campaignId!) },
-      { name: 'Welcome', fn: () => executeStep7(campaignId!) },
-      { name: 'Finalize', fn: () => executeStep8(campaignId!) }
-    ]
+    const phase2Response = await fetch(`${baseUrl}/api/rss/process-phase2`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.CRON_SECRET}`
+      },
+      body: JSON.stringify({ campaign_id: campaignId })
+    })
 
-    const phase2Results = []
-    for (const step of phase2Steps) {
-      try {
-        const result = await step.fn()
-        phase2Results.push({ step: step.name, status: 'success', data: result })
-      } catch (error) {
-        console.error(`[Cron] Phase 2 failed at ${step.name}:`, error)
-        phase2Results.push({ step: step.name, status: 'failed', error: error instanceof Error ? error.message : 'Unknown error' })
-        throw new Error(`Phase 2 failed at ${step.name}: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      }
+    const phase2Result = await phase2Response.json()
+
+    if (!phase2Response.ok) {
+      throw new Error(`Phase 2 failed: ${phase2Result.message || JSON.stringify(phase2Result)}`)
     }
 
     console.log(`[Cron] Phase 2 completed for campaign: ${campaignId}`)
@@ -339,8 +321,8 @@ export async function GET(request: NextRequest) {
       message: 'Full RSS processing workflow completed successfully',
       campaignId: campaignId,
       campaignDate: campaignDate,
-      phase1_results: phase1Results,
-      phase2_results: phase2Results,
+      phase1_results: phase1Result.results,
+      phase2_results: phase2Result.results,
       timestamp: new Date().toISOString()
     })
 
