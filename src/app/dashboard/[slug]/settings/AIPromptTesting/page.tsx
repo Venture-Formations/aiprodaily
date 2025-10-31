@@ -315,12 +315,18 @@ export default function AIPromptTestingPage() {
       const data = await res.json()
 
       if (data.success) {
+        // Convert response to string if it's an object
+        let responseText = data.response
+        if (typeof responseText !== 'string') {
+          responseText = JSON.stringify(responseText, null, 2)
+        }
+
         const result: TestResult = {
           timestamp: new Date(),
           provider: data.provider,
           model: data.model,
           promptType,
-          response: data.response,
+          response: responseText,
           tokensUsed: data.tokensUsed,
           duration: data.duration,
           apiRequest: data.apiRequest
@@ -384,17 +390,26 @@ export default function AIPromptTestingPage() {
       const data = await res.json()
 
       if (data.success) {
+        // Convert responses to strings if they're objects
+        const responseText = data.responses && data.responses[0] 
+          ? (typeof data.responses[0] === 'string' ? data.responses[0] : JSON.stringify(data.responses[0], null, 2))
+          : 'No responses'
+        
+        const responsesText = data.responses?.map((r: any) => 
+          typeof r === 'string' ? r : JSON.stringify(r, null, 2)
+        ) || []
+
         const result: TestResult = {
           timestamp: new Date(),
           provider: data.provider,
           model: data.model,
           promptType,
-          response: data.responses[0] || 'No responses',
+          response: responseText,
           tokensUsed: data.totalTokensUsed,
           duration: data.totalDuration,
           apiRequest: data.apiRequest,
           isMultiple: true,
-          responses: data.responses,
+          responses: responsesText,
           sourcePosts: data.sourcePosts // Include source posts
         }
 
@@ -740,7 +755,9 @@ export default function AIPromptTestingPage() {
                         </span>
                       </div>
                       <p className="text-xs text-gray-600 truncate">
-                        {result.response.substring(0, 100)}...
+                        {typeof result.response === 'string' 
+                          ? result.response.substring(0, 100)
+                          : JSON.stringify(result.response).substring(0, 100)}...
                       </p>
                     </div>
                   ))}
