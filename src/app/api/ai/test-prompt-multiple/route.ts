@@ -189,7 +189,8 @@ export async function POST(request: NextRequest) {
 
     // Process each post
     const startTime = Date.now()
-    const responses: string[] = []
+    const responses: any[] = []
+    const fullApiResponses: any[] = [] // Store full API responses for debugging
     let totalTokens = 0
     let apiRequestForFirstPost: any = null
 
@@ -205,8 +206,9 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        let response: string
+        let response: any
         let tokensUsed = 0
+        let fullApiResponse: any = null
 
         if (provider === 'openai') {
           // Send EXACTLY as-is, only rename messages to input
@@ -219,24 +221,68 @@ export async function POST(request: NextRequest) {
 
           const completion = await (openai as any).responses.create(apiRequest)
           
+          // Store the full API response for debugging
+          fullApiResponse = completion
+          
           // For GPT-5 (reasoning model), search for json_schema content item explicitly
           // since reasoning block may be first item (empty, redacted)
           const outputArray = completion.output?.[0]?.content
           const jsonSchemaItem = outputArray?.find((c: any) => c.type === "json_schema")
           const textItem = outputArray?.find((c: any) => c.type === "text")
           
-          response =
+          // Try to find JSON in any content item
+          let foundJson: any = null
+          if (outputArray && Array.isArray(outputArray)) {
+            for (const item of outputArray) {
+              if (item.json !== undefined) {
+                foundJson = item.json
+                break
+              }
+              if (item.input_json !== undefined) {
+                foundJson = item.input_json
+                break
+              }
+            }
+          }
+          
+          let rawResponse =
+            foundJson ??                                                // JSON found in any content item
             jsonSchemaItem?.json ??                                    // JSON schema response (GPT-5 compatible)
             jsonSchemaItem?.input_json ??                             // Alternative JSON location
             completion.output?.[0]?.content?.[0]?.json ??              // Fallback: first content item (GPT-4o)
             completion.output?.[0]?.content?.[0]?.input_json ??        // Fallback: first input_json
             textItem?.text ??                                         // Text from text content item
             completion.output?.[0]?.content?.[0]?.text ??              // Fallback: first text
+            completion.output_text ??                                  // Legacy location
+            completion.choices?.[0]?.message?.content ??               // Chat completions format
             'No response'
+          
+          // If response is a JSON string, parse it; if it's already an object, use it directly
+          if (typeof rawResponse === 'string' && rawResponse !== 'No response') {
+            try {
+              response = JSON.parse(rawResponse)
+            } catch {
+              response = rawResponse
+            }
+          } else if (rawResponse !== 'No response') {
+            // Already an object (JSON schema returns objects directly)
+            response = rawResponse
+          } else {
+            // Log the completion structure for debugging if we couldn't find a response
+            if (i === 0) {
+              console.log('[TEST-PROMPT-MULTIPLE] Could not extract response. Completion structure:', JSON.stringify(completion, null, 2))
+            }
+            response = 'No response'
+          }
+          
           tokensUsed = completion.usage?.total_tokens || 0
         } else if (provider === 'claude') {
           // Send EXACTLY as-is
           const completion = await anthropic.messages.create(processedJson)
+          
+          // Store the full API response for debugging
+          fullApiResponse = completion
+          
           const textContent = completion.content.find(c => c.type === 'text')
           response = textContent && 'text' in textContent ? textContent.text : 'No response'
           tokensUsed = (completion.usage?.input_tokens || 0) + (completion.usage?.output_tokens || 0)
@@ -245,6 +291,7 @@ export async function POST(request: NextRequest) {
         }
 
         responses.push(response)
+        fullApiResponses.push(fullApiResponse)
         totalTokens += tokensUsed
 
         // Add a small delay between requests to avoid rate limits
@@ -254,6 +301,7 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         console.error(`[AI Test Multiple] Error processing post ${i + 1}:`, error)
         responses.push(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        fullApiResponses.push(null) // No full response on error
       }
     }
 
@@ -264,6 +312,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       responses,
+      fullApiResponses, // Full API responses for debugging
       totalTokensUsed: totalTokens,
       totalDuration,
       provider,

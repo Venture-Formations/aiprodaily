@@ -28,6 +28,7 @@ interface TestResult {
   apiRequest?: any // The exact API request sent
   isMultiple?: boolean // Whether this was a multiple article test
   responses?: string[] // Array of responses for multiple article tests
+  fullApiResponses?: any[] // Full API responses for debugging
   sourcePosts?: Array<{ // Source posts used for multiple article tests
     id: string
     title: string
@@ -83,6 +84,7 @@ export default function AIPromptTestingPage() {
   const [showModal, setShowModal] = useState(false)
   const [showPromptDetails, setShowPromptDetails] = useState(false)
   const [showSourcePosts, setShowSourcePosts] = useState(false)
+  const [showFullApiResponses, setShowFullApiResponses] = useState(false)
 
   // Live prompt tracking
   const [livePrompt, setLivePrompt] = useState<string | null>(null)
@@ -406,6 +408,7 @@ export default function AIPromptTestingPage() {
           apiRequest: data.apiRequest,
           isMultiple: true,
           responses: responsesText,
+          fullApiResponses: data.fullApiResponses, // Include full API responses for debugging
           sourcePosts: data.sourcePosts // Include source posts
         }
 
@@ -413,6 +416,7 @@ export default function AIPromptTestingPage() {
         setTestHistory(prev => [result, ...prev])
         setShowModal(true)
         setShowPromptDetails(false)
+        setShowFullApiResponses(false) // Start with full responses collapsed
       } else {
         alert(`Error: ${data.error}`)
       }
@@ -741,6 +745,7 @@ export default function AIPromptTestingPage() {
                         setCurrentResponse(result)
                         setShowModal(true)
                         setShowPromptDetails(false)
+                        setShowFullApiResponses(false)
                       }}
                     >
                       <div className="flex items-center justify-between mb-1">
@@ -919,6 +924,47 @@ export default function AIPromptTestingPage() {
                   )}
                 </div>
               </div>
+
+              {/* Full API Responses Section (for multiple article tests) */}
+              {currentResponse.isMultiple && currentResponse.fullApiResponses && currentResponse.fullApiResponses.length > 0 && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setShowFullApiResponses(!showFullApiResponses)}
+                    className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left"
+                  >
+                    <span className="font-medium text-gray-900">
+                      {showFullApiResponses ? '▼' : '▶'} Full API Responses ({currentResponse.fullApiResponses.length} responses)
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      {showFullApiResponses ? 'Click to collapse' : 'Click to expand'}
+                    </span>
+                  </button>
+                  {showFullApiResponses && (
+                    <div className="p-4 bg-white">
+                      <p className="text-xs text-gray-600 mb-3">
+                        Full API response objects returned from {currentResponse.provider.toUpperCase()}. 
+                        This shows the complete response structure even if parsing failed.
+                      </p>
+                      <div className="space-y-4 max-h-96 overflow-y-auto">
+                        {currentResponse.fullApiResponses.map((fullResponse, index) => (
+                          <div key={index} className="border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <h5 className="font-medium text-gray-900">Article {index + 1} - Full API Response</h5>
+                            </div>
+                            <div className="bg-gray-50 rounded p-3 max-h-64 overflow-y-auto">
+                              <pre className="whitespace-pre-wrap text-xs font-mono overflow-x-auto">
+                                {fullResponse 
+                                  ? JSON.stringify(fullResponse, null, 2)
+                                  : 'No response available (error occurred)'}
+                              </pre>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Metadata */}
               <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 gap-4 text-sm">
