@@ -22,7 +22,7 @@ interface TestResult {
   provider: Provider
   model: string
   promptType: PromptType
-  response: string
+  response: string | { raw?: string; [key: string]: any } // Can be string or object (like Settings test)
   tokensUsed?: number
   duration: number
   apiRequest?: any // The exact API request sent
@@ -315,18 +315,14 @@ export default function AIPromptTestingPage() {
       const data = await res.json()
 
       if (data.success) {
-        // Convert response to string if it's an object
-        let responseText = data.response
-        if (typeof responseText !== 'string') {
-          responseText = JSON.stringify(responseText, null, 2)
-        }
-
+        // Store response as-is (can be string, object with raw, or object)
+        // Match Settings > AI Prompts test behavior - handle raw property specially
         const result: TestResult = {
           timestamp: new Date(),
           provider: data.provider,
           model: data.model,
           promptType,
-          response: responseText,
+          response: data.response as any, // Can be string or object (with optional raw property)
           tokensUsed: data.tokensUsed,
           duration: data.duration,
           apiRequest: data.apiRequest
@@ -757,7 +753,9 @@ export default function AIPromptTestingPage() {
                       <p className="text-xs text-gray-600 truncate">
                         {typeof result.response === 'string' 
                           ? result.response.substring(0, 100)
-                          : JSON.stringify(result.response).substring(0, 100)}...
+                          : (result.response?.raw 
+                            ? result.response.raw.substring(0, 100)
+                            : JSON.stringify(result.response).substring(0, 100))}...
                       </p>
                     </div>
                   ))}
@@ -910,10 +908,12 @@ export default function AIPromptTestingPage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="bg-gray-50 rounded p-4 whitespace-pre-wrap text-sm">
-                      {typeof currentResponse.response === 'object'
-                        ? JSON.stringify(currentResponse.response, null, 2)
-                        : currentResponse.response}
+                    <div className="bg-gray-50 rounded p-4 whitespace-pre-wrap text-sm font-mono">
+                      {typeof currentResponse.response === 'string' 
+                        ? currentResponse.response
+                        : (currentResponse.response?.raw 
+                          ? currentResponse.response.raw
+                          : JSON.stringify(currentResponse.response, null, 2))}
                     </div>
                   )}
                 </div>
