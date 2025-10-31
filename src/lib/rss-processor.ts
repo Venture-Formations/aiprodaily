@@ -416,7 +416,12 @@ export class RSSProcessor {
       .maybeSingle()
 
     if (existingError) {
-      console.error('Error checking for existing campaign:', existingError)
+      const errorMsg = existingError instanceof Error 
+        ? existingError.message 
+        : typeof existingError === 'object' && existingError !== null
+          ? JSON.stringify(existingError, null, 2)
+          : String(existingError)
+      console.error('Error checking for existing campaign:', errorMsg)
     }
 
     let campaignId: string
@@ -480,7 +485,12 @@ export class RSSProcessor {
         }
       }
     } catch (initError) {
-      console.error('Error initializing campaign content:', initError)
+      const errorMsg = initError instanceof Error 
+        ? initError.message 
+        : typeof initError === 'object' && initError !== null
+          ? JSON.stringify(initError, null, 2)
+          : String(initError)
+      console.error('Error initializing campaign content:', errorMsg)
       // Don't throw - continue with RSS processing even if initialization fails
     }
 
@@ -768,7 +778,12 @@ export class RSSProcessor {
       .or('key.eq.criteria_enabled_count,key.like.criteria_%_name,key.like.criteria_%_weight')
 
     if (configError) {
-      console.error('Failed to fetch criteria configuration:', configError)
+      const errorMsg = configError instanceof Error 
+        ? configError.message 
+        : typeof configError === 'object' && configError !== null
+          ? JSON.stringify(configError, null, 2)
+          : String(configError)
+      console.error('Failed to fetch criteria configuration:', errorMsg)
       throw new Error('Failed to fetch criteria configuration')
     }
 
@@ -1208,7 +1223,12 @@ export class RSSProcessor {
       await this.generateSubjectLineForCampaign(campaignId)
 
     } catch (error) {
-      console.error('Error selecting top articles:', error)
+      const errorMsg = error instanceof Error 
+        ? error.message 
+        : typeof error === 'object' && error !== null
+          ? JSON.stringify(error, null, 2)
+          : String(error)
+      console.error('Error selecting top articles:', errorMsg)
     }
   }
 
@@ -1291,7 +1311,12 @@ export class RSSProcessor {
       }
 
     } catch (error) {
-      console.error('Error selecting top secondary articles:', error)
+      const errorMsg = error instanceof Error 
+        ? error.message 
+        : typeof error === 'object' && error !== null
+          ? JSON.stringify(error, null, 2)
+          : String(error)
+      console.error('Error selecting top secondary articles:', errorMsg)
     }
   }
   private async processArticleImages(campaignId: string) {
@@ -1512,6 +1537,19 @@ export class RSSProcessor {
             result = JSON.parse(cleanedContent.trim())
           }
         } catch (fallbackError) {
+          // If it's not valid JSON at all (like an error message), return a structured error
+          // Check if the raw content looks like an error message (starts with common error phrases)
+          const rawText = result.raw.trim()
+          const isErrorMessage = rawText.startsWith('It looks like') || 
+                                  rawText.startsWith('I\'m sorry') ||
+                                  rawText.startsWith('Error') ||
+                                  rawText.startsWith('There was an issue') ||
+                                  !rawText.includes('{') // No JSON structure at all
+          
+          if (isErrorMessage) {
+            throw new Error(`AI returned error message instead of fact-check JSON: ${rawText.substring(0, 200)}`)
+          }
+          
           throw new Error(`Failed to parse fact-check response: ${JSON.stringify({ raw: result.raw.substring(0, 200), parseError: parseError instanceof Error ? parseError.message : String(parseError) })}`)
         }
       }
@@ -1739,8 +1777,13 @@ export class RSSProcessor {
         .eq('id', campaignId)
         .single()
 
-      if (campaignError || !campaign) {
-        console.error('Failed to fetch campaign for event population:', campaignError)
+        if (campaignError || !campaign) {
+          const errorMsg = campaignError instanceof Error 
+            ? campaignError.message 
+            : typeof campaignError === 'object' && campaignError !== null
+              ? JSON.stringify(campaignError, null, 2)
+              : String(campaignError)
+          console.error('Failed to fetch campaign for event population:', errorMsg)
         return
       }
 
@@ -1763,7 +1806,12 @@ export class RSSProcessor {
         .eq('campaign_id', campaignId)
 
       if (existingError) {
-        console.error('Error checking existing events:', existingError)
+        const errorMsg = existingError instanceof Error 
+          ? existingError.message 
+          : typeof existingError === 'object' && existingError !== null
+            ? JSON.stringify(existingError, null, 2)
+            : String(existingError)
+        console.error('Error checking existing events:', errorMsg)
       }
 
       const existingEventsByDate: Record<string, any[]> = {}
@@ -1790,7 +1838,12 @@ export class RSSProcessor {
         .order('start_date', { ascending: true })
 
       if (eventsError) {
-        console.error('Failed to fetch available events:', eventsError)
+        const errorMsg = eventsError instanceof Error 
+          ? eventsError.message 
+          : typeof eventsError === 'object' && eventsError !== null
+            ? JSON.stringify(eventsError, null, 2)
+            : String(eventsError)
+        console.error('Failed to fetch available events:', errorMsg)
         return
       }
 
@@ -1938,7 +1991,12 @@ export class RSSProcessor {
 
 
     } catch (error) {
-      console.error('Error in populateEventsForCampaignSmart:', error)
+      const errorMsg = error instanceof Error 
+        ? error.message 
+        : typeof error === 'object' && error !== null
+          ? JSON.stringify(error, null, 2)
+          : String(error)
+      console.error('Error in populateEventsForCampaignSmart:', errorMsg)
       await this.logError('Failed to populate events for campaign (smart)', {
         campaignId,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -1956,8 +2014,13 @@ export class RSSProcessor {
         .eq('id', campaignId)
         .single()
 
-      if (campaignError || !campaign) {
-        console.error('Failed to fetch campaign for event population:', campaignError)
+        if (campaignError || !campaign) {
+          const errorMsg = campaignError instanceof Error 
+            ? campaignError.message 
+            : typeof campaignError === 'object' && campaignError !== null
+              ? JSON.stringify(campaignError, null, 2)
+              : String(campaignError)
+          console.error('Failed to fetch campaign for event population:', errorMsg)
         return
       }
 
@@ -1986,7 +2049,12 @@ export class RSSProcessor {
         .order('start_date', { ascending: true })
 
       if (eventsError) {
-        console.error('Failed to fetch available events:', eventsError)
+        const errorMsg = eventsError instanceof Error 
+          ? eventsError.message 
+          : typeof eventsError === 'object' && eventsError !== null
+            ? JSON.stringify(eventsError, null, 2)
+            : String(eventsError)
+        console.error('Failed to fetch available events:', errorMsg)
         return
       }
 
@@ -2105,7 +2173,12 @@ export class RSSProcessor {
       })
 
     } catch (error) {
-      console.error('Error in populateEventsForCampaign:', error)
+      const errorMsg = error instanceof Error 
+        ? error.message 
+        : typeof error === 'object' && error !== null
+          ? JSON.stringify(error, null, 2)
+          : String(error)
+      console.error('Error in populateEventsForCampaign:', errorMsg)
       await this.logError('Failed to auto-populate events for campaign', {
         campaignId,
         error: error instanceof Error ? error.message : 'Unknown error'

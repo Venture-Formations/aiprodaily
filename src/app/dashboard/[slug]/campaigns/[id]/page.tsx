@@ -2390,14 +2390,12 @@ export default function CampaignDetailPage() {
     if (!campaign) return
 
     setProcessing(true)
-    setProcessingStatus('Initializing RSS processing...')
+    setProcessingStatus('Phase 1: Archive, Fetch, Score...')
 
     try {
-      // Start the processing
-      setProcessingStatus('Fetching RSS feeds...')
-
-      // Start processing in the background
-      const processPromise = fetch('/api/rss/process', {
+      // Phase 1: Archive, Fetch+Extract, Score (steps 1-3)
+      setProcessingStatus('Phase 1: Fetching RSS feeds and scoring posts...')
+      const phase1Response = await fetch('/api/rss/process-phase1', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2407,43 +2405,38 @@ export default function CampaignDetailPage() {
         })
       })
 
-      // Poll for status updates while processing
-      const statusInterval = setInterval(async () => {
+      if (!phase1Response.ok) {
+        let errorMessage = 'Phase 1 failed'
         try {
-          const statusResponse = await fetch(`/api/rss/status/${campaign.id}`)
-          if (statusResponse.ok) {
-            const statusData = await statusResponse.json()
-
-            if (statusData.counts.posts > 0) {
-              setProcessingStatus(`Found ${statusData.counts.posts} posts, evaluating with AI...`)
-            }
-
-            if (statusData.counts.articles > 0) {
-              setProcessingStatus(`Generated ${statusData.counts.articles} articles, finalizing...`)
-            }
-          }
-        } catch (error) {
-          // Silent fail for status updates
-        }
-      }, 2000)
-
-      // Wait for processing to complete
-      const response = await processPromise
-      clearInterval(statusInterval)
-
-      if (!response.ok) {
-        let errorMessage = 'Failed to process RSS feeds'
-        try {
-          const data = await response.json()
+          const data = await phase1Response.json()
           errorMessage = data.message || data.error || errorMessage
         } catch (e) {
-          // Response is not JSON, try to get text
-          try {
-            const text = await response.text()
-            errorMessage = text || `HTTP ${response.status}: ${response.statusText}`
-          } catch (textError) {
-            errorMessage = `HTTP ${response.status}: ${response.statusText}`
-          }
+          errorMessage = `HTTP ${phase1Response.status}: ${phase1Response.statusText}`
+        }
+        throw new Error(errorMessage)
+      }
+
+      setProcessingStatus('Phase 1 complete! Starting Phase 2...')
+
+      // Phase 2: Deduplicate, Generate, Select, Welcome, Finalize (steps 4-8)
+      setProcessingStatus('Phase 2: Generating articles and finalizing...')
+      const phase2Response = await fetch('/api/rss/process-phase2', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          campaign_id: campaign.id
+        })
+      })
+
+      if (!phase2Response.ok) {
+        let errorMessage = 'Phase 2 failed'
+        try {
+          const data = await phase2Response.json()
+          errorMessage = data.message || data.error || errorMessage
+        } catch (e) {
+          errorMessage = `HTTP ${phase2Response.status}: ${phase2Response.statusText}`
         }
         throw new Error(errorMessage)
       }
