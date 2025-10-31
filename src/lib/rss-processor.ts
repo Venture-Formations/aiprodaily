@@ -1353,15 +1353,45 @@ export class RSSProcessor {
 
 
   private async processPostIntoArticle(post: any, campaignId: string, section: 'primary' | 'secondary' = 'primary') {
+    let content: NewsletterContent | null = null
+    
     try {
       // Generate newsletter content
-      const content = await this.generateNewsletterContent(post, section)
+      content = await this.generateNewsletterContent(post, section)
+    } catch (error) {
+      const errorMsg = error instanceof Error 
+        ? error.message 
+        : typeof error === 'object' && error !== null
+          ? JSON.stringify(error, null, 2)
+          : String(error)
+      console.error(`[Article] Failed to generate content for post ${post.id}:`, errorMsg)
+      return // Can't proceed without content
+    }
 
-      // Fact-check the content
+    // Fact-check the content (but don't fail if fact-check fails)
+    let factCheckScore: number | null = null
+    let factCheckDetails: string | null = null
+
+    try {
       const factCheck = await this.factCheckContent(content.content, post.content || post.description || '')
+      factCheckScore = factCheck.score
+      factCheckDetails = factCheck.details
+    } catch (error) {
+      // Fact-check failed, but we'll still store the article
+      const errorMsg = error instanceof Error 
+        ? error.message 
+        : typeof error === 'object' && error !== null
+          ? JSON.stringify(error, null, 2)
+          : String(error)
+      console.error(`[Fact-Check] Failed for post ${post.id}, storing article anyway:`, errorMsg)
+      factCheckDetails = `Fact-check failed: ${errorMsg}`
+      // Set score to 0 to indicate fact-check failed
+      factCheckScore = 0
+    }
 
-      // Store ALL articles (both passed and failed) so we can review what's being rejected
-      const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
+    // Store ALL articles (even if fact-check failed) so we can review them
+    const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
+    try {
       const { error } = await supabaseAdmin
         .from(tableName)
         .insert([{
@@ -1370,20 +1400,22 @@ export class RSSProcessor {
           headline: content.headline,
           content: content.content,
           rank: null, // Will be set by ranking algorithm
-          is_active: false, // Only passed articles can be activated
-          fact_check_score: factCheck.score,
-          fact_check_details: factCheck.details,
+          is_active: false, // Only passed articles can be activated (will be set based on fact_check_score later)
+          fact_check_score: factCheckScore,
+          fact_check_details: factCheckDetails,
           word_count: content.word_count
         }])
 
-    } catch (error) {
-      // Log fact-check errors to help debug [object Object] issues
-      const errorMsg = error instanceof Error 
-        ? error.message 
-        : typeof error === 'object' && error !== null
-          ? JSON.stringify(error, null, 2)
-          : String(error)
-      console.error(`[Fact-Check] Failed for post ${post.id}:`, errorMsg)
+      if (error) {
+        console.error(`[Article] Failed to insert article for post ${post.id}:`, error.message)
+      }
+    } catch (insertError) {
+      const errorMsg = insertError instanceof Error 
+        ? insertError.message 
+        : typeof insertError === 'object' && insertError !== null
+          ? JSON.stringify(insertError, null, 2)
+          : String(insertError)
+      console.error(`[Article] Database insert failed for post ${post.id}:`, errorMsg)
     }
   }
 
