@@ -258,64 +258,49 @@ export async function GET(request: NextRequest) {
       console.error('AI app selection failed:', appSelectionError instanceof Error ? appSelectionError.message : 'Unknown error')
     }
 
-    const steps = [
-      { name: 'Archive+Fetch', fn: () => executeStep1(campaignId!) },
-      { name: 'Extract+Score', fn: () => executeStep2(campaignId!) },
-      { name: 'Generate', fn: () => executeStep3(campaignId!) },
-      { name: 'Finalize', fn: () => executeStep4(campaignId!) }
-    ]
+    // Phase 1: Archive, Fetch+Extract, Score (steps 1-3)
+    const phase1Response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/rss/process-phase1`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.CRON_SECRET}`
+      },
+      body: JSON.stringify({ campaign_id: campaignId })
+    })
 
-    const results: any[] = []
+    const phase1Result = await phase1Response.json()
 
-    try {
-      // Execute each step with retry logic
-      for (const step of steps) {
-        let stepSuccessful = false
-        let attempt = 1
-
-        while (attempt <= 2 && !stepSuccessful) {
-          try {
-            const result = await step.fn()
-            results.push({ step: step.name, success: true, ...result })
-            stepSuccessful = true
-          } catch (error) {
-            console.error(`[RSS] ${step.name} failed (attempt ${attempt}/2):`, error)
-            attempt++
-
-            if (attempt > 2) {
-              throw new Error(`${step.name} failed after 2 attempts`)
-            }
-          }
-        }
-
-        if (!stepSuccessful) {
-          throw new Error(`Failed to complete ${step.name}`)
-        }
-      }
-
-    } catch (stepError) {
-      console.error('Failed to complete RSS processing:', stepError)
-
-      // Mark campaign as failed
-      try {
-        await supabaseAdmin
-          .from('newsletter_campaigns')
-          .update({ status: 'failed' })
-          .eq('id', campaignId)
-      } catch (updateError) {
-        console.error('Failed to update campaign status:', updateError)
-      }
-
-      throw stepError
+    if (!phase1Response.ok) {
+      throw new Error(`Phase 1 failed: ${phase1Result.message || JSON.stringify(phase1Result)}`)
     }
 
+    console.log(`[Cron] Phase 1 completed for campaign: ${campaignId}`)
+
+    // Phase 2: Deduplicate, Generate, Select+Subject, Welcome, Finalize (steps 4-8)
+    const phase2Response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/rss/process-phase2`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.CRON_SECRET}`
+      },
+      body: JSON.stringify({ campaign_id: campaignId })
+    })
+
+    const phase2Result = await phase2Response.json()
+
+    if (!phase2Response.ok) {
+      throw new Error(`Phase 2 failed: ${phase2Result.message || JSON.stringify(phase2Result)}`)
+    }
+
+    console.log(`[Cron] Phase 2 completed for campaign: ${campaignId}`)
 
     return NextResponse.json({
       success: true,
-      message: 'RSS processing completed successfully',
+      message: 'Full RSS processing workflow completed successfully',
       campaignId: campaignId,
       campaignDate: campaignDate,
-      steps_completed: results.map(r => r.step),
+      phase1_results: phase1Result.results,
+      phase2_results: phase2Result.results,
       timestamp: new Date().toISOString()
     })
 
