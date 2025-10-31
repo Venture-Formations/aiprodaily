@@ -8,16 +8,14 @@ import { RSSProcessor } from '@/lib/rss-processor'
  * - Fetch RSS feeds from all sources
  */
 export async function executeStep1(campaignId: string) {
-  console.log(`[Step 1/4] Archive + Fetch for campaign ${campaignId}`)
-
   const archiveService = new ArticleArchiveService()
   const processor = new RSSProcessor()
 
   // Archive existing data
   try {
     await archiveService.archiveCampaignArticles(campaignId, 'rss_processing_clear')
-  } catch (error) {
-    console.warn('Archive failed, continuing')
+  } catch {
+    // Archive failure is non-critical
   }
 
   // Clear previous data
@@ -61,6 +59,6 @@ export async function executeStep1(campaignId: string) {
     .eq('campaign_id', campaignId)
 
   const postsCount = posts ? posts.length : 0
-  console.log(`[Step 1/4] Complete: ${postsCount} posts fetched`)
+  console.log(`[Step 1/4] Complete: ${postsCount} posts`)
   return { postsCount }
 }

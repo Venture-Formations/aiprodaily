@@ -18,11 +18,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
     }
 
-    console.log(`[Step 7/7] Starting: Finalize campaign ${campaign_id}`)
 
     const startResult = await startWorkflowStep(campaign_id, 'pending_finalize')
     if (!startResult.success) {
-      console.log(`[Step 7] Skipping - ${startResult.message}`)
       return NextResponse.json({
         success: false,
         message: startResult.message,
@@ -71,13 +69,11 @@ export async function POST(request: NextRequest) {
         articleCount,
         campaignDate
       )
-      console.log('Slack notification sent')
     } catch (slackError) {
       console.error('Failed to send Slack notification:', slackError)
       // Don't fail the entire step if Slack fails
     }
 
-    console.log(`[Step 7/7] Complete: Campaign finalized with ${articleCount} articles`)
 
     await completeWorkflowStep(campaign_id, 'finalizing')
 

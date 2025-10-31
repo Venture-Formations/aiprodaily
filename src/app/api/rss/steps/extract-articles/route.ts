@@ -18,11 +18,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
     }
 
-    console.log(`[Step 3/7] Starting: Extract full article text for campaign ${campaign_id}`)
 
     const startResult = await startWorkflowStep(campaign_id, 'pending_extract')
     if (!startResult.success) {
-      console.log(`[Step 3] Skipping - ${startResult.message}`)
       return NextResponse.json({
         success: false,
         message: startResult.message,
@@ -50,7 +48,6 @@ export async function POST(request: NextRequest) {
 
     try {
       await processor.extractFullArticleText(campaign_id)
-      console.log(`✅ Article extraction completed successfully`)
     } catch (extractionError) {
       console.error('Failed to extract full articles, but continuing with RSS summaries:', extractionError)
       // Don't fail the entire process if article extraction fails
@@ -65,7 +62,6 @@ export async function POST(request: NextRequest) {
 
     const extractedCount = extractedPosts?.length || 0
 
-    console.log(`[Step 3/7] Complete: Extracted ${extractedCount}/${postsToExtract} articles`)
 
     await completeWorkflowStep(campaign_id, 'extracting')
 

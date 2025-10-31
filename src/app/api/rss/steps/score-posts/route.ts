@@ -17,11 +17,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
     }
 
-    console.log(`[Step 4/7] Starting: Score posts for campaign ${campaign_id}`)
 
     const startResult = await startWorkflowStep(campaign_id, 'pending_score')
     if (!startResult.success) {
-      console.log(`[Step 4] Skipping - ${startResult.message}`)
       return NextResponse.json({
         success: false,
         message: startResult.message,
@@ -33,21 +31,16 @@ export async function POST(request: NextRequest) {
     const overallStartTime = Date.now()
 
     // Score primary posts first
-    console.log('Scoring primary posts...')
     const primaryStartTime = Date.now()
     const primaryResults = await processor.scorePostsForSection(campaign_id, 'primary')
     const primaryDuration = ((Date.now() - primaryStartTime) / 1000).toFixed(1)
-    console.log(`Primary scoring: ${primaryResults.scored} scored, ${primaryResults.errors} errors (${primaryDuration}s)`)
 
     // Score secondary posts
-    console.log('Scoring secondary posts...')
     const secondaryStartTime = Date.now()
     const secondaryResults = await processor.scorePostsForSection(campaign_id, 'secondary')
     const secondaryDuration = ((Date.now() - secondaryStartTime) / 1000).toFixed(1)
-    console.log(`Secondary scoring: ${secondaryResults.scored} scored, ${secondaryResults.errors} errors (${secondaryDuration}s)`)
 
     const totalDuration = ((Date.now() - overallStartTime) / 1000).toFixed(1)
-    console.log(`[Step 4/7] Complete: Scored ${primaryResults.scored + secondaryResults.scored} posts in ${totalDuration}s`)
 
     await completeWorkflowStep(campaign_id, 'scoring')
 

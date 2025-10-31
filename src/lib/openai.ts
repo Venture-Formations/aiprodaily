@@ -25,7 +25,6 @@ async function getPrompt(key: string, fallback: string): Promise<string> {
       return fallback
     }
 
-    console.log(`✓ [AI-PROMPT] Using database: ${key}`)
     return data.value
   } catch (error) {
     console.error(`❌ [AI-PROMPT] ERROR fetching ${key}, using fallback:`, error)
@@ -93,7 +92,6 @@ async function getPromptJSON(key: string, fallbackText?: string): Promise<any> {
     // Normalize: If it has 'input' but not 'messages', convert 'input' to 'messages' for internal use
     // This allows database to store either format (Settings saves with 'input', but we use 'messages' internally)
     if (promptJSON.input && !promptJSON.messages) {
-      console.log(`[AI-PROMPT] Converting 'input' to 'messages' for ${key}`)
       promptJSON.messages = promptJSON.input
       // Don't delete 'input' - keep it so it can be used directly if needed
     }
@@ -102,7 +100,6 @@ async function getPromptJSON(key: string, fallbackText?: string): Promise<any> {
     const provider = (data.ai_provider === 'claude' ? 'claude' : 'openai') as 'openai' | 'claude'
     promptJSON._provider = provider
 
-    console.log(`✓ [AI-PROMPT] Using database: ${key} (provider: ${provider})`)
     return promptJSON
   } catch (error) {
     console.error(`❌ [AI-PROMPT] ERROR fetching ${key}:`, error)
@@ -1827,7 +1824,6 @@ export async function callWithStructuredPrompt(
     promptConfig.messages = promptConfig.input
   }
   
-  console.log('[AI] Processing structured prompt with', messagesArray.length, 'messages for provider:', provider)
 
   // Deep clone the entire config to avoid mutating the original
   const apiRequest = JSON.parse(JSON.stringify(promptConfig))
@@ -1865,7 +1861,6 @@ export async function callWithStructuredPrompt(
 
     if (provider === 'claude') {
       // Claude API - send exactly as-is (messages stays as messages)
-      console.log('[AI] Sending to Claude with model:', processedRequest.model || 'claude-sonnet-4-5-20250929')
 
       const response = await anthropic.messages.create(processedRequest, {
         signal: controller.signal
@@ -1887,8 +1882,6 @@ export async function callWithStructuredPrompt(
         delete processedRequest.messages
       }
 
-      console.log('[AI] Sending to OpenAI Responses API with model:', processedRequest.model)
-      console.log('[AI] Full request being sent:', JSON.stringify(processedRequest, null, 2))
 
       const response = await (openai as any).responses.create(processedRequest, {
         signal: controller.signal

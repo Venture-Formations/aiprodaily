@@ -7,8 +7,6 @@ import { RSSProcessor } from '@/lib/rss-processor'
  * - Score posts with AI
  */
 export async function executeStep2(campaignId: string) {
-  console.log(`[Step 2/4] Extract + Score for campaign ${campaignId}`)
-
   const processor = new RSSProcessor()
 
   // Extract article text

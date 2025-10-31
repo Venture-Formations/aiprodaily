@@ -15,16 +15,11 @@ export async function POST(request: NextRequest) {
   try {
     // Verify this is a legitimate cron request
     const authHeader = request.headers.get('authorization')
-    console.log('Auth header received:', authHeader ? 'Present' : 'Missing')
-    console.log('Expected format:', `Bearer ${process.env.CRON_SECRET?.substring(0, 5)}...`)
 
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      console.log('Authentication failed - headers:', Object.fromEntries(request.headers.entries()))
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    console.log('=== AUTOMATED RSS PROCESSING CHECK ===')
-    console.log('Time:', new Date().toISOString())
 
     // Check if it's time to run RSS processing based on database settings
     const shouldRun = await ScheduleChecker.shouldRunRSSProcessing()
@@ -38,9 +33,6 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    console.log('=== RSS PROCESSING STARTED (Time Matched) ===')
-    const currentCentralTime = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
-    console.log('Central Time:', currentCentralTime)
 
     // Get tomorrow's date for campaign creation (RSS processing is for next day)
     // IMPORTANT: Calculate tomorrow based on Central Time, not UTC
@@ -64,10 +56,6 @@ export async function POST(request: NextRequest) {
 
     const campaignDate = centralTomorrow.toISOString().split('T')[0]
 
-    console.log('Processing RSS for tomorrow\'s campaign date:', campaignDate)
-    console.log('Debug: UTC now:', now.toISOString())
-    console.log('Debug: Central date today:', centralDate)
-    console.log('Debug: Central tomorrow:', campaignDate)
 
     // STEP 1: Get newsletter ID first (required for campaign creation)
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
@@ -81,10 +69,6 @@ export async function POST(request: NextRequest) {
       throw new Error(`Failed to fetch newsletter: ${newsletterError?.message || 'No active newsletter found'}`)
     }
 
-    console.log(`Found newsletter: ${newsletter.name} (${newsletter.slug}, ID: ${newsletter.id})`)
-
-    // STEP 2: Create new campaign for tomorrow (allow duplicate dates)
-    console.log('Creating new campaign for tomorrow...')
 
     // Initialize RSS processor
     const rssProcessor = new RSSProcessor()
@@ -105,10 +89,6 @@ export async function POST(request: NextRequest) {
     }
 
     campaignId = newCampaign.id
-    console.log('Created new campaign:', campaignId, 'for date:', campaignDate, 'newsletter_id:', newsletter.id)
-
-    // Execute RSS processing steps directly (no HTTP calls)
-    console.log('Starting RSS processing workflow...')
 
     const steps = [
       { name: 'Archive+Fetch', fn: () => executeStep1(campaignId!) },
@@ -127,7 +107,6 @@ export async function POST(request: NextRequest) {
 
         while (attempt <= 2 && !stepSuccessful) {
           try {
-            console.log(`[RSS] Executing ${step.name} (attempt ${attempt}/2)`)
             const result = await step.fn()
             results.push({ step: step.name, success: true, ...result })
             stepSuccessful = true
@@ -146,8 +125,6 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      console.log('✅ RSS processing completed successfully')
-      console.log('All steps executed:', results.map(r => r.step).join(' → '))
     } catch (stepError) {
       console.error('Failed to complete RSS processing:', stepError)
 
@@ -157,7 +134,6 @@ export async function POST(request: NextRequest) {
           .from('newsletter_campaigns')
           .update({ status: 'failed' })
           .eq('id', campaignId)
-        console.log('Campaign marked as failed:', campaignId)
       } catch (updateError) {
         console.error('Failed to update campaign status:', updateError)
       }
@@ -165,9 +141,6 @@ export async function POST(request: NextRequest) {
       throw stepError
     }
 
-    console.log('=== RSS PROCESSING WORKFLOW COMPLETED ===')
-    console.log('All 4 steps completed sequentially:')
-    console.log('Archive+Fetch → Extract+Score → Generate → Finalize')
 
     return NextResponse.json({
       success: true,
@@ -179,8 +152,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('=== RSS PROCESSING FAILED ===')
-    console.error('Error:', error)
+    console.error('RSS processing failed:', error instanceof Error ? error.message : 'Unknown error')
 
     // Try to mark campaign as failed if campaign_id is available
     if (campaignId) {
@@ -189,7 +161,6 @@ export async function POST(request: NextRequest) {
           .from('newsletter_campaigns')
           .update({ status: 'failed' })
           .eq('id', campaignId)
-        console.log('Campaign marked as failed:', campaignId)
       } catch (updateError) {
         console.error('Failed to update campaign status:', updateError)
       }
@@ -222,9 +193,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    console.log('=== AUTOMATED RSS PROCESSING CHECK (GET) ===')
-    console.log('Time:', new Date().toISOString())
-    console.log('Request type:', isVercelCron ? 'Vercel Cron' : 'Manual Test')
 
     // Check if it's time to run RSS processing based on database settings
     const shouldRun = await ScheduleChecker.shouldRunRSSProcessing()
@@ -238,9 +206,6 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    console.log('=== RSS PROCESSING STARTED (Time Matched) ===')
-    const currentCentralTime = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
-    console.log('Central Time:', currentCentralTime)
 
     // Get tomorrow's date for campaign creation (RSS processing is for next day)
     // IMPORTANT: Calculate tomorrow based on Central Time, not UTC
@@ -264,10 +229,6 @@ export async function GET(request: NextRequest) {
 
     const campaignDate = centralTomorrow.toISOString().split('T')[0]
 
-    console.log('Processing RSS for tomorrow\'s campaign date:', campaignDate)
-    console.log('Debug: UTC now:', now.toISOString())
-    console.log('Debug: Central date today:', centralDate)
-    console.log('Debug: Central tomorrow:', campaignDate)
 
     // STEP 1: Get newsletter ID first (required for campaign creation)
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
@@ -281,10 +242,6 @@ export async function GET(request: NextRequest) {
       throw new Error(`Failed to fetch newsletter: ${newsletterError?.message || 'No active newsletter found'}`)
     }
 
-    console.log(`Found newsletter: ${newsletter.name} (${newsletter.slug}, ID: ${newsletter.id})`)
-
-    // STEP 2: Create new campaign for tomorrow (allow duplicate dates)
-    console.log('Creating new campaign for tomorrow...')
 
     // Always create a new campaign (duplicate dates are now allowed)
     const { data: newCampaign, error: campaignError } = await supabaseAdmin
@@ -305,36 +262,15 @@ export async function GET(request: NextRequest) {
     }
 
     campaignId = newCampaign.id
-    console.log('Created new campaign:', campaignId, 'for date:', campaignDate, 'newsletter_id:', newsletter.id)
 
-    // Select prompt for the campaign immediately after creation
-    console.log('Selecting prompt for campaign...')
-    const selectedPrompt = await PromptSelector.selectPromptForCampaign(campaignId!)
-    if (selectedPrompt) {
-      console.log(`Selected prompt: ${selectedPrompt.title}`)
-    } else {
-      console.log('No prompts available for selection')
-    }
-
-    // Select AI apps for the campaign (using newsletter fetched earlier)
-    console.log('=== SELECTING AI APPS FOR CAMPAIGN ===')
+    // Select prompt and AI apps for the campaign
+    await PromptSelector.selectPromptForCampaign(campaignId!)
     try {
       const { AppSelector } = await import('@/lib/app-selector')
-
-      console.log(`Calling AppSelector.selectAppsForCampaign(${campaignId}, ${newsletter.id})...`)
-      const selectedApps = await AppSelector.selectAppsForCampaign(campaignId!, newsletter.id)
-
-      console.log(`✅ Successfully selected ${selectedApps.length} AI applications`)
-      console.log(`Selected apps:`, selectedApps.map(app => `${app.app_name} (${app.category})`).join(', '))
+      await AppSelector.selectAppsForCampaign(campaignId!, newsletter.id)
     } catch (appSelectionError) {
-      console.error('❌ CRITICAL ERROR selecting AI apps:', appSelectionError)
-      console.error('Error details:', appSelectionError instanceof Error ? appSelectionError.stack : 'No stack trace')
-      // Don't throw - log error but continue with RSS processing
+      console.error('AI app selection failed:', appSelectionError instanceof Error ? appSelectionError.message : 'Unknown error')
     }
-    console.log('=== AI APP SELECTION COMPLETE ===\n')
-
-    // Execute RSS processing steps directly (no HTTP calls)
-    console.log('Starting RSS processing workflow...')
 
     const steps = [
       { name: 'Archive+Fetch', fn: () => executeStep1(campaignId!) },
@@ -353,7 +289,6 @@ export async function GET(request: NextRequest) {
 
         while (attempt <= 2 && !stepSuccessful) {
           try {
-            console.log(`[RSS] Executing ${step.name} (attempt ${attempt}/2)`)
             const result = await step.fn()
             results.push({ step: step.name, success: true, ...result })
             stepSuccessful = true
@@ -372,8 +307,6 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      console.log('✅ RSS processing completed successfully')
-      console.log('All steps executed:', results.map(r => r.step).join(' → '))
     } catch (stepError) {
       console.error('Failed to complete RSS processing:', stepError)
 
@@ -383,7 +316,6 @@ export async function GET(request: NextRequest) {
           .from('newsletter_campaigns')
           .update({ status: 'failed' })
           .eq('id', campaignId)
-        console.log('Campaign marked as failed:', campaignId)
       } catch (updateError) {
         console.error('Failed to update campaign status:', updateError)
       }
@@ -391,9 +323,6 @@ export async function GET(request: NextRequest) {
       throw stepError
     }
 
-    console.log('=== RSS PROCESSING WORKFLOW COMPLETED ===')
-    console.log('All 4 steps completed sequentially:')
-    console.log('Archive+Fetch → Extract+Score → Generate → Finalize')
 
     return NextResponse.json({
       success: true,
@@ -405,8 +334,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('=== RSS PROCESSING FAILED ===')
-    console.error('Error:', error)
+    console.error('RSS processing failed:', error instanceof Error ? error.message : 'Unknown error')
 
     // Try to mark campaign as failed if campaign_id is available
     if (campaignId) {
@@ -415,7 +343,6 @@ export async function GET(request: NextRequest) {
           .from('newsletter_campaigns')
           .update({ status: 'failed' })
           .eq('id', campaignId)
-        console.log('Campaign marked as failed:', campaignId)
       } catch (updateError) {
         console.error('Failed to update campaign status:', updateError)
       }

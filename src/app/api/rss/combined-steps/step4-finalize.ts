@@ -9,7 +9,6 @@ import { RSSProcessor } from '@/lib/rss-processor'
  * - Send completion notifications
  */
 export async function executeStep4(campaignId: string) {
-  console.log(`[Step 4/4] Finalize for campaign ${campaignId}`)
 
   // Generate welcome section (after articles are ready)
   const processor = new RSSProcessor()
@@ -46,6 +45,6 @@ export async function executeStep4(campaignId: string) {
     // Don't fail if Slack fails
   }
 
-  console.log(`[Step 4/4] Complete: Campaign finalized`)
+  console.log(`[Step 4/4] Complete: ${articleCount} articles`)
   return { articleCount, campaignDate }
 }

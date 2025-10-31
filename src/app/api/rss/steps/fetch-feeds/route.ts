@@ -18,12 +18,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
     }
 
-    console.log(`[Step 2/7] Starting: Fetch RSS feeds for campaign ${campaign_id}`)
 
     // Start workflow step
     const startResult = await startWorkflowStep(campaign_id, 'pending_fetch_feeds')
     if (!startResult.success) {
-      console.log(`[Step 2] Skipping - ${startResult.message}`)
       return NextResponse.json({
         success: false,
         message: startResult.message,
@@ -52,7 +50,6 @@ export async function POST(request: NextRequest) {
     const primaryFeeds = allFeeds.filter(feed => feed.use_for_primary_section)
     const secondaryFeeds = allFeeds.filter(feed => feed.use_for_secondary_section)
 
-    console.log(`Processing ${primaryFeeds.length} primary feeds and ${secondaryFeeds.length} secondary feeds`)
 
     const processor = new RSSProcessor()
     let totalPosts = 0
@@ -101,7 +98,6 @@ export async function POST(request: NextRequest) {
 
     totalPosts = posts?.length || 0
 
-    console.log(`[Step 2/7] Complete: Fetched ${totalPosts} posts from ${allFeeds.length} feeds`)
 
     // Complete workflow step
     await completeWorkflowStep(campaign_id, 'fetching_feeds')

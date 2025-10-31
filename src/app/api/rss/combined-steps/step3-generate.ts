@@ -7,8 +7,6 @@ import { RSSProcessor } from '@/lib/rss-processor'
  * - MINIMAL LOGGING to prevent log overflow
  */
 export async function executeStep3(campaignId: string) {
-  console.log(`[Step 3/4] Generate for campaign ${campaignId}`)
-
   const processor = new RSSProcessor()
 
   // Generate articles (processor has minimal logging now)

@@ -18,11 +18,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
     }
 
-    console.log(`[Step 5/7] Starting: Generate newsletter articles for campaign ${campaign_id}`)
 
     const startResult = await startWorkflowStep(campaign_id, 'pending_generate')
     if (!startResult.success) {
-      console.log(`[Step 5] Skipping - ${startResult.message}`)
       return NextResponse.json({
         success: false,
         message: startResult.message,
@@ -37,7 +35,6 @@ export async function POST(request: NextRequest) {
     await processor.generateArticlesForSection(campaign_id, 'primary')
 
     // Generate secondary articles
-    console.log('Generating secondary newsletter articles...')
     await processor.generateArticlesForSection(campaign_id, 'secondary')
 
     // Count generated articles
@@ -60,7 +57,6 @@ export async function POST(request: NextRequest) {
     const secondaryPassed = secondaryArticles?.filter(a => a.fact_check_score >= 70).length || 0
     const totalPassed = primaryPassed + secondaryPassed
 
-    console.log(`[Step 5/7] Complete: Generated ${totalArticles} articles (${totalPassed} passed fact check)`)
 
     await completeWorkflowStep(campaign_id, 'generating')
 

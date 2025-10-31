@@ -25,7 +25,6 @@ export class ArticleExtractor {
     // Attempt 1: Try Readability method (fast, works for most sites)
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       if (attempt > 0) {
-        console.log(`[Extract] Readability retry ${attempt} for: ${url}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
       }
 
@@ -33,7 +32,6 @@ export class ArticleExtractor {
         const result = await this.fetchAndExtract(url)
 
         if (result.success) {
-          console.log(`[Extract] ✓ Readability succeeded: ${url}`)
           return result
         }
 
@@ -45,16 +43,13 @@ export class ArticleExtractor {
     }
 
     // Attempt 2: Try Jina AI Reader fallback (handles JS, paywalls)
-    console.log(`[Extract] Readability failed, trying Jina AI fallback: ${url}`)
     try {
       const jinaResult = await this.extractWithJina(url)
 
       if (jinaResult.success) {
-        console.log(`[Extract] ✓ Jina AI succeeded: ${url}`)
         return jinaResult
       }
 
-      console.log(`[Extract] Jina AI failed: ${jinaResult.error}`)
       lastError = `Readability failed, Jina AI failed: ${jinaResult.error}`
     } catch (error) {
       const jinaError = error instanceof Error ? error.message : 'Unknown error'
@@ -241,14 +236,12 @@ export class ArticleExtractor {
   ): Promise<Map<string, ArticleExtractionResult>> {
     const results = new Map<string, ArticleExtractionResult>()
 
-    console.log(`Starting batch extraction of ${urls.length} articles (batch size: ${batchSize})`)
 
     for (let i = 0; i < urls.length; i += batchSize) {
       const batch = urls.slice(i, i + batchSize)
       const batchNum = Math.floor(i / batchSize) + 1
       const totalBatches = Math.ceil(urls.length / batchSize)
 
-      console.log(`Processing batch ${batchNum}/${totalBatches} (${batch.length} articles)`)
 
       const batchPromises = batch.map(async (url) => {
         const result = await this.extractArticle(url)
@@ -261,7 +254,6 @@ export class ArticleExtractor {
       // Log batch results
       const batchSuccess = batch.filter(url => results.get(url)?.success).length
       const batchFailed = batch.length - batchSuccess
-      console.log(`Batch ${batchNum} complete: ${batchSuccess} successful, ${batchFailed} failed`)
 
       // Small delay between batches to be polite to servers
       if (i + batchSize < urls.length) {
@@ -271,7 +263,6 @@ export class ArticleExtractor {
 
     const totalSuccess = Array.from(results.values()).filter(r => r.success).length
     const totalFailed = results.size - totalSuccess
-    console.log(`Batch extraction complete: ${totalSuccess}/${results.size} successful, ${totalFailed} failed`)
 
     return results
   }

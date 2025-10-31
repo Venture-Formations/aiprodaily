@@ -67,7 +67,6 @@ export async function POST(request: NextRequest) {
           lastError = error
           attempt++
           if (attempt <= 2) {
-            console.log(`[RSS] Retry ${step.name}`)
           }
         }
       }
@@ -92,7 +91,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`[RSS] Complete: ${campaign_id}`)
     return NextResponse.json({
       success: true,
       message: 'RSS processing completed',
