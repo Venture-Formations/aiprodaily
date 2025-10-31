@@ -112,6 +112,9 @@
     },
     "app/api/rss/steps/finalize/route.ts": {
       "maxDuration": 120
+    },
+    "app/api/ai/test-prompt-multiple/route.ts": {
+      "maxDuration": 600
     }
   }
 }
