@@ -618,6 +618,7 @@ export default function AIPromptTestingPage() {
                     <li>Use placeholders like <code className="bg-white px-1 rounded">{'{{title}}'}</code>, <code className="bg-white px-1 rounded">{'{{description}}'}</code>, <code className="bg-white px-1 rounded">{'{{content}}'}</code></li>
                     <li>JSON is sent to API exactly as-is (only placeholders replaced)</li>
                     <li>For OpenAI: Use <code className="bg-white px-1 rounded">max_output_tokens</code> (not max_tokens)</li>
+                    <li>For GPT-5: You can include reasoning parameters like <code className="bg-white px-1 rounded">{'{"reasoning": {"effort": "low", "budget_tokens": 150}}'}</code></li>
                   </ul>
                 </div>
               </div>
