@@ -103,12 +103,12 @@ export default function CampaignsPage() {
           </div>
 
           {/* Filter buttons */}
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 overflow-x-auto pb-2">
             {['all', 'draft', 'in_review', 'changes_made', 'sent', 'failed'].map((status) => (
               <button
                 key={status}
                 onClick={() => setFilter(status)}
-                className={`px-3 py-1 text-sm font-medium rounded-md ${
+                className={`px-3 py-1 text-sm font-medium rounded-md whitespace-nowrap ${
                   filter === status
                     ? 'bg-brand-primary text-white'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -134,7 +134,7 @@ export default function CampaignsPage() {
               No campaigns found
             </div>
           ) : (
-            <div className="overflow-hidden">
+            <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
