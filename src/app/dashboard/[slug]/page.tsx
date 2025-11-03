@@ -45,7 +45,7 @@ export default function NewsletterDashboard() {
 
   const fetchCampaigns = async () => {
     try {
-      const response = await fetch('/api/campaigns?limit=3')
+      const response = await fetch(`/api/campaigns?limit=3&newsletter_slug=${slug}`)
       if (!response.ok) {
         throw new Error('Failed to fetch campaigns')
       }
