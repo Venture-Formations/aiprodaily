@@ -190,7 +190,7 @@ export async function generateNewsletterHeader(formattedDate: string, campaignDa
 <body style='margin:0!important;padding:0!important;background-color:#f7f7f7;width:100%!important;min-width:100%!important;'>
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#f7f7f7" style="background-color:#f7f7f7;margin:0;padding:0;">
   <tr>
-    <td align="center" style="padding:0 2px;">
+    <td align="center" style="padding:0;">
      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
        <tr>
          <td style="font-weight:bold;font-family:Arial,sans-serif;padding:5px 0;">
@@ -323,12 +323,18 @@ export async function generateWelcomeSection(
     : ''
 
   return `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
   <tr>
-    <td style="padding: 10px;">
-      ${introPart}
-      ${taglinePart}
-      ${summaryPart}
+    <td style="padding:0 10px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
+        <tr>
+          <td style="padding: 10px;">
+            ${introPart}
+            ${taglinePart}
+            ${summaryPart}
+          </td>
+        </tr>
+      </table>
     </td>
   </tr>
 </table>
@@ -364,15 +370,21 @@ export async function generatePrimaryArticlesSection(articles: any[], campaignDa
   }).join('')
 
   return `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
   <tr>
-    <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">${sectionName}</h2>
-    </td>
-  </tr>
-  <tr>
-    <td style="padding: 0 10px 10px 10px;">
-      ${articlesHtml}
+    <td style="padding:0 10px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
+        <tr>
+          <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">${sectionName}</h2>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0 10px 10px 10px;">
+            ${articlesHtml}
+          </td>
+        </tr>
+      </table>
     </td>
   </tr>
 </table>
@@ -426,15 +438,21 @@ export async function generateSecondaryArticlesSection(campaign: any, sectionNam
   }).join('')
 
   return `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
   <tr>
-    <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">${sectionName}</h2>
-    </td>
-  </tr>
-  <tr>
-    <td style="padding: 0 10px 10px 10px;">
-      ${articlesHtml}
+    <td style="padding:0 10px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
+        <tr>
+          <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">${sectionName}</h2>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0 10px 10px 10px;">
+            ${articlesHtml}
+          </td>
+        </tr>
+      </table>
     </td>
   </tr>
 </table>
@@ -603,17 +621,23 @@ export async function generateLocalEventsSection(campaign: any): Promise<string>
   const submitEventUrl = wrapTrackingUrl('https://events.stcscoop.com/events/submit', 'Local Events', campaign.date, campaign.mailerlite_campaign_id)
 
   return `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7; font-family: ${bodyFont};">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
   <tr>
-    <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Local Events</h2>
+    <td style="padding:0 10px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; background-color: #f7f7f7; font-family: ${bodyFont};">
+        <tr>
+          <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Local Events</h2>
+          </td>
+        </tr><tr class="row">${dayColumns}
+      </td></table>
+      <div style="text-align: center; padding: 20px 10px;">
+        <a href="${viewAllEventsUrl}" style="display: inline-block; background-color: ${primaryColor}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 10px; font-family: ${bodyFont};">View All Events</a>
+        <a href="${submitEventUrl}" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 10px; font-family: ${bodyFont};">Submit Your Event</a>
+      </div>
     </td>
-  </tr><tr class="row">${dayColumns}
-</td></table>
-<div style="text-align: center; padding: 20px 10px; max-width: 750px; margin: 0 auto;">
-  <a href="${viewAllEventsUrl}" style="display: inline-block; background-color: ${primaryColor}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 10px; font-family: ${bodyFont};">View All Events</a>
-  <a href="${submitEventUrl}" style="display: inline-block; background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 0 10px; font-family: ${bodyFont};">Submit Your Event</a>
-</div>
+  </tr>
+</table>
 <br>`
 }
 
@@ -660,13 +684,19 @@ export async function generateWordleSection(campaign: any): Promise<string> {
     const wordleColumn = `<td class='column' style='padding:8px; vertical-align: top;'>${wordleCard}</td>`
 
     return `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7; font-family: Arial, sans-serif;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
   <tr>
-    <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Yesterday's Wordle</h2>
+    <td style="padding:0 10px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; background-color: #f7f7f7; font-family: Arial, sans-serif;">
+        <tr>
+          <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Yesterday's Wordle</h2>
+          </td>
+        </tr>
+        <tr class="row">${wordleColumn}</tr>
+      </table>
     </td>
   </tr>
-  <tr class="row">${wordleColumn}</tr>
 </table>
 <br>`
 
@@ -723,27 +753,33 @@ export async function generatePollSection(campaignId: string): Promise<string> {
 
     return `
 <!-- Poll card -->
-<table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
   <tr>
-    <td style="padding:5px;">
-      <!-- Poll Box -->
-      <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"
-             style="width:100%; max-width:650px; margin:10px auto; background-color:#E8F0FE;
-                    border:2px solid ${primaryColor}; border-radius:10px; font-family:Arial, sans-serif; box-shadow:0 4px 12px rgba(0,0,0,.15);">
+    <td style="padding:0 10px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation">
         <tr>
-          <td style="padding:14px; color:#1a1a1a; font-size:16px; line-height:1.5; text-align:center;">
+          <td style="padding:5px;">
+            <!-- Poll Box -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"
+                   style="width:100%; max-width:650px; margin:10px auto; background-color:#E8F0FE;
+                          border:2px solid ${primaryColor}; border-radius:10px; font-family:Arial, sans-serif; box-shadow:0 4px 12px rgba(0,0,0,.15);">
+              <tr>
+                <td style="padding:14px; color:#1a1a1a; font-size:16px; line-height:1.5; text-align:center;">
 
-            <!-- Text Sections -->
-            <p style="margin:0 0 6px 0; font-weight:bold; font-size:20px; color:${primaryColor}; text-align:center;">${pollData.title}</p>
-            <p style="margin:0 0 14px 0; font-size:16px; color:#333; text-align:center;">
-              ${pollData.question}
-            </p>
+                  <!-- Text Sections -->
+                  <p style="margin:0 0 6px 0; font-weight:bold; font-size:20px; color:${primaryColor}; text-align:center;">${pollData.title}</p>
+                  <p style="margin:0 0 14px 0; font-size:16px; color:#333; text-align:center;">
+                    ${pollData.question}
+                  </p>
 
-            <!-- Button Stack: 1 per row, centered -->
-            <table cellpadding="0" cellspacing="0" border="0" role="presentation" align="center" style="margin:0 auto; width:100%; max-width:350px;">
+                  <!-- Button Stack: 1 per row, centered -->
+                  <table cellpadding="0" cellspacing="0" border="0" role="presentation" align="center" style="margin:0 auto; width:100%; max-width:350px;">
 ${optionsHtml}
-            </table>
+                  </table>
 
+                </td>
+              </tr>
+            </table>
           </td>
         </tr>
       </table>
@@ -822,18 +858,24 @@ export async function generateCommunityBusinessSpotlightSection(campaign: any, r
       : ''
 
     return `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
   <tr>
-    <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Community Business Spotlight</h2>
-    </td>
-  </tr>
-  <tr class='row'>
-    <td class='column' style='padding:8px; vertical-align: top;'>
-      <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: ${bodyFont}; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
-        <tr><td style='padding: 10px 10px 4px; font-size: 20px; font-weight: bold;'>${selectedAd.title}</td></tr>
-        ${imageHtml}
-        <tr><td style='padding: 0 10px 10px;'>${selectedAd.body}${businessUrl !== '#' ? ` (<a href='${trackedUrl}' style='color: #0080FE; text-decoration: none;'>visit website</a>)` : ''}</td></tr>
+    <td style="padding:0 10px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; background-color: #f7f7f7;">
+        <tr>
+          <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Community Business Spotlight</h2>
+          </td>
+        </tr>
+        <tr class='row'>
+          <td class='column' style='padding:8px; vertical-align: top;'>
+            <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: ${bodyFont}; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
+              <tr><td style='padding: 10px 10px 4px; font-size: 20px; font-weight: bold;'>${selectedAd.title}</td></tr>
+              ${imageHtml}
+              <tr><td style='padding: 0 10px 10px;'>${selectedAd.body}${businessUrl !== '#' ? ` (<a href='${trackedUrl}' style='color: #0080FE; text-decoration: none;'>visit website</a>)` : ''}</td></tr>
+            </table>
+          </td>
+        </tr>
       </table>
     </td>
   </tr>
@@ -932,13 +974,19 @@ export async function generateBreakingNewsSection(campaign: any): Promise<string
     }).join('')
 
     return `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
   <tr>
-    <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Breaking News</h2>
+    <td style="padding:0 10px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; background-color: #f7f7f7;">
+        <tr>
+          <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Breaking News</h2>
+          </td>
+        </tr>
+        ${articlesHtml}
+      </table>
     </td>
   </tr>
-  ${articlesHtml}
 </table>
 <br>`
 
@@ -1009,13 +1057,19 @@ export async function generateBeyondTheFeedSection(campaign: any): Promise<strin
     }).join('')
 
     return `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #f7f7f7;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
   <tr>
-    <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Beyond the Feed</h2>
+    <td style="padding:0 10px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; background-color: #f7f7f7;">
+        <tr>
+          <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Beyond the Feed</h2>
+          </td>
+        </tr>
+        ${articlesHtml}
+      </table>
     </td>
   </tr>
-  ${articlesHtml}
 </table>
 <br>`
 
@@ -1095,15 +1149,21 @@ export async function generateAIAppsSection(campaign: any): Promise<string> {
     }).join('')
 
     return `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
   <tr>
-    <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">AI Applications</h2>
-    </td>
-  </tr>
-  <tr>
-    <td style="padding: 0 10px 10px 10px;">
-      ${appsHtml}
+    <td style="padding:0 10px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
+        <tr>
+          <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">AI Applications</h2>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0 10px 10px 10px;">
+            ${appsHtml}
+          </td>
+        </tr>
+      </table>
     </td>
   </tr>
 </table>
@@ -1142,21 +1202,27 @@ export async function generatePromptIdeasSection(campaign: any): Promise<string>
 
     // Generate HTML with terminal styling (email-safe)
     return `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; max-width: 750px; margin: 0 auto; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
   <tr>
-    <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-      <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Prompt Ideas</h2>
-    </td>
-  </tr>
-  <tr class='row'>
-    <td class='column' style='padding:8px; vertical-align: top;'>
-      <table width='100%' cellpadding='0' cellspacing='0' style='font-family: ${bodyFont}; font-size: 16px; line-height: 26px;'>
-        <tr><td style='padding: 10px 10px 8px; font-size: 20px; font-weight: bold; text-align: center;'>${prompt.title}</td></tr>
+    <td style="padding:0 10px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
         <tr>
-          <td align='center' style='padding: 0 10px 10px;'>
-            <table width="100%" cellpadding='0' cellspacing='0' style='max-width: 550px; margin: 0 auto;'>
+          <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Prompt Ideas</h2>
+          </td>
+        </tr>
+        <tr class='row'>
+          <td class='column' style='padding:8px; vertical-align: top;'>
+            <table width='100%' cellpadding='0' cellspacing='0' style='font-family: ${bodyFont}; font-size: 16px; line-height: 26px;'>
+              <tr><td style='padding: 10px 10px 8px; font-size: 20px; font-weight: bold; text-align: center;'>${prompt.title}</td></tr>
               <tr>
-                <td bgcolor="#000000" style='background-color: #000000; color: #FFFFFF; padding: 16px; border-radius: 6px; border: 2px solid #333; font-family: Courier New, Courier, monospace; font-size: 14px; line-height: 22px; text-align: left;'>${formattedPromptText}</td>
+                <td align='center' style='padding: 0 10px 10px;'>
+                  <table width="100%" cellpadding='0' cellspacing='0' style='max-width: 550px; margin: 0 auto;'>
+                    <tr>
+                      <td bgcolor="#000000" style='background-color: #000000; color: #FFFFFF; padding: 16px; border-radius: 6px; border: 2px solid #333; font-family: Courier New, Courier, monospace; font-size: 14px; line-height: 22px; text-align: left;'>${formattedPromptText}</td>
+                    </tr>
+                  </table>
+                </td>
               </tr>
             </table>
           </td>
