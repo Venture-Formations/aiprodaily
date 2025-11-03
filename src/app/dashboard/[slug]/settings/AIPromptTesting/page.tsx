@@ -161,16 +161,25 @@ export default function AIPromptTestingPage() {
         console.log('[Frontend] Provider matches:', data.data.provider_matches)
 
         // Store provider match status
-        setLivePromptProviderMatches(data.data.provider_matches || false)
+        const providerMatches = data.data.provider_matches || false
+        setLivePromptProviderMatches(providerMatches)
 
         // Use prompt exactly as-is from database
         const promptToSet = data.data.prompt
 
+        // Always store the live prompt for comparison
         setLivePrompt(promptToSet)
-        setPrompt(promptToSet)
-        setSavedPromptInfo(null) // Clear saved prompt info when loading live
-        console.log('[Frontend] Live prompt loaded and set')
-        return
+
+        // ONLY set the prompt if the provider matches
+        if (providerMatches) {
+          setPrompt(promptToSet)
+          setSavedPromptInfo(null) // Clear saved prompt info when loading live
+          console.log('[Frontend] Live prompt loaded and set (provider matches)')
+          return
+        } else {
+          console.log('[Frontend] Live prompt loaded but provider does not match - continuing to load saved prompt')
+          // Continue to step 2 to load saved prompt from database
+        }
       }
     } catch (error) {
       console.error('[Frontend] Error loading live prompt:', error)
