@@ -110,6 +110,13 @@ export async function middleware(request: NextRequest) {
 
   console.log('[Middleware] ✗ Not an admin domain, checking subdomain logic...')
 
+  // Skip subdomain logic for Vercel preview deployments
+  const isVercelPreview = hostname.includes('.vercel.app') && !ADMIN_DOMAINS.includes(hostname)
+  if (isVercelPreview) {
+    console.log('[Middleware] Vercel preview deployment detected - skipping subdomain logic')
+    return NextResponse.next()
+  }
+
   // Extract subdomain
   const parts = hostname.split('.')
   const isDevelopment = hostname.includes('localhost') || hostname.includes('127.0.0.1')
@@ -219,9 +226,9 @@ export const config = {
      * - auth (authentication pages)
      * - _next/static (static files)
      * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
+     * - Static files (files with extensions like .ico, .png, .jpg, .svg, etc.)
      */
     '/',
-    '/((?!api|auth|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|auth|_next/static|_next/image|.*\\..*).*)',
   ],
 }
