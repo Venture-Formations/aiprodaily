@@ -2440,6 +2440,10 @@ function AIPromptsSettings() {
       // If currently editing this prompt, use the current content from the text box
       if (editingPrompt?.key === key && editingPrompt?.value) {
         testUrl += `&promptContent=${encodeURIComponent(editingPrompt.value)}`
+        // Include the selected provider from the dropdown
+        if (editingPrompt.ai_provider) {
+          testUrl += `&provider=${editingPrompt.ai_provider}`
+        }
       }
 
       const response = await fetch(testUrl)

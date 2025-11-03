@@ -114,22 +114,28 @@ async function callAIProvider(
 }
 
 // Helper to load prompt JSON (from custom content or database) and get provider
-async function loadPromptJSON(promptKey: string | null, customPromptContent: string | null): Promise<{ promptJson: any, provider: 'openai' | 'claude' }> {
+async function loadPromptJSON(
+  promptKey: string | null,
+  customPromptContent: string | null,
+  overrideProvider?: 'openai' | 'claude' | null
+): Promise<{ promptJson: any, provider: 'openai' | 'claude' }> {
   let promptJson: any
   let provider: 'openai' | 'claude' = 'openai'
 
   if (customPromptContent) {
     // Use custom prompt content directly (from text box)
     promptJson = JSON.parse(customPromptContent)
-    
-    // Still fetch provider from database if promptKey is provided (provider is separate setting)
-    if (promptKey) {
+
+    // Use override provider if provided, otherwise fetch from database
+    if (overrideProvider) {
+      provider = overrideProvider
+    } else if (promptKey) {
       const { data } = await supabaseAdmin
         .from('app_settings')
         .select('ai_provider')
         .eq('key', promptKey)
         .single()
-      
+
       if (data?.ai_provider === 'claude') {
         provider = 'claude'
       }
@@ -148,7 +154,9 @@ async function loadPromptJSON(promptKey: string | null, customPromptContent: str
 
     // Parse the JSON value from database
     promptJson = typeof data.value === 'string' ? JSON.parse(data.value) : data.value
-    provider = (data.ai_provider === 'claude' ? 'claude' : 'openai')
+
+    // Use override provider if provided, otherwise use database value
+    provider = overrideProvider || (data.ai_provider === 'claude' ? 'claude' : 'openai')
   } else {
     throw new Error('Either promptKey or promptContent must be provided')
   }
@@ -163,6 +171,7 @@ export async function GET(request: NextRequest) {
     const promptKey = searchParams.get('promptKey')
     const rssPostId = searchParams.get('rssPostId')
     const customPromptContent = searchParams.get('promptContent') // Custom prompt content for testing
+    const providerParam = searchParams.get('provider') as 'openai' | 'claude' | null // Override provider for testing
 
     const results: Record<string, any> = {}
 
@@ -261,7 +270,7 @@ export async function GET(request: NextRequest) {
       try {
         // Load prompt JSON (from custom content or database)
         const testPromptKey = promptKey || 'ai_prompt_content_evaluator'
-        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent, providerParam)
         
         // Build post data for placeholder replacement
         const postData = {
@@ -297,7 +306,7 @@ export async function GET(request: NextRequest) {
     if (promptType === 'all' || promptType === 'newsletterWriter') {
       try {
         const testPromptKey = promptKey || 'ai_prompt_newsletter_writer'
-        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent, providerParam)
         
         const postData = {
           title: testData.newsletterWriter.title,
@@ -330,7 +339,7 @@ export async function GET(request: NextRequest) {
     if (promptType === 'primaryArticleTitle') {
       try {
         const testPromptKey = promptKey || 'ai_prompt_primary_article_title'
-        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent, providerParam)
         
         const postData = {
           title: testData.newsletterWriter.title,
@@ -363,7 +372,7 @@ export async function GET(request: NextRequest) {
     if (promptType === 'primaryArticleBody') {
       try {
         const testPromptKey = promptKey || 'ai_prompt_primary_article_body'
-        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent, providerParam)
         
         const sampleHeadline = rssPost?.title || 'Sample Test Headline for Article Body'
         const postData = {
@@ -399,7 +408,7 @@ export async function GET(request: NextRequest) {
     if (promptType === 'secondaryArticleTitle') {
       try {
         const testPromptKey = promptKey || 'ai_prompt_secondary_article_title'
-        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent, providerParam)
         
         const postData = {
           title: testData.newsletterWriter.title,
@@ -432,7 +441,7 @@ export async function GET(request: NextRequest) {
     if (promptType === 'secondaryArticleBody') {
       try {
         const testPromptKey = promptKey || 'ai_prompt_secondary_article_body'
-        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent, providerParam)
         
         const sampleHeadline = rssPost?.title || 'Sample Test Headline for Article Body'
         const postData = {
@@ -468,7 +477,7 @@ export async function GET(request: NextRequest) {
     if (promptType === 'all' || promptType === 'subjectLineGenerator') {
       try {
         const testPromptKey = promptKey || 'ai_prompt_subject_line'
-        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent, providerParam)
         
         const postData = {
           headline: testData.subjectLineGenerator.headline,
@@ -500,7 +509,7 @@ export async function GET(request: NextRequest) {
     if (promptType === 'all' || promptType === 'eventSummarizer') {
       try {
         const testPromptKey = promptKey || 'ai_prompt_event_summary'
-        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent, providerParam)
         
         const postData = {
           title: testData.eventSummarizer.title,
@@ -547,7 +556,7 @@ export async function GET(request: NextRequest) {
     if (promptType === 'all' || promptType === 'factChecker') {
       try {
         const testPromptKey = promptKey || 'ai_prompt_fact_checker'
-        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent, providerParam)
         
         const postData = {
           newsletter_content: testData.factChecker.newsletterContent,
@@ -581,7 +590,7 @@ export async function GET(request: NextRequest) {
     if (promptType === 'all' || promptType === 'welcomeSection') {
       try {
         const testPromptKey = promptKey || 'ai_prompt_welcome_section'
-        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent, providerParam)
         
         const testArticles = [
           {
@@ -634,7 +643,7 @@ export async function GET(request: NextRequest) {
     if (promptType === 'all' || promptType === 'topicDeduper') {
       try {
         const testPromptKey = promptKey || 'ai_prompt_topic_deduper'
-        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent)
+        const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent, providerParam)
         
         const postData = {
           posts: JSON.stringify(testData.topicDeduper, null, 2),
@@ -673,7 +682,7 @@ export async function GET(request: NextRequest) {
         source_url: rssPost.source_url
       } : null,
       results,
-      usage_note: 'Add ?type=promptName to test individual prompts. Add &promptKey=KEY to test a specific prompt from database. Add &promptContent=JSON to test custom prompt. Add &rssPostId=UUID to use real RSS post data instead of sample data.',
+      usage_note: 'Add ?type=promptName to test individual prompts. Add &promptKey=KEY to test a specific prompt from database. Add &promptContent=JSON to test custom prompt. Add &provider=openai|claude to override the AI provider (useful for testing prompts with different providers). Add &rssPostId=UUID to use real RSS post data instead of sample data.',
       timestamp: new Date().toISOString()
     })
 
