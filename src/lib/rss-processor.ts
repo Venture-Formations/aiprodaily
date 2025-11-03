@@ -1019,16 +1019,25 @@ export class RSSProcessor {
       .in('feed_id', feedIds)
       // NO LIMIT - Get ALL posts for this campaign section
 
-    // Get duplicate post IDs to exclude
-    const { data: duplicatePosts } = await supabaseAdmin
-      .from('duplicate_posts')
-      .select(`
-        post_id,
-        group:duplicate_groups!inner(campaign_id)
-      `)
-      .eq('group.campaign_id', campaignId)
+    // Get duplicate post IDs to exclude (two-step query for proper filtering)
+    // Step 1: Get duplicate groups for this campaign
+    const { data: duplicateGroups } = await supabaseAdmin
+      .from('duplicate_groups')
+      .select('id')
+      .eq('campaign_id', campaignId)
 
-    const duplicatePostIds = new Set(duplicatePosts?.map(d => d.post_id) || [])
+    const groupIds = duplicateGroups?.map(g => g.id) || []
+
+    // Step 2: Get duplicate posts for those groups
+    let duplicatePostIds = new Set<string>()
+    if (groupIds.length > 0) {
+      const { data: duplicatePosts } = await supabaseAdmin
+        .from('duplicate_posts')
+        .select('post_id')
+        .in('group_id', groupIds)
+
+      duplicatePostIds = new Set(duplicatePosts?.map(d => d.post_id) || [])
+    }
 
     if (queryError) {
       return

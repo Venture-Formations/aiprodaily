@@ -19,16 +19,23 @@ export async function GET(request: NextRequest) {
     // Get posts with ratings
     const postsWithRatings = allPosts?.filter(p => p.post_ratings && p.post_ratings.length > 0) || []
 
-    // Get duplicates
-    const { data: duplicates } = await supabaseAdmin
-      .from('duplicate_posts')
-      .select(`
-        post_id,
-        group:duplicate_groups!inner(campaign_id)
-      `)
-      .eq('group.campaign_id', campaignId)
+    // Get duplicates (two-step query for proper filtering)
+    const { data: duplicateGroups } = await supabaseAdmin
+      .from('duplicate_groups')
+      .select('id')
+      .eq('campaign_id', campaignId)
 
-    const duplicateIds = new Set(duplicates?.map(d => d.post_id) || [])
+    const groupIds = duplicateGroups?.map(g => g.id) || []
+
+    let duplicateIds = new Set<string>()
+    if (groupIds.length > 0) {
+      const { data: duplicates } = await supabaseAdmin
+        .from('duplicate_posts')
+        .select('post_id')
+        .in('group_id', groupIds)
+
+      duplicateIds = new Set(duplicates?.map(d => d.post_id) || [])
+    }
 
     // Get articles
     const { data: articles, count: totalArticles } = await supabaseAdmin

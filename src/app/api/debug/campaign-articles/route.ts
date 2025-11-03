@@ -40,14 +40,23 @@ export async function GET(request: NextRequest) {
       .select('id, title, post_ratings(total_score)')
       .eq('campaign_id', campaignId)
 
-    // Get duplicate posts count
-    const { data: duplicates, error: dupError } = await supabaseAdmin
-      .from('duplicate_posts')
-      .select(`
-        post_id,
-        group:duplicate_groups!inner(campaign_id)
-      `)
-      .eq('group.campaign_id', campaignId)
+    // Get duplicate posts count (two-step query for proper filtering)
+    const { data: duplicateGroups } = await supabaseAdmin
+      .from('duplicate_groups')
+      .select('id')
+      .eq('campaign_id', campaignId)
+
+    const groupIds = duplicateGroups?.map(g => g.id) || []
+
+    let duplicates: { post_id: string }[] = []
+    if (groupIds.length > 0) {
+      const { data: duplicateData } = await supabaseAdmin
+        .from('duplicate_posts')
+        .select('post_id')
+        .in('group_id', groupIds)
+
+      duplicates = duplicateData || []
+    }
 
     // Get active articles sorted by rating (highest first)
     const activeArticles = campaign.articles
