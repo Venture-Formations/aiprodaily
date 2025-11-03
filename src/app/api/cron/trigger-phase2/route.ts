@@ -65,55 +65,26 @@ export async function GET(request: NextRequest) {
 
       const phase2Url = `${baseUrl}/api/rss/process-phase2`
 
-      try {
-        const response = await fetch(phase2Url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.CRON_SECRET}`
-          },
-          body: JSON.stringify({ campaign_id: campaign.id })
-        })
+      // Trigger Phase 2 in fire-and-forget mode (don't wait for completion)
+      fetch(phase2Url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.CRON_SECRET}`
+        },
+        body: JSON.stringify({ campaign_id: campaign.id })
+      }).catch(error => {
+        // Log error but don't fail the cron
+        console.error(`[Cron] Failed to trigger Phase 2 for campaign ${campaign.id}:`, error)
+        // Phase 2 will handle its own status updates, including failures
+      })
 
-        const result = await response.json()
-
-        if (response.ok) {
-          console.log(`[Cron] Phase 2 triggered successfully for campaign: ${campaign.id}`)
-          results.push({
-            campaign_id: campaign.id,
-            status: 'triggered',
-            message: 'Phase 2 started successfully'
-          })
-        } else {
-          console.error(`[Cron] Phase 2 trigger failed for campaign ${campaign.id}:`, result)
-
-          // Mark as failed
-          await supabaseAdmin
-            .from('newsletter_campaigns')
-            .update({ status: 'failed' })
-            .eq('id', campaign.id)
-
-          results.push({
-            campaign_id: campaign.id,
-            status: 'failed',
-            error: result.message || 'Phase 2 trigger failed'
-          })
-        }
-      } catch (fetchError) {
-        console.error(`[Cron] Failed to trigger Phase 2 for campaign ${campaign.id}:`, fetchError)
-
-        // Mark as failed
-        await supabaseAdmin
-          .from('newsletter_campaigns')
-          .update({ status: 'failed' })
-          .eq('id', campaign.id)
-
-        results.push({
-          campaign_id: campaign.id,
-          status: 'failed',
-          error: fetchError instanceof Error ? fetchError.message : 'Unknown error'
-        })
-      }
+      console.log(`[Cron] Phase 2 trigger sent for campaign: ${campaign.id}`)
+      results.push({
+        campaign_id: campaign.id,
+        status: 'triggered',
+        message: 'Phase 2 trigger sent (fire-and-forget)'
+      })
     }
 
     return NextResponse.json({
