@@ -130,15 +130,15 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    // Validate that value is structured JSON with messages array (same validation as RSS processing)
+    // Validate that value is valid JSON (no structural requirements)
     let parsedValue: any
     if (typeof value === 'string') {
       try {
         parsedValue = JSON.parse(value)
       } catch (parseError) {
         return NextResponse.json(
-          { 
-            error: 'Invalid prompt format. Prompt must be structured JSON with a "messages" array.',
+          {
+            error: 'Invalid JSON format. Prompt must be valid JSON.',
             details: parseError instanceof Error ? parseError.message : 'Parse failed'
           },
           { status: 400 }
@@ -148,18 +148,9 @@ export async function PATCH(request: NextRequest) {
       parsedValue = value
     } else {
       return NextResponse.json(
-        { error: 'Invalid prompt format. Expected structured JSON with a "messages" array.' },
+        { error: 'Invalid format. Expected valid JSON object or string.' },
         { status: 400 }
       )
-    }
-
-    // Validate structure - warn if not structured format but allow it
-    // This allows old plain-text prompts to be saved while encouraging migration to structured format
-    const hasMessagesArray = parsedValue.messages && Array.isArray(parsedValue.messages)
-
-    if (!hasMessagesArray) {
-      console.log(`[AI Prompts] Warning: Prompt ${key} is not using structured format with messages array. Consider migrating to new format.`)
-      // Allow saving but log warning - don't block the save
     }
 
     // Build update object - store as JSON string for consistency
