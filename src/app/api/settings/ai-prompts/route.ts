@@ -153,15 +153,13 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    // Validate structure - must have messages array (same validation as callWithStructuredPrompt)
-    if (!parsedValue.messages || !Array.isArray(parsedValue.messages)) {
-      return NextResponse.json(
-        { 
-          error: 'Invalid prompt structure. Prompt must have a "messages" array.',
-          example: '{ "model": "gpt-4o", "messages": [{ "role": "user", "content": "..." }] }'
-        },
-        { status: 400 }
-      )
+    // Validate structure - warn if not structured format but allow it
+    // This allows old plain-text prompts to be saved while encouraging migration to structured format
+    const hasMessagesArray = parsedValue.messages && Array.isArray(parsedValue.messages)
+
+    if (!hasMessagesArray) {
+      console.log(`[AI Prompts] Warning: Prompt ${key} is not using structured format with messages array. Consider migrating to new format.`)
+      // Allow saving but log warning - don't block the save
     }
 
     // Build update object - store as JSON string for consistency
