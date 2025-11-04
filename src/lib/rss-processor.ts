@@ -446,42 +446,43 @@ export class RSSProcessor {
     console.log('Campaign ID:', campaignId)
 
     try {
-      // STEP 1: Archive old articles
-      console.log('[Step 1/9] Archiving old data...')
+      // STEP 1: Archive old articles and clear previous data
+      console.log('[Step 1/11] Archiving old data...')
       try {
         await this.archiveService.archiveCampaignArticles(campaignId, 'rss_processing_clear')
       } catch {
         // Archive failure is non-critical
       }
-
-      // Clear previous data for this campaign
       await supabaseAdmin.from('articles').delete().eq('campaign_id', campaignId)
       await supabaseAdmin.from('secondary_articles').delete().eq('campaign_id', campaignId)
       await supabaseAdmin.from('rss_posts').delete().eq('campaign_id', campaignId)
-      console.log('[Step 1/9] ✓ Archive complete')
+      console.log('[Step 1/11] ✓ Archive complete')
 
-      // STEP 2: Assign top pre-scored posts from pool to campaign
-      console.log('[Step 2/9] Assigning posts from pool...')
+      // STEP 2: Set campaign status to processing
+      console.log('[Step 2/11] Setting campaign status to processing...')
+      await supabaseAdmin
+        .from('newsletter_campaigns')
+        .update({ status: 'processing' })
+        .eq('id', campaignId)
+      console.log('[Step 2/11] ✓ Status: processing')
+
+      // STEP 3: Assign top 12 rated posts from pool for each section
+      console.log('[Step 3/11] Assigning top 12 posts per section from pool...')
       const assignResult = await this.assignTopPostsToCampaign(campaignId)
-      console.log(`[Step 2/9] ✓ Assigned ${assignResult.primary} primary, ${assignResult.secondary} secondary posts`)
+      console.log(`[Step 3/11] ✓ Assigned ${assignResult.primary} primary, ${assignResult.secondary} secondary posts`)
 
-      // STEP 3: Deduplicate posts
-      console.log('[Step 3/9] Deduplicating posts...')
+      // STEP 4: Run deduplication
+      console.log('[Step 4/11] Deduplicating posts...')
       await this.handleDuplicatesForCampaign(campaignId)
       const { data: duplicateGroups } = await supabaseAdmin
         .from('duplicate_groups')
         .select('id')
         .eq('campaign_id', campaignId)
-      const { data: duplicatePosts } = await supabaseAdmin
-        .from('duplicate_posts')
-        .select('id')
-        .in('group_id', duplicateGroups?.map(g => g.id) || [])
       const groupsCount = duplicateGroups ? duplicateGroups.length : 0
-      const duplicatesCount = duplicatePosts ? duplicatePosts.length : 0
-      console.log(`[Step 3/9] ✓ Deduplicated: ${groupsCount} groups, ${duplicatesCount} duplicates`)
+      console.log(`[Step 4/11] ✓ Deduplicated: ${groupsCount} duplicate groups`)
 
-      // STEP 4: Generate articles (6 primary + 6 secondary)
-      console.log('[Step 4/9] Generating articles...')
+      // STEP 5: Generate articles from top 6 remaining posts per section
+      console.log('[Step 5/11] Generating articles from top 6 posts per section...')
       await this.generateArticlesForSection(campaignId, 'primary', 6)
       await this.generateArticlesForSection(campaignId, 'secondary', 6)
       const { data: generatedPrimary } = await supabaseAdmin
@@ -492,12 +493,10 @@ export class RSSProcessor {
         .from('secondary_articles')
         .select('id')
         .eq('campaign_id', campaignId)
-      const primaryCount = generatedPrimary ? generatedPrimary.length : 0
-      const secondaryCount = generatedSecondary ? generatedSecondary.length : 0
-      console.log(`[Step 4/9] ✓ Generated ${primaryCount} primary, ${secondaryCount} secondary`)
+      console.log(`[Step 5/11] ✓ Generated ${generatedPrimary?.length || 0} primary, ${generatedSecondary?.length || 0} secondary`)
 
-      // STEP 5: Select top 3 articles per section (set is_active = true)
-      console.log('[Step 5/9] Selecting top articles...')
+      // STEP 6: Auto-select top 3 articles per section
+      console.log('[Step 6/11] Auto-selecting top 3 articles per section...')
       await this.selectTopArticlesForCampaign(campaignId)
       const { data: activeArticles } = await supabaseAdmin
         .from('articles')
@@ -509,30 +508,36 @@ export class RSSProcessor {
         .select('id')
         .eq('campaign_id', campaignId)
         .eq('is_active', true)
-      console.log(`[Step 5/9] ✓ Selected ${activeArticles?.length || 0} primary, ${activeSecondary?.length || 0} secondary`)
+      console.log(`[Step 6/11] ✓ Selected ${activeArticles?.length || 0} primary, ${activeSecondary?.length || 0} secondary`)
 
-      // STEP 6: Generate welcome section
-      console.log('[Step 6/9] Generating welcome section...')
+      // STEP 7: Generate welcome section
+      console.log('[Step 7/11] Generating welcome section...')
       await this.generateWelcomeSection(campaignId)
-      console.log('[Step 6/9] ✓ Welcome section generated')
+      console.log('[Step 7/11] ✓ Welcome section generated')
 
-      // STEP 7: Finalize campaign (mark as in_review)
-      console.log('[Step 7/9] Finalizing campaign...')
+      // STEP 8: Subject line is already generated in selectTopArticlesForCampaign
+      const { data: campaign } = await supabaseAdmin
+        .from('newsletter_campaigns')
+        .select('subject_line')
+        .eq('id', campaignId)
+        .single()
+      console.log(`[Step 8/11] ✓ Subject line: "${campaign?.subject_line?.substring(0, 50) || 'Not found'}..."`)
+
+      // STEP 9: Select AI prompt and applications (already done in getOrCreateTodaysCampaign)
+      console.log('[Step 9/11] ✓ AI prompt and applications already selected')
+
+      // STEP 10: Set campaign status to draft
+      console.log('[Step 10/11] Setting campaign status to draft...')
       await supabaseAdmin
         .from('newsletter_campaigns')
-        .update({ status: 'in_review' })
+        .update({ status: 'draft' })
         .eq('id', campaignId)
-      console.log('[Step 7/9] ✓ Campaign status: in_review')
+      console.log('[Step 10/11] ✓ Status: draft')
 
-      // STEP 8: Stage 1 Unassignment (posts without articles)
-      console.log('[Step 8/9] Stage 1 unassignment...')
+      // STEP 11: Stage 1 Unassignment (posts without articles)
+      console.log('[Step 11/11] Stage 1 unassignment for unused posts...')
       const unassignResult = await this.unassignUnusedPosts(campaignId)
-      console.log(`[Step 8/9] ✓ Unassigned ${unassignResult.unassigned} posts (no articles generated)`)
-
-      // STEP 9: Send notification
-      console.log('[Step 9/9] Sending notification...')
-      await this.slack.sendRSSProcessingAlert(true, campaignId)
-      console.log('[Step 9/9] ✓ Notification sent')
+      console.log(`[Step 11/11] ✓ Unassigned ${unassignResult.unassigned} posts back to pool`)
 
       console.log('=== HYBRID RSS PROCESSING COMPLETE ===')
 
@@ -585,7 +590,8 @@ export class RSSProcessor {
     const secondaryFeedIds = secondaryFeeds?.map(f => f.id) || []
 
     // Get top primary posts (unassigned, within lookback window, with ratings)
-    const { data: topPrimary } = await supabaseAdmin
+    // Get more posts initially, then sort by rating and take top 12
+    const { data: allPrimaryPosts } = await supabaseAdmin
       .from('rss_posts')
       .select(`
         id,
@@ -595,11 +601,18 @@ export class RSSProcessor {
       .is('campaign_id', null)
       .gte('processed_at', lookbackTimestamp)
       .not('post_ratings', 'is', null)
-      .order('processed_at', { ascending: false })
-      .limit(20) // Get more than we need for deduplication
+
+    // Sort by rating score and take top 12
+    const topPrimary = allPrimaryPosts
+      ?.sort((a: any, b: any) => {
+        const scoreA = a.post_ratings?.[0]?.total_score || 0
+        const scoreB = b.post_ratings?.[0]?.total_score || 0
+        return scoreB - scoreA
+      })
+      .slice(0, 12) || []
 
     // Get top secondary posts
-    const { data: topSecondary } = await supabaseAdmin
+    const { data: allSecondaryPosts } = await supabaseAdmin
       .from('rss_posts')
       .select(`
         id,
@@ -609,8 +622,15 @@ export class RSSProcessor {
       .is('campaign_id', null)
       .gte('processed_at', lookbackTimestamp)
       .not('post_ratings', 'is', null)
-      .order('processed_at', { ascending: false })
-      .limit(20)
+
+    // Sort by rating score and take top 12
+    const topSecondary = allSecondaryPosts
+      ?.sort((a: any, b: any) => {
+        const scoreA = a.post_ratings?.[0]?.total_score || 0
+        const scoreB = b.post_ratings?.[0]?.total_score || 0
+        return scoreB - scoreA
+      })
+      .slice(0, 12) || []
 
     // Assign to campaign
     const primaryIds = topPrimary?.map(p => p.id) || []
