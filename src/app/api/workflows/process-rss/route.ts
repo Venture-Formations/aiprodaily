@@ -16,12 +16,12 @@ export async function POST(request: NextRequest) {
   try {
     // Start the workflow using the API from workflow/api
     // Arguments must be passed as an array
-    const result = await start(processRSSWorkflow, [{ trigger: 'cron' }])
+    // Workflows execute asynchronously across multiple steps
+    await start(processRSSWorkflow, [{ trigger: 'cron' }])
 
     return NextResponse.json({
       success: true,
-      campaignId: result.campaignId,
-      message: 'Workflow started',
+      message: 'Workflow started successfully',
       timestamp: new Date().toISOString()
     })
   } catch (error) {
