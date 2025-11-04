@@ -36,13 +36,30 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Manual testing endpoint
-export async function GET() {
-  return NextResponse.json({
-    message: 'RSS ingestion endpoint is active',
-    timestamp: new Date().toISOString(),
-    schedule: 'Every 15 minutes'
-  })
+// Vercel cron uses GET requests
+export async function GET(request: NextRequest) {
+  try {
+    console.log('[Ingest] Starting RSS ingestion (GET)...')
+
+    const processor = new RSSProcessor()
+    const result = await processor.ingestNewPosts()
+
+    console.log(`[Ingest] ✓ Complete: ${result.fetched} fetched, ${result.scored} scored`)
+
+    return NextResponse.json({
+      success: true,
+      fetched: result.fetched,
+      scored: result.scored,
+      timestamp: new Date().toISOString()
+    })
+
+  } catch (error) {
+    console.error('[Ingest] Error:', error)
+    return NextResponse.json({
+      error: 'Ingestion failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
 }
 
 export const maxDuration = 300 // 5 minutes
