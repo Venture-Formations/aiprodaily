@@ -1,3 +1,5 @@
+const { withWorkflow } = require('workflow/next')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   serverExternalPackages: ['rss-parser'],
@@ -12,4 +14,4 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig
+module.exports = withWorkflow(nextConfig)
