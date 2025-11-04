@@ -157,17 +157,18 @@ export class RSSProcessor {
   /**
    * Public method to generate newsletter articles - used by step-based processing
    */
-  async generateArticlesForSection(campaignId: string, section: 'primary' | 'secondary' = 'primary') {
-    return await this.generateNewsletterArticles(campaignId, section)
+  async generateArticlesForSection(campaignId: string, section: 'primary' | 'secondary' = 'primary', limit: number = 12) {
+    return await this.generateNewsletterArticles(campaignId, section, limit)
   }
 
   async processAllFeeds() {
-    // Starting RSS processing
+    // Starting RSS processing (HYBRID MODE)
 
     try {
       // Get today's campaign or create one
       const campaignId = await this.getOrCreateTodaysCampaign()
-      await this.processAllFeedsForCampaign(campaignId)
+      // Use hybrid workflow (processes pre-scored posts from ingestion)
+      await this.processAllFeedsHybrid(campaignId)
     } catch (error) {
       await this.errorHandler.handleError(error, {
         source: 'rss_processor',
@@ -436,6 +437,251 @@ export class RSSProcessor {
     return item.thumbnail || item.image || item['media:thumbnail']?.url || null
   }
 
+  /**
+   * HYBRID WORKFLOW: Process campaign using pre-scored posts from ingestion
+   * This is the main workflow for nightly batch processing
+   */
+  async processAllFeedsHybrid(campaignId: string) {
+    console.log('=== HYBRID RSS PROCESSING START ===')
+    console.log('Campaign ID:', campaignId)
+
+    try {
+      // STEP 1: Archive old articles
+      console.log('[Step 1/9] Archiving old data...')
+      try {
+        await this.archiveService.archiveCampaignArticles(campaignId, 'rss_processing_clear')
+      } catch {
+        // Archive failure is non-critical
+      }
+
+      // Clear previous data for this campaign
+      await supabaseAdmin.from('articles').delete().eq('campaign_id', campaignId)
+      await supabaseAdmin.from('secondary_articles').delete().eq('campaign_id', campaignId)
+      await supabaseAdmin.from('rss_posts').delete().eq('campaign_id', campaignId)
+      console.log('[Step 1/9] ✓ Archive complete')
+
+      // STEP 2: Assign top pre-scored posts from pool to campaign
+      console.log('[Step 2/9] Assigning posts from pool...')
+      const assignResult = await this.assignTopPostsToCampaign(campaignId)
+      console.log(`[Step 2/9] ✓ Assigned ${assignResult.primary} primary, ${assignResult.secondary} secondary posts`)
+
+      // STEP 3: Deduplicate posts
+      console.log('[Step 3/9] Deduplicating posts...')
+      await this.handleDuplicatesForCampaign(campaignId)
+      const { data: duplicateGroups } = await supabaseAdmin
+        .from('duplicate_groups')
+        .select('id')
+        .eq('campaign_id', campaignId)
+      const { data: duplicatePosts } = await supabaseAdmin
+        .from('duplicate_posts')
+        .select('id')
+        .in('group_id', duplicateGroups?.map(g => g.id) || [])
+      const groupsCount = duplicateGroups ? duplicateGroups.length : 0
+      const duplicatesCount = duplicatePosts ? duplicatePosts.length : 0
+      console.log(`[Step 3/9] ✓ Deduplicated: ${groupsCount} groups, ${duplicatesCount} duplicates`)
+
+      // STEP 4: Generate articles (6 primary + 6 secondary)
+      console.log('[Step 4/9] Generating articles...')
+      await this.generateArticlesForSection(campaignId, 'primary', 6)
+      await this.generateArticlesForSection(campaignId, 'secondary', 6)
+      const { data: generatedPrimary } = await supabaseAdmin
+        .from('articles')
+        .select('id')
+        .eq('campaign_id', campaignId)
+      const { data: generatedSecondary } = await supabaseAdmin
+        .from('secondary_articles')
+        .select('id')
+        .eq('campaign_id', campaignId)
+      const primaryCount = generatedPrimary ? generatedPrimary.length : 0
+      const secondaryCount = generatedSecondary ? generatedSecondary.length : 0
+      console.log(`[Step 4/9] ✓ Generated ${primaryCount} primary, ${secondaryCount} secondary`)
+
+      // STEP 5: Select top 3 articles per section (set is_active = true)
+      console.log('[Step 5/9] Selecting top articles...')
+      await this.selectTopArticlesForCampaign(campaignId)
+      const { data: activeArticles } = await supabaseAdmin
+        .from('articles')
+        .select('id')
+        .eq('campaign_id', campaignId)
+        .eq('is_active', true)
+      const { data: activeSecondary } = await supabaseAdmin
+        .from('secondary_articles')
+        .select('id')
+        .eq('campaign_id', campaignId)
+        .eq('is_active', true)
+      console.log(`[Step 5/9] ✓ Selected ${activeArticles?.length || 0} primary, ${activeSecondary?.length || 0} secondary`)
+
+      // STEP 6: Generate welcome section
+      console.log('[Step 6/9] Generating welcome section...')
+      await this.generateWelcomeSection(campaignId)
+      console.log('[Step 6/9] ✓ Welcome section generated')
+
+      // STEP 7: Finalize campaign (mark as in_review)
+      console.log('[Step 7/9] Finalizing campaign...')
+      await supabaseAdmin
+        .from('newsletter_campaigns')
+        .update({ status: 'in_review' })
+        .eq('id', campaignId)
+      console.log('[Step 7/9] ✓ Campaign status: in_review')
+
+      // STEP 8: Stage 1 Unassignment (posts without articles)
+      console.log('[Step 8/9] Stage 1 unassignment...')
+      const unassignResult = await this.unassignUnusedPosts(campaignId)
+      console.log(`[Step 8/9] ✓ Unassigned ${unassignResult.unassigned} posts (no articles generated)`)
+
+      // STEP 9: Send notification
+      console.log('[Step 9/9] Sending notification...')
+      await this.slack.sendRSSProcessingAlert(true, campaignId)
+      console.log('[Step 9/9] ✓ Notification sent')
+
+      console.log('=== HYBRID RSS PROCESSING COMPLETE ===')
+
+    } catch (error) {
+      console.error('=== HYBRID RSS PROCESSING FAILED ===')
+      console.error('Error:', error)
+
+      // Mark campaign as failed
+      await supabaseAdmin
+        .from('newsletter_campaigns')
+        .update({ status: 'failed' })
+        .eq('id', campaignId)
+
+      throw error
+    }
+  }
+
+  /**
+   * Assign top-scoring posts from pool to campaign
+   */
+  private async assignTopPostsToCampaign(campaignId: string): Promise<{ primary: number; secondary: number }> {
+    // Get lookback window
+    const { data: lookbackSetting } = await supabaseAdmin
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'primary_article_lookback_hours')
+      .single()
+
+    const lookbackHours = lookbackSetting ? parseInt(lookbackSetting.value) : 72
+    const lookbackDate = new Date()
+    lookbackDate.setHours(lookbackDate.getHours() - lookbackHours)
+    const lookbackTimestamp = lookbackDate.toISOString()
+
+    // Get feeds for primary section
+    const { data: primaryFeeds } = await supabaseAdmin
+      .from('rss_feeds')
+      .select('id')
+      .eq('active', true)
+      .eq('use_for_primary_section', true)
+
+    const primaryFeedIds = primaryFeeds?.map(f => f.id) || []
+
+    // Get feeds for secondary section
+    const { data: secondaryFeeds } = await supabaseAdmin
+      .from('rss_feeds')
+      .select('id')
+      .eq('active', true)
+      .eq('use_for_secondary_section', true)
+
+    const secondaryFeedIds = secondaryFeeds?.map(f => f.id) || []
+
+    // Get top primary posts (unassigned, within lookback window, with ratings)
+    const { data: topPrimary } = await supabaseAdmin
+      .from('rss_posts')
+      .select(`
+        id,
+        post_ratings(total_score)
+      `)
+      .in('feed_id', primaryFeedIds)
+      .is('campaign_id', null)
+      .gte('processed_at', lookbackTimestamp)
+      .not('post_ratings', 'is', null)
+      .order('processed_at', { ascending: false })
+      .limit(20) // Get more than we need for deduplication
+
+    // Get top secondary posts
+    const { data: topSecondary } = await supabaseAdmin
+      .from('rss_posts')
+      .select(`
+        id,
+        post_ratings(total_score)
+      `)
+      .in('feed_id', secondaryFeedIds)
+      .is('campaign_id', null)
+      .gte('processed_at', lookbackTimestamp)
+      .not('post_ratings', 'is', null)
+      .order('processed_at', { ascending: false })
+      .limit(20)
+
+    // Assign to campaign
+    const primaryIds = topPrimary?.map(p => p.id) || []
+    const secondaryIds = topSecondary?.map(p => p.id) || []
+
+    if (primaryIds.length > 0) {
+      await supabaseAdmin
+        .from('rss_posts')
+        .update({ campaign_id: campaignId })
+        .in('id', primaryIds)
+    }
+
+    if (secondaryIds.length > 0) {
+      await supabaseAdmin
+        .from('rss_posts')
+        .update({ campaign_id: campaignId })
+        .in('id', secondaryIds)
+    }
+
+    return { primary: primaryIds.length, secondary: secondaryIds.length }
+  }
+
+  /**
+   * Stage 1 Unassignment: Unassign posts that were assigned but no articles generated
+   */
+  private async unassignUnusedPosts(campaignId: string): Promise<{ unassigned: number }> {
+    // Find all posts assigned to this campaign
+    const { data: assignedPosts } = await supabaseAdmin
+      .from('rss_posts')
+      .select('id')
+      .eq('campaign_id', campaignId)
+
+    const assignedPostIds = assignedPosts?.map(p => p.id) || []
+
+    if (assignedPostIds.length === 0) {
+      return { unassigned: 0 }
+    }
+
+    // Find posts used in primary articles
+    const { data: primaryArticles } = await supabaseAdmin
+      .from('articles')
+      .select('post_id')
+      .eq('campaign_id', campaignId)
+
+    // Find posts used in secondary articles
+    const { data: secondaryArticles } = await supabaseAdmin
+      .from('secondary_articles')
+      .select('post_id')
+      .eq('campaign_id', campaignId)
+
+    const usedPostIds = [
+      ...(primaryArticles?.map(a => a.post_id) || []),
+      ...(secondaryArticles?.map(a => a.post_id) || [])
+    ]
+
+    // Find unused posts (assigned but no articles generated)
+    const unusedPostIds = assignedPostIds.filter(id => !usedPostIds.includes(id))
+
+    if (unusedPostIds.length === 0) {
+      return { unassigned: 0 }
+    }
+
+    // Unassign unused posts back to pool
+    await supabaseAdmin
+      .from('rss_posts')
+      .update({ campaign_id: null })
+      .in('id', unusedPostIds)
+
+    return { unassigned: unusedPostIds.length }
+  }
+
   async processAllFeedsForCampaign(campaignId: string) {
 
     let archiveResult: any = null
@@ -663,19 +909,20 @@ export class RSSProcessor {
     const campaignDate = centralDate.toISOString().split('T')[0]
 
 
-    // Check if campaign exists for this date
-    // Use maybeSingle() to gracefully handle multiple matches
+    // Check if campaign exists for this date that is NOT sent or in_review
+    // Only process campaigns in 'draft' or 'processing' status
     const { data: existing, error: existingError } = await supabaseAdmin
       .from('newsletter_campaigns')
-      .select('id')
+      .select('id, status')
       .eq('date', campaignDate)
+      .in('status', ['draft', 'processing'])
       .order('created_at', { ascending: true })
       .limit(1)
       .maybeSingle()
 
     if (existingError) {
-      const errorMsg = existingError instanceof Error 
-        ? existingError.message 
+      const errorMsg = existingError instanceof Error
+        ? existingError.message
         : typeof existingError === 'object' && existingError !== null
           ? JSON.stringify(existingError, null, 2)
           : String(existingError)
@@ -686,7 +933,9 @@ export class RSSProcessor {
     let isNewCampaign = false
 
     if (existing) {
+      // Found a draft/processing campaign for this date
       campaignId = existing.id
+      console.log(`Using existing campaign ${campaignId} (status: ${existing.status})`)
     } else {
       // Create new campaign with processing status
       const { data: newCampaign, error } = await supabaseAdmin
@@ -701,6 +950,7 @@ export class RSSProcessor {
 
       campaignId = newCampaign.id
       isNewCampaign = true
+      console.log(`Created new campaign ${campaignId} for date ${campaignDate}`)
     }
 
     // Initialize AI Applications and Prompt Ideas if not already done
@@ -1251,7 +1501,7 @@ export class RSSProcessor {
     }
   }
 
-  private async generateNewsletterArticles(campaignId: string, section: 'primary' | 'secondary' = 'primary') {
+  private async generateNewsletterArticles(campaignId: string, section: 'primary' | 'secondary' = 'primary', limit: number = 12) {
 
     // Get feeds for this section
     const { data: feeds, error: feedsError } = await supabaseAdmin
@@ -1316,7 +1566,7 @@ export class RSSProcessor {
         const scoreB = b.post_ratings?.[0]?.total_score || 0
         return scoreB - scoreA
       })
-      .slice(0, 12) // Limit to top 12 posts per section to prevent timeout (each article = 3 AI calls)
+      .slice(0, limit) // Use configurable limit (hybrid: 6, old: 12)
 
     if (postsWithRatings.length === 0) {
       // Try a simpler query to get posts with ratings
@@ -1341,7 +1591,7 @@ export class RSSProcessor {
             const scoreB = b.post_ratings?.[0]?.total_score || 0
             return scoreB - scoreA
           })
-          .slice(0, 12) // Limit to top 12 posts per section
+          .slice(0, limit) // Use configurable limit (hybrid: 6, old: 12)
         
         // Process articles in batches (limit to top 12 to prevent timeout)
         const limitedPosts = filteredPosts
