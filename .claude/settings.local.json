@@ -30,7 +30,9 @@
       "Bash(npm install:*)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:useworkflow.dev)",
-      "Bash(vercel logs:*)"
+      "Bash(vercel logs:*)",
+      "Bash(npx workflow --help:*)",
+      "Bash(npx workflow inspect --help:*)"
     ],
     "deny": [],
     "ask": []

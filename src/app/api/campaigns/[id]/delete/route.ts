@@ -42,25 +42,25 @@ export async function DELETE(
       deletionErrors.campaign_events = { message: campaignEventsError.message, code: campaignEventsError.code }
     }
 
-    // 2. Unassign articles (set campaign_id to null instead of deleting)
+    // 2. Delete articles (permanently remove generated content)
     const { error: articlesError } = await supabaseAdmin
       .from('articles')
-      .update({ campaign_id: null })
+      .delete()
       .eq('campaign_id', campaignId)
 
     if (articlesError) {
-      console.error('Error unassigning articles:', articlesError)
+      console.error('Error deleting articles:', articlesError)
       deletionErrors.articles = { message: articlesError.message, code: articlesError.code }
     }
 
-    // 2b. Unassign secondary articles
+    // 2b. Delete secondary articles (permanently remove generated content)
     const { error: secondaryArticlesError } = await supabaseAdmin
       .from('secondary_articles')
-      .update({ campaign_id: null })
+      .delete()
       .eq('campaign_id', campaignId)
 
     if (secondaryArticlesError) {
-      console.error('Error unassigning secondary articles:', secondaryArticlesError)
+      console.error('Error deleting secondary articles:', secondaryArticlesError)
       deletionErrors.secondary_articles = { message: secondaryArticlesError.message, code: secondaryArticlesError.code }
     }
 
