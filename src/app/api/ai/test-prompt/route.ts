@@ -49,13 +49,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { provider, promptJson, post } = body
 
-    if (!provider || !promptJson) {
-      return NextResponse.json(
-        { error: 'Missing required fields: provider, promptJson' },
-        { status: 400 }
-      )
-    }
-
     // Inject post data into the entire JSON request
     const processedJson = injectPostData(promptJson, post)
 

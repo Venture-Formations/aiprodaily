@@ -9,21 +9,15 @@ import { newsletterArchiver } from '@/lib/newsletter-archiver'
 async function logFinalArticlePositions(campaign: any) {
   console.log('=== LOGGING ARTICLE POSITIONS FOR FINAL SEND ===')
 
-  // Get active articles sorted by rank (same logic as MailerLite service)
+  // PRIMARY ARTICLES
   const finalActiveArticles = campaign.articles
     .filter((article: any) => article.is_active)
     .sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999))
-    .slice(0, 5) // Only log positions 1-5
+    .slice(0, 3) // Top 3 for final send
 
-  const finalActiveManualArticles = campaign.manual_articles
-    .filter((article: any) => article.is_active)
-    .sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999))
-    .slice(0, 5) // Only log positions 1-5
+  console.log('Final active primary articles:', finalActiveArticles.map((a: any) => `ID: ${a.id}, Rank: ${a.rank}, Headline: ${a.headline}`))
 
-  console.log('Final active articles for position logging:', finalActiveArticles.map((a: any) => `ID: ${a.id}, Rank: ${a.rank}, Headline: ${a.headline}`))
-  console.log('Final active manual articles for position logging:', finalActiveManualArticles.map((a: any) => `ID: ${a.id}, Rank: ${a.rank}, Title: ${a.title}`))
-
-  // Update final positions for regular articles
+  // Update final positions for primary articles
   for (let i = 0; i < finalActiveArticles.length; i++) {
     const position = i + 1
     const { error: updateError } = await supabaseAdmin
@@ -32,11 +26,42 @@ async function logFinalArticlePositions(campaign: any) {
       .eq('id', finalActiveArticles[i].id)
 
     if (updateError) {
-      console.error(`Failed to update final position for article ${finalActiveArticles[i].id}:`, updateError)
+      console.error(`Failed to update final position for primary article ${finalActiveArticles[i].id}:`, updateError)
     } else {
-      console.log(`Set final position ${position} for article: ${finalActiveArticles[i].headline}`)
+      console.log(`✓ Primary article position ${position}: ${finalActiveArticles[i].headline}`)
     }
   }
+
+  // SECONDARY ARTICLES
+  const finalActiveSecondaryArticles = (campaign.secondary_articles || [])
+    .filter((article: any) => article.is_active)
+    .sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999))
+    .slice(0, 3) // Top 3 for final send
+
+  console.log('Final active secondary articles:', finalActiveSecondaryArticles.map((a: any) => `ID: ${a.id}, Rank: ${a.rank}, Headline: ${a.headline}`))
+
+  // Update final positions for secondary articles
+  for (let i = 0; i < finalActiveSecondaryArticles.length; i++) {
+    const position = i + 1
+    const { error: updateError } = await supabaseAdmin
+      .from('secondary_articles')
+      .update({ final_position: position })
+      .eq('id', finalActiveSecondaryArticles[i].id)
+
+    if (updateError) {
+      console.error(`Failed to update final position for secondary article ${finalActiveSecondaryArticles[i].id}:`, updateError)
+    } else {
+      console.log(`✓ Secondary article position ${position}: ${finalActiveSecondaryArticles[i].headline}`)
+    }
+  }
+
+  // MANUAL ARTICLES
+  const finalActiveManualArticles = campaign.manual_articles
+    .filter((article: any) => article.is_active)
+    .sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999))
+    .slice(0, 5)
+
+  console.log('Final active manual articles:', finalActiveManualArticles.map((a: any) => `ID: ${a.id}, Rank: ${a.rank}, Title: ${a.title}`))
 
   // Update final positions for manual articles
   for (let i = 0; i < finalActiveManualArticles.length; i++) {
@@ -49,11 +74,58 @@ async function logFinalArticlePositions(campaign: any) {
     if (updateError) {
       console.error(`Failed to update final position for manual article ${finalActiveManualArticles[i].id}:`, updateError)
     } else {
-      console.log(`Set final position ${position} for manual article: ${finalActiveManualArticles[i].title}`)
+      console.log(`✓ Manual article position ${position}: ${finalActiveManualArticles[i].title}`)
     }
   }
 
   console.log('=== FINAL ARTICLE POSITION LOGGING COMPLETE ===')
+}
+
+/**
+ * Stage 2 Unassignment: Recycle posts that had articles generated but weren't selected
+ * Runs AFTER final_position is set and campaign is sent
+ */
+async function unassignUnusedArticlePosts(campaignId: string) {
+  console.log('=== STAGE 2: UNASSIGNING UNUSED ARTICLE POSTS ===')
+
+  // Find posts with articles that don't have final_position set (not selected for send)
+  const { data: unusedPrimaryPosts } = await supabaseAdmin
+    .from('articles')
+    .select('post_id')
+    .eq('campaign_id', campaignId)
+    .is('final_position', null) // Articles generated but NOT in final send
+
+  const { data: unusedSecondaryPosts } = await supabaseAdmin
+    .from('secondary_articles')
+    .select('post_id')
+    .eq('campaign_id', campaignId)
+    .is('final_position', null)
+
+  const unusedPostIds = [
+    ...(unusedPrimaryPosts?.map(a => a.post_id) || []),
+    ...(unusedSecondaryPosts?.map(a => a.post_id) || [])
+  ].filter(Boolean) // Remove null values
+
+  if (unusedPostIds.length === 0) {
+    console.log('[Stage 2] All generated articles were used in final send')
+    return { unassigned: 0 }
+  }
+
+  // Unassign posts back to pool (set campaign_id = NULL)
+  const { error } = await supabaseAdmin
+    .from('rss_posts')
+    .update({ campaign_id: null })
+    .in('id', unusedPostIds)
+
+  if (error) {
+    console.error('[Stage 2] Error unassigning posts:', error.message)
+    throw error
+  }
+
+  console.log(`[Stage 2] ✓ Unassigned ${unusedPostIds.length} posts back to pool`)
+  console.log('=== STAGE 2 UNASSIGNMENT COMPLETE ===')
+
+  return { unassigned: unusedPostIds.length }
 }
 
 export async function POST(request: NextRequest) {
@@ -124,6 +196,13 @@ export async function POST(request: NextRequest) {
       .select(`
         *,
         articles:articles(
+          *,
+          rss_post:rss_posts(
+            *,
+            rss_feed:rss_feeds(*)
+          )
+        ),
+        secondary_articles:secondary_articles(
           *,
           rss_post:rss_posts(
             *,
@@ -223,6 +302,15 @@ export async function POST(request: NextRequest) {
       // Don't fail the entire operation - the email was sent successfully
     } else {
       console.log('Campaign status updated to sent')
+    }
+
+    // 🔄 Stage 2 Unassignment - Free up unused article posts
+    try {
+      const unassignResult = await unassignUnusedArticlePosts(campaign.id)
+      console.log(`✓ Stage 2 complete: ${unassignResult.unassigned} posts recycled back to pool`)
+    } catch (unassignError) {
+      console.error('Stage 2 unassignment failed (non-fatal):', unassignError)
+      // Don't fail the entire send if unassignment fails
     }
 
     return NextResponse.json({
@@ -345,6 +433,13 @@ export async function GET(request: NextRequest) {
             rss_feed:rss_feeds(*)
           )
         ),
+        secondary_articles:secondary_articles(
+          *,
+          rss_post:rss_posts(
+            *,
+            rss_feed:rss_feeds(*)
+          )
+        ),
         manual_articles:manual_articles(*)
       `)
       .eq('newsletter_id', newsletter.id)
@@ -438,6 +533,15 @@ export async function GET(request: NextRequest) {
       // Don't fail the entire operation - the email was sent successfully
     } else {
       console.log('Campaign status updated to sent')
+    }
+
+    // 🔄 Stage 2 Unassignment - Free up unused article posts
+    try {
+      const unassignResult = await unassignUnusedArticlePosts(campaign.id)
+      console.log(`✓ Stage 2 complete: ${unassignResult.unassigned} posts recycled back to pool`)
+    } catch (unassignError) {
+      console.error('Stage 2 unassignment failed (non-fatal):', unassignError)
+      // Don't fail the entire send if unassignment fails
     }
 
     return NextResponse.json({

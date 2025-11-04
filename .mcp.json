@@ -2,7 +2,10 @@
   "mcpServers": {
     "postgres": {
       "command": "cmd",
-      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-postgres", "postgresql://postgres.vsbdfrqfokoltgjyiivq:StoringData247!@aws-0-us-west-1.pooler.supabase.com:5432/postgres"]
+      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-postgres"],
+      "env": {
+        "POSTGRES_URL": "${env:DATABASE_URL}"
+      }
     },
     "vercel": {
       "command": "cmd",

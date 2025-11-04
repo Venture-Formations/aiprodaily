@@ -178,6 +178,264 @@ export class RSSProcessor {
     }
   }
 
+  /**
+   * Ingest and score new posts (runs every 15 minutes)
+   * Does NOT generate articles or assign to campaigns
+   */
+  async ingestNewPosts(): Promise<{ fetched: number; scored: number }> {
+    let totalFetched = 0
+    let totalScored = 0
+
+    // Get all active feeds
+    const { data: allFeeds } = await supabaseAdmin
+      .from('rss_feeds')
+      .select('*')
+      .eq('active', true)
+
+    if (!allFeeds || allFeeds.length === 0) {
+      return { fetched: 0, scored: 0 }
+    }
+
+    // Process each feed
+    for (const feed of allFeeds) {
+      try {
+        const result = await this.ingestFeedPosts(feed)
+        totalFetched += result.fetched
+        totalScored += result.scored
+      } catch (error) {
+        console.error(`[Ingest] Feed ${feed.name} failed:`, error instanceof Error ? error.message : 'Unknown')
+      }
+    }
+
+    return { fetched: totalFetched, scored: totalScored }
+  }
+
+  /**
+   * Ingest posts from a single feed
+   */
+  private async ingestFeedPosts(feed: any): Promise<{ fetched: number; scored: number }> {
+    const rssFeed = await parser.parseURL(feed.url)
+
+    // Filter posts from last 6 hours (safety margin)
+    const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000)
+
+    const recentPosts = rssFeed.items.filter(item => {
+      if (!item.pubDate) return true // Include if no date
+      const pubDate = new Date(item.pubDate)
+      return pubDate >= sixHoursAgo
+    })
+
+    const newPosts: any[] = []
+
+    // Check which posts are actually new
+    for (const item of recentPosts) {
+      const externalId = item.guid || item.link || ''
+
+      // Check if already exists (any campaign or no campaign)
+      const { data: existing } = await supabaseAdmin
+        .from('rss_posts')
+        .select('id')
+        .eq('external_id', externalId)
+        .maybeSingle()
+
+      if (existing) continue
+
+      // Get excluded sources
+      const { data: excludedSettings } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'excluded_rss_sources')
+        .single()
+
+      const excludedSources: string[] = excludedSettings?.value
+        ? JSON.parse(excludedSettings.value)
+        : []
+
+      const author = item.creator || (item as any)['dc:creator'] || null
+      const blockImages = excludedSources.includes(author)
+
+      // Extract image URL
+      let imageUrl = this.extractImageUrl(item)
+
+      // Re-host Facebook images
+      if (!blockImages && imageUrl && imageUrl.includes('fbcdn.net')) {
+        try {
+          const githubUrl = await this.githubStorage.uploadImage(imageUrl, item.title || 'Untitled')
+          if (githubUrl) imageUrl = githubUrl
+        } catch (error) {
+          // Silent failure
+        }
+      }
+
+      if (blockImages) imageUrl = null
+
+      // Insert new post (campaign_id = null)
+      const { data: newPost, error: insertError } = await supabaseAdmin
+        .from('rss_posts')
+        .insert([{
+          feed_id: feed.id,
+          campaign_id: null, // ← Not assigned to campaign yet
+          external_id: externalId,
+          title: item.title || '',
+          description: item.contentSnippet || item.content || '',
+          content: item.content || '',
+          author,
+          publication_date: item.pubDate,
+          source_url: item.link,
+          image_url: imageUrl,
+        }])
+        .select('id, source_url')
+        .single()
+
+      if (insertError || !newPost) continue
+
+      newPosts.push(newPost)
+    }
+
+    // Extract full text for new posts (parallel, batch of 10)
+    if (newPosts.length > 0) {
+      const urls = newPosts
+        .filter(p => p.source_url)
+        .map(p => p.source_url)
+
+      try {
+        const extractionResults = await this.articleExtractor.extractBatch(urls, 10)
+
+        // Update posts with full text
+        for (const post of newPosts) {
+          if (!post.source_url) continue
+
+          const result = extractionResults.get(post.source_url)
+          if (result?.success && result.fullText) {
+            await supabaseAdmin
+              .from('rss_posts')
+              .update({ full_article_text: result.fullText })
+              .eq('id', post.id)
+          }
+        }
+      } catch (error) {
+        console.error('[Ingest] Extraction failed:', error instanceof Error ? error.message : 'Unknown')
+      }
+    }
+
+    // Score new posts (batch of 5)
+    let scoredCount = 0
+
+    if (newPosts.length > 0) {
+      // Get full post data for scoring
+      const { data: fullPosts } = await supabaseAdmin
+        .from('rss_posts')
+        .select('*')
+        .in('id', newPosts.map(p => p.id))
+
+      if (fullPosts && fullPosts.length > 0) {
+        // Score in batches of 5
+        const BATCH_SIZE = 5
+        const BATCH_DELAY = 2000
+
+        for (let i = 0; i < fullPosts.length; i += BATCH_SIZE) {
+          const batch = fullPosts.slice(i, i + BATCH_SIZE)
+
+          // Process batch in parallel
+          const results = await Promise.allSettled(
+            batch.map(post => this.scoreAndStorePost(post))
+          )
+
+          scoredCount += results.filter(r => r.status === 'fulfilled').length
+
+          // Delay between batches
+          if (i + BATCH_SIZE < fullPosts.length) {
+            await new Promise(resolve => setTimeout(resolve, BATCH_DELAY))
+          }
+        }
+      }
+    }
+
+    return { fetched: newPosts.length, scored: scoredCount }
+  }
+
+  /**
+   * Score a single post and store rating
+   */
+  private async scoreAndStorePost(post: any): Promise<void> {
+    const evaluation = await this.evaluatePost(post)
+
+    if (typeof evaluation.interest_level !== 'number' ||
+        typeof evaluation.local_relevance !== 'number' ||
+        typeof evaluation.community_impact !== 'number') {
+      throw new Error('Invalid score types')
+    }
+
+    const ratingRecord: any = {
+      post_id: post.id,
+      interest_level: evaluation.interest_level,
+      local_relevance: evaluation.local_relevance,
+      community_impact: evaluation.community_impact,
+      ai_reasoning: evaluation.reasoning,
+      total_score: (evaluation as any).total_score ||
+        ((evaluation.interest_level + evaluation.local_relevance + evaluation.community_impact) / 30 * 100)
+    }
+
+    const criteriaScores = (evaluation as any).criteria_scores
+    if (criteriaScores && Array.isArray(criteriaScores)) {
+      for (let k = 0; k < criteriaScores.length && k < 5; k++) {
+        const criterionNum = k + 1
+        ratingRecord[`criteria_${criterionNum}_score`] = criteriaScores[k].score
+        ratingRecord[`criteria_${criterionNum}_reason`] = criteriaScores[k].reason
+        ratingRecord[`criteria_${criterionNum}_weight`] = criteriaScores[k].weight
+      }
+    }
+
+    const { error } = await supabaseAdmin
+      .from('post_ratings')
+      .insert([ratingRecord])
+
+    if (error) {
+      throw new Error(`Rating insert failed: ${error.message}`)
+    }
+  }
+
+  /**
+   * Helper to extract image URL from RSS item
+   */
+  private extractImageUrl(item: any): string | null {
+    // Method 1: media:content
+    if (item['media:content']) {
+      if (Array.isArray(item['media:content'])) {
+        const imageContent = item['media:content'].find((media: any) =>
+          media.type?.startsWith('image/') || media.medium === 'image'
+        )
+        return imageContent?.url || imageContent?.$?.url || null
+      } else {
+        const mediaContent = item['media:content']
+        return mediaContent.url ||
+               mediaContent.$?.url ||
+               (mediaContent.medium === 'image' ? mediaContent.url : null) ||
+               (mediaContent.$?.medium === 'image' ? mediaContent.$?.url : null)
+      }
+    }
+
+    // Method 2: enclosure
+    if (item.enclosure) {
+      if (Array.isArray(item.enclosure)) {
+        const imageEnclosure = item.enclosure.find((enc: any) => enc.type?.startsWith('image/'))
+        return imageEnclosure?.url || null
+      } else if (item.enclosure.type?.startsWith('image/')) {
+        return item.enclosure.url
+      }
+    }
+
+    // Method 3: Look in content HTML
+    if (item.content || item.contentSnippet) {
+      const content = item.content || item.contentSnippet || ''
+      const imgMatch = content.match(/<img[^>]+src=["']([^"']+)["'][^>]*>/i)
+      if (imgMatch) return imgMatch[1]
+    }
+
+    // Method 4: thumbnail or image fields
+    return item.thumbnail || item.image || item['media:thumbnail']?.url || null
+  }
+
   async processAllFeedsForCampaign(campaignId: string) {
 
     let archiveResult: any = null
