@@ -17,7 +17,7 @@
       "schedule": "*/5 * * * *"
     },
     {
-      "path": "/api/cron/process-rss",
+      "path": "/api/workflows/process-rss",
       "schedule": "30 20 * * *"
     },
     {
@@ -135,6 +135,9 @@
     },
     "app/api/cron/trigger-phase2/route.ts": {
       "maxDuration": 600
+    },
+    "app/api/workflows/process-rss/route.ts": {
+      "maxDuration": 800
     }
   }
 }

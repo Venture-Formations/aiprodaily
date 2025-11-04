@@ -26,7 +26,10 @@
       "Bash(test:*)",
       "Bash(ls:*)",
       "WebSearch",
-      "mcp__memory__create_entities"
+      "mcp__memory__create_entities",
+      "Bash(npm install:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:useworkflow.dev)"
     ],
     "deny": [],
     "ask": []

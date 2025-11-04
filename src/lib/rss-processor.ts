@@ -161,6 +161,33 @@ export class RSSProcessor {
     return await this.generateNewsletterArticles(campaignId, section, limit)
   }
 
+  /**
+   * Generate titles for articles that don't have them yet
+   * Used in workflow to separate title generation from article body generation
+   */
+  async generateTitlesForArticles(campaignId: string, section: 'primary' | 'secondary' = 'primary') {
+    // TODO: For now, titles are generated together with article bodies
+    // This method is a placeholder for future refactoring when we separate
+    // body generation from title generation for better GPT-5 timeout handling
+
+    // Get articles without titles (currently all articles have titles from initial generation)
+    const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
+
+    const { data: articles } = await supabaseAdmin
+      .from(tableName)
+      .select('id, headline')
+      .eq('campaign_id', campaignId)
+      .is('headline', null)
+
+    if (!articles || articles.length === 0) {
+      console.log(`[Titles] No articles without titles for ${section} section`)
+      return
+    }
+
+    // Future: Generate titles for these articles
+    console.log(`[Titles] Found ${articles.length} articles without titles (future implementation)`)
+  }
+
   async processAllFeeds() {
     // Starting RSS processing (HYBRID MODE)
 
@@ -680,7 +707,7 @@ export class RSSProcessor {
   /**
    * Stage 1 Unassignment: Unassign posts that were assigned but no articles generated
    */
-  private async unassignUnusedPosts(campaignId: string): Promise<{ unassigned: number }> {
+  async unassignUnusedPosts(campaignId: string): Promise<{ unassigned: number }> {
     // Find all posts assigned to this campaign
     const { data: assignedPosts } = await supabaseAdmin
       .from('rss_posts')
