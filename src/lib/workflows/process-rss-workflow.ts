@@ -163,7 +163,8 @@ async function setupCampaign() {
   console.log(`[Workflow Step 1/8] Assigned ${topPrimary.length} primary, ${topSecondary.length} secondary posts`)
 
   // Deduplicate
-  await processor.handleDuplicatesForCampaign(id)
+  const dedupeResult = await processor.handleDuplicatesForCampaign(id)
+  console.log(`[Workflow Step 1/8] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicate posts found`)
   console.log('[Workflow Step 1/8] ✓ Setup complete')
 
   return id
