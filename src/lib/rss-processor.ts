@@ -1966,8 +1966,22 @@ export class RSSProcessor {
 
 
   private async processPostIntoArticle(post: any, campaignId: string, section: 'primary' | 'secondary' = 'primary') {
+    // Check if article already exists for this post (prevents duplicates when running in batches)
+    const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
+    const { data: existingArticle } = await supabaseAdmin
+      .from(tableName)
+      .select('id')
+      .eq('post_id', post.id)
+      .eq('campaign_id', campaignId)
+      .single()
+
+    if (existingArticle) {
+      console.log(`[Article] Skipping post ${post.id} - article already exists`)
+      return
+    }
+
     let content: NewsletterContent | null = null
-    
+
     try {
       // Generate newsletter content
       content = await this.generateNewsletterContent(post, section)
