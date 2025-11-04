@@ -165,10 +165,8 @@ export class RSSProcessor {
     // Starting RSS processing (HYBRID MODE)
 
     try {
-      // Get today's campaign or create one
-      const campaignId = await this.getOrCreateTodaysCampaign()
-      // Use hybrid workflow (processes pre-scored posts from ingestion)
-      await this.processAllFeedsHybrid(campaignId)
+      // Use hybrid workflow (creates campaign and processes pre-scored posts)
+      await this.processAllFeedsHybrid()
     } catch (error) {
       await this.errorHandler.handleError(error, {
         source: 'rss_processor',
@@ -441,25 +439,57 @@ export class RSSProcessor {
    * HYBRID WORKFLOW: Process campaign using pre-scored posts from ingestion
    * This is the main workflow for nightly batch processing
    */
-  async processAllFeedsHybrid(campaignId: string) {
+  async processAllFeedsHybrid() {
     console.log('=== HYBRID RSS PROCESSING START ===')
-    console.log('Campaign ID:', campaignId)
+
+    let campaignId = ''
 
     try {
-      // STEP 1: Clear previous data (no archiving)
-      console.log('[Step 1/10] Clearing previous data...')
-      await supabaseAdmin.from('articles').delete().eq('campaign_id', campaignId)
-      await supabaseAdmin.from('secondary_articles').delete().eq('campaign_id', campaignId)
-      await supabaseAdmin.from('rss_posts').delete().eq('campaign_id', campaignId)
-      console.log('[Step 1/10] ✓ Cleared')
+      // STEP 1: Create NEW campaign
+      console.log('[Step 1/10] Creating new campaign...')
 
-      // STEP 2: Set campaign status to processing
-      console.log('[Step 2/10] Setting campaign status to processing...')
-      await supabaseAdmin
+      // Calculate campaign date (Central Time + 12 hours)
+      const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
+      const centralDate = new Date(nowCentral)
+      centralDate.setHours(centralDate.getHours() + 12)
+      const campaignDate = centralDate.toISOString().split('T')[0]
+
+      // Create new campaign with processing status
+      const { data: newCampaign, error: createError } = await supabaseAdmin
         .from('newsletter_campaigns')
-        .update({ status: 'processing' })
-        .eq('id', campaignId)
-      console.log('[Step 2/10] ✓ Status: processing')
+        .insert([{ date: campaignDate, status: 'processing' }])
+        .select('id')
+        .single()
+
+      if (createError || !newCampaign) {
+        throw new Error('Failed to create campaign')
+      }
+
+      campaignId = newCampaign.id
+      console.log(`[Step 1/10] ✓ Campaign created: ${campaignId} for ${campaignDate}`)
+
+      // STEP 2: Select AI applications and prompts
+      console.log('[Step 2/10] Selecting AI apps and prompts...')
+
+      try {
+        const { AppSelector } = await import('./app-selector')
+        const { PromptSelector } = await import('./prompt-selector')
+        const { data: newsletter } = await supabaseAdmin
+          .from('newsletters')
+          .select('id, name, slug')
+          .eq('is_active', true)
+          .limit(1)
+          .single()
+
+        if (newsletter) {
+          await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
+          await PromptSelector.selectPromptForCampaign(campaignId)
+        }
+      } catch (error) {
+        console.log('[Step 2/10] ⚠️ AI selection failed (non-critical):', error)
+      }
+
+      console.log('[Step 2/10] ✓ AI apps and prompts selected')
 
       // STEP 3: Assign top 12 rated posts from pool for each section
       console.log('[Step 3/10] Assigning top 12 posts per section from pool...')
@@ -537,11 +567,13 @@ export class RSSProcessor {
       console.error('=== HYBRID RSS PROCESSING FAILED ===')
       console.error('Error:', error)
 
-      // Mark campaign as failed
-      await supabaseAdmin
-        .from('newsletter_campaigns')
-        .update({ status: 'failed' })
-        .eq('id', campaignId)
+      // Mark campaign as failed (only if campaign was created)
+      if (campaignId) {
+        await supabaseAdmin
+          .from('newsletter_campaigns')
+          .update({ status: 'failed' })
+          .eq('id', campaignId)
+      }
 
       throw error
     }
