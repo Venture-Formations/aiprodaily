@@ -2017,7 +2017,7 @@ export class RSSProcessor {
     }
 
     // Store ALL articles (even if fact-check failed) so we can review them
-    const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
+    // tableName already declared above for duplicate check
     try {
       const { error } = await supabaseAdmin
         .from(tableName)
