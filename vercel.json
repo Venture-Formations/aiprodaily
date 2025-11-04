@@ -5,10 +5,6 @@
       "schedule": "*/5 * * * *"
     },
     {
-      "path": "/api/cron/rss-processing",
-      "schedule": "*/5 * * * *"
-    },
-    {
       "path": "/api/cron/create-campaign",
       "schedule": "*/5 * * * *"
     },
@@ -17,8 +13,8 @@
       "schedule": "*/5 * * * *"
     },
     {
-      "path": "/api/workflows/process-rss",
-      "schedule": "30 20 * * *"
+      "path": "/api/cron/trigger-workflow",
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/ingest-rss",
@@ -51,10 +47,6 @@
     {
       "path": "/api/cron/cleanup-pending-submissions",
       "schedule": "0 7 * * *"
-    },
-    {
-      "path": "/api/cron/trigger-phase2",
-      "schedule": "*/5 * * * *"
     }
   ],
   "functions": {
@@ -133,8 +125,8 @@
     "app/api/rss/process-phase2/route.ts": {
       "maxDuration": 600
     },
-    "app/api/cron/trigger-phase2/route.ts": {
-      "maxDuration": 600
+    "app/api/cron/trigger-workflow/route.ts": {
+      "maxDuration": 60
     },
     "app/api/workflows/process-rss/route.ts": {
       "maxDuration": 800
