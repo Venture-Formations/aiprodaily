@@ -29,7 +29,8 @@
       "mcp__memory__create_entities",
       "Bash(npm install:*)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:useworkflow.dev)"
+      "WebFetch(domain:useworkflow.dev)",
+      "Bash(vercel logs:*)"
     ],
     "deny": [],
     "ask": []
