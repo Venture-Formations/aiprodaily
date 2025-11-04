@@ -1891,7 +1891,7 @@ export async function callWithStructuredPrompt(
 
   // Add timeout
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 30000)
+  const timeoutId = setTimeout(() => controller.abort(), 120000) // 120s for GPT-5
 
   try {
     let content: string = ''
@@ -2135,7 +2135,7 @@ export async function callOpenAIStructured(options: OpenAICallOptions) {
 
     // Add timeout to prevent hanging
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 120000) // 120s for GPT-5 // 30 second timeout
 
     try {
       const requestOptions: any = {
@@ -2310,7 +2310,7 @@ export async function callOpenAI(prompt: string, maxTokens = 1000, temperature =
 
     // Add timeout to prevent hanging
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 120000) // 120s for GPT-5 // 30 second timeout
 
     try {
       // console.log('Using GPT-4o model with improved JSON parsing...') // Commented out to reduce log count
