@@ -78,9 +78,9 @@ export async function GET(request: NextRequest) {
       })),
       timestamp: new Date().toISOString(),
       diagnostics: {
-        message: last6Hours === 0
+        message: (last6Hours || 0) === 0
           ? '⚠️ No posts ingested in last 6 hours - RSS feeds may not have new content or ingestion may be failing'
-          : last6Hours < 5
+          : (last6Hours || 0) < 5
           ? `⚠️ Only ${last6Hours} posts in last 6 hours - RSS feeds may have low activity`
           : `✅ ${last6Hours} posts ingested in last 6 hours - ingestion appears to be working`
       }
