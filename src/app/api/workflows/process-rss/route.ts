@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { start } from 'workflow'
 import { processRSSWorkflow } from '@/lib/workflows/process-rss-workflow'
 
 /**
@@ -13,12 +14,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await processRSSWorkflow({ trigger: 'cron' })
+    const result = await start(processRSSWorkflow, { trigger: 'cron' })
 
     return NextResponse.json({
       success: true,
       campaignId: result.campaignId,
-      message: 'Workflow completed',
+      message: 'Workflow started',
       timestamp: new Date().toISOString()
     })
   } catch (error) {
