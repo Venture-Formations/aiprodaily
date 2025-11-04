@@ -446,43 +446,38 @@ export class RSSProcessor {
     console.log('Campaign ID:', campaignId)
 
     try {
-      // STEP 1: Archive old articles and clear previous data
-      console.log('[Step 1/11] Archiving old data...')
-      try {
-        await this.archiveService.archiveCampaignArticles(campaignId, 'rss_processing_clear')
-      } catch {
-        // Archive failure is non-critical
-      }
+      // STEP 1: Clear previous data (no archiving)
+      console.log('[Step 1/10] Clearing previous data...')
       await supabaseAdmin.from('articles').delete().eq('campaign_id', campaignId)
       await supabaseAdmin.from('secondary_articles').delete().eq('campaign_id', campaignId)
       await supabaseAdmin.from('rss_posts').delete().eq('campaign_id', campaignId)
-      console.log('[Step 1/11] ✓ Archive complete')
+      console.log('[Step 1/10] ✓ Cleared')
 
       // STEP 2: Set campaign status to processing
-      console.log('[Step 2/11] Setting campaign status to processing...')
+      console.log('[Step 2/10] Setting campaign status to processing...')
       await supabaseAdmin
         .from('newsletter_campaigns')
         .update({ status: 'processing' })
         .eq('id', campaignId)
-      console.log('[Step 2/11] ✓ Status: processing')
+      console.log('[Step 2/10] ✓ Status: processing')
 
       // STEP 3: Assign top 12 rated posts from pool for each section
-      console.log('[Step 3/11] Assigning top 12 posts per section from pool...')
+      console.log('[Step 3/10] Assigning top 12 posts per section from pool...')
       const assignResult = await this.assignTopPostsToCampaign(campaignId)
-      console.log(`[Step 3/11] ✓ Assigned ${assignResult.primary} primary, ${assignResult.secondary} secondary posts`)
+      console.log(`[Step 3/10] ✓ Assigned ${assignResult.primary} primary, ${assignResult.secondary} secondary posts`)
 
       // STEP 4: Run deduplication
-      console.log('[Step 4/11] Deduplicating posts...')
+      console.log('[Step 4/10] Deduplicating posts...')
       await this.handleDuplicatesForCampaign(campaignId)
       const { data: duplicateGroups } = await supabaseAdmin
         .from('duplicate_groups')
         .select('id')
         .eq('campaign_id', campaignId)
       const groupsCount = duplicateGroups ? duplicateGroups.length : 0
-      console.log(`[Step 4/11] ✓ Deduplicated: ${groupsCount} duplicate groups`)
+      console.log(`[Step 4/10] ✓ Deduplicated: ${groupsCount} duplicate groups`)
 
       // STEP 5: Generate articles from top 6 remaining posts per section
-      console.log('[Step 5/11] Generating articles from top 6 posts per section...')
+      console.log('[Step 5/10] Generating articles from top 6 posts per section...')
       await this.generateArticlesForSection(campaignId, 'primary', 6)
       await this.generateArticlesForSection(campaignId, 'secondary', 6)
       const { data: generatedPrimary } = await supabaseAdmin
@@ -493,10 +488,10 @@ export class RSSProcessor {
         .from('secondary_articles')
         .select('id')
         .eq('campaign_id', campaignId)
-      console.log(`[Step 5/11] ✓ Generated ${generatedPrimary?.length || 0} primary, ${generatedSecondary?.length || 0} secondary`)
+      console.log(`[Step 5/10] ✓ Generated ${generatedPrimary?.length || 0} primary, ${generatedSecondary?.length || 0} secondary`)
 
       // STEP 6: Auto-select top 3 articles per section
-      console.log('[Step 6/11] Auto-selecting top 3 articles per section...')
+      console.log('[Step 6/10] Auto-selecting top 3 articles per section...')
       await this.selectTopArticlesForCampaign(campaignId)
       const { data: activeArticles } = await supabaseAdmin
         .from('articles')
@@ -508,12 +503,12 @@ export class RSSProcessor {
         .select('id')
         .eq('campaign_id', campaignId)
         .eq('is_active', true)
-      console.log(`[Step 6/11] ✓ Selected ${activeArticles?.length || 0} primary, ${activeSecondary?.length || 0} secondary`)
+      console.log(`[Step 6/10] ✓ Selected ${activeArticles?.length || 0} primary, ${activeSecondary?.length || 0} secondary`)
 
       // STEP 7: Generate welcome section
-      console.log('[Step 7/11] Generating welcome section...')
+      console.log('[Step 7/10] Generating welcome section...')
       await this.generateWelcomeSection(campaignId)
-      console.log('[Step 7/11] ✓ Welcome section generated')
+      console.log('[Step 7/10] ✓ Welcome section generated')
 
       // STEP 8: Subject line is already generated in selectTopArticlesForCampaign
       const { data: campaign } = await supabaseAdmin
@@ -521,23 +516,20 @@ export class RSSProcessor {
         .select('subject_line')
         .eq('id', campaignId)
         .single()
-      console.log(`[Step 8/11] ✓ Subject line: "${campaign?.subject_line?.substring(0, 50) || 'Not found'}..."`)
+      console.log(`[Step 8/10] ✓ Subject line: "${campaign?.subject_line?.substring(0, 50) || 'Not found'}..."`)
 
-      // STEP 9: Select AI prompt and applications (already done in getOrCreateTodaysCampaign)
-      console.log('[Step 9/11] ✓ AI prompt and applications already selected')
-
-      // STEP 10: Set campaign status to draft
-      console.log('[Step 10/11] Setting campaign status to draft...')
+      // STEP 9: Set campaign status to draft
+      console.log('[Step 9/10] Setting campaign status to draft...')
       await supabaseAdmin
         .from('newsletter_campaigns')
         .update({ status: 'draft' })
         .eq('id', campaignId)
-      console.log('[Step 10/11] ✓ Status: draft')
+      console.log('[Step 9/10] ✓ Status: draft')
 
-      // STEP 11: Stage 1 Unassignment (posts without articles)
-      console.log('[Step 11/11] Stage 1 unassignment for unused posts...')
+      // STEP 10: Stage 1 Unassignment (posts without articles)
+      console.log('[Step 10/10] Stage 1 unassignment for unused posts...')
       const unassignResult = await this.unassignUnusedPosts(campaignId)
-      console.log(`[Step 11/11] ✓ Unassigned ${unassignResult.unassigned} posts back to pool`)
+      console.log(`[Step 10/10] ✓ Unassigned ${unassignResult.unassigned} posts back to pool`)
 
       console.log('=== HYBRID RSS PROCESSING COMPLETE ===')
 

@@ -42,25 +42,36 @@ export async function DELETE(
       deletionErrors.campaign_events = { message: campaignEventsError.message, code: campaignEventsError.code }
     }
 
-    // 2. Delete articles associated with this campaign
+    // 2. Unassign articles (set campaign_id to null instead of deleting)
     const { error: articlesError } = await supabaseAdmin
       .from('articles')
-      .delete()
+      .update({ campaign_id: null })
       .eq('campaign_id', campaignId)
 
     if (articlesError) {
-      console.error('Error deleting campaign articles:', articlesError)
+      console.error('Error unassigning articles:', articlesError)
       deletionErrors.articles = { message: articlesError.message, code: articlesError.code }
     }
 
-    // 3. Delete RSS posts associated with this campaign
+    // 2b. Unassign secondary articles
+    const { error: secondaryArticlesError } = await supabaseAdmin
+      .from('secondary_articles')
+      .update({ campaign_id: null })
+      .eq('campaign_id', campaignId)
+
+    if (secondaryArticlesError) {
+      console.error('Error unassigning secondary articles:', secondaryArticlesError)
+      deletionErrors.secondary_articles = { message: secondaryArticlesError.message, code: secondaryArticlesError.code }
+    }
+
+    // 3. Unassign RSS posts (set campaign_id to null instead of deleting)
     const { error: postsError } = await supabaseAdmin
       .from('rss_posts')
-      .delete()
+      .update({ campaign_id: null })
       .eq('campaign_id', campaignId)
 
     if (postsError) {
-      console.error('Error deleting RSS posts:', postsError)
+      console.error('Error unassigning RSS posts:', postsError)
       deletionErrors.rss_posts = { message: postsError.message, code: postsError.code }
     }
 
