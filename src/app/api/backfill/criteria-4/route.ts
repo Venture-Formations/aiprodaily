@@ -97,7 +97,12 @@ export async function POST(request: NextRequest) {
 
     if (ratingsError) {
       console.error('[Backfill] Error fetching ratings:', ratingsError)
-      return NextResponse.json({ error: 'Failed to fetch ratings' }, { status: 500 })
+      return NextResponse.json({
+        error: 'Failed to fetch ratings',
+        details: ratingsError?.message || 'Unknown error',
+        code: ratingsError?.code,
+        hint: ratingsError?.hint
+      }, { status: 500 })
     }
 
     console.log(`[Backfill] Found ${ratings?.length || 0} ratings for ${postIds.length} posts`)
