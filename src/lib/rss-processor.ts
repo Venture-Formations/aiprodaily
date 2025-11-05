@@ -182,30 +182,299 @@ export class RSSProcessor {
   }
 
   /**
-   * Generate titles for articles that don't have them yet
-   * Used in workflow to separate title generation from article body generation
+   * NEW WORKFLOW: Generate titles only (Step 1 of article generation)
+   * Creates article records with headlines but no content
    */
-  async generateTitlesForArticles(campaignId: string, section: 'primary' | 'secondary' = 'primary') {
-    // TODO: For now, titles are generated together with article bodies
-    // This method is a placeholder for future refactoring when we separate
-    // body generation from title generation for better GPT-5 timeout handling
-
-    // Get articles without titles (currently all articles have titles from initial generation)
+  async generateTitlesOnly(campaignId: string, section: 'primary' | 'secondary' = 'primary', limit: number = 6) {
+    const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
     const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
 
-    const { data: articles } = await supabaseAdmin
-      .from(tableName)
-      .select('id, headline')
-      .eq('campaign_id', campaignId)
-      .is('headline', null)
+    // Get feeds for this section
+    const { data: feeds } = await supabaseAdmin
+      .from('rss_feeds')
+      .select('id')
+      .eq('active', true)
+      .eq(section === 'primary' ? 'use_for_primary_section' : 'use_for_secondary_section', true)
 
-    if (!articles || articles.length === 0) {
-      console.log(`[Titles] No articles without titles for ${section} section`)
+    if (!feeds || feeds.length === 0) {
+      console.log(`[Titles] No active feeds for ${section} section`)
       return
     }
 
-    // Future: Generate titles for these articles
-    console.log(`[Titles] Found ${articles.length} articles without titles (future implementation)`)
+    const feedIds = feeds.map(f => f.id)
+
+    // Get top posts assigned to this campaign
+    const { data: topPosts } = await supabaseAdmin
+      .from('rss_posts')
+      .select('*, post_ratings(*)')
+      .eq('campaign_id', campaignId)
+      .in('feed_id', feedIds)
+
+    if (!topPosts || topPosts.length === 0) {
+      console.log(`[Titles] No posts assigned to campaign for ${section} section`)
+      return
+    }
+
+    // Get duplicate post IDs to exclude
+    const { data: duplicateGroups } = await supabaseAdmin
+      .from('duplicate_groups')
+      .select('id')
+      .eq('campaign_id', campaignId)
+
+    const groupIds = duplicateGroups?.map(g => g.id) || []
+    let duplicatePostIds = new Set<string>()
+
+    if (groupIds.length > 0) {
+      const { data: duplicatePosts } = await supabaseAdmin
+        .from('duplicate_posts')
+        .select('post_id')
+        .in('group_id', groupIds)
+      duplicatePostIds = new Set(duplicatePosts?.map(d => d.post_id) || [])
+    }
+
+    // Filter and sort posts
+    const postsWithRatings = topPosts
+      .filter(post =>
+        post.post_ratings?.[0] &&
+        !duplicatePostIds.has(post.id) &&
+        post.full_article_text
+      )
+      .sort((a, b) => {
+        const scoreA = a.post_ratings?.[0]?.total_score || 0
+        const scoreB = b.post_ratings?.[0]?.total_score || 0
+        return scoreB - scoreA
+      })
+      .slice(0, limit)
+
+    console.log(`[Titles] Generating ${postsWithRatings.length} ${section} titles...`)
+
+    // Generate titles in batch
+    const BATCH_SIZE = 3
+    for (let i = 0; i < postsWithRatings.length; i += BATCH_SIZE) {
+      const batch = postsWithRatings.slice(i, i + BATCH_SIZE)
+
+      await Promise.all(batch.map(async (post) => {
+        try {
+          // Check if article already exists
+          const { data: existing } = await supabaseAdmin
+            .from(tableName)
+            .select('id')
+            .eq('post_id', post.id)
+            .eq('campaign_id', campaignId)
+            .single()
+
+          if (existing) {
+            console.log(`[Titles] Article already exists for post ${post.id}`)
+            return
+          }
+
+          const fullText = post.full_article_text || post.content || post.description || ''
+          const postData = {
+            title: post.title,
+            description: post.description || '',
+            content: fullText,
+            source_url: post.source_url || ''
+          }
+
+          // Generate title
+          const titleResult = section === 'primary'
+            ? await AI_CALL.primaryArticleTitle(postData, newsletterId, 200, 0.7)
+            : await AI_CALL.secondaryArticleTitle(postData, newsletterId, 200, 0.7)
+
+          const headline = typeof titleResult === 'string'
+            ? titleResult.trim()
+            : (titleResult.raw || titleResult.headline || '').trim()
+
+          if (!headline) {
+            console.error(`[Titles] Failed to generate title for post ${post.id}`)
+            return
+          }
+
+          // Create article record with title only
+          await supabaseAdmin
+            .from(tableName)
+            .insert([{
+              post_id: post.id,
+              campaign_id: campaignId,
+              headline: headline,
+              content: null, // Will be generated later
+              rank: null,
+              is_active: false,
+              fact_check_score: null,
+              fact_check_details: null,
+              word_count: null
+            }])
+
+          console.log(`[Titles] Generated title for post ${post.id}: "${headline.substring(0, 50)}..."`)
+
+        } catch (error) {
+          console.error(`[Titles] Failed for post ${post.id}:`, error instanceof Error ? error.message : 'Unknown')
+        }
+      }))
+
+      // Delay between batches
+      if (i + BATCH_SIZE < postsWithRatings.length) {
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      }
+    }
+
+    console.log(`[Titles] ✓ Generated ${postsWithRatings.length} ${section} titles`)
+  }
+
+  /**
+   * NEW WORKFLOW: Generate bodies only (Step 2 of article generation)
+   * Generates content for articles that have titles but no content
+   */
+  async generateBodiesOnly(campaignId: string, section: 'primary' | 'secondary' = 'primary', offset: number = 0, limit: number = 3) {
+    const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+    const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
+
+    // Get articles with titles but no content
+    const { data: articles } = await supabaseAdmin
+      .from(tableName)
+      .select('*, rss_posts(*)')
+      .eq('campaign_id', campaignId)
+      .is('content', null)
+      .not('headline', 'is', null)
+      .order('post_id', { ascending: true })
+      .range(offset, offset + limit - 1)
+
+    if (!articles || articles.length === 0) {
+      console.log(`[Bodies] No articles awaiting body generation (offset ${offset})`)
+      return
+    }
+
+    console.log(`[Bodies] Generating ${articles.length} ${section} bodies (offset ${offset})...`)
+
+    // Generate bodies in batch (2 at a time for safety)
+    const BATCH_SIZE = 2
+    for (let i = 0; i < articles.length; i += BATCH_SIZE) {
+      const batch = articles.slice(i, i + BATCH_SIZE)
+
+      await Promise.all(batch.map(async (article: any) => {
+        try {
+          const post = article.rss_posts
+          if (!post) {
+            console.error(`[Bodies] No RSS post found for article ${article.id}`)
+            return
+          }
+
+          const fullText = post.full_article_text || post.content || post.description || ''
+          const postData = {
+            title: post.title,
+            description: post.description || '',
+            content: fullText,
+            source_url: post.source_url || ''
+          }
+
+          // Generate body using existing headline
+          const bodyResult = section === 'primary'
+            ? await AI_CALL.primaryArticleBody(postData, newsletterId, article.headline, 500, 0.7)
+            : await AI_CALL.secondaryArticleBody(postData, newsletterId, article.headline, 500, 0.7)
+
+          if (!bodyResult.content || !bodyResult.word_count) {
+            console.error(`[Bodies] Invalid body response for article ${article.id}`)
+            return
+          }
+
+          // Update article with body
+          await supabaseAdmin
+            .from(tableName)
+            .update({
+              content: bodyResult.content,
+              word_count: bodyResult.word_count
+            })
+            .eq('id', article.id)
+
+          console.log(`[Bodies] Generated body for article ${article.id} (${bodyResult.word_count} words)`)
+
+        } catch (error) {
+          console.error(`[Bodies] Failed for article ${article.id}:`, error instanceof Error ? error.message : 'Unknown')
+        }
+      }))
+
+      // Delay between batches
+      if (i + BATCH_SIZE < articles.length) {
+        await new Promise(resolve => setTimeout(resolve, 3000))
+      }
+    }
+
+    console.log(`[Bodies] ✓ Generated ${articles.length} ${section} bodies`)
+  }
+
+  /**
+   * NEW WORKFLOW: Fact-check articles (Step 3 of article generation)
+   * Fact-checks all articles that have content but no fact-check score
+   */
+  async factCheckArticles(campaignId: string, section: 'primary' | 'secondary' = 'primary') {
+    const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+    const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
+
+    // Get articles with content but no fact-check
+    const { data: articles } = await supabaseAdmin
+      .from(tableName)
+      .select('*, rss_posts(*)')
+      .eq('campaign_id', campaignId)
+      .not('content', 'is', null)
+      .is('fact_check_score', null)
+
+    if (!articles || articles.length === 0) {
+      console.log(`[Fact-Check] No articles awaiting fact-check for ${section}`)
+      return
+    }
+
+    console.log(`[Fact-Check] Checking ${articles.length} ${section} articles...`)
+
+    // Fact-check in batches
+    const BATCH_SIZE = 3
+    for (let i = 0; i < articles.length; i += BATCH_SIZE) {
+      const batch = articles.slice(i, i + BATCH_SIZE)
+
+      await Promise.all(batch.map(async (article: any) => {
+        try {
+          const post = article.rss_posts
+          if (!post) {
+            console.error(`[Fact-Check] No RSS post found for article ${article.id}`)
+            return
+          }
+
+          const originalContent = post.content || post.description || ''
+
+          // Fact-check the content
+          const factCheck = await this.factCheckContent(article.content, originalContent, newsletterId)
+
+          // Update article with fact-check results
+          await supabaseAdmin
+            .from(tableName)
+            .update({
+              fact_check_score: factCheck.score,
+              fact_check_details: factCheck.details
+            })
+            .eq('id', article.id)
+
+          console.log(`[Fact-Check] Article ${article.id}: Score ${factCheck.score}/10`)
+
+        } catch (error) {
+          console.error(`[Fact-Check] Failed for article ${article.id}:`, error instanceof Error ? error.message : 'Unknown')
+
+          // Store failed fact-check
+          await supabaseAdmin
+            .from(tableName)
+            .update({
+              fact_check_score: 0,
+              fact_check_details: `Fact-check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+            })
+            .eq('id', article.id)
+        }
+      }))
+
+      // Delay between batches
+      if (i + BATCH_SIZE < articles.length) {
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      }
+    }
+
+    console.log(`[Fact-Check] ✓ Checked ${articles.length} ${section} articles`)
   }
 
   async processAllFeeds() {

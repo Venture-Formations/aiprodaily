@@ -2,9 +2,20 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { RSSProcessor } from '@/lib/rss-processor'
 
 /**
- * RSS Processing Workflow
+ * RSS Processing Workflow (REFACTORED)
  * Each step gets its own 800-second timeout
- * Handles GPT-5's longer processing times
+ *
+ * NEW STRUCTURE:
+ * Step 1:  Setup + Deduplication
+ * Step 2:  Generate 6 primary titles (fast)
+ * Step 3:  Generate 3 primary bodies (batch 1)
+ * Step 4:  Generate 3 primary bodies (batch 2)
+ * Step 5:  Fact-check all 6 primary articles
+ * Step 6:  Generate 6 secondary titles (fast)
+ * Step 7:  Generate 3 secondary bodies (batch 1)
+ * Step 8:  Generate 3 secondary bodies (batch 2)
+ * Step 9:  Fact-check all 6 secondary articles
+ * Step 10: Finalize
  */
 export async function processRSSWorkflow(input: {
   trigger: 'cron' | 'manual'
@@ -16,24 +27,32 @@ export async function processRSSWorkflow(input: {
 
   console.log(`[Workflow] Starting for newsletter: ${input.newsletter_id}`)
 
-  // STEP 1: Setup - Create campaign and assign posts
+  // STEP 1: Setup - Create campaign, assign posts, deduplicate
   campaignId = await setupCampaign(input.newsletter_id)
 
-  // STEP 2-3: Generate primary articles in 2 batches (3 articles each)
-  await generatePrimaryArticlesBatch1(campaignId)
-  await generatePrimaryArticlesBatch2(campaignId)
-
-  // STEP 4: Generate primary titles (placeholder for now)
+  // PRIMARY SECTION
+  // STEP 2: Generate all 6 primary titles (fast, batched)
   await generatePrimaryTitles(campaignId)
 
-  // STEP 5-6: Generate secondary articles in 2 batches
-  await generateSecondaryArticlesBatch1(campaignId)
-  await generateSecondaryArticlesBatch2(campaignId)
+  // STEP 3-4: Generate primary bodies in 2 batches (3 articles each)
+  await generatePrimaryBodiesBatch1(campaignId)
+  await generatePrimaryBodiesBatch2(campaignId)
 
-  // STEP 7: Generate secondary titles (placeholder for now)
+  // STEP 5: Fact-check all primary articles
+  await factCheckPrimary(campaignId)
+
+  // SECONDARY SECTION
+  // STEP 6: Generate all 6 secondary titles (fast, batched)
   await generateSecondaryTitles(campaignId)
 
-  // STEP 8: Finalize
+  // STEP 7-8: Generate secondary bodies in 2 batches (3 articles each)
+  await generateSecondaryBodiesBatch1(campaignId)
+  await generateSecondaryBodiesBatch2(campaignId)
+
+  // STEP 9: Fact-check all secondary articles
+  await factCheckSecondary(campaignId)
+
+  // STEP 10: Finalize
   await finalizeCampaign(campaignId)
 
   console.log('=== WORKFLOW COMPLETE ===')
@@ -45,7 +64,7 @@ export async function processRSSWorkflow(input: {
 async function setupCampaign(newsletterId: string) {
   "use step"
 
-  console.log('[Workflow Step 1/8] Setting up campaign...')
+  console.log('[Workflow Step 1/10] Setting up campaign...')
 
   const processor = new RSSProcessor()
 
@@ -60,7 +79,7 @@ async function setupCampaign(newsletterId: string) {
     throw new Error(`Newsletter not found: ${newsletterId}`)
   }
 
-  console.log(`[Workflow Step 1/8] Using newsletter: ${newsletter.name} (${newsletter.id})`)
+  console.log(`[Workflow Step 1/10] Using newsletter: ${newsletter.name} (${newsletter.id})`)
 
   // Calculate campaign date (Central Time + 12 hours)
   const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
@@ -84,7 +103,7 @@ async function setupCampaign(newsletterId: string) {
   }
 
   const id = newCampaign.id
-  console.log(`[Workflow Step 1/8] Campaign created: ${id} for ${campaignDate}`)
+  console.log(`[Workflow Step 1/10] Campaign created: ${id} for ${campaignDate}`)
 
   // Select AI apps and prompts
   try {
@@ -94,7 +113,7 @@ async function setupCampaign(newsletterId: string) {
     await AppSelector.selectAppsForCampaign(id, newsletter.id)
     await PromptSelector.selectPromptForCampaign(id)
   } catch (error) {
-    console.log('[Workflow Step 1/8] AI selection failed (non-critical)')
+    console.log('[Workflow Step 1/10] AI selection failed (non-critical)')
   }
 
   // Assign top 12 posts per section
@@ -117,6 +136,7 @@ async function setupCampaign(newsletterId: string) {
   const { data: lookbackSetting } = await supabaseAdmin
     .from('app_settings')
     .select('value')
+    .eq('newsletter_id', newsletterId)
     .eq('key', 'primary_article_lookback_hours')
     .single()
 
@@ -174,98 +194,153 @@ async function setupCampaign(newsletterId: string) {
       .in('id', topSecondary.map(p => p.id))
   }
 
-  console.log(`[Workflow Step 1/8] Assigned ${topPrimary.length} primary, ${topSecondary.length} secondary posts`)
+  console.log(`[Workflow Step 1/10] Assigned ${topPrimary.length} primary, ${topSecondary.length} secondary posts`)
 
   // Deduplicate
   const dedupeResult = await processor.handleDuplicatesForCampaign(id)
-  console.log(`[Workflow Step 1/8] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicate posts found`)
-  console.log('[Workflow Step 1/8] ✓ Setup complete')
+  console.log(`[Workflow Step 1/10] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicate posts found`)
+  console.log('[Workflow Step 1/10] ✓ Setup complete')
 
   return id
 }
 
-async function generatePrimaryArticlesBatch1(campaignId: string) {
-  "use step"
-
-  console.log('[Workflow Step 2/8] Generating 3 primary articles (batch 1)...')
-  const processor = new RSSProcessor()
-  await processor.generateArticlesForSection(campaignId, 'primary', 3)
-
-  const { data: articles } = await supabaseAdmin
-    .from('articles')
-    .select('id')
-    .eq('campaign_id', campaignId)
-
-  console.log(`[Workflow Step 2/8] ✓ Generated ${articles?.length || 0} primary articles so far`)
-}
-
-async function generatePrimaryArticlesBatch2(campaignId: string) {
-  "use step"
-
-  console.log('[Workflow Step 3/8] Generating 3 more primary articles (batch 2)...')
-  const processor = new RSSProcessor()
-  await processor.generateArticlesForSection(campaignId, 'primary', 6)
-
-  const { data: articles } = await supabaseAdmin
-    .from('articles')
-    .select('id')
-    .eq('campaign_id', campaignId)
-
-  console.log(`[Workflow Step 3/8] ✓ Total primary articles: ${articles?.length || 0}`)
-}
-
+// PRIMARY SECTION
 async function generatePrimaryTitles(campaignId: string) {
   "use step"
 
-  console.log('[Workflow Step 4/8] Checking primary article titles...')
+  console.log('[Workflow Step 2/10] Generating 6 primary titles...')
   const processor = new RSSProcessor()
-  await processor.generateTitlesForArticles(campaignId, 'primary')
-  console.log('[Workflow Step 4/8] ✓ Primary titles complete')
-}
-
-async function generateSecondaryArticlesBatch1(campaignId: string) {
-  "use step"
-
-  console.log('[Workflow Step 5/8] Generating 3 secondary articles (batch 1)...')
-  const processor = new RSSProcessor()
-  await processor.generateArticlesForSection(campaignId, 'secondary', 3)
+  await processor.generateTitlesOnly(campaignId, 'primary', 6)
 
   const { data: articles } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('id')
+    .from('articles')
+    .select('id, headline')
     .eq('campaign_id', campaignId)
+    .not('headline', 'is', null)
 
-  console.log(`[Workflow Step 5/8] ✓ Generated ${articles?.length || 0} secondary articles so far`)
+  console.log(`[Workflow Step 2/10] ✓ Generated ${articles?.length || 0} primary titles`)
 }
 
-async function generateSecondaryArticlesBatch2(campaignId: string) {
+async function generatePrimaryBodiesBatch1(campaignId: string) {
   "use step"
 
-  console.log('[Workflow Step 6/8] Generating 3 more secondary articles (batch 2)...')
+  console.log('[Workflow Step 3/10] Generating 3 primary bodies (batch 1)...')
   const processor = new RSSProcessor()
-  await processor.generateArticlesForSection(campaignId, 'secondary', 6)
+  await processor.generateBodiesOnly(campaignId, 'primary', 0, 3)
 
   const { data: articles } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('id')
+    .from('articles')
+    .select('id, content')
     .eq('campaign_id', campaignId)
+    .not('content', 'is', null)
 
-  console.log(`[Workflow Step 6/8] ✓ Total secondary articles: ${articles?.length || 0}`)
+  console.log(`[Workflow Step 3/10] ✓ Total bodies generated: ${articles?.length || 0}`)
 }
 
+async function generatePrimaryBodiesBatch2(campaignId: string) {
+  "use step"
+
+  console.log('[Workflow Step 4/10] Generating 3 more primary bodies (batch 2)...')
+  const processor = new RSSProcessor()
+  await processor.generateBodiesOnly(campaignId, 'primary', 3, 3)
+
+  const { data: articles } = await supabaseAdmin
+    .from('articles')
+    .select('id, content')
+    .eq('campaign_id', campaignId)
+    .not('content', 'is', null)
+
+  console.log(`[Workflow Step 4/10] ✓ Total primary bodies: ${articles?.length || 0}`)
+}
+
+async function factCheckPrimary(campaignId: string) {
+  "use step"
+
+  console.log('[Workflow Step 5/10] Fact-checking all primary articles...')
+  const processor = new RSSProcessor()
+  await processor.factCheckArticles(campaignId, 'primary')
+
+  const { data: articles } = await supabaseAdmin
+    .from('articles')
+    .select('id, fact_check_score')
+    .eq('campaign_id', campaignId)
+    .not('fact_check_score', 'is', null)
+
+  const avgScore = (articles?.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) || 0) / (articles?.length || 1)
+  console.log(`[Workflow Step 5/10] ✓ Fact-checked ${articles?.length || 0} articles (avg score: ${avgScore.toFixed(1)}/10)`)
+}
+
+// SECONDARY SECTION
 async function generateSecondaryTitles(campaignId: string) {
   "use step"
 
-  console.log('[Workflow Step 7/8] Checking secondary article titles...')
+  console.log('[Workflow Step 6/10] Generating 6 secondary titles...')
   const processor = new RSSProcessor()
-  await processor.generateTitlesForArticles(campaignId, 'secondary')
-  console.log('[Workflow Step 7/8] ✓ Secondary titles complete')
+  await processor.generateTitlesOnly(campaignId, 'secondary', 6)
+
+  const { data: articles } = await supabaseAdmin
+    .from('secondary_articles')
+    .select('id, headline')
+    .eq('campaign_id', campaignId)
+    .not('headline', 'is', null)
+
+  console.log(`[Workflow Step 6/10] ✓ Generated ${articles?.length || 0} secondary titles`)
 }
 
+async function generateSecondaryBodiesBatch1(campaignId: string) {
+  "use step"
+
+  console.log('[Workflow Step 7/10] Generating 3 secondary bodies (batch 1)...')
+  const processor = new RSSProcessor()
+  await processor.generateBodiesOnly(campaignId, 'secondary', 0, 3)
+
+  const { data: articles } = await supabaseAdmin
+    .from('secondary_articles')
+    .select('id, content')
+    .eq('campaign_id', campaignId)
+    .not('content', 'is', null)
+
+  console.log(`[Workflow Step 7/10] ✓ Total bodies generated: ${articles?.length || 0}`)
+}
+
+async function generateSecondaryBodiesBatch2(campaignId: string) {
+  "use step"
+
+  console.log('[Workflow Step 8/10] Generating 3 more secondary bodies (batch 2)...')
+  const processor = new RSSProcessor()
+  await processor.generateBodiesOnly(campaignId, 'secondary', 3, 3)
+
+  const { data: articles } = await supabaseAdmin
+    .from('secondary_articles')
+    .select('id, content')
+    .eq('campaign_id', campaignId)
+    .not('content', 'is', null)
+
+  console.log(`[Workflow Step 8/10] ✓ Total secondary bodies: ${articles?.length || 0}`)
+}
+
+async function factCheckSecondary(campaignId: string) {
+  "use step"
+
+  console.log('[Workflow Step 9/10] Fact-checking all secondary articles...')
+  const processor = new RSSProcessor()
+  await processor.factCheckArticles(campaignId, 'secondary')
+
+  const { data: articles } = await supabaseAdmin
+    .from('secondary_articles')
+    .select('id, fact_check_score')
+    .eq('campaign_id', campaignId)
+    .not('fact_check_score', 'is', null)
+
+  const avgScore = (articles?.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) || 0) / (articles?.length || 1)
+  console.log(`[Workflow Step 9/10] ✓ Fact-checked ${articles?.length || 0} articles (avg score: ${avgScore.toFixed(1)}/10)`)
+}
+
+// FINALIZE
 async function finalizeCampaign(campaignId: string) {
   "use step"
 
-  console.log('[Workflow Step 8/8] Finalizing campaign...')
+  console.log('[Workflow Step 10/10] Finalizing campaign...')
   const processor = new RSSProcessor()
 
   // Auto-select top 3 per section
@@ -305,5 +380,5 @@ async function finalizeCampaign(campaignId: string) {
 
   // Stage 1 unassignment
   const unassignResult = await processor.unassignUnusedPosts(campaignId)
-  console.log(`[Workflow Step 8/8] ✓ Finalized. Unassigned ${unassignResult.unassigned} unused posts`)
+  console.log(`[Workflow Step 10/10] ✓ Finalized. Unassigned ${unassignResult.unassigned} unused posts`)
 }
