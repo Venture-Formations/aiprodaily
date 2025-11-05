@@ -210,8 +210,7 @@ export async function POST(request: NextRequest) {
                 criteria_4_score: criteria4Score,
                 criteria_4_weight: criteria4Weight,
                 criteria_4_reason: criteria4Reason,
-                total_score: newTotalScore,
-                updated_at: new Date().toISOString()
+                total_score: newTotalScore
               })
               .eq('id', rating.id)
 
