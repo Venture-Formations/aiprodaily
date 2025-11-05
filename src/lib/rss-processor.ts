@@ -2084,10 +2084,14 @@ export class RSSProcessor {
 
   private async selectTop5Articles(campaignId: string) {
     try {
+      // Get newsletter_id from campaign for multi-tenant filtering
+      const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+
       // Get max_top_articles setting (defaults to 3)
       const { data: maxTopArticlesSetting } = await supabaseAdmin
         .from('app_settings')
         .select('value')
+        .eq('newsletter_id', newsletterId)
         .eq('key', 'max_top_articles')
         .single()
 
@@ -2097,6 +2101,7 @@ export class RSSProcessor {
       const { data: lookbackSetting } = await supabaseAdmin
         .from('app_settings')
         .select('value')
+        .eq('newsletter_id', newsletterId)
         .eq('key', 'primary_article_lookback_hours')
         .single()
 
@@ -2123,13 +2128,20 @@ export class RSSProcessor {
         .gte('fact_check_score', 15)
         .is('final_position', null)  // Only articles NOT used in sent newsletters
 
+      console.log(`[Primary Selection] Target: ${finalArticleCount} articles`)
+      console.log(`[Primary Selection] Lookback: ${lookbackHours} hours (since ${lookbackTimestamp})`)
+
       if (error) {
+        console.error(`[Primary Selection] Query error:`, error.message)
         return
       }
 
       if (!availableArticles || availableArticles.length === 0) {
+        console.log(`[Primary Selection] No articles found matching criteria`)
         return
       }
+
+      console.log(`[Primary Selection] Found ${availableArticles.length} articles meeting criteria (fact_check_score >= 15, not used in sent newsletters)`)
 
       // Sort ALL available articles by rating (highest first) and take the top N
       const sortedArticles = availableArticles
@@ -2142,7 +2154,13 @@ export class RSSProcessor {
         .sort((a, b) => b.score - a.score)
         .slice(0, finalArticleCount)
 
+      console.log(`[Primary Selection] Selected ${sortedArticles.length} articles (sorted by score):`)
+      sortedArticles.forEach((a, idx) => {
+        console.log(`  ${idx + 1}. Article ${a.id} - Score: ${a.score}`)
+      })
+
       if (sortedArticles.length === 0) {
+        console.log(`[Primary Selection] No articles to activate after sorting`)
         return
       }
 
@@ -2160,6 +2178,8 @@ export class RSSProcessor {
           .eq('id', article.id)
       }
 
+      console.log(`[Primary Selection] ✓ Activated ${sortedArticles.length} primary articles for campaign`)
+
       // Generate subject line using the top-ranked article
       await this.generateSubjectLineForCampaign(campaignId)
 
@@ -2176,10 +2196,14 @@ export class RSSProcessor {
 
   private async selectTopSecondaryArticles(campaignId: string) {
     try {
+      // Get newsletter_id from campaign for multi-tenant filtering
+      const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+
       // Get max_secondary_articles setting (defaults to 3)
       const { data: maxSecondaryArticlesSetting } = await supabaseAdmin
         .from('app_settings')
         .select('value')
+        .eq('newsletter_id', newsletterId)
         .eq('key', 'max_secondary_articles')
         .single()
 
@@ -2189,6 +2213,7 @@ export class RSSProcessor {
       const { data: lookbackSetting } = await supabaseAdmin
         .from('app_settings')
         .select('value')
+        .eq('newsletter_id', newsletterId)
         .eq('key', 'secondary_article_lookback_hours')
         .single()
 
@@ -2214,13 +2239,20 @@ export class RSSProcessor {
         .gte('fact_check_score', 15)
         .is('final_position', null)  // Only articles NOT used in sent newsletters
 
+      console.log(`[Secondary Selection] Target: ${finalArticleCount} articles`)
+      console.log(`[Secondary Selection] Lookback: ${lookbackHours} hours (since ${lookbackTimestamp})`)
+
       if (error) {
+        console.error(`[Secondary Selection] Query error:`, error.message)
         return
       }
 
       if (!availableArticles || availableArticles.length === 0) {
+        console.log(`[Secondary Selection] No articles found matching criteria`)
         return
       }
+
+      console.log(`[Secondary Selection] Found ${availableArticles.length} articles meeting criteria (fact_check_score >= 15, not used in sent newsletters)`)
 
       // Sort ALL available articles by rating (highest first) and take the top N
       const sortedArticles = availableArticles
@@ -2233,7 +2265,13 @@ export class RSSProcessor {
         .sort((a, b) => b.score - a.score)
         .slice(0, finalArticleCount)
 
+      console.log(`[Secondary Selection] Selected ${sortedArticles.length} articles (sorted by score):`)
+      sortedArticles.forEach((a, idx) => {
+        console.log(`  ${idx + 1}. Article ${a.id} - Score: ${a.score}`)
+      })
+
       if (sortedArticles.length === 0) {
+        console.log(`[Secondary Selection] No articles to activate after sorting`)
         return
       }
 
@@ -2250,6 +2288,8 @@ export class RSSProcessor {
           })
           .eq('id', article.id)
       }
+
+      console.log(`[Secondary Selection] ✓ Activated ${sortedArticles.length} secondary articles for campaign`)
 
     } catch (error) {
       const errorMsg = error instanceof Error 
