@@ -11,11 +11,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    console.log('BACKEND GET: Loading email settings from database')
+    // Get user's newsletter_id (use first active newsletter for now)
+    const { data: newsletter } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (!newsletter) {
+      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    }
+
+    console.log('BACKEND GET: Loading email settings from database for newsletter:', newsletter.id)
     // Get current settings from database (key-value structure)
     const { data: settingsRows, error } = await supabaseAdmin
       .from('app_settings')
       .select('key, value')
+      .eq('newsletter_id', newsletter.id)
       .or('key.like.email_%,key.eq.max_top_articles,key.eq.max_bottom_articles,key.eq.primary_article_lookback_hours,key.eq.secondary_article_lookback_hours,key.eq.dedup_historical_lookback_days,key.eq.dedup_strictness_threshold')
 
     if (error) {
@@ -99,6 +112,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Get user's newsletter_id (use first active newsletter for now)
+    const { data: newsletter } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (!newsletter) {
+      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    }
+
+    const newsletterId = newsletter.id
+    console.log('BACKEND: Saving settings for newsletter:', newsletterId)
+
     const settings = await request.json()
     console.log('BACKEND: Received email settings:', JSON.stringify(settings, null, 2))
     // Check if this is a lookback hours update request
@@ -126,10 +154,9 @@ export async function POST(request: NextRequest) {
           .upsert({
             key: setting.key,
             value: setting.value,
+            newsletter_id: newsletterId,
             description: `Article lookback hours: ${setting.key}`,
             updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'key'
           })
 
         if (error) {
@@ -168,12 +195,11 @@ export async function POST(request: NextRequest) {
           .upsert({
             key: setting.key,
             value: setting.value,
+            newsletter_id: newsletterId,
             description: setting.key === 'dedup_historical_lookback_days'
               ? 'Number of days of sent newsletters to check for duplicate articles'
               : 'Similarity threshold for all deduplication checks (0.0-1.0)',
             updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'key'
           })
 
         if (error) {
@@ -213,10 +239,9 @@ export async function POST(request: NextRequest) {
           .upsert({
             key: setting.key,
             value: setting.value,
+            newsletter_id: newsletterId,
             description: `Max articles setting: ${setting.key}`,
             updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'key'
           })
 
         if (error) {
@@ -272,10 +297,9 @@ export async function POST(request: NextRequest) {
         .upsert({
           key: setting.key,
           value: setting.value,
+          newsletter_id: newsletterId,
           description: `Email configuration: ${setting.key.replace('email_', '')}`,
           updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'key'
         })
         .select()
 
