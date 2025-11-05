@@ -52,7 +52,12 @@ export async function POST(request: NextRequest) {
 
     if (postsError || !posts) {
       console.error('[Backfill] Error fetching posts:', postsError)
-      return NextResponse.json({ error: 'Failed to fetch posts' }, { status: 500 })
+      return NextResponse.json({
+        error: 'Failed to fetch posts',
+        details: postsError?.message || 'No posts returned',
+        code: postsError?.code,
+        hint: postsError?.hint
+      }, { status: 500 })
     }
 
     console.log(`[Backfill] Found ${posts.length} posts from last 36 days`)
