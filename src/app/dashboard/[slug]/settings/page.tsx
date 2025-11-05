@@ -2148,8 +2148,10 @@ function EmailSettings() {
 function AIPromptsSettings() {
   const [prompts, setPrompts] = useState<any[]>([])
   const [grouped, setGrouped] = useState<Record<string, any[]>>({})
-  const [criteria, setCriteria] = useState<any[]>([])
-  const [enabledCount, setEnabledCount] = useState(3)
+  const [primaryCriteria, setPrimaryCriteria] = useState<any[]>([])
+  const [secondaryCriteria, setSecondaryCriteria] = useState<any[]>([])
+  const [primaryEnabledCount, setPrimaryEnabledCount] = useState(3)
+  const [secondaryEnabledCount, setSecondaryEnabledCount] = useState(3)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
   const [message, setMessage] = useState('')
@@ -2206,8 +2208,10 @@ function AIPromptsSettings() {
       const response = await fetch(`/api/settings/criteria?newsletter_id=${newsletterSlug}`)
       if (response.ok) {
         const data = await response.json()
-        setCriteria(data.criteria || [])
-        setEnabledCount(data.enabledCount || 3)
+        setPrimaryCriteria(data.primaryCriteria || [])
+        setSecondaryCriteria(data.secondaryCriteria || [])
+        setPrimaryEnabledCount(data.primaryEnabledCount || 3)
+        setSecondaryEnabledCount(data.secondaryEnabledCount || 3)
       }
     } catch (error) {
       console.error('Failed to load criteria:', error)
@@ -2669,16 +2673,16 @@ function AIPromptsSettings() {
     }
   }
 
-  const handleAddCriteria = async () => {
+  const handleAddPrimaryCriteria = async () => {
     if (!newsletterSlug) return
 
-    if (enabledCount >= 5) {
-      setMessage('Maximum of 5 criteria reached')
+    if (primaryEnabledCount >= 5) {
+      setMessage('Maximum of 5 primary criteria reached')
       setTimeout(() => setMessage(''), 3000)
       return
     }
 
-    setSaving('add_criteria')
+    setSaving('add_primary_criteria')
     setMessage('')
 
     try {
@@ -2687,41 +2691,42 @@ function AIPromptsSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'set_enabled_count',
-          enabledCount: enabledCount + 1,
+          enabledCount: primaryEnabledCount + 1,
+          isSecondary: false,
           newsletterSlug
         })
       })
 
       if (response.ok) {
-        setMessage(`Enabled ${enabledCount + 1} criteria`)
+        setMessage(`Enabled ${primaryEnabledCount + 1} primary criteria`)
         await loadCriteria()
         await loadPrompts()
         setTimeout(() => setMessage(''), 3000)
       } else {
-        throw new Error('Failed to add criteria')
+        throw new Error('Failed to add primary criteria')
       }
     } catch (error) {
-      setMessage('Error: Failed to add criteria')
+      setMessage('Error: Failed to add primary criteria')
       setTimeout(() => setMessage(''), 5000)
     } finally {
       setSaving(null)
     }
   }
 
-  const handleRemoveCriteria = async () => {
+  const handleRemovePrimaryCriteria = async () => {
     if (!newsletterSlug) return
 
-    if (enabledCount <= 1) {
-      setMessage('At least 1 criteria must remain enabled')
+    if (primaryEnabledCount <= 1) {
+      setMessage('At least 1 primary criteria must remain enabled')
       setTimeout(() => setMessage(''), 3000)
       return
     }
 
-    if (!confirm(`Remove criteria ${enabledCount}? This will disable it from scoring.`)) {
+    if (!confirm(`Remove primary criteria ${primaryEnabledCount}? This will disable it from scoring.`)) {
       return
     }
 
-    setSaving('remove_criteria')
+    setSaving('remove_primary_criteria')
     setMessage('')
 
     try {
@@ -2730,21 +2735,106 @@ function AIPromptsSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'set_enabled_count',
-          enabledCount: enabledCount - 1,
+          enabledCount: primaryEnabledCount - 1,
+          isSecondary: false,
           newsletterSlug
         })
       })
 
       if (response.ok) {
-        setMessage(`Reduced to ${enabledCount - 1} criteria`)
+        setMessage(`Reduced to ${primaryEnabledCount - 1} primary criteria`)
         await loadCriteria()
         await loadPrompts()
         setTimeout(() => setMessage(''), 3000)
       } else {
-        throw new Error('Failed to remove criteria')
+        throw new Error('Failed to remove primary criteria')
       }
     } catch (error) {
-      setMessage('Error: Failed to remove criteria')
+      setMessage('Error: Failed to remove primary criteria')
+      setTimeout(() => setMessage(''), 5000)
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  const handleAddSecondaryCriteria = async () => {
+    if (!newsletterSlug) return
+
+    if (secondaryEnabledCount >= 5) {
+      setMessage('Maximum of 5 secondary criteria reached')
+      setTimeout(() => setMessage(''), 3000)
+      return
+    }
+
+    setSaving('add_secondary_criteria')
+    setMessage('')
+
+    try {
+      const response = await fetch('/api/settings/criteria', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'set_enabled_count',
+          enabledCount: secondaryEnabledCount + 1,
+          isSecondary: true,
+          newsletterSlug
+        })
+      })
+
+      if (response.ok) {
+        setMessage(`Enabled ${secondaryEnabledCount + 1} secondary criteria`)
+        await loadCriteria()
+        await loadPrompts()
+        setTimeout(() => setMessage(''), 3000)
+      } else {
+        throw new Error('Failed to add secondary criteria')
+      }
+    } catch (error) {
+      setMessage('Error: Failed to add secondary criteria')
+      setTimeout(() => setMessage(''), 5000)
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  const handleRemoveSecondaryCriteria = async () => {
+    if (!newsletterSlug) return
+
+    if (secondaryEnabledCount <= 1) {
+      setMessage('At least 1 secondary criteria must remain enabled')
+      setTimeout(() => setMessage(''), 3000)
+      return
+    }
+
+    if (!confirm(`Remove secondary criteria ${secondaryEnabledCount}? This will disable it from scoring.`)) {
+      return
+    }
+
+    setSaving('remove_secondary_criteria')
+    setMessage('')
+
+    try {
+      const response = await fetch('/api/settings/criteria', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'set_enabled_count',
+          enabledCount: secondaryEnabledCount - 1,
+          isSecondary: true,
+          newsletterSlug
+        })
+      })
+
+      if (response.ok) {
+        setMessage(`Reduced to ${secondaryEnabledCount - 1} secondary criteria`)
+        await loadCriteria()
+        await loadPrompts()
+        setTimeout(() => setMessage(''), 3000)
+      } else {
+        throw new Error('Failed to remove secondary criteria')
+      }
+    } catch (error) {
+      setMessage('Error: Failed to remove secondary criteria')
       setTimeout(() => setMessage(''), 5000)
     } finally {
       setSaving(null)
@@ -2969,23 +3059,23 @@ function AIPromptsSettings() {
             <div>
               <h3 className="text-lg font-medium text-gray-900">Primary Article Prompts</h3>
               <p className="text-sm text-gray-600 mt-1">
-                Configure evaluation criteria and content generation for primary (top) articles. Includes Article Title and Article Body prompts. {enabledCount} of 5 criteria enabled.
+                Configure evaluation criteria and content generation for primary (top) articles. Includes Article Title and Article Body prompts. {primaryEnabledCount} of 5 criteria enabled.
               </p>
             </div>
             <div className="flex items-center space-x-2">
               <button
-                onClick={handleAddCriteria}
-                disabled={enabledCount >= 5 || saving === 'add_criteria'}
+                onClick={handleAddPrimaryCriteria}
+                disabled={primaryEnabledCount >= 5 || saving === 'add_primary_criteria'}
                 className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving === 'add_criteria' ? 'Adding...' : 'Add Criteria'}
+                {saving === 'add_primary_criteria' ? 'Adding...' : 'Add Criteria'}
               </button>
               <button
-                onClick={handleRemoveCriteria}
-                disabled={enabledCount <= 1 || saving === 'remove_criteria'}
+                onClick={handleRemovePrimaryCriteria}
+                disabled={primaryEnabledCount <= 1 || saving === 'remove_primary_criteria'}
                 className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving === 'remove_criteria' ? 'Removing...' : 'Remove Criteria'}
+                {saving === 'remove_primary_criteria' ? 'Removing...' : 'Remove Criteria'}
               </button>
             </div>
           </div>
@@ -3018,7 +3108,7 @@ function AIPromptsSettings() {
           </div>
         </div>
         <div className="divide-y divide-gray-200">
-          {criteria.filter(c => c.enabled).map((criterion) => {
+          {primaryCriteria.filter(c => c.enabled).map((criterion) => {
             const promptKey = `ai_prompt_criteria_${criterion.number}`
             const prompt = criteriaPrompts.find(p => p.key === promptKey)
             const isExpanded = expandedPrompt === promptKey
@@ -3267,23 +3357,23 @@ function AIPromptsSettings() {
             <div>
               <h3 className="text-lg font-medium text-gray-900">Secondary Article Prompts</h3>
               <p className="text-sm text-gray-600 mt-1">
-                Configure evaluation criteria and content generation for secondary (bottom) articles. Includes Article Title and Article Body prompts. {enabledCount} of 5 criteria enabled.
+                Configure evaluation criteria and content generation for secondary (bottom) articles. Includes Article Title and Article Body prompts. {secondaryEnabledCount} of 5 criteria enabled.
               </p>
             </div>
             <div className="flex items-center space-x-2">
               <button
-                onClick={handleAddCriteria}
-                disabled={enabledCount >= 5 || saving === 'add_criteria'}
+                onClick={handleAddSecondaryCriteria}
+                disabled={secondaryEnabledCount >= 5 || saving === 'add_secondary_criteria'}
                 className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving === 'add_criteria' ? 'Adding...' : 'Add Criteria'}
+                {saving === 'add_secondary_criteria' ? 'Adding...' : 'Add Criteria'}
               </button>
               <button
-                onClick={handleRemoveCriteria}
-                disabled={enabledCount <= 1 || saving === 'remove_criteria'}
+                onClick={handleRemoveSecondaryCriteria}
+                disabled={secondaryEnabledCount <= 1 || saving === 'remove_secondary_criteria'}
                 className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving === 'remove_criteria' ? 'Removing...' : 'Remove Criteria'}
+                {saving === 'remove_secondary_criteria' ? 'Removing...' : 'Remove Criteria'}
               </button>
             </div>
           </div>
@@ -3316,7 +3406,7 @@ function AIPromptsSettings() {
           </div>
         </div>
         <div className="divide-y divide-gray-200">
-          {criteria.filter(c => c.enabled).map((criterion) => {
+          {secondaryCriteria.filter(c => c.enabled).map((criterion) => {
             const promptKey = `ai_prompt_secondary_criteria_${criterion.number}`
             const prompt = secondaryCriteriaPrompts.find(p => p.key === promptKey)
             const isExpanded = expandedPrompt === promptKey

@@ -37,15 +37,23 @@ export async function GET(request: NextRequest) {
 
     const newsletterId = newsletter.id
 
-    // Fetch criteria enabled count
-    const { data: enabledData } = await supabaseAdmin
+    // Fetch SEPARATE enabled counts for primary and secondary
+    const { data: primaryEnabledData } = await supabaseAdmin
       .from('app_settings')
       .select('value')
-      .eq('key', 'criteria_enabled_count')
+      .eq('key', 'primary_criteria_enabled_count')
       .eq('newsletter_id', newsletterId)
       .single()
 
-    const enabledCount = enabledData?.value ? parseInt(enabledData.value) : 3
+    const { data: secondaryEnabledData } = await supabaseAdmin
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'secondary_criteria_enabled_count')
+      .eq('newsletter_id', newsletterId)
+      .single()
+
+    const primaryEnabledCount = primaryEnabledData?.value ? parseInt(primaryEnabledData.value) : 3
+    const secondaryEnabledCount = secondaryEnabledData?.value ? parseInt(secondaryEnabledData.value) : 3
 
     // Fetch all criteria names and weights (both primary and secondary)
     const { data: settingsData } = await supabaseAdmin
@@ -54,7 +62,9 @@ export async function GET(request: NextRequest) {
       .eq('newsletter_id', newsletterId)
       .or('key.like.criteria_%_name,key.like.criteria_%_weight,key.like.secondary_criteria_%_weight,key.like.secondary_criteria_%_name')
 
-    const criteria = []
+    const primaryCriteria = []
+    const secondaryCriteria = []
+
     for (let i = 1; i <= 5; i++) {
       const nameKey = `criteria_${i}_name`
       const weightKey = `criteria_${i}_weight`
@@ -66,20 +76,27 @@ export async function GET(request: NextRequest) {
       const secondaryNameRecord = settingsData?.find(s => s.key === secondaryNameKey)
       const secondaryWeightRecord = settingsData?.find(s => s.key === secondaryWeightKey)
 
-      criteria.push({
+      primaryCriteria.push({
         number: i,
         name: nameRecord?.value || `Criteria ${i}`,
         weight: weightRecord?.value ? parseFloat(weightRecord.value) : 1.0,
-        secondaryName: secondaryNameRecord?.value || nameRecord?.value || `Criteria ${i}`,
-        secondaryWeight: secondaryWeightRecord?.value ? parseFloat(secondaryWeightRecord.value) : 1.0,
-        enabled: i <= enabledCount
+        enabled: i <= primaryEnabledCount
+      })
+
+      secondaryCriteria.push({
+        number: i,
+        name: secondaryNameRecord?.value || nameRecord?.value || `Criteria ${i}`,
+        weight: secondaryWeightRecord?.value ? parseFloat(secondaryWeightRecord.value) : 1.0,
+        enabled: i <= secondaryEnabledCount
       })
     }
 
     return NextResponse.json({
       success: true,
-      enabledCount,
-      criteria
+      primaryEnabledCount,
+      secondaryEnabledCount,
+      primaryCriteria,
+      secondaryCriteria
     })
 
   } catch (error) {
@@ -194,11 +211,16 @@ export async function PATCH(request: NextRequest) {
         )
       }
 
-      // Check if criteria_enabled_count exists
+      // Use different keys for primary vs secondary enabled counts
+      const settingKey = isSecondary
+        ? 'secondary_criteria_enabled_count'
+        : 'primary_criteria_enabled_count'
+
+      // Check if setting exists
       const { data: existing } = await supabaseAdmin
         .from('app_settings')
         .select('key')
-        .eq('key', 'criteria_enabled_count')
+        .eq('key', settingKey)
         .eq('newsletter_id', newsletterId)
         .single()
 
@@ -211,7 +233,7 @@ export async function PATCH(request: NextRequest) {
             value: enabledCount.toString(),
             updated_at: new Date().toISOString()
           })
-          .eq('key', 'criteria_enabled_count')
+          .eq('key', settingKey)
           .eq('newsletter_id', newsletterId)
         error = result.error
       } else {
@@ -219,10 +241,10 @@ export async function PATCH(request: NextRequest) {
         const result = await supabaseAdmin
           .from('app_settings')
           .insert({
-            key: 'criteria_enabled_count',
+            key: settingKey,
             value: enabledCount.toString(),
             newsletter_id: newsletterId,
-            description: 'Number of criteria currently enabled (1-5)'
+            description: `Number of ${isSecondary ? 'secondary' : 'primary'} criteria currently enabled (1-5)`
           })
         error = result.error
       }
@@ -232,9 +254,10 @@ export async function PATCH(request: NextRequest) {
         throw error
       }
 
+      const sectionName = isSecondary ? 'secondary' : 'primary'
       return NextResponse.json({
         success: true,
-        message: `Enabled criteria count set to ${enabledCount}`,
+        message: `Enabled ${sectionName} criteria count set to ${enabledCount}`,
         enabledCount
       })
     }
