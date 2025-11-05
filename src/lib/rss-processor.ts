@@ -232,6 +232,9 @@ export class RSSProcessor {
       duplicatePostIds = new Set(duplicatePosts?.map(d => d.post_id) || [])
     }
 
+    console.log(`[Titles] Campaign has ${topPosts.length} total posts for ${section} section`)
+    console.log(`[Titles] Excluding ${duplicatePostIds.size} duplicate posts`)
+
     // Filter and sort posts
     const postsWithRatings = topPosts
       .filter(post =>
@@ -246,6 +249,7 @@ export class RSSProcessor {
       })
       .slice(0, limit)
 
+    console.log(`[Titles] After filtering: ${postsWithRatings.length} posts available (target: ${limit})`)
     console.log(`[Titles] Generating ${postsWithRatings.length} ${section} titles...`)
 
     // Generate titles in batch
@@ -329,12 +333,17 @@ export class RSSProcessor {
   /**
    * NEW WORKFLOW: Generate bodies only (Step 2 of article generation)
    * Generates content for articles that have titles but no content
+   *
+   * NOTE: We don't use offset here because the WHERE content='' filter already
+   * excludes processed articles. Batch 1 updates first 3, so batch 2 automatically
+   * gets the next 3 without needing offset logic.
    */
   async generateBodiesOnly(campaignId: string, section: 'primary' | 'secondary' = 'primary', offset: number = 0, limit: number = 3) {
     const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
     const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
 
     // Get articles with titles but empty/placeholder content
+    // Always get first N (offset is ignored because filter auto-excludes processed articles)
     const { data: articles } = await supabaseAdmin
       .from(tableName)
       .select('*, rss_posts(*)')
@@ -342,14 +351,15 @@ export class RSSProcessor {
       .eq('content', '') // Empty placeholder from title generation step
       .not('headline', 'is', null)
       .order('post_id', { ascending: true })
-      .range(offset, offset + limit - 1)
+      .limit(limit) // Just take first N with content='' (no offset needed)
 
     if (!articles || articles.length === 0) {
-      console.log(`[Bodies] No articles awaiting body generation (offset ${offset})`)
+      console.log(`[Bodies] No articles awaiting body generation`)
       return
     }
 
-    console.log(`[Bodies] Generating ${articles.length} ${section} bodies (offset ${offset})...`)
+    console.log(`[Bodies] Found ${articles.length} articles awaiting body generation`)
+    console.log(`[Bodies] Generating ${articles.length} ${section} bodies...`)
 
     // Generate bodies in batch (2 at a time for safety)
     const BATCH_SIZE = 2
