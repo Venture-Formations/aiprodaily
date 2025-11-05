@@ -11,17 +11,24 @@ import { callAIWithPrompt } from '@/lib/openai'
  */
 export async function POST(request: NextRequest) {
   try {
+    console.log('[Backfill] Endpoint called')
+
     // Check auth: either session or CRON_SECRET
     const session = await getServerSession(authOptions)
     const { searchParams } = new URL(request.url)
     const secret = searchParams.get('secret')
 
+    console.log('[Backfill] Auth check:', { hasSession: !!session, hasSecret: !!secret })
+
     if (!session && secret !== process.env.CRON_SECRET) {
+      console.log('[Backfill] Auth failed')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const body = await request.json()
     const { newsletterId, dryRun = false } = body
+
+    console.log('[Backfill] Request body:', { newsletterId, dryRun })
 
     if (!newsletterId) {
       return NextResponse.json({ error: 'newsletter_id required' }, { status: 400 })
@@ -195,10 +202,14 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('[Backfill] Failed:', error)
+    console.error('[Backfill] CRITICAL ERROR:', error)
+    console.error('[Backfill] Error stack:', error instanceof Error ? error.stack : 'No stack')
+    console.error('[Backfill] Error details:', JSON.stringify(error, null, 2))
+
     return NextResponse.json({
       error: 'Backfill failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
+      message: error instanceof Error ? error.message : 'Unknown error',
+      details: error instanceof Error ? error.stack : String(error)
     }, { status: 500 })
   }
 }
