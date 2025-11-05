@@ -88,24 +88,36 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Get post_ratings for these posts
+    // Get post_ratings for these posts (batch to avoid Supabase query size limits)
     const postIds = posts.map(p => p.id)
-    const { data: ratings, error: ratingsError } = await supabaseAdmin
-      .from('post_ratings')
-      .select('*')
-      .in('post_id', postIds)
+    const RATINGS_BATCH_SIZE = 100
+    const allRatings: any[] = []
 
-    if (ratingsError) {
-      console.error('[Backfill] Error fetching ratings:', ratingsError)
-      return NextResponse.json({
-        error: 'Failed to fetch ratings',
-        details: ratingsError?.message || 'Unknown error',
-        code: ratingsError?.code,
-        hint: ratingsError?.hint
-      }, { status: 500 })
+    for (let i = 0; i < postIds.length; i += RATINGS_BATCH_SIZE) {
+      const batch = postIds.slice(i, i + RATINGS_BATCH_SIZE)
+      const { data: batchRatings, error: ratingsError } = await supabaseAdmin
+        .from('post_ratings')
+        .select('*')
+        .in('post_id', batch)
+
+      if (ratingsError) {
+        console.error('[Backfill] Error fetching ratings batch:', ratingsError)
+        return NextResponse.json({
+          error: 'Failed to fetch ratings',
+          details: ratingsError?.message || 'Unknown error',
+          code: ratingsError?.code,
+          hint: ratingsError?.hint,
+          batch: `${i}-${i + batch.length}`
+        }, { status: 500 })
+      }
+
+      if (batchRatings) {
+        allRatings.push(...batchRatings)
+      }
     }
 
-    console.log(`[Backfill] Found ${ratings?.length || 0} ratings for ${postIds.length} posts`)
+    const ratings = allRatings
+    console.log(`[Backfill] Found ${ratings.length} ratings for ${postIds.length} posts`)
 
     // Create a map of post_id to rating
     const ratingsMap = new Map()
