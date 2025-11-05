@@ -44,10 +44,28 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Backfill] Fetching posts from ${lookbackTimestamp}...`)
 
+    // First get all feed IDs for this newsletter
+    const { data: feeds, error: feedsError } = await supabaseAdmin
+      .from('rss_feeds')
+      .select('id')
+      .eq('newsletter_id', newsletterId)
+
+    if (feedsError || !feeds || feeds.length === 0) {
+      console.error('[Backfill] Error fetching feeds:', feedsError)
+      return NextResponse.json({
+        error: 'Failed to fetch feeds for newsletter',
+        details: feedsError?.message || 'No feeds found'
+      }, { status: 500 })
+    }
+
+    const feedIds = feeds.map(f => f.id)
+    console.log(`[Backfill] Found ${feedIds.length} feeds for newsletter`)
+
+    // Get posts from these feeds
     const { data: posts, error: postsError } = await supabaseAdmin
       .from('rss_posts')
       .select('id, title, description, content, full_article_text')
-      .eq('newsletter_id', newsletterId)  // CRITICAL: Filter by newsletter
+      .in('feed_id', feedIds)  // Filter by newsletter's feeds
       .gte('processed_at', lookbackTimestamp)
 
     if (postsError || !posts) {
