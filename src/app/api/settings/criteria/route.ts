@@ -85,8 +85,8 @@ export async function GET(request: NextRequest) {
 
       secondaryCriteria.push({
         number: i,
-        name: secondaryNameRecord?.value || nameRecord?.value || `Criteria ${i}`,
-        weight: secondaryWeightRecord?.value ? parseFloat(secondaryWeightRecord.value) : 1.0,
+        secondaryName: secondaryNameRecord?.value || nameRecord?.value || `Criteria ${i}`,
+        secondaryWeight: secondaryWeightRecord?.value ? parseFloat(secondaryWeightRecord.value) : 1.0,
         enabled: i <= secondaryEnabledCount
       })
     }
