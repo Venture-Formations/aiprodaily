@@ -34,11 +34,12 @@ async function getPrompt(key: string, fallback: string): Promise<string> {
 
 // Helper function to fetch complete JSON API request from database
 // Returns the prompt exactly as stored (complete JSON with model, messages, temperature, etc.)
-async function getPromptJSON(key: string, fallbackText?: string): Promise<any> {
+async function getPromptJSON(key: string, newsletterId: string, fallbackText?: string): Promise<any> {
   try {
     const { data, error } = await supabaseAdmin
       .from('app_settings')
       .select('value, ai_provider')
+      .eq('newsletter_id', newsletterId)
       .eq('key', key)
       .single()
 
@@ -2088,11 +2089,12 @@ export async function callWithStructuredPrompt(
  */
 export async function callAIWithPrompt(
   promptKey: string,
+  newsletterId: string,
   placeholders: Record<string, string> = {},
   fallbackText?: string
 ): Promise<any> {
   // Load complete JSON prompt from database
-  const promptJSON = await getPromptJSON(promptKey, fallbackText)
+  const promptJSON = await getPromptJSON(promptKey, newsletterId, fallbackText)
 
   // Extract provider info
   const provider = promptJSON._provider || 'openai'
@@ -2562,13 +2564,13 @@ export async function callAI(prompt: string, maxTokens = 1000, temperature = 0.3
 
 // Complete AI call interface - fetches prompt+provider, replaces placeholders, calls AI
 export const AI_CALL = {
-  contentEvaluator: async (post: { title: string; description: string; content?: string; hasImage?: boolean }, maxTokens = 1000, temperature = 0.3) => {
+  contentEvaluator: async (post: { title: string; description: string; content?: string; hasImage?: boolean }, newsletterId: string, maxTokens = 1000, temperature = 0.3) => {
     const imagePenaltyText = post.hasImage
       ? 'This post HAS an image.'
       : 'This post has NO image - subtract 5 points from interest_level.'
 
     // Use callAIWithPrompt to load complete config from database
-    return callAIWithPrompt('ai_prompt_content_evaluator', {
+    return callAIWithPrompt('ai_prompt_content_evaluator', newsletterId, {
       title: post.title,
       description: post.description || 'No description available',
       content: post.content ? post.content.substring(0, 1000) + '...' : 'No content available',
@@ -2576,9 +2578,9 @@ export const AI_CALL = {
     })
   },
 
-  primaryArticleTitle: async (post: { title: string; description: string; content?: string; source_url?: string }, maxTokens = 200, temperature = 0.7) => {
+  primaryArticleTitle: async (post: { title: string; description: string; content?: string; source_url?: string }, newsletterId: string, maxTokens = 200, temperature = 0.7) => {
     // Use callAIWithPrompt to load complete config from database
-    return callAIWithPrompt('ai_prompt_primary_article_title', {
+    return callAIWithPrompt('ai_prompt_primary_article_title', newsletterId, {
       title: post.title,
       description: post.description || 'No description available',
       content: post.content ? post.content.substring(0, 1500) + '...' : 'No additional content',
@@ -2586,9 +2588,9 @@ export const AI_CALL = {
     })
   },
 
-  primaryArticleBody: async (post: { title: string; description: string; content?: string; source_url?: string }, headline: string, maxTokens = 500, temperature = 0.7) => {
+  primaryArticleBody: async (post: { title: string; description: string; content?: string; source_url?: string }, newsletterId: string, headline: string, maxTokens = 500, temperature = 0.7) => {
     // Use callAIWithPrompt to load complete config from database
-    return callAIWithPrompt('ai_prompt_primary_article_body', {
+    return callAIWithPrompt('ai_prompt_primary_article_body', newsletterId, {
       title: post.title,
       description: post.description || 'No description available',
       content: post.content ? post.content.substring(0, 1500) + '...' : 'No additional content',
@@ -2597,9 +2599,9 @@ export const AI_CALL = {
     })
   },
 
-  secondaryArticleTitle: async (post: { title: string; description: string; content?: string; source_url?: string }, maxTokens = 200, temperature = 0.7) => {
+  secondaryArticleTitle: async (post: { title: string; description: string; content?: string; source_url?: string }, newsletterId: string, maxTokens = 200, temperature = 0.7) => {
     // Use callAIWithPrompt to load complete config from database
-    return callAIWithPrompt('ai_prompt_secondary_article_title', {
+    return callAIWithPrompt('ai_prompt_secondary_article_title', newsletterId, {
       title: post.title,
       description: post.description || 'No description available',
       content: post.content ? post.content.substring(0, 1500) + '...' : 'No additional content',
@@ -2607,9 +2609,9 @@ export const AI_CALL = {
     })
   },
 
-  secondaryArticleBody: async (post: { title: string; description: string; content?: string; source_url?: string }, headline: string, maxTokens = 500, temperature = 0.7) => {
+  secondaryArticleBody: async (post: { title: string; description: string; content?: string; source_url?: string }, newsletterId: string, headline: string, maxTokens = 500, temperature = 0.7) => {
     // Use callAIWithPrompt to load complete config from database
-    return callAIWithPrompt('ai_prompt_secondary_article_body', {
+    return callAIWithPrompt('ai_prompt_secondary_article_body', newsletterId, {
       title: post.title,
       description: post.description || 'No description available',
       content: post.content ? post.content.substring(0, 1500) + '...' : 'No additional content',
@@ -2618,15 +2620,15 @@ export const AI_CALL = {
     })
   },
 
-  subjectLineGenerator: async (top_article: { headline: string; content: string }, maxTokens = 100, temperature = 0.8) => {
+  subjectLineGenerator: async (top_article: { headline: string; content: string }, newsletterId: string, maxTokens = 100, temperature = 0.8) => {
     // Use callAIWithPrompt to load complete config from database
-    return callAIWithPrompt('ai_prompt_subject_line', {
+    return callAIWithPrompt('ai_prompt_subject_line', newsletterId, {
       headline: top_article.headline,
       content: top_article.content
     })
   },
 
-  welcomeSection: async (articles: Array<{ headline: string; content: string }>, maxTokens = 500, temperature = 0.8) => {
+  welcomeSection: async (articles: Array<{ headline: string; content: string }>, newsletterId: string, maxTokens = 500, temperature = 0.8) => {
     // Format articles as JSON string for placeholder replacement
     const articlesJson = JSON.stringify(articles.map(a => ({
       headline: a.headline,
@@ -2634,12 +2636,12 @@ export const AI_CALL = {
     })))
 
     // Use callAIWithPrompt to load complete config from database
-    return callAIWithPrompt('ai_prompt_welcome_section', {
+    return callAIWithPrompt('ai_prompt_welcome_section', newsletterId, {
       articles: articlesJson
     })
   },
 
-  topicDeduper: async (posts: Array<{ title: string; description: string; full_article_text: string }>, maxTokens = 1000, temperature = 0.3) => {
+  topicDeduper: async (posts: Array<{ title: string; description: string; full_article_text: string }>, newsletterId: string, maxTokens = 1000, temperature = 0.3) => {
     // Format posts as numbered list for placeholder replacement
     const postsFormatted = posts.map((post, i) =>
       `${i}. Title: ${post.title}\n   Description: ${post.description || 'No description'}\n   Full Article: ${post.full_article_text ? post.full_article_text.substring(0, 1500) + (post.full_article_text.length > 1500 ? '...' : '') : 'No full text available'}`
@@ -2647,15 +2649,15 @@ export const AI_CALL = {
 
     // Use callAIWithPrompt to load complete config from database
     // Support both {{articles}} and {{posts}} placeholders for compatibility
-    return callAIWithPrompt('ai_prompt_topic_deduper', {
+    return callAIWithPrompt('ai_prompt_topic_deduper', newsletterId, {
       articles: postsFormatted,
       posts: postsFormatted  // Also support {{posts}} placeholder
     })
   },
 
-  factChecker: async (newsletterContent: string, originalContent: string, maxTokens = 1000, temperature = 0.3) => {
+  factChecker: async (newsletterContent: string, originalContent: string, newsletterId: string, maxTokens = 1000, temperature = 0.3) => {
     // Use callAIWithPrompt to load complete config from database
-    return callAIWithPrompt('ai_prompt_fact_checker', {
+    return callAIWithPrompt('ai_prompt_fact_checker', newsletterId, {
       newsletter_content: newsletterContent,
       original_content: originalContent
     })

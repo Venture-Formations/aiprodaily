@@ -12,6 +12,20 @@ export async function autoRegenerateWelcome(
   try {
     console.log('[WELCOME] Auto-regenerating welcome section for campaign:', campaignId)
 
+    // Get newsletter_id from campaign
+    const { data: campaign, error: campaignError } = await supabaseAdmin
+      .from('newsletter_campaigns')
+      .select('newsletter_id')
+      .eq('id', campaignId)
+      .single()
+
+    if (campaignError || !campaign || !campaign.newsletter_id) {
+      console.error('[WELCOME] Failed to get newsletter_id for campaign:', campaignError)
+      return { success: false, error: 'Failed to get campaign newsletter_id' }
+    }
+
+    const newsletterId = campaign.newsletter_id
+
     // Fetch ALL active PRIMARY articles for this campaign
     const { data: primaryArticles, error: primaryError } = await supabaseAdmin
       .from('articles')
@@ -52,7 +66,7 @@ export async function autoRegenerateWelcome(
     console.log(`[WELCOME] Generating welcome from ${primaryArticles?.length || 0} primary and ${secondaryArticles?.length || 0} secondary articles`)
 
     // Generate welcome text using AI_CALL (handles prompt + provider + call)
-    const result = await AI_CALL.welcomeSection(allArticles, 500, 0.8)
+    const result = await AI_CALL.welcomeSection(allArticles, newsletterId, 500, 0.8)
 
     // Parse JSON response to extract intro, tagline, and summary
     let welcomeIntro = ''

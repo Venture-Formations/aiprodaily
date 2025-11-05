@@ -10,7 +10,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const scheduleDisplay = await ScheduleChecker.getScheduleDisplay()
+    const { searchParams } = new URL(request.url)
+    const newsletter_id = searchParams.get('newsletter_id')
+
+    if (!newsletter_id) {
+      return NextResponse.json({
+        error: 'newsletter_id query parameter is required'
+      }, { status: 400 })
+    }
+
+    const scheduleDisplay = await ScheduleChecker.getScheduleDisplay(newsletter_id)
 
     return NextResponse.json(scheduleDisplay)
 

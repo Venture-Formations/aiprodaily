@@ -6,13 +6,18 @@ import { RSSProcessor } from '@/lib/rss-processor'
  * Each step gets its own 800-second timeout
  * Handles GPT-5's longer processing times
  */
-export async function processRSSWorkflow(input: { trigger: 'cron' | 'manual' }) {
+export async function processRSSWorkflow(input: {
+  trigger: 'cron' | 'manual'
+  newsletter_id: string
+}) {
   "use workflow"
 
   let campaignId: string
 
+  console.log(`[Workflow] Starting for newsletter: ${input.newsletter_id}`)
+
   // STEP 1: Setup - Create campaign and assign posts
-  campaignId = await setupCampaign()
+  campaignId = await setupCampaign(input.newsletter_id)
 
   // STEP 2-3: Generate primary articles in 2 batches (3 articles each)
   await generatePrimaryArticlesBatch1(campaignId)
@@ -37,12 +42,25 @@ export async function processRSSWorkflow(input: { trigger: 'cron' | 'manual' }) 
 }
 
 // Step functions
-async function setupCampaign() {
+async function setupCampaign(newsletterId: string) {
   "use step"
 
   console.log('[Workflow Step 1/8] Setting up campaign...')
 
   const processor = new RSSProcessor()
+
+  // Get the newsletter
+  const { data: newsletter, error: newsletterError } = await supabaseAdmin
+    .from('newsletters')
+    .select('id, name, slug')
+    .eq('id', newsletterId)
+    .single()
+
+  if (newsletterError || !newsletter) {
+    throw new Error(`Newsletter not found: ${newsletterId}`)
+  }
+
+  console.log(`[Workflow Step 1/8] Using newsletter: ${newsletter.name} (${newsletter.id})`)
 
   // Calculate campaign date (Central Time + 12 hours)
   const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
@@ -50,10 +68,14 @@ async function setupCampaign() {
   centralDate.setHours(centralDate.getHours() + 12)
   const campaignDate = centralDate.toISOString().split('T')[0]
 
-  // Create new campaign
+  // Create new campaign with newsletter_id
   const { data: newCampaign, error: createError } = await supabaseAdmin
     .from('newsletter_campaigns')
-    .insert([{ date: campaignDate, status: 'processing' }])
+    .insert([{
+      date: campaignDate,
+      status: 'processing',
+      newsletter_id: newsletter.id
+    }])
     .select('id')
     .single()
 
@@ -68,17 +90,9 @@ async function setupCampaign() {
   try {
     const { AppSelector } = await import('@/lib/app-selector')
     const { PromptSelector } = await import('@/lib/prompt-selector')
-    const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
-      .select('id, name, slug')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
 
-    if (newsletter) {
-      await AppSelector.selectAppsForCampaign(id, newsletter.id)
-      await PromptSelector.selectPromptForCampaign(id)
-    }
+    await AppSelector.selectAppsForCampaign(id, newsletter.id)
+    await PromptSelector.selectPromptForCampaign(id)
   } catch (error) {
     console.log('[Workflow Step 1/8] AI selection failed (non-critical)')
   }

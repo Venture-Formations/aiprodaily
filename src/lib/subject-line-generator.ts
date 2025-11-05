@@ -22,6 +22,7 @@ export async function generateSubjectLine(campaignId: string, userEmail?: string
       .from('newsletter_campaigns')
       .select(`
         *,
+        newsletter_id,
         articles:articles(
           headline,
           content,
@@ -73,6 +74,12 @@ export async function generateSubjectLine(campaignId: string, userEmail?: string
       return { success: false, error: 'Campaign not found' }
     }
 
+    // Get and validate newsletter_id
+    const newsletterId = campaign.newsletter_id
+    if (!newsletterId) {
+      return { success: false, error: 'Campaign missing newsletter_id' }
+    }
+
     // Get active articles sorted by rank (excluding skipped)
     const activeArticles = campaign.articles
       .filter((article: any) => {
@@ -94,7 +101,7 @@ export async function generateSubjectLine(campaignId: string, userEmail?: string
     console.log(`Auto-generating subject line based on current #1 article: "${topArticle.headline}" (rank: ${topArticle.rank || 'unranked'})`)
 
     // Generate subject line using AI_CALL (handles prompt + provider + call)
-    const result = await AI_CALL.subjectLineGenerator(topArticle, 100, 0.8)
+    const result = await AI_CALL.subjectLineGenerator(topArticle, newsletterId, 100, 0.8)
 
     // Handle both plain text and JSON responses
     let subjectLine = ''

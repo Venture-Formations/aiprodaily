@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ScheduleChecker } from '@/lib/schedule-checker'
 import { start } from 'workflow/api'
 import { processRSSWorkflow } from '@/lib/workflows/process-rss-workflow'
+import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * Workflow Trigger Cron
  * Runs every 5 minutes to check if it's time to execute the RSS workflow
- * based on the schedule configured in Settings > Email
+ * for any newsletter based on their individual schedules
  *
- * This replaces the hardcoded vercel.json schedule with a dynamic,
- * database-driven schedule that can be changed via the UI
+ * Multi-tenant: Each newsletter has its own schedule in app_settings
  */
 export async function GET(request: NextRequest) {
   try {
@@ -25,29 +25,59 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if it's time to run RSS processing based on database schedule
-    const shouldRun = await ScheduleChecker.shouldRunRSSProcessing()
+    // Get all active newsletters
+    const { data: newsletters, error: newslettersError } = await supabaseAdmin
+      .from('newsletters')
+      .select('id, name, slug')
+      .eq('is_active', true)
 
-    if (!shouldRun) {
-      console.log('[Workflow Trigger] Not time to run workflow yet')
+    if (newslettersError || !newsletters || newsletters.length === 0) {
+      console.log('[Workflow Trigger] No active newsletters found')
       return NextResponse.json({
         success: true,
-        message: 'Not time to run RSS workflow',
+        message: 'No active newsletters',
         skipped: true,
         timestamp: new Date().toISOString()
       })
     }
 
-    console.log('[Workflow Trigger] Time to run workflow - starting...')
+    console.log(`[Workflow Trigger] Checking schedules for ${newsletters.length} newsletters`)
 
-    // Start the workflow
-    await start(processRSSWorkflow, [{ trigger: 'cron' }])
+    // Check each newsletter's schedule and start workflows as needed
+    const startedWorkflows: string[] = []
 
-    console.log('[Workflow Trigger] Workflow started successfully')
+    for (const newsletter of newsletters) {
+      const shouldRun = await ScheduleChecker.shouldRunRSSProcessing(newsletter.id)
+
+      if (shouldRun) {
+        console.log(`[Workflow Trigger] Starting workflow for ${newsletter.name} (${newsletter.id})`)
+
+        await start(processRSSWorkflow, [{
+          trigger: 'cron',
+          newsletter_id: newsletter.id
+        }])
+
+        startedWorkflows.push(newsletter.name)
+      } else {
+        console.log(`[Workflow Trigger] Not time yet for ${newsletter.name}`)
+      }
+    }
+
+    if (startedWorkflows.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: 'No workflows scheduled at this time',
+        skipped: true,
+        timestamp: new Date().toISOString()
+      })
+    }
+
+    console.log(`[Workflow Trigger] Started workflows for: ${startedWorkflows.join(', ')}`)
 
     return NextResponse.json({
       success: true,
-      message: 'Workflow started successfully',
+      message: `Started ${startedWorkflows.length} workflow(s)`,
+      newsletters: startedWorkflows,
       timestamp: new Date().toISOString()
     })
 

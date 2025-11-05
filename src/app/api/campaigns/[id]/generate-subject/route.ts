@@ -24,6 +24,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .from('newsletter_campaigns')
       .select(`
         *,
+        newsletter_id,
         articles:articles(
           headline,
           content,
@@ -108,8 +109,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       skipped: topArticle.skipped
     })
 
+    // Get newsletter_id from campaign
+    const newsletterId = campaign.newsletter_id
+    if (!newsletterId) {
+      return NextResponse.json({
+        error: 'Campaign missing newsletter_id'
+      }, { status: 400 })
+    }
+
     // Generate subject line using AI_CALL (handles prompt + provider + call)
-    const result = await AI_CALL.subjectLineGenerator(topArticle, 100, 0.8)
+    const result = await AI_CALL.subjectLineGenerator(topArticle, newsletterId, 100, 0.8)
 
     console.log('=== AI RESPONSE ===')
     console.log(result)

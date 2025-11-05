@@ -37,6 +37,23 @@ export class RSSProcessor {
   }
 
   /**
+   * Helper: Get newsletter_id from campaign_id
+   */
+  private async getNewsletterIdFromCampaign(campaignId: string): Promise<string> {
+    const { data: campaign, error } = await supabaseAdmin
+      .from('newsletter_campaigns')
+      .select('newsletter_id')
+      .eq('id', campaignId)
+      .single()
+
+    if (error || !campaign || !campaign.newsletter_id) {
+      throw new Error(`Failed to get newsletter_id for campaign ${campaignId}`)
+    }
+
+    return campaign.newsletter_id
+  }
+
+  /**
    * Public method to process a single feed - used by step-based processing
    */
   async processSingleFeed(feed: RssFeed, campaignId: string, section: 'primary' | 'secondary' = 'primary') {
@@ -54,6 +71,9 @@ export class RSSProcessor {
    * Public method to score/evaluate posts - used by step-based processing
    */
   async scorePostsForSection(campaignId: string, section: 'primary' | 'secondary' = 'primary') {
+    // Get newsletter_id from campaign
+    const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+
     // Get feeds for this section
     const { data: feeds, error: feedsError } = await supabaseAdmin
       .from('rss_feeds')
@@ -97,7 +117,7 @@ export class RSSProcessor {
       for (let j = 0; j < batch.length; j++) {
         const post = batch[j]
         try {
-          const evaluation = await this.evaluatePost(post)
+          const evaluation = await this.evaluatePost(post, newsletterId)
 
           if (typeof evaluation.interest_level !== 'number' ||
               typeof evaluation.local_relevance !== 'number' ||
@@ -209,6 +229,20 @@ export class RSSProcessor {
    * Does NOT generate articles or assign to campaigns
    */
   async ingestNewPosts(): Promise<{ fetched: number; scored: number }> {
+    // Get first active newsletter for backward compatibility
+    // (ingestion happens without campaign context)
+    const { data: newsletter } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (!newsletter) {
+      console.log('[Ingest] No active newsletter found')
+      return { fetched: 0, scored: 0 }
+    }
+
     let totalFetched = 0
     let totalScored = 0
 
@@ -225,7 +259,7 @@ export class RSSProcessor {
     // Process each feed
     for (const feed of allFeeds) {
       try {
-        const result = await this.ingestFeedPosts(feed)
+        const result = await this.ingestFeedPosts(feed, newsletter.id)
         totalFetched += result.fetched
         totalScored += result.scored
       } catch (error) {
@@ -239,7 +273,7 @@ export class RSSProcessor {
   /**
    * Ingest posts from a single feed
    */
-  private async ingestFeedPosts(feed: any): Promise<{ fetched: number; scored: number }> {
+  private async ingestFeedPosts(feed: any, newsletterId: string): Promise<{ fetched: number; scored: number }> {
     const rssFeed = await parser.parseURL(feed.url)
 
     // Filter posts from last 6 hours (safety margin)
@@ -364,7 +398,7 @@ export class RSSProcessor {
 
           // Process batch in parallel
           const results = await Promise.allSettled(
-            batch.map(post => this.scoreAndStorePost(post))
+            batch.map(post => this.scoreAndStorePost(post, newsletterId))
           )
 
           scoredCount += results.filter(r => r.status === 'fulfilled').length
@@ -383,8 +417,8 @@ export class RSSProcessor {
   /**
    * Score a single post and store rating
    */
-  private async scoreAndStorePost(post: any): Promise<void> {
-    const evaluation = await this.evaluatePost(post)
+  private async scoreAndStorePost(post: any, newsletterId: string): Promise<void> {
+    const evaluation = await this.evaluatePost(post, newsletterId)
 
     if (typeof evaluation.interest_level !== 'number' ||
         typeof evaluation.local_relevance !== 'number' ||
@@ -1238,6 +1272,8 @@ export class RSSProcessor {
   }
 
   private async processPostsWithAI(campaignId: string, section: 'primary' | 'secondary' = 'primary') {
+    // Get newsletter_id from campaign
+    const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
 
     // Get feeds for this section
     const { data: feeds, error: feedsError } = await supabaseAdmin
@@ -1279,7 +1315,7 @@ export class RSSProcessor {
       // Process batch concurrently
       const batchPromises = batch.map(async (post, index) => {
         try {
-          const evaluation = await this.evaluatePost(post)
+          const evaluation = await this.evaluatePost(post, newsletterId)
 
           // Basic validation: ensure scores exist and are numbers
           if (typeof evaluation.interest_level !== 'number' ||
@@ -1349,11 +1385,12 @@ export class RSSProcessor {
     await this.generateNewsletterArticles(campaignId, section)
   }
 
-  private async evaluatePost(post: RssPost): Promise<ContentEvaluation> {
+  private async evaluatePost(post: RssPost, newsletterId: string): Promise<ContentEvaluation> {
     // Fetch enabled criteria configuration from database
     const { data: criteriaConfig, error: configError } = await supabaseAdmin
       .from('app_settings')
       .select('key, value')
+      .eq('newsletter_id', newsletterId)
       .or('key.eq.criteria_enabled_count,key.like.criteria_%_name,key.like.criteria_%_weight')
 
     if (configError) {
@@ -1396,7 +1433,7 @@ export class RSSProcessor {
         
         let result
         try {
-          result = await callAIWithPrompt(promptKey, {
+          result = await callAIWithPrompt(promptKey, newsletterId, {
             title: post.title,
             description: post.description || '',
             content: fullText
@@ -1966,6 +2003,9 @@ export class RSSProcessor {
 
 
   private async processPostIntoArticle(post: any, campaignId: string, section: 'primary' | 'secondary' = 'primary') {
+    // Get newsletter_id from campaign
+    const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+
     // Check if article already exists for this post (prevents duplicates when running in batches)
     const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
     const { data: existingArticle } = await supabaseAdmin
@@ -1984,7 +2024,7 @@ export class RSSProcessor {
 
     try {
       // Generate newsletter content
-      content = await this.generateNewsletterContent(post, section)
+      content = await this.generateNewsletterContent(post, newsletterId, section)
     } catch (error) {
       const errorMsg = error instanceof Error 
         ? error.message 
@@ -2000,7 +2040,7 @@ export class RSSProcessor {
     let factCheckDetails: string | null = null
 
     try {
-      const factCheck = await this.factCheckContent(content.content, post.content || post.description || '')
+      const factCheck = await this.factCheckContent(content.content, post.content || post.description || '', newsletterId)
       factCheckScore = factCheck.score
       factCheckDetails = factCheck.details
     } catch (error) {
@@ -2046,7 +2086,7 @@ export class RSSProcessor {
     }
   }
 
-  private async generateNewsletterContent(post: RssPost, section: 'primary' | 'secondary' = 'primary'): Promise<NewsletterContent> {
+  private async generateNewsletterContent(post: RssPost, newsletterId: string, section: 'primary' | 'secondary' = 'primary'): Promise<NewsletterContent> {
     // Use full article text if available, otherwise fall back to RSS content/description
     const fullText = post.full_article_text || post.content || post.description || ''
 
@@ -2059,8 +2099,8 @@ export class RSSProcessor {
 
     // Step 1: Generate title using AI_CALL (handles prompt + provider + call)
     const titleResult = section === 'primary'
-      ? await AI_CALL.primaryArticleTitle(postData, 200, 0.7)
-      : await AI_CALL.secondaryArticleTitle(postData, 200, 0.7)
+      ? await AI_CALL.primaryArticleTitle(postData, newsletterId, 200, 0.7)
+      : await AI_CALL.secondaryArticleTitle(postData, newsletterId, 200, 0.7)
 
     // Handle both string and object responses
     const headline = typeof titleResult === 'string'
@@ -2073,8 +2113,8 @@ export class RSSProcessor {
 
     // Step 2: Generate body using AI_CALL with the generated title
     const bodyResult = section === 'primary'
-      ? await AI_CALL.primaryArticleBody(postData, headline, 500, 0.7)
-      : await AI_CALL.secondaryArticleBody(postData, headline, 500, 0.7)
+      ? await AI_CALL.primaryArticleBody(postData, newsletterId, headline, 500, 0.7)
+      : await AI_CALL.secondaryArticleBody(postData, newsletterId, headline, 500, 0.7)
 
     if (!bodyResult.content || !bodyResult.word_count) {
       throw new Error('Invalid article body response')
@@ -2087,11 +2127,11 @@ export class RSSProcessor {
     }
   }
 
-  private async factCheckContent(newsletterContent: string, originalContent: string): Promise<FactCheckResult> {
+  private async factCheckContent(newsletterContent: string, originalContent: string, newsletterId: string): Promise<FactCheckResult> {
     // Use callAIWithPrompt to handle structured prompts the same way as other AI calls
     let result
     try {
-      result = await callAIWithPrompt('ai_prompt_fact_checker', {
+      result = await callAIWithPrompt('ai_prompt_fact_checker', newsletterId, {
         newsletter_content: newsletterContent,
         original_content: originalContent
       })
@@ -2148,6 +2188,9 @@ export class RSSProcessor {
 
   async generateWelcomeSection(campaignId: string): Promise<string> {
     try {
+      // Get newsletter_id from campaign
+      const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+
       // Fetch ALL active PRIMARY articles for this campaign
       const { data: primaryArticles, error: primaryError } = await supabaseAdmin
         .from('articles')
@@ -2185,7 +2228,7 @@ export class RSSProcessor {
       // Generate welcome text using AI_CALL (uses callAIWithPrompt like other prompts)
       let result
       try {
-        result = await AI_CALL.welcomeSection(allArticles, 500, 0.8)
+        result = await AI_CALL.welcomeSection(allArticles, newsletterId, 500, 0.8)
       } catch (callError) {
         throw new Error(`AI call failed for welcome section: ${callError instanceof Error ? callError.message : 'Unknown error'}`)
       }
@@ -2276,6 +2319,9 @@ export class RSSProcessor {
 
   async generateSubjectLineForCampaign(campaignId: string) {
     try {
+      // Get newsletter_id from campaign
+      const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+
       // Get the campaign with its articles for subject line generation
       const { data: campaignWithArticles, error: campaignError } = await supabaseAdmin
         .from('newsletter_campaigns')
@@ -2324,7 +2370,7 @@ export class RSSProcessor {
       // Generate subject line using AI_CALL (uses callAIWithPrompt and respects provider setting)
       let result
       try {
-        result = await AI_CALL.subjectLineGenerator(topArticle, 100, 0.8)
+        result = await AI_CALL.subjectLineGenerator(topArticle, newsletterId, 100, 0.8)
       } catch (callError) {
         throw new Error(`AI call failed for subject line: ${callError instanceof Error ? callError.message : 'Unknown error'}`)
       }

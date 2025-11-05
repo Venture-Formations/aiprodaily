@@ -6,10 +6,30 @@ import { PromptSelector } from '@/lib/prompt-selector'
 async function processRSSWorkflow(request: NextRequest, force: boolean = false) {
   let campaignId: string | undefined
 
+  // TODO: This legacy route should be deprecated in favor of trigger-workflow
+  // Get first active newsletter for backward compatibility
+  const { data: activeNewsletter } = await supabaseAdmin
+    .from('newsletters')
+    .select('id')
+    .eq('is_active', true)
+    .limit(1)
+    .single()
+
+  if (!activeNewsletter) {
+    return {
+      skipped: true,
+      response: NextResponse.json({
+        success: false,
+        error: 'No active newsletter found',
+        timestamp: new Date().toISOString()
+      }, { status: 404 })
+    }
+  }
+
   // Check if it's time to run RSS processing based on database settings
   // Allow bypassing the schedule check with force=true parameter
   if (!force) {
-    const shouldRun = await ScheduleChecker.shouldRunRSSProcessing()
+    const shouldRun = await ScheduleChecker.shouldRunRSSProcessing(activeNewsletter.id)
 
     if (!shouldRun) {
       return {

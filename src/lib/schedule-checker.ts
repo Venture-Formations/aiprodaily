@@ -11,10 +11,11 @@ interface ScheduleSettings {
 }
 
 export class ScheduleChecker {
-  public static async getScheduleSettings(): Promise<ScheduleSettings> {
+  public static async getScheduleSettings(newsletterId: string): Promise<ScheduleSettings> {
     const { data: settings } = await supabaseAdmin
       .from('app_settings')
       .select('key, value')
+      .eq('newsletter_id', newsletterId)
       .in('key', [
         'email_reviewScheduleEnabled',
         'email_dailyScheduleEnabled',
@@ -57,7 +58,7 @@ export class ScheduleChecker {
     return { hours, minutes }
   }
 
-  private static isTimeToRun(currentTime: string, scheduledTime: string, lastRunKey: string): Promise<boolean> {
+  private static isTimeToRun(currentTime: string, scheduledTime: string, lastRunKey: string, newsletterId: string): Promise<boolean> {
     return new Promise(async (resolve) => {
       const current = this.parseTime(currentTime)
       const scheduled = this.parseTime(scheduledTime)
@@ -87,6 +88,7 @@ export class ScheduleChecker {
         await supabaseAdmin
           .from('app_settings')
           .upsert({
+            newsletter_id: newsletterId,
             key: lastRunKey,
             value: today,
             description: `Last run date for ${lastRunKey}`,
@@ -103,9 +105,9 @@ export class ScheduleChecker {
     })
   }
 
-  static async shouldRunRSSProcessing(): Promise<boolean> {
+  static async shouldRunRSSProcessing(newsletterId: string): Promise<boolean> {
     try {
-      const settings = await this.getScheduleSettings()
+      const settings = await this.getScheduleSettings(newsletterId)
 
       if (!settings.reviewScheduleEnabled) {
         return false
@@ -117,7 +119,8 @@ export class ScheduleChecker {
       return await this.isTimeToRun(
         currentTime.timeString,
         settings.rssProcessingTime,
-        'last_rss_processing_run'
+        'last_rss_processing_run',
+        newsletterId
       )
     } catch (error) {
       console.error('Error checking RSS processing schedule:', error)
@@ -125,9 +128,9 @@ export class ScheduleChecker {
     }
   }
 
-  static async shouldRunCampaignCreation(): Promise<boolean> {
+  static async shouldRunCampaignCreation(newsletterId: string): Promise<boolean> {
     try {
-      const settings = await this.getScheduleSettings()
+      const settings = await this.getScheduleSettings(newsletterId)
 
       if (!settings.reviewScheduleEnabled) {
         return false
@@ -139,7 +142,8 @@ export class ScheduleChecker {
       return await this.isTimeToRun(
         currentTime.timeString,
         settings.campaignCreationTime,
-        'last_campaign_creation_run'
+        'last_campaign_creation_run',
+        newsletterId
       )
     } catch (error) {
       console.error('Error checking campaign creation schedule:', error)
@@ -147,9 +151,9 @@ export class ScheduleChecker {
     }
   }
 
-  static async shouldRunReviewSend(): Promise<boolean> {
+  static async shouldRunReviewSend(newsletterId: string): Promise<boolean> {
     try {
-      const settings = await this.getScheduleSettings()
+      const settings = await this.getScheduleSettings(newsletterId)
 
       if (!settings.reviewScheduleEnabled) {
         return false
@@ -161,7 +165,8 @@ export class ScheduleChecker {
       return await this.isTimeToRun(
         currentTime.timeString,
         settings.campaignCreationTime,
-        'last_review_send_run'
+        'last_review_send_run',
+        newsletterId
       )
     } catch (error) {
       console.error('Error checking review send schedule:', error)
@@ -169,9 +174,9 @@ export class ScheduleChecker {
     }
   }
 
-  static async shouldRunEventPopulation(): Promise<boolean> {
+  static async shouldRunEventPopulation(newsletterId: string): Promise<boolean> {
     try {
-      const settings = await this.getScheduleSettings()
+      const settings = await this.getScheduleSettings(newsletterId)
 
       if (!settings.reviewScheduleEnabled) {
         return false
@@ -188,7 +193,8 @@ export class ScheduleChecker {
       return await this.isTimeToRun(
         currentTime.timeString,
         eventTime,
-        'last_event_population_run'
+        'last_event_population_run',
+        newsletterId
       )
     } catch (error) {
       console.error('Error checking event population schedule:', error)
@@ -197,9 +203,9 @@ export class ScheduleChecker {
   }
 
 
-  static async shouldRunFinalSend(): Promise<boolean> {
+  static async shouldRunFinalSend(newsletterId: string): Promise<boolean> {
     try {
-      const settings = await this.getScheduleSettings()
+      const settings = await this.getScheduleSettings(newsletterId)
 
       if (!settings.dailyScheduleEnabled) {
         return false
@@ -211,7 +217,8 @@ export class ScheduleChecker {
       return await this.isTimeToRun(
         currentTime.timeString,
         settings.dailyCampaignCreationTime,
-        'last_final_send_run'
+        'last_final_send_run',
+        newsletterId
       )
     } catch (error) {
       console.error('Error checking final send schedule:', error)
@@ -226,7 +233,7 @@ export class ScheduleChecker {
     return false
   }
 
-  static async getScheduleDisplay(): Promise<{
+  static async getScheduleDisplay(newsletterId: string): Promise<{
     rssProcessing: string
     subjectGeneration: string
     campaignCreation: string
@@ -236,7 +243,7 @@ export class ScheduleChecker {
     dailyEnabled: boolean
   }> {
     try {
-      const settings = await this.getScheduleSettings()
+      const settings = await this.getScheduleSettings(newsletterId)
 
       // Subject generation now happens as part of RSS processing (after 60-second delay)
       const subjectGeneration = `${settings.rssProcessingTime} (integrated)`

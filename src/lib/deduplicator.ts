@@ -50,6 +50,23 @@ export class Deduplicator {
   }
 
   /**
+   * Get newsletter_id from campaign
+   */
+  private async getNewsletterIdFromCampaign(campaignId: string): Promise<string> {
+    const { data: campaign, error } = await supabaseAdmin
+      .from('newsletter_campaigns')
+      .select('newsletter_id')
+      .eq('id', campaignId)
+      .single()
+
+    if (error || !campaign || !campaign.newsletter_id) {
+      throw new Error(`Failed to get newsletter_id for campaign ${campaignId}`)
+    }
+
+    return campaign.newsletter_id
+  }
+
+  /**
    * Main orchestrator - runs all 4 stages (0-3)
    */
   async detectAllDuplicates(posts: RssPost[], campaignId: string): Promise<DeduplicationResult> {
@@ -141,7 +158,8 @@ export class Deduplicator {
     if (stillRemaining.length >= 2) {
       const semanticGroups = await this.detectSemanticDuplicates(
         stillRemaining.map(p => p.post),
-        stillRemaining.map(p => p.idx)
+        stillRemaining.map(p => p.idx),
+        campaignId
       )
 
       if (Array.isArray(semanticGroups)) {
@@ -383,7 +401,8 @@ export class Deduplicator {
    */
   private async detectSemanticDuplicates(
     posts: RssPost[],
-    originalIndices: number[]
+    originalIndices: number[],
+    campaignId: string
   ): Promise<DuplicateGroup[]> {
     try {
       if (!posts || !Array.isArray(posts) || posts.length === 0) {
@@ -401,7 +420,10 @@ export class Deduplicator {
         full_article_text: post.full_article_text || post.content || ''
       }))
 
-      const result = await AI_CALL.topicDeduper(postSummaries, 1000, 0.3)
+      // Get newsletter_id for AI call
+      const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+
+      const result = await AI_CALL.topicDeduper(postSummaries, newsletterId, 1000, 0.3)
 
       if (!result || typeof result !== 'object' || !Array.isArray(result.groups)) {
         return []

@@ -138,11 +138,27 @@ export async function POST(request: NextRequest) {
   let campaign: any = null
 
   try {
+    // TODO: This legacy route should be deprecated in favor of trigger-workflow
+    // Get first active newsletter for backward compatibility
+    const { data: activeNewsletter } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (!activeNewsletter) {
+      return NextResponse.json({
+        success: false,
+        error: 'No active newsletter found'
+      }, { status: 404 })
+    }
+
     console.log('=== AUTOMATED FINAL SEND CHECK ===')
     console.log('Time:', new Date().toISOString())
 
     // Check if it's time to run final send based on database settings
-    const shouldRun = await ScheduleChecker.shouldRunFinalSend()
+    const shouldRun = await ScheduleChecker.shouldRunFinalSend(activeNewsletter.id)
 
     if (!shouldRun) {
       // Check if there's a campaign that's ready to send but missed its window
@@ -368,12 +384,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // TODO: This legacy route should be deprecated in favor of trigger-workflow
+    // Get first active newsletter for backward compatibility
+    const { data: activeNewsletter } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (!activeNewsletter) {
+      return NextResponse.json({
+        success: false,
+        error: 'No active newsletter found'
+      }, { status: 404 })
+    }
+
     console.log('=== AUTOMATED FINAL SEND CHECK (GET) ===')
     console.log('Time:', new Date().toISOString())
     console.log('Request type:', isVercelCron ? 'Vercel Cron' : 'Manual Test')
 
     // Check if it's time to run final send based on database settings
-    const shouldRun = await ScheduleChecker.shouldRunFinalSend()
+    const shouldRun = await ScheduleChecker.shouldRunFinalSend(activeNewsletter.id)
 
     if (!shouldRun) {
       // Check if there's a campaign that's ready to send but missed its window

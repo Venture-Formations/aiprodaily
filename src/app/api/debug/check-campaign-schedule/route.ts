@@ -6,6 +6,22 @@ export async function GET(request: NextRequest) {
   try {
     console.log('=== CAMPAIGN SCHEDULE DEBUG ===')
 
+    // TODO: This legacy route should be deprecated in favor of trigger-workflow
+    // Get first active newsletter for backward compatibility
+    const { data: activeNewsletter } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (!activeNewsletter) {
+      return NextResponse.json({
+        success: false,
+        error: 'No active newsletter found'
+      }, { status: 404 })
+    }
+
     // Get current time info
     const nowUTC = new Date()
     const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
@@ -17,8 +33,8 @@ export async function GET(request: NextRequest) {
     const tomorrowDate = tomorrow.toISOString().split('T')[0]
 
     // Check schedule settings
-    const shouldRunReviewSend = await ScheduleChecker.shouldRunReviewSend()
-    const shouldRunCampaignCreation = await ScheduleChecker.shouldRunCampaignCreation()
+    const shouldRunReviewSend = await ScheduleChecker.shouldRunReviewSend(activeNewsletter.id)
+    const shouldRunCampaignCreation = await ScheduleChecker.shouldRunCampaignCreation(activeNewsletter.id)
 
     // Get email settings from database
     const { data: settings } = await supabaseAdmin
