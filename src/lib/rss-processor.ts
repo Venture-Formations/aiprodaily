@@ -291,7 +291,7 @@ export class RSSProcessor {
           }
 
           // Create article record with title only
-          await supabaseAdmin
+          const { error: insertError } = await supabaseAdmin
             .from(tableName)
             .insert([{
               post_id: post.id,
@@ -304,6 +304,11 @@ export class RSSProcessor {
               fact_check_details: null,
               word_count: null
             }])
+
+          if (insertError) {
+            console.error(`[Titles] Database insert failed for post ${post.id}:`, insertError.message)
+            throw insertError
+          }
 
           console.log(`[Titles] Generated title for post ${post.id}: "${headline.substring(0, 50)}..."`)
 
