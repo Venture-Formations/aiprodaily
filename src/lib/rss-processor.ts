@@ -297,12 +297,12 @@ export class RSSProcessor {
               post_id: post.id,
               campaign_id: campaignId,
               headline: headline,
-              content: null, // Will be generated later
+              content: '', // Empty placeholder - will be filled by body generation step
               rank: null,
               is_active: false,
               fact_check_score: null,
               fact_check_details: null,
-              word_count: null
+              word_count: 0 // Placeholder - will be updated with actual count
             }])
 
           if (insertError) {
@@ -334,12 +334,12 @@ export class RSSProcessor {
     const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
     const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
 
-    // Get articles with titles but no content
+    // Get articles with titles but empty/placeholder content
     const { data: articles } = await supabaseAdmin
       .from(tableName)
       .select('*, rss_posts(*)')
       .eq('campaign_id', campaignId)
-      .is('content', null)
+      .eq('content', '') // Empty placeholder from title generation step
       .not('headline', 'is', null)
       .order('post_id', { ascending: true })
       .range(offset, offset + limit - 1)
@@ -415,11 +415,12 @@ export class RSSProcessor {
     const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
     const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
 
-    // Get articles with content but no fact-check
+    // Get articles with actual content (not empty placeholder) but no fact-check
     const { data: articles } = await supabaseAdmin
       .from(tableName)
       .select('*, rss_posts(*)')
       .eq('campaign_id', campaignId)
+      .neq('content', '') // Has actual content (not empty placeholder)
       .not('content', 'is', null)
       .is('fact_check_score', null)
 
