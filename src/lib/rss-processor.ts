@@ -1814,10 +1814,14 @@ export class RSSProcessor {
         return
       }
 
+      // Get newsletter_id from campaign for multi-tenant filtering
+      const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+
       // Load deduplication settings
       const { data: settings } = await supabaseAdmin
         .from('app_settings')
         .select('key, value')
+        .eq('newsletter_id', newsletterId)
         .in('key', ['dedup_historical_lookback_days', 'dedup_strictness_threshold'])
 
       const settingsMap = new Map(settings?.map(s => [s.key, s.value]) || [])
@@ -1832,14 +1836,26 @@ export class RSSProcessor {
       })
       const result = await deduplicator.detectAllDuplicates(allPosts, campaignId)
 
+      console.log(`[Dedup] AI found ${result.groups?.length || 0} duplicate groups`)
+      console.log(`[Dedup] Full result:`, JSON.stringify(result, null, 2))
+
       if (!result || !result.groups || !Array.isArray(result.groups)) {
+        console.log('[Dedup] No duplicate groups to store')
         return
       }
 
       // Store results in database
+      let storedGroups = 0
+      let storedDuplicates = 0
+
       for (const group of result.groups) {
         const primaryPost = allPosts[group.primary_post_index]
-        if (!primaryPost) continue
+        if (!primaryPost) {
+          console.error(`[Dedup] Primary post not found at index ${group.primary_post_index}`)
+          continue
+        }
+
+        console.log(`[Dedup] Storing group: "${group.topic_signature?.substring(0, 50)}..." - Primary: ${primaryPost.id}`)
 
         // Create duplicate group
         const { data: duplicateGroup, error: groupError } = await supabaseAdmin
@@ -1853,34 +1869,59 @@ export class RSSProcessor {
           .single()
 
         if (groupError) {
+          console.error(`[Dedup] Failed to create group:`, groupError.message)
           continue
         }
+
+        storedGroups++
 
         if (duplicateGroup) {
           // Add duplicate posts to group with metadata
           if (!Array.isArray(group.duplicate_indices)) {
+            console.error(`[Dedup] Invalid duplicate_indices for group ${duplicateGroup.id}`)
             continue
           }
-          
+
+          console.log(`[Dedup] Marking ${group.duplicate_indices.length} posts as duplicates`)
+
           for (const dupIndex of group.duplicate_indices) {
             const dupPost = allPosts[dupIndex]
-            if (dupPost && dupPost.id !== primaryPost.id) {
-              await supabaseAdmin
-                .from('duplicate_posts')
-                .insert([{
-                  group_id: duplicateGroup.id,
-                  post_id: dupPost.id,
-                  similarity_score: group.similarity_score,
-                  detection_method: group.detection_method,
-                  actual_similarity_score: group.similarity_score
-                }])
+            if (!dupPost) {
+              console.error(`[Dedup] Duplicate post not found at index ${dupIndex}`)
+              continue
+            }
+
+            if (dupPost.id === primaryPost.id) {
+              console.log(`[Dedup] Skipping primary post ${dupPost.id} from duplicate list`)
+              continue
+            }
+
+            const { error: dupError } = await supabaseAdmin
+              .from('duplicate_posts')
+              .insert([{
+                group_id: duplicateGroup.id,
+                post_id: dupPost.id,
+                similarity_score: group.similarity_score,
+                detection_method: group.detection_method,
+                actual_similarity_score: group.similarity_score
+              }])
+
+            if (dupError) {
+              console.error(`[Dedup] Failed to mark post ${dupPost.id} as duplicate:`, dupError.message)
+            } else {
+              console.log(`[Dedup] Marked post ${dupPost.id} as duplicate`)
+              storedDuplicates++
             }
           }
         }
       }
 
-    } catch (error) {
-      // Silent failure
+      console.log(`[Dedup] Stored ${storedGroups} groups with ${storedDuplicates} duplicate posts total`)
+
+    } catch (error: any) {
+      console.error(`[Dedup] CRITICAL ERROR - Deduplication failed completely:`, error.message)
+      console.error(`[Dedup] Stack trace:`, error.stack)
+      // Don't throw - allow workflow to continue, but log the failure prominently
     }
   }
 
