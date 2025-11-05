@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
           total_score
         )
       `)
+      .eq('newsletter_id', newsletterId)  // CRITICAL: Filter by newsletter
       .gte('processed_at', lookbackTimestamp)
       .not('post_ratings', 'is', null)
 
