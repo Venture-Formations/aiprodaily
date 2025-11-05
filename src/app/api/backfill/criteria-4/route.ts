@@ -42,39 +42,52 @@ export async function POST(request: NextRequest) {
     lookbackDate.setDate(lookbackDate.getDate() - 36)
     const lookbackTimestamp = lookbackDate.toISOString()
 
+    console.log(`[Backfill] Fetching posts from ${lookbackTimestamp}...`)
+
     const { data: posts, error: postsError } = await supabaseAdmin
       .from('rss_posts')
-      .select(`
-        id,
-        title,
-        description,
-        content,
-        full_article_text,
-        post_ratings(
-          id,
-          criteria_1_score,
-          criteria_1_weight,
-          criteria_2_score,
-          criteria_2_weight,
-          criteria_3_score,
-          criteria_3_weight,
-          criteria_4_score,
-          criteria_4_weight,
-          criteria_5_score,
-          criteria_5_weight,
-          total_score
-        )
-      `)
+      .select('id, title, description, content, full_article_text')
       .eq('newsletter_id', newsletterId)  // CRITICAL: Filter by newsletter
       .gte('processed_at', lookbackTimestamp)
-      .not('post_ratings', 'is', null)
 
     if (postsError || !posts) {
       console.error('[Backfill] Error fetching posts:', postsError)
       return NextResponse.json({ error: 'Failed to fetch posts' }, { status: 500 })
     }
 
-    console.log(`[Backfill] Found ${posts.length} posts with ratings from last 36 days`)
+    console.log(`[Backfill] Found ${posts.length} posts from last 36 days`)
+
+    if (posts.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: 'No posts found in the last 36 days',
+        stats: { total: 0, processed: 0, skipped: 0, errors: 0, dryRun }
+      })
+    }
+
+    // Get post_ratings for these posts
+    const postIds = posts.map(p => p.id)
+    const { data: ratings, error: ratingsError } = await supabaseAdmin
+      .from('post_ratings')
+      .select('*')
+      .in('post_id', postIds)
+
+    if (ratingsError) {
+      console.error('[Backfill] Error fetching ratings:', ratingsError)
+      return NextResponse.json({ error: 'Failed to fetch ratings' }, { status: 500 })
+    }
+
+    console.log(`[Backfill] Found ${ratings?.length || 0} ratings for ${postIds.length} posts`)
+
+    // Create a map of post_id to rating
+    const ratingsMap = new Map()
+    ratings?.forEach(rating => {
+      ratingsMap.set(rating.post_id, rating)
+    })
+
+    // Filter to only posts that have ratings
+    const postsWithRatings = posts.filter(post => ratingsMap.has(post.id))
+    console.log(`[Backfill] ${postsWithRatings.length} posts have ratings`)
 
     // Get criteria 4 weight setting
     const { data: weightSetting } = await supabaseAdmin
@@ -96,12 +109,12 @@ export async function POST(request: NextRequest) {
     const BATCH_SIZE = 3
     const BATCH_DELAY = 2000
 
-    for (let i = 0; i < posts.length; i += BATCH_SIZE) {
-      const batch = posts.slice(i, i + BATCH_SIZE)
+    for (let i = 0; i < postsWithRatings.length; i += BATCH_SIZE) {
+      const batch = postsWithRatings.slice(i, i + BATCH_SIZE)
 
       await Promise.all(batch.map(async (post: any) => {
         try {
-          const rating = post.post_ratings?.[0]
+          const rating = ratingsMap.get(post.id)
           if (!rating) {
             console.log(`[Backfill] Skipping post ${post.id} - no rating found`)
             skipped++
@@ -178,13 +191,13 @@ export async function POST(request: NextRequest) {
       }))
 
       // Delay between batches
-      if (i + BATCH_SIZE < posts.length) {
+      if (i + BATCH_SIZE < postsWithRatings.length) {
         await new Promise(resolve => setTimeout(resolve, BATCH_DELAY))
       }
 
       // Progress update every 10 posts
       if ((i + BATCH_SIZE) % 10 === 0) {
-        console.log(`[Backfill] Progress: ${Math.min(i + BATCH_SIZE, posts.length)}/${posts.length} posts processed`)
+        console.log(`[Backfill] Progress: ${Math.min(i + BATCH_SIZE, postsWithRatings.length)}/${postsWithRatings.length} posts processed`)
       }
     }
 
@@ -194,7 +207,8 @@ export async function POST(request: NextRequest) {
       success: true,
       message: dryRun ? 'Dry run completed' : 'Backfill completed',
       stats: {
-        total: posts.length,
+        totalPosts: posts.length,
+        postsWithRatings: postsWithRatings.length,
         processed,
         skipped,
         errors,
