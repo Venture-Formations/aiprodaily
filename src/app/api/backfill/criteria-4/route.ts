@@ -6,7 +6,7 @@ import { callAIWithPrompt } from '@/lib/openai'
 
 /**
  * Backfill Criteria 4 Scores
- * Re-evaluates all posts from the last 36 days with criteria 4
+ * Re-evaluates all posts from the last 36 hours with criteria 4
  * and updates total_score to include the new criteria
  */
 export async function POST(request: NextRequest) {
@@ -37,12 +37,12 @@ export async function POST(request: NextRequest) {
     console.log(`[Backfill] Starting criteria 4 backfill for newsletter: ${newsletterId}`)
     console.log(`[Backfill] Dry run: ${dryRun}`)
 
-    // Get posts from last 36 days
+    // Get posts from last 36 hours
     const lookbackDate = new Date()
-    lookbackDate.setDate(lookbackDate.getDate() - 36)
+    lookbackDate.setHours(lookbackDate.getHours() - 36)
     const lookbackTimestamp = lookbackDate.toISOString()
 
-    console.log(`[Backfill] Fetching posts from ${lookbackTimestamp}...`)
+    console.log(`[Backfill] Fetching posts from ${lookbackTimestamp} (last 36 hours)...`)
 
     // First get all feed IDs for this newsletter
     const { data: feeds, error: feedsError } = await supabaseAdmin
