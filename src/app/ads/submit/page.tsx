@@ -28,7 +28,7 @@ export default function SubmitAdPage() {
     title: '',
     body: '',
     button_text: '',
-    button_url: '',
+    button_url: 'https://',
     submitter_email: ''
   })
 
@@ -236,9 +236,16 @@ export default function SubmitAdPage() {
                     Button URL <span className="text-red-500">*</span>
                   </label>
                   <input
-                    type="url"
+                    type="text"
                     value={formData.button_url}
-                    onChange={(e) => setFormData({ ...formData, button_url: e.target.value })}
+                    onChange={(e) => {
+                      let value = e.target.value;
+                      // Ensure https:// prefix
+                      if (!value.startsWith('http://') && !value.startsWith('https://')) {
+                        value = 'https://' + value.replace(/^https?:\/\//, '');
+                      }
+                      setFormData({ ...formData, button_url: value });
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="https://example.com"
                     required

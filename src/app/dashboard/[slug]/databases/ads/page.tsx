@@ -460,7 +460,7 @@ export default function AdsManagementPage() {
 
                   <div className="mb-4">
                     <div
-                      className="prose prose-sm max-w-none"
+                      className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer"
                       dangerouslySetInnerHTML={{ __html: ad.body }}
                     />
                   </div>
@@ -531,7 +531,7 @@ export default function AdsManagementPage() {
 
                   <div className="mb-4">
                     <div
-                      className="prose prose-sm max-w-none"
+                      className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer"
                       dangerouslySetInnerHTML={{ __html: ad.body }}
                     />
                   </div>
@@ -607,7 +607,7 @@ export default function AdsManagementPage() {
 
                   <div className="mb-4">
                     <div
-                      className="prose prose-sm max-w-none"
+                      className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer"
                       dangerouslySetInnerHTML={{ __html: ad.body }}
                     />
                   </div>
@@ -667,7 +667,7 @@ function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
     title: '',
     body: '',
     button_text: '',
-    button_url: ''
+    button_url: 'https://'
   })
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [crop, setCrop] = useState<Crop>()
@@ -876,12 +876,19 @@ function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
                 Button URL *
               </label>
               <input
-                type="url"
+                type="text"
                 required
                 value={formData.button_url}
-                onChange={(e) => setFormData({ ...formData, button_url: e.target.value })}
+                onChange={(e) => {
+                  let value = e.target.value;
+                  // Ensure https:// prefix
+                  if (!value.startsWith('http://') && !value.startsWith('https://')) {
+                    value = 'https://' + value.replace(/^https?:\/\//, '');
+                  }
+                  setFormData({ ...formData, button_url: value });
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="https://"
+                placeholder="https://example.com"
               />
             </div>
           </div>
@@ -1004,12 +1011,19 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
                 Button URL *
               </label>
               <input
-                type="url"
+                type="text"
                 required
                 value={formData.button_url}
-                onChange={(e) => setFormData({ ...formData, button_url: e.target.value })}
+                onChange={(e) => {
+                  let value = e.target.value;
+                  // Ensure https:// prefix
+                  if (!value.startsWith('http://') && !value.startsWith('https://')) {
+                    value = 'https://' + value.replace(/^https?:\/\//, '');
+                  }
+                  setFormData({ ...formData, button_url: value });
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="https://"
+                placeholder="https://example.com"
               />
             </div>
           </div>
