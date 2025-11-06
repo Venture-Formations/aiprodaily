@@ -96,7 +96,7 @@ export default async function NewsletterPage({ params }: PageProps) {
       <section className="pt-20 py-10 px-4 sm:px-6 lg:px-8">
         <div className="container mx-auto max-w-4xl">
           <Link
-            href="/newsletters"
+            href="/website"
             className="text-sm text-[#a855f7] hover:text-[#a855f7]/80 mb-4 inline-block"
           >
             ← Back to Newsletter Archive
