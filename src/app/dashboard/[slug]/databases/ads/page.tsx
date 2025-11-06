@@ -380,7 +380,7 @@ export default function AdsManagementPage() {
               <strong>Next ad in rotation:</strong> Position {nextAdPosition}
               {nextAdPosition <= ads.length && (
                 <span className="ml-2 text-purple-600">
-                  ({ads[nextAdPosition - 1]?.business_name})
+                  ({ads[nextAdPosition - 1]?.title})
                 </span>
               )}
             </p>
@@ -438,7 +438,7 @@ export default function AdsManagementPage() {
                           )}
                         </div>
                         <p className="text-sm text-gray-600">
-                          {ad.business_name} • {ad.times_used} times used
+                          {ad.times_used} times used
                         </p>
                       </div>
                     </div>
@@ -467,19 +467,18 @@ export default function AdsManagementPage() {
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t text-sm">
                     <div>
-                      <span className="font-medium">Contact:</span>
-                      <p className="text-gray-600">{ad.contact_name}</p>
-                      <p className="text-gray-600">{ad.contact_email}</p>
+                      <span className="font-medium">Button:</span>
+                      <p className="text-gray-600">{ad.button_text}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Button URL:</span>
+                      <p className="text-gray-600 truncate" title={ad.button_url}>{ad.button_url}</p>
                     </div>
                     <div>
                       <span className="font-medium">Last Used:</span>
                       <p className="text-gray-600">
                         {ad.last_used_date ? new Date(ad.last_used_date).toLocaleDateString() : 'Never'}
                       </p>
-                    </div>
-                    <div>
-                      <span className="font-medium">Word Count:</span>
-                      <p className="text-gray-600">{ad.word_count} words</p>
                     </div>
                   </div>
                 </div>
@@ -505,7 +504,7 @@ export default function AdsManagementPage() {
                         {getStatusBadge(ad.status)}
                       </div>
                       <p className="text-sm text-gray-600">
-                        {ad.business_name} • Submitted {new Date(ad.created_at).toLocaleDateString()}
+                        Submitted {new Date(ad.created_at).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -577,7 +576,7 @@ export default function AdsManagementPage() {
                         {getStatusBadge(ad.status)}
                       </div>
                       <p className="text-sm text-gray-600">
-                        {ad.business_name} • {ad.times_used} times used
+                        {ad.times_used} times used
                       </p>
                       {ad.status === 'rejected' && ad.rejection_reason && (
                         <p className="text-sm text-red-600 mt-2">
@@ -616,19 +615,18 @@ export default function AdsManagementPage() {
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t text-sm">
                     <div>
-                      <span className="font-medium">Contact:</span>
-                      <p className="text-gray-600">{ad.contact_name}</p>
-                      <p className="text-gray-600">{ad.contact_email}</p>
+                      <span className="font-medium">Button:</span>
+                      <p className="text-gray-600">{ad.button_text}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Button URL:</span>
+                      <p className="text-gray-600 truncate" title={ad.button_url}>{ad.button_url}</p>
                     </div>
                     <div>
                       <span className="font-medium">Last Used:</span>
                       <p className="text-gray-600">
                         {ad.last_used_date ? new Date(ad.last_used_date).toLocaleDateString() : 'Never'}
                       </p>
-                    </div>
-                    <div>
-                      <span className="font-medium">Word Count:</span>
-                      <p className="text-gray-600">{ad.word_count} words</p>
                     </div>
                   </div>
                 </div>
@@ -669,12 +667,8 @@ function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
   const [formData, setFormData] = useState({
     title: '',
     body: '',
-    business_name: '',
-    contact_name: '',
-    contact_email: '',
-    contact_phone: '',
-    business_address: '',
-    business_website: ''
+    button_text: '',
+    button_url: ''
   })
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [crop, setCrop] = useState<Crop>()
@@ -863,74 +857,30 @@ function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
             </label>
           </div>
 
-          {/* Business Information */}
+          {/* Button Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Business Name *
+                Button Text *
               </label>
               <input
                 type="text"
                 required
-                value={formData.business_name}
-                onChange={(e) => setFormData({ ...formData, business_name: e.target.value })}
+                value={formData.button_text}
+                onChange={(e) => setFormData({ ...formData, button_text: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="e.g. Learn More, Visit Website, Get Started"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Contact Name *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.contact_name}
-                onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Contact Email *
-              </label>
-              <input
-                type="email"
-                required
-                value={formData.contact_email}
-                onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Contact Phone
-              </label>
-              <input
-                type="tel"
-                value={formData.contact_phone}
-                onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Business Address
-              </label>
-              <input
-                type="text"
-                value={formData.business_address}
-                onChange={(e) => setFormData({ ...formData, business_address: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Website URL
+                Button URL *
               </label>
               <input
                 type="url"
-                value={formData.business_website}
-                onChange={(e) => setFormData({ ...formData, business_website: e.target.value })}
+                required
+                value={formData.button_url}
+                onChange={(e) => setFormData({ ...formData, button_url: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 placeholder="https://"
               />
@@ -966,12 +916,8 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
   const [formData, setFormData] = useState({
     title: ad.title,
     body: ad.body,
-    business_name: ad.business_name,
-    contact_name: ad.contact_name,
-    contact_email: ad.contact_email,
-    contact_phone: ad.contact_phone || '',
-    business_address: ad.business_address || '',
-    business_website: ad.business_website || ''
+    button_text: ad.button_text,
+    button_url: ad.button_url
   })
   const [submitting, setSubmitting] = useState(false)
 
@@ -1039,74 +985,30 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
             />
           </div>
 
-          {/* Business Information */}
+          {/* Button Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Business Name *
+                Button Text *
               </label>
               <input
                 type="text"
                 required
-                value={formData.business_name}
-                onChange={(e) => setFormData({ ...formData, business_name: e.target.value })}
+                value={formData.button_text}
+                onChange={(e) => setFormData({ ...formData, button_text: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="e.g. Learn More, Visit Website, Get Started"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Contact Name *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.contact_name}
-                onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Contact Email *
-              </label>
-              <input
-                type="email"
-                required
-                value={formData.contact_email}
-                onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Contact Phone
-              </label>
-              <input
-                type="tel"
-                value={formData.contact_phone}
-                onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Business Address
-              </label>
-              <input
-                type="text"
-                value={formData.business_address}
-                onChange={(e) => setFormData({ ...formData, business_address: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Website URL
+                Button URL *
               </label>
               <input
                 type="url"
-                value={formData.business_website}
-                onChange={(e) => setFormData({ ...formData, business_website: e.target.value })}
+                required
+                value={formData.button_url}
+                onChange={(e) => setFormData({ ...formData, button_url: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 placeholder="https://"
               />

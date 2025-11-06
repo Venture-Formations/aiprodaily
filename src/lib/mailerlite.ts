@@ -9,7 +9,7 @@ import {
   generateDiningDealsSection,
   generateRoadWorkSection,
   generatePollSection,
-  generateCommunityBusinessSpotlightSection
+  generateAdvertorialSection
 } from './newsletter-templates'
 
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
@@ -426,10 +426,10 @@ export class MailerLiteService {
           if (beyondFeedHtml) {
             sectionsHtml += beyondFeedHtml
           }
-        } else if (section.name === 'Community Business Spotlight') {
-          const spotlightHtml = await generateCommunityBusinessSpotlightSection(campaign, !isReview) // Record usage for final campaigns only
-          if (spotlightHtml) {
-            sectionsHtml += spotlightHtml
+        } else if (section.name === 'Advertorial') {
+          const advertorialHtml = await generateAdvertorialSection(campaign, !isReview) // Record usage for final campaigns only
+          if (advertorialHtml) {
+            sectionsHtml += advertorialHtml
           }
         }
       }

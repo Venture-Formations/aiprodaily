@@ -8,7 +8,7 @@ import {
   generateWelcomeSection,
   generatePrimaryArticlesSection,
   generateSecondaryArticlesSection,
-  generateCommunityBusinessSpotlightSection,
+  generateAdvertorialSection,
   generateDiningDealsSection,
   generateRoadWorkSection,
   generatePollSection,
@@ -250,10 +250,10 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
           if (beyondFeedHtml) {
             sectionsHtml += beyondFeedHtml
           }
-        } else if (section.name === 'Community Business Spotlight') {
-          const spotlightHtml = await generateCommunityBusinessSpotlightSection(campaign, false) // Don't record usage during preview
-          if (spotlightHtml) {
-            sectionsHtml += spotlightHtml
+        } else if (section.name === 'Advertorial') {
+          const advertorialHtml = await generateAdvertorialSection(campaign, false) // Don't record usage during preview
+          if (advertorialHtml) {
+            sectionsHtml += advertorialHtml
           }
         }
       }

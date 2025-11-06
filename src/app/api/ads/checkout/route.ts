@@ -8,12 +8,9 @@ export async function POST(request: NextRequest) {
       title,
       body: adBody,
       word_count,
-      business_name,
-      contact_name,
-      contact_email,
-      contact_phone,
-      business_address,
-      business_website,
+      button_text,
+      button_url,
+      submitter_email,
       frequency,
       times,
       preferred_start_date,
@@ -21,7 +18,7 @@ export async function POST(request: NextRequest) {
     } = body
 
     // Validation
-    if (!title || !adBody || !business_name || !contact_name || !contact_email) {
+    if (!title || !adBody || !button_text || !button_url || !submitter_email) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -42,8 +39,8 @@ export async function POST(request: NextRequest) {
       price_data: {
         currency: 'usd',
         product_data: {
-          name: `${frequencyLabel} Advertisement - ${business_name}`,
-          description: `${times} appearance(s) in St. Cloud Scoop Newsletter`
+          name: `${frequencyLabel} Advertorial - ${title}`,
+          description: `${times} appearance(s) in Newsletter`
         },
         unit_amount: Math.round(total_amount * 100) // Convert to cents
       },
@@ -53,8 +50,8 @@ export async function POST(request: NextRequest) {
     // Create metadata for Stripe
     const metadata = {
       type: 'advertisement',
-      business_name,
-      contact_email,
+      title,
+      submitter_email,
       frequency,
       times: times.toString(),
       preferred_start_date: preferred_start_date || ''
@@ -71,7 +68,7 @@ export async function POST(request: NextRequest) {
         'mode': 'payment',
         'success_url': `${process.env.NEXT_PUBLIC_URL || 'https://st-cloud-scoop.vercel.app'}/ads/success?session_id={CHECKOUT_SESSION_ID}`,
         'cancel_url': `${process.env.NEXT_PUBLIC_URL || 'https://st-cloud-scoop.vercel.app'}/ads/submit`,
-        'customer_email': contact_email,
+        'customer_email': submitter_email,
         'line_items[0][price_data][currency]': lineItem.price_data.currency,
         'line_items[0][price_data][product_data][name]': lineItem.price_data.product_data.name,
         'line_items[0][price_data][product_data][description]': lineItem.price_data.product_data.description,
@@ -98,12 +95,8 @@ export async function POST(request: NextRequest) {
         title,
         body: adBody,
         word_count,
-        business_name,
-        contact_name,
-        contact_email,
-        contact_phone,
-        business_address,
-        business_website,
+        button_text,
+        button_url,
         frequency,
         times_paid: times,
         times_used: 0,

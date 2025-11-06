@@ -801,11 +801,11 @@ export async function generateDiningDealsSection(campaign: any): Promise<string>
   return ''
 }
 
-// ==================== COMMUNITY BUSINESS SPOTLIGHT ====================
+// ==================== ADVERTORIAL ====================
 
-export async function generateCommunityBusinessSpotlightSection(campaign: any, recordUsage: boolean = false): Promise<string> {
+export async function generateAdvertorialSection(campaign: any, recordUsage: boolean = false): Promise<string> {
   try {
-    console.log('Generating Community Business Spotlight section for campaign:', campaign?.id, 'recordUsage:', recordUsage)
+    console.log('Generating Advertorial section for campaign:', campaign?.id, 'recordUsage:', recordUsage)
 
     // Fetch colors from business settings
     const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
@@ -844,10 +844,12 @@ export async function generateCommunityBusinessSpotlightSection(campaign: any, r
       return ''
     }
 
-    // Generate HTML for the ad - matching Local Scoop layout
-    const businessUrl = selectedAd.business_website || '#'
-    const trackedUrl = businessUrl !== '#'
-      ? wrapTrackingUrl(businessUrl, 'Community Business Spotlight', campaign.date, campaign.mailerlite_campaign_id)
+    // Generate HTML for the ad
+    const buttonUrl = selectedAd.button_url || '#'
+    const buttonText = selectedAd.button_text || 'Learn More'
+
+    const trackedUrl = buttonUrl !== '#'
+      ? wrapTrackingUrl(buttonUrl, 'Advertorial', campaign.date, campaign.mailerlite_campaign_id)
       : '#'
 
     const imageUrl = selectedAd.image_url || ''
@@ -857,6 +859,11 @@ export async function generateCommunityBusinessSpotlightSection(campaign: any, r
       ? `<tr><td style='padding: 0 12px; text-align: center;'><img src='${imageUrl}' alt='${selectedAd.title}' style='max-width: 100%; max-height: 500px; border-radius: 4px;'></td></tr>`
       : ''
 
+    // Generate button HTML
+    const buttonHtml = buttonUrl !== '#'
+      ? `<tr><td style='padding: 12px; text-align: center;'><a href='${trackedUrl}' style='display: inline-block; background-color: ${primaryColor}; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-family: ${bodyFont};'>${buttonText}</a></td></tr>`
+      : ''
+
     return `
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
   <tr>
@@ -864,15 +871,16 @@ export async function generateCommunityBusinessSpotlightSection(campaign: any, r
       <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; background-color: #f7f7f7;">
         <tr>
           <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Community Business Spotlight</h2>
+            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Advertorial</h2>
           </td>
         </tr>
         <tr class='row'>
           <td class='column' style='padding:8px; vertical-align: top;'>
             <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: ${bodyFont}; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
-              <tr><td style='padding: 10px 10px 4px; font-size: 20px; font-weight: bold;'>${selectedAd.title}</td></tr>
+              <tr><td style='padding: 10px 10px 4px; font-size: 20px; font-weight: bold; text-align: center;'>${selectedAd.title}</td></tr>
               ${imageHtml}
-              <tr><td style='padding: 0 10px 10px;'>${selectedAd.body}${businessUrl !== '#' ? ` (<a href='${trackedUrl}' style='color: #0080FE; text-decoration: none;'>visit website</a>)` : ''}</td></tr>
+              <tr><td style='padding: 0 10px 10px;'>${selectedAd.body}</td></tr>
+              ${buttonHtml}
             </table>
           </td>
         </tr>
@@ -882,7 +890,7 @@ export async function generateCommunityBusinessSpotlightSection(campaign: any, r
 </table>
 <br>`
   } catch (error) {
-    console.error('Error generating Community Business Spotlight section:', error)
+    console.error('Error generating Advertorial section:', error)
     return ''
   }
 }

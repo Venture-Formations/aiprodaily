@@ -10,12 +10,9 @@ import { getCroppedImage } from '@/utils/imageCrop'
 interface AdFormData {
   title: string
   body: string
-  business_name: string
-  contact_name: string
-  contact_email: string
-  contact_phone: string
-  business_address: string
-  business_website: string
+  button_text: string
+  button_url: string
+  submitter_email: string
 }
 
 export default function SubmitAdPage() {
@@ -30,12 +27,9 @@ export default function SubmitAdPage() {
   const [formData, setFormData] = useState<AdFormData>({
     title: '',
     body: '',
-    business_name: '',
-    contact_name: '',
-    contact_email: '',
-    contact_phone: '',
-    business_address: '',
-    business_website: ''
+    button_text: '',
+    button_url: '',
+    submitter_email: ''
   })
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -59,8 +53,8 @@ export default function SubmitAdPage() {
       return
     }
 
-    if (!formData.business_name || !formData.contact_name || !formData.contact_email) {
-      alert('Please fill in all business and contact information')
+    if (!formData.button_text || !formData.button_url || !formData.submitter_email) {
+      alert('Please fill in button text, button URL, and email')
       return
     }
 
@@ -138,11 +132,11 @@ export default function SubmitAdPage() {
       <div className="max-w-4xl mx-auto px-4">
         <div className="bg-white rounded-lg shadow-lg p-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Submit Your Business Advertisement
+            Submit Your Advertorial
           </h1>
           <p className="text-gray-600 mb-8">
-            Get featured in the St. Cloud Scoop newsletter's Community Business Spotlight section.
-            Your ad will reach thousands of local subscribers! Submit your ad for review today.
+            Get featured in the newsletter's Advertorial section.
+            Your ad will reach thousands of subscribers! Submit your ad for review today.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -218,47 +212,36 @@ export default function SubmitAdPage() {
               </div>
             </div>
 
-            {/* Business Information Section */}
+            {/* Button Information Section */}
             <div className="border-b pb-6">
-              <h2 className="text-xl font-semibold mb-4">Business Information</h2>
+              <h2 className="text-xl font-semibold mb-4">Call-to-Action Button</h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Business Name <span className="text-red-500">*</span>
+                    Button Text <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
-                    value={formData.business_name}
-                    onChange={(e) => setFormData({ ...formData, business_name: e.target.value })}
+                    value={formData.button_text}
+                    onChange={(e) => setFormData({ ...formData, button_text: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., Learn More, Visit Website, Get Started"
                     required
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Website
+                    Button URL <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="url"
-                    value={formData.business_website}
-                    onChange={(e) => setFormData({ ...formData, business_website: e.target.value })}
+                    value={formData.button_url}
+                    onChange={(e) => setFormData({ ...formData, button_url: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="https://example.com"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Business Address
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.business_address}
-                    onChange={(e) => setFormData({ ...formData, business_address: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="123 Main St, St. Cloud, MN 56301"
+                    required
                   />
                 </div>
               </div>
@@ -266,46 +249,24 @@ export default function SubmitAdPage() {
 
             {/* Contact Information Section */}
             <div className="border-b pb-6">
-              <h2 className="text-xl font-semibold mb-4">Contact Information</h2>
+              <h2 className="text-xl font-semibold mb-4">Your Contact Information</h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Contact Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.contact_name}
-                    onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-
+              <div className="grid grid-cols-1 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Email <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="email"
-                    value={formData.contact_email}
-                    onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
+                    value={formData.submitter_email}
+                    onChange={(e) => setFormData({ ...formData, submitter_email: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="your.email@example.com"
                     required
                   />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.contact_phone}
-                    onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="(320) 555-0123"
-                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    We'll use this email to notify you about your ad's status
+                  </p>
                 </div>
               </div>
             </div>
@@ -317,7 +278,7 @@ export default function SubmitAdPage() {
                 disabled={loading}
                 className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                {loading ? 'Submitting...' : 'Submit Advertisement for Review'}
+                {loading ? 'Submitting...' : 'Submit Advertorial for Review'}
               </button>
             </div>
           </form>
@@ -327,11 +288,11 @@ export default function SubmitAdPage() {
         <div className="mt-8 bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-xl font-semibold mb-4">How It Works</h2>
           <ol className="list-decimal list-inside space-y-2 text-gray-700">
-            <li>Fill out the form above with your advertisement content and business information</li>
+            <li>Fill out the form above with your advertorial content and call-to-action button</li>
             <li>Submit your ad for review - no payment required at this time</li>
             <li>Our team will review your submission (typically within 1 business day)</li>
             <li>Once approved, your ad will be added to the rotation queue</li>
-            <li>Your ad will appear in upcoming newsletters on a rotating basis</li>
+            <li>Your ad will appear in upcoming newsletters with a centered button linking to your destination</li>
             <li>You'll receive notifications via email about your ad's status</li>
           </ol>
         </div>

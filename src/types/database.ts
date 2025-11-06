@@ -841,12 +841,8 @@ export interface Advertisement {
   title: string
   body: string  // Rich text HTML
   word_count: number
-  business_name: string
-  contact_name: string
-  contact_email: string
-  contact_phone: string | null
-  business_address: string | null
-  business_website: string | null
+  button_text: string
+  button_url: string
   image_url: string | null  // Optional cropped image (5:4 ratio)
   frequency: AdFrequency
   times_paid: number

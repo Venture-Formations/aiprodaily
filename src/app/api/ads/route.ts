@@ -39,18 +39,14 @@ export async function POST(request: NextRequest) {
       title,
       body: adBody,
       word_count,
-      business_name,
-      contact_name,
-      contact_email,
-      contact_phone,
-      business_address,
-      business_website,
+      button_text,
+      button_url,
       frequency,
       times_paid
     } = body
 
     // Validation
-    if (!title || !adBody || !business_name || !contact_name || !contact_email) {
+    if (!title || !adBody || !button_text || !button_url) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -124,12 +120,8 @@ export async function POST(request: NextRequest) {
         title,
         body: adBody,
         word_count,
-        business_name,
-        contact_name,
-        contact_email,
-        contact_phone,
-        business_address,
-        business_website,
+        button_text,
+        button_url,
         frequency: frequency || 'single', // Default to 'single' if not provided
         times_paid: times_paid || 1, // Default to 1 if not provided
         times_used: 0,
