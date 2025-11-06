@@ -59,6 +59,10 @@ export async function POST(request: NextRequest) {
       '24-36_hours': {
         start: new Date(now.getTime() - (36 * 60 * 60 * 1000)),
         end: new Date(now.getTime() - (24 * 60 * 60 * 1000))
+      },
+      '36-60_hours': {
+        start: new Date(now.getTime() - (60 * 60 * 60 * 1000)),
+        end: new Date(now.getTime() - (36 * 60 * 60 * 1000))
       }
     }
 

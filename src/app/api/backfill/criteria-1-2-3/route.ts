@@ -31,9 +31,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate timeWindow
-    if (!['all', '6-24', '24-36'].includes(timeWindow)) {
+    if (!['all', '6-24', '24-36', '36-60'].includes(timeWindow)) {
       return NextResponse.json({
-        error: 'Invalid timeWindow. Must be: all, 6-24, or 24-36'
+        error: 'Invalid timeWindow. Must be: all, 6-24, 24-36, or 36-60'
       }, { status: 400 })
     }
 
@@ -50,9 +50,12 @@ export async function POST(request: NextRequest) {
     } else if (timeWindow === '6-24') {
       startHours = 24
       endHours = 6
-    } else { // 24-36
+    } else if (timeWindow === '24-36') {
       startHours = 36
       endHours = 24
+    } else { // 36-60
+      startHours = 60
+      endHours = 36
     }
 
     const startTime = new Date(now.getTime() - (startHours * 60 * 60 * 1000))

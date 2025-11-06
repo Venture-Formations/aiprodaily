@@ -45,7 +45,7 @@ Performs the actual backfilling of criteria 1-3 scores.
 
 #### Parameters:
 - `newsletterId` (required): Newsletter ID (e.g., "accounting")
-- `timeWindow` (optional): "all" (default), "6-24", or "24-36"
+- `timeWindow` (optional): "all" (default), "6-24", "24-36", or "36-60"
 - `dryRun` (optional): true/false (default: false) - test without updating database
 
 ## Usage Scenarios
@@ -232,5 +232,15 @@ curl -X POST "https://www.aiprodaily.com/api/backfill/criteria-1-2-3?secret=60Nk
   -d '{
     "newsletterId": "eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf",
     "timeWindow": "24-36"
+  }'
+```
+
+### Run backfill (36-60 hours only):
+```bash
+curl -X POST "https://www.aiprodaily.com/api/backfill/criteria-1-2-3?secret=60NkupzhvNpuExfyl0aa9wzzVVnfWGWWPsr3gfvchTg=" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "newsletterId": "eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf",
+    "timeWindow": "36-60"
   }'
 ```

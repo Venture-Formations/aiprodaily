@@ -40,7 +40,10 @@
       "Bash(SECRET=\"60NkupzhvNpuExfyl0aa9wzzVVnfWGWWPsr3gfvchTg=\")",
       "Bash(git restore:*)",
       "Bash(npx vercel logs --token $VERCEL_TOKEN aiprodaily-venture-formations.vercel.app --since 5m)",
-      "Bash(dir /b:*)"
+      "Bash(dir /b:*)",
+      "Bash(campaign-test.json)",
+      "Bash(\"src/app/api/debug/check-sections/route.ts\")",
+      "Bash(node -e:*)"
     ],
     "deny": [],
     "ask": []
