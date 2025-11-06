@@ -23,10 +23,11 @@ export class AdScheduler {
     const { campaignId } = context
 
     try {
-      // Get the current next_ad_position from app_settings
+      // Get the current next_ad_position from app_settings (global setting)
       const { data: settingsData, error: settingsError } = await supabaseAdmin
         .from('app_settings')
         .select('value')
+        .is('newsletter_id', null)
         .eq('key', 'next_ad_position')
         .maybeSingle()
 
@@ -165,15 +166,18 @@ export class AdScheduler {
       }
 
       // Update next_ad_position in app_settings (upsert in case it doesn't exist)
+      // Note: next_ad_position is global, not per-newsletter
       const { error: settingsError } = await supabaseAdmin
         .from('app_settings')
         .upsert({
           key: 'next_ad_position',
+          newsletter_id: null, // Global setting
           value: nextPosition.toString(),
           updated_at: new Date().toISOString(),
           description: 'Next position in ad rotation sequence'
         }, {
-          onConflict: 'key'
+          onConflict: 'newsletter_id,key',
+          ignoreDuplicates: false
         })
 
       if (settingsError) {
