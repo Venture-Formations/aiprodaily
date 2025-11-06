@@ -33,9 +33,10 @@ interface Newsletter {
 
 interface NewslettersListProps {
   newsletters: Newsletter[]
+  imageOverride?: string // Optional: Use this image for all newsletter cards
 }
 
-export function NewslettersList({ newsletters }: NewslettersListProps) {
+export function NewslettersList({ newsletters, imageOverride }: NewslettersListProps) {
   const [currentPage, setCurrentPage] = useState(1)
 
   // Calculate pagination
@@ -94,9 +95,9 @@ export function NewslettersList({ newsletters }: NewslettersListProps) {
             const metadata = newsletter.metadata || {}
             const totalArticles = (metadata.total_articles || 0) + (metadata.total_secondary_articles || 0)
 
-            // Get first article's image
+            // Get first article's image or use override
             const firstArticle = newsletter.articles?.[0]
-            const imageUrl = firstArticle?.rss_post?.image_url
+            const imageUrl = imageOverride || firstArticle?.rss_post?.image_url
             const placeholderSvg = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600"%3E%3Crect width="800" height="600" fill="%23e5e7eb"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="24" fill="%239ca3af"%3EAI Accounting Daily%3C/text%3E%3C/svg%3E'
 
             return (
