@@ -593,6 +593,70 @@ function RoadWorkSection({ campaign }: { campaign: any }) {
   )
 }
 
+function AdvertorialSection({ campaign }: { campaign: any }) {
+  // Get ad from campaign data
+  const ad = campaign?.campaign_advertisements?.[0]?.advertisement
+
+  if (!ad) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        No advertisement selected for this campaign.
+        <br />
+        <span className="text-sm text-gray-400">
+          An ad will be automatically selected during RSS processing.
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-6">
+      <div className="border border-gray-200 rounded-lg bg-white shadow-sm p-6">
+        <div className="mb-4 text-sm text-gray-600">
+          <strong>Selected Ad:</strong> {ad.title}
+        </div>
+
+        {/* Preview of how it will appear in newsletter */}
+        <div className="border-l-4 border-blue-500 pl-4">
+          <h3 className="text-xl font-bold text-center mb-3">{ad.title}</h3>
+
+          {ad.image_url && (
+            <div className="text-center mb-3">
+              <img
+                src={ad.image_url}
+                alt={ad.title}
+                className="inline-block max-w-full max-h-96 rounded"
+              />
+            </div>
+          )}
+
+          <div
+            className="prose prose-sm max-w-none mb-4 [&_a]:text-blue-600 [&_a]:underline"
+            dangerouslySetInnerHTML={{ __html: ad.body }}
+          />
+
+          {ad.button_url && (
+            <div className="text-center">
+              <a
+                href={ad.button_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700"
+              >
+                {ad.button_text || 'Learn More'}
+              </a>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 pt-4 border-t text-sm text-gray-500">
+          Times used: {ad.times_used || 0} | Display order: {ad.display_order}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function BreakingNewsSection({ campaign }: { campaign: any }) {
   const [articles, setArticles] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -1089,6 +1153,8 @@ function NewsletterSectionComponent({
         return <RoadWorkSection campaign={campaign} />
       case 'Poll':
         return <PollSection campaign={campaign} />
+      case 'Advertorial':
+        return <AdvertorialSection campaign={campaign} />
       case 'Breaking News':
         return <BreakingNewsSection campaign={campaign} />
       case 'Beyond the Feed':

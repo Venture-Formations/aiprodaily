@@ -819,23 +819,67 @@ export async function generateAdvertorialSection(campaign: any, recordUsage: boo
 
     let selectedAd = existingAd?.advertisement
 
-    // If no ad selected yet, use scheduler to select one
+    // If no ad selected, return empty (RSS processing should have selected one)
     if (!selectedAd) {
-      console.log('No ad selected yet, using scheduler...')
-      selectedAd = await AdScheduler.selectAdForCampaign({
-        campaignId: campaign.id,
-        campaignDate: campaign.date
-      })
+      console.log('No ad selected for this campaign (RSS processing may not have completed)')
+      return ''
+    }
 
-      // Record the usage ONLY if recordUsage is true (final campaign creation)
-      if (selectedAd && recordUsage) {
-        await AdScheduler.recordAdUsage(campaign.id, selectedAd.id, campaign.date)
-        console.log(`Selected and recorded ad usage: ${selectedAd.title}`)
-      } else if (selectedAd) {
-        console.log(`Selected ad (usage NOT recorded - preview only): ${selectedAd.title}`)
+    console.log(`Using selected ad: ${selectedAd.title}`)
+
+    // Record usage if this is the final send (not a preview)
+    if (recordUsage) {
+      try {
+        // Increment times_used, update last_used_date, and update next_ad_position
+        const { data: currentAd } = await supabaseAdmin
+          .from('advertisements')
+          .select('times_used, display_order')
+          .eq('id', selectedAd.id)
+          .single()
+
+        if (currentAd) {
+          // Update the ad stats
+          await supabaseAdmin
+            .from('advertisements')
+            .update({
+              times_used: (currentAd.times_used || 0) + 1,
+              last_used_date: campaign.date,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', selectedAd.id)
+
+          // Update next_ad_position
+          const { data: activeAds } = await supabaseAdmin
+            .from('advertisements')
+            .select('display_order')
+            .eq('status', 'active')
+            .not('display_order', 'is', null)
+            .order('display_order', { ascending: true })
+
+          if (activeAds && activeAds.length > 0) {
+            const currentPosition = currentAd.display_order || 1
+            let nextPosition = currentPosition + 1
+            const maxPosition = Math.max(...activeAds.map(ad => ad.display_order || 0))
+
+            if (nextPosition > maxPosition) {
+              nextPosition = 1
+            }
+
+            await supabaseAdmin
+              .from('app_settings')
+              .update({
+                value: nextPosition.toString(),
+                updated_at: new Date().toISOString()
+              })
+              .eq('key', 'next_ad_position')
+
+            console.log(`Recorded ad usage: ${selectedAd.title}, next position: ${nextPosition}`)
+          }
+        }
+      } catch (usageError) {
+        console.error('Error recording ad usage:', usageError)
+        // Don't fail the entire email generation if usage recording fails
       }
-    } else {
-      console.log(`Using existing ad: ${selectedAd.title}`)
     }
 
     // If no ad available, return empty section

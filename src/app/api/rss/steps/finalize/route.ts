@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { ErrorHandler, SlackNotificationService } from '@/lib/slack'
 import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/workflow-state'
+import { AdScheduler } from '@/lib/ad-scheduler'
 
 /**
  * Step 6: Finalize campaign
@@ -38,6 +39,52 @@ export async function POST(request: NextRequest) {
       .eq('id', campaign_id)
 
     console.log('Campaign status updated to draft')
+
+    // Select and assign advertisement for this campaign
+    try {
+      const { data: campaignData } = await supabaseAdmin
+        .from('newsletter_campaigns')
+        .select('date')
+        .eq('id', campaign_id)
+        .single()
+
+      if (campaignData) {
+        const selectedAd = await AdScheduler.selectAdForCampaign({
+          campaignId: campaign_id,
+          campaignDate: campaignData.date
+        })
+
+        if (selectedAd) {
+          // Check if ad already assigned to prevent duplicates
+          const { data: existingAssignment } = await supabaseAdmin
+            .from('campaign_advertisements')
+            .select('id')
+            .eq('campaign_id', campaign_id)
+            .single()
+
+          if (!existingAssignment) {
+            // Store the selected ad (without recording usage yet)
+            await supabaseAdmin
+              .from('campaign_advertisements')
+              .insert({
+                campaign_id: campaign_id,
+                advertisement_id: selectedAd.id,
+                campaign_date: campaignData.date,
+                used_at: new Date().toISOString()
+              })
+
+            console.log(`[Finalize] Selected ad: ${selectedAd.title} (ID: ${selectedAd.id})`)
+          } else {
+            console.log('[Finalize] Ad already assigned to this campaign')
+          }
+        } else {
+          console.log('[Finalize] No active ads available for this campaign')
+        }
+      }
+    } catch (adError) {
+      console.error('[Finalize] Error selecting ad:', adError)
+      // Don't fail the entire step if ad selection fails
+    }
 
     // Get final article count to report to Slack
     const { data: finalArticles } = await supabaseAdmin

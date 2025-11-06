@@ -43,6 +43,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         campaign_ai_app_selections(
           *,
           app:ai_applications(*)
+        ),
+        campaign_advertisements(
+          *,
+          advertisement:advertisements(*)
         )
       `)
       .eq('id', id)
