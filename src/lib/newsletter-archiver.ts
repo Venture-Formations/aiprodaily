@@ -168,6 +168,28 @@ export class NewsletterArchiver {
         sections.prompt = promptSelection.prompt
       }
 
+      // Advertorial section
+      const { data: advertorialData } = await supabaseAdmin
+        .from('campaign_advertisements')
+        .select(`
+          campaign_date,
+          used_at,
+          advertisement:advertisements(
+            id,
+            title,
+            body,
+            button_text,
+            button_url,
+            image_url
+          )
+        `)
+        .eq('campaign_id', campaignId)
+        .single()
+
+      if (advertorialData && advertorialData.advertisement) {
+        sections.advertorial = advertorialData.advertisement
+      }
+
       // 4. Gather metadata
       const metadata = {
         total_articles: articles?.length || 0,
@@ -177,6 +199,7 @@ export class NewsletterArchiver {
         has_ai_apps: !!aiApps && aiApps.length > 0,
         has_poll: !!poll,
         has_prompt: !!promptSelection,
+        has_advertorial: !!advertorialData,
         archived_at: new Date().toISOString()
       }
 

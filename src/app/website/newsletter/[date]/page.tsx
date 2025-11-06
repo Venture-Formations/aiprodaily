@@ -81,6 +81,7 @@ export default async function NewsletterPage({ params }: PageProps) {
   const poll = newsletter.sections?.poll
   const roadWork = newsletter.sections?.road_work
   const welcome = newsletter.sections?.welcome
+  const advertorial = newsletter.sections?.advertorial
 
   // Section IDs for stable matching
   const SECTION_IDS = {
@@ -279,6 +280,43 @@ export default async function NewsletterPage({ params }: PageProps) {
                   <p className="text-[#1D1D1F]/60 text-sm text-center">
                     This poll was available in the email newsletter.
                   </p>
+                </div>
+              )
+            }
+
+            // Advertorial Section
+            if (section.name === 'Advertorial' && advertorial) {
+              return (
+                <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
+                  <h2 className="text-2xl font-bold mb-6 inline-block px-3 py-1.5 rounded-md text-white" style={{ backgroundColor: primaryColor }}>{section.name}</h2>
+                  <div className="text-center">
+                    <h3 className="text-xl font-bold text-[#1D1D1F] mb-4">{advertorial.title}</h3>
+                    {advertorial.image_url && (
+                      <div className="mb-4">
+                        <img
+                          src={advertorial.image_url}
+                          alt={advertorial.title}
+                          className="mx-auto max-w-full rounded-lg"
+                          style={{ maxHeight: '400px' }}
+                        />
+                      </div>
+                    )}
+                    <div
+                      className="text-[#1D1D1F] leading-relaxed mb-4 text-left prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline"
+                      dangerouslySetInnerHTML={{ __html: advertorial.body }}
+                    />
+                    {advertorial.button_url && (
+                      <a
+                        href={advertorial.button_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block px-6 py-3 text-white font-semibold rounded-lg hover:opacity-90 transition-opacity"
+                        style={{ backgroundColor: primaryColor }}
+                      >
+                        {advertorial.button_text || 'Learn More'}
+                      </a>
+                    )}
+                  </div>
                 </div>
               )
             }
