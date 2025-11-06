@@ -923,7 +923,8 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
     title: ad.title,
     body: ad.body,
     button_text: ad.button_text,
-    button_url: ad.button_url
+    button_url: ad.button_url,
+    status: ad.status
   })
   const [submitting, setSubmitting] = useState(false)
 
@@ -989,6 +990,34 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
               onChange={(html) => setFormData({ ...formData, body: html })}
               maxWords={100}
             />
+          </div>
+
+          {/* Status Toggle */}
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Advertisement Status
+              </label>
+              <p className="text-xs text-gray-600">
+                {formData.status === 'active' ? 'Ad is active and will appear in newsletters' : 'Ad is inactive (approved but not in rotation)'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFormData({
+                ...formData,
+                status: formData.status === 'active' ? 'approved' : 'active'
+              })}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                formData.status === 'active' ? 'bg-green-600' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  formData.status === 'active' ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
           </div>
 
           {/* Button Information */}
