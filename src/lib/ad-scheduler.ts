@@ -28,7 +28,7 @@ export class AdScheduler {
         .from('app_settings')
         .select('value')
         .eq('key', 'next_ad_position')
-        .single()
+        .maybeSingle()
 
       if (settingsError) {
         console.error('[AdScheduler] Error fetching next_ad_position:', settingsError)
