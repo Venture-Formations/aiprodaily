@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
-import { start } from 'workflow/api'
-import { createCampaignWorkflow } from '@/lib/workflows/create-campaign-workflow'
 
 /**
  * Create Campaign with Full Workflow
@@ -192,15 +190,31 @@ export async function POST(request: NextRequest) {
     const dedupeResult = await processor.handleDuplicatesForCampaign(campaignId)
     console.log(`[Create Campaign] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicates`)
 
-    // Step 6: Start the article generation workflow in background
-    start(createCampaignWorkflow, [{
-      campaign_id: campaignId,
-      newsletter_id: newsletterUuid
-    }]).catch(error => {
-      console.error('[Create Campaign] Failed to start workflow:', error)
-    })
+    // Step 6: Start the article generation workflow via API endpoint
+    try {
+      const workflowResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/workflows/create-campaign`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.CRON_SECRET}`
+        },
+        body: JSON.stringify({
+          campaign_id: campaignId,
+          newsletter_id: newsletterUuid
+        })
+      })
 
-    console.log('[Create Campaign] Setup complete, workflow started in background')
+      if (!workflowResponse.ok) {
+        const errorData = await workflowResponse.json()
+        console.error('[Create Campaign] Workflow start failed:', errorData)
+      } else {
+        console.log('[Create Campaign] Workflow started successfully')
+      }
+    } catch (error) {
+      console.error('[Create Campaign] Failed to start workflow:', error)
+    }
+
+    console.log('[Create Campaign] Setup complete, workflow triggered')
 
     return NextResponse.json({
       success: true,

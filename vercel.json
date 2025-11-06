@@ -130,6 +130,9 @@
     },
     "app/api/workflows/process-rss/route.ts": {
       "maxDuration": 800
+    },
+    "app/api/workflows/create-campaign/route.ts": {
+      "maxDuration": 800
     }
   }
 }
