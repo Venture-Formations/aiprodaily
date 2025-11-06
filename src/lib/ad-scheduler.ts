@@ -40,11 +40,11 @@ export class AdScheduler {
       const nextAdPosition = settingsData ? parseInt(settingsData.value) : 1
       console.log(`[AdScheduler] Current next_ad_position: ${nextAdPosition}`)
 
-      // Get all active ads with display_order, sorted by display_order
-      // Note: Advertisements are global (not per-newsletter) but rotation is tracked per-newsletter
+      // Get all active ads for this newsletter with display_order, sorted by display_order
       const { data: activeAds, error: adsError } = await supabaseAdmin
         .from('advertisements')
         .select('*')
+        .eq('newsletter_id', newsletterId)
         .eq('status', 'active')
         .not('display_order', 'is', null)
         .order('display_order', { ascending: true })
@@ -155,10 +155,11 @@ export class AdScheduler {
       // Calculate next position
       const currentPosition = usedAd.display_order || 1
 
-      // Get all active ads to determine next position
+      // Get all active ads for this newsletter to determine next position
       const { data: activeAds, error: adsError } = await supabaseAdmin
         .from('advertisements')
         .select('display_order')
+        .eq('newsletter_id', newsletterId)
         .eq('status', 'active')
         .not('display_order', 'is', null)
         .order('display_order', { ascending: true })
