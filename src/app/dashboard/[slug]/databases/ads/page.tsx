@@ -538,13 +538,12 @@ export default function AdsManagementPage() {
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t text-sm">
                     <div>
-                      <span className="font-medium">Contact:</span>
-                      <p className="text-gray-600">{ad.contact_name}</p>
-                      <p className="text-gray-600">{ad.contact_email}</p>
+                      <span className="font-medium">Button:</span>
+                      <p className="text-gray-600">{ad.button_text}</p>
                     </div>
                     <div>
-                      <span className="font-medium">Word Count:</span>
-                      <p className="text-gray-600">{ad.word_count} words</p>
+                      <span className="font-medium">Button URL:</span>
+                      <p className="text-gray-600 truncate" title={ad.button_url}>{ad.button_url}</p>
                     </div>
                     {ad.image_url && (
                       <div>
