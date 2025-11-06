@@ -255,6 +255,72 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Check if this is a schedule time update request
+    const scheduleFields = ['rssProcessingTime', 'campaignCreationTime', 'scheduledSendTime',
+                           'dailyCampaignCreationTime', 'dailyScheduledSendTime',
+                           'reviewScheduleEnabled', 'dailyScheduleEnabled']
+    const isScheduleUpdate = scheduleFields.some(field => settings[field] !== undefined) &&
+                            !settings.fromEmail && !settings.senderName
+
+    if (isScheduleUpdate) {
+      // Validate time formats (HH:MM)
+      const timeFields = ['rssProcessingTime', 'campaignCreationTime', 'scheduledSendTime',
+                         'dailyCampaignCreationTime', 'dailyScheduledSendTime']
+      for (const field of timeFields) {
+        if (settings[field] && !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(settings[field])) {
+          return NextResponse.json({
+            error: `Invalid time format for ${field}. Use HH:MM format.`
+          }, { status: 400 })
+        }
+      }
+
+      // Save only schedule settings
+      const settingsToSave = []
+      if (settings.rssProcessingTime !== undefined) {
+        settingsToSave.push({ key: 'email_rssProcessingTime', value: settings.rssProcessingTime })
+      }
+      if (settings.campaignCreationTime !== undefined) {
+        settingsToSave.push({ key: 'email_campaignCreationTime', value: settings.campaignCreationTime })
+      }
+      if (settings.scheduledSendTime !== undefined) {
+        settingsToSave.push({ key: 'email_scheduledSendTime', value: settings.scheduledSendTime })
+      }
+      if (settings.dailyCampaignCreationTime !== undefined) {
+        settingsToSave.push({ key: 'email_dailyCampaignCreationTime', value: settings.dailyCampaignCreationTime })
+      }
+      if (settings.dailyScheduledSendTime !== undefined) {
+        settingsToSave.push({ key: 'email_dailyScheduledSendTime', value: settings.dailyScheduledSendTime })
+      }
+      if (settings.reviewScheduleEnabled !== undefined) {
+        settingsToSave.push({ key: 'email_reviewScheduleEnabled', value: settings.reviewScheduleEnabled ? 'true' : 'false' })
+      }
+      if (settings.dailyScheduleEnabled !== undefined) {
+        settingsToSave.push({ key: 'email_dailyScheduleEnabled', value: settings.dailyScheduleEnabled ? 'true' : 'false' })
+      }
+
+      // Upsert schedule settings
+      for (const setting of settingsToSave) {
+        const { error } = await supabaseAdmin
+          .from('app_settings')
+          .upsert({
+            key: setting.key,
+            value: setting.value,
+            newsletter_id: newsletterId,
+            description: `Email schedule: ${setting.key.replace('email_', '')}`,
+            updated_at: new Date().toISOString()
+          })
+
+        if (error) {
+          throw error
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Schedule settings saved successfully'
+      })
+    }
+
     // Validate required fields for email settings
     if (!settings.fromEmail || !settings.senderName) {
       return NextResponse.json({
