@@ -157,6 +157,8 @@ export async function POST(request: NextRequest) {
             newsletter_id: newsletterId,
             description: `Article lookback hours: ${setting.key}`,
             updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'newsletter_id,key'
           })
 
         if (error) {
@@ -200,6 +202,8 @@ export async function POST(request: NextRequest) {
               ? 'Number of days of sent newsletters to check for duplicate articles'
               : 'Similarity threshold for all deduplication checks (0.0-1.0)',
             updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'newsletter_id,key'
           })
 
         if (error) {
@@ -242,6 +246,8 @@ export async function POST(request: NextRequest) {
             newsletter_id: newsletterId,
             description: `Max articles setting: ${setting.key}`,
             updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'newsletter_id,key'
           })
 
         if (error) {
@@ -308,6 +314,8 @@ export async function POST(request: NextRequest) {
             newsletter_id: newsletterId,
             description: `Email schedule: ${setting.key.replace('email_', '')}`,
             updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'newsletter_id,key'
           })
 
         if (error) {
@@ -366,6 +374,8 @@ export async function POST(request: NextRequest) {
           newsletter_id: newsletterId,
           description: `Email configuration: ${setting.key.replace('email_', '')}`,
           updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'newsletter_id,key'
         })
         .select()
 
