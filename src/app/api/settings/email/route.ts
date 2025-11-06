@@ -93,7 +93,16 @@ export async function GET(request: NextRequest) {
       scheduledSendTime: finalSettings.scheduledSendTime
     })
 
-    return NextResponse.json(finalSettings)
+    // Convert flat settings object to array format for frontend compatibility
+    const settingsArray = Object.entries(finalSettings).map(([key, value]) => ({
+      key,
+      value
+    }))
+
+    return NextResponse.json({
+      ...finalSettings,
+      settings: settingsArray
+    })
 
   } catch (error) {
     console.error('Failed to load email settings:', error)
