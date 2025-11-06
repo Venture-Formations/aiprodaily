@@ -499,6 +499,32 @@ export default function AIApplicationsPage() {
           </div>
         )}
 
+        {/* Database Summary Stats */}
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-lg shadow">
+            <div className="text-2xl font-bold text-blue-600">{apps.length}</div>
+            <div className="text-sm text-gray-600">Total Applications</div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <div className="text-2xl font-bold text-green-600">
+              {apps.filter(a => a.is_active).length}
+            </div>
+            <div className="text-sm text-gray-600">Active</div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <div className="text-2xl font-bold text-yellow-600">
+              {apps.filter(a => a.is_affiliate).length}
+            </div>
+            <div className="text-sm text-gray-600">Affiliates</div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <div className="text-2xl font-bold text-purple-600">
+              {new Set(apps.map(a => a.category)).size}
+            </div>
+            <div className="text-sm text-gray-600">Categories</div>
+          </div>
+        </div>
+
         {/* Search and Filter */}
         <div className="mb-4 flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
@@ -738,32 +764,6 @@ export default function AIApplicationsPage() {
               No AI applications found. Click "Add Application" to get started.
             </div>
           )}
-        </div>
-
-        {/* Stats */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-blue-600">{apps.length}</div>
-            <div className="text-sm text-gray-600">Total Applications</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-green-600">
-              {apps.filter(a => a.is_active).length}
-            </div>
-            <div className="text-sm text-gray-600">Active</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-yellow-600">
-              {apps.filter(a => a.is_affiliate).length}
-            </div>
-            <div className="text-sm text-gray-600">Affiliates</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-purple-600">
-              {new Set(apps.map(a => a.category)).size}
-            </div>
-            <div className="text-sm text-gray-600">Categories</div>
-          </div>
         </div>
       </div>
     </Layout>
