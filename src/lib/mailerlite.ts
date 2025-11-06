@@ -361,7 +361,8 @@ export class MailerLiteService {
     // Section ID constants (stable across name changes) - SAME AS PREVIEW
     const SECTION_IDS = {
       AI_APPLICATIONS: '853f8d0b-bc76-473a-bfc6-421418266222',
-      PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b'
+      PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b',
+      ADVERTISEMENT: 'c0bc7173-de47-41b2-a260-77f55525ee3d'
     }
 
     // Generate sections in order based on database configuration - SAME AS PREVIEW
@@ -414,7 +415,9 @@ export class MailerLiteService {
           if (beyondFeedHtml) {
             sectionsHtml += beyondFeedHtml
           }
-        } else if (section.name === 'Advertisement' || section.name === 'Advertorial') {
+        }
+        // Use section ID for Advertisement (stable across name changes)
+        else if (section.id === SECTION_IDS.ADVERTISEMENT) {
           const advertorialHtml = await generateAdvertorialSection(campaign, !isReview, section.name) // Record usage for final campaigns only, pass section name
           if (advertorialHtml) {
             sectionsHtml += advertorialHtml
