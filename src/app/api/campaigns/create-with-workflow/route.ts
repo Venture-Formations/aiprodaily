@@ -93,10 +93,15 @@ export async function POST(request: NextRequest) {
       if (selectedAd) {
         console.log(`[Create Campaign] Selected ad: ${selectedAd.title} (ID: ${selectedAd.id})`)
 
-        // Use AdScheduler.recordAdUsage which handles everything properly
-        await AdScheduler.recordAdUsage(campaignId, selectedAd.id, date)
-
-        console.log('[Create Campaign] Advertisement recorded successfully')
+        try {
+          // Use AdScheduler.recordAdUsage which handles everything properly
+          await AdScheduler.recordAdUsage(campaignId, selectedAd.id, date)
+          console.log('[Create Campaign] Advertisement recorded successfully')
+        } catch (recordError) {
+          console.error('[Create Campaign] Failed to record advertisement usage:', recordError)
+          // Log full error details
+          console.error('[Create Campaign] Error details:', JSON.stringify(recordError, null, 2))
+        }
       } else {
         console.log('[Create Campaign] No advertisement available')
       }

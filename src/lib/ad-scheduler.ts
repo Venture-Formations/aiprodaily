@@ -164,14 +164,17 @@ export class AdScheduler {
         console.log(`[AdScheduler] Moving to next position: ${nextPosition}`)
       }
 
-      // Update next_ad_position in app_settings
+      // Update next_ad_position in app_settings (upsert in case it doesn't exist)
       const { error: settingsError } = await supabaseAdmin
         .from('app_settings')
-        .update({
+        .upsert({
+          key: 'next_ad_position',
           value: nextPosition.toString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          description: 'Next position in ad rotation sequence'
+        }, {
+          onConflict: 'key'
         })
-        .eq('key', 'next_ad_position')
 
       if (settingsError) {
         console.error('[AdScheduler] Failed to update next_ad_position:', settingsError)

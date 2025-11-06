@@ -39,7 +39,8 @@
       "Bash(.gitignore)",
       "Bash(SECRET=\"60NkupzhvNpuExfyl0aa9wzzVVnfWGWWPsr3gfvchTg=\")",
       "Bash(git restore:*)",
-      "Bash(npx vercel logs --token $VERCEL_TOKEN aiprodaily-venture-formations.vercel.app --since 5m)"
+      "Bash(npx vercel logs --token $VERCEL_TOKEN aiprodaily-venture-formations.vercel.app --since 5m)",
+      "Bash(dir /b:*)"
     ],
     "deny": [],
     "ask": []
