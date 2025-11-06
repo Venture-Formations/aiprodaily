@@ -2456,117 +2456,41 @@ export default function CampaignDetailPage() {
     if (!campaign) return
 
     setProcessing(true)
-    setProcessingStatus('Phase 1: Archive, Fetch, Score...')
+    setProcessingStatus('Starting reprocess workflow...')
 
     try {
-      // Phase 1: Archive, Fetch+Extract, Score (steps 1-3)
-      setProcessingStatus('Phase 1: Fetching RSS feeds and scoring posts...')
-      const phase1Response = await fetch('/api/rss/process-phase1', {
+      const response = await fetch(`/api/campaigns/${campaign.id}/reprocess`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          campaign_id: campaign.id
-        })
+        }
       })
 
-      if (!phase1Response.ok) {
-        let errorMessage = 'Phase 1 failed'
+      if (!response.ok) {
+        let errorMessage = 'Reprocess failed'
         try {
-          const data = await phase1Response.json()
+          const data = await response.json()
           errorMessage = data.message || data.error || errorMessage
         } catch (e) {
-          errorMessage = `HTTP ${phase1Response.status}: ${phase1Response.statusText}`
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`
         }
         throw new Error(errorMessage)
       }
 
-      const phase1Data = await phase1Response.json()
-      console.log('[Client] Phase 1 completed:', phase1Data)
-      setProcessingStatus('Phase 1 complete! Starting Phase 2...')
+      const data = await response.json()
+      console.log('[Client] Reprocess workflow started:', data)
 
-      // Phase 2: Deduplicate, Generate, Select, Welcome, Finalize (steps 4-8)
-      setProcessingStatus('Phase 2: Generating articles and finalizing...')
-      console.log('[Client] Starting Phase 2 for campaign:', campaign.id)
-      const phase2Response = await fetch('/api/rss/process-phase2', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          campaign_id: campaign.id
-        })
-      })
+      setProcessingStatus('Workflow started! Articles will regenerate in background. Refresh page to see progress.')
 
-      if (!phase2Response.ok) {
-        let errorMessage = 'Phase 2 failed'
-        try {
-          const data = await phase2Response.json()
-          errorMessage = data.message || data.error || errorMessage
-        } catch (e) {
-          errorMessage = `HTTP ${phase2Response.status}: ${phase2Response.statusText}`
-        }
-        console.error('[Client] Phase 2 failed:', errorMessage)
-        throw new Error(errorMessage)
-      }
+      // Wait a bit then refresh to show processing status
+      setTimeout(async () => {
+        await fetchCampaign(campaign.id)
+        setProcessingStatus('')
+      }, 3000)
 
-      const phase2Data = await phase2Response.json()
-      console.log('[Client] Phase 2 completed:', phase2Data)
-      setProcessingStatus('Processing complete! Refreshing articles...')
-
-      // Refresh the campaign data to show new articles
-      await fetchCampaign(campaign.id)
-
-      setProcessingStatus('Done!')
-      setTimeout(() => setProcessingStatus(''), 2000)
     } catch (error) {
       setProcessingStatus('')
-      alert('Failed to process RSS feeds: ' + (error instanceof Error ? error.message : 'Unknown error'))
-    } finally {
-      setProcessing(false)
-    }
-  }
-
-  const processRSSFeedsPhase2 = async () => {
-    if (!campaign) return
-
-    setProcessing(true)
-    setProcessingStatus('Phase 2: Deduplicate, Generate, Select, Welcome, Finalize...')
-
-    try {
-      setProcessingStatus('Phase 2: Generating articles and finalizing...')
-      const phase2Response = await fetch('/api/rss/process-phase2', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          campaign_id: campaign.id
-        })
-      })
-
-      if (!phase2Response.ok) {
-        let errorMessage = 'Phase 2 failed'
-        try {
-          const data = await phase2Response.json()
-          errorMessage = data.message || data.error || errorMessage
-        } catch (e) {
-          errorMessage = `HTTP ${phase2Response.status}: ${phase2Response.statusText}`
-        }
-        throw new Error(errorMessage)
-      }
-
-      setProcessingStatus('Phase 2 complete! Refreshing articles...')
-
-      // Refresh the campaign data to show new articles
-      await fetchCampaign(campaign.id)
-
-      setProcessingStatus('Done!')
-      setTimeout(() => setProcessingStatus(''), 2000)
-    } catch (error) {
-      setProcessingStatus('')
-      alert('Failed to process Phase 2: ' + (error instanceof Error ? error.message : 'Unknown error'))
+      alert('Failed to start reprocess: ' + (error instanceof Error ? error.message : 'Unknown error'))
     } finally {
       setProcessing(false)
     }
@@ -3059,15 +2983,7 @@ export default function CampaignDetailPage() {
                 disabled={processing || saving || generatingSubject || campaign.status === 'processing'}
                 className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium"
               >
-                {(processing || campaign.status === 'processing') ? 'Processing in background...' : 'Process RSS Feeds'}
-              </button>
-              <button
-                onClick={processRSSFeedsPhase2}
-                disabled={processing || saving || generatingSubject || campaign.status === 'processing'}
-                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium"
-                title="Run Phase 2 only (Deduplicate, Generate, Select, Welcome, Finalize). Requires Phase 1 to be completed first."
-              >
-                {processing ? 'Processing...' : 'Run Phase 2'}
+                {(processing || campaign.status === 'processing') ? 'Processing in background...' : 'Reprocess Articles'}
               </button>
               <button
                 onClick={previewNewsletter}
@@ -3234,15 +3150,7 @@ export default function CampaignDetailPage() {
                     disabled={processing}
                     className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium"
                   >
-                    {processing ? 'Processing...' : 'Process RSS Feeds'}
-                  </button>
-                  <button
-                    onClick={processRSSFeedsPhase2}
-                    disabled={processing}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium"
-                    title="Run Phase 2 only (Deduplicate, Generate, Select, Welcome, Finalize). Requires Phase 1 to be completed first."
-                  >
-                    {processing ? 'Processing...' : 'Run Phase 2'}
+                    {processing ? 'Processing...' : 'Reprocess Articles'}
                   </button>
                 </div>
               </div>
