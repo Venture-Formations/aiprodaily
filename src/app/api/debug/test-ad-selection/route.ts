@@ -114,12 +114,14 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
-    // Verify the ad was recorded
+    // Verify the ad was recorded (get most recent)
     const { data: verification, error: verifyError } = await supabaseAdmin
       .from('campaign_advertisements')
       .select('*, advertisement:advertisements(*)')
       .eq('campaign_id', campaignId)
-      .single()
+      .order('used_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
     if (verifyError) {
       console.error('[Test Ad] Verification failed:', verifyError)
@@ -129,8 +131,9 @@ export async function POST(request: NextRequest) {
     const { data: nextPosition } = await supabaseAdmin
       .from('app_settings')
       .select('value')
+      .eq('newsletter_id', campaign.newsletter_id)
       .eq('key', 'next_ad_position')
-      .single()
+      .maybeSingle()
 
     return NextResponse.json({
       success: true,
