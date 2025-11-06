@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
       console.log('[Create Campaign] AI selection failed (non-critical):', error)
     }
 
-    // Step 3: Select advertisement
+    // Step 4: Select advertisement
     try {
       const { AdScheduler } = await import('@/lib/ad-scheduler')
       const selectedAd = await AdScheduler.selectAdForCampaign({
@@ -91,21 +91,21 @@ export async function POST(request: NextRequest) {
       })
 
       if (selectedAd) {
-        await supabaseAdmin
-          .from('campaign_advertisements')
-          .insert({
-            campaign_id: campaignId,
-            advertisement_id: selectedAd.id,
-            campaign_date: date,
-            used_at: new Date().toISOString()
-          })
-        console.log('[Create Campaign] Selected advertisement')
+        console.log(`[Create Campaign] Selected ad: ${selectedAd.title} (ID: ${selectedAd.id})`)
+
+        // Use AdScheduler.recordAdUsage which handles everything properly
+        await AdScheduler.recordAdUsage(campaignId, selectedAd.id, date)
+
+        console.log('[Create Campaign] Advertisement recorded successfully')
+      } else {
+        console.log('[Create Campaign] No advertisement available')
       }
     } catch (error) {
-      console.log('[Create Campaign] Ad selection failed (non-critical):', error)
+      console.error('[Create Campaign] Ad selection failed:', error)
+      // Non-critical - campaign can proceed without ad
     }
 
-    // Step 4: Assign top 12 posts per section (using dynamic import)
+    // Step 5: Assign top 12 posts per section (using dynamic import)
     const { RSSProcessor } = await import('@/lib/rss-processor')
     const processor = new RSSProcessor()
 
@@ -188,11 +188,11 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Create Campaign] Assigned ${topPrimary.length} primary, ${topSecondary.length} secondary posts`)
 
-    // Step 5: Deduplicate
+    // Step 6: Deduplicate
     const dedupeResult = await processor.handleDuplicatesForCampaign(campaignId)
     console.log(`[Create Campaign] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicates`)
 
-    // Step 6: Start the article generation workflow
+    // Step 7: Start the article generation workflow
     console.log('[Create Campaign] Starting article generation workflow...')
     try {
       await start(createCampaignWorkflow, [{
