@@ -414,8 +414,8 @@ export class MailerLiteService {
           if (beyondFeedHtml) {
             sectionsHtml += beyondFeedHtml
           }
-        } else if (section.name === 'Advertorial') {
-          const advertorialHtml = await generateAdvertorialSection(campaign, !isReview) // Record usage for final campaigns only
+        } else if (section.name === 'Advertisement' || section.name === 'Advertorial') {
+          const advertorialHtml = await generateAdvertorialSection(campaign, !isReview, section.name) // Record usage for final campaigns only, pass section name
           if (advertorialHtml) {
             sectionsHtml += advertorialHtml
           }

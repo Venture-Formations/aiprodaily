@@ -572,7 +572,7 @@ export async function generateDiningDealsSection(campaign: any): Promise<string>
 
 // ==================== ADVERTORIAL ====================
 
-export async function generateAdvertorialSection(campaign: any, recordUsage: boolean = false): Promise<string> {
+export async function generateAdvertorialSection(campaign: any, recordUsage: boolean = false, sectionName: string = 'Advertorial'): Promise<string> {
   try {
     console.log('Generating Advertorial section for campaign:', campaign?.id, 'recordUsage:', recordUsage)
 
@@ -683,22 +683,16 @@ export async function generateAdvertorialSection(campaign: any, recordUsage: boo
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
   <tr>
     <td style="padding:0 10px;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin-top: 10px; background-color: #f7f7f7;">
+      <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 10px; background: #fff; font-family: ${bodyFont}; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15); margin-top: 10px; overflow: hidden;'>
         <tr>
           <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Advertorial</h2>
+            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">${sectionName}</h2>
           </td>
         </tr>
-        <tr class='row'>
-          <td class='column' style='padding:8px; vertical-align: top;'>
-            <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: ${bodyFont}; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
-              <tr><td style='padding: 10px 10px 4px; font-size: 20px; font-weight: bold; text-align: left;'>${selectedAd.title}</td></tr>
-              ${imageHtml}
-              <tr><td style='padding: 0 10px 10px;'>${selectedAd.body}</td></tr>
-              ${buttonHtml}
-            </table>
-          </td>
-        </tr>
+        <tr><td style='padding: 10px 10px 4px; font-size: 20px; font-weight: bold; text-align: left;'>${selectedAd.title}</td></tr>
+        ${imageHtml}
+        <tr><td style='padding: 0 10px 10px;'>${selectedAd.body}</td></tr>
+        ${buttonHtml}
       </table>
     </td>
   </tr>

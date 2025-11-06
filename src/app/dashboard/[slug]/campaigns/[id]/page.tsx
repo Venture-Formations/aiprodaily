@@ -295,7 +295,7 @@ function AIAppsSection({ campaign }: { campaign: any }) {
   )
 }
 
-function AdvertorialSection({ campaign }: { campaign: any }) {
+function AdvertorialSection({ campaign, sectionName }: { campaign: any; sectionName: string }) {
   // Get ad from campaign data
   const ad = campaign?.campaign_advertisements?.[0]?.advertisement
 
@@ -322,54 +322,49 @@ function AdvertorialSection({ campaign }: { campaign: any }) {
         </div>
       </div>
 
-      {/* Styled to match email appearance */}
+      {/* Styled to match email appearance - single card with header as first element */}
       <div className="max-w-3xl mx-auto">
-        <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
-          {/* Header */}
+        <div className="border border-gray-300 rounded-lg bg-white shadow-lg overflow-hidden">
+          {/* Header - part of the card with no gap */}
           <div className="bg-blue-600 px-4 py-3">
-            <h2 className="text-white text-2xl font-bold m-0">Advertorial</h2>
+            <h2 className="text-white text-2xl font-bold m-0">{sectionName}</h2>
           </div>
 
-          {/* Content */}
-          <div className="p-3">
-            <div className="border border-gray-300 rounded-lg bg-white shadow-lg">
-              {/* Title - inside card, left-justified */}
-              <div className="px-4 pt-4 pb-2">
-                <h3 className="text-xl font-bold text-left m-0">{ad.title}</h3>
-              </div>
+          {/* Title - inside card, left-justified */}
+          <div className="px-4 pt-4 pb-2">
+            <h3 className="text-xl font-bold text-left m-0">{ad.title}</h3>
+          </div>
 
-              {/* Image */}
-              {ad.image_url && (
-                <div className="px-4 text-center">
-                  <img
-                    src={ad.image_url}
-                    alt={ad.title}
-                    className="inline-block max-w-full max-h-[500px] rounded"
-                  />
-                </div>
-              )}
-
-              {/* Body */}
-              <div
-                className="px-4 pb-4 text-base leading-relaxed [&_a]:text-blue-600 [&_a]:underline [&_b]:font-bold [&_strong]:font-bold"
-                dangerouslySetInnerHTML={{ __html: ad.body }}
+          {/* Image */}
+          {ad.image_url && (
+            <div className="px-4 text-center">
+              <img
+                src={ad.image_url}
+                alt={ad.title}
+                className="inline-block max-w-full max-h-[500px] rounded"
               />
-
-              {/* Button */}
-              {ad.button_url && (
-                <div className="px-4 pb-4 text-center">
-                  <a
-                    href={ad.button_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block bg-blue-600 text-white px-6 py-3 rounded-md font-bold no-underline hover:bg-blue-700"
-                  >
-                    {ad.button_text || 'Learn More'}
-                  </a>
-                </div>
-              )}
             </div>
-          </div>
+          )}
+
+          {/* Body */}
+          <div
+            className="px-4 pb-4 text-base leading-relaxed [&_a]:text-blue-600 [&_a]:underline [&_b]:font-bold [&_strong]:font-bold"
+            dangerouslySetInnerHTML={{ __html: ad.body }}
+          />
+
+          {/* Button */}
+          {ad.button_url && (
+            <div className="px-4 pb-4 text-center">
+              <a
+                href={ad.button_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block bg-blue-600 text-white px-6 py-3 rounded-md font-bold no-underline hover:bg-blue-700"
+              >
+                {ad.button_text || 'Learn More'}
+              </a>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -773,7 +768,7 @@ function NewsletterSectionComponent({
       case 'Poll':
         return <PollSection campaign={campaign} />
       case 'Advertisement':
-        return <AdvertorialSection campaign={campaign} />
+        return <AdvertorialSection campaign={campaign} sectionName={section.name} />
       case 'Breaking News':
         return <BreakingNewsSection campaign={campaign} />
       case 'Beyond the Feed':

@@ -239,7 +239,7 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
             sectionsHtml += beyondFeedHtml
           }
         } else if (section.name === 'Advertisement' || section.name === 'Advertorial') {
-          const advertorialHtml = await generateAdvertorialSection(campaign, false) // Don't record usage during preview
+          const advertorialHtml = await generateAdvertorialSection(campaign, false, section.name) // Don't record usage during preview, pass section name
           if (advertorialHtml) {
             sectionsHtml += advertorialHtml
           }
