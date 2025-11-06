@@ -197,6 +197,8 @@ export class AppSelector {
         .map(cc => cc.category)
 
       while (selectedApps.length < totalApps && fillerCategories.length > 0) {
+        const previousLength = selectedApps.length
+
         for (const category of fillerCategories) {
           if (selectedApps.length >= totalApps) break
 
@@ -211,8 +213,9 @@ export class AppSelector {
           }
         }
 
-        // Safety break if we can't fill more slots
-        if (selectedApps.length === allApps.length) break
+        // Safety breaks
+        if (selectedApps.length === allApps.length) break // Selected all available apps
+        if (selectedApps.length === previousLength) break // No progress made, can't fill more slots
       }
 
       // 3. If still need more, grab any unused apps
