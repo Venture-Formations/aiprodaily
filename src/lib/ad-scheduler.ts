@@ -110,6 +110,18 @@ export class AdScheduler {
 
       console.log(`[AdScheduler] Recording usage for ad at position ${usedAd.display_order}`)
 
+      // Check if ad already assigned to this campaign
+      const { data: existingAssignment } = await supabaseAdmin
+        .from('campaign_advertisements')
+        .select('id')
+        .eq('campaign_id', campaignId)
+        .maybeSingle()
+
+      if (existingAssignment) {
+        console.log('[AdScheduler] Ad already assigned to this campaign, skipping insert')
+        return
+      }
+
       // Insert into campaign_advertisements
       const { error: insertError } = await supabaseAdmin
         .from('campaign_advertisements')

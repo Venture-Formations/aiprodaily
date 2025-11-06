@@ -579,12 +579,14 @@ export async function generateAdvertorialSection(campaign: any, recordUsage: boo
     // Fetch colors from business settings
     const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
 
-    // Check if ad already selected for this campaign
+    // Check if ad already selected for this campaign (get most recent if multiple)
     const { data: existingAd } = await supabaseAdmin
       .from('campaign_advertisements')
       .select('*, advertisement:advertisements(*)')
       .eq('campaign_id', campaign.id)
-      .single()
+      .order('used_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
     let selectedAd = existingAd?.advertisement
 
