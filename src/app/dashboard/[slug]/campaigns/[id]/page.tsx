@@ -737,7 +737,8 @@ function NewsletterSectionComponent({
   // These IDs are stable and won't change even if section names are updated
   const SECTION_IDS = {
     AI_APPLICATIONS: '853f8d0b-bc76-473a-bfc6-421418266222',
-    PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b'
+    PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b',
+    ADVERTISEMENT: 'c0bc7173-de47-41b2-a260-77f55525ee3d'
   }
 
   const renderSectionContent = () => {
@@ -749,6 +750,11 @@ function NewsletterSectionComponent({
     // Use section ID for Prompt Ideas (stable across name changes)
     if (section.id === SECTION_IDS.PROMPT_IDEAS) {
       return <PromptIdeasSection campaign={campaign} />
+    }
+
+    // Use section ID for Advertisement (stable across name changes)
+    if (section.id === SECTION_IDS.ADVERTISEMENT) {
+      return <AdvertorialSection campaign={campaign} sectionName={section.name} />
     }
 
     // Legacy name-based matching for other sections
@@ -767,8 +773,6 @@ function NewsletterSectionComponent({
         }} />
       case 'Poll':
         return <PollSection campaign={campaign} />
-      case 'Advertisement':
-        return <AdvertorialSection campaign={campaign} sectionName={section.name} />
       case 'Breaking News':
         return <BreakingNewsSection campaign={campaign} />
       case 'Beyond the Feed':
