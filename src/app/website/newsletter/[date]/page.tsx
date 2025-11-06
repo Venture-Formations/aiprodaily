@@ -302,19 +302,6 @@ export default async function NewsletterPage({ params }: PageProps) {
 
             return null
           })}
-
-          {/* Footer CTA */}
-          <div className="text-center py-8 border-t border-gray-200 bg-white rounded-xl px-6 mt-8">
-            <p className="text-[#1D1D1F]/60 mb-4">
-              This is an archived edition of the AI Accounting Daily newsletter.
-            </p>
-            <Link
-              href="/newsletters"
-              className="text-[#a855f7] hover:text-[#a855f7]/80 font-medium"
-            >
-              View All Newsletters
-            </Link>
-          </div>
         </div>
       </section>
 
