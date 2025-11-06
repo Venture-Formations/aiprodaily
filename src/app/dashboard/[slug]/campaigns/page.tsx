@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Layout from '@/components/Layout'
 import Link from 'next/link'
 import DeleteCampaignModal from '@/components/DeleteCampaignModal'
@@ -9,6 +9,7 @@ import type { NewsletterCampaign } from '@/types/database'
 
 export default function CampaignsPage() {
   const params = useParams()
+  const router = useRouter()
   const slug = params.slug as string
   const [campaigns, setCampaigns] = useState<NewsletterCampaign[]>([])
   const [loading, setLoading] = useState(true)
@@ -18,6 +19,9 @@ export default function CampaignsPage() {
     isOpen: boolean
     campaign: NewsletterCampaign | null
   }>({ isOpen: false, campaign: null })
+  const [createModal, setCreateModal] = useState(false)
+  const [selectedDate, setSelectedDate] = useState('')
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     fetchCampaigns()
@@ -86,6 +90,58 @@ export default function CampaignsPage() {
     setDeleteModal({ isOpen: false, campaign: null })
   }
 
+  const handleCreateNewCampaign = () => {
+    // Set default date to tomorrow
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const dateString = tomorrow.toISOString().split('T')[0]
+    setSelectedDate(dateString)
+    setCreateModal(true)
+  }
+
+  const handleCreateConfirm = async () => {
+    if (!selectedDate) {
+      alert('Please select a date')
+      return
+    }
+
+    setCreating(true)
+    try {
+      const response = await fetch('/api/campaigns/create-with-workflow', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          date: selectedDate,
+          newsletter_id: 'accounting' // TODO: Get from context/params
+        })
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to create campaign')
+      }
+
+      const data = await response.json()
+      console.log('Campaign created:', data)
+
+      // Close modal and redirect to campaign page
+      setCreateModal(false)
+      router.push(`/dashboard/${slug}/campaigns/${data.campaign_id}`)
+    } catch (error) {
+      console.error('Error creating campaign:', error)
+      alert('Failed to create campaign: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleCreateCancel = () => {
+    setCreateModal(false)
+    setSelectedDate('')
+  }
+
   return (
     <Layout>
       <div className="px-4 py-6 sm:px-0">
@@ -94,12 +150,20 @@ export default function CampaignsPage() {
             <h1 className="text-2xl font-bold text-gray-900">
               Newsletter Campaigns
             </h1>
-            <Link
-              href={`/dashboard/${slug}/campaigns/new`}
-              className="bg-brand-primary hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-            >
-              Create Campaign
-            </Link>
+            <div className="flex space-x-2">
+              <Link
+                href={`/dashboard/${slug}/campaigns/new`}
+                className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium"
+              >
+                Create Blank Campaign
+              </Link>
+              <button
+                onClick={handleCreateNewCampaign}
+                className="bg-brand-primary hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+              >
+                Create New Campaign
+              </button>
+            </div>
           </div>
 
           {/* Filter buttons */}
@@ -210,6 +274,50 @@ export default function CampaignsPage() {
             onClose={handleDeleteCancel}
             onConfirm={handleDeleteConfirm}
           />
+        )}
+
+        {/* Create New Campaign Modal */}
+        {createModal && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+              <div className="mt-3">
+                <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
+                  Create New Campaign
+                </h3>
+                <div className="mb-4">
+                  <label htmlFor="campaign-date" className="block text-sm font-medium text-gray-700 mb-2">
+                    Campaign Date
+                  </label>
+                  <input
+                    type="date"
+                    id="campaign-date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <p className="mt-2 text-sm text-gray-500">
+                    This will start the full RSS workflow to create articles for this date.
+                  </p>
+                </div>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={handleCreateCancel}
+                    disabled={creating}
+                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreateConfirm}
+                    disabled={creating || !selectedDate}
+                    className="px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {creating ? 'Creating...' : 'Create Campaign'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </Layout>
