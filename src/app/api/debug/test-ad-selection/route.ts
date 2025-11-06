@@ -63,12 +63,24 @@ export async function POST(request: NextRequest) {
       console.log(`[Test Ad] Created test campaign: ${campaignId}`)
     }
 
+    // Get newsletter_id from campaign
+    const { data: campaign } = await supabaseAdmin
+      .from('newsletter_campaigns')
+      .select('newsletter_id')
+      .eq('id', campaignId)
+      .single()
+
+    if (!campaign) {
+      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+    }
+
     // Test ad selection
     console.log(`[Test Ad] Testing ad selection for campaign: ${campaignId}`)
 
     const selectedAd = await AdScheduler.selectAdForCampaign({
       campaignId: campaignId,
-      campaignDate: date
+      campaignDate: date,
+      newsletterId: campaign.newsletter_id
     })
 
     if (!selectedAd) {
@@ -84,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     // Test ad recording
     try {
-      await AdScheduler.recordAdUsage(campaignId, selectedAd.id, date)
+      await AdScheduler.recordAdUsage(campaignId, selectedAd.id, date, campaign.newsletter_id)
       console.log('[Test Ad] Successfully recorded ad usage')
     } catch (recordError) {
       console.error('[Test Ad] Failed to record ad usage:', recordError)
@@ -97,7 +109,8 @@ export async function POST(request: NextRequest) {
           title: selectedAd.title,
           display_order: selectedAd.display_order
         },
-        campaign_id: campaignId
+        campaign_id: campaignId,
+        newsletter_id: campaign.newsletter_id
       }, { status: 500 })
     }
 

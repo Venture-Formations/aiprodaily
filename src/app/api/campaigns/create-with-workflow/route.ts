@@ -87,7 +87,8 @@ export async function POST(request: NextRequest) {
       const { AdScheduler } = await import('@/lib/ad-scheduler')
       const selectedAd = await AdScheduler.selectAdForCampaign({
         campaignId: campaignId,
-        campaignDate: date
+        campaignDate: date,
+        newsletterId: newsletterUuid
       })
 
       if (selectedAd) {
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
 
         try {
           // Use AdScheduler.recordAdUsage which handles everything properly
-          await AdScheduler.recordAdUsage(campaignId, selectedAd.id, date)
+          await AdScheduler.recordAdUsage(campaignId, selectedAd.id, date, newsletterUuid)
           console.log('[Create Campaign] Advertisement recorded successfully')
         } catch (recordError) {
           console.error('[Create Campaign] Failed to record advertisement usage:', recordError)

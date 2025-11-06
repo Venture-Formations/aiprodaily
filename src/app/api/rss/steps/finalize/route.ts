@@ -44,14 +44,15 @@ export async function POST(request: NextRequest) {
     try {
       const { data: campaignData } = await supabaseAdmin
         .from('newsletter_campaigns')
-        .select('date')
+        .select('date, newsletter_id')
         .eq('id', campaign_id)
         .single()
 
       if (campaignData) {
         const selectedAd = await AdScheduler.selectAdForCampaign({
           campaignId: campaign_id,
-          campaignDate: campaignData.date
+          campaignDate: campaignData.date,
+          newsletterId: campaignData.newsletter_id
         })
 
         if (selectedAd) {

@@ -4,6 +4,7 @@ import type { Advertisement } from '@/types/database'
 interface ScheduleContext {
   campaignDate: string // YYYY-MM-DD format
   campaignId: string
+  newsletterId: string // UUID - needed for app_settings storage
 }
 
 /**
@@ -20,14 +21,14 @@ export class AdScheduler {
    * Select the next ad in the rotation queue
    */
   static async selectAdForCampaign(context: ScheduleContext): Promise<Advertisement | null> {
-    const { campaignId } = context
+    const { campaignId, newsletterId } = context
 
     try {
-      // Get the current next_ad_position from app_settings (global setting)
+      // Get the current next_ad_position from app_settings (per newsletter)
       const { data: settingsData, error: settingsError } = await supabaseAdmin
         .from('app_settings')
         .select('value')
-        .is('newsletter_id', null)
+        .eq('newsletter_id', newsletterId)
         .eq('key', 'next_ad_position')
         .maybeSingle()
 
@@ -40,6 +41,7 @@ export class AdScheduler {
       console.log(`[AdScheduler] Current next_ad_position: ${nextAdPosition}`)
 
       // Get all active ads with display_order, sorted by display_order
+      // Note: Advertisements are global (not per-newsletter) but rotation is tracked per-newsletter
       const { data: activeAds, error: adsError } = await supabaseAdmin
         .from('advertisements')
         .select('*')
@@ -90,7 +92,8 @@ export class AdScheduler {
   static async recordAdUsage(
     campaignId: string,
     adId: string,
-    campaignDate: string
+    campaignDate: string,
+    newsletterId: string
   ): Promise<void> {
     try {
       // Get the ad that was just used
@@ -166,12 +169,12 @@ export class AdScheduler {
       }
 
       // Update next_ad_position in app_settings (upsert in case it doesn't exist)
-      // Note: next_ad_position is global, not per-newsletter
+      // Store per newsletter_id due to app_settings table constraints
       const { error: settingsError } = await supabaseAdmin
         .from('app_settings')
         .upsert({
           key: 'next_ad_position',
-          newsletter_id: null, // Global setting
+          newsletter_id: newsletterId,
           value: nextPosition.toString(),
           updated_at: new Date().toISOString(),
           description: 'Next position in ad rotation sequence'
