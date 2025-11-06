@@ -263,7 +263,7 @@ export default async function NewsletterPage({ params }: PageProps) {
                   <div className="text-center mb-4">
                     <div className="text-xl font-bold text-[#1D1D1F]">{prompt.title}</div>
                   </div>
-                  <div className="bg-black text-green-400 p-4 rounded-md font-mono text-sm leading-relaxed whitespace-pre-wrap border-2 border-gray-800">
+                  <div className="bg-black text-white p-4 rounded-md font-mono text-sm leading-relaxed whitespace-pre-wrap border-2 border-gray-800">
                     {prompt.prompt_text}
                   </div>
                 </div>
