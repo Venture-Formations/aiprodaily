@@ -2276,6 +2276,21 @@ function AIPromptsSettings() {
     }
   }
 
+  // Helper function to format JSON with actual newlines
+  const formatJSON = (value: any, prettyPrint: boolean): string => {
+    if (typeof value !== 'object') return value
+
+    const jsonStr = prettyPrint ? JSON.stringify(value, null, 2) : JSON.stringify(value)
+
+    // If pretty-print is enabled, convert escaped \n to actual newlines
+    // This makes prompt content with multiple lines more readable
+    if (prettyPrint) {
+      return jsonStr.replace(/\\n/g, '\n')
+    }
+
+    return jsonStr
+  }
+
   const handleEdit = (prompt: any) => {
     const valueStr = typeof prompt.value === 'object' ? JSON.stringify(prompt.value, null, 2) : prompt.value
     setEditingPrompt({ key: prompt.key, value: valueStr, ai_provider: prompt.ai_provider || 'openai' })
@@ -3012,7 +3027,7 @@ function AIPromptsSettings() {
                 </div>
                 <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
                   {typeof prompt.value === 'object'
-                    ? (prettyPrint ? JSON.stringify(prompt.value, null, 2) : JSON.stringify(prompt.value))
+                    ? formatJSON(prompt.value, prettyPrint)
                     : prompt.value}
                 </div>
                 <div className="mt-3 flex items-center justify-between">
@@ -3332,7 +3347,7 @@ function AIPromptsSettings() {
                         </div>
                         <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
                           {typeof prompt.value === 'object'
-                            ? (prettyPrint ? JSON.stringify(prompt.value, null, 2) : JSON.stringify(prompt.value))
+                            ? formatJSON(prompt.value, prettyPrint)
                             : prompt.value}
                         </div>
                         <div className="mt-3 flex items-center justify-between">
@@ -3645,7 +3660,7 @@ function AIPromptsSettings() {
                         </div>
                         <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
                           {typeof prompt.value === 'object'
-                            ? (prettyPrint ? JSON.stringify(prompt.value, null, 2) : JSON.stringify(prompt.value))
+                            ? formatJSON(prompt.value, prettyPrint)
                             : prompt.value}
                         </div>
                         <div className="mt-3 flex items-center justify-between">
@@ -3763,7 +3778,7 @@ function AIPromptsSettings() {
                           </div>
                           <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
                             {typeof prompt.value === 'object'
-                              ? (prettyPrint ? JSON.stringify(prompt.value, null, 2) : JSON.stringify(prompt.value))
+                              ? formatJSON(prompt.value, prettyPrint)
                               : prompt.value}
                           </div>
                           <div className="mt-3 flex items-center justify-between">
@@ -3938,7 +3953,7 @@ function AIPromptsSettings() {
                           </div>
                           <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
                             {typeof prompt.value === 'object'
-                              ? (prettyPrint ? JSON.stringify(prompt.value, null, 2) : JSON.stringify(prompt.value))
+                              ? formatJSON(prompt.value, prettyPrint)
                               : prompt.value}
                           </div>
                           <div className="mt-3 flex items-center justify-between">
