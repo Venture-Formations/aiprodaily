@@ -46,7 +46,7 @@ export class GitHubImageStorage {
       const response = await fetch(imageUrl, {
         signal: controller.signal,
         headers: {
-          'User-Agent': 'StCloudScoop-Newsletter/1.0',
+          'User-Agent': 'AI-Pro-Daily/1.0',
           'Accept': 'image/*',
           'Cache-Control': 'no-cache'
         }
@@ -139,7 +139,7 @@ export class GitHubImageStorage {
         response = await fetch(imageUrl, {
           signal: controller.signal,
           headers: {
-            'User-Agent': 'StCloudScoop-Newsletter/1.0',
+            'User-Agent': 'AI-Pro-Daily/1.0',
             'Accept': 'image/*',
             'Cache-Control': 'no-cache'
           }

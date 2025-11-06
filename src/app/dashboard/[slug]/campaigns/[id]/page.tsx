@@ -123,151 +123,6 @@ function WelcomeSection({ campaign, onRegenerate }: { campaign: any; onRegenerat
   )
 }
 
-function WordleSection({ campaign }: { campaign: any }) {
-  const [wordleData, setWordleData] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchWordleData = async () => {
-      try {
-        const response = await fetch(`/api/test/wordle?campaign_date=${campaign.date}`)
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success && data.wordle) {
-            setWordleData(data.wordle)
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch Wordle data:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    if (campaign?.date) {
-      fetchWordleData()
-    }
-  }, [campaign?.date])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
-        <span className="ml-3 text-gray-600">Loading Wordle data...</span>
-      </div>
-    )
-  }
-
-  if (!wordleData) {
-    return (
-      <div className="text-center py-8 text-gray-500">
-        No Wordle data available for yesterday
-      </div>
-    )
-  }
-
-  return (
-    <div className="p-6">
-      <div className="border border-gray-200 rounded-lg bg-white shadow-sm">
-        <div className="bg-gray-50 text-center py-2 font-bold text-2xl text-gray-700 uppercase rounded-t-lg">
-          {wordleData.word}
-        </div>
-        <div className="p-4">
-          <div className="mb-3">
-            <strong>Definition:</strong> {wordleData.definition}
-          </div>
-          <div>
-            <strong>Interesting Fact:</strong> {wordleData.interesting_fact}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function MinnesotaGetawaysSection({ campaign }: { campaign: any }) {
-  const [properties, setProperties] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchProperties = async () => {
-      try {
-        const response = await fetch(`/api/test/minnesota-getaways?campaign_id=${campaign.id}`)
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success && data.properties) {
-            setProperties(data.properties)
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch Minnesota Getaways data:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    if (campaign?.id) {
-      fetchProperties()
-    }
-  }, [campaign?.id])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
-        <span className="ml-3 text-gray-600">Loading Minnesota Getaways...</span>
-      </div>
-    )
-  }
-
-  if (properties.length === 0) {
-    return (
-      <div className="text-center py-8 text-gray-500">
-        No Minnesota Getaways properties available
-      </div>
-    )
-  }
-
-  return (
-    <div className="p-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {properties.map((property, index) => (
-          <div key={index} className="border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden">
-            {property.adjusted_image_url && (
-              <img
-                src={property.adjusted_image_url}
-                alt={property.title}
-                className="w-full h-48 object-cover"
-              />
-            )}
-            <div className="p-4">
-              <h3 className="font-semibold text-lg mb-2 text-blue-600">
-                <a href={property.link || '#'} className="hover:underline">
-                  {property.title}
-                </a>
-              </h3>
-              <p className="text-gray-600 text-sm mb-3">{property.city}</p>
-              <div className="border-t border-gray-200 pt-2">
-                <div className="grid grid-cols-3 gap-2 text-center text-xs text-gray-700">
-                  <div>
-                    <strong>{property.bedrooms}</strong> BR
-                  </div>
-                  <div className="border-l border-r border-gray-200">
-                    <strong>{property.bathrooms}</strong> BA
-                  </div>
-                  <div>
-                    Sleeps <strong>{property.sleeps}</strong>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 function PromptIdeasSection({ campaign }: { campaign: any }) {
   const [prompt, setPrompt] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -435,159 +290,6 @@ function AIAppsSection({ campaign }: { campaign: any }) {
             </div>
           )
         })}
-      </div>
-    </div>
-  )
-}
-
-function RoadWorkSection({ campaign }: { campaign: any }) {
-  const [roadWorkItems, setRoadWorkItems] = useState<any[]>([])
-  const [selectedItems, setSelectedItems] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [updating, setUpdating] = useState(false)
-
-  useEffect(() => {
-    const fetchRoadWorkData = async () => {
-      try {
-        // Fetch all road work items
-        const itemsResponse = await fetch(`/api/campaigns/${campaign.id}/road-work`)
-        // Fetch selected items
-        const selectionsResponse = await fetch(`/api/campaigns/${campaign.id}/road-work-selections`)
-
-        if (itemsResponse.ok && selectionsResponse.ok) {
-          const itemsData = await itemsResponse.json()
-          const selectionsData = await selectionsResponse.json()
-
-          if (itemsData.success) {
-            setRoadWorkItems(itemsData.roadWorkItems || [])
-          }
-
-          if (selectionsData.success) {
-            setSelectedItems(selectionsData.selections || [])
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch road work data:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchRoadWorkData()
-  }, [campaign.id])
-
-  const handleItemToggle = async (itemId: string, isSelected: boolean) => {
-    let newSelected: string[]
-
-    if (isSelected) {
-      // Add item if under limit (9 items max)
-      if (selectedItems.length < 9) {
-        newSelected = [...selectedItems.map(s => s.road_work_item_id), itemId]
-      } else {
-        alert('Maximum 9 road work items can be selected')
-        return
-      }
-    } else {
-      // Remove item
-      newSelected = selectedItems.map(s => s.road_work_item_id).filter(id => id !== itemId)
-    }
-
-    setUpdating(true)
-    try {
-      const response = await fetch(`/api/campaigns/${campaign.id}/road-work-selections`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ item_ids: newSelected })
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        // Refetch selections to get updated data
-        const selectionsResponse = await fetch(`/api/campaigns/${campaign.id}/road-work-selections`)
-        if (selectionsResponse.ok) {
-          const selectionsData = await selectionsResponse.json()
-          setSelectedItems(selectionsData.selections || [])
-        }
-      }
-    } catch (error) {
-      console.error('Failed to update road work selection:', error)
-    } finally {
-      setUpdating(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
-        <span className="ml-3 text-gray-600">Loading road work data...</span>
-      </div>
-    )
-  }
-
-  return (
-    <div className="p-6">
-      <div className="bg-gray-50 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-gray-900">
-            Road Work for {campaign.date}
-          </h3>
-          <div className="text-sm text-gray-500">
-            {selectedItems.length}/9 items selected
-          </div>
-        </div>
-
-        {roadWorkItems.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            No road work items found for this date
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-            {roadWorkItems.map(item => {
-              const isSelected = selectedItems.some(s => s.road_work_item_id === item.id)
-
-              return (
-                <div
-                  key={item.id}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    isSelected
-                      ? 'border-green-300 bg-green-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-start space-x-2 mb-2">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={(e) => handleItemToggle(item.id, e.target.checked)}
-                      disabled={updating}
-                      className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded flex-shrink-0"
-                    />
-                    <h4 className="font-semibold text-gray-900 text-sm">{item.road_name}</h4>
-                  </div>
-                  <div className="ml-6">
-                    <p className="text-gray-600 text-xs mb-1">{item.road_range}</p>
-                    <p className="text-gray-500 text-xs mb-2">{item.reason}</p>
-                    <div className="flex flex-col gap-1 text-xs">
-                      <span className="text-orange-600">📍 {item.city_or_township}</span>
-                      <span className="text-gray-500">{item.start_date} → {item.expected_reopen}</span>
-                    </div>
-                    {item.source_url && (
-                      <a
-                        href={item.source_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-600 hover:text-blue-800 underline mt-1 inline-block"
-                      >
-                        View Source
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
       </div>
     </div>
   )
@@ -1005,93 +707,17 @@ function PollSection({ campaign }: { campaign: any }) {
   )
 }
 
-function DiningDealsSection({ campaign }: { campaign: any }) {
-  const [deals, setDeals] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchDeals = async () => {
-      try {
-        const response = await fetch(`/api/test/dining-deals`)
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success && data.deals) {
-            setDeals(data.deals)
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch Dining Deals data:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchDeals()
-  }, [])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
-        <span className="ml-3 text-gray-600">Loading Dining Deals...</span>
-      </div>
-    )
-  }
-
-  if (deals.length === 0) {
-    return (
-      <div className="text-center py-8 text-gray-500">
-        No dining deals available for this date
-      </div>
-    )
-  }
-
-  return (
-    <div className="p-6">
-      <div className="space-y-4">
-        {deals.map((deal, index) => (
-          <div key={index} className="border border-gray-200 rounded-lg bg-white shadow-sm p-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-semibold text-lg">{deal.business_name}</h3>
-                <p className="text-gray-600 mt-1">{deal.deal_description}</p>
-                <p className="text-sm text-gray-500 mt-2">{deal.address}</p>
-              </div>
-              <div className="text-right">
-                <div className="text-sm text-gray-500">{deal.day_of_week}</div>
-                {deal.phone && (
-                  <div className="text-sm text-gray-500">{deal.phone}</div>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // Newsletter Section Component
 function NewsletterSectionComponent({
   section,
   campaign,
   expanded,
-  onToggleExpanded,
-  availableDiningDeals,
-  campaignDiningDeals,
-  onDiningDealsExpand,
-  onUpdateDiningDeals,
-  updatingDiningDeals
+  onToggleExpanded
 }: {
   section: NewsletterSection
   campaign: CampaignWithArticles | null
   expanded: boolean
   onToggleExpanded: () => void
-  availableDiningDeals?: any[]
-  campaignDiningDeals?: any[]
-  onDiningDealsExpand?: () => void
-  onUpdateDiningDeals?: (selectedDealIds: string[], featuredDealId?: string) => void
-  updatingDiningDeals?: boolean
 }) {
   if (!campaign) return null
 
@@ -1127,30 +753,6 @@ function NewsletterSectionComponent({
               })
           }
         }} />
-      case 'Yesterday\'s Wordle':
-        return <WordleSection campaign={campaign} />
-      case 'Minnesota Getaways':
-        return <MinnesotaGetawaysSection campaign={campaign} />
-      case 'Dining Deals':
-        return (
-          <div className="p-6">
-            {campaign && availableDiningDeals && campaignDiningDeals && onUpdateDiningDeals ? (
-              <DiningDealsManager
-                campaign={campaign}
-                availableDeals={availableDiningDeals}
-                campaignDeals={campaignDiningDeals}
-                onUpdateDeals={onUpdateDiningDeals}
-                updating={updatingDiningDeals || false}
-              />
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                Click "View Dining Deals" to load management interface
-              </div>
-            )}
-          </div>
-        )
-      case 'Road Work':
-        return <RoadWorkSection campaign={campaign} />
       case 'Poll':
         return <PollSection campaign={campaign} />
       case 'Advertorial':
@@ -1189,12 +791,7 @@ function NewsletterSectionComponent({
           </h2>
           <button
             onClick={() => {
-              if (section.name === 'Dining Deals' && onDiningDealsExpand) {
-                onDiningDealsExpand()
-                onToggleExpanded()
-              } else {
-                onToggleExpanded()
-              }
+              onToggleExpanded()
             }}
             className="flex items-center space-x-2 text-sm text-brand-primary hover:text-blue-700"
           >
@@ -1220,146 +817,6 @@ function NewsletterSectionComponent({
 }
 
 // Events Manager Component
-function DiningDealsManager({
-  campaign,
-  availableDeals,
-  campaignDeals,
-  onUpdateDeals,
-  updating
-}: {
-  campaign: CampaignWithArticles | null
-  availableDeals: any[]
-  campaignDeals: any[]
-  onUpdateDeals: (selectedDealIds: string[], featuredDealId?: string) => void
-  updating: boolean
-}) {
-  if (!campaign) return null
-
-  const campaignDate = new Date(campaign.date + 'T00:00:00')
-  const dayOfWeek = campaignDate.toLocaleDateString('en-US', { weekday: 'long' })
-  const dateLabel = campaignDate.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric'
-  })
-
-  // Filter deals for this day of week
-  const dealsForDay = availableDeals.filter(deal => deal.day_of_week === dayOfWeek)
-
-  const selectedDeals = campaignDeals // All items in campaignDeals are selected by definition
-  const featuredDealId = campaignDeals.find(cd => cd.is_featured_in_campaign)?.deal_id
-
-  const handleDealToggle = (dealId: string, isSelected: boolean) => {
-    let newSelected: string[]
-    if (isSelected) {
-      // Add deal if under limit (8 deals max)
-      if (campaignDeals.length < 8) {
-        newSelected = [...campaignDeals.map(cd => cd.deal_id), dealId]
-      } else {
-        return // Don't add if at limit
-      }
-    } else {
-      // Remove deal
-      newSelected = campaignDeals.map(cd => cd.deal_id).filter(id => id !== dealId)
-    }
-
-    // Clear featured if we're removing the featured deal
-    const newFeatured = newSelected.includes(featuredDealId || '') ? featuredDealId : undefined
-
-    onUpdateDeals(newSelected, newFeatured)
-  }
-
-  const handleFeaturedToggle = (dealId: string) => {
-    const currentSelected = campaignDeals.map(cd => cd.deal_id)
-    const newFeatured = featuredDealId === dealId ? undefined : dealId
-    onUpdateDeals(currentSelected, newFeatured)
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-gray-50 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-gray-900">
-            {dateLabel} Dining Deals
-          </h3>
-          <div className="text-sm text-gray-500">
-            {campaignDeals.length}/8 deals selected
-          </div>
-        </div>
-
-        {dealsForDay.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="text-gray-500 mb-2">
-              No dining deals available for {dayOfWeek}
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {dealsForDay.map(deal => {
-              const isSelected = campaignDeals.some(cd => cd.deal_id === deal.id)
-              const isFeatured = featuredDealId === deal.id
-
-              return (
-                <div
-                  key={deal.id}
-                  className={`p-3 rounded-lg border-2 transition-all ${
-                    isFeatured
-                      ? 'border-blue-500 bg-blue-50 shadow-md'
-                      : isSelected
-                        ? 'border-green-300 bg-green-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  {/* Deal Header with Checkbox */}
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-start space-x-3">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={(e) => handleDealToggle(deal.id, e.target.checked)}
-                        disabled={updating}
-                        className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900">
-                          {deal.business_name}
-                        </h4>
-                        <p className="text-gray-600 text-sm mt-1">
-                          {deal.special_description}
-                        </p>
-                        {deal.special_time && (
-                          <p className="text-gray-500 text-xs mt-1">
-                            {deal.special_time}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Featured Toggle */}
-                    {isSelected && (
-                      <button
-                        onClick={() => handleFeaturedToggle(deal.id)}
-                        disabled={updating}
-                        className={`ml-2 px-2 py-1 text-xs font-medium rounded transition-colors ${
-                          isFeatured
-                            ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                            : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
-                        }`}
-                      >
-                        {isFeatured ? '★ Featured' : 'Make Featured'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 function EventsManager({
   campaign,
   availableEvents,
@@ -1998,12 +1455,6 @@ export default function CampaignDetailPage() {
   const [updatingEvents, setUpdatingEvents] = useState(false)
   const [articlesExpanded, setArticlesExpanded] = useState(false)
   const [secondaryArticlesExpanded, setSecondaryArticlesExpanded] = useState(false)
-
-  const [diningDealsExpanded, setDiningDealsExpanded] = useState(false)
-  const [availableDiningDeals, setAvailableDiningDeals] = useState<any[]>([])
-  const [campaignDiningDeals, setCampaignDiningDeals] = useState<any[]>([])
-  const [loadingDiningDeals, setLoadingDiningDeals] = useState(false)
-  const [updatingDiningDeals, setUpdatingDiningDeals] = useState(false)
 
   // Newsletter sections state
   const [newsletterSections, setNewsletterSections] = useState<NewsletterSection[]>([])
@@ -2672,86 +2123,6 @@ export default function CampaignDetailPage() {
     setEventsExpanded(!eventsExpanded)
   }
 
-  const handleDiningDealsExpand = async () => {
-    if (!diningDealsExpanded && campaign) {
-      setLoadingDiningDeals(true)
-      try {
-        // Fetch available dining deals for the campaign date's day of week
-        const campaignDate = new Date(campaign.date + 'T00:00:00')
-        const dayOfWeek = campaignDate.toLocaleDateString('en-US', { weekday: 'long' })
-
-        console.log('🍽️ Fetching dining deals for', dayOfWeek, 'campaign date:', campaign.date)
-
-        const response = await fetch(`/api/dining-deals/available?day=${dayOfWeek}`)
-        let availableDealsData: any = null
-
-        if (response.ok) {
-          const data = await response.json()
-          console.log('📊 Available dining deals response:', data)
-          setAvailableDiningDeals(data.deals || [])
-          availableDealsData = data
-        } else {
-          console.error('❌ Failed to fetch available dining deals:', response.status, response.statusText)
-        }
-
-        // Fetch existing campaign dining selections
-        const selectionsResponse = await fetch(`/api/campaigns/${campaign.id}/dining-deals`)
-        if (selectionsResponse.ok) {
-          const selectionsData = await selectionsResponse.json()
-          console.log('📋 Campaign dining selections:', selectionsData)
-          setCampaignDiningDeals(selectionsData.selections || [])
-
-          // Auto-populate dining deals if none are selected yet - DISABLED (feature not needed for AI Accounting Daily)
-          // if ((!selectionsData.selections || selectionsData.selections.length === 0) && availableDealsData?.deals?.length > 0) {
-          //   console.log('🎲 Auto-selecting dining deals with business limits and randomization')
-          //   // Dining deals feature disabled
-          // }
-        } else {
-          console.error('❌ Failed to fetch campaign dining selections:', selectionsResponse.status, selectionsResponse.statusText)
-        }
-      } catch (error) {
-        console.error('Error fetching dining deals data:', error)
-      } finally {
-        setLoadingDiningDeals(false)
-      }
-    }
-    setDiningDealsExpanded(!diningDealsExpanded)
-  }
-
-  const updateDiningDealsSelections = async (selectedDealIds: string[], featuredDealId?: string) => {
-    if (!campaign) return
-
-    setUpdatingDiningDeals(true)
-    try {
-      const response = await fetch(`/api/campaigns/${campaign.id}/dining-deals`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          deal_ids: selectedDealIds,
-          featured_deal_id: featuredDealId
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to update dining deals selections')
-      }
-
-      // Refresh dining deals data
-      const updatedResponse = await fetch(`/api/campaigns/${campaign.id}/dining-deals`)
-      if (updatedResponse.ok) {
-        const updatedData = await updatedResponse.json()
-        setCampaignDiningDeals(updatedData.selections || [])
-      }
-
-    } catch (error) {
-      console.error('Error updating dining deals:', error)
-    } finally {
-      setUpdatingDiningDeals(false)
-    }
-  }
-
   const getScoreColor = (score: number) => {
     if (score >= 32) return 'text-green-600'  // 80% of 40
     if (score >= 26) return 'text-yellow-600' // 65% of 40
@@ -3307,11 +2678,6 @@ export default function CampaignDetailPage() {
                   [section.id]: !prev[section.id]
                 }))
               }}
-              availableDiningDeals={section.name === 'Dining Deals' ? availableDiningDeals : undefined}
-              campaignDiningDeals={section.name === 'Dining Deals' ? campaignDiningDeals : undefined}
-              onDiningDealsExpand={section.name === 'Dining Deals' ? handleDiningDealsExpand : undefined}
-              onUpdateDiningDeals={section.name === 'Dining Deals' ? updateDiningDealsSelections : undefined}
-              updatingDiningDeals={section.name === 'Dining Deals' ? updatingDiningDeals : false}
             />
           ))}
 

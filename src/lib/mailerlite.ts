@@ -6,8 +6,6 @@ import {
   generateNewsletterHeader,
   generateNewsletterFooter,
   generateWelcomeSection,
-  generateDiningDealsSection,
-  generateRoadWorkSection,
   generatePollSection,
   generateAdvertorialSection
 } from './newsletter-templates'
@@ -403,16 +401,6 @@ export class MailerLiteService {
           const pollHtml = await generatePollSection(campaign.id)
           if (pollHtml) {
             sectionsHtml += pollHtml
-          }
-        } else if (section.name === 'Dining Deals') {
-          const diningHtml = await generateDiningDealsSection(campaign)
-          if (diningHtml) {
-            sectionsHtml += diningHtml
-          }
-        } else if (section.name === 'Road Work') {
-          const roadWorkHtml = await generateRoadWorkSection(campaign)
-          if (roadWorkHtml) {
-            sectionsHtml += roadWorkHtml
           }
         } else if (section.name === 'Breaking News') {
           const { generateBreakingNewsSection } = await import('./newsletter-templates')

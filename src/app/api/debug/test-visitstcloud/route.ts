@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const response = await fetch(apiUrl, {
       signal: controller.signal,
       headers: {
-        'User-Agent': 'StCloudScoop/1.0'
+        'User-Agent': 'AI-Pro-Daily/1.0'
       }
     })
 

@@ -32,7 +32,13 @@
       "WebFetch(domain:useworkflow.dev)",
       "Bash(vercel logs:*)",
       "Bash(npx workflow --help:*)",
-      "Bash(npx workflow inspect --help:*)"
+      "Bash(npx workflow inspect --help:*)",
+      "Bash(npx workflow:*)",
+      "Bash(NUL)",
+      "Bash(del NUL 2)",
+      "Bash(.gitignore)",
+      "Bash(SECRET=\"60NkupzhvNpuExfyl0aa9wzzVVnfWGWWPsr3gfvchTg=\")",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []

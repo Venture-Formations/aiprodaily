@@ -16,11 +16,11 @@ export async function GET(request: NextRequest) {
     const timeoutId = setTimeout(() => controller.abort(), 15000)
 
     try {
-      console.log('Attempting fetch with StCloudScoop user agent...')
+      console.log('Attempting fetch with AI-Pro-Daily user agent...')
       const response = await fetch(imageUrl, {
         signal: controller.signal,
         headers: {
-          'User-Agent': 'StCloudScoop-Newsletter/1.0'
+          'User-Agent': 'AI-Pro-Daily/1.0'
         }
       })
 
