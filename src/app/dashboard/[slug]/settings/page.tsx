@@ -2173,6 +2173,7 @@ function AIPromptsSettings() {
   const [testLoading, setTestLoading] = useState(false)
   const [testResults, setTestResults] = useState<any>(null)
   const [testError, setTestError] = useState<string | null>(null)
+  const [prettyPrint, setPrettyPrint] = useState(true)
 
   // Get newsletter slug from pathname
   const pathname = usePathname()
@@ -2998,8 +2999,21 @@ function AIPromptsSettings() {
               </>
             ) : (
               <>
+                <div className="mb-2 flex items-center">
+                  <label className="flex items-center text-sm text-gray-600 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={prettyPrint}
+                      onChange={(e) => setPrettyPrint(e.target.checked)}
+                      className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    Pretty-print
+                  </label>
+                </div>
                 <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
-                  {typeof prompt.value === 'object' ? JSON.stringify(prompt.value, null, 2) : prompt.value}
+                  {typeof prompt.value === 'object'
+                    ? (prettyPrint ? JSON.stringify(prompt.value, null, 2) : JSON.stringify(prompt.value))
+                    : prompt.value}
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                   <div className="flex items-center space-x-3">
@@ -3305,8 +3319,21 @@ function AIPromptsSettings() {
                       </>
                     ) : (
                       <>
+                        <div className="mb-2 flex items-center">
+                          <label className="flex items-center text-sm text-gray-600 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={prettyPrint}
+                              onChange={(e) => setPrettyPrint(e.target.checked)}
+                              className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            Pretty-print
+                          </label>
+                        </div>
                         <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
-                          {typeof prompt.value === 'object' ? JSON.stringify(prompt.value, null, 2) : prompt.value}
+                          {typeof prompt.value === 'object'
+                            ? (prettyPrint ? JSON.stringify(prompt.value, null, 2) : JSON.stringify(prompt.value))
+                            : prompt.value}
                         </div>
                         <div className="mt-3 flex items-center justify-between">
                           <div className="flex items-center space-x-3">
@@ -3605,8 +3632,21 @@ function AIPromptsSettings() {
                       </>
                     ) : (
                       <>
+                        <div className="mb-2 flex items-center">
+                          <label className="flex items-center text-sm text-gray-600 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={prettyPrint}
+                              onChange={(e) => setPrettyPrint(e.target.checked)}
+                              className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            Pretty-print
+                          </label>
+                        </div>
                         <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
-                          {typeof prompt.value === 'object' ? JSON.stringify(prompt.value, null, 2) : prompt.value}
+                          {typeof prompt.value === 'object'
+                            ? (prettyPrint ? JSON.stringify(prompt.value, null, 2) : JSON.stringify(prompt.value))
+                            : prompt.value}
                         </div>
                         <div className="mt-3 flex items-center justify-between">
                           <div className="flex items-center space-x-3">
@@ -3710,8 +3750,21 @@ function AIPromptsSettings() {
                         </>
                       ) : (
                         <>
+                          <div className="mb-2 flex items-center">
+                            <label className="flex items-center text-sm text-gray-600 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={prettyPrint}
+                                onChange={(e) => setPrettyPrint(e.target.checked)}
+                                className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              />
+                              Pretty-print
+                            </label>
+                          </div>
                           <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
-                            {typeof prompt.value === 'object' ? JSON.stringify(prompt.value, null, 2) : prompt.value}
+                            {typeof prompt.value === 'object'
+                              ? (prettyPrint ? JSON.stringify(prompt.value, null, 2) : JSON.stringify(prompt.value))
+                              : prompt.value}
                           </div>
                           <div className="mt-3 flex items-center justify-between">
                             <div className="flex items-center space-x-3">
@@ -3872,8 +3925,21 @@ function AIPromptsSettings() {
                         </>
                       ) : (
                         <>
+                          <div className="mb-2 flex items-center">
+                            <label className="flex items-center text-sm text-gray-600 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={prettyPrint}
+                                onChange={(e) => setPrettyPrint(e.target.checked)}
+                                className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              />
+                              Pretty-print
+                            </label>
+                          </div>
                           <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
-                            {typeof prompt.value === 'object' ? JSON.stringify(prompt.value, null, 2) : prompt.value}
+                            {typeof prompt.value === 'object'
+                              ? (prettyPrint ? JSON.stringify(prompt.value, null, 2) : JSON.stringify(prompt.value))
+                              : prompt.value}
                           </div>
                           <div className="mt-3 flex items-center justify-between">
                             <div className="flex items-center space-x-3">
