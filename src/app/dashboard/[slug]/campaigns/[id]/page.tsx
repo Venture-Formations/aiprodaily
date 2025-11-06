@@ -755,7 +755,7 @@ function NewsletterSectionComponent({
         }} />
       case 'Poll':
         return <PollSection campaign={campaign} />
-      case 'Advertorial':
+      case 'Advertisement':
         return <AdvertorialSection campaign={campaign} />
       case 'Breaking News':
         return <BreakingNewsSection campaign={campaign} />
