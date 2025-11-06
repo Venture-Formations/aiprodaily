@@ -333,9 +333,9 @@ function AdvertorialSection({ campaign }: { campaign: any }) {
           {/* Content */}
           <div className="p-3">
             <div className="border border-gray-300 rounded-lg bg-white shadow-lg">
-              {/* Title */}
+              {/* Title - inside card, left-justified */}
               <div className="px-4 pt-4 pb-2">
-                <h3 className="text-xl font-bold text-center m-0">{ad.title}</h3>
+                <h3 className="text-xl font-bold text-left m-0">{ad.title}</h3>
               </div>
 
               {/* Image */}

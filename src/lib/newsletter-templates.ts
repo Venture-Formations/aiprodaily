@@ -692,7 +692,7 @@ export async function generateAdvertorialSection(campaign: any, recordUsage: boo
         <tr class='row'>
           <td class='column' style='padding:8px; vertical-align: top;'>
             <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 8px; background: #fff; font-family: ${bodyFont}; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15);'>
-              <tr><td style='padding: 10px 10px 4px; font-size: 20px; font-weight: bold; text-align: center;'>${selectedAd.title}</td></tr>
+              <tr><td style='padding: 10px 10px 4px; font-size: 20px; font-weight: bold; text-align: left;'>${selectedAd.title}</td></tr>
               ${imageHtml}
               <tr><td style='padding: 0 10px 10px;'>${selectedAd.body}</td></tr>
               ${buttonHtml}
