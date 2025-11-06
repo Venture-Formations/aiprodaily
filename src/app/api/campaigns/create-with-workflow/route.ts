@@ -30,13 +30,31 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Create Campaign] Creating campaign for ${date}`)
 
-    // Step 1: Create the campaign
+    // Step 1: Look up newsletter UUID from slug
+    const { data: newsletter, error: newsletterError } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('slug', newsletter_id)
+      .single()
+
+    if (newsletterError || !newsletter) {
+      console.error('[Create Campaign] Newsletter not found:', newsletter_id)
+      return NextResponse.json({
+        error: 'Newsletter not found',
+        details: `No newsletter found with slug: ${newsletter_id}`
+      }, { status: 404 })
+    }
+
+    const newsletterUuid = newsletter.id
+    console.log(`[Create Campaign] Newsletter UUID: ${newsletterUuid}`)
+
+    // Step 2: Create the campaign
     const { data: newCampaign, error: createError } = await supabaseAdmin
       .from('newsletter_campaigns')
       .insert([{
         date: date,
         status: 'processing',
-        newsletter_id: newsletter_id
+        newsletter_id: newsletterUuid
       }])
       .select('id')
       .single()
@@ -52,12 +70,12 @@ export async function POST(request: NextRequest) {
     const campaignId = newCampaign.id
     console.log(`[Create Campaign] Created campaign: ${campaignId}`)
 
-    // Step 2: Select AI apps and prompts (like setupCampaign does)
+    // Step 3: Select AI apps and prompts (like setupCampaign does)
     try {
       const { AppSelector } = await import('@/lib/app-selector')
       const { PromptSelector } = await import('@/lib/prompt-selector')
 
-      await AppSelector.selectAppsForCampaign(campaignId, newsletter_id)
+      await AppSelector.selectAppsForCampaign(campaignId, newsletterUuid)
       await PromptSelector.selectPromptForCampaign(campaignId)
       console.log('[Create Campaign] Selected AI apps and prompts')
     } catch (error) {
@@ -110,7 +128,7 @@ export async function POST(request: NextRequest) {
     const { data: lookbackSetting } = await supabaseAdmin
       .from('app_settings')
       .select('value')
-      .eq('newsletter_id', newsletter_id)
+      .eq('newsletter_id', newsletterUuid)
       .eq('key', 'primary_article_lookback_hours')
       .single()
 
@@ -177,7 +195,7 @@ export async function POST(request: NextRequest) {
     // Step 6: Start the article generation workflow in background
     start(createCampaignWorkflow, [{
       campaign_id: campaignId,
-      newsletter_id: newsletter_id
+      newsletter_id: newsletterUuid
     }]).catch(error => {
       console.error('[Create Campaign] Failed to start workflow:', error)
     })
