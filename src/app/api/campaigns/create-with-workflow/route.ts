@@ -395,7 +395,7 @@ async function finalizeCampaign(campaignId: string) {
   const { data: campaign } = await supabaseAdmin
     .from('newsletter_campaigns')
     .select('subject_line')
-    .eq('campaign_id', campaignId)
+    .eq('id', campaignId)
     .single()
 
   console.log(`Subject line: "${campaign?.subject_line?.substring(0, 50) || 'Not found'}..."`)
