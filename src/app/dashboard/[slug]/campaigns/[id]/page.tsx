@@ -313,46 +313,63 @@ function AdvertorialSection({ campaign }: { campaign: any }) {
 
   return (
     <div className="p-6">
-      <div className="border border-gray-200 rounded-lg bg-white shadow-sm p-6">
-        <div className="mb-4 text-sm text-gray-600">
+      <div className="mb-4 text-sm text-gray-600 flex justify-between items-center">
+        <div>
           <strong>Selected Ad:</strong> {ad.title}
         </div>
-
-        {/* Preview of how it will appear in newsletter */}
-        <div className="border-l-4 border-blue-500 pl-4">
-          <h3 className="text-xl font-bold text-center mb-3">{ad.title}</h3>
-
-          {ad.image_url && (
-            <div className="text-center mb-3">
-              <img
-                src={ad.image_url}
-                alt={ad.title}
-                className="inline-block max-w-full max-h-96 rounded"
-              />
-            </div>
-          )}
-
-          <div
-            className="prose prose-sm max-w-none mb-4 [&_a]:text-blue-600 [&_a]:underline"
-            dangerouslySetInnerHTML={{ __html: ad.body }}
-          />
-
-          {ad.button_url && (
-            <div className="text-center">
-              <a
-                href={ad.button_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700"
-              >
-                {ad.button_text || 'Learn More'}
-              </a>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-4 pt-4 border-t text-sm text-gray-500">
+        <div className="text-xs text-gray-400">
           Times used: {ad.times_used || 0} | Display order: {ad.display_order}
+        </div>
+      </div>
+
+      {/* Styled to match email appearance */}
+      <div className="max-w-3xl mx-auto">
+        <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+          {/* Header */}
+          <div className="bg-blue-600 px-4 py-3">
+            <h2 className="text-white text-2xl font-bold m-0">Advertorial</h2>
+          </div>
+
+          {/* Content */}
+          <div className="p-3">
+            <div className="border border-gray-300 rounded-lg bg-white shadow-lg">
+              {/* Title */}
+              <div className="px-4 pt-4 pb-2">
+                <h3 className="text-xl font-bold text-center m-0">{ad.title}</h3>
+              </div>
+
+              {/* Image */}
+              {ad.image_url && (
+                <div className="px-4 text-center">
+                  <img
+                    src={ad.image_url}
+                    alt={ad.title}
+                    className="inline-block max-w-full max-h-[500px] rounded"
+                  />
+                </div>
+              )}
+
+              {/* Body */}
+              <div
+                className="px-4 pb-4 text-base leading-relaxed [&_a]:text-blue-600 [&_a]:underline [&_b]:font-bold [&_strong]:font-bold"
+                dangerouslySetInnerHTML={{ __html: ad.body }}
+              />
+
+              {/* Button */}
+              {ad.button_url && (
+                <div className="px-4 pb-4 text-center">
+                  <a
+                    href={ad.button_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block bg-blue-600 text-white px-6 py-3 rounded-md font-bold no-underline hover:bg-blue-700"
+                  >
+                    {ad.button_text || 'Learn More'}
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
