@@ -4202,13 +4202,13 @@ function AIPromptsSettings() {
 function SlackSettings() {
   const [settings, setSettings] = useState({
     campaignStatusUpdates: true,
+    workflowFailure: true,
     systemErrors: true,
     rssProcessingUpdates: true,
     rssProcessingIncomplete: true,
     lowArticleCount: true,
     scheduledSendFailure: true,
     scheduledSendTiming: true,
-    userActions: false,
     healthCheckAlerts: true,
     emailDeliveryUpdates: true
   })
@@ -4264,101 +4264,102 @@ function SlackSettings() {
     {
       id: 'campaignStatusUpdates',
       name: 'Campaign Status Updates',
-      description: 'Notifications when campaigns require attention (Changes Made or Failed status)',
+      description: 'Notifications when campaigns are marked as "Changes Made" by reviewers',
       examples: [
-        'Campaign marked as "Changes Made" - review required',
-        'Campaign status changed to "Failed" due to processing error',
-        'Campaign requires manual intervention before sending'
+        'Campaign marked as "Changes Made" for Dec 15 by John Doe',
+        'Campaign requires review before proceeding to send',
+        'Manual edits detected - status updated to "Changes Made"'
       ]
     },
     {
-      id: 'systemErrors',
-      name: 'System Errors',
-      description: 'Critical system errors and failures',
+      id: 'workflowFailure',
+      name: 'Workflow Failures',
+      description: 'Critical alerts when automated workflows fail after all retry attempts',
       examples: [
-        'Database connection failures',
-        'API authentication errors',
-        'Critical application crashes'
+        'Workflow failed after retries - Campaign ID: abc123',
+        'RSS processing workflow terminated due to repeated errors',
+        'Campaign creation workflow failed - manual intervention required'
       ]
     },
     {
       id: 'rssProcessingUpdates',
-      name: 'RSS Processing Updates',
-      description: 'Completion and success notifications for RSS feed processing',
+      name: 'RSS Processing Completion',
+      description: 'Success notifications when RSS processing completes',
       examples: [
-        'RSS processing completed with 8 articles generated',
-        'Subject line generated successfully',
-        'Archive preserved 12 articles before processing'
+        'RSS Processing Complete - Campaign abc123 - 8 articles generated',
+        'Archive: 12 articles, 45 posts preserved',
+        'Ready for review and scheduling'
       ]
     },
     {
       id: 'rssProcessingIncomplete',
       name: 'RSS Processing Incomplete',
-      description: 'Alerts when RSS processing fails partway through',
+      description: 'Alerts when RSS processing fails partway through steps',
       examples: [
-        'RSS processing stopped at AI article generation due to OpenAI timeout',
-        'Feed processing completed but article creation failed',
-        'Archive succeeded but RSS feed parsing crashed'
+        'RSS Processing Incomplete - Completed: Archive, Fetch - Failed at: Score Posts',
+        'Campaign may be missing content or in invalid state',
+        'Error: OpenAI API timeout during article generation'
       ]
     },
     {
       id: 'lowArticleCount',
-      name: 'Low Article Count (≤6 articles)',
-      description: 'Warnings when newsletter may not have enough content',
+      name: 'Low Article Count (≤6 articles) - CRITICAL',
+      description: 'CRITICAL: Always enabled - Cannot be disabled. Alerts when article count is too low for quality delivery.',
       examples: [
-        'Only 3 articles generated for tomorrow\'s newsletter',
-        'RSS feeds produced 6 articles - consider manual review',
-        'Insufficient content detected for quality delivery'
-      ]
+        'CRITICAL: Low Article Count Alert - 4 articles (≤6 threshold)',
+        'Newsletter may not have enough content for quality delivery',
+        'Action Required: Manual review before sending'
+      ],
+      alwaysEnabled: true
     },
     {
       id: 'scheduledSendFailure',
       name: 'Scheduled Send Failures',
-      description: 'Alerts when scheduled sends trigger but fail to deliver',
+      description: 'Alerts when scheduled sends fail to deliver to MailerLite',
       examples: [
-        'Final send scheduled but MailerLite API authentication failed',
-        'Campaign ready but delivery blocked by MailerLite configuration error',
-        'Send triggered at 9 PM but no email actually delivered'
+        'Scheduled Send Failed - Campaign abc123',
+        'Send triggered but no email delivered to MailerLite',
+        'MailerLite API authentication failed during scheduled send'
       ]
     },
     {
       id: 'scheduledSendTiming',
       name: 'Scheduled Send Timing Issues',
-      description: 'Warnings about scheduling configuration problems',
+      description: 'Warnings when scheduling logic detects configuration problems',
       examples: [
-        'Campaign marked "ready_to_send" but cron says it\'s not time to send',
-        'Multiple campaigns waiting but send window appears misconfigured',
-        'Scheduling logic conflict detected'
+        'Found 2 campaigns with ready_to_send status but shouldRun returned false',
+        'Timing configuration issue detected',
+        'Send window may be misconfigured'
       ]
     },
     {
       id: 'emailDeliveryUpdates',
-      name: 'Email Delivery Updates',
-      description: 'MailerLite campaign delivery confirmations and stats',
+      name: 'Email Delivery Success',
+      description: 'MailerLite campaign delivery confirmations',
       examples: [
-        'Review campaign sent to review group successfully',
-        'Final newsletter delivered to 1,247 subscribers',
-        'MailerLite campaign creation completed'
+        'Review campaign sent successfully for campaign abc123',
+        'Final campaign sent successfully for campaign xyz789',
+        'MailerLite delivery confirmed'
       ]
     },
     {
       id: 'healthCheckAlerts',
       name: 'Health Check Alerts',
-      description: 'System health monitoring alerts and warnings',
+      description: 'System health monitoring alerts for degraded or down services',
       examples: [
-        'Database connection degraded',
-        'MailerLite API responding slowly',
-        'OpenAI service health check failed'
+        'Health Check: RSS Feeds is degraded - 3 feeds have multiple errors',
+        'Health Check: Database is down - Unable to connect',
+        'System health check failed - some components not healthy'
       ]
     },
     {
-      id: 'userActions',
-      name: 'User Actions',
-      description: 'User login, campaign modifications, and administrative actions',
+      id: 'systemErrors',
+      name: 'System Errors',
+      description: 'Critical system-wide errors from various components',
       examples: [
-        'Admin user logged in from new device',
-        'Campaign manually edited and saved',
-        'User changed email scheduling settings'
+        'Critical error in rss_processor during article generation',
+        'System Alert: Database connection lost',
+        'Authentication system failure detected'
       ]
     }
   ]
@@ -4395,23 +4396,36 @@ function SlackSettings() {
                 </div>
 
                 <div className="flex flex-col items-end ml-4">
-                  <button
-                    onClick={() => handleToggle(type.id, !settings[type.id as keyof typeof settings])}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      settings[type.id as keyof typeof settings] ? 'bg-brand-primary' : 'bg-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        settings[type.id as keyof typeof settings] ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                  <span className={`mt-2 text-sm font-medium ${
-                    settings[type.id as keyof typeof settings] ? 'text-green-600' : 'text-gray-500'
-                  }`}>
-                    {settings[type.id as keyof typeof settings] ? 'Enabled' : 'Disabled'}
-                  </span>
+                  {type.alwaysEnabled ? (
+                    <div className="flex flex-col items-center">
+                      <div className="relative inline-flex h-6 w-11 items-center rounded-full bg-brand-primary opacity-60 cursor-not-allowed">
+                        <span className="inline-block h-4 w-4 transform rounded-full bg-white translate-x-6" />
+                      </div>
+                      <span className="mt-2 text-sm font-medium text-orange-600">
+                        Always On
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleToggle(type.id, !settings[type.id as keyof typeof settings])}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          settings[type.id as keyof typeof settings] ? 'bg-brand-primary' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            settings[type.id as keyof typeof settings] ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                      <span className={`mt-2 text-sm font-medium ${
+                        settings[type.id as keyof typeof settings] ? 'text-green-600' : 'text-gray-500'
+                      }`}>
+                        {settings[type.id as keyof typeof settings] ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
