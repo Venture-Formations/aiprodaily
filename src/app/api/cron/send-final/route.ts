@@ -205,7 +205,7 @@ export async function POST(request: NextRequest) {
       }, { status: 404 })
     }
 
-    // Get the most recent campaign with status 'in_review' (for testing/flexibility)
+    // Get the most recent campaign with status 'in_review' or 'changes_made' (for testing/flexibility)
     // This allows sending review campaigns immediately instead of waiting for date match
     const { data, error } = await supabaseAdmin
       .from('newsletter_campaigns')
@@ -228,7 +228,7 @@ export async function POST(request: NextRequest) {
         manual_articles:manual_articles(*)
       `)
       .eq('newsletter_id', newsletter.id)
-      .eq('status', 'in_review')
+      .in('status', ['in_review', 'changes_made'])
       .order('date', { ascending: false })
       .limit(1)
       .single()
@@ -236,9 +236,9 @@ export async function POST(request: NextRequest) {
     campaign = data
 
     if (error || !campaign) {
-      console.log('No campaign with in_review status found')
+      console.log('No campaign with in_review or changes_made status found')
       return NextResponse.json({
-        message: 'No campaign with in_review status found',
+        message: 'No campaign with in_review or changes_made status found',
         timestamp: new Date().toISOString()
       })
     }
@@ -452,7 +452,7 @@ export async function GET(request: NextRequest) {
       }, { status: 404 })
     }
 
-    // Get the most recent campaign with status 'in_review' (for testing/flexibility)
+    // Get the most recent campaign with status 'in_review' or 'changes_made' (for testing/flexibility)
     // This allows sending review campaigns immediately instead of waiting for date match
     const { data, error } = await supabaseAdmin
       .from('newsletter_campaigns')
@@ -475,7 +475,7 @@ export async function GET(request: NextRequest) {
         manual_articles:manual_articles(*)
       `)
       .eq('newsletter_id', newsletter.id)
-      .eq('status', 'in_review')
+      .in('status', ['in_review', 'changes_made'])
       .order('date', { ascending: false })
       .limit(1)
       .single()
@@ -483,9 +483,9 @@ export async function GET(request: NextRequest) {
     campaign = data
 
     if (error || !campaign) {
-      console.log('No campaign with in_review status found')
+      console.log('No campaign with in_review or changes_made status found')
       return NextResponse.json({
-        message: 'No campaign with in_review status found',
+        message: 'No campaign with in_review or changes_made status found',
         timestamp: new Date().toISOString()
       })
     }

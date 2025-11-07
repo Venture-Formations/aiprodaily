@@ -60,325 +60,496 @@ export async function processRSSWorkflow(input: {
   return { campaignId, success: true }
 }
 
-// Step functions
+// Step functions with retry logic
 async function setupCampaign(newsletterId: string) {
   "use step"
 
-  console.log('[Workflow Step 1/10] Setting up campaign...')
+  let retryCount = 0
+  const maxRetries = 2
 
-  const processor = new RSSProcessor()
+  while (retryCount <= maxRetries) {
+    try {
+      console.log('[Workflow Step 1/10] Setting up campaign...')
 
-  // Get the newsletter
-  const { data: newsletter, error: newsletterError } = await supabaseAdmin
-    .from('newsletters')
-    .select('id, name, slug')
-    .eq('id', newsletterId)
-    .single()
+      const processor = new RSSProcessor()
 
-  if (newsletterError || !newsletter) {
-    throw new Error(`Newsletter not found: ${newsletterId}`)
+      // Get the newsletter
+      const { data: newsletter, error: newsletterError } = await supabaseAdmin
+        .from('newsletters')
+        .select('id, name, slug')
+        .eq('id', newsletterId)
+        .single()
+
+      if (newsletterError || !newsletter) {
+        throw new Error(`Newsletter not found: ${newsletterId}`)
+      }
+
+      console.log(`[Workflow Step 1/10] Using newsletter: ${newsletter.name} (${newsletter.id})`)
+
+      // Calculate campaign date (Central Time + 12 hours)
+      const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
+      const centralDate = new Date(nowCentral)
+      centralDate.setHours(centralDate.getHours() + 12)
+      const campaignDate = centralDate.toISOString().split('T')[0]
+
+      // Create new campaign with newsletter_id
+      const { data: newCampaign, error: createError } = await supabaseAdmin
+        .from('newsletter_campaigns')
+        .insert([{
+          date: campaignDate,
+          status: 'processing',
+          newsletter_id: newsletter.id
+        }])
+        .select('id')
+        .single()
+
+      if (createError || !newCampaign) {
+        throw new Error('Failed to create campaign')
+      }
+
+      const id = newCampaign.id
+      console.log(`[Workflow Step 1/10] Campaign created: ${id} for ${campaignDate}`)
+
+      // Select AI apps and prompts
+      try {
+        const { AppSelector } = await import('@/lib/app-selector')
+        const { PromptSelector } = await import('@/lib/prompt-selector')
+
+        await AppSelector.selectAppsForCampaign(id, newsletter.id)
+        await PromptSelector.selectPromptForCampaign(id)
+      } catch (error) {
+        console.log('[Workflow Step 1/10] AI selection failed (non-critical)')
+      }
+
+      // Assign top 12 posts per section
+      const { data: primaryFeeds } = await supabaseAdmin
+        .from('rss_feeds')
+        .select('id')
+        .eq('active', true)
+        .eq('use_for_primary_section', true)
+
+      const { data: secondaryFeeds } = await supabaseAdmin
+        .from('rss_feeds')
+        .select('id')
+        .eq('active', true)
+        .eq('use_for_secondary_section', true)
+
+      const primaryFeedIds = primaryFeeds?.map(f => f.id) || []
+      const secondaryFeedIds = secondaryFeeds?.map(f => f.id) || []
+
+      // Get lookback window
+      const { data: lookbackSetting } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('newsletter_id', newsletterId)
+        .eq('key', 'primary_article_lookback_hours')
+        .single()
+
+      const lookbackHours = lookbackSetting ? parseInt(lookbackSetting.value) : 72
+      const lookbackDate = new Date()
+      lookbackDate.setHours(lookbackDate.getHours() - lookbackHours)
+      const lookbackTimestamp = lookbackDate.toISOString()
+
+      // Get and assign top primary posts
+      const { data: allPrimaryPosts } = await supabaseAdmin
+        .from('rss_posts')
+        .select('id, post_ratings(total_score)')
+        .in('feed_id', primaryFeedIds)
+        .is('campaign_id', null)
+        .gte('processed_at', lookbackTimestamp)
+        .not('post_ratings', 'is', null)
+
+      const topPrimary = allPrimaryPosts
+        ?.sort((a: any, b: any) => {
+          const scoreA = a.post_ratings?.[0]?.total_score || 0
+          const scoreB = b.post_ratings?.[0]?.total_score || 0
+          return scoreB - scoreA
+        })
+        .slice(0, 12) || []
+
+      // Get and assign top secondary posts
+      const { data: allSecondaryPosts } = await supabaseAdmin
+        .from('rss_posts')
+        .select('id, post_ratings(total_score)')
+        .in('feed_id', secondaryFeedIds)
+        .is('campaign_id', null)
+        .gte('processed_at', lookbackTimestamp)
+        .not('post_ratings', 'is', null)
+
+      const topSecondary = allSecondaryPosts
+        ?.sort((a: any, b: any) => {
+          const scoreA = a.post_ratings?.[0]?.total_score || 0
+          const scoreB = b.post_ratings?.[0]?.total_score || 0
+          return scoreB - scoreA
+        })
+        .slice(0, 12) || []
+
+      // Assign to campaign
+      if (topPrimary.length > 0) {
+        await supabaseAdmin
+          .from('rss_posts')
+          .update({ campaign_id: id })
+          .in('id', topPrimary.map(p => p.id))
+      }
+
+      if (topSecondary.length > 0) {
+        await supabaseAdmin
+          .from('rss_posts')
+          .update({ campaign_id: id })
+          .in('id', topSecondary.map(p => p.id))
+      }
+
+      console.log(`[Workflow Step 1/10] Assigned ${topPrimary.length} primary, ${topSecondary.length} secondary posts`)
+
+      // Deduplicate
+      const dedupeResult = await processor.handleDuplicatesForCampaign(id)
+      console.log(`[Workflow Step 1/10] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicate posts found`)
+      console.log('[Workflow Step 1/10] ✓ Setup complete')
+
+      return id
+
+    } catch (error) {
+      retryCount++
+      if (retryCount > maxRetries) {
+        console.error(`[Workflow Step 1/10] Failed after ${maxRetries} retries`)
+        throw error
+      }
+      console.log(`[Workflow Step 1/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
   }
 
-  console.log(`[Workflow Step 1/10] Using newsletter: ${newsletter.name} (${newsletter.id})`)
-
-  // Calculate campaign date (Central Time + 12 hours)
-  const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
-  const centralDate = new Date(nowCentral)
-  centralDate.setHours(centralDate.getHours() + 12)
-  const campaignDate = centralDate.toISOString().split('T')[0]
-
-  // Create new campaign with newsletter_id
-  const { data: newCampaign, error: createError } = await supabaseAdmin
-    .from('newsletter_campaigns')
-    .insert([{
-      date: campaignDate,
-      status: 'processing',
-      newsletter_id: newsletter.id
-    }])
-    .select('id')
-    .single()
-
-  if (createError || !newCampaign) {
-    throw new Error('Failed to create campaign')
-  }
-
-  const id = newCampaign.id
-  console.log(`[Workflow Step 1/10] Campaign created: ${id} for ${campaignDate}`)
-
-  // Select AI apps and prompts
-  try {
-    const { AppSelector } = await import('@/lib/app-selector')
-    const { PromptSelector } = await import('@/lib/prompt-selector')
-
-    await AppSelector.selectAppsForCampaign(id, newsletter.id)
-    await PromptSelector.selectPromptForCampaign(id)
-  } catch (error) {
-    console.log('[Workflow Step 1/10] AI selection failed (non-critical)')
-  }
-
-  // Assign top 12 posts per section
-  const { data: primaryFeeds } = await supabaseAdmin
-    .from('rss_feeds')
-    .select('id')
-    .eq('active', true)
-    .eq('use_for_primary_section', true)
-
-  const { data: secondaryFeeds } = await supabaseAdmin
-    .from('rss_feeds')
-    .select('id')
-    .eq('active', true)
-    .eq('use_for_secondary_section', true)
-
-  const primaryFeedIds = primaryFeeds?.map(f => f.id) || []
-  const secondaryFeedIds = secondaryFeeds?.map(f => f.id) || []
-
-  // Get lookback window
-  const { data: lookbackSetting } = await supabaseAdmin
-    .from('app_settings')
-    .select('value')
-    .eq('newsletter_id', newsletterId)
-    .eq('key', 'primary_article_lookback_hours')
-    .single()
-
-  const lookbackHours = lookbackSetting ? parseInt(lookbackSetting.value) : 72
-  const lookbackDate = new Date()
-  lookbackDate.setHours(lookbackDate.getHours() - lookbackHours)
-  const lookbackTimestamp = lookbackDate.toISOString()
-
-  // Get and assign top primary posts
-  const { data: allPrimaryPosts } = await supabaseAdmin
-    .from('rss_posts')
-    .select('id, post_ratings(total_score)')
-    .in('feed_id', primaryFeedIds)
-    .is('campaign_id', null)
-    .gte('processed_at', lookbackTimestamp)
-    .not('post_ratings', 'is', null)
-
-  const topPrimary = allPrimaryPosts
-    ?.sort((a: any, b: any) => {
-      const scoreA = a.post_ratings?.[0]?.total_score || 0
-      const scoreB = b.post_ratings?.[0]?.total_score || 0
-      return scoreB - scoreA
-    })
-    .slice(0, 12) || []
-
-  // Get and assign top secondary posts
-  const { data: allSecondaryPosts } = await supabaseAdmin
-    .from('rss_posts')
-    .select('id, post_ratings(total_score)')
-    .in('feed_id', secondaryFeedIds)
-    .is('campaign_id', null)
-    .gte('processed_at', lookbackTimestamp)
-    .not('post_ratings', 'is', null)
-
-  const topSecondary = allSecondaryPosts
-    ?.sort((a: any, b: any) => {
-      const scoreA = a.post_ratings?.[0]?.total_score || 0
-      const scoreB = b.post_ratings?.[0]?.total_score || 0
-      return scoreB - scoreA
-    })
-    .slice(0, 12) || []
-
-  // Assign to campaign
-  if (topPrimary.length > 0) {
-    await supabaseAdmin
-      .from('rss_posts')
-      .update({ campaign_id: id })
-      .in('id', topPrimary.map(p => p.id))
-  }
-
-  if (topSecondary.length > 0) {
-    await supabaseAdmin
-      .from('rss_posts')
-      .update({ campaign_id: id })
-      .in('id', topSecondary.map(p => p.id))
-  }
-
-  console.log(`[Workflow Step 1/10] Assigned ${topPrimary.length} primary, ${topSecondary.length} secondary posts`)
-
-  // Deduplicate
-  const dedupeResult = await processor.handleDuplicatesForCampaign(id)
-  console.log(`[Workflow Step 1/10] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicate posts found`)
-  console.log('[Workflow Step 1/10] ✓ Setup complete')
-
-  return id
+  throw new Error('Unexpected: Retry loop exited without return')
 }
 
 // PRIMARY SECTION
 async function generatePrimaryTitles(campaignId: string) {
   "use step"
 
-  console.log('[Workflow Step 2/10] Generating 6 primary titles...')
-  const processor = new RSSProcessor()
-  await processor.generateTitlesOnly(campaignId, 'primary', 6)
+  let retryCount = 0
+  const maxRetries = 2
 
-  const { data: articles } = await supabaseAdmin
-    .from('articles')
-    .select('id, headline')
-    .eq('campaign_id', campaignId)
-    .not('headline', 'is', null)
+  while (retryCount <= maxRetries) {
+    try {
+      console.log('[Workflow Step 2/10] Generating 6 primary titles...')
+      const processor = new RSSProcessor()
+      await processor.generateTitlesOnly(campaignId, 'primary', 6)
 
-  console.log(`[Workflow Step 2/10] ✓ Generated ${articles?.length || 0} primary titles`)
+      const { data: articles } = await supabaseAdmin
+        .from('articles')
+        .select('id, headline')
+        .eq('campaign_id', campaignId)
+        .not('headline', 'is', null)
+
+      console.log(`[Workflow Step 2/10] ✓ Generated ${articles?.length || 0} primary titles`)
+      return
+
+    } catch (error) {
+      retryCount++
+      if (retryCount > maxRetries) {
+        console.error(`[Workflow Step 2/10] Failed after ${maxRetries} retries`)
+        throw error
+      }
+      console.log(`[Workflow Step 2/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+  }
 }
 
 async function generatePrimaryBodiesBatch1(campaignId: string) {
   "use step"
 
-  console.log('[Workflow Step 3/10] Generating 3 primary bodies (batch 1)...')
-  const processor = new RSSProcessor()
-  await processor.generateBodiesOnly(campaignId, 'primary', 0, 3)
+  let retryCount = 0
+  const maxRetries = 2
 
-  const { data: articles } = await supabaseAdmin
-    .from('articles')
-    .select('id, content')
-    .eq('campaign_id', campaignId)
-    .not('content', 'is', null)
+  while (retryCount <= maxRetries) {
+    try {
+      console.log('[Workflow Step 3/10] Generating 3 primary bodies (batch 1)...')
+      const processor = new RSSProcessor()
+      await processor.generateBodiesOnly(campaignId, 'primary', 0, 3)
 
-  console.log(`[Workflow Step 3/10] ✓ Total bodies generated: ${articles?.length || 0}`)
+      const { data: articles } = await supabaseAdmin
+        .from('articles')
+        .select('id, content')
+        .eq('campaign_id', campaignId)
+        .not('content', 'is', null)
+
+      console.log(`[Workflow Step 3/10] ✓ Total bodies generated: ${articles?.length || 0}`)
+      return
+
+    } catch (error) {
+      retryCount++
+      if (retryCount > maxRetries) {
+        console.error(`[Workflow Step 3/10] Failed after ${maxRetries} retries`)
+        throw error
+      }
+      console.log(`[Workflow Step 3/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+  }
 }
 
 async function generatePrimaryBodiesBatch2(campaignId: string) {
   "use step"
 
-  console.log('[Workflow Step 4/10] Generating 3 more primary bodies (batch 2)...')
-  const processor = new RSSProcessor()
-  await processor.generateBodiesOnly(campaignId, 'primary', 3, 3)
+  let retryCount = 0
+  const maxRetries = 2
 
-  const { data: articles } = await supabaseAdmin
-    .from('articles')
-    .select('id, content')
-    .eq('campaign_id', campaignId)
-    .not('content', 'is', null)
+  while (retryCount <= maxRetries) {
+    try {
+      console.log('[Workflow Step 4/10] Generating 3 more primary bodies (batch 2)...')
+      const processor = new RSSProcessor()
+      await processor.generateBodiesOnly(campaignId, 'primary', 3, 3)
 
-  console.log(`[Workflow Step 4/10] ✓ Total primary bodies: ${articles?.length || 0}`)
+      const { data: articles } = await supabaseAdmin
+        .from('articles')
+        .select('id, content')
+        .eq('campaign_id', campaignId)
+        .not('content', 'is', null)
+
+      console.log(`[Workflow Step 4/10] ✓ Total primary bodies: ${articles?.length || 0}`)
+      return
+
+    } catch (error) {
+      retryCount++
+      if (retryCount > maxRetries) {
+        console.error(`[Workflow Step 4/10] Failed after ${maxRetries} retries`)
+        throw error
+      }
+      console.log(`[Workflow Step 4/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+  }
 }
 
 async function factCheckPrimary(campaignId: string) {
   "use step"
 
-  console.log('[Workflow Step 5/10] Fact-checking all primary articles...')
-  const processor = new RSSProcessor()
-  await processor.factCheckArticles(campaignId, 'primary')
+  let retryCount = 0
+  const maxRetries = 2
 
-  const { data: articles } = await supabaseAdmin
-    .from('articles')
-    .select('id, fact_check_score')
-    .eq('campaign_id', campaignId)
-    .not('fact_check_score', 'is', null)
+  while (retryCount <= maxRetries) {
+    try {
+      console.log('[Workflow Step 5/10] Fact-checking all primary articles...')
+      const processor = new RSSProcessor()
+      await processor.factCheckArticles(campaignId, 'primary')
 
-  const avgScore = (articles?.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) || 0) / (articles?.length || 1)
-  console.log(`[Workflow Step 5/10] ✓ Fact-checked ${articles?.length || 0} articles (avg score: ${avgScore.toFixed(1)}/10)`)
+      const { data: articles } = await supabaseAdmin
+        .from('articles')
+        .select('id, fact_check_score')
+        .eq('campaign_id', campaignId)
+        .not('fact_check_score', 'is', null)
+
+      const avgScore = (articles?.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) || 0) / (articles?.length || 1)
+      console.log(`[Workflow Step 5/10] ✓ Fact-checked ${articles?.length || 0} articles (avg score: ${avgScore.toFixed(1)}/10)`)
+      return
+
+    } catch (error) {
+      retryCount++
+      if (retryCount > maxRetries) {
+        console.error(`[Workflow Step 5/10] Failed after ${maxRetries} retries`)
+        throw error
+      }
+      console.log(`[Workflow Step 5/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+  }
 }
 
 // SECONDARY SECTION
 async function generateSecondaryTitles(campaignId: string) {
   "use step"
 
-  console.log('[Workflow Step 6/10] Generating 6 secondary titles...')
-  const processor = new RSSProcessor()
-  await processor.generateTitlesOnly(campaignId, 'secondary', 6)
+  let retryCount = 0
+  const maxRetries = 2
 
-  const { data: articles } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('id, headline')
-    .eq('campaign_id', campaignId)
-    .not('headline', 'is', null)
+  while (retryCount <= maxRetries) {
+    try {
+      console.log('[Workflow Step 6/10] Generating 6 secondary titles...')
+      const processor = new RSSProcessor()
+      await processor.generateTitlesOnly(campaignId, 'secondary', 6)
 
-  console.log(`[Workflow Step 6/10] ✓ Generated ${articles?.length || 0} secondary titles`)
+      const { data: articles } = await supabaseAdmin
+        .from('secondary_articles')
+        .select('id, headline')
+        .eq('campaign_id', campaignId)
+        .not('headline', 'is', null)
+
+      console.log(`[Workflow Step 6/10] ✓ Generated ${articles?.length || 0} secondary titles`)
+      return
+
+    } catch (error) {
+      retryCount++
+      if (retryCount > maxRetries) {
+        console.error(`[Workflow Step 6/10] Failed after ${maxRetries} retries`)
+        throw error
+      }
+      console.log(`[Workflow Step 6/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+  }
 }
 
 async function generateSecondaryBodiesBatch1(campaignId: string) {
   "use step"
 
-  console.log('[Workflow Step 7/10] Generating 3 secondary bodies (batch 1)...')
-  const processor = new RSSProcessor()
-  await processor.generateBodiesOnly(campaignId, 'secondary', 0, 3)
+  let retryCount = 0
+  const maxRetries = 2
 
-  const { data: articles } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('id, content')
-    .eq('campaign_id', campaignId)
-    .not('content', 'is', null)
+  while (retryCount <= maxRetries) {
+    try {
+      console.log('[Workflow Step 7/10] Generating 3 secondary bodies (batch 1)...')
+      const processor = new RSSProcessor()
+      await processor.generateBodiesOnly(campaignId, 'secondary', 0, 3)
 
-  console.log(`[Workflow Step 7/10] ✓ Total bodies generated: ${articles?.length || 0}`)
+      const { data: articles } = await supabaseAdmin
+        .from('secondary_articles')
+        .select('id, content')
+        .eq('campaign_id', campaignId)
+        .not('content', 'is', null)
+
+      console.log(`[Workflow Step 7/10] ✓ Total bodies generated: ${articles?.length || 0}`)
+      return
+
+    } catch (error) {
+      retryCount++
+      if (retryCount > maxRetries) {
+        console.error(`[Workflow Step 7/10] Failed after ${maxRetries} retries`)
+        throw error
+      }
+      console.log(`[Workflow Step 7/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+  }
 }
 
 async function generateSecondaryBodiesBatch2(campaignId: string) {
   "use step"
 
-  console.log('[Workflow Step 8/10] Generating 3 more secondary bodies (batch 2)...')
-  const processor = new RSSProcessor()
-  await processor.generateBodiesOnly(campaignId, 'secondary', 3, 3)
+  let retryCount = 0
+  const maxRetries = 2
 
-  const { data: articles } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('id, content')
-    .eq('campaign_id', campaignId)
-    .not('content', 'is', null)
+  while (retryCount <= maxRetries) {
+    try {
+      console.log('[Workflow Step 8/10] Generating 3 more secondary bodies (batch 2)...')
+      const processor = new RSSProcessor()
+      await processor.generateBodiesOnly(campaignId, 'secondary', 3, 3)
 
-  console.log(`[Workflow Step 8/10] ✓ Total secondary bodies: ${articles?.length || 0}`)
+      const { data: articles } = await supabaseAdmin
+        .from('secondary_articles')
+        .select('id, content')
+        .eq('campaign_id', campaignId)
+        .not('content', 'is', null)
+
+      console.log(`[Workflow Step 8/10] ✓ Total secondary bodies: ${articles?.length || 0}`)
+      return
+
+    } catch (error) {
+      retryCount++
+      if (retryCount > maxRetries) {
+        console.error(`[Workflow Step 8/10] Failed after ${maxRetries} retries`)
+        throw error
+      }
+      console.log(`[Workflow Step 8/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+  }
 }
 
 async function factCheckSecondary(campaignId: string) {
   "use step"
 
-  console.log('[Workflow Step 9/10] Fact-checking all secondary articles...')
-  const processor = new RSSProcessor()
-  await processor.factCheckArticles(campaignId, 'secondary')
+  let retryCount = 0
+  const maxRetries = 2
 
-  const { data: articles } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('id, fact_check_score')
-    .eq('campaign_id', campaignId)
-    .not('fact_check_score', 'is', null)
+  while (retryCount <= maxRetries) {
+    try {
+      console.log('[Workflow Step 9/10] Fact-checking all secondary articles...')
+      const processor = new RSSProcessor()
+      await processor.factCheckArticles(campaignId, 'secondary')
 
-  const avgScore = (articles?.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) || 0) / (articles?.length || 1)
-  console.log(`[Workflow Step 9/10] ✓ Fact-checked ${articles?.length || 0} articles (avg score: ${avgScore.toFixed(1)}/10)`)
+      const { data: articles } = await supabaseAdmin
+        .from('secondary_articles')
+        .select('id, fact_check_score')
+        .eq('campaign_id', campaignId)
+        .not('fact_check_score', 'is', null)
+
+      const avgScore = (articles?.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) || 0) / (articles?.length || 1)
+      console.log(`[Workflow Step 9/10] ✓ Fact-checked ${articles?.length || 0} articles (avg score: ${avgScore.toFixed(1)}/10)`)
+      return
+
+    } catch (error) {
+      retryCount++
+      if (retryCount > maxRetries) {
+        console.error(`[Workflow Step 9/10] Failed after ${maxRetries} retries`)
+        throw error
+      }
+      console.log(`[Workflow Step 9/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+  }
 }
 
 // FINALIZE
 async function finalizeCampaign(campaignId: string) {
   "use step"
 
-  console.log('[Workflow Step 10/10] Finalizing campaign...')
-  const processor = new RSSProcessor()
+  let retryCount = 0
+  const maxRetries = 2
 
-  // Auto-select top 3 per section
-  await processor.selectTopArticlesForCampaign(campaignId)
+  while (retryCount <= maxRetries) {
+    try {
+      console.log('[Workflow Step 10/10] Finalizing campaign...')
+      const processor = new RSSProcessor()
 
-  const { data: activeArticles } = await supabaseAdmin
-    .from('articles')
-    .select('id')
-    .eq('campaign_id', campaignId)
-    .eq('is_active', true)
+      // Auto-select top 3 per section
+      await processor.selectTopArticlesForCampaign(campaignId)
 
-  const { data: activeSecondary } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('id')
-    .eq('campaign_id', campaignId)
-    .eq('is_active', true)
+      const { data: activeArticles } = await supabaseAdmin
+        .from('articles')
+        .select('id')
+        .eq('campaign_id', campaignId)
+        .eq('is_active', true)
 
-  console.log(`Selected ${activeArticles?.length || 0} primary, ${activeSecondary?.length || 0} secondary`)
+      const { data: activeSecondary } = await supabaseAdmin
+        .from('secondary_articles')
+        .select('id')
+        .eq('campaign_id', campaignId)
+        .eq('is_active', true)
 
-  // Generate welcome section
-  await processor.generateWelcomeSection(campaignId)
+      console.log(`Selected ${activeArticles?.length || 0} primary, ${activeSecondary?.length || 0} secondary`)
 
-  // Subject line (generated in selectTopArticlesForCampaign)
-  const { data: campaign } = await supabaseAdmin
-    .from('newsletter_campaigns')
-    .select('subject_line')
-    .eq('id', campaignId)
-    .single()
+      // Generate welcome section
+      await processor.generateWelcomeSection(campaignId)
 
-  console.log(`Subject line: "${campaign?.subject_line?.substring(0, 50) || 'Not found'}..."`)
+      // Subject line (generated in selectTopArticlesForCampaign)
+      const { data: campaign } = await supabaseAdmin
+        .from('newsletter_campaigns')
+        .select('subject_line')
+        .eq('id', campaignId)
+        .single()
 
-  // Set status to draft
-  await supabaseAdmin
-    .from('newsletter_campaigns')
-    .update({ status: 'draft' })
-    .eq('id', campaignId)
+      console.log(`Subject line: "${campaign?.subject_line?.substring(0, 50) || 'Not found'}..."`)
 
-  // Stage 1 unassignment
-  const unassignResult = await processor.unassignUnusedPosts(campaignId)
-  console.log(`[Workflow Step 10/10] ✓ Finalized. Unassigned ${unassignResult.unassigned} unused posts`)
+      // Set status to draft
+      await supabaseAdmin
+        .from('newsletter_campaigns')
+        .update({ status: 'draft' })
+        .eq('id', campaignId)
+
+      // Stage 1 unassignment
+      const unassignResult = await processor.unassignUnusedPosts(campaignId)
+      console.log(`[Workflow Step 10/10] ✓ Finalized. Unassigned ${unassignResult.unassigned} unused posts`)
+      return
+
+    } catch (error) {
+      retryCount++
+      if (retryCount > maxRetries) {
+        console.error(`[Workflow Step 10/10] Failed after ${maxRetries} retries`)
+        throw error
+      }
+      console.log(`[Workflow Step 10/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+  }
 }
