@@ -198,70 +198,20 @@ export class SlackNotificationService {
 
   /**
    * Alert when campaign has 6 or fewer articles available
-   * CRITICAL: This alert bypasses notification settings and always sends
    */
   async sendLowArticleCountAlert(campaignId: string, articleCount: number, campaignDate: string) {
-    const webhookUrl = await this.getWebhookUrl()
-    if (!webhookUrl) {
-      console.warn('Slack webhook URL not configured - cannot send low article count alert')
-      return
-    }
-
     const message = [
-      `⚠️ 📰 CRITICAL: Low Article Count Alert`,
+      `⚠️ 📰 Low Article Count Alert`,
       ``,
       `Campaign: ${campaignId}`,
       `Date: ${campaignDate}`,
       `Article Count: ${articleCount} articles (≤6 threshold)`,
       ``,
       `⚠️ Newsletter may not have enough content for quality delivery`,
-      `🔍 Action Required: Manual review before sending`,
-      ``,
-      `This is a critical alert and cannot be disabled in settings.`
+      `🔍 Action Required: Manual review before sending`
     ].join('\n')
 
-    try {
-      // Send directly without checking notification settings (this is critical)
-      const payload = {
-        text: message
-      }
-
-      await axios.post(webhookUrl, payload)
-
-      // Log the notification
-      await supabaseAdmin
-        .from('system_logs')
-        .insert([{
-          level: 'warn',
-          message: 'Critical low article count alert sent',
-          context: {
-            campaignId,
-            articleCount,
-            campaignDate,
-            alert_type: 'low_article_count_critical'
-          },
-          source: 'slack_service'
-        }])
-
-      console.log(`✅ Low article count alert sent for campaign ${campaignId} (${articleCount} articles)`)
-    } catch (error) {
-      console.error('Failed to send low article count alert:', error)
-
-      // Log the failure
-      await supabaseAdmin
-        .from('system_logs')
-        .insert([{
-          level: 'error',
-          message: 'Failed to send critical low article count alert',
-          context: {
-            campaignId,
-            articleCount,
-            campaignDate,
-            error: error instanceof Error ? error.message : 'Unknown error'
-          },
-          source: 'slack_service'
-        }])
-    }
+    await this.sendAlert(message, 'warn', 'low_article_count')
   }
 
   /**

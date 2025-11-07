@@ -4303,14 +4303,13 @@ function SlackSettings() {
     },
     {
       id: 'lowArticleCount',
-      name: 'Low Article Count (≤6 articles) - CRITICAL',
-      description: 'CRITICAL: Always enabled - Cannot be disabled. Alerts when article count is too low for quality delivery.',
+      name: 'Low Article Count (≤6 articles)',
+      description: 'Alerts when article count is too low for quality delivery',
       examples: [
-        'CRITICAL: Low Article Count Alert - 4 articles (≤6 threshold)',
+        'Low Article Count Alert - 4 articles (≤6 threshold)',
         'Newsletter may not have enough content for quality delivery',
         'Action Required: Manual review before sending'
-      ],
-      alwaysEnabled: true
+      ]
     },
     {
       id: 'scheduledSendFailure',
@@ -4396,36 +4395,23 @@ function SlackSettings() {
                 </div>
 
                 <div className="flex flex-col items-end ml-4">
-                  {type.alwaysEnabled ? (
-                    <div className="flex flex-col items-center">
-                      <div className="relative inline-flex h-6 w-11 items-center rounded-full bg-brand-primary opacity-60 cursor-not-allowed">
-                        <span className="inline-block h-4 w-4 transform rounded-full bg-white translate-x-6" />
-                      </div>
-                      <span className="mt-2 text-sm font-medium text-orange-600">
-                        Always On
-                      </span>
-                    </div>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => handleToggle(type.id, !settings[type.id as keyof typeof settings])}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          settings[type.id as keyof typeof settings] ? 'bg-brand-primary' : 'bg-gray-300'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            settings[type.id as keyof typeof settings] ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                      <span className={`mt-2 text-sm font-medium ${
-                        settings[type.id as keyof typeof settings] ? 'text-green-600' : 'text-gray-500'
-                      }`}>
-                        {settings[type.id as keyof typeof settings] ? 'Enabled' : 'Disabled'}
-                      </span>
-                    </>
-                  )}
+                  <button
+                    onClick={() => handleToggle(type.id, !settings[type.id as keyof typeof settings])}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      settings[type.id as keyof typeof settings] ? 'bg-brand-primary' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        settings[type.id as keyof typeof settings] ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                  <span className={`mt-2 text-sm font-medium ${
+                    settings[type.id as keyof typeof settings] ? 'text-green-600' : 'text-gray-500'
+                  }`}>
+                    {settings[type.id as keyof typeof settings] ? 'Enabled' : 'Disabled'}
+                  </span>
                 </div>
               </div>
             </div>
