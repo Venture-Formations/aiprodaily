@@ -66,40 +66,27 @@ export async function autoRegenerateWelcome(
     console.log(`[WELCOME] Generating welcome from ${primaryArticles?.length || 0} primary and ${secondaryArticles?.length || 0} secondary articles`)
 
     // Generate welcome text using AI_CALL (handles prompt + provider + call)
-    const result = await AI_CALL.welcomeSection(allArticles, newsletterId, 500, 0.8)
+    const result = await AI_CALL.welcomeSection(allArticles, newsletterId)
 
-    // Parse JSON response to extract intro, tagline, and summary
+    // Extract intro, tagline, and summary from the result
     let welcomeIntro = ''
     let welcomeTagline = ''
     let welcomeSummary = ''
 
     try {
-      // Handle response (could be object or string)
+      // AI_CALL.welcomeSection returns the parsed JSON response directly
       if (typeof result === 'object' && result !== null) {
-        // Check if it's already parsed JSON
-        if ('intro' in result || 'tagline' in result || 'summary' in result) {
-          welcomeIntro = (result as any).intro || ''
-          welcomeTagline = (result as any).tagline || ''
-          welcomeSummary = (result as any).summary || ''
-        } else {
-          // Try parsing as JSON string
-          const welcomeJson = JSON.parse(JSON.stringify(result))
-          welcomeIntro = welcomeJson.intro || ''
-          welcomeTagline = welcomeJson.tagline || ''
-          welcomeSummary = welcomeJson.summary || ''
-        }
-      } else if (typeof result === 'string') {
-        // Parse JSON from string
-        const welcomeJson = JSON.parse(result)
-        welcomeIntro = welcomeJson.intro || ''
-        welcomeTagline = welcomeJson.tagline || ''
-        welcomeSummary = welcomeJson.summary || ''
+        welcomeIntro = result.intro || ''
+        welcomeTagline = result.tagline || ''
+        welcomeSummary = result.summary || ''
+        console.log('[WELCOME] Extracted welcome sections - intro:', welcomeIntro.length, 'tagline:', welcomeTagline.length, 'summary:', welcomeSummary.length)
+      } else {
+        throw new Error('Unexpected result format from AI_CALL.welcomeSection')
       }
-
-      console.log('[WELCOME] Parsed welcome JSON - intro:', welcomeIntro.length, 'tagline:', welcomeTagline.length, 'summary:', welcomeSummary.length)
     } catch (parseError) {
-      console.error('[WELCOME] Failed to parse welcome JSON:', parseError)
-      return { success: false, error: 'Failed to parse welcome JSON' }
+      console.error('[WELCOME] Failed to extract welcome sections:', parseError)
+      console.error('[WELCOME] Result preview:', JSON.stringify(result).substring(0, 200))
+      return { success: false, error: 'Failed to generate welcome section' }
     }
 
     // Save all 3 parts to campaign
