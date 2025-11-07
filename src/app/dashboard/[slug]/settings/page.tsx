@@ -4232,27 +4232,38 @@ function SlackSettings() {
   }
 
   const handleSave = async () => {
+    console.log('[Slack Settings] Save button clicked')
+    console.log('[Slack Settings] Current settings:', settings)
+
     setSaving(true)
     setMessage('')
 
     try {
+      console.log('[Slack Settings] Sending request to /api/settings/slack')
       const response = await fetch('/api/settings/slack', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
       })
 
+      console.log('[Slack Settings] Response status:', response.status)
+
       if (response.ok) {
+        const data = await response.json()
+        console.log('[Slack Settings] Save successful:', data)
         setMessage('Slack settings saved successfully!')
         setTimeout(() => setMessage(''), 3000)
       } else {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('[Slack Settings] Save failed:', response.status, errorData)
         throw new Error('Failed to save settings')
       }
     } catch (error) {
+      console.error('[Slack Settings] Save error:', error)
       setMessage('Failed to save settings. Please try again.')
-      console.error('Save error:', error)
     } finally {
       setSaving(false)
+      console.log('[Slack Settings] Save complete')
     }
   }
 

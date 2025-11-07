@@ -52,12 +52,16 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('[API /settings/slack] POST request received')
+
     const session = await getServerSession(authOptions)
     if (!session) {
+      console.log('[API /settings/slack] Unauthorized - no session')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const body = await request.json()
+    console.log('[API /settings/slack] Request body:', body)
 
     // Convert frontend format to database format
     const dbSettings = [
@@ -73,19 +77,27 @@ export async function POST(request: NextRequest) {
       { key: 'slack_email_delivery_updates_enabled', value: body.emailDeliveryUpdates ? 'true' : 'false' }
     ]
 
+    console.log('[API /settings/slack] Upserting settings:', dbSettings.length, 'records')
+
     // Upsert all settings
     for (const setting of dbSettings) {
-      await supabaseAdmin
+      const { error } = await supabaseAdmin
         .from('app_settings')
         .upsert(setting, { onConflict: 'key' })
+
+      if (error) {
+        console.error('[API /settings/slack] Upsert error for', setting.key, ':', error)
+        throw error
+      }
     }
 
+    console.log('[API /settings/slack] All settings saved successfully')
     return NextResponse.json({ success: true })
 
   } catch (error) {
-    console.error('Failed to save Slack settings:', error)
+    console.error('[API /settings/slack] Error:', error)
     return NextResponse.json(
-      { error: 'Failed to save Slack settings' },
+      { error: 'Failed to save Slack settings', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }
