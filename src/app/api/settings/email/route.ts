@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       .from('app_settings')
       .select('key, value')
       .eq('newsletter_id', newsletter.id)
-      .or('key.like.email_%,key.eq.max_top_articles,key.eq.max_bottom_articles,key.eq.primary_article_lookback_hours,key.eq.secondary_article_lookback_hours,key.eq.dedup_historical_lookback_days,key.eq.dedup_strictness_threshold')
+      .or('key.like.email_%,key.like.criteria_%,key.eq.max_top_articles,key.eq.max_bottom_articles,key.eq.max_secondary_articles,key.eq.primary_article_lookback_hours,key.eq.secondary_article_lookback_hours,key.eq.dedup_historical_lookback_days,key.eq.dedup_strictness_threshold')
 
     if (error) {
       console.error('BACKEND GET: Database error:', error)

@@ -1413,7 +1413,8 @@ function SortableArticle({
                 {criteriaConfig.map((criterion, index) => {
                   const criterionNum = index + 1
                   const score = article.rss_post.post_rating[0][`criteria_${criterionNum}_score` as keyof typeof article.rss_post.post_rating[0]]
-                  const weight = criterion.weight
+                  const storedWeight = article.rss_post.post_rating[0][`criteria_${criterionNum}_weight` as keyof typeof article.rss_post.post_rating[0]]
+                  const weight = typeof storedWeight === 'number' ? storedWeight : criterion.weight
                   const rawScore = typeof score === 'number' ? score : 0
                   const weightedScore = (rawScore * weight).toFixed(1)
 
