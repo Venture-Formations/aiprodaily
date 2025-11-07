@@ -2278,8 +2278,16 @@ function AIPromptsSettings() {
 
   // Helper function to format JSON with actual newlines
   const formatJSON = (value: any, prettyPrint: boolean): string => {
-    if (typeof value !== 'object') return value
+    // Handle plain string values
+    if (typeof value !== 'object') {
+      if (prettyPrint && typeof value === 'string') {
+        // Convert literal \n sequences to actual newlines
+        return value.replace(/\\n/g, '\n')
+      }
+      return value
+    }
 
+    // Handle object values (JSON)
     const jsonStr = prettyPrint ? JSON.stringify(value, null, 2) : JSON.stringify(value)
 
     // If pretty-print is enabled, convert escaped \n to actual newlines
