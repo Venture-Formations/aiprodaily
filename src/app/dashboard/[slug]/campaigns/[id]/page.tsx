@@ -1409,7 +1409,7 @@ function SortableArticle({
           {article.rss_post?.post_rating?.[0] && criteriaConfig.length > 0 && (
             <div className="mt-3">
               <div className="text-xs font-medium text-gray-700 mb-2">Criteria Scores:</div>
-              <div className={`grid grid-cols-${Math.min(criteriaConfig.length, 3)} gap-3 text-xs`}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 text-xs">
                 {criteriaConfig.map((criterion, index) => {
                   const criterionNum = index + 1
                   const score = article.rss_post.post_rating[0][`criteria_${criterionNum}_score` as keyof typeof article.rss_post.post_rating[0]]
