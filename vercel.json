@@ -47,6 +47,10 @@
     {
       "path": "/api/cron/cleanup-pending-submissions",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/monitor-workflows",
+      "schedule": "*/5 * * * *"
     }
   ],
   "functions": {
