@@ -1483,6 +1483,7 @@ export default function CampaignDetailPage() {
 
   // Criteria and article limits state
   const [criteriaConfig, setCriteriaConfig] = useState<Array<{name: string, weight: number}>>([])
+  const [secondaryCriteriaConfig, setSecondaryCriteriaConfig] = useState<Array<{name: string, weight: number}>>([])
   const [maxTopArticles, setMaxTopArticles] = useState(3)
   const [maxBottomArticles, setMaxBottomArticles] = useState(3)
   const [maxSecondaryArticles, setMaxSecondaryArticles] = useState(3)
@@ -1577,23 +1578,49 @@ export default function CampaignDetailPage() {
       if (response.ok) {
         const data = await response.json()
 
-        // Get enabled criteria count
-        const enabledCountSetting = data.settings.find((s: any) => s.key === 'criteria_enabled_count')
-        const enabledCount = enabledCountSetting?.value ? parseInt(enabledCountSetting.value) : 3
+        // Get enabled criteria counts for primary and secondary
+        const primaryEnabledCountSetting = data.settings.find((s: any) => s.key === 'primary_criteria_enabled_count')
+        const secondaryEnabledCountSetting = data.settings.find((s: any) => s.key === 'secondary_criteria_enabled_count')
 
-        // Build criteria config array
-        const criteria: Array<{name: string, weight: number}> = []
-        for (let i = 1; i <= enabledCount; i++) {
+        // Fallback to old criteria_enabled_count key if new ones don't exist
+        const fallbackEnabledCountSetting = data.settings.find((s: any) => s.key === 'criteria_enabled_count')
+
+        const primaryEnabledCount = primaryEnabledCountSetting?.value ? parseInt(primaryEnabledCountSetting.value) :
+                                     (fallbackEnabledCountSetting?.value ? parseInt(fallbackEnabledCountSetting.value) : 3)
+        const secondaryEnabledCount = secondaryEnabledCountSetting?.value ? parseInt(secondaryEnabledCountSetting.value) :
+                                       (fallbackEnabledCountSetting?.value ? parseInt(fallbackEnabledCountSetting.value) : 3)
+
+        // Build PRIMARY criteria config array
+        const primaryCriteria: Array<{name: string, weight: number}> = []
+        for (let i = 1; i <= primaryEnabledCount; i++) {
           const nameSetting = data.settings.find((s: any) => s.key === `criteria_${i}_name`)
           const weightSetting = data.settings.find((s: any) => s.key === `criteria_${i}_weight`)
 
-          criteria.push({
+          primaryCriteria.push({
             name: nameSetting?.value || `Criteria ${i}`,
             weight: weightSetting?.value ? parseFloat(weightSetting.value) : 1.0
           })
         }
 
-        setCriteriaConfig(criteria)
+        // Build SECONDARY criteria config array
+        const secondaryCriteria: Array<{name: string, weight: number}> = []
+        for (let i = 1; i <= secondaryEnabledCount; i++) {
+          const nameSetting = data.settings.find((s: any) => s.key === `secondary_criteria_${i}_name`)
+          const weightSetting = data.settings.find((s: any) => s.key === `secondary_criteria_${i}_weight`)
+
+          // Fallback to primary criteria names/weights if secondary not set
+          const fallbackNameSetting = data.settings.find((s: any) => s.key === `criteria_${i}_name`)
+          const fallbackWeightSetting = data.settings.find((s: any) => s.key === `criteria_${i}_weight`)
+
+          secondaryCriteria.push({
+            name: nameSetting?.value || fallbackNameSetting?.value || `Criteria ${i}`,
+            weight: weightSetting?.value ? parseFloat(weightSetting.value) :
+                    (fallbackWeightSetting?.value ? parseFloat(fallbackWeightSetting.value) : 1.0)
+          })
+        }
+
+        setCriteriaConfig(primaryCriteria)
+        setSecondaryCriteriaConfig(secondaryCriteria)
 
         // Get max articles settings
         const maxTopSetting = data.settings.find((s: any) => s.key === 'max_top_articles')
@@ -2669,7 +2696,7 @@ export default function CampaignDetailPage() {
                         skipArticle={skipSecondaryArticle}
                         saving={saving}
                         getScoreColor={getScoreColor}
-                        criteriaConfig={criteriaConfig}
+                        criteriaConfig={secondaryCriteriaConfig}
                         maxTopArticles={maxSecondaryArticles || 3}
                       />
                     ))}
