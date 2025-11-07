@@ -23,41 +23,86 @@ export async function processRSSWorkflow(input: {
 }) {
   "use workflow"
 
-  let campaignId: string
+  let campaignId: string | undefined
 
-  console.log(`[Workflow] Starting for newsletter: ${input.newsletter_id}`)
+  try {
+    console.log(`[Workflow] Starting for newsletter: ${input.newsletter_id}`)
 
-  // STEP 1: Setup - Create campaign, assign posts, deduplicate
-  campaignId = await setupCampaign(input.newsletter_id)
+    // STEP 1: Setup - Create campaign, assign posts, deduplicate
+    const createdCampaignId = await setupCampaign(input.newsletter_id)
+    campaignId = createdCampaignId
 
-  // PRIMARY SECTION
-  // STEP 2: Generate all 6 primary titles (fast, batched)
-  await generatePrimaryTitles(campaignId)
+    // PRIMARY SECTION
+    // STEP 2: Generate all 6 primary titles (fast, batched)
+    await generatePrimaryTitles(createdCampaignId)
 
-  // STEP 3-4: Generate primary bodies in 2 batches (3 articles each)
-  await generatePrimaryBodiesBatch1(campaignId)
-  await generatePrimaryBodiesBatch2(campaignId)
+    // STEP 3-4: Generate primary bodies in 2 batches (3 articles each)
+    await generatePrimaryBodiesBatch1(createdCampaignId)
+    await generatePrimaryBodiesBatch2(createdCampaignId)
 
-  // STEP 5: Fact-check all primary articles
-  await factCheckPrimary(campaignId)
+    // STEP 5: Fact-check all primary articles
+    await factCheckPrimary(createdCampaignId)
 
-  // SECONDARY SECTION
-  // STEP 6: Generate all 6 secondary titles (fast, batched)
-  await generateSecondaryTitles(campaignId)
+    // SECONDARY SECTION
+    // STEP 6: Generate all 6 secondary titles (fast, batched)
+    await generateSecondaryTitles(createdCampaignId)
 
-  // STEP 7-8: Generate secondary bodies in 2 batches (3 articles each)
-  await generateSecondaryBodiesBatch1(campaignId)
-  await generateSecondaryBodiesBatch2(campaignId)
+    // STEP 7-8: Generate secondary bodies in 2 batches (3 articles each)
+    await generateSecondaryBodiesBatch1(createdCampaignId)
+    await generateSecondaryBodiesBatch2(createdCampaignId)
 
-  // STEP 9: Fact-check all secondary articles
-  await factCheckSecondary(campaignId)
+    // STEP 9: Fact-check all secondary articles
+    await factCheckSecondary(createdCampaignId)
 
-  // STEP 10: Finalize
-  await finalizeCampaign(campaignId)
+    // STEP 10: Finalize
+    await finalizeCampaign(createdCampaignId)
 
-  console.log('=== WORKFLOW COMPLETE ===')
+    console.log('=== WORKFLOW COMPLETE ===')
 
-  return { campaignId, success: true }
+    return { campaignId, success: true }
+
+  } catch (error) {
+    console.error('[Workflow] FATAL ERROR after retries:', error)
+
+    // Send Slack notification for workflow failure
+    try {
+      const { SlackNotificationService } = await import('@/lib/slack')
+      const slack = new SlackNotificationService()
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      const errorStack = error instanceof Error ? error.stack : undefined
+
+      await slack.sendAlert(
+        `🚨 RSS Workflow Failed After Retries\n\n` +
+        `Campaign ID: ${campaignId || 'unknown'}\n` +
+        `Newsletter ID: ${input.newsletter_id}\n` +
+        `Trigger: ${input.trigger}\n` +
+        `Error: ${errorMessage}\n\n` +
+        `${errorStack ? `Stack: ${errorStack.substring(0, 500)}` : ''}`,
+        'error',
+        'workflow_failure'
+      )
+    } catch (slackError) {
+      console.error('[Workflow] Failed to send Slack notification:', slackError)
+    }
+
+    // Mark campaign as failed
+    if (campaignId) {
+      try {
+        await supabaseAdmin
+          .from('newsletter_campaigns')
+          .update({
+            status: 'failed',
+            workflow_error: error instanceof Error ? error.message : 'Unknown error'
+          })
+          .eq('id', campaignId)
+      } catch (updateError) {
+        console.error('[Workflow] Failed to update campaign status:', updateError)
+      }
+    }
+
+    throw error // Re-throw so Vercel Workflow Engine marks it as failed
+  }
 }
 
 // Step functions with retry logic
