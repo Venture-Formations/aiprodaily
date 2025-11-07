@@ -10,10 +10,25 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Get user's newsletter_id (use first active newsletter)
+    const { data: newsletter } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (!newsletter) {
+      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    }
+
+    const newsletterId = newsletter.id
+
     // Get current Slack settings from database
     const { data: settings } = await supabaseAdmin
       .from('app_settings')
       .select('key, value')
+      .eq('newsletter_id', newsletterId)
       .like('key', 'slack_%_enabled')
 
     const slackSettings: any = {
@@ -60,6 +75,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Get user's newsletter_id (use first active newsletter)
+    const { data: newsletter } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (!newsletter) {
+      console.log('[API /settings/slack] No active newsletter found')
+      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    }
+
+    const newsletterId = newsletter.id
+    console.log('[API /settings/slack] Newsletter ID:', newsletterId)
+
     const body = await request.json()
     console.log('[API /settings/slack] Request body:', body)
 
@@ -86,14 +117,19 @@ export async function POST(request: NextRequest) {
         .from('app_settings')
         .select('key')
         .eq('key', setting.key)
+        .eq('newsletter_id', newsletterId)
         .single()
 
       if (existing) {
         // Update existing setting
         const { error } = await supabaseAdmin
           .from('app_settings')
-          .update({ value: setting.value })
+          .update({
+            value: setting.value,
+            updated_at: new Date().toISOString()
+          })
           .eq('key', setting.key)
+          .eq('newsletter_id', newsletterId)
 
         if (error) {
           console.error('[API /settings/slack] Update error for', setting.key, ':', error)
@@ -104,7 +140,12 @@ export async function POST(request: NextRequest) {
         // Insert new setting
         const { error } = await supabaseAdmin
           .from('app_settings')
-          .insert(setting)
+          .insert({
+            key: setting.key,
+            value: setting.value,
+            newsletter_id: newsletterId,
+            description: `Slack notification setting: ${setting.key}`
+          })
 
         if (error) {
           console.error('[API /settings/slack] Insert error for', setting.key, ':', error)
