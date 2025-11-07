@@ -3034,9 +3034,7 @@ function AIPromptsSettings() {
                   </label>
                 </div>
                 <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
-                  {typeof prompt.value === 'object'
-                    ? formatJSON(prompt.value, prettyPrint)
-                    : prompt.value}
+                  {formatJSON(prompt.value, prettyPrint)}
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                   <div className="flex items-center space-x-3">
@@ -3354,9 +3352,7 @@ function AIPromptsSettings() {
                           </label>
                         </div>
                         <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
-                          {typeof prompt.value === 'object'
-                            ? formatJSON(prompt.value, prettyPrint)
-                            : prompt.value}
+                          {formatJSON(prompt.value, prettyPrint)}
                         </div>
                         <div className="mt-3 flex items-center justify-between">
                           <div className="flex items-center space-x-3">
@@ -3667,9 +3663,7 @@ function AIPromptsSettings() {
                           </label>
                         </div>
                         <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
-                          {typeof prompt.value === 'object'
-                            ? formatJSON(prompt.value, prettyPrint)
-                            : prompt.value}
+                          {formatJSON(prompt.value, prettyPrint)}
                         </div>
                         <div className="mt-3 flex items-center justify-between">
                           <div className="flex items-center space-x-3">
@@ -3785,9 +3779,7 @@ function AIPromptsSettings() {
                             </label>
                           </div>
                           <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
-                            {typeof prompt.value === 'object'
-                              ? formatJSON(prompt.value, prettyPrint)
-                              : prompt.value}
+                            {formatJSON(prompt.value, prettyPrint)}
                           </div>
                           <div className="mt-3 flex items-center justify-between">
                             <div className="flex items-center space-x-3">
@@ -3960,9 +3952,7 @@ function AIPromptsSettings() {
                             </label>
                           </div>
                           <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
-                            {typeof prompt.value === 'object'
-                              ? formatJSON(prompt.value, prettyPrint)
-                              : prompt.value}
+                            {formatJSON(prompt.value, prettyPrint)}
                           </div>
                           <div className="mt-3 flex items-center justify-between">
                             <div className="flex items-center space-x-3">
