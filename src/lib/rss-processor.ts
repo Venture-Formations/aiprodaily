@@ -117,7 +117,7 @@ export class RSSProcessor {
       for (let j = 0; j < batch.length; j++) {
         const post = batch[j]
         try {
-          const evaluation = await this.evaluatePost(post, newsletterId)
+          const evaluation = await this.evaluatePost(post, newsletterId, section)
 
           if (typeof evaluation.interest_level !== 'number' ||
               typeof evaluation.local_relevance !== 'number' ||
@@ -1610,7 +1610,7 @@ export class RSSProcessor {
       // Process batch concurrently
       const batchPromises = batch.map(async (post, index) => {
         try {
-          const evaluation = await this.evaluatePost(post, newsletterId)
+          const evaluation = await this.evaluatePost(post, newsletterId, section)
 
           // Basic validation: ensure scores exist and are numbers
           if (typeof evaluation.interest_level !== 'number' ||
@@ -1680,17 +1680,20 @@ export class RSSProcessor {
     await this.generateNewsletterArticles(campaignId, section)
   }
 
-  private async evaluatePost(post: RssPost, newsletterId: string): Promise<ContentEvaluation> {
-    // Fetch enabled criteria configuration from database
+  private async evaluatePost(post: RssPost, newsletterId: string, section: 'primary' | 'secondary' = 'primary'): Promise<ContentEvaluation> {
+    // Fetch enabled criteria configuration from database (section-specific)
+    const enabledCountKey = section === 'primary' ? 'primary_criteria_enabled_count' : 'secondary_criteria_enabled_count'
+    const criteriaPrefix = section === 'primary' ? 'criteria_' : 'secondary_criteria_'
+
     const { data: criteriaConfig, error: configError } = await supabaseAdmin
       .from('app_settings')
       .select('key, value')
       .eq('newsletter_id', newsletterId)
-      .or('key.eq.criteria_enabled_count,key.like.criteria_%_name,key.like.criteria_%_weight')
+      .or(`key.eq.${enabledCountKey},key.eq.criteria_enabled_count,key.like.${criteriaPrefix}%_name,key.like.${criteriaPrefix}%_weight,key.like.criteria_%_name,key.like.criteria_%_weight`)
 
     if (configError) {
-      const errorMsg = configError instanceof Error 
-        ? configError.message 
+      const errorMsg = configError instanceof Error
+        ? configError.message
         : typeof configError === 'object' && configError !== null
           ? JSON.stringify(configError, null, 2)
           : String(configError)
@@ -1698,15 +1701,19 @@ export class RSSProcessor {
       throw new Error('Failed to fetch criteria configuration')
     }
 
-    // Parse criteria configuration
-    const enabledCountSetting = criteriaConfig?.find(s => s.key === 'criteria_enabled_count')
+    // Parse criteria configuration (try section-specific first, fallback to primary)
+    const enabledCountSetting = criteriaConfig?.find(s => s.key === enabledCountKey) ||
+                                 criteriaConfig?.find(s => s.key === 'criteria_enabled_count')
     const enabledCount = enabledCountSetting?.value ? parseInt(enabledCountSetting.value) : 3
 
     // Collect enabled criteria with their weights
     const criteria: Array<{ number: number; name: string; weight: number }> = []
     for (let i = 1; i <= enabledCount; i++) {
-      const nameSetting = criteriaConfig?.find(s => s.key === `criteria_${i}_name`)
-      const weightSetting = criteriaConfig?.find(s => s.key === `criteria_${i}_weight`)
+      // Try section-specific keys first, then fallback to primary keys
+      const nameSetting = criteriaConfig?.find(s => s.key === `${criteriaPrefix}${i}_name`) ||
+                         criteriaConfig?.find(s => s.key === `criteria_${i}_name`)
+      const weightSetting = criteriaConfig?.find(s => s.key === `${criteriaPrefix}${i}_weight`) ||
+                           criteriaConfig?.find(s => s.key === `criteria_${i}_weight`)
 
       criteria.push({
         number: i,
