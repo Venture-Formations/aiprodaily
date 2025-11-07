@@ -79,15 +79,38 @@ export async function POST(request: NextRequest) {
 
     console.log('[API /settings/slack] Upserting settings:', dbSettings.length, 'records')
 
-    // Upsert all settings
+    // Update or insert each setting
     for (const setting of dbSettings) {
-      const { error } = await supabaseAdmin
+      // Check if setting exists
+      const { data: existing } = await supabaseAdmin
         .from('app_settings')
-        .upsert(setting, { onConflict: 'key' })
+        .select('key')
+        .eq('key', setting.key)
+        .single()
 
-      if (error) {
-        console.error('[API /settings/slack] Upsert error for', setting.key, ':', error)
-        throw error
+      if (existing) {
+        // Update existing setting
+        const { error } = await supabaseAdmin
+          .from('app_settings')
+          .update({ value: setting.value })
+          .eq('key', setting.key)
+
+        if (error) {
+          console.error('[API /settings/slack] Update error for', setting.key, ':', error)
+          throw error
+        }
+        console.log('[API /settings/slack] Updated:', setting.key, '=', setting.value)
+      } else {
+        // Insert new setting
+        const { error } = await supabaseAdmin
+          .from('app_settings')
+          .insert(setting)
+
+        if (error) {
+          console.error('[API /settings/slack] Insert error for', setting.key, ':', error)
+          throw error
+        }
+        console.log('[API /settings/slack] Inserted:', setting.key, '=', setting.value)
       }
     }
 
