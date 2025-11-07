@@ -954,16 +954,67 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
     status: ad.status
   })
   const [submitting, setSubmitting] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [crop, setCrop] = useState<Crop>()
+  const [completedCrop, setCompletedCrop] = useState<PixelCrop>()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const imgRef = useRef<HTMLImageElement>(null)
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader()
+      reader.onload = () => {
+        setSelectedImage(reader.result as string)
+        // Set initial crop to show crop box immediately (16:9 aspect ratio, centered)
+        setCrop({
+          unit: '%',
+          x: 10,
+          y: 10,
+          width: 80,
+          height: 45 // 80 * (9/16) = 45 to maintain 16:9 aspect ratio
+        })
+      }
+      reader.readAsDataURL(file)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
 
     try {
+      let imageUrl = ad.image_url // Keep existing image URL by default
+
+      // Upload new image if one was selected
+      if (selectedImage && completedCrop && completedCrop.width > 0 && completedCrop.height > 0) {
+        const croppedBlob = await getCroppedImage(imgRef.current, completedCrop)
+        if (croppedBlob) {
+          const imageFormData = new FormData()
+          imageFormData.append('image', croppedBlob, 'ad-image.jpg')
+
+          const uploadResponse = await fetch('/api/ads/upload-image', {
+            method: 'POST',
+            body: imageFormData
+          })
+
+          if (uploadResponse.ok) {
+            const { url } = await uploadResponse.json()
+            imageUrl = url
+          } else {
+            const errorData = await uploadResponse.json().catch(() => ({ error: 'Unknown error' }))
+            throw new Error(errorData.error || 'Failed to upload image')
+          }
+        }
+      }
+
       const response = await fetch(`/api/ads/${ad.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          ...formData,
+          image_url: imageUrl
+        })
       })
 
       if (response.ok) {
@@ -974,7 +1025,7 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
       }
     } catch (error) {
       console.error('Update error:', error)
-      alert('Failed to update advertisement')
+      alert(error instanceof Error ? error.message : 'Failed to update advertisement')
     } finally {
       setSubmitting(false)
     }
@@ -1018,6 +1069,89 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
               maxWords={100}
             />
           </div>
+
+          {/* Current Image Display */}
+          {ad.image_url && !selectedImage && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Current Image
+              </label>
+              <img
+                src={ad.image_url}
+                alt={ad.title}
+                className="w-full max-w-md h-auto rounded border border-gray-200 mb-2"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+              >
+                Replace Image
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+            </div>
+          )}
+
+          {/* Image Upload (if no current image) */}
+          {!ad.image_url && !selectedImage && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Advertisement Image (Optional)
+              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Upload an image for your ad. It will be cropped to 16:9 ratio.
+              </p>
+            </div>
+          )}
+
+          {/* Image Cropper */}
+          {selectedImage && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Crop New Image (16:9 ratio)
+              </label>
+              <ReactCrop
+                crop={crop}
+                onChange={(c) => setCrop(c)}
+                onComplete={(c) => setCompletedCrop(c)}
+                aspect={16 / 9}
+              >
+                <img
+                  ref={imgRef}
+                  src={selectedImage}
+                  alt="Crop preview"
+                  style={{ maxWidth: '100%' }}
+                />
+              </ReactCrop>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedImage(null)
+                  setCrop(undefined)
+                  setCompletedCrop(undefined)
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = ''
+                  }
+                }}
+                className="mt-2 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 text-sm"
+              >
+                Cancel Image Change
+              </button>
+            </div>
+          )}
 
           {/* Status Toggle */}
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
