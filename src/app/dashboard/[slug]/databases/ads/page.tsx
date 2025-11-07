@@ -415,13 +415,6 @@ export default function AdsManagementPage() {
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex-1 flex items-center gap-4">
-                      {ad.image_url && (
-                        <img
-                          src={ad.image_url}
-                          alt={ad.title}
-                          className="w-20 h-20 object-cover rounded border border-gray-200 flex-shrink-0"
-                        />
-                      )}
                       <div className="flex items-center gap-2">
                         <span className="text-2xl font-bold text-gray-400">☰</span>
                         <input
@@ -449,19 +442,28 @@ export default function AdsManagementPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setEditingAd(ad)}
-                        className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(ad.id)}
-                        className="bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-700 text-sm"
-                      >
-                        Delete
-                      </button>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEditingAd(ad)}
+                          className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(ad.id)}
+                          className="bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-700 text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                      {ad.image_url && (
+                        <img
+                          src={ad.image_url}
+                          alt={ad.title}
+                          className="w-[284px] h-40 object-cover rounded border border-gray-200"
+                        />
+                      )}
                     </div>
                   </div>
 
@@ -505,43 +507,43 @@ export default function AdsManagementPage() {
               ads.map(ad => (
                 <div key={ad.id} className="bg-white rounded-lg shadow p-6">
                   <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1 flex items-center gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-xl font-semibold">{ad.title}</h3>
+                        {getStatusBadge(ad.status)}
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        Submitted {new Date(ad.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleApprove(ad.id)}
+                          className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleReject(ad.id)}
+                          className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm"
+                        >
+                          Reject
+                        </button>
+                        <button
+                          onClick={() => setEditingAd(ad)}
+                          className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"
+                        >
+                          Edit
+                        </button>
+                      </div>
                       {ad.image_url && (
                         <img
                           src={ad.image_url}
                           alt={ad.title}
-                          className="w-20 h-20 object-cover rounded border border-gray-200 flex-shrink-0"
+                          className="w-[284px] h-40 object-cover rounded border border-gray-200"
                         />
                       )}
-                      <div>
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-xl font-semibold">{ad.title}</h3>
-                          {getStatusBadge(ad.status)}
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          Submitted {new Date(ad.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleApprove(ad.id)}
-                        className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => handleReject(ad.id)}
-                        className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm"
-                      >
-                        Reject
-                      </button>
-                      <button
-                        onClick={() => setEditingAd(ad)}
-                        className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"
-                      >
-                        Edit
-                      </button>
                     </div>
                   </div>
 
@@ -585,48 +587,48 @@ export default function AdsManagementPage() {
               ads.map(ad => (
                 <div key={ad.id} className="bg-white rounded-lg shadow p-6">
                   <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1 flex items-center gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-xl font-semibold">{ad.title}</h3>
+                        {getStatusBadge(ad.status)}
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        {ad.times_used} times used
+                      </p>
+                      {ad.status === 'rejected' && ad.rejection_reason && (
+                        <p className="text-sm text-red-600 mt-2">
+                          <strong>Rejection reason:</strong> {ad.rejection_reason}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleActivate(ad.id)}
+                          className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"
+                        >
+                          Activate
+                        </button>
+                        <button
+                          onClick={() => setEditingAd(ad)}
+                          className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(ad.id)}
+                          className="bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-700 text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
                       {ad.image_url && (
                         <img
                           src={ad.image_url}
                           alt={ad.title}
-                          className="w-20 h-20 object-cover rounded border border-gray-200 flex-shrink-0"
+                          className="w-[284px] h-40 object-cover rounded border border-gray-200"
                         />
                       )}
-                      <div>
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-xl font-semibold">{ad.title}</h3>
-                          {getStatusBadge(ad.status)}
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          {ad.times_used} times used
-                        </p>
-                        {ad.status === 'rejected' && ad.rejection_reason && (
-                          <p className="text-sm text-red-600 mt-2">
-                            <strong>Rejection reason:</strong> {ad.rejection_reason}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleActivate(ad.id)}
-                        className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"
-                      >
-                        Activate
-                      </button>
-                      <button
-                        onClick={() => setEditingAd(ad)}
-                        className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(ad.id)}
-                        className="bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-700 text-sm"
-                      >
-                        Delete
-                      </button>
                     </div>
                   </div>
 
