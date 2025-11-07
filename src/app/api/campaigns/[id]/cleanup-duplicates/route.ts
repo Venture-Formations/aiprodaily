@@ -12,8 +12,11 @@ interface RouteParams {
 /**
  * Cleanup Duplicate Articles
  *
- * Removes duplicate articles from a campaign, keeping only the best 6 per section
- * based on fact_check_score (or creation date if no scores exist)
+ * Removes duplicate articles from a campaign:
+ * 1. Identifies articles with the same post_id (true duplicates)
+ * 2. Keeps the first occurrence (highest fact_check_score, earliest created_at)
+ * 3. Deletes subsequent duplicates
+ * 4. If more than 6 unique articles remain, trims to top 6
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
@@ -44,40 +47,115 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     let deletedPrimary = 0
     let deletedSecondary = 0
+    const duplicatesFound: { primary: string[], secondary: string[] } = { primary: [], secondary: [] }
 
-    // Keep only top 6 primary articles
-    if (primaryArticles && primaryArticles.length > 6) {
-      const toDelete = primaryArticles.slice(6) // Everything after the first 6
-      const deleteIds = toDelete.map(a => a.id)
+    // Remove duplicate PRIMARY articles (same post_id)
+    if (primaryArticles && primaryArticles.length > 0) {
+      const seenPostIds = new Set<string>()
+      const toDelete: string[] = []
 
-      const { error: deleteError } = await supabaseAdmin
-        .from('articles')
-        .delete()
-        .in('id', deleteIds)
+      for (const article of primaryArticles) {
+        if (seenPostIds.has(article.post_id)) {
+          // This is a duplicate - mark for deletion
+          toDelete.push(article.id)
+          duplicatesFound.primary.push(article.post_id)
+          console.log(`[Cleanup] Found duplicate primary article: ${article.id} (post_id: ${article.post_id})`)
+        } else {
+          // First occurrence - keep it
+          seenPostIds.add(article.post_id)
+        }
+      }
 
-      if (deleteError) {
-        console.error('[Cleanup] Error deleting primary articles:', deleteError)
-      } else {
-        deletedPrimary = deleteIds.length
-        console.log(`[Cleanup] Deleted ${deletedPrimary} duplicate primary articles`)
+      if (toDelete.length > 0) {
+        const { error: deleteError } = await supabaseAdmin
+          .from('articles')
+          .delete()
+          .in('id', toDelete)
+
+        if (deleteError) {
+          console.error('[Cleanup] Error deleting primary articles:', deleteError)
+        } else {
+          deletedPrimary = toDelete.length
+          console.log(`[Cleanup] Deleted ${deletedPrimary} duplicate primary articles`)
+        }
+      }
+
+      // After removing duplicates, check if we still have more than 6 and trim
+      const remaining = primaryArticles.length - deletedPrimary
+      if (remaining > 6) {
+        const keepCount = 6
+        const trimCount = remaining - keepCount
+
+        // Get articles to trim (lowest scores, keeping unique post_ids)
+        const keptArticles = primaryArticles.filter(a => !toDelete.includes(a.id))
+        const toTrim = keptArticles.slice(keepCount).map(a => a.id)
+
+        if (toTrim.length > 0) {
+          const { error: trimError } = await supabaseAdmin
+            .from('articles')
+            .delete()
+            .in('id', toTrim)
+
+          if (!trimError) {
+            deletedPrimary += toTrim.length
+            console.log(`[Cleanup] Trimmed ${toTrim.length} extra primary articles`)
+          }
+        }
       }
     }
 
-    // Keep only top 6 secondary articles
-    if (secondaryArticles && secondaryArticles.length > 6) {
-      const toDelete = secondaryArticles.slice(6) // Everything after the first 6
-      const deleteIds = toDelete.map(a => a.id)
+    // Remove duplicate SECONDARY articles (same post_id)
+    if (secondaryArticles && secondaryArticles.length > 0) {
+      const seenPostIds = new Set<string>()
+      const toDelete: string[] = []
 
-      const { error: deleteError } = await supabaseAdmin
-        .from('secondary_articles')
-        .delete()
-        .in('id', deleteIds)
+      for (const article of secondaryArticles) {
+        if (seenPostIds.has(article.post_id)) {
+          // This is a duplicate - mark for deletion
+          toDelete.push(article.id)
+          duplicatesFound.secondary.push(article.post_id)
+          console.log(`[Cleanup] Found duplicate secondary article: ${article.id} (post_id: ${article.post_id})`)
+        } else {
+          // First occurrence - keep it
+          seenPostIds.add(article.post_id)
+        }
+      }
 
-      if (deleteError) {
-        console.error('[Cleanup] Error deleting secondary articles:', deleteError)
-      } else {
-        deletedSecondary = deleteIds.length
-        console.log(`[Cleanup] Deleted ${deletedSecondary} duplicate secondary articles`)
+      if (toDelete.length > 0) {
+        const { error: deleteError } = await supabaseAdmin
+          .from('secondary_articles')
+          .delete()
+          .in('id', toDelete)
+
+        if (deleteError) {
+          console.error('[Cleanup] Error deleting secondary articles:', deleteError)
+        } else {
+          deletedSecondary = toDelete.length
+          console.log(`[Cleanup] Deleted ${deletedSecondary} duplicate secondary articles`)
+        }
+      }
+
+      // After removing duplicates, check if we still have more than 6 and trim
+      const remaining = secondaryArticles.length - deletedSecondary
+      if (remaining > 6) {
+        const keepCount = 6
+        const trimCount = remaining - keepCount
+
+        // Get articles to trim (lowest scores, keeping unique post_ids)
+        const keptArticles = secondaryArticles.filter(a => !toDelete.includes(a.id))
+        const toTrim = keptArticles.slice(keepCount).map(a => a.id)
+
+        if (toTrim.length > 0) {
+          const { error: trimError } = await supabaseAdmin
+            .from('secondary_articles')
+            .delete()
+            .in('id', toTrim)
+
+          if (!trimError) {
+            deletedSecondary += toTrim.length
+            console.log(`[Cleanup] Trimmed ${toTrim.length} extra secondary articles`)
+          }
+        }
       }
     }
 
@@ -108,6 +186,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       success: true,
       deletedPrimary,
       deletedSecondary,
+      duplicatesFound: {
+        primaryCount: duplicatesFound.primary.length,
+        secondaryCount: duplicatesFound.secondary.length,
+        primaryPostIds: Array.from(new Set(duplicatesFound.primary)),
+        secondaryPostIds: Array.from(new Set(duplicatesFound.secondary))
+      },
       remainingPrimary: (primaryArticles?.length || 0) - deletedPrimary,
       remainingSecondary: (secondaryArticles?.length || 0) - deletedSecondary,
       message: `Cleaned up ${deletedPrimary} primary and ${deletedSecondary} secondary duplicate articles`
