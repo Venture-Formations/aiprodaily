@@ -259,13 +259,18 @@ export class RSSProcessor {
 
       await Promise.all(batch.map(async (post) => {
         try {
-          // Check if article already exists
-          const { data: existing } = await supabaseAdmin
+          // Check if article already exists (use maybeSingle to avoid error on 0 results)
+          const { data: existing, error: checkError } = await supabaseAdmin
             .from(tableName)
             .select('id')
             .eq('post_id', post.id)
             .eq('campaign_id', campaignId)
-            .single()
+            .maybeSingle()
+
+          if (checkError) {
+            console.error(`[Titles] Error checking for existing article:`, checkError.message)
+            return
+          }
 
           if (existing) {
             console.log(`[Titles] Article already exists for post ${post.id}`)
@@ -310,6 +315,11 @@ export class RSSProcessor {
             }])
 
           if (insertError) {
+            // Check if it's a duplicate key error (race condition)
+            if (insertError.code === '23505') {
+              console.log(`[Titles] Article already created by parallel process for post ${post.id}`)
+              return
+            }
             console.error(`[Titles] Database insert failed for post ${post.id}:`, insertError.message)
             throw insertError
           }
