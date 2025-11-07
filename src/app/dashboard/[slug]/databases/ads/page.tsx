@@ -442,36 +442,36 @@ export default function AdsManagementPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setEditingAd(ad)}
-                          className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(ad.id)}
-                          className="bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-700 text-sm"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                      {ad.image_url && (
-                        <img
-                          src={ad.image_url}
-                          alt={ad.title}
-                          className="w-[284px] h-40 object-cover rounded border border-gray-200"
-                        />
-                      )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setEditingAd(ad)}
+                        className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(ad.id)}
+                        className="bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-700 text-sm"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
 
-                  <div className="mb-4">
-                    <div
-                      className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer"
-                      dangerouslySetInnerHTML={{ __html: ad.body }}
-                    />
+                  <div className="mb-4 flex gap-4">
+                    <div className="flex-1">
+                      <div
+                        className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer"
+                        dangerouslySetInnerHTML={{ __html: ad.body }}
+                      />
+                    </div>
+                    {ad.image_url && (
+                      <img
+                        src={ad.image_url}
+                        alt={ad.title}
+                        className="w-[284px] h-40 object-cover rounded border border-gray-200 flex-shrink-0"
+                      />
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t text-sm">
@@ -516,42 +516,42 @@ export default function AdsManagementPage() {
                         Submitted {new Date(ad.created_at).toLocaleDateString()}
                       </p>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleApprove(ad.id)}
-                          className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => handleReject(ad.id)}
-                          className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm"
-                        >
-                          Reject
-                        </button>
-                        <button
-                          onClick={() => setEditingAd(ad)}
-                          className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"
-                        >
-                          Edit
-                        </button>
-                      </div>
-                      {ad.image_url && (
-                        <img
-                          src={ad.image_url}
-                          alt={ad.title}
-                          className="w-[284px] h-40 object-cover rounded border border-gray-200"
-                        />
-                      )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleApprove(ad.id)}
+                        className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleReject(ad.id)}
+                        className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => setEditingAd(ad)}
+                        className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"
+                      >
+                        Edit
+                      </button>
                     </div>
                   </div>
 
-                  <div className="mb-4">
-                    <div
-                      className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer"
-                      dangerouslySetInnerHTML={{ __html: ad.body }}
-                    />
+                  <div className="mb-4 flex gap-4">
+                    <div className="flex-1">
+                      <div
+                        className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer"
+                        dangerouslySetInnerHTML={{ __html: ad.body }}
+                      />
+                    </div>
+                    {ad.image_url && (
+                      <img
+                        src={ad.image_url}
+                        alt={ad.title}
+                        className="w-[284px] h-40 object-cover rounded border border-gray-200 flex-shrink-0"
+                      />
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t text-sm">
@@ -601,42 +601,42 @@ export default function AdsManagementPage() {
                         </p>
                       )}
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleActivate(ad.id)}
-                          className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"
-                        >
-                          Activate
-                        </button>
-                        <button
-                          onClick={() => setEditingAd(ad)}
-                          className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(ad.id)}
-                          className="bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-700 text-sm"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                      {ad.image_url && (
-                        <img
-                          src={ad.image_url}
-                          alt={ad.title}
-                          className="w-[284px] h-40 object-cover rounded border border-gray-200"
-                        />
-                      )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleActivate(ad.id)}
+                        className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"
+                      >
+                        Activate
+                      </button>
+                      <button
+                        onClick={() => setEditingAd(ad)}
+                        className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(ad.id)}
+                        className="bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-700 text-sm"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
 
-                  <div className="mb-4">
-                    <div
-                      className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer"
-                      dangerouslySetInnerHTML={{ __html: ad.body }}
-                    />
+                  <div className="mb-4 flex gap-4">
+                    <div className="flex-1">
+                      <div
+                        className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer"
+                        dangerouslySetInnerHTML={{ __html: ad.body }}
+                      />
+                    </div>
+                    {ad.image_url && (
+                      <img
+                        src={ad.image_url}
+                        alt={ad.title}
+                        className="w-[284px] h-40 object-cover rounded border border-gray-200 flex-shrink-0"
+                      />
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t text-sm">
