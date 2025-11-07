@@ -184,7 +184,7 @@ export default function SubmitAdPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Upload an image to make your ad stand out! It will be cropped to 5:4 ratio.
+                    Upload an image to make your ad stand out! It will be cropped to 16:9 ratio.
                   </p>
                 </div>
 
@@ -192,13 +192,13 @@ export default function SubmitAdPage() {
                 {selectedImage && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Crop Image (5:4 ratio)
+                      Crop Image (16:9 ratio)
                     </label>
                     <ReactCrop
                       crop={crop}
                       onChange={(c) => setCrop(c)}
                       onComplete={(c) => setCompletedCrop(c)}
-                      aspect={5 / 4}
+                      aspect={16 / 9}
                     >
                       <img
                         ref={imgRef}

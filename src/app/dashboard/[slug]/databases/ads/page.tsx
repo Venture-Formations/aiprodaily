@@ -683,13 +683,13 @@ function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
       const reader = new FileReader()
       reader.onload = () => {
         setSelectedImage(reader.result as string)
-        // Set initial crop to show crop box immediately (5:4 aspect ratio, centered)
+        // Set initial crop to show crop box immediately (16:9 aspect ratio, centered)
         setCrop({
           unit: '%',
           x: 10,
           y: 10,
           width: 80,
-          height: 64 // 80 * (4/5) = 64 to maintain 5:4 aspect ratio
+          height: 45 // 80 * (9/16) = 45 to maintain 16:9 aspect ratio
         })
       }
       reader.readAsDataURL(file)
@@ -813,7 +813,7 @@ function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Upload an image for your ad. It will be cropped to 5:4 ratio.
+              Upload an image for your ad. It will be cropped to 16:9 ratio.
             </p>
           </div>
 
@@ -821,13 +821,13 @@ function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
           {selectedImage && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Crop Image (5:4 ratio)
+                Crop Image (16:9 ratio)
               </label>
               <ReactCrop
                 crop={crop}
                 onChange={(c) => setCrop(c)}
                 onComplete={(c) => setCompletedCrop(c)}
-                aspect={5 / 4}
+                aspect={16 / 9}
               >
                 <img
                   ref={imgRef}
