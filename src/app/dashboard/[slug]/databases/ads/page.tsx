@@ -415,6 +415,13 @@ export default function AdsManagementPage() {
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex-1 flex items-center gap-4">
+                      {ad.image_url && (
+                        <img
+                          src={ad.image_url}
+                          alt={ad.title}
+                          className="w-20 h-20 object-cover rounded border border-gray-200 flex-shrink-0"
+                        />
+                      )}
                       <div className="flex items-center gap-2">
                         <span className="text-2xl font-bold text-gray-400">☰</span>
                         <input
@@ -498,14 +505,23 @@ export default function AdsManagementPage() {
               ads.map(ad => (
                 <div key={ad.id} className="bg-white rounded-lg shadow p-6">
                   <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-xl font-semibold">{ad.title}</h3>
-                        {getStatusBadge(ad.status)}
+                    <div className="flex-1 flex items-center gap-4">
+                      {ad.image_url && (
+                        <img
+                          src={ad.image_url}
+                          alt={ad.title}
+                          className="w-20 h-20 object-cover rounded border border-gray-200 flex-shrink-0"
+                        />
+                      )}
+                      <div>
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="text-xl font-semibold">{ad.title}</h3>
+                          {getStatusBadge(ad.status)}
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          Submitted {new Date(ad.created_at).toLocaleDateString()}
+                        </p>
                       </div>
-                      <p className="text-sm text-gray-600">
-                        Submitted {new Date(ad.created_at).toLocaleDateString()}
-                      </p>
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -569,19 +585,28 @@ export default function AdsManagementPage() {
               ads.map(ad => (
                 <div key={ad.id} className="bg-white rounded-lg shadow p-6">
                   <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-xl font-semibold">{ad.title}</h3>
-                        {getStatusBadge(ad.status)}
-                      </div>
-                      <p className="text-sm text-gray-600">
-                        {ad.times_used} times used
-                      </p>
-                      {ad.status === 'rejected' && ad.rejection_reason && (
-                        <p className="text-sm text-red-600 mt-2">
-                          <strong>Rejection reason:</strong> {ad.rejection_reason}
-                        </p>
+                    <div className="flex-1 flex items-center gap-4">
+                      {ad.image_url && (
+                        <img
+                          src={ad.image_url}
+                          alt={ad.title}
+                          className="w-20 h-20 object-cover rounded border border-gray-200 flex-shrink-0"
+                        />
                       )}
+                      <div>
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="text-xl font-semibold">{ad.title}</h3>
+                          {getStatusBadge(ad.status)}
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          {ad.times_used} times used
+                        </p>
+                        {ad.status === 'rejected' && ad.rejection_reason && (
+                          <p className="text-sm text-red-600 mt-2">
+                            <strong>Rejection reason:</strong> {ad.rejection_reason}
+                          </p>
+                        )}
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <button

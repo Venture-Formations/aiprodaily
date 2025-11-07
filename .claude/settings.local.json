@@ -43,7 +43,11 @@
       "Bash(dir /b:*)",
       "Bash(campaign-test.json)",
       "Bash(\"src/app/api/debug/check-sections/route.ts\")",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(npx vercel logs:*)",
+      "Bash(git revert:*)",
+      "Bash(echo:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []
