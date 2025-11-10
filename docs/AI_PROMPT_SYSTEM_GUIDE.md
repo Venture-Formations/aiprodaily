@@ -637,7 +637,7 @@ export const maxDuration = 300 // 5 minutes for testing
 ### Adding a New Plain Text Prompt
 
 ```sql
--- database_migrations/add_content_evaluator_prompt.sql
+-- db/migrations/add_content_evaluator_prompt.sql
 
 INSERT INTO app_settings (key, value, description)
 VALUES (
@@ -662,14 +662,14 @@ SET
   updated_at = NOW();
 ```
 
-**Run with**: `psql -f database_migrations/add_content_evaluator_prompt.sql`
+**Run with**: `psql -f db/migrations/add_content_evaluator_prompt.sql`
 
 ---
 
 ### Adding a Structured JSON Prompt
 
 ```sql
--- database_migrations/add_topic_deduper_structured.sql
+-- db/migrations/add_topic_deduper_structured.sql
 
 INSERT INTO app_settings (key, value, description)
 VALUES (
@@ -749,7 +749,7 @@ SET
 ### Updating an Existing Prompt
 
 ```sql
--- database_migrations/update_content_evaluator.sql
+-- db/migrations/update_content_evaluator.sql
 
 UPDATE app_settings
 SET
@@ -880,7 +880,7 @@ async function scorePost(post: RSSPost) {
 
 ```bash
 # 1. Run migration
-psql -d your_database -f database_migrations/add_content_scorer.sql
+psql -d your_database -f db/migrations/add_content_scorer.sql
 
 # 2. Start dev server
 npm run dev
@@ -1150,6 +1150,6 @@ Refer back to the AI Pros Newsletter implementation:
 - `src/lib/openai.ts` - Prompt loading logic
 - `src/app/dashboard/[slug]/settings/page.tsx` - UI implementation
 - `src/app/api/debug/test-ai-prompts/route.ts` - Test endpoint
-- `database_migrations/*.sql` - Migration examples
+- `db/migrations/*.sql` - Migration examples
 
 This guide contains everything needed to replicate the system. Good luck with St Cloud Scoop! 🚀

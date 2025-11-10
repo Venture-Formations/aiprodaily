@@ -47,14 +47,22 @@
       "Bash(npx vercel logs:*)",
       "Bash(git revert:*)",
       "Bash(echo:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(npx -y @modelcontextprotocol/server-postgres --version)",
+      "Bash(set PGSSLMODE=require)",
+      "Bash(npx -y @modelcontextprotocol/server-postgres)",
+      "Bash(timeout /t 3)",
+      "Bash(nul)",
+      "Bash(set:*)",
+      "Bash(node:*)",
+      "Bash(timeout /t 15)",
+      "Bash(del \"C:\\Users\\dpenn\\Documents\\AI_Pros_Newsletter\\test-ad-assign.js\")"
     ],
     "deny": [],
     "ask": []
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
-    "postgres",
     "vercel",
     "memory"
   ]

@@ -13,9 +13,10 @@
 2. Task-specific docs (see [Documentation Map](#documentation-map))
 
 **Key References:**
-- `MULTI_CRITERIA_SCORING_GUIDE.md` - Post scoring system details
+- `docs/workflows/MULTI_CRITERIA_SCORING_GUIDE.md` - Post scoring system details
 - `docs/AI_PROMPT_SYSTEM_GUIDE.md` - AI prompt management
 - `docs/OPENAI_RESPONSES_API_GUIDE.md` - OpenAI Responses API usage
+- `docs/feature-summary.md` - Feature inventory with code + schema touchpoints (consult before changing workflows/features)
 
 ---
 
@@ -273,7 +274,7 @@ VALUES (
 
 ### Multi-Criteria Post Scoring
 
-**See:** `MULTI_CRITERIA_SCORING_GUIDE.md` for full details
+**See:** `docs/workflows/MULTI_CRITERIA_SCORING_GUIDE.md` for full details
 
 **Overview:**
 - System evaluates posts using **1-5 customizable criteria**
@@ -331,11 +332,22 @@ Total Score: 28.5
 | Task | Read First |
 |------|-----------|
 | **RSS Workflow** | This file → `src/lib/workflows/process-rss-workflow.ts` |
-| **Post Scoring** | `MULTI_CRITERIA_SCORING_GUIDE.md` |
+| **Post Scoring** | `docs/workflows/MULTI_CRITERIA_SCORING_GUIDE.md` |
+| **Feature Inventory / Dependencies** | `docs/feature-summary.md` |
 | **AI Prompts** | `docs/AI_PROMPT_SYSTEM_GUIDE.md` |
 | **OpenAI API** | `docs/OPENAI_RESPONSES_API_GUIDE.md` |
 | **Database** | This file (Schema section) |
 | **Cron Jobs** | This file + `vercel.json` |
+
+### Directory Index
+- `docs/guides/` – Feature implementation guides, onboarding plans, troubleshooting notes
+- `docs/workflows/` – Step-by-step operational playbooks for RSS, scoring, and backfill
+- `docs/migrations/` – Schema changes, migration status history, setup walkthroughs
+- `docs/status/` – Progress logs, session notes, cleanup recommendations
+- `docs/checklists/` – Deployment and testing checklists
+- `docs/reference/` – Legacy research and historical references
+- `apps/marketing/` – Standalone marketing site (Next.js) slated for consolidation
+- `src/app/api/debug/(domain)/` – Grouped debug route families (campaign, checks, maintenance, ai, rss, integrations, media, tests)
 
 ### External API Docs
 

@@ -29,6 +29,9 @@ yarn-error.log*
 .env*.local
 .env
 
+# MCP configuration (contains database credentials)
+mcp.json
+
 # vercel
 .vercel
 

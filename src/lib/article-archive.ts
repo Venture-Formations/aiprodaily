@@ -202,7 +202,7 @@ export class ArticleArchiveService {
         // If table doesn't exist, log warning but don't fail the entire archive
         if (insertRatingsError.message.includes('archived_post_ratings')) {
           console.warn('⚠️ archived_post_ratings table does not exist - skipping rating archival')
-          console.warn('Run migrations/create_archived_post_ratings.sql to enable rating archival')
+          console.warn('Run db/migrations/create_archived_post_ratings.sql to enable rating archival')
         } else {
           throw new Error(`Failed to insert archived ratings: ${insertRatingsError.message}`)
         }
