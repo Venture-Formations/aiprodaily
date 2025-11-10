@@ -669,15 +669,35 @@ export async function generateAdvertorialSection(campaign: any, recordUsage: boo
 
     const imageUrl = selectedAd.image_url || ''
 
-    // Generate image HTML if valid URL exists
+    // Generate clickable image HTML if valid URL exists
     const imageHtml = imageUrl
-      ? `<tr><td style='padding: 0 12px; text-align: center;'><img src='${imageUrl}' alt='${selectedAd.title}' style='max-width: 100%; max-height: 500px; border-radius: 4px;'></td></tr>`
+      ? `<tr><td style='padding: 0 12px; text-align: center;'><a href='${trackedUrl}'><img src='${imageUrl}' alt='${selectedAd.title}' style='max-width: 100%; max-height: 500px; border-radius: 4px; display: block; margin: 0 auto;'></a></td></tr>`
       : ''
 
-    // Generate button HTML
-    const buttonHtml = buttonUrl !== '#'
-      ? `<tr><td style='padding: 12px; text-align: center;'><a href='${trackedUrl}' style='display: inline-block; background-color: ${primaryColor}; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-family: ${bodyFont};'>${buttonText}</a></td></tr>`
-      : ''
+    // Process ad body: make the last line a hyperlink
+    let processedBody = selectedAd.body || ''
+    if (buttonUrl !== '#' && processedBody) {
+      // Split by common delimiters (paragraph breaks, line breaks)
+      const lines = processedBody.split(/<\/p>|<br\s*\/?>|<\/div>/i).filter((line: string) => line.trim())
+
+      if (lines.length > 0) {
+        // Get the last meaningful line
+        let lastLine = lines[lines.length - 1].trim()
+        // Clean up any opening tags left from the split
+        lastLine = lastLine.replace(/<\/?p[^>]*>|<\/?div[^>]*>/gi, '').trim()
+
+        // Remove the last line from the body
+        const bodyWithoutLastLine = lines.slice(0, -1).join('</p><p>').trim()
+
+        // Reconstruct body with linked last line
+        if (bodyWithoutLastLine) {
+          processedBody = `${bodyWithoutLastLine}</p><p><a href='${trackedUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${lastLine}</a>`
+        } else {
+          // If only one line, just link it
+          processedBody = `<a href='${trackedUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${lastLine}</a>`
+        }
+      }
+    }
 
     return `
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
@@ -691,8 +711,7 @@ export async function generateAdvertorialSection(campaign: any, recordUsage: boo
         </tr>
         <tr><td style='padding: 10px 10px 4px; font-size: 20px; font-weight: bold; text-align: left;'>${selectedAd.title}</td></tr>
         ${imageHtml}
-        <tr><td style='padding: 0 10px 10px;'>${selectedAd.body}</td></tr>
-        ${buttonHtml}
+        <tr><td style='padding: 0 10px 10px;'>${processedBody}</td></tr>
       </table>
     </td>
   </tr>
