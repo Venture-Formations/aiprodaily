@@ -31,7 +31,7 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
     setWordCount(words.length)
   }
 
-  const handleInput = () => {
+  const handleInput = (forceUpdate = false) => {
     if (!editorRef.current) return
 
     const html = editorRef.current.innerHTML
@@ -41,7 +41,7 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
     const text = html.replace(/<[^>]*>/g, '').trim()
     const words = text.split(/\s+/).filter(w => w.length > 0)
 
-    if (words.length <= maxWords) {
+    if (words.length <= maxWords || forceUpdate) {
       onChange(html)
     } else {
       // Revert to previous value if word limit exceeded
@@ -125,8 +125,8 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
 
       console.log('Link inserted successfully')
 
-      // Trigger the input handler to save changes
-      handleInput()
+      // Trigger the input handler to save changes (force update to bypass word count check)
+      handleInput(true)
     } catch (error) {
       console.error('Error inserting link:', error)
       alert(`Failed to insert link: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -185,7 +185,7 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
       <div
         ref={editorRef}
         contentEditable
-        onInput={handleInput}
+        onInput={() => handleInput()}
         className="p-3 min-h-[200px] focus:outline-none"
         style={{ wordWrap: 'break-word' }}
         data-placeholder={placeholder}

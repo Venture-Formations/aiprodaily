@@ -26,6 +26,25 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
+// Helper function to process ad body and make last sentence a link
+function processAdBody(body: string, buttonUrl?: string): string {
+  if (!buttonUrl || !body) return body
+
+  // Find the last sentence or paragraph
+  // Match text after the last period, or the last meaningful text
+  const sentenceMatch = body.match(/([^.!?]+[.!?]?\s*)$/i)
+
+  if (sentenceMatch && sentenceMatch[1].trim()) {
+    const lastSentence = sentenceMatch[1].trim()
+    const bodyBeforeLastSentence = body.substring(0, body.lastIndexOf(sentenceMatch[1]))
+
+    // Create linked version
+    return `${bodyBeforeLastSentence}<a href='${buttonUrl}' target='_blank' rel='noopener noreferrer' style='color: #000; text-decoration: underline; font-weight: bold;'>${lastSentence}</a>`
+  }
+
+  return body
+}
+
 // Section Components
 function WelcomeSection({ campaign, onRegenerate }: { campaign: any; onRegenerate?: () => void }) {
   const [regenerating, setRegenerating] = useState(false)
@@ -335,36 +354,32 @@ function AdvertorialSection({ campaign, sectionName }: { campaign: any; sectionN
             <h3 className="text-xl font-bold text-left m-0">{ad.title}</h3>
           </div>
 
-          {/* Image */}
+          {/* Image - clickable */}
           {ad.image_url && (
             <div className="px-4 text-center">
-              <img
-                src={ad.image_url}
-                alt={ad.title}
-                className="inline-block max-w-full max-h-[500px] rounded"
-              />
+              {ad.button_url ? (
+                <a href={ad.button_url} target="_blank" rel="noopener noreferrer">
+                  <img
+                    src={ad.image_url}
+                    alt={ad.title}
+                    className="inline-block max-w-full max-h-[500px] rounded cursor-pointer"
+                  />
+                </a>
+              ) : (
+                <img
+                  src={ad.image_url}
+                  alt={ad.title}
+                  className="inline-block max-w-full max-h-[500px] rounded"
+                />
+              )}
             </div>
           )}
 
-          {/* Body */}
+          {/* Body - with last line as link */}
           <div
             className="px-4 pb-4 text-base leading-relaxed [&_a]:text-blue-600 [&_a]:underline [&_b]:font-bold [&_strong]:font-bold"
-            dangerouslySetInnerHTML={{ __html: ad.body }}
+            dangerouslySetInnerHTML={{ __html: processAdBody(ad.body, ad.button_url) }}
           />
-
-          {/* Button */}
-          {ad.button_url && (
-            <div className="px-4 pb-4 text-center">
-              <a
-                href={ad.button_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block bg-blue-600 text-white px-6 py-3 rounded-md font-bold no-underline hover:bg-blue-700"
-              >
-                {ad.button_text || 'Learn More'}
-              </a>
-            </div>
-          )}
         </div>
       </div>
     </div>

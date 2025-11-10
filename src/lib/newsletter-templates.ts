@@ -677,25 +677,16 @@ export async function generateAdvertorialSection(campaign: any, recordUsage: boo
     // Process ad body: make the last line a hyperlink
     let processedBody = selectedAd.body || ''
     if (buttonUrl !== '#' && processedBody) {
-      // Split by common delimiters (paragraph breaks, line breaks)
-      const lines = processedBody.split(/<\/p>|<br\s*\/?>|<\/div>/i).filter((line: string) => line.trim())
+      // Find the last sentence or paragraph
+      // Match text after the last period, or the last paragraph if no period
+      const sentenceMatch = processedBody.match(/([^.!?]+[.!?]?\s*)$/i)
 
-      if (lines.length > 0) {
-        // Get the last meaningful line
-        let lastLine = lines[lines.length - 1].trim()
-        // Clean up any opening tags left from the split
-        lastLine = lastLine.replace(/<\/?p[^>]*>|<\/?div[^>]*>/gi, '').trim()
+      if (sentenceMatch && sentenceMatch[1].trim()) {
+        const lastSentence = sentenceMatch[1].trim()
+        const bodyBeforeLastSentence = processedBody.substring(0, processedBody.lastIndexOf(sentenceMatch[1]))
 
-        // Remove the last line from the body
-        const bodyWithoutLastLine = lines.slice(0, -1).join('</p><p>').trim()
-
-        // Reconstruct body with linked last line
-        if (bodyWithoutLastLine) {
-          processedBody = `${bodyWithoutLastLine}</p><p><a href='${trackedUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${lastLine}</a>`
-        } else {
-          // If only one line, just link it
-          processedBody = `<a href='${trackedUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${lastLine}</a>`
-        }
+        // Create linked version
+        processedBody = `${bodyBeforeLastSentence}<a href='${trackedUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${lastSentence}</a>`
       }
     }
 
