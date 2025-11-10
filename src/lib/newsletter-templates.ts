@@ -674,19 +674,45 @@ export async function generateAdvertorialSection(campaign: any, recordUsage: boo
       ? `<tr><td style='padding: 0 12px; text-align: center;'><a href='${trackedUrl}'><img src='${imageUrl}' alt='${selectedAd.title}' style='max-width: 100%; max-height: 500px; border-radius: 4px; display: block; margin: 0 auto;'></a></td></tr>`
       : ''
 
-    // Process ad body: make the last line a hyperlink
+    // Process ad body: make the last sentence a hyperlink
     let processedBody = selectedAd.body || ''
     if (buttonUrl !== '#' && processedBody) {
-      // Find the last sentence or paragraph
-      // Match text after the last period, or the last paragraph if no period
-      const sentenceMatch = processedBody.match(/([^.!?]+[.!?]?\s*)$/i)
+      // Strip HTML to get plain text
+      const plainText = processedBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 
-      if (sentenceMatch && sentenceMatch[1].trim()) {
-        const lastSentence = sentenceMatch[1].trim()
-        const bodyBeforeLastSentence = processedBody.substring(0, processedBody.lastIndexOf(sentenceMatch[1]))
+      // Find the last sentence (text after the last period/exclamation/question mark)
+      const lastPeriodIndex = Math.max(
+        plainText.lastIndexOf('.'),
+        plainText.lastIndexOf('!'),
+        plainText.lastIndexOf('?')
+      )
 
-        // Create linked version
-        processedBody = `${bodyBeforeLastSentence}<a href='${trackedUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${lastSentence}</a>`
+      if (lastPeriodIndex > 0 && lastPeriodIndex < plainText.length - 1) {
+        // Get the last sentence (including the punctuation)
+        const lastSentence = plainText.substring(lastPeriodIndex + 1).trim()
+
+        if (lastSentence.length > 5) {
+          // Find this sentence in the HTML and replace it with a linked version
+          // Use a more flexible regex that handles potential HTML tags within
+          const escapedSentence = lastSentence.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          const sentenceRegex = new RegExp(`(${escapedSentence})(?=\\s*<|\\s*$)`, 'i')
+
+          processedBody = processedBody.replace(
+            sentenceRegex,
+            `<a href='${trackedUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>$1</a>`
+          )
+        }
+      } else if (lastPeriodIndex === -1) {
+        // No period found - wrap the entire last line/paragraph
+        // Find content after the last closing tag
+        const lastTagMatch = processedBody.match(/>([^<]+)$/i)
+        if (lastTagMatch && lastTagMatch[1].trim().length > 5) {
+          const lastText = lastTagMatch[1].trim()
+          processedBody = processedBody.replace(
+            new RegExp(`${lastText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
+            `<a href='${trackedUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${lastText}</a>`
+          )
+        }
       }
     }
 

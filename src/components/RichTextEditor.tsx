@@ -17,13 +17,16 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
   const [linkText, setLinkText] = useState('')
   const [savedRange, setSavedRange] = useState<Range | null>(null)
 
+  // Track if we're currently inserting a link to prevent reset
+  const [isInsertingLink, setIsInsertingLink] = useState(false)
+
   // Initialize editor with value
   useEffect(() => {
-    if (editorRef.current && editorRef.current.innerHTML !== value) {
+    if (editorRef.current && editorRef.current.innerHTML !== value && !isInsertingLink) {
       editorRef.current.innerHTML = value
       updateWordCount(value)
     }
-  }, [value])
+  }, [value, isInsertingLink])
 
   const updateWordCount = (html: string) => {
     const text = html.replace(/<[^>]*>/g, '').trim()
@@ -78,6 +81,9 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
     }
 
     try {
+      // Prevent useEffect from resetting content
+      setIsInsertingLink(true)
+
       // Focus the editor first
       editorRef.current.focus()
 
@@ -127,9 +133,13 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
 
       // Trigger the input handler to save changes (force update to bypass word count check)
       handleInput(true)
+
+      // Re-enable useEffect after a short delay
+      setTimeout(() => setIsInsertingLink(false), 100)
     } catch (error) {
       console.error('Error inserting link:', error)
       alert(`Failed to insert link: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      setIsInsertingLink(false)
     }
 
     // Close modal and reset

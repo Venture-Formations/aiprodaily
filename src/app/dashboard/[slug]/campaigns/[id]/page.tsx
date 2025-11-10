@@ -30,16 +30,40 @@ import { CSS } from '@dnd-kit/utilities'
 function processAdBody(body: string, buttonUrl?: string): string {
   if (!buttonUrl || !body) return body
 
-  // Find the last sentence or paragraph
-  // Match text after the last period, or the last meaningful text
-  const sentenceMatch = body.match(/([^.!?]+[.!?]?\s*)$/i)
+  // Strip HTML to get plain text
+  const plainText = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 
-  if (sentenceMatch && sentenceMatch[1].trim()) {
-    const lastSentence = sentenceMatch[1].trim()
-    const bodyBeforeLastSentence = body.substring(0, body.lastIndexOf(sentenceMatch[1]))
+  // Find the last sentence (text after the last period/exclamation/question mark)
+  const lastPeriodIndex = Math.max(
+    plainText.lastIndexOf('.'),
+    plainText.lastIndexOf('!'),
+    plainText.lastIndexOf('?')
+  )
 
-    // Create linked version
-    return `${bodyBeforeLastSentence}<a href='${buttonUrl}' target='_blank' rel='noopener noreferrer' style='color: #000; text-decoration: underline; font-weight: bold;'>${lastSentence}</a>`
+  if (lastPeriodIndex > 0 && lastPeriodIndex < plainText.length - 1) {
+    // Get the last sentence (not including the punctuation mark itself)
+    const lastSentence = plainText.substring(lastPeriodIndex + 1).trim()
+
+    if (lastSentence.length > 5) {
+      // Find this sentence in the HTML and replace it with a linked version
+      const escapedSentence = lastSentence.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const sentenceRegex = new RegExp(`(${escapedSentence})(?=\\s*<|\\s*$)`, 'i')
+
+      return body.replace(
+        sentenceRegex,
+        `<a href='${buttonUrl}' target='_blank' rel='noopener noreferrer' style='color: #000; text-decoration: underline; font-weight: bold;'>$1</a>`
+      )
+    }
+  } else if (lastPeriodIndex === -1) {
+    // No period found - wrap the entire last line/paragraph
+    const lastTagMatch = body.match(/>([^<]+)$/i)
+    if (lastTagMatch && lastTagMatch[1].trim().length > 5) {
+      const lastText = lastTagMatch[1].trim()
+      return body.replace(
+        new RegExp(`${lastText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
+        `<a href='${buttonUrl}' target='_blank' rel='noopener noreferrer' style='color: #000; text-decoration: underline; font-weight: bold;'>${lastText}</a>`
+      )
+    }
   }
 
   return body
