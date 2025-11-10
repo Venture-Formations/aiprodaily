@@ -57,9 +57,12 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
 
   const openLinkModal = () => {
     const selection = window.getSelection()
+    console.log('Opening link modal, selection:', selection?.toString())
     if (selection && selection.toString().length > 0 && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0).cloneRange()
       setLinkText(selection.toString())
-      setSavedRange(selection.getRangeAt(0).cloneRange()) // Save the current selection range
+      setSavedRange(range)
+      console.log('Saved range:', range)
       setShowLinkModal(true)
     } else {
       alert('Please select text first to create a link')
@@ -67,37 +70,73 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
   }
 
   const insertLink = () => {
-    if (linkUrl && linkText && savedRange) {
+    console.log('insertLink called', { linkUrl, linkText, hasSavedRange: !!savedRange, hasEditor: !!editorRef.current })
+
+    if (!linkUrl || !linkText || !savedRange || !editorRef.current) {
+      console.error('Missing required data for link insertion')
+      return
+    }
+
+    try {
+      // Focus the editor first
+      editorRef.current.focus()
+
       const selection = window.getSelection()
-      if (selection) {
-        // Restore the saved range
-        selection.removeAllRanges()
-        selection.addRange(savedRange)
-
-        // Delete the selected text
-        savedRange.deleteContents()
-
-        const link = document.createElement('a')
-        link.href = linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`
-        link.textContent = linkText
-        link.target = '_blank'
-        link.rel = 'noopener noreferrer'
-
-        savedRange.insertNode(link)
-
-        // Move cursor after the link
-        savedRange.setStartAfter(link)
-        savedRange.setEndAfter(link)
-        selection.removeAllRanges()
-        selection.addRange(savedRange)
+      if (!selection) {
+        console.error('No selection available')
+        return
       }
 
+      console.log('Restoring saved range...')
+      // Restore the saved range
+      selection.removeAllRanges()
+      selection.addRange(savedRange)
+
+      // Delete the selected text
+      savedRange.deleteContents()
+
+      // Create the link element
+      const link = document.createElement('a')
+      const fullUrl = linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`
+      link.href = fullUrl
+      link.textContent = linkText
+      link.setAttribute('target', '_blank')
+      link.setAttribute('rel', 'noopener noreferrer')
+
+      console.log('Inserting link:', { href: link.href, text: link.textContent })
+
+      // Insert the link
+      savedRange.insertNode(link)
+
+      // Add a space after the link for easier editing
+      const space = document.createTextNode('\u00A0') // non-breaking space
+      if (link.nextSibling) {
+        link.parentNode?.insertBefore(space, link.nextSibling)
+      } else {
+        link.parentNode?.appendChild(space)
+      }
+
+      // Move cursor after the space
+      const newRange = document.createRange()
+      newRange.setStartAfter(space)
+      newRange.collapse(true)
+      selection.removeAllRanges()
+      selection.addRange(newRange)
+
+      console.log('Link inserted successfully')
+
+      // Trigger the input handler to save changes
       handleInput()
-      setShowLinkModal(false)
-      setLinkUrl('')
-      setLinkText('')
-      setSavedRange(null)
+    } catch (error) {
+      console.error('Error inserting link:', error)
+      alert(`Failed to insert link: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
+
+    // Close modal and reset
+    setShowLinkModal(false)
+    setLinkUrl('')
+    setLinkText('')
+    setSavedRange(null)
   }
 
   return (
