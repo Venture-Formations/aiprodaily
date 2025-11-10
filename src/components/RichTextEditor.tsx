@@ -244,7 +244,7 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
         ref={editorRef}
         contentEditable
         onInput={() => handleInput()}
-        className="p-3 min-h-[200px] focus:outline-none"
+        className="p-3 min-h-[200px] focus:outline-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer"
         style={{ wordWrap: 'break-word' }}
         data-placeholder={placeholder}
       />
@@ -307,14 +307,6 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
           content: attr(data-placeholder);
           color: #9CA3AF;
           pointer-events: none;
-        }
-        [contenteditable] a {
-          color: #2563EB;
-          text-decoration: underline;
-          cursor: pointer;
-        }
-        [contenteditable] a:hover {
-          color: #1D4ED8;
         }
       `}</style>
     </div>
