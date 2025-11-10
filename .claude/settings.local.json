@@ -56,7 +56,8 @@
       "Bash(set:*)",
       "Bash(node:*)",
       "Bash(timeout /t 15)",
-      "Bash(del \"C:\\Users\\dpenn\\Documents\\AI_Pros_Newsletter\\test-ad-assign.js\")"
+      "Bash(del \"C:\\Users\\dpenn\\Documents\\AI_Pros_Newsletter\\test-ad-assign.js\")",
+      "Bash(npx vercel:*)"
     ],
     "deny": [],
     "ask": []
