@@ -16,6 +16,8 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
   const [linkUrl, setLinkUrl] = useState('')
   const [linkText, setLinkText] = useState('')
   const [savedRange, setSavedRange] = useState<Range | null>(null)
+  const [showColorPicker, setShowColorPicker] = useState(false)
+  const [selectedColor, setSelectedColor] = useState('#000000')
 
   // Track if we're currently inserting a link to prevent reset
   const [isInsertingLink, setIsInsertingLink] = useState(false)
@@ -60,21 +62,34 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
 
   const openLinkModal = () => {
     const selection = window.getSelection()
-    console.log('Opening link modal, selection:', selection?.toString())
-    if (selection && selection.toString().length > 0 && selection.rangeCount > 0) {
+    if (selection && selection.rangeCount > 0) {
       const range = selection.getRangeAt(0).cloneRange()
-      setLinkText(selection.toString())
+      const selectedText = selection.toString()
+
+      // If text is selected, use it as link text
+      // If not, user will need to type link text
+      setLinkText(selectedText)
       setSavedRange(range)
-      console.log('Saved range:', range)
       setShowLinkModal(true)
     } else {
-      alert('Please select text first to create a link')
+      alert('Please click in the editor first to position your cursor')
+    }
+  }
+
+  const applyColor = () => {
+    const selection = window.getSelection()
+    if (selection && selection.toString().length > 0) {
+      document.execCommand('foreColor', false, selectedColor)
+      handleInput()
+      setShowColorPicker(false)
+    } else {
+      alert('Please select text first to change color')
     }
   }
 
   const insertLink = () => {
-    if (!linkUrl || !linkText || !editorRef.current) {
-      console.error('Missing required data for link insertion')
+    if (!linkUrl || !linkText || !savedRange || !editorRef.current) {
+      alert('Please enter both link text and URL')
       return
     }
 
@@ -85,29 +100,47 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
       // Focus the editor
       editorRef.current.focus()
 
-      // Get current HTML before modification
-      const beforeHtml = editorRef.current.innerHTML
+      // Restore the saved range
+      const selection = window.getSelection()
+      if (!selection) {
+        throw new Error('No selection available')
+      }
 
-      // Create the link HTML
+      selection.removeAllRanges()
+      selection.addRange(savedRange)
+
+      // Delete any selected content first
+      savedRange.deleteContents()
+
+      // Create the link element
       const fullUrl = linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`
-      const linkHtml = `<a href="${fullUrl}" target="_blank" rel="noopener noreferrer">${linkText}</a>&nbsp;`
+      const link = document.createElement('a')
+      link.href = fullUrl
+      link.textContent = linkText
+      link.setAttribute('target', '_blank')
+      link.setAttribute('rel', 'noopener noreferrer')
 
-      // Simply append to the end of current content
-      editorRef.current.innerHTML = beforeHtml + linkHtml
+      // Insert the link at the saved position
+      savedRange.insertNode(link)
 
-      console.log('Link inserted successfully')
+      // Add a space after for easier editing
+      const space = document.createTextNode('\u00A0')
+      if (link.nextSibling) {
+        link.parentNode?.insertBefore(space, link.nextSibling)
+      } else {
+        link.parentNode?.appendChild(space)
+      }
+
+      // Move cursor after the link
+      const newRange = document.createRange()
+      newRange.setStartAfter(space)
+      newRange.collapse(true)
+      selection.removeAllRanges()
+      selection.addRange(newRange)
 
       // Update the parent component
       onChange(editorRef.current.innerHTML)
       updateWordCount(editorRef.current.innerHTML)
-
-      // Move cursor to end
-      const range = document.createRange()
-      const sel = window.getSelection()
-      range.selectNodeContents(editorRef.current)
-      range.collapse(false)
-      sel?.removeAllRanges()
-      sel?.addRange(range)
 
       // Re-enable useEffect after delay
       setTimeout(() => setIsInsertingLink(false), 100)
@@ -161,6 +194,46 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
         >
           🔗
         </button>
+        <div className="w-px h-6 bg-gray-300 mx-1"></div>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowColorPicker(!showColorPicker)}
+            className="px-3 py-1 hover:bg-gray-200 rounded flex items-center gap-1"
+            title="Text Color"
+          >
+            <span style={{ color: selectedColor }}>A</span>
+            <span className="text-xs">▼</span>
+          </button>
+          {showColorPicker && (
+            <div className="absolute top-full left-0 mt-1 p-2 bg-white border border-gray-300 rounded shadow-lg z-10">
+              <div className="flex flex-col gap-2">
+                <input
+                  type="color"
+                  value={selectedColor}
+                  onChange={(e) => setSelectedColor(e.target.value)}
+                  className="w-full h-8 cursor-pointer"
+                />
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={applyColor}
+                    className="flex-1 bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700"
+                  >
+                    Apply
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowColorPicker(false)}
+                    className="flex-1 bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs hover:bg-gray-400"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
         <div className="ml-auto text-sm text-gray-600">
           {wordCount} / {maxWords} words
         </div>
