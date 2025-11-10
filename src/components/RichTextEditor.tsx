@@ -73,68 +73,43 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
   }
 
   const insertLink = () => {
-    console.log('insertLink called', { linkUrl, linkText, hasSavedRange: !!savedRange, hasEditor: !!editorRef.current })
-
-    if (!linkUrl || !linkText || !savedRange || !editorRef.current) {
+    if (!linkUrl || !linkText || !editorRef.current) {
       console.error('Missing required data for link insertion')
       return
     }
 
-    try {
-      // Prevent useEffect from resetting content
-      setIsInsertingLink(true)
+    // Prevent useEffect from resetting content
+    setIsInsertingLink(true)
 
-      // Focus the editor first
+    try {
+      // Focus the editor
       editorRef.current.focus()
 
-      const selection = window.getSelection()
-      if (!selection) {
-        console.error('No selection available')
-        return
-      }
+      // Get current HTML before modification
+      const beforeHtml = editorRef.current.innerHTML
 
-      console.log('Restoring saved range...')
-      // Restore the saved range
-      selection.removeAllRanges()
-      selection.addRange(savedRange)
-
-      // Delete the selected text
-      savedRange.deleteContents()
-
-      // Create the link element
-      const link = document.createElement('a')
+      // Create the link HTML
       const fullUrl = linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`
-      link.href = fullUrl
-      link.textContent = linkText
-      link.setAttribute('target', '_blank')
-      link.setAttribute('rel', 'noopener noreferrer')
+      const linkHtml = `<a href="${fullUrl}" target="_blank" rel="noopener noreferrer">${linkText}</a>&nbsp;`
 
-      console.log('Inserting link:', { href: link.href, text: link.textContent })
-
-      // Insert the link
-      savedRange.insertNode(link)
-
-      // Add a space after the link for easier editing
-      const space = document.createTextNode('\u00A0') // non-breaking space
-      if (link.nextSibling) {
-        link.parentNode?.insertBefore(space, link.nextSibling)
-      } else {
-        link.parentNode?.appendChild(space)
-      }
-
-      // Move cursor after the space
-      const newRange = document.createRange()
-      newRange.setStartAfter(space)
-      newRange.collapse(true)
-      selection.removeAllRanges()
-      selection.addRange(newRange)
+      // Simply append to the end of current content
+      editorRef.current.innerHTML = beforeHtml + linkHtml
 
       console.log('Link inserted successfully')
 
-      // Trigger the input handler to save changes (force update to bypass word count check)
-      handleInput(true)
+      // Update the parent component
+      onChange(editorRef.current.innerHTML)
+      updateWordCount(editorRef.current.innerHTML)
 
-      // Re-enable useEffect after a short delay
+      // Move cursor to end
+      const range = document.createRange()
+      const sel = window.getSelection()
+      range.selectNodeContents(editorRef.current)
+      range.collapse(false)
+      sel?.removeAllRanges()
+      sel?.addRange(range)
+
+      // Re-enable useEffect after delay
       setTimeout(() => setIsInsertingLink(false), 100)
     } catch (error) {
       console.error('Error inserting link:', error)
