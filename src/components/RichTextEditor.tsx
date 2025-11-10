@@ -211,6 +211,14 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
           color: #9CA3AF;
           pointer-events: none;
         }
+        [contenteditable] a {
+          color: #2563EB;
+          text-decoration: underline;
+          cursor: pointer;
+        }
+        [contenteditable] a:hover {
+          color: #1D4ED8;
+        }
       `}</style>
     </div>
   )
