@@ -112,16 +112,14 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
       // Delete any selected content first
       savedRange.deleteContents()
 
-      // Create the link element with visible styling
+      // Create the link element
       const fullUrl = linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`
       const link = document.createElement('a')
       link.href = fullUrl
       link.textContent = linkText
       link.setAttribute('target', '_blank')
       link.setAttribute('rel', 'noopener noreferrer')
-      link.style.color = '#2563EB'
-      link.style.textDecoration = 'underline'
-      link.style.cursor = 'pointer'
+      // Don't set inline styles - let CSS provide default, but allow override
 
       // Insert the link at the saved position
       savedRange.insertNode(link)
@@ -311,13 +309,14 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
           color: #9CA3AF;
           pointer-events: none;
         }
+        /* Default link styling - but can be overridden by user formatting */
         div[contenteditable] a {
-          color: #2563EB !important;
-          text-decoration: underline !important;
-          cursor: pointer !important;
+          color: #2563EB;
+          text-decoration: underline;
+          cursor: pointer;
         }
         div[contenteditable] a:hover {
-          color: #1D4ED8 !important;
+          color: #1D4ED8;
         }
       `}</style>
     </div>
