@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { RSSProcessor } from '@/lib/rss-processor'
+import { AdScheduler } from '@/lib/ad-scheduler'
 
 /**
  * RSS Processing Workflow (REFACTORED)
@@ -530,6 +531,53 @@ async function finalizeCampaign(campaignId: string) {
         .single()
 
       console.log(`Subject line: "${campaign?.subject_line?.substring(0, 50) || 'Not found'}..."`)
+
+      // Select and assign advertisement for this campaign
+      try {
+        const { data: campaignData } = await supabaseAdmin
+          .from('newsletter_campaigns')
+          .select('date, newsletter_id')
+          .eq('id', campaignId)
+          .single()
+
+        if (campaignData) {
+          const selectedAd = await AdScheduler.selectAdForCampaign({
+            campaignId: campaignId,
+            campaignDate: campaignData.date,
+            newsletterId: campaignData.newsletter_id
+          })
+
+          if (selectedAd) {
+            // Check if ad already assigned to prevent duplicates
+            const { data: existingAssignment } = await supabaseAdmin
+              .from('campaign_advertisements')
+              .select('id')
+              .eq('campaign_id', campaignId)
+              .maybeSingle()
+
+            if (!existingAssignment) {
+              // Store the selected ad
+              await supabaseAdmin
+                .from('campaign_advertisements')
+                .insert({
+                  campaign_id: campaignId,
+                  advertisement_id: selectedAd.id,
+                  campaign_date: campaignData.date,
+                  used_at: new Date().toISOString()
+                })
+
+              console.log(`[Workflow Step 10/10] Selected ad: ${selectedAd.title}`)
+            } else {
+              console.log('[Workflow Step 10/10] Ad already assigned')
+            }
+          } else {
+            console.log('[Workflow Step 10/10] No active ads available')
+          }
+        }
+      } catch (adError) {
+        console.log('[Workflow Step 10/10] Ad selection failed (non-critical):', adError)
+        // Don't fail the entire step if ad selection fails
+      }
 
       // Set status to draft
       await supabaseAdmin
