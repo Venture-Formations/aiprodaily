@@ -924,7 +924,6 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
   const [formData, setFormData] = useState({
     title: ad.title,
     body: ad.body,
-    button_text: ad.button_text,
     button_url: ad.button_url,
     status: ad.status
   })

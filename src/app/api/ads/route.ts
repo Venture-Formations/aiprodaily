@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     } = body
 
     // Validation
-    if (!title || !adBody || !button_text || !button_url) {
+    if (!title || !adBody || !button_url) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
         title,
         body: adBody,
         word_count,
-        button_text,
+        button_text: button_text || '',
         button_url,
         frequency: frequency || 'single', // Default to 'single' if not provided
         times_paid: times_paid || 1, // Default to 1 if not provided
