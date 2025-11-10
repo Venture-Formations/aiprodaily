@@ -474,13 +474,9 @@ export default function AdsManagementPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t text-sm">
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t text-sm">
                     <div>
-                      <span className="font-medium">Button:</span>
-                      <p className="text-gray-600">{ad.button_text}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium">Button URL:</span>
+                      <span className="font-medium">URL:</span>
                       <p className="text-gray-600 truncate" title={ad.button_url}>{ad.button_url}</p>
                     </div>
                     <div>
@@ -554,13 +550,9 @@ export default function AdsManagementPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t text-sm">
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t text-sm">
                     <div>
-                      <span className="font-medium">Button:</span>
-                      <p className="text-gray-600">{ad.button_text}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium">Button URL:</span>
+                      <span className="font-medium">URL:</span>
                       <p className="text-gray-600 truncate" title={ad.button_url}>{ad.button_url}</p>
                     </div>
                     {ad.image_url && (
@@ -639,13 +631,9 @@ export default function AdsManagementPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t text-sm">
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t text-sm">
                     <div>
-                      <span className="font-medium">Button:</span>
-                      <p className="text-gray-600">{ad.button_text}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium">Button URL:</span>
+                      <span className="font-medium">URL:</span>
                       <p className="text-gray-600 truncate" title={ad.button_url}>{ad.button_url}</p>
                     </div>
                     <div>
@@ -693,7 +681,6 @@ function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
   const [formData, setFormData] = useState({
     title: '',
     body: '',
-    button_text: '',
     button_url: 'https://'
   })
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
@@ -883,41 +870,29 @@ function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
             </label>
           </div>
 
-          {/* Button Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Button Text *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.button_text}
-                onChange={(e) => setFormData({ ...formData, button_text: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="e.g. Learn More, Visit Website, Get Started"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Button URL *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.button_url}
-                onChange={(e) => {
-                  let value = e.target.value;
-                  // Ensure https:// prefix
-                  if (!value.startsWith('http://') && !value.startsWith('https://')) {
-                    value = 'https://' + value.replace(/^https?:\/\//, '');
-                  }
-                  setFormData({ ...formData, button_url: value });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="https://example.com"
-              />
-            </div>
+          {/* URL */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              URL *
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.button_url}
+              onChange={(e) => {
+                let value = e.target.value;
+                // Ensure https:// prefix
+                if (!value.startsWith('http://') && !value.startsWith('https://')) {
+                  value = 'https://' + value.replace(/^https?:\/\//, '');
+                }
+                setFormData({ ...formData, button_url: value });
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="https://example.com"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              The image and last line of the ad will link to this URL
+            </p>
           </div>
 
           {/* Submit Buttons */}
@@ -1181,41 +1156,29 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
             </button>
           </div>
 
-          {/* Button Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Button Text *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.button_text}
-                onChange={(e) => setFormData({ ...formData, button_text: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="e.g. Learn More, Visit Website, Get Started"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Button URL *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.button_url}
-                onChange={(e) => {
-                  let value = e.target.value;
-                  // Ensure https:// prefix
-                  if (!value.startsWith('http://') && !value.startsWith('https://')) {
-                    value = 'https://' + value.replace(/^https?:\/\//, '');
-                  }
-                  setFormData({ ...formData, button_url: value });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="https://example.com"
-              />
-            </div>
+          {/* URL */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              URL *
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.button_url}
+              onChange={(e) => {
+                let value = e.target.value;
+                // Ensure https:// prefix
+                if (!value.startsWith('http://') && !value.startsWith('https://')) {
+                  value = 'https://' + value.replace(/^https?:\/\//, '');
+                }
+                setFormData({ ...formData, button_url: value });
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="https://example.com"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              The image and last line of the ad will link to this URL
+            </p>
           </div>
 
           {/* Submit Buttons */}

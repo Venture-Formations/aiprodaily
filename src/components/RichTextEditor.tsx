@@ -15,6 +15,7 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
   const [showLinkModal, setShowLinkModal] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
   const [linkText, setLinkText] = useState('')
+  const [savedRange, setSavedRange] = useState<Range | null>(null)
 
   // Initialize editor with value
   useEffect(() => {
@@ -56,8 +57,9 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
 
   const openLinkModal = () => {
     const selection = window.getSelection()
-    if (selection && selection.toString().length > 0) {
+    if (selection && selection.toString().length > 0 && selection.rangeCount > 0) {
       setLinkText(selection.toString())
+      setSavedRange(selection.getRangeAt(0).cloneRange()) // Save the current selection range
       setShowLinkModal(true)
     } else {
       alert('Please select text first to create a link')
@@ -65,11 +67,15 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
   }
 
   const insertLink = () => {
-    if (linkUrl && linkText) {
+    if (linkUrl && linkText && savedRange) {
       const selection = window.getSelection()
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0)
-        range.deleteContents()
+      if (selection) {
+        // Restore the saved range
+        selection.removeAllRanges()
+        selection.addRange(savedRange)
+
+        // Delete the selected text
+        savedRange.deleteContents()
 
         const link = document.createElement('a')
         link.href = linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`
@@ -77,19 +83,20 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
         link.target = '_blank'
         link.rel = 'noopener noreferrer'
 
-        range.insertNode(link)
+        savedRange.insertNode(link)
 
         // Move cursor after the link
-        range.setStartAfter(link)
-        range.setEndAfter(link)
+        savedRange.setStartAfter(link)
+        savedRange.setEndAfter(link)
         selection.removeAllRanges()
-        selection.addRange(range)
+        selection.addRange(savedRange)
       }
 
       handleInput()
       setShowLinkModal(false)
       setLinkUrl('')
       setLinkText('')
+      setSavedRange(null)
     }
   }
 
@@ -187,6 +194,7 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
                   setShowLinkModal(false)
                   setLinkUrl('')
                   setLinkText('')
+                  setSavedRange(null)
                 }}
                 className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
               >
