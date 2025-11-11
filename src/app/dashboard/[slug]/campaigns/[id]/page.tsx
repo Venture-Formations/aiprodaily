@@ -1315,7 +1315,8 @@ function SortableArticle({
   saving,
   getScoreColor,
   criteriaConfig,
-  maxTopArticles
+  maxTopArticles,
+  primaryCriteriaConfig
 }: {
   article: ArticleWithPost
   toggleArticle: (id: string, currentState: boolean) => void
@@ -1324,6 +1325,7 @@ function SortableArticle({
   getScoreColor: (score: number) => string
   criteriaConfig: Array<{name: string, weight: number}>
   maxTopArticles: number
+  primaryCriteriaConfig?: Array<{name: string, weight: number}>
 }) {
   const {
     attributes,
@@ -1468,7 +1470,16 @@ function SortableArticle({
               <div className="text-xs font-medium text-gray-700 mb-2">Criteria Scores:</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 text-xs">
                 {criteriaConfig.map((criterion, index) => {
-                  const criterionNum = index + 1
+                  // If primaryCriteriaConfig is provided, match by name to get the correct score index
+                  // Otherwise, use the current index (for primary articles)
+                  let criterionNum = index + 1
+                  if (primaryCriteriaConfig) {
+                    const matchingPrimaryIndex = primaryCriteriaConfig.findIndex(pc => pc.name === criterion.name)
+                    if (matchingPrimaryIndex !== -1) {
+                      criterionNum = matchingPrimaryIndex + 1
+                    }
+                  }
+
                   const score = article.rss_post.post_rating[0][`criteria_${criterionNum}_score` as keyof typeof article.rss_post.post_rating[0]]
                   // Use the weight from the config prop (primary or secondary context-appropriate weight)
                   const weight = criterion.weight
@@ -2755,6 +2766,7 @@ export default function CampaignDetailPage() {
                         getScoreColor={getScoreColor}
                         criteriaConfig={secondaryCriteriaConfig}
                         maxTopArticles={maxSecondaryArticles || 3}
+                        primaryCriteriaConfig={criteriaConfig}
                       />
                     ))}
                 </SortableContext>
