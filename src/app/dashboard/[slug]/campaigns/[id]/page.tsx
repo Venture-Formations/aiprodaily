@@ -1636,6 +1636,10 @@ export default function CampaignDetailPage() {
       if (response.ok) {
         const data = await response.json()
 
+        // Debug: Log all secondary criteria settings
+        const secondarySettings = data.settings.filter((s: any) => s.key.startsWith('secondary_criteria_'))
+        console.log('[Campaigns] All secondary criteria settings:', secondarySettings)
+
         // Get enabled criteria counts for primary and secondary
         const primaryEnabledCountSetting = data.settings.find((s: any) => s.key === 'primary_criteria_enabled_count')
         const secondaryEnabledCountSetting = data.settings.find((s: any) => s.key === 'secondary_criteria_enabled_count')
@@ -1670,10 +1674,19 @@ export default function CampaignDetailPage() {
           const fallbackNameSetting = data.settings.find((s: any) => s.key === `criteria_${i}_name`)
           const fallbackWeightSetting = data.settings.find((s: any) => s.key === `criteria_${i}_weight`)
 
-          secondaryCriteria.push({
-            name: nameSetting?.value || fallbackNameSetting?.value || `Criteria ${i}`,
-            weight: weightSetting?.value ? parseFloat(weightSetting.value) :
+          const finalName = nameSetting?.value || fallbackNameSetting?.value || `Criteria ${i}`
+          const finalWeight = weightSetting?.value ? parseFloat(weightSetting.value) :
                     (fallbackWeightSetting?.value ? parseFloat(fallbackWeightSetting.value) : 1.0)
+
+          console.log(`[Campaigns] Secondary Criteria ${i}: ${finalName}`, {
+            secondaryWeight: weightSetting?.value,
+            primaryWeight: fallbackWeightSetting?.value,
+            finalWeight
+          })
+
+          secondaryCriteria.push({
+            name: finalName,
+            weight: finalWeight
           })
         }
 
