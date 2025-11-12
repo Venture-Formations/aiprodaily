@@ -39,10 +39,10 @@ export default function NewsletterSelect() {
           {/* Header */}
           <header className="text-center mb-12">
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
-              Select Your Newsletter
+              Select Your Publication
             </h1>
             <p className="text-lg text-gray-600">
-              Select a newsletter to access your dashboard
+              Select a publication to access your dashboard
             </p>
           </header>
 
@@ -53,8 +53,8 @@ export default function NewsletterSelect() {
             </div>
           ) : newsletters.length === 0 ? (
             <div className="text-center py-12">
-              <div className="text-gray-500 mb-4">No newsletters available</div>
-              <p className="text-sm text-gray-400">Contact an administrator to set up newsletters</p>
+              <div className="text-gray-500 mb-4">No publications available</div>
+              <p className="text-sm text-gray-400">Contact an administrator to set up publications</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -98,7 +98,7 @@ export default function NewsletterSelect() {
                               <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
                               <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
                             </svg>
-                            Newsletter
+                            Publication
                           </span>
                         </div>
                       </div>

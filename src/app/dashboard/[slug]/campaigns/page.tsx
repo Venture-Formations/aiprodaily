@@ -148,7 +148,7 @@ export default function CampaignsPage() {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-2xl font-bold text-gray-900">
-              Newsletter Campaigns
+              Publication Campaigns
             </h1>
             <div className="flex space-x-2">
               <Link

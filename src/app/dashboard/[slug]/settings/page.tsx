@@ -41,7 +41,7 @@ export default function SettingsPage() {
             <nav className="-mb-px flex space-x-8">
               {[
                 { id: 'system', name: 'System Status' },
-                { id: 'business', name: 'Business Settings' },
+                { id: 'business', name: 'Publication Settings' },
                 { id: 'newsletter', name: 'Newsletter' },
                 { id: 'email', name: 'Email' },
                 { id: 'slack', name: 'Slack' },
@@ -422,9 +422,9 @@ function NewsletterSettings() {
       <div className="bg-white shadow rounded-lg p-6">
         <div className="flex justify-between items-start mb-4">
           <div className="flex-1">
-            <h3 className="text-lg font-medium text-gray-900">Newsletter Section Order</h3>
+            <h3 className="text-lg font-medium text-gray-900">Publication Section Order</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Drag sections to reorder them in the newsletter. Toggle sections on/off to control what appears.
+              Drag sections to reorder them in the publication. Toggle sections on/off to control what appears.
             </p>
           </div>
           {sections.length < 6 && (
@@ -475,12 +475,12 @@ function NewsletterSettings() {
         )}
 
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h4 className="font-medium text-blue-900 mb-3">Newsletter Section Information</h4>
+          <h4 className="font-medium text-blue-900 mb-3">Publication Section Information</h4>
           <div className="text-sm text-blue-800 space-y-2">
             <div className="space-y-2 mb-3">
-              <p><strong>Manage Your Newsletter Sections:</strong></p>
+              <p><strong>Manage Your Publication Sections:</strong></p>
               <ul className="list-disc list-inside space-y-1 ml-2">
-                <li><strong>Drag & Drop:</strong> Reorder sections to change how they appear in your newsletter</li>
+                <li><strong>Drag & Drop:</strong> Reorder sections to change how they appear in your publication</li>
                 <li><strong>Toggle On/Off:</strong> Use the switch to activate or deactivate sections</li>
                 <li><strong>Edit Names:</strong> Click "Edit name" to customize section titles for your audience</li>
                 <li><strong>Custom Content:</strong> Each section pulls dynamic content based on its type</li>
@@ -637,7 +637,7 @@ function SystemStatus() {
           </div>
           <div className="flex justify-between items-center py-2 border-b">
             <div>
-              <div className="font-medium">Final Newsletter Send</div>
+              <div className="font-medium">Final Publication Send</div>
               <div className="text-sm text-gray-600">
                 Daily at {scheduleDisplay?.finalSend || '04:55'} CT
               </div>
@@ -1102,7 +1102,7 @@ function Notifications() {
         <div className="flex justify-between items-center">
           <div>
             <div className="font-medium">Email Notifications</div>
-            <div className="text-sm text-gray-600">Newsletter review and delivery confirmations</div>
+            <div className="text-sm text-gray-600">Publication review and delivery confirmations</div>
           </div>
           <span className="text-green-600 text-sm">Active</span>
         </div>
@@ -1457,10 +1457,10 @@ function EmailSettings() {
         </div>
       </div>
 
-      {/* Automated Newsletter Review Schedule */}
+      {/* Automated Publication Review Schedule */}
       <div className="bg-white shadow rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-gray-900">Automated Newsletter Review Schedule</h3>
+          <h3 className="text-lg font-medium text-gray-900">Automated Publication Review Schedule</h3>
           <div className="flex items-center">
             <label className="flex items-center cursor-pointer">
               <input
@@ -1654,7 +1654,7 @@ function EmailSettings() {
                 <option value="PM">PM</option>
               </select>
             </div>
-            <p className="text-xs text-gray-500 mt-1">Newsletter campaign setup and review (5-minute increments)</p>
+            <p className="text-xs text-gray-500 mt-1">Publication campaign setup and review (5-minute increments)</p>
           </div>
 
           <div>
@@ -1753,10 +1753,10 @@ function EmailSettings() {
         </div>
       </div>
 
-      {/* Automated Daily Newsletter Schedule */}
+      {/* Automated Daily Publication Schedule */}
       <div className="bg-white shadow rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-gray-900">Automated Daily Newsletter Schedule</h3>
+          <h3 className="text-lg font-medium text-gray-900">Automated Daily Publication Schedule</h3>
           <div className="flex items-center">
             <label className="flex items-center cursor-pointer">
               <input
@@ -1950,15 +1950,15 @@ function EmailSettings() {
                 <option value="PM">PM</option>
               </select>
             </div>
-            <p className="text-xs text-gray-500 mt-1">Final newsletter delivery to main subscriber group (5-minute increments)</p>
+            <p className="text-xs text-gray-500 mt-1">Final publication delivery to main subscriber group (5-minute increments)</p>
           </div>
         </div>
 
         <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <h4 className="font-medium text-green-900 mb-2">Daily Newsletter Workflow</h4>
+          <h4 className="font-medium text-green-900 mb-2">Daily Publication Workflow</h4>
           <div className="text-sm text-green-800 space-y-1">
-            <div>1. <strong>{settings.dailyCampaignCreationTime}</strong> - Create final newsletter with any changes made during review</div>
-            <div>2. <strong>{settings.dailyScheduledSendTime}</strong> - Send final newsletter to main subscriber group</div>
+            <div>1. <strong>{settings.dailyCampaignCreationTime}</strong> - Create final publication with any changes made during review</div>
+            <div>2. <strong>{settings.dailyScheduledSendTime}</strong> - Send final publication to main subscriber group</div>
           </div>
         </div>
       </div>
@@ -5006,15 +5006,15 @@ function AdsSettings() {
         )}
       </div>
 
-      {/* Ads Per Newsletter Configuration */}
+      {/* Ads Per Publication Configuration */}
       <div className="bg-white shadow rounded-lg p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Newsletter Ad Settings</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Publication Ad Settings</h3>
         <p className="text-sm text-gray-600 mb-6">
-          Configure how many advertisements appear in each newsletter. Total newsletter items (ads + articles) = 5.
+          Configure how many advertisements appear in each publication. Total publication items (ads + articles) = 5.
         </p>
 
         <div className="flex items-center gap-4">
-          <label className="font-medium text-gray-700">Ads per newsletter:</label>
+          <label className="font-medium text-gray-700">Ads per publication:</label>
           <input
             type="number"
             min="1"
@@ -5256,7 +5256,7 @@ function BusinessSettings() {
           {/* Newsletter Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Newsletter Name
+              Publication Name
             </label>
             <input
               type="text"
@@ -5668,7 +5668,7 @@ function BusinessSettings() {
           disabled={saving}
           className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-2 rounded-md font-medium"
         >
-          {saving ? 'Saving...' : 'Save Business Settings'}
+          {saving ? 'Saving...' : 'Save Publication Settings'}
         </button>
       </div>
     </div>

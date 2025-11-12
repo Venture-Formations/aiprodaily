@@ -2426,7 +2426,7 @@ export default function CampaignDetailPage() {
           <div className="flex justify-between items-start">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                Newsletter for {formatDate(campaign.date)}
+                Publication for {formatDate(campaign.date)}
               </h1>
               <div className="flex items-center space-x-4">
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -2469,7 +2469,7 @@ export default function CampaignDetailPage() {
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                 )}
-                <span>{previewLoading ? 'Loading...' : 'Preview Newsletter'}</span>
+                <span>{previewLoading ? 'Loading...' : 'Preview Publication'}</span>
               </button>
             </div>
           </div>

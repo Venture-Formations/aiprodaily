@@ -72,7 +72,7 @@ export default function NewsletterDashboard() {
   }
 
   const statCards = [
-    { label: 'Newsletters Sent', count: campaigns.filter(c => c.status === 'sent').length, color: 'text-brand-primary' },
+    { label: 'Publications Sent', count: campaigns.filter(c => c.status === 'sent').length, color: 'text-brand-primary' },
     { label: 'In Review', count: campaigns.filter(c => c.status === 'in_review').length, color: 'text-yellow-600' },
     { label: 'Changes Made', count: campaigns.filter(c => c.status === 'changes_made').length, color: 'text-blue-600' },
     { label: 'Drafts', count: campaigns.filter(c => c.status === 'draft').length, color: 'text-gray-600' },
@@ -86,10 +86,10 @@ export default function NewsletterDashboard() {
           {/* Header */}
           <header className="text-center mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-              Newsletter Dashboard
+              Publication Dashboard
             </h1>
             <p className="text-base sm:text-lg text-gray-600">
-              Manage your {newsletter?.name || 'newsletter'} campaigns
+              Manage your {newsletter?.name || 'publication'} campaigns
             </p>
           </header>
 
@@ -148,7 +148,7 @@ export default function NewsletterDashboard() {
                   <EmptyState
                     icon="📧"
                     title="No campaigns yet"
-                    description="Get started by creating your first newsletter campaign"
+                    description="Get started by creating your first publication campaign"
                     actionLabel="Create Campaign"
                     actionHref={`/dashboard/${slug}/campaigns/new`}
                   />
@@ -194,7 +194,7 @@ export default function NewsletterDashboard() {
                       Create Campaign
                     </div>
                     <div className="text-sm text-gray-600">
-                      Start a new newsletter campaign
+                      Start a new publication campaign
                     </div>
                   </div>
                 </Card>
