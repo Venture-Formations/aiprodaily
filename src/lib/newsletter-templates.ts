@@ -674,6 +674,19 @@ export async function generateAdvertorialSection(campaign: any, recordUsage: boo
       ? `<tr><td style='padding: 0 12px; text-align: center;'><a href='${trackedUrl}'><img src='${imageUrl}' alt='${selectedAd.title}' style='max-width: 100%; max-height: 500px; border-radius: 4px; display: block; margin: 0 auto;'></a></td></tr>`
       : ''
 
+    // Function to normalize HTML for email clients
+    const normalizeEmailHtml = (html: string): string => {
+      return html
+        // Remove newlines and extra whitespace between tags
+        .replace(/>\s+</g, '><')
+        // Remove newlines within text content but preserve intentional spaces
+        .replace(/\n+/g, ' ')
+        // Collapse multiple spaces into one
+        .replace(/\s{2,}/g, ' ')
+        // Trim whitespace at start/end
+        .trim()
+    }
+
     // Process ad body: make the last sentence a hyperlink
     let processedBody = selectedAd.body || ''
     if (buttonUrl !== '#' && processedBody) {
@@ -731,6 +744,9 @@ export async function generateAdvertorialSection(campaign: any, recordUsage: boo
         }
       }
     }
+
+    // Normalize the processed body HTML for email clients
+    processedBody = normalizeEmailHtml(processedBody)
 
     return `
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
