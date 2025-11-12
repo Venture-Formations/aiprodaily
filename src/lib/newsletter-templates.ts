@@ -696,17 +696,17 @@ export async function generateAdvertorialSection(campaign: any, recordUsage: boo
       // Find all sentence-ending punctuation marks (., !, ?)
       // But exclude periods that are part of domains (.com, .ai, .io, etc.) or abbreviations
       const sentenceEndPattern = /[.!?](?=\s+[A-Z]|$)/g
-      const matches = [...plainText.matchAll(sentenceEndPattern)]
+      const matches = Array.from(plainText.matchAll(sentenceEndPattern))
 
       if (matches.length > 0) {
         // Get the position of the last sentence-ending punctuation
-        const lastMatch = matches[matches.length - 1]
+        const lastMatch = matches[matches.length - 1] as RegExpMatchArray
         const lastPeriodIndex = lastMatch.index!
 
         // Find the second-to-last sentence-ending punctuation
         let startIndex = 0
         if (matches.length > 1) {
-          const secondLastMatch = matches[matches.length - 2]
+          const secondLastMatch = matches[matches.length - 2] as RegExpMatchArray
           startIndex = secondLastMatch.index! + 1
         }
 
