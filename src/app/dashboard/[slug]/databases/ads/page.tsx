@@ -146,11 +146,13 @@ export default function AdsManagementPage() {
       }
 
       // Refresh to ensure consistency
-      fetchAds()
+      await fetchAds()
+      await fetchNextAdPosition()
     } catch (error) {
       console.error('Reorder error:', error)
       alert('Failed to reorder ads')
-      fetchAds()
+      await fetchAds()
+      await fetchNextAdPosition()
     }
   }
 
@@ -177,7 +179,8 @@ export default function AdsManagementPage() {
       }
 
       // Refresh ads to show updated ordering
-      fetchAds()
+      await fetchAds()
+      await fetchNextAdPosition()
     } catch (error) {
       console.error('Order update error:', error)
       alert('Failed to update order')

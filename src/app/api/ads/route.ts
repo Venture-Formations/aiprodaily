@@ -7,13 +7,35 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
 
+    // Get the first active newsletter for newsletter_id
+    const { data: newsletter, error: newsletterError } = await supabaseAdmin
+      .from('newsletters')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (newsletterError || !newsletter) {
+      return NextResponse.json(
+        { error: 'No active newsletter found' },
+        { status: 404 }
+      )
+    }
+
     let query = supabaseAdmin
       .from('advertisements')
       .select('*')
+      .eq('newsletter_id', newsletter.id)
       .order('created_at', { ascending: false })
 
     if (status) {
-      query = query.eq('status', status)
+      // Handle comma-separated status values
+      const statuses = status.split(',').map(s => s.trim())
+      if (statuses.length > 1) {
+        query = query.in('status', statuses)
+      } else {
+        query = query.eq('status', status)
+      }
     }
 
     const { data: ads, error } = await query
