@@ -693,25 +693,25 @@ export async function generateAdvertorialSection(campaign: any, recordUsage: boo
       // Strip HTML to get plain text
       const plainText = processedBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 
-      // Find the last punctuation mark
-      const lastPeriodIndex = Math.max(
-        plainText.lastIndexOf('.'),
-        plainText.lastIndexOf('!'),
-        plainText.lastIndexOf('?')
-      )
+      // Find all sentence-ending punctuation marks (., !, ?)
+      // But exclude periods that are part of domains (.com, .ai, .io, etc.) or abbreviations
+      const sentenceEndPattern = /[.!?](?=\s+[A-Z]|$)/g
+      const matches = [...plainText.matchAll(sentenceEndPattern)]
 
-      if (lastPeriodIndex > 0) {
-        // Find the second-to-last punctuation mark
-        const beforeLastPeriod = plainText.substring(0, lastPeriodIndex)
-        const secondLastPeriodIndex = Math.max(
-          beforeLastPeriod.lastIndexOf('.'),
-          beforeLastPeriod.lastIndexOf('!'),
-          beforeLastPeriod.lastIndexOf('?')
-        )
+      if (matches.length > 0) {
+        // Get the position of the last sentence-ending punctuation
+        const lastMatch = matches[matches.length - 1]
+        const lastPeriodIndex = lastMatch.index!
 
-        // Extract the last complete sentence (from after previous punctuation to end)
-        const startIndex = secondLastPeriodIndex >= 0 ? secondLastPeriodIndex + 1 : 0
-        const lastSentence = plainText.substring(startIndex).trim()
+        // Find the second-to-last sentence-ending punctuation
+        let startIndex = 0
+        if (matches.length > 1) {
+          const secondLastMatch = matches[matches.length - 2]
+          startIndex = secondLastMatch.index! + 1
+        }
+
+        // Extract the last complete sentence (from after previous punctuation to end, including the final punctuation)
+        const lastSentence = plainText.substring(startIndex, lastPeriodIndex + 1).trim()
 
         if (lastSentence.length > 5) {
           // Escape special regex characters
@@ -729,7 +729,7 @@ export async function generateAdvertorialSection(campaign: any, recordUsage: boo
           )
         }
       } else {
-        // No punctuation found - wrap the entire text
+        // No sentence-ending punctuation found - wrap the entire text
         const trimmedText = plainText.trim()
         if (trimmedText.length > 5) {
           const escapedText = trimmedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
