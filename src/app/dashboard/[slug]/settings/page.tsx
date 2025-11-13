@@ -514,6 +514,10 @@ function SystemStatus() {
   const [scheduleDisplay, setScheduleDisplay] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
+  // Get newsletter slug from pathname
+  const pathname = usePathname()
+  const newsletterSlug = pathname ? pathname.match(/^\/dashboard\/([^\/]+)/)?.[1] : null
+
   useEffect(() => {
     fetchSystemStatus()
     fetchScheduleDisplay()
