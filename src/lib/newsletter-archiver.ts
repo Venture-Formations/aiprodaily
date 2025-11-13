@@ -2,8 +2,8 @@ import { supabaseAdmin } from './supabase'
 import type { ArchivedNewsletter } from '@/types/database'
 
 interface ArchiveNewsletterParams {
-  campaignId: string
-  campaignDate: string  // YYYY-MM-DD format
+  issueId: string
+  issueDate: string  // YYYY-MM-DD format
   subjectLine: string
   recipientCount: number
   htmlContent?: string  // Optional HTML backup
@@ -16,23 +16,23 @@ export class NewsletterArchiver {
    */
   async archiveNewsletter(params: ArchiveNewsletterParams): Promise<{ success: boolean; error?: string }> {
     try {
-      const { campaignId, campaignDate, subjectLine, recipientCount, htmlContent } = params
+      const { issueId, issueDate, subjectLine, recipientCount, htmlContent } = params
 
-      console.log(`Archiving newsletter for campaign ${campaignId} (${campaignDate})...`)
+      console.log(`Archiving newsletter for issue ${issueId} (${issueDate})...`)
 
-      // 1. Fetch campaign data (including welcome section and newsletter_id)
-      const { data: campaign, error: campaignError } = await supabaseAdmin
-        .from('newsletter_campaigns')
-        .select('newsletter_id, welcome_intro, welcome_tagline, welcome_summary')
-        .eq('id', campaignId)
+      // 1. Fetch issue data (including welcome section and publication_id)
+      const { data: issue, error: issueError } = await supabaseAdmin
+        .from('publication_issues')
+        .select('publication_id, welcome_intro, welcome_tagline, welcome_summary')
+        .eq('id', issueId)
         .single()
 
-      if (campaignError) {
-        console.error('Error fetching campaign:', campaignError)
-        return { success: false, error: `Failed to fetch campaign: ${campaignError.message}` }
+      if (issueError) {
+        console.error('Error fetching issue:', issueError)
+        return { success: false, error: `Failed to fetch issue: ${issueError.message}` }
       }
 
-      // 2. Fetch all articles for this campaign
+      // 2. Fetch all articles for this issue
       const { data: articles, error: articlesError } = await supabaseAdmin
         .from('articles')
         .select(`
@@ -50,7 +50,7 @@ export class NewsletterArchiver {
             publication_date
           )
         `)
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .eq('is_active', true)
         .order('rank', { ascending: true })
 
@@ -77,7 +77,7 @@ export class NewsletterArchiver {
             publication_date
           )
         `)
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .eq('is_active', true)
         .order('rank', { ascending: true })
 
@@ -85,16 +85,16 @@ export class NewsletterArchiver {
       const sections: Record<string, any> = {}
 
       // Welcome section
-      if (campaign && (campaign.welcome_intro || campaign.welcome_tagline || campaign.welcome_summary)) {
+      if (issue && (issue.welcome_intro || issue.welcome_tagline || issue.welcome_summary)) {
         // Prepend personalized greeting to intro for email
         const greeting = `Hey, {$name|default('Accounting Pro')}!`
-        const intro = campaign.welcome_intro || ''
+        const intro = issue.welcome_intro || ''
         const fullIntro = intro.trim() ? `${greeting} ${intro.trim()}` : greeting
 
         sections.welcome = {
           intro: greeting,
-          tagline: campaign.welcome_tagline || '',
-          summary: campaign.welcome_summary || ''
+          tagline: issue.welcome_tagline || '',
+          summary: issue.welcome_summary || ''
         }
       }
 
@@ -102,7 +102,7 @@ export class NewsletterArchiver {
       const { data: roadWork } = await supabaseAdmin
         .from('road_work_data')
         .select('*')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .eq('is_active', true)
         .single()
 
@@ -115,7 +115,7 @@ export class NewsletterArchiver {
 
       // AI Apps section
       const { data: aiApps } = await supabaseAdmin
-        .from('campaign_ai_app_selections')
+        .from('issue_ai_app_selections')
         .select(`
           selection_order,
           is_featured,
@@ -130,7 +130,7 @@ export class NewsletterArchiver {
             tool_type
           )
         `)
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .order('selection_order', { ascending: true })
 
       if (aiApps && aiApps.length > 0) {
@@ -141,7 +141,7 @@ export class NewsletterArchiver {
       const { data: poll } = await supabaseAdmin
         .from('poll_questions')
         .select('*')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .single()
 
       if (poll) {
@@ -150,7 +150,7 @@ export class NewsletterArchiver {
 
       // Prompt Ideas section
       const { data: promptSelection } = await supabaseAdmin
-        .from('campaign_prompt_selections')
+        .from('issue_prompt_selections')
         .select(`
           selection_order,
           is_featured,
@@ -161,7 +161,7 @@ export class NewsletterArchiver {
             category
           )
         `)
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .single()
 
       if (promptSelection && promptSelection.prompt) {
@@ -170,9 +170,9 @@ export class NewsletterArchiver {
 
       // Advertorial section
       const { data: advertorialData } = await supabaseAdmin
-        .from('campaign_advertisements')
+        .from('issue_advertisements')
         .select(`
-          campaign_date,
+          issue_date,
           used_at,
           advertisement:advertisements(
             id,
@@ -183,7 +183,7 @@ export class NewsletterArchiver {
             image_url
           )
         `)
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .single()
 
       if (advertorialData && advertorialData.advertisement) {
@@ -194,7 +194,7 @@ export class NewsletterArchiver {
       const metadata = {
         total_articles: articles?.length || 0,
         total_secondary_articles: secondaryArticles?.length || 0,
-        has_welcome: !!(campaign?.welcome_intro || campaign?.welcome_tagline || campaign?.welcome_summary),
+        has_welcome: !!(issue?.welcome_intro || issue?.welcome_tagline || issue?.welcome_summary),
         has_road_work: !!roadWork,
         has_ai_apps: !!aiApps && aiApps.length > 0,
         has_poll: !!poll,
@@ -205,9 +205,9 @@ export class NewsletterArchiver {
 
       // 5. Create archive record
       const archiveData: Partial<ArchivedNewsletter> = {
-        campaign_id: campaignId,
-        newsletter_id: campaign.newsletter_id,
-        campaign_date: campaignDate,
+        issue_id: issueId,
+        publication_id: issue.publication_id,
+        issue_date: issueDate,
         subject_line: subjectLine,
         send_date: new Date().toISOString(),
         recipient_count: recipientCount,
@@ -228,7 +228,7 @@ export class NewsletterArchiver {
         return { success: false, error: `Failed to create archive: ${insertError.message}` }
       }
 
-      console.log(`✓ Newsletter archived successfully: ${campaignDate}`)
+      console.log(`✓ Newsletter archived successfully: ${issueDate}`)
       return { success: true }
 
     } catch (error: any) {
@@ -245,7 +245,7 @@ export class NewsletterArchiver {
       const { data, error } = await supabaseAdmin
         .from('archived_newsletters')
         .select('*')
-        .eq('campaign_date', date)
+        .eq('issue_date', date)
         .single()
 
       if (error) {
@@ -263,12 +263,12 @@ export class NewsletterArchiver {
   /**
    * Get list of all archived newsletters
    */
-  async getArchiveList(limit = 50): Promise<Array<Pick<ArchivedNewsletter, 'id' | 'campaign_date' | 'subject_line' | 'send_date' | 'metadata'>>> {
+  async getArchiveList(limit = 50): Promise<Array<Pick<ArchivedNewsletter, 'id' | 'issue_date' | 'subject_line' | 'send_date' | 'metadata'>>> {
     try {
       const { data, error } = await supabaseAdmin
         .from('archived_newsletters')
-        .select('id, campaign_date, subject_line, send_date, metadata')
-        .order('campaign_date', { ascending: false })
+        .select('id, issue_date, subject_line, send_date, metadata')
+        .order('issue_date', { ascending: false })
         .limit(limit)
 
       if (error) {
@@ -286,7 +286,7 @@ export class NewsletterArchiver {
   /**
    * Update archive with additional data (e.g., analytics)
    */
-  async updateArchive(campaignId: string, updates: Partial<ArchivedNewsletter>): Promise<{ success: boolean; error?: string }> {
+  async updateArchive(issueId: string, updates: Partial<ArchivedNewsletter>): Promise<{ success: boolean; error?: string }> {
     try {
       const { error } = await supabaseAdmin
         .from('archived_newsletters')
@@ -294,7 +294,7 @@ export class NewsletterArchiver {
           ...updates,
           updated_at: new Date().toISOString()
         })
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
 
       if (error) {
         console.error('Error updating archive:', error)

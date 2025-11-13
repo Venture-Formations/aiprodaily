@@ -15,29 +15,29 @@ export async function GET() {
   try {
     console.log('=== Breaking News Processor Test ===')
 
-    // Get latest campaign
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Get latest issue
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select('id, date, status')
       .order('date', { ascending: false })
       .limit(1)
       .single()
 
-    if (campaignError || !campaign) {
+    if (issueError || !issue) {
       return NextResponse.json({
         success: false,
-        error: 'No campaign found'
+        error: 'No issue found'
       }, { status: 404 })
     }
 
-    console.log(`Testing with campaign: ${campaign.id} (${campaign.date})`)
+    console.log(`Testing with issue: ${issue.id} (${issue.date})`)
 
     // Check RSS feeds
     const { data: feeds, error: feedsError } = await supabaseAdmin
       .from('rss_feeds')
       .select('*')
       .eq('active', true)
-      .not('newsletter_id', 'is', null)
+      .not('publication_id', 'is', null)
 
     console.log(`Found ${feeds?.length || 0} active Breaking News feeds`)
 
@@ -51,13 +51,13 @@ export async function GET() {
 
     // Process Breaking News
     const processor = new BreakingNewsProcessor()
-    await processor.processBreakingNewsFeeds(campaign.id)
+    await processor.processBreakingNewsFeeds(issue.id)
 
     // Get results
     const { data: posts, error: postsError } = await supabaseAdmin
       .from('rss_posts')
       .select('*')
-      .eq('campaign_id', campaign.id)
+      .eq('issue_id', issue.id)
       .not('breaking_news_score', 'is', null)
       .order('breaking_news_score', { ascending: false })
 
@@ -70,10 +70,10 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      campaign: {
-        id: campaign.id,
-        date: campaign.date,
-        status: campaign.status
+      issue: {
+        id: issue.id,
+        date: issue.date,
+        status: issue.status
       },
       feeds_processed: feeds.length,
       articles_scored: posts?.length || 0,

@@ -4,10 +4,10 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function GET(request: NextRequest) {
   try {
     const searchParams = new URL(request.url).searchParams
-    const campaignId = searchParams.get('campaign_id')
+    const issueId = searchParams.get('issue_id')
 
-    if (!campaignId) {
-      return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
+    if (!issueId) {
+      return NextResponse.json({ error: 'issueId required' }, { status: 400 })
     }
 
     // Get secondary articles
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
           post_rating:post_ratings(total_score)
         )
       `)
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .order('rank', { ascending: true, nullsFirst: false })
 
     if (secondaryError) {
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      campaign_id: campaignId,
+      issue_id: issueId,
       total_secondary_articles: totalCount,
       active_secondary_articles: activeCount,
       articles: secondaryArticles?.map(a => ({

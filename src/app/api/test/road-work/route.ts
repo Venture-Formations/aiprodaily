@@ -4,12 +4,12 @@ import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const campaignDate = searchParams.get('campaign_date') || 'Sep 25, 2025'
+    const issueDate = searchParams.get('issue_date') || 'Sep 25, 2025'
 
-    console.log(`Testing road work generation for date: ${campaignDate}`)
+    console.log(`Testing road work generation for date: ${issueDate}`)
 
     // Generate road work data using AI directly
-    const prompt = await AI_PROMPTS.roadWorkGenerator(campaignDate)
+    const prompt = await AI_PROMPTS.roadWorkGenerator(issueDate)
     console.log('Calling AI for road work generation...')
 
     const aiResponse = await callOpenAI(prompt, 3000, 0.7)
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
           road_range: 'N/A',
           city_or_township: 'St. Cloud Area',
           reason: 'No major closures reported',
-          start_date: campaignDate.split(',')[0] || 'Sep 25',
+          start_date: issueDate.split(',')[0] || 'Sep 25',
           expected_reopen: 'N/A',
           source_url: 'https://www.dot.state.mn.us/d3/'
         })

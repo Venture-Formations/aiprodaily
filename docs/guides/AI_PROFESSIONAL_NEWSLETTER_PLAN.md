@@ -79,7 +79,7 @@ A **multi-tenant newsletter platform** for AI applications tailored to specific 
 ```sql
 CREATE TABLE ai_applications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  newsletter_id UUID NOT NULL REFERENCES newsletters(id) ON DELETE CASCADE,
+  newsletter_id UUID NOT NULL REFERENCES publications(id) ON DELETE CASCADE,
 
   -- Application Details
   app_name TEXT NOT NULL,
@@ -116,7 +116,7 @@ CREATE INDEX idx_ai_apps_category ON ai_applications(category);
 -- Example data for Accounting newsletter
 INSERT INTO ai_applications (newsletter_id, app_name, tagline, description, category, app_url, pricing) VALUES
 (
-  (SELECT id FROM newsletters WHERE slug = 'accounting'),
+  (SELECT id FROM publications WHERE slug = 'accounting'),
   'QuickBooks AI Assistant',
   'Automate your bookkeeping with AI',
   'AI-powered accounting assistant that categorizes transactions, detects anomalies, and generates financial reports automatically.',
@@ -149,7 +149,7 @@ CREATE INDEX idx_campaign_apps_campaign ON campaign_ai_app_selections(campaign_i
 ```sql
 CREATE TABLE prompt_ideas (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  newsletter_id UUID NOT NULL REFERENCES newsletters(id) ON DELETE CASCADE,
+  newsletter_id UUID NOT NULL REFERENCES publications(id) ON DELETE CASCADE,
 
   -- Prompt Details
   title TEXT NOT NULL, -- e.g., "Analyze Cash Flow Trends"
@@ -183,7 +183,7 @@ CREATE INDEX idx_prompt_ideas_category ON prompt_ideas(category);
 -- Example data for Accounting newsletter
 INSERT INTO prompt_ideas (newsletter_id, title, prompt_text, category, use_case, suggested_model, difficulty_level) VALUES
 (
-  (SELECT id FROM newsletters WHERE slug = 'accounting'),
+  (SELECT id FROM publications WHERE slug = 'accounting'),
   'Analyze Monthly Cash Flow',
   'Review the following cash flow data from [Month]: [paste data]. Identify trends, potential issues, and provide 3 actionable recommendations to improve cash flow in the next quarter.',
   'Financial Analysis',
@@ -192,7 +192,7 @@ INSERT INTO prompt_ideas (newsletter_id, title, prompt_text, category, use_case,
   'Beginner'
 ),
 (
-  (SELECT id FROM newsletters WHERE slug = 'accounting'),
+  (SELECT id FROM publications WHERE slug = 'accounting'),
   'Draft Tax Deadline Reminder Email',
   'Write a professional email to clients reminding them of the [Tax Deadline Date] deadline. Include: 1) Required documents, 2) Consequences of missing deadline, 3) How to schedule appointment. Tone: Professional but friendly.',
   'Client Communication',
@@ -228,12 +228,12 @@ UPDATE newsletter_sections SET is_active = false WHERE newsletter_id IS NULL;
 
 -- Insert new sections for Accounting newsletter
 INSERT INTO newsletter_sections (newsletter_id, name, display_order, is_active) VALUES
-((SELECT id FROM newsletters WHERE slug = 'accounting'), 'Welcome', 1, true),
-((SELECT id FROM newsletters WHERE slug = 'accounting'), 'Advertisement', 2, true),
-((SELECT id FROM newsletters WHERE slug = 'accounting'), 'Top Articles', 3, true),
-((SELECT id FROM newsletters WHERE slug = 'accounting'), 'AI Applications', 4, true),
-((SELECT id FROM newsletters WHERE slug = 'accounting'), 'Bottom Articles', 5, true),
-((SELECT id FROM newsletters WHERE slug = 'accounting'), 'Prompt Ideas', 6, true);
+((SELECT id FROM publications WHERE slug = 'accounting'), 'Welcome', 1, true),
+((SELECT id FROM publications WHERE slug = 'accounting'), 'Advertisement', 2, true),
+((SELECT id FROM publications WHERE slug = 'accounting'), 'Top Articles', 3, true),
+((SELECT id FROM publications WHERE slug = 'accounting'), 'AI Applications', 4, true),
+((SELECT id FROM publications WHERE slug = 'accounting'), 'Bottom Articles', 5, true),
+((SELECT id FROM publications WHERE slug = 'accounting'), 'Prompt Ideas', 6, true);
 ```
 
 ---
@@ -332,22 +332,22 @@ Sender Emails:
 ```sql
 -- Accounting newsletter MailerLite settings
 INSERT INTO newsletter_settings (newsletter_id, key, value, description) VALUES
-((SELECT id FROM newsletters WHERE slug = 'accounting'),
+((SELECT id FROM publications WHERE slug = 'accounting'),
  'mailerlite_test_group_id',
  'YOUR_TEST_GROUP_ID',
  'MailerLite test group ID for Accounting newsletter'),
 
-((SELECT id FROM newsletters WHERE slug = 'accounting'),
+((SELECT id FROM publications WHERE slug = 'accounting'),
  'mailerlite_main_group_id',
  'YOUR_MAIN_GROUP_ID',
  'MailerLite production group ID for Accounting newsletter'),
 
-((SELECT id FROM newsletters WHERE slug = 'accounting'),
+((SELECT id FROM publications WHERE slug = 'accounting'),
  'from_email',
  'accounting@yourdomain.com',
  'Email sender address'),
 
-((SELECT id FROM newsletters WHERE slug = 'accounting'),
+((SELECT id FROM publications WHERE slug = 'accounting'),
  'sender_name',
  'Accounting AI Daily',
  'Email sender name');

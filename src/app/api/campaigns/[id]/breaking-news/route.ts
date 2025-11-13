@@ -7,18 +7,18 @@ type RouteParams = {
 
 /**
  * GET /api/campaigns/[id]/breaking-news
- * Fetch Breaking News articles for a campaign
+ * Fetch Breaking News articles for an issue
  */
 export async function GET(request: NextRequest, props: RouteParams) {
   try {
     const params = await props.params
-    const campaignId = params.id
+    const issueId = params.id
 
-    // Fetch RSS posts with Breaking News scores for this campaign
+    // Fetch RSS posts with Breaking News scores for this issue
     const { data: posts, error: postsError } = await supabaseAdmin
       .from('rss_posts')
       .select('*')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .not('breaking_news_score', 'is', null)
       .order('breaking_news_score', { ascending: false })
 
@@ -30,11 +30,11 @@ export async function GET(request: NextRequest, props: RouteParams) {
       }, { status: 500 })
     }
 
-    // Fetch selected Breaking News articles from campaign_breaking_news table
+    // Fetch selected Breaking News articles from issue_breaking_news table
     const { data: selections, error: selectionsError } = await supabaseAdmin
-      .from('campaign_breaking_news')
+      .from('issue_breaking_news')
       .select('*')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     const selectedBreaking = selections?.filter(s => s.section === 'breaking').map(s => s.post_id) || []
     const selectedBeyondFeed = selections?.filter(s => s.section === 'beyond_feed').map(s => s.post_id) || []
@@ -57,31 +57,31 @@ export async function GET(request: NextRequest, props: RouteParams) {
 
 /**
  * POST /api/campaigns/[id]/breaking-news
- * Update Breaking News article selections for a campaign
+ * Update Breaking News article selections for an issue
  */
 export async function POST(request: NextRequest, props: RouteParams) {
   try {
     const params = await props.params
-    const campaignId = params.id
+    const issueId = params.id
     const body = await request.json()
     const { breaking, beyond_feed } = body
 
     // Delete existing selections
     await supabaseAdmin
-      .from('campaign_breaking_news')
+      .from('issue_breaking_news')
       .delete()
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     // Insert new selections
     const insertions = [
       ...breaking.map((postId: string, index: number) => ({
-        campaign_id: campaignId,
+        issue_id: issueId,
         post_id: postId,
         section: 'breaking',
         position: index + 1
       })),
       ...beyond_feed.map((postId: string, index: number) => ({
-        campaign_id: campaignId,
+        issue_id: issueId,
         post_id: postId,
         section: 'beyond_feed',
         position: index + 1
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest, props: RouteParams) {
 
     if (insertions.length > 0) {
       const { error: insertError } = await supabaseAdmin
-        .from('campaign_breaking_news')
+        .from('issue_breaking_news')
         .insert(insertions)
 
       if (insertError) {

@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
   try {
     // Get current newsletters
     const { data: newsletters, error: fetchError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id, name, slug')
       .order('created_at')
 
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     // Update newsletter names
     // Update accounting newsletter
     const { error: accountingError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .update({ name: 'AI Accounting Daily' })
       .eq('slug', 'accounting')
 
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     // Get updated newsletters
     const { data: newsletters, error: fetchError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id, name, slug')
       .order('created_at')
 

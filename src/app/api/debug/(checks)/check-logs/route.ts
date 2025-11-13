@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const campaignId = searchParams.get('campaign_id')
+    const issueId = searchParams.get('issue_id')
     const limit = parseInt(searchParams.get('limit') || '50')
 
     let query = supabaseAdmin
@@ -13,8 +13,8 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: false })
       .limit(limit)
 
-    if (campaignId) {
-      query = query.eq('context->>campaignId', campaignId)
+    if (issueId) {
+      query = query.eq('context->>issueId', issueId)
     }
 
     const { data: logs, error } = await query

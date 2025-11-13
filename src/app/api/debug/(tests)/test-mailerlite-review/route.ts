@@ -4,11 +4,11 @@ import { MailerLiteService } from '@/lib/mailerlite'
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🧪 Testing MailerLite review campaign creation...')
+    console.log('🧪 Testing MailerLite review issue creation...')
 
-    // Get the latest campaign
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Get the latest issue
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         *,
         articles:articles!inner(
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
           )
         ),
         manual_articles:manual_articles(*),
-        campaign_events:campaign_events(
+        issue_events:issue_events(
           *,
           event:events(*)
         )
@@ -30,30 +30,30 @@ export async function GET(request: NextRequest) {
       .limit(1)
       .single()
 
-    if (campaignError || !campaign) {
+    if (issueError || !issue) {
       return NextResponse.json({
         success: false,
-        error: 'No campaign found',
-        details: campaignError?.message
+        error: 'No issue found',
+        details: issueError?.message
       }, { status: 404 })
     }
 
-    console.log(`Testing MailerLite integration for campaign ${campaign.id} (${campaign.date})`)
+    console.log(`Testing MailerLite integration for issue ${issue.id} (${issue.date})`)
 
     // Test MailerLite API connection
     const mailerLiteService = new MailerLiteService()
 
     try {
-      console.log('Testing MailerLite review campaign creation...')
-      const result = await mailerLiteService.createReviewCampaign(campaign)
+      console.log('Testing MailerLite review issue creation...')
+      const result = await mailerLiteService.createReviewissue(issue)
 
       return NextResponse.json({
         success: true,
-        message: 'MailerLite review campaign created successfully',
-        campaignId: campaign.id,
-        campaignDate: campaign.date,
-        mailerliteCampaignId: result.campaignId,
-        subjectLine: campaign.subject_line,
+        message: 'MailerLite review issue created successfully',
+        issueId: issue.id,
+        issueDate: issue.date,
+        mailerliteissueId: result.issueId,
+        subjectLine: issue.subject_line,
         result: result
       })
 
@@ -64,10 +64,10 @@ export async function GET(request: NextRequest) {
         success: false,
         error: 'MailerLite API failed',
         details: mailerLiteError instanceof Error ? mailerLiteError.message : 'Unknown MailerLite error',
-        campaignId: campaign.id,
-        campaignDate: campaign.date,
-        hasSubjectLine: !!campaign.subject_line,
-        activeArticlesCount: campaign.articles?.length || 0
+        issueId: issue.id,
+        issueDate: issue.date,
+        hasSubjectLine: !!issue.subject_line,
+        activeArticlesCount: issue.articles?.length || 0
       }, { status: 500 })
     }
 

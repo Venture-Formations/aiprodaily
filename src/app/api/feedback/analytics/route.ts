@@ -25,8 +25,8 @@ export async function GET(request: NextRequest) {
     const { data: responses, error } = await supabaseAdmin
       .from('feedback_responses')
       .select('*')
-      .gte('campaign_date', startDate.toISOString().split('T')[0])
-      .lte('campaign_date', endDate.toISOString().split('T')[0])
+      .gte('issue_date', startDate.toISOString().split('T')[0])
+      .lte('issue_date', endDate.toISOString().split('T')[0])
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     // Calculate daily response counts
     const dailyResponses: { [key: string]: number } = {}
     responses?.forEach(response => {
-      const date = response.campaign_date
+      const date = response.issue_date
       dailyResponses[date] = (dailyResponses[date] || 0) + 1
     })
 

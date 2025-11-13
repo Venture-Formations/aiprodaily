@@ -81,7 +81,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Deal not found' }, { status: 404 })
     }
 
-    // Delete the deal (this will also delete any campaign selections due to cascade)
+    // Delete the deal (this will also delete any issue selections due to cascade)
     const { error: deleteError } = await supabaseAdmin
       .from('dining_deals')
       .delete()

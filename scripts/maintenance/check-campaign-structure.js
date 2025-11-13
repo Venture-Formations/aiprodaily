@@ -16,7 +16,7 @@ async function checkCampaignStructure() {
   try {
     // Get the accounting newsletter ID
     const { data: newsletter, error: newsletterError } = await supabase
-      .from('newsletters')
+      .from('publications')
       .select('id, slug, name')
       .eq('slug', 'accounting')
       .single();

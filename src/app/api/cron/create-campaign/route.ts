@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     // TODO: This legacy route should be deprecated in favor of trigger-workflow
     // Get first active newsletter for backward compatibility
     const { data: activeNewsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('is_active', true)
       .limit(1)
@@ -27,39 +27,39 @@ export async function POST(request: NextRequest) {
       }, { status: 404 })
     }
 
-    console.log('=== AUTOMATED CAMPAIGN CREATION CHECK ===')
+    console.log('=== AUTOMATED issue CREATION CHECK ===')
     console.log('Time:', new Date().toISOString())
 
-    // Check if it's time to run campaign creation based on database settings
-    const shouldRun = await ScheduleChecker.shouldRunCampaignCreation(activeNewsletter.id)
+    // Check if it's time to run issue creation based on database settings
+    const shouldRun = await ScheduleChecker.shouldRunissueCreation(activeNewsletter.id)
 
     if (!shouldRun) {
       return NextResponse.json({
         success: true,
-        message: 'Not time to run campaign creation or already ran today',
+        message: 'Not time to run issue creation or already ran today',
         skipped: true,
         timestamp: new Date().toISOString()
       })
     }
 
-    console.log('=== CAMPAIGN CREATION STARTED (Time Matched) ===')
+    console.log('=== issue CREATION STARTED (Time Matched) ===')
     console.log('Central Time:', new Date().toLocaleString("en-US", {timeZone: "America/Chicago"}))
 
-    // Get campaign (already processed with RSS and subject line)
+    // Get issue (already processed with RSS and subject line)
     // Use Central Time + 12 hours for consistent date calculations
-    // This ensures evening runs (8pm+) create campaigns for tomorrow
+    // This ensures evening runs (8pm+) create issues for tomorrow
     const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
     const centralDate = new Date(nowCentral)
-    // Add 12 hours to determine campaign date (same logic as RSS Processing)
+    // Add 12 hours to determine issue date (same logic as RSS Processing)
     centralDate.setHours(centralDate.getHours() + 12)
-    const campaignDate = centralDate.toISOString().split('T')[0]
+    const issueDate = centralDate.toISOString().split('T')[0]
 
-    console.log('Campaign date calculation: Current CT time + 12 hours =', campaignDate)
-    console.log('Creating review campaign for date:', campaignDate)
+    console.log('issue date calculation: Current CT time + 12 hours =', issueDate)
+    console.log('Creating review issue for date:', issueDate)
 
     // Get accounting newsletter ID
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('slug', 'accounting')
       .single()
@@ -71,9 +71,9 @@ export async function POST(request: NextRequest) {
       }, { status: 404 })
     }
 
-    // Find tomorrow's campaign with articles
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Find tomorrow's issue with articles
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         *,
         articles:articles(
@@ -85,73 +85,73 @@ export async function POST(request: NextRequest) {
         ),
         manual_articles:manual_articles(*)
       `)
-      .eq('newsletter_id', newsletter.id)
-      .eq('date', campaignDate)
+      .eq('publication_id', newsletter.id)
+      .eq('date', issueDate)
       .single()
 
-    if (campaignError || !campaign) {
+    if (issueError || !issue) {
       return NextResponse.json({
         success: false,
-        error: 'No campaign found for tomorrow',
-        campaignDate: campaignDate
+        error: 'No issue found for tomorrow',
+        issueDate: issueDate
       }, { status: 404 })
     }
 
-    console.log('Found campaign:', campaign.id, 'Status:', campaign.status)
+    console.log('Found issue:', issue.id, 'Status:', issue.status)
 
-    // Only create if campaign is in draft status
-    if (campaign.status !== 'draft') {
+    // Only create if issue is in draft status
+    if (issue.status !== 'draft') {
       return NextResponse.json({
         success: true,
-        message: `Campaign status is ${campaign.status}, skipping campaign creation`,
-        campaignId: campaign.id,
+        message: `issue status is ${issue.status}, skipping issue creation`,
+        issueId: issue.id,
         skipped: true
       })
     }
 
-    // Check if campaign has active articles
-    const activeArticles = campaign.articles.filter((article: any) => article.is_active)
+    // Check if issue has active articles
+    const activeArticles = issue.articles.filter((article: any) => article.is_active)
     if (activeArticles.length === 0) {
       return NextResponse.json({
         success: false,
-        error: 'No active articles found for campaign creation',
-        campaignId: campaign.id
+        error: 'No active articles found for issue creation',
+        issueId: issue.id
       }, { status: 400 })
     }
 
-    console.log(`Campaign has ${activeArticles.length} active articles`)
+    console.log(`issue has ${activeArticles.length} active articles`)
 
     // Check if subject line exists
-    if (!campaign.subject_line || campaign.subject_line.trim() === '') {
+    if (!issue.subject_line || issue.subject_line.trim() === '') {
       return NextResponse.json({
         success: false,
-        error: 'No subject line found for campaign. Run subject line generation first.',
-        campaignId: campaign.id
+        error: 'No subject line found for issue. Run subject line generation first.',
+        issueId: issue.id
       }, { status: 400 })
     }
 
-    console.log('Using subject line:', campaign.subject_line)
-    console.log('=== CAMPAIGN CREATION COMPLETED ===')
-    console.log('Campaign remains in draft status until sent to MailerLite for review')
+    console.log('Using subject line:', issue.subject_line)
+    console.log('=== issue CREATION COMPLETED ===')
+    console.log('issue remains in draft status until sent to MailerLite for review')
 
     return NextResponse.json({
       success: true,
-      message: 'Campaign created successfully - ready for MailerLite review sending',
-      campaignId: campaign.id,
-      campaignDate: campaignDate,
-      subjectLine: campaign.subject_line,
+      message: 'issue created successfully - ready for MailerLite review sending',
+      issueId: issue.id,
+      issueDate: issueDate,
+      subjectLine: issue.subject_line,
       activeArticlesCount: activeArticles.length,
       status: 'draft',
       timestamp: new Date().toISOString()
     })
 
   } catch (error) {
-    console.error('=== CAMPAIGN CREATION FAILED ===')
+    console.error('=== issue CREATION FAILED ===')
     console.error('Error:', error)
 
     return NextResponse.json({
       success: false,
-      error: 'Campaign creation failed',
+      error: 'issue creation failed',
       message: error instanceof Error ? error.message : 'Unknown error',
       timestamp: new Date().toISOString()
     }, { status: 500 })
@@ -176,7 +176,7 @@ export async function GET(request: NextRequest) {
     // TODO: This legacy route should be deprecated in favor of trigger-workflow
     // Get first active newsletter for backward compatibility
     const { data: activeNewsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('is_active', true)
       .limit(1)
@@ -189,40 +189,40 @@ export async function GET(request: NextRequest) {
       }, { status: 404 })
     }
 
-    console.log('=== AUTOMATED CAMPAIGN CREATION CHECK (GET) ===')
+    console.log('=== AUTOMATED issue CREATION CHECK (GET) ===')
     console.log('Time:', new Date().toISOString())
     console.log('Request type:', isVercelCron ? 'Vercel Cron' : 'Manual Test')
 
-    // Check if it's time to run campaign creation based on database settings
-    const shouldRun = await ScheduleChecker.shouldRunCampaignCreation(activeNewsletter.id)
+    // Check if it's time to run issue creation based on database settings
+    const shouldRun = await ScheduleChecker.shouldRunissueCreation(activeNewsletter.id)
 
     if (!shouldRun) {
       return NextResponse.json({
         success: true,
-        message: 'Not time to run campaign creation or already ran today',
+        message: 'Not time to run issue creation or already ran today',
         skipped: true,
         timestamp: new Date().toISOString()
       })
     }
 
-    console.log('=== CAMPAIGN CREATION STARTED (Time Matched) ===')
+    console.log('=== issue CREATION STARTED (Time Matched) ===')
     console.log('Central Time:', new Date().toLocaleString("en-US", {timeZone: "America/Chicago"}))
 
-    // Get campaign (already processed with RSS and subject line)
+    // Get issue (already processed with RSS and subject line)
     // Use Central Time + 12 hours for consistent date calculations
-    // This ensures evening runs (8pm+) create campaigns for tomorrow
+    // This ensures evening runs (8pm+) create issues for tomorrow
     const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
     const centralDate = new Date(nowCentral)
-    // Add 12 hours to determine campaign date (same logic as RSS Processing)
+    // Add 12 hours to determine issue date (same logic as RSS Processing)
     centralDate.setHours(centralDate.getHours() + 12)
-    const campaignDate = centralDate.toISOString().split('T')[0]
+    const issueDate = centralDate.toISOString().split('T')[0]
 
-    console.log('Campaign date calculation: Current CT time + 12 hours =', campaignDate)
-    console.log('Creating review campaign for date:', campaignDate)
+    console.log('issue date calculation: Current CT time + 12 hours =', issueDate)
+    console.log('Creating review issue for date:', issueDate)
 
     // Get accounting newsletter ID
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('slug', 'accounting')
       .single()
@@ -234,9 +234,9 @@ export async function GET(request: NextRequest) {
       }, { status: 404 })
     }
 
-    // Find tomorrow's campaign with articles
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Find tomorrow's issue with articles
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         *,
         articles:articles(
@@ -248,73 +248,73 @@ export async function GET(request: NextRequest) {
         ),
         manual_articles:manual_articles(*)
       `)
-      .eq('newsletter_id', newsletter.id)
-      .eq('date', campaignDate)
+      .eq('publication_id', newsletter.id)
+      .eq('date', issueDate)
       .single()
 
-    if (campaignError || !campaign) {
+    if (issueError || !issue) {
       return NextResponse.json({
         success: false,
-        error: 'No campaign found for tomorrow',
-        campaignDate: campaignDate
+        error: 'No issue found for tomorrow',
+        issueDate: issueDate
       }, { status: 404 })
     }
 
-    console.log('Found campaign:', campaign.id, 'Status:', campaign.status)
+    console.log('Found issue:', issue.id, 'Status:', issue.status)
 
-    // Only create if campaign is in draft status
-    if (campaign.status !== 'draft') {
+    // Only create if issue is in draft status
+    if (issue.status !== 'draft') {
       return NextResponse.json({
         success: true,
-        message: `Campaign status is ${campaign.status}, skipping campaign creation`,
-        campaignId: campaign.id,
+        message: `issue status is ${issue.status}, skipping issue creation`,
+        issueId: issue.id,
         skipped: true
       })
     }
 
-    // Check if campaign has active articles
-    const activeArticles = campaign.articles.filter((article: any) => article.is_active)
+    // Check if issue has active articles
+    const activeArticles = issue.articles.filter((article: any) => article.is_active)
     if (activeArticles.length === 0) {
       return NextResponse.json({
         success: false,
-        error: 'No active articles found for campaign creation',
-        campaignId: campaign.id
+        error: 'No active articles found for issue creation',
+        issueId: issue.id
       }, { status: 400 })
     }
 
-    console.log(`Campaign has ${activeArticles.length} active articles`)
+    console.log(`issue has ${activeArticles.length} active articles`)
 
     // Check if subject line exists
-    if (!campaign.subject_line || campaign.subject_line.trim() === '') {
+    if (!issue.subject_line || issue.subject_line.trim() === '') {
       return NextResponse.json({
         success: false,
-        error: 'No subject line found for campaign. Run subject line generation first.',
-        campaignId: campaign.id
+        error: 'No subject line found for issue. Run subject line generation first.',
+        issueId: issue.id
       }, { status: 400 })
     }
 
-    console.log('Using subject line:', campaign.subject_line)
-    console.log('=== CAMPAIGN CREATION COMPLETED ===')
-    console.log('Campaign remains in draft status until sent to MailerLite for review')
+    console.log('Using subject line:', issue.subject_line)
+    console.log('=== issue CREATION COMPLETED ===')
+    console.log('issue remains in draft status until sent to MailerLite for review')
 
     return NextResponse.json({
       success: true,
-      message: 'Campaign created successfully - ready for MailerLite review sending',
-      campaignId: campaign.id,
-      campaignDate: campaignDate,
-      subjectLine: campaign.subject_line,
+      message: 'issue created successfully - ready for MailerLite review sending',
+      issueId: issue.id,
+      issueDate: issueDate,
+      subjectLine: issue.subject_line,
       activeArticlesCount: activeArticles.length,
       status: 'draft',
       timestamp: new Date().toISOString()
     })
 
   } catch (error) {
-    console.error('=== CAMPAIGN CREATION FAILED ===')
+    console.error('=== issue CREATION FAILED ===')
     console.error('Error:', error)
 
     return NextResponse.json({
       success: false,
-      error: 'Campaign creation failed',
+      error: 'issue creation failed',
       message: error instanceof Error ? error.message : 'Unknown error',
       timestamp: new Date().toISOString()
     }, { status: 500 })

@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     // Step 1: Check newsletters
     const { data: newsletters, error: newsletterError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('*')
       .eq('is_active', true)
 
@@ -24,23 +24,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: appsError.message, step: 'apps' }, { status: 500 })
     }
 
-    // Step 3: Get most recent campaign
-    const { data: campaigns, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Step 3: Get most recent issue
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select('id, date, created_at')
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
 
-    if (campaignError) {
-      return NextResponse.json({ error: campaignError.message, step: 'campaign' }, { status: 500 })
+    if (issueError) {
+      return NextResponse.json({ error: issueError.message, step: 'issue' }, { status: 500 })
     }
 
-    // Step 4: Check existing app selections for this campaign
+    // Step 4: Check existing app selections for this issue
     const { data: existingSelections } = await supabaseAdmin
-      .from('campaign_ai_app_selections')
+      .from('issue_ai_app_selections')
       .select('*, app:ai_applications(*)')
-      .eq('campaign_id', campaigns.id)
+      .eq('issue_id', issue.id)
 
     // Step 5: Try selecting apps manually
     let selectionResult = null
@@ -49,12 +49,12 @@ export async function GET(request: NextRequest) {
     if (newsletters && newsletters.length > 0) {
       const newsletter = newsletters[0]
       try {
-        const selectedApps = await AppSelector.selectAppsForCampaign(campaigns.id, newsletter.id)
+        const selectedApps = await AppSelector.selectAppsForissue(issue.id, newsletter.id)
         selectionResult = {
-          newsletter_id: newsletter.id,
+          publication_id: newsletter.id,
           newsletter_name: newsletter.name,
           selected_count: selectedApps.length,
-          selected_apps: selectedApps.map(app => ({
+          selected_apps: selectedApps.map((app: any) => ({
             id: app.id,
             name: app.app_name,
             category: app.category
@@ -76,13 +76,13 @@ export async function GET(request: NextRequest) {
           total_active: apps?.length || 0,
           by_newsletter: newsletters?.map(n => ({
             newsletter: n.name,
-            app_count: apps?.filter(app => app.newsletter_id === n.id).length || 0
+            app_count: apps?.filter(app => app.publication_id === n.id).length || 0
           }))
         },
-        latest_campaign: {
-          id: campaigns.id,
-          date: campaigns.date,
-          created_at: campaigns.created_at,
+        latest_issue: {
+          id: issue.id,
+          date: issue.date,
+          created_at: issue.created_at,
           existing_app_selections: existingSelections?.length || 0
         },
         manual_selection_test: selectionResult,

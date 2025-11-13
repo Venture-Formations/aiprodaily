@@ -7,29 +7,29 @@ export async function GET(request: NextRequest) {
   try {
     logs.push('=== MANUAL APP SELECTION TEST ===')
 
-    // Step 1: Get the most recent campaign
-    logs.push('Step 1: Fetching most recent campaign...')
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Step 1: Get the most recent issue
+    logs.push('Step 1: Fetching most recent issue...')
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select('id, date, created_at, status')
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
 
-    if (campaignError) {
-      logs.push(`ERROR: Failed to fetch campaign: ${campaignError.message}`)
-      return NextResponse.json({ success: false, error: campaignError.message, logs })
+    if (issueError) {
+      logs.push(`ERROR: Failed to fetch issue: ${issueError.message}`)
+      return NextResponse.json({ success: false, error: issueError.message, logs })
     }
 
-    logs.push(`Found campaign: ${campaign.id}`)
-    logs.push(`Campaign date: ${campaign.date}`)
-    logs.push(`Campaign status: ${campaign.status}`)
-    logs.push(`Created at: ${campaign.created_at}`)
+    logs.push(`Found issue: ${issue.id}`)
+    logs.push(`issue date: ${issue.date}`)
+    logs.push(`issue status: ${issue.status}`)
+    logs.push(`Created at: ${issue.created_at}`)
 
     // Step 2: Get the active newsletter
     logs.push('\nStep 2: Fetching active newsletter...')
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id, name, slug, is_active')
       .eq('is_active', true)
       .limit(1)
@@ -44,22 +44,22 @@ export async function GET(request: NextRequest) {
     logs.push(`Newsletter ID: ${newsletter.id}`)
     logs.push(`Newsletter slug: ${newsletter.slug}`)
 
-    // Step 3: Check if apps already selected for this campaign
+    // Step 3: Check if apps already selected for this issue
     logs.push('\nStep 3: Checking existing app selections...')
     const { data: existingSelections, error: selectionsError } = await supabaseAdmin
-      .from('campaign_ai_app_selections')
+      .from('issue_ai_app_selections')
       .select('id, app_id, selection_order')
-      .eq('campaign_id', campaign.id)
+      .eq('issue_id', issue.id)
 
     if (selectionsError) {
       logs.push(`ERROR: Failed to check existing selections: ${selectionsError.message}`)
     } else {
       logs.push(`Existing selections: ${existingSelections?.length || 0}`)
       if (existingSelections && existingSelections.length > 0) {
-        logs.push('Campaign already has app selections - skipping')
+        logs.push('issue already has app selections - skipping')
         return NextResponse.json({
           success: true,
-          message: 'Campaign already has apps selected',
+          message: 'issue already has apps selected',
           existing_count: existingSelections.length,
           logs
         })
@@ -70,8 +70,8 @@ export async function GET(request: NextRequest) {
     logs.push('\nStep 4: Fetching available AI apps...')
     const { data: apps, error: appsError } = await supabaseAdmin
       .from('ai_applications')
-      .select('id, app_name, category, newsletter_id, is_active')
-      .eq('newsletter_id', newsletter.id)
+      .select('id, app_name, category, publication_id, is_active')
+      .eq('publication_id', newsletter.id)
       .eq('is_active', true)
 
     if (appsError) {
@@ -97,9 +97,9 @@ export async function GET(request: NextRequest) {
       logs.push('AppSelector imported successfully')
 
       // Step 6: Call selectAppsForCampaign
-      logs.push(`\nStep 6: Calling AppSelector.selectAppsForCampaign(${campaign.id}, ${newsletter.id})...`)
+      logs.push(`\nStep 6: Calling AppSelector.selectAppsForissue(${issue.id}, ${newsletter.id})...`)
 
-      const selectedApps = await AppSelector.selectAppsForCampaign(campaign.id, newsletter.id)
+      const selectedApps = await AppSelector.selectAppsForissue(issue.id, newsletter.id)
 
       logs.push(`✅ Selection completed! Selected ${selectedApps.length} apps`)
       selectedApps.forEach((app, index) => {
@@ -109,16 +109,16 @@ export async function GET(request: NextRequest) {
       // Step 7: Verify selections were saved
       logs.push('\nStep 7: Verifying selections were saved to database...')
       const { data: verifySelections } = await supabaseAdmin
-        .from('campaign_ai_app_selections')
+        .from('issue_ai_app_selections')
         .select('id, app_id, selection_order')
-        .eq('campaign_id', campaign.id)
+        .eq('issue_id', issue.id)
 
       logs.push(`Verified: ${verifySelections?.length || 0} selections saved to database`)
 
       return NextResponse.json({
         success: true,
-        campaign_id: campaign.id,
-        newsletter_id: newsletter.id,
+        issue_id: issue.id,
+        publication_id: newsletter.id,
         selected_count: selectedApps.length,
         verified_count: verifySelections?.length || 0,
         logs

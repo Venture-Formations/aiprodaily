@@ -50,26 +50,26 @@ export class Deduplicator {
   }
 
   /**
-   * Get newsletter_id from campaign
+   * Get publication_id from issue
    */
-  private async getNewsletterIdFromCampaign(campaignId: string): Promise<string> {
-    const { data: campaign, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
-      .select('newsletter_id')
-      .eq('id', campaignId)
+  private async getNewsletterIdFromissue(issueId: string): Promise<string> {
+    const { data: issue, error } = await supabaseAdmin
+      .from('publication_issues')
+      .select('publication_id')
+      .eq('id', issueId)
       .single()
 
-    if (error || !campaign || !campaign.newsletter_id) {
-      throw new Error(`Failed to get newsletter_id for campaign ${campaignId}`)
+    if (error || !issue || !issue.publication_id) {
+      throw new Error(`Failed to get publication_id for issue ${issueId}`)
     }
 
-    return campaign.newsletter_id
+    return issue.publication_id
   }
 
   /**
    * Main orchestrator - runs all 4 stages (0-3)
    */
-  async detectAllDuplicates(posts: RssPost[], campaignId: string): Promise<DeduplicationResult> {
+  async detectAllDuplicates(posts: RssPost[], issueId: string): Promise<DeduplicationResult> {
     if (posts.length === 0) {
       return {
         groups: [],
@@ -88,7 +88,7 @@ export class Deduplicator {
     const allGroups: DuplicateGroup[] = []
     const markedAsDuplicate = new Set<number>()
 
-    const historicalGroups = await this.detectHistoricalDuplicates(posts, campaignId)
+    const historicalGroups = await this.detectHistoricalDuplicates(posts, issueId)
 
     for (const group of historicalGroups) {
       if (!group || !Array.isArray(group.duplicate_indices)) {
@@ -159,7 +159,7 @@ export class Deduplicator {
       const semanticGroups = await this.detectSemanticDuplicates(
         stillRemaining.map(p => p.post),
         stillRemaining.map(p => p.idx),
-        campaignId
+        issueId
       )
 
       if (Array.isArray(semanticGroups)) {
@@ -201,45 +201,45 @@ export class Deduplicator {
   /**
    * Stage 0: Check against articles from recently sent newsletters
    */
-  private async detectHistoricalDuplicates(posts: RssPost[], campaignId: string): Promise<DuplicateGroup[]> {
+  private async detectHistoricalDuplicates(posts: RssPost[], issueId: string): Promise<DuplicateGroup[]> {
     try {
-      // Get sent campaigns from last N days
+      // Get sent issues from last N days
       const cutoffDate = new Date()
       cutoffDate.setDate(cutoffDate.getDate() - this.config.historicalLookbackDays)
       const cutoffDateStr = cutoffDate.toISOString().split('T')[0]
 
-      const { data: recentCampaigns, error: campaignsError } = await supabaseAdmin
-        .from('newsletter_campaigns')
+      const { data: recentCampaigns, error: issuesError } = await supabaseAdmin
+        .from('publication_issues')
         .select('id')
         .eq('status', 'sent')
         .gte('date', cutoffDateStr)
-        .neq('id', campaignId) // Exclude current campaign
+        .neq('id', issueId) // Exclude current issue
 
-      if (campaignsError || !recentCampaigns || recentCampaigns.length === 0) {
+      if (issuesError || !recentCampaigns || recentCampaigns.length === 0) {
         return []
       }
 
-      const campaignIds = recentCampaigns.map(c => c.id)
+      const issueIds = recentCampaigns.map(c => c.id)
 
       // Get all articles from those campaigns (only active ones that were included)
       const { data: historicalArticles, error: articlesError } = await supabaseAdmin
         .from('articles')
         .select('id, post_id, headline')
-        .in('campaign_id', campaignIds)
+        .in('issue_id', issueIds)
         .eq('is_active', true)
         .eq('skipped', false)
 
       const { data: historicalSecondaryArticles } = await supabaseAdmin
         .from('secondary_articles')
         .select('id, post_id, headline')
-        .in('campaign_id', campaignIds)
+        .in('issue_id', issueIds)
         .eq('is_active', true)
         .eq('skipped', false)
 
       const { data: historicalManualArticles } = await supabaseAdmin
         .from('manual_articles')
         .select('id, title, content')
-        .in('campaign_id', campaignIds)
+        .in('issue_id', issueIds)
         .eq('is_active', true)
 
       if (articlesError) {
@@ -402,7 +402,7 @@ export class Deduplicator {
   private async detectSemanticDuplicates(
     posts: RssPost[],
     originalIndices: number[],
-    campaignId: string
+    issueId: string
   ): Promise<DuplicateGroup[]> {
     try {
       if (!posts || !Array.isArray(posts) || posts.length === 0) {
@@ -420,8 +420,8 @@ export class Deduplicator {
         full_article_text: post.full_article_text || post.content || ''
       }))
 
-      // Get newsletter_id for AI call
-      const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+      // Get publication_id for AI call
+      const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
       const result = await AI_CALL.topicDeduper(postSummaries, newsletterId, 1000, 0.3)
 

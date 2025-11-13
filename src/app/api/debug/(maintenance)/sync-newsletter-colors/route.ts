@@ -27,7 +27,7 @@ export async function POST() {
 
     // Update the newsletters table to match app_settings
     const { error: updateError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .update({ primary_color: primaryColor })
       .eq('slug', 'accounting')
 

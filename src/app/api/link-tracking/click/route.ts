@@ -8,8 +8,8 @@ import { supabaseAdmin } from '@/lib/supabase'
  * Query Parameters:
  * - url: Destination URL (required)
  * - section: Newsletter section (required)
- * - date: Campaign date (required)
- * - campaign_id: MailerLite campaign ID (optional)
+ * - date: issue date (required)
+ * - issue_id: MailerLite issue ID (optional)
  * - email: Subscriber email from MailerLite (required)
  * - subscriber_id: MailerLite subscriber ID (optional)
  */
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const url = searchParams.get('url')
     const section = searchParams.get('section')
     const date = searchParams.get('date')
-    const campaignId = searchParams.get('campaign_id')
+    const issueId = searchParams.get('issue_id')
     const email = searchParams.get('email')
     const subscriberId = searchParams.get('subscriber_id')
 
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
       url,
       section,
       date,
-      campaignId,
+      issueId,
       email,
       subscriberId,
       userAgent,
@@ -73,8 +73,8 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from('link_clicks')
       .insert({
-        campaign_date: date,
-        campaign_id: campaignId,
+        issue_date: date,
+        issue_id: issueId,
         subscriber_email: email,
         subscriber_id: subscriberId,
         link_url: url,

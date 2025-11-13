@@ -38,7 +38,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         .from('articles')
         .update(updateData)
         .eq('id', article_id)
-        .eq('campaign_id', id)
+        .eq('issue_id', id)
     })
 
     await Promise.all(updatePromises)
@@ -56,7 +56,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           .from('user_activities')
           .insert([{
             user_id: user.id,
-            campaign_id: id,
+            issue_id: id,
             action: 'articles_updated',
             details: { updates_count: article_updates.length }
           }])

@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Layout from '@/components/Layout'
-import DeleteCampaignModal from '@/components/DeleteCampaignModal'
-import type { CampaignWithArticles, ArticleWithPost, CampaignEvent, Event, NewsletterSection } from '@/types/database'
+import DeleteIssueModal from '@/components/DeleteIssueModal'
+import type { issueWithArticles, ArticleWithPost, issueEvent, Event, NewsletterSection } from '@/types/database'
 import {
   DndContext,
   closestCenter,
@@ -88,25 +88,25 @@ function processAdBody(body: string, buttonUrl?: string): string {
 }
 
 // Section Components
-function WelcomeSection({ campaign, onRegenerate }: { campaign: any; onRegenerate?: () => void }) {
+function WelcomeSection({ issue, onRegenerate }: { issue: any; onRegenerate?: () => void }) {
   const [regenerating, setRegenerating] = useState(false)
 
-  if (!campaign) {
+  if (!issue) {
     return (
       <div className="text-center py-8 text-gray-500">
-        No campaign data available
+        No issue data available
       </div>
     )
   }
 
-  const hasContent = campaign.welcome_intro || campaign.welcome_tagline || campaign.welcome_summary
+  const hasContent = issue.welcome_intro || issue.welcome_tagline || issue.welcome_summary
 
   const handleRegenerate = async () => {
-    if (!campaign?.id) return
+    if (!issue?.id) return
 
     setRegenerating(true)
     try {
-      const response = await fetch(`/api/campaigns/${campaign.id}/regenerate-welcome`, {
+      const response = await fetch(`/api/campaigns/${issue.id}/regenerate-welcome`, {
         method: 'POST'
       })
 
@@ -114,7 +114,7 @@ function WelcomeSection({ campaign, onRegenerate }: { campaign: any; onRegenerat
         throw new Error('Failed to regenerate welcome section')
       }
 
-      // Refresh campaign data
+      // Refresh issue data
       if (onRegenerate) {
         onRegenerate()
       }
@@ -152,19 +152,19 @@ function WelcomeSection({ campaign, onRegenerate }: { campaign: any; onRegenerat
   return (
     <div className="p-6">
       <div className="border border-gray-200 rounded-lg bg-white shadow-sm p-6 space-y-3">
-        {campaign.welcome_intro && (
+        {issue.welcome_intro && (
           <div className="text-gray-700">
-            {campaign.welcome_intro}
+            {issue.welcome_intro}
           </div>
         )}
-        {campaign.welcome_tagline && (
+        {issue.welcome_tagline && (
           <div className="text-gray-700 font-bold">
-            {campaign.welcome_tagline}
+            {issue.welcome_tagline}
           </div>
         )}
-        {campaign.welcome_summary && (
+        {issue.welcome_summary && (
           <div className="text-gray-700">
-            {campaign.welcome_summary}
+            {issue.welcome_summary}
           </div>
         )}
       </div>
@@ -184,7 +184,7 @@ function WelcomeSection({ campaign, onRegenerate }: { campaign: any; onRegenerat
   )
 }
 
-function PromptIdeasSection({ campaign }: { campaign: any }) {
+function PromptIdeasSection({ issue }: { issue: any }) {
   const [prompt, setPrompt] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
@@ -192,7 +192,7 @@ function PromptIdeasSection({ campaign }: { campaign: any }) {
     const fetchPrompt = async () => {
       try {
         setLoading(true)
-        const response = await fetch(`/api/campaigns/${campaign.id}/prompt`)
+        const response = await fetch(`/api/campaigns/${issue.id}/prompt`)
         if (response.ok) {
           const data = await response.json()
           if (data.success && data.prompt) {
@@ -206,10 +206,10 @@ function PromptIdeasSection({ campaign }: { campaign: any }) {
       }
     }
 
-    if (campaign?.id) {
+    if (issue?.id) {
       fetchPrompt()
     }
-  }, [campaign?.id])
+  }, [issue?.id])
 
   if (loading) {
     return (
@@ -223,7 +223,7 @@ function PromptIdeasSection({ campaign }: { campaign: any }) {
   if (!prompt) {
     return (
       <div className="text-center py-8 text-gray-500">
-        No prompt selected for this campaign
+        No prompt selected for this issue
       </div>
     )
   }
@@ -257,16 +257,16 @@ function PromptIdeasSection({ campaign }: { campaign: any }) {
   )
 }
 
-function AIAppsSection({ campaign }: { campaign: any }) {
+function AIAppsSection({ issue }: { issue: any }) {
   const [aiApps, setAiApps] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchAIApps = async () => {
       try {
-        // AI apps are already loaded with campaign data
-        if (campaign?.campaign_ai_app_selections) {
-          const sortedApps = [...campaign.campaign_ai_app_selections]
+        // AI apps are already loaded with issue data
+        if (issue?.issue_ai_app_selections) {
+          const sortedApps = [...issue.issue_ai_app_selections]
             .sort((a, b) => a.selection_order - b.selection_order)
           setAiApps(sortedApps)
         }
@@ -278,7 +278,7 @@ function AIAppsSection({ campaign }: { campaign: any }) {
     }
 
     fetchAIApps()
-  }, [campaign])
+  }, [issue])
 
   if (loading) {
     return (
@@ -292,7 +292,7 @@ function AIAppsSection({ campaign }: { campaign: any }) {
   if (!aiApps || aiApps.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
-        No AI Applications selected for this campaign
+        No AI Applications selected for this issue
       </div>
     )
   }
@@ -356,14 +356,14 @@ function AIAppsSection({ campaign }: { campaign: any }) {
   )
 }
 
-function AdvertorialSection({ campaign, sectionName }: { campaign: any; sectionName: string }) {
-  // Get ad from campaign data
-  const ad = campaign?.campaign_advertisements?.[0]?.advertisement
+function AdvertorialSection({ issue, sectionName }: { issue: any; sectionName: string }) {
+  // Get ad from issue data
+  const ad = issue?.issue_advertisements?.[0]?.advertisement
 
   if (!ad) {
     return (
       <div className="text-center py-8 text-gray-500">
-        No advertisement selected for this campaign.
+        No advertisement selected for this issue.
         <br />
         <span className="text-sm text-gray-400">
           An ad will be automatically selected during RSS processing.
@@ -428,7 +428,7 @@ function AdvertorialSection({ campaign, sectionName }: { campaign: any; sectionN
   )
 }
 
-function BreakingNewsSection({ campaign }: { campaign: any }) {
+function BreakingNewsSection({ issue }: { issue: any }) {
   const [articles, setArticles] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedBreaking, setSelectedBreaking] = useState<string[]>([])
@@ -438,8 +438,8 @@ function BreakingNewsSection({ campaign }: { campaign: any }) {
   useEffect(() => {
     const fetchBreakingNews = async () => {
       try {
-        // Fetch scored RSS posts for this campaign
-        const response = await fetch(`/api/campaigns/${campaign.id}/breaking-news`)
+        // Fetch scored RSS posts for this issue
+        const response = await fetch(`/api/campaigns/${issue.id}/breaking-news`)
         if (response.ok) {
           const data = await response.json()
           setArticles(data.articles || [])
@@ -454,7 +454,7 @@ function BreakingNewsSection({ campaign }: { campaign: any }) {
     }
 
     fetchBreakingNews()
-  }, [campaign.id])
+  }, [issue.id])
 
   const handleBreakingToggle = async (articleId: string, isSelected: boolean) => {
     let newSelected: string[]
@@ -472,7 +472,7 @@ function BreakingNewsSection({ campaign }: { campaign: any }) {
 
     setUpdating(true)
     try {
-      const response = await fetch(`/api/campaigns/${campaign.id}/breaking-news`, {
+      const response = await fetch(`/api/campaigns/${issue.id}/breaking-news`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -507,7 +507,7 @@ function BreakingNewsSection({ campaign }: { campaign: any }) {
 
     setUpdating(true)
     try {
-      const response = await fetch(`/api/campaigns/${campaign.id}/breaking-news`, {
+      const response = await fetch(`/api/campaigns/${issue.id}/breaking-news`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -685,7 +685,7 @@ function BreakingNewsSection({ campaign }: { campaign: any }) {
   )
 }
 
-function PollSection({ campaign }: { campaign: any }) {
+function PollSection({ issue }: { issue: any }) {
   const [activePoll, setActivePoll] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [responseCount, setResponseCount] = useState(0)
@@ -779,16 +779,16 @@ function PollSection({ campaign }: { campaign: any }) {
 // Newsletter Section Component
 function NewsletterSectionComponent({
   section,
-  campaign,
+  issue,
   expanded,
   onToggleExpanded
 }: {
   section: NewsletterSection
-  campaign: CampaignWithArticles | null
+  issue: issueWithArticles | null
   expanded: boolean
   onToggleExpanded: () => void
 }) {
-  if (!campaign) return null
+  if (!issue) return null
 
   // Section ID constants (reference IDs from newsletter_sections table)
   // These IDs are stable and won't change even if section names are updated
@@ -801,37 +801,37 @@ function NewsletterSectionComponent({
   const renderSectionContent = () => {
     // Use section ID for AI Applications (stable across name changes)
     if (section.id === SECTION_IDS.AI_APPLICATIONS) {
-      return <AIAppsSection campaign={campaign} />
+      return <AIAppsSection issue={issue} />
     }
 
     // Use section ID for Prompt Ideas (stable across name changes)
     if (section.id === SECTION_IDS.PROMPT_IDEAS) {
-      return <PromptIdeasSection campaign={campaign} />
+      return <PromptIdeasSection issue={issue} />
     }
 
     // Use section ID for Advertisement (stable across name changes)
     if (section.id === SECTION_IDS.ADVERTISEMENT) {
-      return <AdvertorialSection campaign={campaign} sectionName={section.name} />
+      return <AdvertorialSection issue={issue} sectionName={section.name} />
     }
 
     // Legacy name-based matching for other sections
     switch (section.name) {
       case 'Welcome':
-        return <WelcomeSection campaign={campaign} onRegenerate={() => {
-          // Refresh campaign data after regenerating
-          if (campaign?.id) {
-            fetch(`/api/campaigns/${campaign.id}`)
+        return <WelcomeSection issue={issue} onRegenerate={() => {
+          // Refresh issue data after regenerating
+          if (issue?.id) {
+            fetch(`/api/campaigns/${issue.id}`)
               .then(res => res.json())
               .then(data => {
-                // Update campaign state with fresh data
+                // Update issue state with fresh data
                 window.location.reload() // Simple solution - reload the page
               })
           }
         }} />
       case 'Poll':
-        return <PollSection campaign={campaign} />
+        return <PollSection issue={issue} />
       case 'Breaking News':
-        return <BreakingNewsSection campaign={campaign} />
+        return <BreakingNewsSection issue={issue} />
       case 'Beyond the Feed':
         return (
           <div className="text-center py-8 text-gray-500">
@@ -891,23 +891,23 @@ function NewsletterSectionComponent({
 
 // Events Manager Component
 function EventsManager({
-  campaign,
+  issue,
   availableEvents,
-  campaignEvents,
+  issueEvents,
   onUpdateEvents,
   updating
 }: {
-  campaign: CampaignWithArticles | null
+  issue: issueWithArticles | null
   availableEvents: Event[]
-  campaignEvents: CampaignEvent[]
+  issueEvents: issueEvent[]
   onUpdateEvents: (eventDate: string, selectedEvents: string[], featuredEvent?: string) => void
   updating: boolean
 }) {
-  if (!campaign) return null
+  if (!issue) return null
 
-  // Calculate 3-day range starting from the newsletter date (campaign.date)
+  // Calculate 3-day range starting from the newsletter date (issue.date)
   // Day 1: Newsletter date, Day 2: Next day, Day 3: Day after that
-  const newsletterDate = new Date(campaign.date + 'T00:00:00') // Parse as local date
+  const newsletterDate = new Date(issue.date + 'T00:00:00') // Parse as local date
 
   const dates = []
   for (let i = 0; i <= 2; i++) {
@@ -931,7 +931,7 @@ function EventsManager({
   }
 
   const getSelectedEventsForDate = (date: string) => {
-    return campaignEvents
+    return issueEvents
       .filter(ce => ce.event_date === date && ce.is_selected)
       .sort((a, b) => (a.display_order || 999) - (b.display_order || 999))
   }
@@ -942,7 +942,7 @@ function EventsManager({
     if (hasDatabaseFeatured) {
       return null // Disable manual featuring when database-featured exists
     }
-    const featured = campaignEvents.find(ce => ce.event_date === date && ce.is_featured)
+    const featured = issueEvents.find(ce => ce.event_date === date && ce.is_featured)
     return featured?.event_id
   }
 
@@ -1088,7 +1088,7 @@ function EventsManager({
                     {dateEvents.map(event => {
                       const isSelected = selectedEvents.some(ce => ce.event_id === event.id)
                       const isDatabaseFeatured = event.featured === true // Featured in events table
-                      const isFeatured = featuredEventId === event.id // Manually featured in campaign
+                      const isFeatured = featuredEventId === event.id // Manually featured in issue
                       const hasDatabaseFeatured = dateEvents.some(e => e.featured === true)
 
                       return (
@@ -1295,7 +1295,7 @@ function RegularArticle({
                 onClick={() => skipArticle(article.id)}
                 disabled={saving}
                 className="bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded text-xs font-medium disabled:opacity-50"
-                title="Skip this article - removes it from the campaign"
+                title="Skip this article - removes it from the issue"
               >
                 Skip Article
               </button>
@@ -1456,7 +1456,7 @@ function SortableArticle({
                 onClick={() => skipArticle(article.id)}
                 disabled={saving}
                 className="bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded text-xs font-medium disabled:opacity-50"
-                title="Skip this article - removes it from the campaign"
+                title="Skip this article - removes it from the issue"
               >
                 Skip Article
               </button>
@@ -1503,10 +1503,10 @@ function SortableArticle({
   )
 }
 
-export default function CampaignDetailPage() {
+export default function issueDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const [campaign, setCampaign] = useState<CampaignWithArticles | null>(null)
+  const [issue, setissue] = useState<issueWithArticles | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -1523,7 +1523,7 @@ export default function CampaignDetailPage() {
   const [savingSubject, setSavingSubject] = useState(false)
 
   // Events state
-  const [campaignEvents, setCampaignEvents] = useState<CampaignEvent[]>([])
+  const [issueEvents, setissueEvents] = useState<issueEvent[]>([])
   const [availableEvents, setAvailableEvents] = useState<Event[]>([])
   const [loadingEvents, setLoadingEvents] = useState(false)
   const [eventsExpanded, setEventsExpanded] = useState(false)
@@ -1561,38 +1561,38 @@ export default function CampaignDetailPage() {
   )
 
   useEffect(() => {
-    console.log('📄 Campaign page loaded, params:', params.id)
+    console.log('📄 issue page loaded, params:', params.id)
     if (params.id) {
-      fetchCampaign(params.id as string)
-      fetchCampaignEvents(params.id as string)
+      fetchissue(params.id as string)
+      fetchissueEvents(params.id as string)
       fetchNewsletterSections()
       fetchCriteriaConfig()
     }
   }, [params.id])
 
-  // Poll for status updates when campaign is processing
+  // Poll for status updates when issue is processing
   useEffect(() => {
-    if (!campaign || campaign.status !== 'processing') {
+    if (!issue || issue.status !== 'processing') {
       return
     }
 
-    console.log('🔄 Campaign is processing, starting status polling...')
+    console.log('🔄 issue is processing, starting status polling...')
 
     const pollInterval = setInterval(async () => {
       try {
-        const response = await fetch(`/api/campaigns/${campaign.id}`)
+        const response = await fetch(`/api/campaigns/${issue.id}`)
         if (response.ok) {
           const data = await response.json()
-          const newStatus = data.campaign.status
+          const newStatus = data.issue.status
 
           console.log(`📊 Status poll: ${newStatus}`)
 
           if (newStatus !== 'processing') {
-            console.log('✅ Processing complete! Refreshing campaign data...')
+            console.log('✅ Processing complete! Refreshing issue data...')
             clearInterval(pollInterval)
-            // Refresh all campaign data
-            await fetchCampaign(campaign.id)
-            await fetchCampaignEvents(campaign.id)
+            // Refresh all issue data
+            await fetchissue(issue.id)
+            await fetchissueEvents(issue.id)
           }
         }
       } catch (error) {
@@ -1601,16 +1601,16 @@ export default function CampaignDetailPage() {
     }, 3000) // Poll every 3 seconds
 
     return () => clearInterval(pollInterval)
-  }, [campaign?.status, campaign?.id])
+  }, [issue?.status, issue?.id])
 
-  const fetchCampaign = async (id: string) => {
+  const fetchissue = async (id: string) => {
     try {
       const response = await fetch(`/api/campaigns/${id}`)
       if (!response.ok) {
-        throw new Error('Failed to fetch campaign')
+        throw new Error('Failed to fetch issue')
       }
       const data = await response.json()
-      setCampaign(data.campaign)
+      setissue(data.issue)
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error')
     } finally {
@@ -1618,15 +1618,15 @@ export default function CampaignDetailPage() {
     }
   }
 
-  const fetchCampaignEvents = async (campaignId: string) => {
+  const fetchissueEvents = async (issueId: string) => {
     try {
-      const response = await fetch(`/api/campaigns/${campaignId}/events`)
+      const response = await fetch(`/api/campaigns/${issueId}/events`)
       if (response.ok) {
         const data = await response.json()
-        setCampaignEvents(data.campaign_events || [])
+        setissueEvents(data.issue_events || [])
       }
     } catch (error) {
-      console.error('Failed to fetch campaign events:', error)
+      console.error('Failed to fetch issue events:', error)
     }
   }
 
@@ -1725,11 +1725,11 @@ export default function CampaignDetailPage() {
   }
 
   const toggleArticle = async (articleId: string, currentState: boolean) => {
-    if (!campaign) return
+    if (!issue) return
 
     // Prevent selecting a 6th article - simply return without action
     if (!currentState) { // currentState is false means we're trying to activate
-      const activeCount = campaign.articles.filter(article => article.is_active && !article.skipped).length
+      const activeCount = issue.articles.filter(article => article.is_active && !article.skipped).length
       if (activeCount >= 5) {
         return // No action taken, no alert - just prevent the selection
       }
@@ -1737,7 +1737,7 @@ export default function CampaignDetailPage() {
 
     setSaving(true)
     try {
-      const response = await fetch(`/api/campaigns/${campaign.id}/articles`, {
+      const response = await fetch(`/api/campaigns/${issue.id}/articles`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -1755,7 +1755,7 @@ export default function CampaignDetailPage() {
       }
 
       // Update local state
-      setCampaign(prev => {
+      setissue(prev => {
         if (!prev) return prev
         return {
           ...prev,
@@ -1775,7 +1775,7 @@ export default function CampaignDetailPage() {
   }
 
   const skipArticle = async (articleId: string) => {
-    if (!campaign) return
+    if (!issue) return
 
     setSaving(true)
     try {
@@ -1794,10 +1794,10 @@ export default function CampaignDetailPage() {
       const responseData = await response.json()
 
       // Update local state to remove the skipped article
-      setCampaign(prev => {
+      setissue(prev => {
         if (!prev) return prev
 
-        const updatedCampaign = {
+        const updatedissue = {
           ...prev,
           articles: prev.articles.map(article =>
             article.id === articleId
@@ -1809,10 +1809,10 @@ export default function CampaignDetailPage() {
         // Update subject line if it was auto-regenerated
         if (responseData.subject_line_regenerated && responseData.new_subject_line) {
           console.log(`Subject line auto-updated after skip to: "${responseData.new_subject_line}"`)
-          updatedCampaign.subject_line = responseData.new_subject_line
+          updatedissue.subject_line = responseData.new_subject_line
         }
 
-        return updatedCampaign
+        return updatedissue
       })
 
       // Show success message with subject line info if applicable
@@ -1831,7 +1831,7 @@ export default function CampaignDetailPage() {
 
   // Secondary Article Functions
   const toggleSecondaryArticle = async (articleId: string, currentState: boolean) => {
-    if (!campaign) return
+    if (!issue) return
 
     setSaving(true)
     try {
@@ -1849,7 +1849,7 @@ export default function CampaignDetailPage() {
       }
 
       // Update local state
-      setCampaign(prev => {
+      setissue(prev => {
         if (!prev) return prev
         return {
           ...prev,
@@ -1869,7 +1869,7 @@ export default function CampaignDetailPage() {
   }
 
   const skipSecondaryArticle = async (articleId: string) => {
-    if (!campaign) return
+    if (!issue) return
 
     setSaving(true)
     try {
@@ -1886,7 +1886,7 @@ export default function CampaignDetailPage() {
       }
 
       // Update local state to remove the skipped article
-      setCampaign(prev => {
+      setissue(prev => {
         if (!prev) return prev
         return {
           ...prev,
@@ -1910,14 +1910,14 @@ export default function CampaignDetailPage() {
   const handleSecondaryDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
 
-    if (!over || active.id === over.id || !campaign) {
+    if (!over || active.id === over.id || !issue) {
       return
     }
 
     console.log('Reordering secondary articles:', { activeId: active.id, overId: over.id })
 
     // Get non-skipped secondary articles sorted by rank
-    const sortedSecondaryArticles = campaign.secondary_articles
+    const sortedSecondaryArticles = issue.secondary_articles
       .filter(article => !article.skipped)
       .sort((a, b) => {
         const rankA = a.rank ?? 9999
@@ -1943,7 +1943,7 @@ export default function CampaignDetailPage() {
     }))
 
     // Optimistically update UI
-    setCampaign(prev => {
+    setissue(prev => {
       if (!prev) return prev
       return {
         ...prev,
@@ -1956,7 +1956,7 @@ export default function CampaignDetailPage() {
 
     // Send to API
     try {
-      const response = await fetch(`/api/campaigns/${campaign.id}/secondary-articles/reorder`, {
+      const response = await fetch(`/api/campaigns/${issue.id}/secondary-articles/reorder`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1973,17 +1973,17 @@ export default function CampaignDetailPage() {
       console.error('Failed to reorder secondary articles:', error)
       alert('Failed to reorder secondary articles')
       // Refresh to get correct state
-      fetchCampaign(campaign.id)
+      fetchissue(issue.id)
     }
   }
 
   const previewNewsletter = async () => {
-    if (!campaign) return
+    if (!issue) return
 
     setPreviewLoading(true)
     try {
-      console.log('Calling preview API for campaign:', campaign.id)
-      const response = await fetch(`/api/campaigns/${campaign.id}/preview`)
+      console.log('Calling preview API for issue:', issue.id)
+      const response = await fetch(`/api/campaigns/${issue.id}/preview`)
       console.log('Preview API response status:', response.status, response.statusText)
 
       if (!response.ok) {
@@ -2006,13 +2006,13 @@ export default function CampaignDetailPage() {
   }
 
   const processRSSFeeds = async () => {
-    if (!campaign) return
+    if (!issue) return
 
     setProcessing(true)
     setProcessingStatus('Starting reprocess workflow...')
 
     try {
-      const response = await fetch(`/api/campaigns/${campaign.id}/reprocess`, {
+      const response = await fetch(`/api/campaigns/${issue.id}/reprocess`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2037,7 +2037,7 @@ export default function CampaignDetailPage() {
 
       // Wait a bit then refresh to show processing status
       setTimeout(async () => {
-        await fetchCampaign(campaign.id)
+        await fetchissue(issue.id)
         setProcessingStatus('')
       }, 3000)
 
@@ -2050,10 +2050,10 @@ export default function CampaignDetailPage() {
   }
 
   const generateSubjectLine = async () => {
-    if (!campaign) return
+    if (!issue) return
 
     // Check if there are any active articles
-    const activeArticles = campaign.articles.filter(article => article.is_active)
+    const activeArticles = issue.articles.filter(article => article.is_active)
     if (activeArticles.length === 0) {
       alert('Please select at least one article before generating a subject line.')
       return
@@ -2061,7 +2061,7 @@ export default function CampaignDetailPage() {
 
     setGeneratingSubject(true)
     try {
-      const response = await fetch(`/api/campaigns/${campaign.id}/generate-subject`, {
+      const response = await fetch(`/api/campaigns/${issue.id}/generate-subject`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2075,8 +2075,8 @@ export default function CampaignDetailPage() {
 
       const data = await response.json()
 
-      // Update campaign locally with new subject line
-      setCampaign(prev => {
+      // Update issue locally with new subject line
+      setissue(prev => {
         if (!prev) return prev
         return {
           ...prev,
@@ -2094,7 +2094,7 @@ export default function CampaignDetailPage() {
   }
 
   const startEditingSubject = () => {
-    setEditSubjectValue(campaign?.subject_line || '')
+    setEditSubjectValue(issue?.subject_line || '')
     setEditingSubject(true)
   }
 
@@ -2104,11 +2104,11 @@ export default function CampaignDetailPage() {
   }
 
   const saveSubjectLine = async () => {
-    if (!campaign) return
+    if (!issue) return
 
     setSavingSubject(true)
     try {
-      const response = await fetch(`/api/campaigns/${campaign.id}/subject-line`, {
+      const response = await fetch(`/api/campaigns/${issue.id}/subject-line`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -2124,7 +2124,7 @@ export default function CampaignDetailPage() {
       }
 
       const data = await response.json()
-      setCampaign(prev => prev ? { ...prev, subject_line: data.subject_line } : null)
+      setissue(prev => prev ? { ...prev, subject_line: data.subject_line } : null)
       setEditingSubject(false)
       setEditSubjectValue('')
 
@@ -2136,11 +2136,11 @@ export default function CampaignDetailPage() {
   }
 
   const updateEventSelections = async (eventDate: string, selectedEvents: string[], featuredEvent?: string) => {
-    if (!campaign) return
+    if (!issue) return
 
     setUpdatingEvents(true)
     try {
-      const response = await fetch(`/api/campaigns/${campaign.id}/events`, {
+      const response = await fetch(`/api/campaigns/${issue.id}/events`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -2157,8 +2157,8 @@ export default function CampaignDetailPage() {
         throw new Error(errorData.error || 'Failed to update events')
       }
 
-      // Refresh campaign events
-      await fetchCampaignEvents(campaign.id)
+      // Refresh issue events
+      await fetchissueEvents(issue.id)
 
     } catch (error) {
       alert('Failed to update events: ' + (error instanceof Error ? error.message : 'Unknown error'))
@@ -2169,11 +2169,11 @@ export default function CampaignDetailPage() {
 
   // Helper function to get events count by date with color coding
   const getEventCountsByDate = () => {
-    if (!campaign) return []
+    if (!issue) return []
 
-    // Calculate 3-day range starting from the newsletter date (campaign.date)
+    // Calculate 3-day range starting from the newsletter date (issue.date)
     // Day 1: Newsletter date, Day 2: Next day, Day 3: Day after that
-    const newsletterDate = new Date(campaign.date + 'T00:00:00') // Parse as local date
+    const newsletterDate = new Date(issue.date + 'T00:00:00') // Parse as local date
 
     const dates = []
     for (let i = 0; i <= 2; i++) {
@@ -2182,7 +2182,7 @@ export default function CampaignDetailPage() {
       const dateStr = date.toISOString().split('T')[0]
 
       // Count selected events for this date
-      const eventCount = campaignEvents.filter(ce =>
+      const eventCount = issueEvents.filter(ce =>
         ce.event_date === dateStr && ce.is_selected
       ).length
 
@@ -2204,10 +2204,10 @@ export default function CampaignDetailPage() {
   }
 
   const handleEventsExpand = () => {
-    if (!eventsExpanded && campaign) {
-      // Calculate 3-day range starting from the newsletter date (campaign.date)
+    if (!eventsExpanded && issue) {
+      // Calculate 3-day range starting from the newsletter date (issue.date)
       // Day 1: Newsletter date, Day 2: Next day, Day 3: Day after that
-      const newsletterDate = new Date(campaign.date + 'T00:00:00') // Parse as local date
+      const newsletterDate = new Date(issue.date + 'T00:00:00') // Parse as local date
 
       const dates = []
       for (let i = 0; i <= 2; i++) {
@@ -2219,7 +2219,7 @@ export default function CampaignDetailPage() {
       const startDateStr = dates[0]
       const endDateStr = dates[dates.length - 1]
 
-      console.log('Fetching events with date range:', startDateStr, 'to', endDateStr, 'for newsletter date:', campaign.date)
+      console.log('Fetching events with date range:', startDateStr, 'to', endDateStr, 'for newsletter date:', issue.date)
       fetchAvailableEvents(startDateStr, endDateStr)
     }
     setEventsExpanded(!eventsExpanded)
@@ -2243,12 +2243,12 @@ export default function CampaignDetailPage() {
     }
   }
 
-  const updateCampaignStatus = async (action: 'changes_made') => {
-    if (!campaign) return
+  const updateIssueStatus = async (action: 'changes_made') => {
+    if (!issue) return
 
     setUpdatingStatus(true)
     try {
-      const response = await fetch(`/api/campaigns/${campaign.id}/status`, {
+      const response = await fetch(`/api/campaigns/${issue.id}/status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2258,27 +2258,27 @@ export default function CampaignDetailPage() {
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to update campaign status')
+        throw new Error(errorData.error || 'Failed to update issue status')
       }
 
       const data = await response.json()
 
-      // Update local campaign state
-      setCampaign(prev => {
+      // Update local issue state
+      setissue(prev => {
         if (!prev) return prev
         return {
           ...prev,
           status: 'changes_made',
           last_action: action,
-          last_action_at: data.campaign.last_action_at,
-          last_action_by: data.campaign.last_action_by
+          last_action_at: data.issue.last_action_at,
+          last_action_by: data.issue.last_action_by
         }
       })
 
-      alert(`Campaign marked as "Changes Made" and status updated. Slack notification sent.`)
+      alert(`issue marked as "Changes Made" and status updated. Slack notification sent.`)
 
     } catch (error) {
-      alert('Failed to update campaign status: ' + (error instanceof Error ? error.message : 'Unknown error'))
+      alert('Failed to update issue status: ' + (error instanceof Error ? error.message : 'Unknown error'))
     } finally {
       setUpdatingStatus(false)
     }
@@ -2286,7 +2286,7 @@ export default function CampaignDetailPage() {
 
   const handleDeleteConfirm = () => {
     setDeleteModal(false)
-    router.push('/dashboard/campaigns')
+    router.push('/dashboard/issues')
   }
 
   const handleDeleteCancel = () => {
@@ -2297,15 +2297,15 @@ export default function CampaignDetailPage() {
     console.log('🎯 handleDragEnd called with event:', event)
     const { active, over } = event
 
-    if (!over || active.id === over.id || !campaign) {
-      console.log('⚠️ Early return from handleDragEnd:', { over: !!over, sameId: active.id === over?.id, campaign: !!campaign })
+    if (!over || active.id === over.id || !issue) {
+      console.log('⚠️ Early return from handleDragEnd:', { over: !!over, sameId: active.id === over?.id, issue: !!issue })
       return
     }
 
     console.log('Drag ended:', { activeId: active.id, overId: over.id })
 
     // Get current active articles sorted by rank
-    const activeArticles = campaign.articles
+    const activeArticles = issue.articles
       .filter(article => article.is_active)
       .sort((a, b) => (a.rank || 999) - (b.rank || 999))
 
@@ -2321,7 +2321,7 @@ export default function CampaignDetailPage() {
       console.log('New order:', newOrder.map((a, i) => `${i + 1}. ${a.headline} (was rank ${a.rank})`))
 
       // Update local state immediately for UI responsiveness
-      setCampaign(prev => {
+      setissue(prev => {
         if (!prev) return prev
         const updatedArticles = [...prev.articles]
 
@@ -2348,7 +2348,7 @@ export default function CampaignDetailPage() {
 
         console.log('Sending rank updates:', articleOrders)
 
-        const response = await fetch(`/api/campaigns/${campaign.id}/articles/reorder`, {
+        const response = await fetch(`/api/campaigns/${issue.id}/articles/reorder`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ articleOrders })
@@ -2365,17 +2365,17 @@ export default function CampaignDetailPage() {
         if (responseData.subject_line_regenerated && responseData.new_subject_line) {
           console.log(`Subject line auto-updated to: "${responseData.new_subject_line}"`)
 
-          // Update the campaign state with the new subject line
-          setCampaign(prev => prev ? {
+          // Update the issue state with the new subject line
+          setissue(prev => prev ? {
             ...prev,
             subject_line: responseData.new_subject_line
           } : null)
         }
       } catch (error) {
         console.error('Failed to update article order:', error)
-        // Refresh campaign to revert changes
-        if (campaign.id) {
-          fetchCampaign(campaign.id)
+        // Refresh issue to revert changes
+        if (issue.id) {
+          fetchissue(issue.id)
         }
       }
     }
@@ -2403,14 +2403,14 @@ export default function CampaignDetailPage() {
     )
   }
 
-  if (error || !campaign) {
+  if (error || !issue) {
     return (
       <Layout>
         <div className="text-center py-12">
           <div className="text-red-600 mb-4">
-            {error || 'Campaign not found'}
+            {error || 'issue not found'}
           </div>
-          <a href="/dashboard/campaigns" className="text-brand-primary hover:text-blue-700">
+          <a href="/dashboard/issues" className="text-brand-primary hover:text-blue-700">
             Back to Campaigns
           </a>
         </div>
@@ -2421,42 +2421,42 @@ export default function CampaignDetailPage() {
   return (
     <Layout>
       <div className="px-4 py-6 sm:px-0">
-        {/* Campaign Header */}
+        {/* issue Header */}
         <div className="bg-white shadow rounded-lg p-6 mb-6">
           <div className="flex justify-between items-start">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                Publication for {formatDate(campaign.date)}
+                Publication for {formatDate(issue.date)}
               </h1>
               <div className="flex items-center space-x-4">
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  campaign.status === 'draft' ? 'bg-gray-100 text-gray-800' :
-                  campaign.status === 'in_review' ? 'bg-yellow-100 text-yellow-800' :
-                  campaign.status === 'changes_made' ? 'bg-orange-100 text-orange-800' :
-                  campaign.status === 'sent' ? 'bg-green-100 text-green-800' :
-                  campaign.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                  issue.status === 'draft' ? 'bg-gray-100 text-gray-800' :
+                  issue.status === 'in_review' ? 'bg-yellow-100 text-yellow-800' :
+                  issue.status === 'changes_made' ? 'bg-orange-100 text-orange-800' :
+                  issue.status === 'sent' ? 'bg-green-100 text-green-800' :
+                  issue.status === 'processing' ? 'bg-blue-100 text-blue-800' :
                   'bg-red-100 text-red-800'
                 }`}>
-                  {campaign.status === 'processing' && (
+                  {issue.status === 'processing' && (
                     <svg className="animate-spin -ml-0.5 mr-1.5 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                   )}
-                  {formatStatus(campaign.status)}
+                  {formatStatus(issue.status)}
                 </span>
                 <span className="text-sm text-gray-500">
-                  {campaign.articles.filter(a => a.is_active && !a.skipped).length}/{maxTopArticles} selected
+                  {issue.articles.filter(a => a.is_active && !a.skipped).length}/{maxTopArticles} selected
                 </span>
               </div>
             </div>
             <div className="flex space-x-2">
               <button
                 onClick={processRSSFeeds}
-                disabled={processing || saving || generatingSubject || campaign.status === 'processing'}
+                disabled={processing || saving || generatingSubject || issue.status === 'processing'}
                 className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium"
               >
-                {(processing || campaign.status === 'processing') ? 'Processing in background...' : 'Reprocess Articles'}
+                {(processing || issue.status === 'processing') ? 'Processing in background...' : 'Reprocess Articles'}
               </button>
               <button
                 onClick={previewNewsletter}
@@ -2518,8 +2518,8 @@ export default function CampaignDetailPage() {
                   </div>
                 ) : (
                   <>
-                    {campaign.subject_line ? (
-                      <div className="font-medium text-gray-900">{campaign.subject_line}</div>
+                    {issue.subject_line ? (
+                      <div className="font-medium text-gray-900">{issue.subject_line}</div>
                     ) : (
                       <div className="text-gray-500 italic">No subject line generated yet</div>
                     )}
@@ -2528,7 +2528,7 @@ export default function CampaignDetailPage() {
               </div>
               {!editingSubject && (
                 <div className="ml-4 flex space-x-2">
-                  {campaign.subject_line && (
+                  {issue.subject_line && (
                     <button
                       onClick={startEditingSubject}
                       disabled={generatingSubject || processing || savingSubject}
@@ -2542,17 +2542,17 @@ export default function CampaignDetailPage() {
                     disabled={generatingSubject || processing || savingSubject}
                     className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white px-3 py-1 rounded text-sm font-medium"
                   >
-                    {generatingSubject ? 'Generating...' : campaign.subject_line ? 'Regenerate' : 'Generate'}
+                    {generatingSubject ? 'Generating...' : issue.subject_line ? 'Regenerate' : 'Generate'}
                   </button>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Campaign Approval Buttons */}
+          {/* issue Approval Buttons */}
           <div className="mt-4 flex justify-end space-x-3">
             <button
-              onClick={() => updateCampaignStatus('changes_made')}
+              onClick={() => updateIssueStatus('changes_made')}
               disabled={updatingStatus}
               className="bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 text-white px-4 py-2 rounded-md font-medium text-sm flex items-center"
             >
@@ -2572,7 +2572,7 @@ export default function CampaignDetailPage() {
               onClick={() => setDeleteModal(true)}
               className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md font-medium text-sm"
             >
-              Delete Campaign
+              Delete Issue
             </button>
           </div>
         </div>
@@ -2604,17 +2604,17 @@ export default function CampaignDetailPage() {
                 Check articles to select them for the newsletter. Drag to reorder selected articles.
               </p>
               <div className="text-sm">
-                <span className={`font-medium ${campaign.articles.filter(a => a.is_active && !a.skipped).length === maxTopArticles ? 'text-green-600' : 'text-yellow-600'}`}>
-                  {campaign.articles.filter(a => a.is_active && !a.skipped).length}/{maxTopArticles} selected
+                <span className={`font-medium ${issue.articles.filter(a => a.is_active && !a.skipped).length === maxTopArticles ? 'text-green-600' : 'text-yellow-600'}`}>
+                  {issue.articles.filter(a => a.is_active && !a.skipped).length}/{maxTopArticles} selected
                 </span>
-                <span className="text-gray-500 ml-1">• {campaign.articles.filter(a => !a.skipped).length} total articles</span>
+                <span className="text-gray-500 ml-1">• {issue.articles.filter(a => !a.skipped).length} total articles</span>
               </div>
             </div>
           </div>
 
           {articlesExpanded && (
             <div className="divide-y divide-gray-200">
-              {campaign.articles.length === 0 ? (
+              {issue.articles.length === 0 ? (
               <div className="p-6 text-center text-gray-500">
                 <p className="mb-4">No articles generated yet. Run RSS processing to generate articles.</p>
                 <div className="flex space-x-2">
@@ -2640,7 +2640,7 @@ export default function CampaignDetailPage() {
                 onDragEnd={handleDragEnd}
               >
                 <SortableContext
-                  items={campaign.articles
+                  items={issue.articles
                     .filter(article => !article.skipped)
                     .sort((a, b) => {
                       // Sort by rank field (lower rank = higher priority)
@@ -2652,7 +2652,7 @@ export default function CampaignDetailPage() {
                     .map(article => article.id)}
                   strategy={verticalListSortingStrategy}
                 >
-                  {campaign.articles
+                  {issue.articles
                     .filter(article => !article.skipped)
                     .sort((a, b) => {
                       // Sort by rank field (lower rank = higher priority)
@@ -2707,17 +2707,17 @@ export default function CampaignDetailPage() {
                 Secondary section articles appear below the main articles. Drag to reorder.
               </p>
               <div className="text-sm">
-                <span className={`font-medium ${campaign.secondary_articles?.filter(a => a.is_active && !a.skipped).length === (maxSecondaryArticles || 3) ? 'text-green-600' : 'text-yellow-600'}`}>
-                  {campaign.secondary_articles?.filter(a => a.is_active && !a.skipped).length || 0}/{maxSecondaryArticles || 3} selected
+                <span className={`font-medium ${issue.secondary_articles?.filter(a => a.is_active && !a.skipped).length === (maxSecondaryArticles || 3) ? 'text-green-600' : 'text-yellow-600'}`}>
+                  {issue.secondary_articles?.filter(a => a.is_active && !a.skipped).length || 0}/{maxSecondaryArticles || 3} selected
                 </span>
-                <span className="text-gray-500 ml-1">• {campaign.secondary_articles?.filter(a => !a.skipped).length || 0} total articles</span>
+                <span className="text-gray-500 ml-1">• {issue.secondary_articles?.filter(a => !a.skipped).length || 0} total articles</span>
               </div>
             </div>
           </div>
 
           {secondaryArticlesExpanded && (
             <div className="divide-y divide-gray-200">
-              {!campaign.secondary_articles || campaign.secondary_articles.length === 0 ? (
+              {!issue.secondary_articles || issue.secondary_articles.length === 0 ? (
               <div className="p-6 text-center text-gray-500">
                 <p className="mb-2">No secondary articles generated yet.</p>
                 <p className="text-sm">Configure RSS feeds for secondary section in Settings, then run RSS processing.</p>
@@ -2729,7 +2729,7 @@ export default function CampaignDetailPage() {
                 onDragEnd={handleSecondaryDragEnd}
               >
                 <SortableContext
-                  items={campaign.secondary_articles
+                  items={issue.secondary_articles
                     .filter(article => !article.skipped)
                     .sort((a, b) => {
                       const rankA = a.rank ?? 9999
@@ -2739,7 +2739,7 @@ export default function CampaignDetailPage() {
                     .map(article => article.id)}
                   strategy={verticalListSortingStrategy}
                 >
-                  {campaign.secondary_articles
+                  {issue.secondary_articles
                     .filter(article => !article.skipped)
                     .sort((a, b) => {
                       const rankA = a.rank ?? 9999
@@ -2772,7 +2772,7 @@ export default function CampaignDetailPage() {
             <NewsletterSectionComponent
               key={section.id}
               section={section}
-              campaign={campaign}
+              issue={issue}
               expanded={sectionExpandedStates[section.id] || false}
               onToggleExpanded={() => {
                 setSectionExpandedStates(prev => ({
@@ -2799,7 +2799,7 @@ export default function CampaignDetailPage() {
                         const url = URL.createObjectURL(blob)
                         const a = document.createElement('a')
                         a.href = url
-                        a.download = `newsletter-${campaign?.date}.html`
+                        a.download = `newsletter-${issue?.date}.html`
                         a.click()
                         URL.revokeObjectURL(url)
                       }
@@ -2829,10 +2829,10 @@ export default function CampaignDetailPage() {
           </div>
         )}
 
-        {/* Delete Campaign Modal */}
-        {campaign && (
-          <DeleteCampaignModal
-            campaign={campaign}
+        {/* Delete issue Modal */}
+        {issue && (
+          <DeleteIssueModal
+            issue={issue}
             isOpen={deleteModal}
             onClose={handleDeleteCancel}
             onConfirm={handleDeleteConfirm}

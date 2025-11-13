@@ -10,7 +10,7 @@
 
 CREATE TABLE ai_applications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  newsletter_id UUID NOT NULL REFERENCES newsletters(id) ON DELETE CASCADE,
+  newsletter_id UUID NOT NULL REFERENCES publications(id) ON DELETE CASCADE,
 
   -- Application Details
   app_name TEXT NOT NULL,
@@ -70,7 +70,7 @@ CREATE INDEX idx_campaign_apps_app ON campaign_ai_app_selections(app_id);
 
 CREATE TABLE prompt_ideas (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  newsletter_id UUID NOT NULL REFERENCES newsletters(id) ON DELETE CASCADE,
+  newsletter_id UUID NOT NULL REFERENCES publications(id) ON DELETE CASCADE,
 
   -- Prompt Details
   title TEXT NOT NULL, -- e.g., "Analyze Cash Flow Trends"
@@ -128,7 +128,7 @@ CREATE INDEX idx_campaign_prompts_prompt ON campaign_prompt_selections(prompt_id
 -- Insert sample AI applications for Accounting newsletter
 INSERT INTO ai_applications (newsletter_id, app_name, tagline, description, category, app_url, pricing) VALUES
 (
-  (SELECT id FROM newsletters WHERE slug = 'accounting'),
+  (SELECT id FROM publications WHERE slug = 'accounting'),
   'QuickBooks AI Assistant',
   'Automate your bookkeeping with AI',
   'AI-powered accounting assistant that categorizes transactions, detects anomalies, and generates financial reports automatically.',
@@ -137,7 +137,7 @@ INSERT INTO ai_applications (newsletter_id, app_name, tagline, description, cate
   'Freemium'
 ),
 (
-  (SELECT id FROM newsletters WHERE slug = 'accounting'),
+  (SELECT id FROM publications WHERE slug = 'accounting'),
   'TaxGPT',
   'AI tax advisor for complex scenarios',
   'Get instant answers to complex tax questions with AI trained on IRS publications and tax law. Includes source citations for accuracy.',
@@ -146,7 +146,7 @@ INSERT INTO ai_applications (newsletter_id, app_name, tagline, description, cate
   'Paid'
 ),
 (
-  (SELECT id FROM newsletters WHERE slug = 'accounting'),
+  (SELECT id FROM publications WHERE slug = 'accounting'),
   'Receipt-AI',
   'Snap receipts, auto-categorize expenses',
   'Mobile app that uses computer vision to extract data from receipts and automatically categorizes expenses for your accounting software.',
@@ -155,7 +155,7 @@ INSERT INTO ai_applications (newsletter_id, app_name, tagline, description, cate
   'Free'
 ),
 (
-  (SELECT id FROM newsletters WHERE slug = 'accounting'),
+  (SELECT id FROM publications WHERE slug = 'accounting'),
   'ForecastFlow',
   'AI-powered financial forecasting',
   'Upload historical financial data and get AI-generated forecasts with scenario analysis for better business planning.',
@@ -164,7 +164,7 @@ INSERT INTO ai_applications (newsletter_id, app_name, tagline, description, cate
   '$49/mo'
 ),
 (
-  (SELECT id FROM newsletters WHERE slug = 'accounting'),
+  (SELECT id FROM publications WHERE slug = 'accounting'),
   'AuditBot',
   'Automated compliance checking',
   'AI assistant that reviews your financial statements for common errors, compliance issues, and audit red flags before submission.',
@@ -176,7 +176,7 @@ INSERT INTO ai_applications (newsletter_id, app_name, tagline, description, cate
 -- Insert sample prompt ideas for Accounting newsletter
 INSERT INTO prompt_ideas (newsletter_id, title, prompt_text, category, use_case, suggested_model, difficulty_level, estimated_time) VALUES
 (
-  (SELECT id FROM newsletters WHERE slug = 'accounting'),
+  (SELECT id FROM publications WHERE slug = 'accounting'),
   'Analyze Monthly Cash Flow',
   'Review the following cash flow data from [Month]: [paste data]. Identify trends, potential issues, and provide 3 actionable recommendations to improve cash flow in the next quarter.',
   'Financial Analysis',
@@ -186,7 +186,7 @@ INSERT INTO prompt_ideas (newsletter_id, title, prompt_text, category, use_case,
   '2 minutes'
 ),
 (
-  (SELECT id FROM newsletters WHERE slug = 'accounting'),
+  (SELECT id FROM publications WHERE slug = 'accounting'),
   'Draft Tax Deadline Reminder Email',
   'Write a professional email to clients reminding them of the [Tax Deadline Date] deadline. Include: 1) Required documents, 2) Consequences of missing deadline, 3) How to schedule appointment. Tone: Professional but friendly.',
   'Client Communication',
@@ -196,7 +196,7 @@ INSERT INTO prompt_ideas (newsletter_id, title, prompt_text, category, use_case,
   '1 minute'
 ),
 (
-  (SELECT id FROM newsletters WHERE slug = 'accounting'),
+  (SELECT id FROM publications WHERE slug = 'accounting'),
   'Explain Complex Tax Concept',
   'Explain [Tax Concept] to a small business owner with no accounting background. Use simple language, analogies, and a real-world example. Keep it under 200 words.',
   'Client Education',
@@ -206,7 +206,7 @@ INSERT INTO prompt_ideas (newsletter_id, title, prompt_text, category, use_case,
   '3 minutes'
 ),
 (
-  (SELECT id FROM newsletters WHERE slug = 'accounting'),
+  (SELECT id FROM publications WHERE slug = 'accounting'),
   'Generate Financial Ratio Analysis',
   'Analyze these financial ratios for [Company Name]: [paste ratios]. Compare them to industry benchmarks and identify 3 areas of concern and 2 strengths. Suggest specific actions to improve weak areas.',
   'Financial Analysis',
@@ -216,7 +216,7 @@ INSERT INTO prompt_ideas (newsletter_id, title, prompt_text, category, use_case,
   '5 minutes'
 ),
 (
-  (SELECT id FROM newsletters WHERE slug = 'accounting'),
+  (SELECT id FROM publications WHERE slug = 'accounting'),
   'Create Year-End Tax Planning Checklist',
   'Create a year-end tax planning checklist for [Type of Business/Individual]. Include: 1) Income strategies, 2) Deduction opportunities, 3) Retirement contributions, 4) Important deadlines. Format as a prioritized checklist.',
   'Tax Planning',
@@ -232,12 +232,12 @@ INSERT INTO prompt_ideas (newsletter_id, title, prompt_text, category, use_case,
 
 -- Add new sections for AI Professional newsletters
 INSERT INTO newsletter_sections (newsletter_id, name, display_order, is_active, description) VALUES
-((SELECT id FROM newsletters WHERE slug = 'accounting'), 'Welcome', 1, true, 'Article overview section'),
-((SELECT id FROM newsletters WHERE slug = 'accounting'), 'Advertisement', 2, true, 'Sponsor advertisement'),
-((SELECT id FROM newsletters WHERE slug = 'accounting'), 'Top Articles', 3, true, 'First 3 articles from RSS feed'),
-((SELECT id FROM newsletters WHERE slug = 'accounting'), 'AI Applications', 4, true, '5 AI tools for accountants'),
-((SELECT id FROM newsletters WHERE slug = 'accounting'), 'Bottom Articles', 5, true, 'Last 3 articles from RSS feed'),
-((SELECT id FROM newsletters WHERE slug = 'accounting'), 'Prompt Ideas', 6, true, '3-5 AI prompts to try');
+((SELECT id FROM publications WHERE slug = 'accounting'), 'Welcome', 1, true, 'Article overview section'),
+((SELECT id FROM publications WHERE slug = 'accounting'), 'Advertisement', 2, true, 'Sponsor advertisement'),
+((SELECT id FROM publications WHERE slug = 'accounting'), 'Top Articles', 3, true, 'First 3 articles from RSS feed'),
+((SELECT id FROM publications WHERE slug = 'accounting'), 'AI Applications', 4, true, '5 AI tools for accountants'),
+((SELECT id FROM publications WHERE slug = 'accounting'), 'Bottom Articles', 5, true, 'Last 3 articles from RSS feed'),
+((SELECT id FROM publications WHERE slug = 'accounting'), 'Prompt Ideas', 6, true, '3-5 AI prompts to try');
 
 -- ============================================
 -- MIGRATION COMPLETE

@@ -31,37 +31,37 @@ export async function GET(request: NextRequest) {
 
     console.log('Starting Breaking News RSS processing...')
 
-    // Get the latest draft campaign for AI Accounting newsletter
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Get the latest draft issue for AI Accounting newsletter
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select('id, date, status')
       .eq('status', 'draft')
       .order('date', { ascending: false })
       .limit(1)
       .single()
 
-    if (campaignError || !campaign) {
-      console.log('No draft campaign found for Breaking News processing')
+    if (issueError || !issue) {
+      console.log('No draft issue found for Breaking News processing')
       return NextResponse.json({
         success: false,
-        message: 'No draft campaign found',
+        message: 'No draft issue found',
         timestamp: new Date().toISOString()
       })
     }
 
-    console.log(`Processing Breaking News for campaign ${campaign.id} (date: ${campaign.date})`)
+    console.log(`Processing Breaking News for issue ${issue.id} (date: ${issue.date})`)
 
     // Initialize and run Breaking News processor
     const processor = new BreakingNewsProcessor()
-    await processor.processBreakingNewsFeeds(campaign.id)
+    await processor.processBreakingNewsFeeds(issue.id)
 
     console.log('Breaking News RSS processing completed successfully')
 
     return NextResponse.json({
       success: true,
       message: 'Breaking News RSS processing completed',
-      campaign_id: campaign.id,
-      campaign_date: campaign.date,
+      issue_id: issue.id,
+      issue_date: issue.date,
       timestamp: new Date().toISOString()
     })
 

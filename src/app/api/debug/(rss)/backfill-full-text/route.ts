@@ -7,7 +7,7 @@ export const maxDuration = 600 // 10 minutes for backfill
 /**
  * Backfill missing full_article_text using Jina AI
  *
- * Usage: GET /api/debug/backfill-full-text?campaign_id=XXX&dry_run=true
+ * Usage: GET /api/debug/backfill-full-text?issueId=XXX&dry_run=true
  *
  * This will:
  * 1. Find all posts with no/empty full_article_text
@@ -16,22 +16,22 @@ export const maxDuration = 600 // 10 minutes for backfill
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  const campaignId = searchParams.get('campaign_id')
+  const issueId = searchParams.get('issue_id')
   const dryRun = searchParams.get('dry_run') !== 'false' // Default true
   const limit = parseInt(searchParams.get('limit') || '20') // Max posts to process
 
-  if (!campaignId) {
-    return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
+  if (!issueId) {
+    return NextResponse.json({ error: 'issueId required' }, { status: 400 })
   }
 
   try {
-    console.log(`[BACKFILL] ${dryRun ? 'DRY RUN:' : ''} Starting backfill for campaign ${campaignId}`)
+    console.log(`[BACKFILL] ${dryRun ? 'DRY RUN:' : ''} Starting backfill for issue ${issueId}`)
 
     // Find posts with no full_article_text
     const { data: posts, error } = await supabaseAdmin
       .from('rss_posts')
       .select('id, title, source_url, full_article_text')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .or('full_article_text.is.null,full_article_text.eq.')
       .limit(limit)
 
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         status: 'success',
         message: 'No posts need backfilling',
-        campaign_id: campaignId,
+        issue_id: issueId,
         posts_found: 0
       })
     }
@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
       message: dryRun
         ? `DRY RUN: Would backfill ${successCount} posts`
         : `Backfilled ${successCount} posts`,
-      campaign_id: campaignId,
+      issue_id: issueId,
       total_posts: posts.length,
       succeeded: successCount,
       failed: failedCount,

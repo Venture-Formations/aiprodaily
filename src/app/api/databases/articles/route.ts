@@ -9,18 +9,18 @@ export async function GET(request: NextRequest) {
     );
 
     const { searchParams } = new URL(request.url);
-    const newsletterSlug = searchParams.get('newsletter_id'); // Actually a slug, not UUID
+    const newsletterSlug = searchParams.get('publication_id'); // Actually a slug, not UUID
 
     if (!newsletterSlug) {
       return NextResponse.json(
-        { error: 'newsletter_id is required' },
+        { error: 'publication_id is required' },
         { status: 400 }
       );
     }
 
     // Convert slug to UUID (required for database queries)
     const { data: newsletter, error: newsletterError } = await supabase
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('slug', newsletterSlug)
       .single();
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     const { data: criteriaSettings } = await supabase
       .from('app_settings')
       .select('key, value')
-      .eq('newsletter_id', newsletterId)
+      .eq('publication_id', newsletterId)
       .in('key', [
         'criteria_1_name',
         'criteria_1_weight',
@@ -63,24 +63,24 @@ export async function GET(request: NextRequest) {
     console.log('[API] Criteria settings found:', criteriaSettings?.length || 0);
     console.log('[API] Criteria config:', JSON.stringify(criteriaConfig, null, 2));
 
-    // First, get campaigns for this newsletter
-    const { data: campaigns } = await supabase
-      .from('newsletter_campaigns')
-      .select('id, date, newsletter_id')
-      .eq('newsletter_id', newsletterId);
+    // First, get issues for this newsletter
+    const { data: issues } = await supabase
+      .from('publication_issues')
+      .select('id, date, publication_id')
+      .eq('publication_id', newsletterId);
 
-    console.log('[API] Found campaigns:', campaigns?.length || 0);
+    console.log('[API] Found issues:', issues?.length || 0);
 
-    const campaignIds = (campaigns || []).map(c => c.id);
-    const campaignMap = new Map((campaigns || []).map(c => [c.id, c]));
+    const issueIds = (issues || []).map(c => c.id);
+    const issueMap = new Map((issues || []).map(c => [c.id, c]));
 
-    // Fetch primary articles - if we have campaigns, filter by them, otherwise get all
+    // Fetch primary articles - if we have issues, filter by them, otherwise get all
     let primaryQuery = supabase
       .from('articles')
       .select(`
         id,
         post_id,
-        campaign_id,
+        issue_id,
         headline,
         content,
         rank,
@@ -89,8 +89,8 @@ export async function GET(request: NextRequest) {
         created_at
       `);
 
-    if (campaignIds.length > 0) {
-      primaryQuery = primaryQuery.in('campaign_id', campaignIds);
+    if (issueIds.length > 0) {
+      primaryQuery = primaryQuery.in('issue_id', issueIds);
     }
 
     const { data: primaryArticles, error: primaryError } = await primaryQuery;
@@ -102,16 +102,16 @@ export async function GET(request: NextRequest) {
 
     console.log('[API] Found primary articles:', primaryArticles?.length || 0);
     if (primaryArticles && primaryArticles.length > 0) {
-      console.log('[API] Sample primary article:', { id: primaryArticles[0].id, post_id: primaryArticles[0].post_id, campaign_id: primaryArticles[0].campaign_id });
+      console.log('[API] Sample primary article:', { id: primaryArticles[0].id, post_id: primaryArticles[0].post_id, issue_id: primaryArticles[0].issue_id });
     }
 
-    // Fetch secondary articles - if we have campaigns, filter by them, otherwise get all
+    // Fetch secondary articles - if we have issues, filter by them, otherwise get all
     let secondaryQuery = supabase
       .from('secondary_articles')
       .select(`
         id,
         post_id,
-        campaign_id,
+        issue_id,
         headline,
         content,
         rank,
@@ -120,8 +120,8 @@ export async function GET(request: NextRequest) {
         created_at
       `);
 
-    if (campaignIds.length > 0) {
-      secondaryQuery = secondaryQuery.in('campaign_id', campaignIds);
+    if (issueIds.length > 0) {
+      secondaryQuery = secondaryQuery.in('issue_id', issueIds);
     }
 
     const { data: secondaryArticles, error: secondaryError } = await secondaryQuery;
@@ -229,7 +229,7 @@ export async function GET(request: NextRequest) {
     // Transform and combine articles
     const transformArticle = (article: any, isPrimary: boolean) => {
       const post = postMap.get(article.post_id);
-      const campaign = campaignMap.get(article.campaign_id);
+      const issue = issueMap.get(article.issue_id);
       const feed = post ? feedMap.get(post.feed_id) : null;
       const rating = ratingsMap.get(article.post_id);
 
@@ -237,8 +237,8 @@ export async function GET(request: NextRequest) {
       if (!post) {
         console.log('[API] Missing post for article:', article.id, 'post_id:', article.post_id);
       }
-      if (!campaign) {
-        console.log('[API] Missing campaign for article:', article.id, 'campaign_id:', article.campaign_id);
+      if (!issue) {
+        console.log('[API] Missing issue for article:', article.id, 'issue_id:', article.issue_id);
       }
       if (post && !feed) {
         console.log('[API] Missing feed for post:', post.id, 'feed_id:', post.feed_id);
@@ -296,7 +296,7 @@ export async function GET(request: NextRequest) {
         wordCount: article.word_count || null,
         finalPosition: article.rank || null,
         createdAt: article.created_at || '',
-        campaignDate: campaign?.date || ''
+        issueDate: issue?.date || ''
       };
     };
 
@@ -305,9 +305,9 @@ export async function GET(request: NextRequest) {
       ...(secondaryArticles || []).map(a => transformArticle(a, false))
     ];
 
-    // Sort by campaign date (most recent first), then by final position
+    // Sort by issue date (most recent first), then by final position
     allArticles.sort((a, b) => {
-      const dateCompare = (b?.campaignDate || '').localeCompare(a?.campaignDate || '');
+      const dateCompare = (b?.issueDate || '').localeCompare(a?.issueDate || '');
       if (dateCompare !== 0) return dateCompare;
 
       const posA = a?.finalPosition || 999;

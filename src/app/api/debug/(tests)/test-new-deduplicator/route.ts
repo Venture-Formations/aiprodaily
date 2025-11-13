@@ -7,27 +7,27 @@ export const maxDuration = 600
 /**
  * Test endpoint for new 3-stage deduplication system
  *
- * Usage: GET /api/debug/test-new-deduplicator?campaign_id=XXX&dry_run=true
+ * Usage: GET /api/debug/test-new-deduplicator?issueId=XXX&dry_run=true
  *
  * Shows detailed results from each stage without persisting to database
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const campaignId = searchParams.get('campaign_id')
+  const issueId = searchParams.get('issue_id')
   const dryRun = searchParams.get('dry_run') !== 'false' // Default true
 
-  if (!campaignId) {
-    return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
+  if (!issueId) {
+    return NextResponse.json({ error: 'issueId required' }, { status: 400 })
   }
 
   try {
-    console.log(`[TEST-DEDUP] Testing deduplication for campaign ${campaignId}`)
+    console.log(`[TEST-DEDUP] Testing deduplication for issue ${issueId}`)
 
-    // Fetch all posts for this campaign
+    // Fetch all posts for this issue
     const { data: posts, error } = await supabaseAdmin
       .from('rss_posts')
       .select('*')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .order('processed_at', { ascending: false })
 
     if (error) {
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     if (!posts || posts.length === 0) {
       return NextResponse.json({
         success: false,
-        message: 'No posts found for this campaign'
+        message: 'No posts found for this issue'
       })
     }
 
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
       historicalLookbackDays,
       strictnessThreshold
     })
-    const result = await deduplicator.detectAllDuplicates(posts, campaignId)
+    const result = await deduplicator.detectAllDuplicates(posts, issueId)
 
     // Format results for display
     const groupDetails = result.groups.map(group => {
@@ -86,16 +86,16 @@ export async function GET(request: Request) {
       }
     })
 
-    // Check if campaign has already been deduplicated
+    // Check if issue has already been deduplicated
     const { data: existingGroups } = await supabaseAdmin
       .from('duplicate_groups')
       .select('id, topic_signature')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     const response = {
       success: true,
       dry_run: dryRun,
-      campaign_id: campaignId,
+      issue_id: issueId,
       total_posts: posts.length,
       stats: result.stats,
       groups: groupDetails,
@@ -125,7 +125,7 @@ export async function GET(request: Request) {
         const { data: duplicateGroup, error: groupError } = await supabaseAdmin
           .from('duplicate_groups')
           .insert([{
-            campaign_id: campaignId,
+            issue_id: issueId,
             primary_post_id: primaryPost.id,
             topic_signature: group.topic_signature
           }])

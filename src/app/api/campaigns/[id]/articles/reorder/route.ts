@@ -15,7 +15,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id: campaignId } = await params
+    const { id: issueId } = await params
     const body = await request.json()
     const { articleOrders } = body
 
@@ -24,7 +24,7 @@ export async function POST(
     }
 
     // Get the current #1 article before reordering
-    const { article: previousTopArticle } = await getCurrentTopArticle(campaignId)
+    const { article: previousTopArticle } = await getCurrentTopArticle(issueId)
     const previousTopArticleId = previousTopArticle?.id
 
     console.log(`Current #1 article before reorder: ${previousTopArticle?.headline || 'None'} (ID: ${previousTopArticleId || 'N/A'})`)
@@ -37,7 +37,7 @@ export async function POST(
         .from('articles')
         .update({ rank })
         .eq('id', articleId)
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
     )
 
     const results = await Promise.all(updatePromises)
@@ -54,7 +54,7 @@ export async function POST(
     }
 
     // Get the new #1 article after reordering
-    const { article: newTopArticle } = await getCurrentTopArticle(campaignId)
+    const { article: newTopArticle } = await getCurrentTopArticle(issueId)
     const newTopArticleId = newTopArticle?.id
 
     console.log(`New #1 article after reorder: ${newTopArticle?.headline || 'None'} (ID: ${newTopArticleId || 'N/A'})`)
@@ -65,7 +65,7 @@ export async function POST(
 
     if (topArticleChanged && newTopArticle) {
       console.log('The #1 article changed during reordering - auto-regenerating subject line...')
-      subjectLineResult = await generateSubjectLine(campaignId, session.user?.email || undefined)
+      subjectLineResult = await generateSubjectLine(issueId, session.user?.email || undefined)
 
       if (subjectLineResult.success) {
         console.log(`Subject line auto-regenerated: "${subjectLineResult.subject_line}"`)
@@ -80,7 +80,7 @@ export async function POST(
 
     // Auto-regenerate welcome section (fire and forget - don't wait)
     console.log('Auto-regenerating welcome section after article reorder...')
-    autoRegenerateWelcome(campaignId, session.user?.email || undefined).then(result => {
+    autoRegenerateWelcome(issueId, session.user?.email || undefined).then(result => {
       if (result.success) {
         console.log('Welcome section auto-regenerated successfully after reorder')
       } else {

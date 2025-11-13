@@ -5,31 +5,31 @@ export async function GET() {
   try {
     console.log('=== RSS Processing Trace Started ===')
 
-    // 1. Check for latest campaign
-    const { data: campaigns, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // 1. Check for latest issue
+    const { data: issues, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(1)
 
-    console.log('Latest campaign:', campaigns)
+    console.log('Latest issue:', issues)
 
-    if (campaignError || !campaigns || campaigns.length === 0) {
+    if (issueError || !issues || issues.length === 0) {
       return NextResponse.json({
-        error: 'No campaigns found',
-        details: campaignError
+        error: 'No issues found',
+        details: issueError
       })
     }
 
-    const campaign = campaigns[0]
+    const issue = issues[0]
 
     // 2. Check for RSS posts
     const { data: rssPosts, error: postsError } = await supabaseAdmin
       .from('rss_posts')
       .select('*')
-      .eq('campaign_id', campaign.id)
+      .eq('issue_id', issue.id)
 
-    console.log(`Found ${rssPosts?.length || 0} RSS posts for campaign ${campaign.id}`)
+    console.log(`Found ${rssPosts?.length || 0} RSS posts for issue ${issue.id}`)
 
     if (postsError) {
       return NextResponse.json({
@@ -58,9 +58,9 @@ export async function GET() {
     const { data: articles, error: articlesError } = await supabaseAdmin
       .from('articles')
       .select('*')
-      .eq('campaign_id', campaign.id)
+      .eq('issue_id', issue.id)
 
-    console.log(`Found ${articles?.length || 0} articles for campaign ${campaign.id}`)
+    console.log(`Found ${articles?.length || 0} articles for issue ${issue.id}`)
 
     if (articlesError) {
       return NextResponse.json({
@@ -86,11 +86,11 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      campaign: {
-        id: campaign.id,
-        date: campaign.date,
-        status: campaign.status,
-        created_at: campaign.created_at
+      issue: {
+        id: issue.id,
+        date: issue.date,
+        status: issue.status,
+        created_at: issue.created_at
       },
       rss_posts_count: rssPosts?.length || 0,
       ratings_count: ratings?.length || 0,

@@ -66,7 +66,7 @@ export const STEP_NAMES: Record<WorkflowState, string> = {
   'pending_generate': 'Ready to Generate Articles',
   'generating': 'Generating Newsletter Articles',
   'pending_finalize': 'Ready to Finalize',
-  'finalizing': 'Finalizing Campaign',
+  'finalizing': 'Finalizing issue',
   'complete': 'Complete',
   'failed': 'Failed'
 }

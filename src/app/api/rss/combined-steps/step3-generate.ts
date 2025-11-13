@@ -6,17 +6,17 @@ import { RSSProcessor } from '@/lib/rss-processor'
  * - Generate newsletter articles from scored posts
  * - MINIMAL LOGGING to prevent log overflow
  */
-export async function executeStep3(campaignId: string) {
+export async function executeStep3(issueId: string) {
   const processor = new RSSProcessor()
 
   // Generate articles (processor has minimal logging now)
-  await processor.generateArticlesForSection(campaignId, 'primary')
-  await processor.generateArticlesForSection(campaignId, 'secondary')
+  await processor.generateArticlesForSection(issueId, 'primary')
+  await processor.generateArticlesForSection(issueId, 'secondary')
 
   const { data: articles } = await supabaseAdmin
     .from('articles')
     .select('id')
-    .eq('campaign_id', campaignId)
+    .eq('issue_id', issueId)
 
   const articlesCount = articles ? articles.length : 0
   console.log(`[Step 3/4] Complete: ${articlesCount} articles`)

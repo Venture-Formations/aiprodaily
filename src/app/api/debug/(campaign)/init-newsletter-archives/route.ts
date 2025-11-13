@@ -23,8 +23,8 @@ export async function GET() {
     const createTableSQL = `
       CREATE TABLE IF NOT EXISTS archived_newsletters (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        campaign_id TEXT NOT NULL UNIQUE,
-        campaign_date DATE NOT NULL,
+        issueId TEXT NOT NULL UNIQUE,
+        issue_date DATE NOT NULL,
         subject_line TEXT NOT NULL,
         send_date TIMESTAMPTZ NOT NULL,
         recipient_count INTEGER DEFAULT 0,
@@ -37,9 +37,9 @@ export async function GET() {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
 
-      -- Create index on campaign_date for fast lookups by date
+      -- Create index on issue_date for fast lookups by date
       CREATE INDEX IF NOT EXISTS idx_archived_newsletters_date
-        ON archived_newsletters(campaign_date DESC);
+        ON archived_newsletters(issue_date DESC);
 
       -- Create index on send_date for archive list ordering
       CREATE INDEX IF NOT EXISTS idx_archived_newsletters_send_date

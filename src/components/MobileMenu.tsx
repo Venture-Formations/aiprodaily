@@ -22,7 +22,7 @@ export default function MobileMenu({
   onSignOut,
   userDisplay,
   dashboardUrl = '/dashboard',
-  campaignsUrl = '/dashboard/campaigns',
+  campaignsUrl = '/dashboard/issues',
   analyticsUrl = '/dashboard/analytics',
   databasesUrl = '/dashboard/databases',
   settingsUrl = '/dashboard/settings'

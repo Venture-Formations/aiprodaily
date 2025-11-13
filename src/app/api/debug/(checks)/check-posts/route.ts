@@ -4,20 +4,20 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const campaignId = searchParams.get('campaign_id')
+    const issueId = searchParams.get('issue_id')
 
-    if (!campaignId) {
-      return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
+    if (!issueId) {
+      return NextResponse.json({ error: 'issueId required' }, { status: 400 })
     }
 
-    // Get RSS posts for this campaign
+    // Get RSS posts for this issue
     const { data: posts, error: postsError } = await supabaseAdmin
       .from('rss_posts')
       .select(`
         id,
         title,
         description,
-        campaign_id,
+        issueId,
         post_rating:post_ratings(
           interest_level,
           local_relevance,
@@ -26,18 +26,18 @@ export async function GET(request: Request) {
           ai_reasoning
         )
       `)
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .order('processed_at', { ascending: false })
 
     if (postsError) {
       return NextResponse.json({ error: postsError.message }, { status: 500 })
     }
 
-    // Get articles for this campaign
+    // Get articles for this issue
     const { data: articles, error: articlesError } = await supabaseAdmin
       .from('articles')
       .select('id, headline, is_active, post_id')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     if (articlesError) {
       return NextResponse.json({ error: articlesError.message }, { status: 500 })
@@ -48,7 +48,7 @@ export async function GET(request: Request) {
     const postsWithoutRatings = posts?.filter(p => !p.post_rating || p.post_rating.length === 0) || []
 
     return NextResponse.json({
-      campaign_id: campaignId,
+      issue_id: issueId,
       total_posts: posts?.length || 0,
       posts_with_ratings: postsWithRatings.length,
       posts_without_ratings: postsWithoutRatings.length,

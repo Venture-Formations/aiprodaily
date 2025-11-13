@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     // Return all newsletters (including inactive ones) for admin view
     // Frontend can filter by is_active if needed
     const { data: newsletters, error } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('*')
       .order('name', { ascending: true })
 
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     // Insert newsletter
     const { data: newsletter, error } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .insert({
         slug,
         name,

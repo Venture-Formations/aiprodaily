@@ -3,13 +3,13 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { start } from 'workflow/api'
-import { createCampaignWorkflow } from '@/lib/workflows/create-campaign-workflow'
+import { createIssueWorkflow } from '@/lib/workflows/create-issue-workflow'
 
 /**
- * Create Campaign with Full Workflow
+ * Create issue with Full Workflow
  *
- * Creates a campaign for a specific date and triggers the full RSS workflow
- * Returns after campaign is created so UI can redirect immediately
+ * Creates a issue for a specific date and triggers the full RSS workflow
+ * Returns after issue is created so UI can redirect immediately
  */
 export async function POST(request: NextRequest) {
   try {
@@ -20,95 +20,95 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { date, newsletter_id } = body
+    const { date, publication_id } = body
 
-    if (!date || !newsletter_id) {
+    if (!date || !publication_id) {
       return NextResponse.json({
-        error: 'date and newsletter_id are required'
+        error: 'date and publication_id are required'
       }, { status: 400 })
     }
 
-    console.log(`[Create Campaign] Creating campaign for ${date}`)
+    console.log(`[Create issue] Creating issue for ${date}`)
 
     // Step 1: Look up newsletter UUID from slug
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
-      .eq('slug', newsletter_id)
+      .eq('slug', publication_id)
       .single()
 
     if (newsletterError || !newsletter) {
-      console.error('[Create Campaign] Newsletter not found:', newsletter_id)
+      console.error('[Create issue] Newsletter not found:', publication_id)
       return NextResponse.json({
         error: 'Newsletter not found',
-        details: `No newsletter found with slug: ${newsletter_id}`
+        details: `No newsletter found with slug: ${publication_id}`
       }, { status: 404 })
     }
 
     const newsletterUuid = newsletter.id
-    console.log(`[Create Campaign] Newsletter UUID: ${newsletterUuid}`)
+    console.log(`[Create issue] Newsletter UUID: ${newsletterUuid}`)
 
-    // Step 2: Create the campaign
-    const { data: newCampaign, error: createError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Step 2: Create the issue
+    const { data: newissue, error: createError } = await supabaseAdmin
+      .from('publication_issues')
       .insert([{
         date: date,
         status: 'processing',
-        newsletter_id: newsletterUuid
+        publication_id: newsletterUuid
       }])
       .select('id')
       .single()
 
-    if (createError || !newCampaign) {
-      console.error('[Create Campaign] Failed to create campaign:', createError)
+    if (createError || !newissue) {
+      console.error('[Create issue] Failed to create issue:', createError)
       return NextResponse.json({
-        error: 'Failed to create campaign',
+        error: 'Failed to create issue',
         details: createError?.message
       }, { status: 500 })
     }
 
-    const campaignId = newCampaign.id
-    console.log(`[Create Campaign] Created campaign: ${campaignId}`)
+    const issueId = newissue.id
+    console.log(`[Create issue] Created issue: ${issueId}`)
 
-    // Step 3: Select AI apps and prompts (like setupCampaign does)
+    // Step 3: Select AI apps and prompts (like setupissue does)
     try {
       const { AppSelector } = await import('@/lib/app-selector')
       const { PromptSelector } = await import('@/lib/prompt-selector')
 
-      await AppSelector.selectAppsForCampaign(campaignId, newsletterUuid)
-      await PromptSelector.selectPromptForCampaign(campaignId)
-      console.log('[Create Campaign] Selected AI apps and prompts')
+      await AppSelector.selectAppsForissue(issueId, newsletterUuid)
+      await PromptSelector.selectPromptForissue(issueId)
+      console.log('[Create issue] Selected AI apps and prompts')
     } catch (error) {
-      console.log('[Create Campaign] AI selection failed (non-critical):', error)
+      console.log('[Create issue] AI selection failed (non-critical):', error)
     }
 
     // Step 4: Select advertisement
     try {
       const { AdScheduler } = await import('@/lib/ad-scheduler')
-      const selectedAd = await AdScheduler.selectAdForCampaign({
-        campaignId: campaignId,
-        campaignDate: date,
+      const selectedAd = await AdScheduler.selectAdForissue({
+        issueId: issueId,
+        issueDate: date,
         newsletterId: newsletterUuid
       })
 
       if (selectedAd) {
-        console.log(`[Create Campaign] Selected ad: ${selectedAd.title} (ID: ${selectedAd.id})`)
+        console.log(`[Create issue] Selected ad: ${selectedAd.title} (ID: ${selectedAd.id})`)
 
         try {
           // Use AdScheduler.recordAdUsage which handles everything properly
-          await AdScheduler.recordAdUsage(campaignId, selectedAd.id, date, newsletterUuid)
-          console.log('[Create Campaign] Advertisement recorded successfully')
+          await AdScheduler.recordAdUsage(issueId, selectedAd.id, date, newsletterUuid)
+          console.log('[Create issue] Advertisement recorded successfully')
         } catch (recordError) {
-          console.error('[Create Campaign] Failed to record advertisement usage:', recordError)
+          console.error('[Create issue] Failed to record advertisement usage:', recordError)
           // Log full error details
-          console.error('[Create Campaign] Error details:', JSON.stringify(recordError, null, 2))
+          console.error('[Create issue] Error details:', JSON.stringify(recordError, null, 2))
         }
       } else {
-        console.log('[Create Campaign] No advertisement available')
+        console.log('[Create issue] No advertisement available')
       }
     } catch (error) {
-      console.error('[Create Campaign] Ad selection failed:', error)
-      // Non-critical - campaign can proceed without ad
+      console.error('[Create issue] Ad selection failed:', error)
+      // Non-critical - issue can proceed without ad
     }
 
     // Step 5: Assign top 12 posts per section (using dynamic import)
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
     const { data: lookbackSetting } = await supabaseAdmin
       .from('app_settings')
       .select('value')
-      .eq('newsletter_id', newsletterUuid)
+      .eq('publication_id', newsletterUuid)
       .eq('key', 'primary_article_lookback_hours')
       .single()
 
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
       .from('rss_posts')
       .select('id, post_ratings(total_score)')
       .in('feed_id', primaryFeedIds)
-      .is('campaign_id', null)
+      .is('issue_id', null)
       .gte('processed_at', lookbackTimestamp)
       .not('post_ratings', 'is', null)
 
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
       .from('rss_posts')
       .select('id, post_ratings(total_score)')
       .in('feed_id', secondaryFeedIds)
-      .is('campaign_id', null)
+      .is('issue_id', null)
       .gte('processed_at', lookbackTimestamp)
       .not('post_ratings', 'is', null)
 
@@ -177,52 +177,52 @@ export async function POST(request: NextRequest) {
       })
       .slice(0, 12) || []
 
-    // Assign to campaign
+    // Assign to issue
     if (topPrimary.length > 0) {
       await supabaseAdmin
         .from('rss_posts')
-        .update({ campaign_id: campaignId })
+        .update({ issue_id: issueId })
         .in('id', topPrimary.map(p => p.id))
     }
 
     if (topSecondary.length > 0) {
       await supabaseAdmin
         .from('rss_posts')
-        .update({ campaign_id: campaignId })
+        .update({ issue_id: issueId })
         .in('id', topSecondary.map(p => p.id))
     }
 
-    console.log(`[Create Campaign] Assigned ${topPrimary.length} primary, ${topSecondary.length} secondary posts`)
+    console.log(`[Create issue] Assigned ${topPrimary.length} primary, ${topSecondary.length} secondary posts`)
 
     // Step 6: Deduplicate
-    const dedupeResult = await processor.handleDuplicatesForCampaign(campaignId)
-    console.log(`[Create Campaign] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicates`)
+    const dedupeResult = await processor.handleDuplicatesForissue(issueId)
+    console.log(`[Create issue] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicates`)
 
     // Step 7: Start the article generation workflow
-    console.log('[Create Campaign] Starting article generation workflow...')
+    console.log('[Create issue] Starting article generation workflow...')
     try {
-      await start(createCampaignWorkflow, [{
-        campaign_id: campaignId,
-        newsletter_id: newsletterUuid
+      await start(createIssueWorkflow, [{
+        issue_id: issueId,
+        publication_id: newsletterUuid
       }])
-      console.log('[Create Campaign] Workflow started successfully')
+      console.log('[Create issue] Workflow started successfully')
     } catch (error) {
-      console.error('[Create Campaign] Failed to start workflow:', error)
+      console.error('[Create issue] Failed to start workflow:', error)
       // Don't fail the whole request - workflow will be retried or run manually
     }
 
-    console.log('[Create Campaign] Setup complete, workflow started in background')
+    console.log('[Create issue] Setup complete, workflow started in background')
 
     return NextResponse.json({
       success: true,
-      campaign_id: campaignId,
-      message: 'Campaign created and workflow started'
+      issue_id: issueId,
+      message: 'issue created and workflow started'
     })
 
   } catch (error) {
-    console.error('[Create Campaign] Failed:', error)
+    console.error('[Create issue] Failed:', error)
     return NextResponse.json({
-      error: 'Failed to create campaign',
+      error: 'Failed to create issue',
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }

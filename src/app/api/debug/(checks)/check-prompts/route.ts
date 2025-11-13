@@ -25,8 +25,8 @@ export async function GET() {
 
     // Check recent prompt selections
     const { data: recentSelections } = await supabaseAdmin
-      .from('campaign_prompts')
-      .select('*, prompt:prompt_ideas(title), campaign:newsletter_campaigns(date)')
+      .from('issue_prompt_selections')
+      .select('*, prompt:prompt_ideas(title), issue:publication_issues(date)')
       .order('created_at', { ascending: false })
       .limit(5)
 
@@ -38,7 +38,7 @@ export async function GET() {
         id: p.id,
         title: p.title,
         is_active: p.is_active,
-        newsletter_id: p.newsletter_id
+        publication_id: p.publication_id
       })),
       newsletter_prompts_detail: newsletterPrompts?.slice(0, 5).map(p => ({
         id: p.id,
@@ -46,7 +46,7 @@ export async function GET() {
         newsletter_name: (p as any).newsletter?.name
       })),
       recent_selections: recentSelections?.map(s => ({
-        campaign_date: (s as any).campaign?.date,
+        issue_date: (s as any).issue?.date,
         prompt_title: (s as any).prompt?.title,
         created_at: s.created_at
       }))

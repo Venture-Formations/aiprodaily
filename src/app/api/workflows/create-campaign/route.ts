@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { start } from 'workflow/api'
-import { createCampaignWorkflow } from '@/lib/workflows/create-campaign-workflow'
+import { createIssueWorkflow } from '@/lib/workflows/create-issue-workflow'
 
 /**
- * Create Campaign Workflow Endpoint
- * Generates articles for an existing campaign
+ * Create issue Workflow Endpoint
+ * Generates articles for an existing issue
  * Each step gets its own 800-second timeout via Vercel Workflow DevKit
  */
 export async function POST(request: NextRequest) {
@@ -15,33 +15,33 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { campaign_id, newsletter_id } = body
+    const { issue_id, publication_id } = body
 
-    if (!campaign_id || !newsletter_id) {
+    if (!issue_id || !publication_id) {
       return NextResponse.json({
-        error: 'campaign_id and newsletter_id are required'
+        error: 'issue_id and publication_id are required'
       }, { status: 400 })
     }
 
-    console.log(`[Create Campaign Workflow] Starting for campaign: ${campaign_id}`)
+    console.log(`[Create issue Workflow] Starting for issue: ${issue_id}`)
 
     // Start the workflow using the API from workflow/api
-    await start(createCampaignWorkflow, [{
-      campaign_id,
-      newsletter_id
+    await start(createIssueWorkflow, [{
+      issue_id,
+      publication_id
     }])
 
-    console.log(`[Create Campaign Workflow] Started successfully`)
+    console.log(`[Create issue Workflow] Started successfully`)
 
     return NextResponse.json({
       success: true,
       message: 'Workflow started successfully',
-      campaign_id,
-      newsletter_id,
+      issue_id,
+      publication_id,
       timestamp: new Date().toISOString()
     })
   } catch (error) {
-    console.error('[Create Campaign Workflow] Failed:', error)
+    console.error('[Create issue Workflow] Failed:', error)
     return NextResponse.json({
       error: 'Workflow failed',
       message: error instanceof Error ? error.message : 'Unknown error'

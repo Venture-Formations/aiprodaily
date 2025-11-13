@@ -4,24 +4,24 @@ import { RSSProcessor } from '@/lib/rss-processor'
 
 /**
  * Combined Step 1: Archive + Fetch
- * - Archive old campaign data
+ * - Archive old issue data
  * - Fetch RSS feeds from all sources
  */
-export async function executeStep1(campaignId: string) {
+export async function executeStep1(issueId: string) {
   const archiveService = new ArticleArchiveService()
   const processor = new RSSProcessor()
 
   // Archive existing data
   try {
-    await archiveService.archiveCampaignArticles(campaignId, 'rss_processing_clear')
+    await archiveService.archiveissueArticles(issueId, 'rss_processing_clear')
   } catch {
     // Archive failure is non-critical
   }
 
   // Clear previous data
-  await supabaseAdmin.from('articles').delete().eq('campaign_id', campaignId)
-  await supabaseAdmin.from('secondary_articles').delete().eq('campaign_id', campaignId)
-  await supabaseAdmin.from('rss_posts').delete().eq('campaign_id', campaignId)
+  await supabaseAdmin.from('articles').delete().eq('issue_id', issueId)
+  await supabaseAdmin.from('secondary_articles').delete().eq('issue_id', issueId)
+  await supabaseAdmin.from('rss_posts').delete().eq('issue_id', issueId)
 
   // Fetch RSS feeds
   const { data: allFeeds } = await supabaseAdmin
@@ -39,7 +39,7 @@ export async function executeStep1(campaignId: string) {
   // Process feeds
   for (const feed of primaryFeeds) {
     try {
-      await processor.processSingleFeed(feed, campaignId, 'primary')
+      await processor.processSingleFeed(feed, issueId, 'primary')
     } catch (error) {
       console.error(`Feed ${feed.name} failed`)
     }
@@ -47,7 +47,7 @@ export async function executeStep1(campaignId: string) {
 
   for (const feed of secondaryFeeds) {
     try {
-      await processor.processSingleFeed(feed, campaignId, 'secondary')
+      await processor.processSingleFeed(feed, issueId, 'secondary')
     } catch (error) {
       console.error(`Feed ${feed.name} failed`)
     }
@@ -56,7 +56,7 @@ export async function executeStep1(campaignId: string) {
   const { data: posts } = await supabaseAdmin
     .from('rss_posts')
     .select('id')
-    .eq('campaign_id', campaignId)
+    .eq('issue_id', issueId)
 
   const postsCount = posts ? posts.length : 0
   console.log(`[Step 1/4] Complete: ${postsCount} posts`)

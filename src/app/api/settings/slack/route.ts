@@ -10,9 +10,9 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's newsletter_id (use first active newsletter)
+    // Get user's publication_id (use first active newsletter)
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('is_active', true)
       .limit(1)
@@ -28,7 +28,7 @@ export async function GET() {
     const { data: settings } = await supabaseAdmin
       .from('app_settings')
       .select('key, value')
-      .eq('newsletter_id', newsletterId)
+      .eq('publication_id', newsletterId)
       .like('key', 'slack_%_enabled')
 
     const slackSettings: any = {
@@ -75,9 +75,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's newsletter_id (use first active newsletter)
+    // Get user's publication_id (use first active newsletter)
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('is_active', true)
       .limit(1)
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     // Convert frontend format to database format
     const dbSettings = [
-      { key: 'slack_campaign_status_updates_enabled', value: body.campaignStatusUpdates ? 'true' : 'false' },
+      { key: 'slack_issue_status_updates_enabled', value: body.campaignStatusUpdates ? 'true' : 'false' },
       { key: 'slack_workflow_failure_enabled', value: body.workflowFailure ? 'true' : 'false' },
       { key: 'slack_system_errors_enabled', value: body.systemErrors ? 'true' : 'false' },
       { key: 'slack_rss_processing_updates_enabled', value: body.rssProcessingUpdates ? 'true' : 'false' },
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
         .from('app_settings')
         .select('key')
         .eq('key', setting.key)
-        .eq('newsletter_id', newsletterId)
+        .eq('publication_id', newsletterId)
         .single()
 
       if (existing) {
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
             updated_at: new Date().toISOString()
           })
           .eq('key', setting.key)
-          .eq('newsletter_id', newsletterId)
+          .eq('publication_id', newsletterId)
 
         if (error) {
           console.error('[API /settings/slack] Update error for', setting.key, ':', error)
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
           .insert({
             key: setting.key,
             value: setting.value,
-            newsletter_id: newsletterId,
+            publication_id: newsletterId,
             description: `Slack notification setting: ${setting.key}`
           })
 

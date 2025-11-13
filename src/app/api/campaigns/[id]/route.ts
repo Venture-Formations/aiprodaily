@@ -18,8 +18,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
-    const { data: campaign, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    const { data: issue, error } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         *,
         articles:articles(
@@ -40,11 +40,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         ),
         manual_articles:manual_articles(*),
         email_metrics(*),
-        campaign_ai_app_selections(
+        issue_ai_app_selections(
           *,
           app:ai_applications(*)
         ),
-        campaign_advertisements(
+        issue_advertisements(
           *,
           advertisement:advertisements(*)
         )
@@ -56,16 +56,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       throw error
     }
 
-    if (!campaign) {
-      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+    if (!issue) {
+      return NextResponse.json({ error: 'issue not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ campaign })
+    return NextResponse.json({ issue })
 
   } catch (error) {
-    console.error('Failed to fetch campaign:', error)
+    console.error('Failed to fetch issue:', error)
     return NextResponse.json({
-      error: 'Failed to fetch campaign',
+      error: 'Failed to fetch issue',
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
@@ -87,8 +87,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (status) updateData.status = status
     if (subject_line !== undefined) updateData.subject_line = subject_line
 
-    const { data: campaign, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    const { data: issue, error } = await supabaseAdmin
+      .from('publication_issues')
       .update(updateData)
       .eq('id', id)
       .select('*')
@@ -111,19 +111,19 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           .from('user_activities')
           .insert([{
             user_id: user.id,
-            campaign_id: id,
-            action: 'campaign_updated',
+            issue_id: id,
+            action: 'issue_updated',
             details: updateData
           }])
       }
     }
 
-    return NextResponse.json({ campaign })
+    return NextResponse.json({ issue })
 
   } catch (error) {
-    console.error('Failed to update campaign:', error)
+    console.error('Failed to update issue:', error)
     return NextResponse.json({
-      error: 'Failed to update campaign',
+      error: 'Failed to update issue',
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }

@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
     // Get accounting newsletter ID
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('slug', 'accounting')
       .single()
@@ -39,11 +39,11 @@ export async function GET(request: NextRequest) {
         source_url,
         publication_date,
         processed_at,
-        campaign_id,
+        issueId,
         feed_id,
-        rss_feed:rss_feeds!inner(name, use_for_primary_section, use_for_secondary_section, newsletter_id)
+        rss_feed:rss_feeds!inner(name, use_for_primary_section, use_for_secondary_section, publication_id)
       `)
-      .eq('rss_feed.newsletter_id', newsletter.id)
+      .eq('rss_feed.publication_id', newsletter.id)
       .order('processed_at', { ascending: false })
       .limit(200) // Fetch more to ensure we have enough after filtering
 

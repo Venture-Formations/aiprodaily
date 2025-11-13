@@ -7,7 +7,7 @@ import type { AIApplication } from '@/types/database'
  * Simulate app selection without updating database
  * This replicates the core selection logic for dry-run testing
  */
-async function simulateAppSelection(campaignId: string, newsletterId: string): Promise<AIApplication[]> {
+async function simulateAppSelection(issueId: string, newsletterId: string): Promise<AIApplication[]> {
   // Get settings
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
@@ -22,7 +22,7 @@ async function simulateAppSelection(campaignId: string, newsletterId: string): P
   const { data: allApps } = await supabaseAdmin
     .from('ai_applications')
     .select('*')
-    .eq('newsletter_id', newsletterId)
+    .eq('publication_id', newsletterId)
     .eq('is_active', true)
 
   if (!allApps || allApps.length === 0) return []
@@ -80,22 +80,22 @@ async function simulateAppSelection(campaignId: string, newsletterId: string): P
  * Tests the affiliate app selection logic without running RSS process
  *
  * Query params:
- * - campaignId: (optional) Use existing campaign, or creates test campaign
+ * - issueId: (optional) Use existing issue, or creates test issue
  * - reset: (optional) Set to 'true' to clear existing selections first
  * - dryRun: (optional) Set to 'true' to simulate without updating database
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const campaignId = searchParams.get('campaignId')
+    const issueId = searchParams.get('issueId')
     const reset = searchParams.get('reset') === 'true'
     const dryRun = searchParams.get('dryRun') === 'true'
 
-    let testCampaignId = campaignId
+    let testissueId = issueId
 
     // Get newsletter ID
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('slug', 'accounting')
       .single()
@@ -104,45 +104,45 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Newsletter not found' }, { status: 404 })
     }
 
-    // If no campaign ID provided, get latest draft campaign or create test one
-    if (!testCampaignId) {
-      const { data: latestCampaign } = await supabaseAdmin
-        .from('newsletter_campaigns')
+    // If no issue ID provided, get latest draft issue or create test one
+    if (!testissueId) {
+      const { data: latestissue } = await supabaseAdmin
+        .from('publication_issues')
         .select('id')
-        .eq('newsletter_id', newsletter.id)
+        .eq('publication_id', newsletter.id)
         .eq('status', 'draft')
         .order('created_at', { ascending: false })
         .limit(1)
         .single()
 
-      if (latestCampaign) {
-        testCampaignId = latestCampaign.id
+      if (latestissue) {
+        testissueId = latestissue.id
       } else {
-        // Create a test campaign
+        // Create a test issue
         const testDate = new Date().toISOString().split('T')[0]
-        const { data: newCampaign, error } = await supabaseAdmin
-          .from('newsletter_campaigns')
+        const { data: newissue, error } = await supabaseAdmin
+          .from('publication_issues')
           .insert({
-            newsletter_id: newsletter.id,
+            publication_id: newsletter.id,
             date: testDate,
             status: 'draft'
           })
           .select('id')
           .single()
 
-        if (error || !newCampaign) {
-          return NextResponse.json({ error: 'Failed to create test campaign' }, { status: 500 })
+        if (error || !newissue) {
+          return NextResponse.json({ error: 'Failed to create test issue' }, { status: 500 })
         }
-        testCampaignId = newCampaign.id
+        testissueId = newissue.id
       }
     }
 
     // Clear existing selections if reset=true
     if (reset) {
       await supabaseAdmin
-        .from('campaign_ai_app_selections')
+        .from('issue_ai_app_selections')
         .delete()
-        .eq('campaign_id', testCampaignId)
+        .eq('issue_id', testissueId)
     }
 
     // Get current settings
@@ -160,22 +160,22 @@ export async function GET(request: NextRequest) {
     const { data: allApps } = await supabaseAdmin
       .from('ai_applications')
       .select('*')
-      .eq('newsletter_id', newsletter.id)
+      .eq('publication_id', newsletter.id)
       .eq('is_active', true)
       .order('app_name')
 
     // Run selection logic
-    if (!testCampaignId) {
-      return NextResponse.json({ error: 'Failed to get or create campaign' }, { status: 500 })
+    if (!testissueId) {
+      return NextResponse.json({ error: 'Failed to get or create issue' }, { status: 500 })
     }
 
     let selectedApps
     if (dryRun) {
       // Dry run: Simulate selection without updating database
-      selectedApps = await simulateAppSelection(testCampaignId, newsletter.id)
+      selectedApps = await simulateAppSelection(testissueId, newsletter.id)
     } else {
       // Real run: Actually select and update database
-      selectedApps = await AppSelector.selectAppsForCampaign(testCampaignId, newsletter.id)
+      selectedApps = await AppSelector.selectAppsForissue(testissueId, newsletter.id)
     }
 
     // Get detailed info about all apps for comparison
@@ -205,15 +205,15 @@ export async function GET(request: NextRequest) {
 
     // Get selection details from database
     const { data: selections } = await supabaseAdmin
-      .from('campaign_ai_app_selections')
+      .from('issue_ai_app_selections')
       .select('*, app:ai_applications(*)')
-      .eq('campaign_id', testCampaignId)
+      .eq('issue_id', testissueId)
       .order('selection_order')
 
     return NextResponse.json({
       success: true,
       dry_run: dryRun,
-      campaign_id: testCampaignId,
+      issue_id: testissueId,
       settings: {
         total_apps: settingsMap.ai_apps_per_newsletter || '6',
         affiliate_cooldown_days: affiliateCooldownDays,

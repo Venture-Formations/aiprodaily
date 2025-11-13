@@ -10,11 +10,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { campaign_id, title, content, image_url, source_url, rank } = body
+    const { issue_id, title, content, image_url, source_url, rank } = body
 
-    if (!campaign_id || !title || !content) {
+    if (!issue_id || !title || !content) {
       return NextResponse.json({
-        error: 'campaign_id, title, and content are required'
+        error: 'issue_id, title, and content are required'
       }, { status: 400 })
     }
 
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const { data: article, error } = await supabaseAdmin
       .from('manual_articles')
       .insert([{
-        campaign_id,
+        issue_id,
         title,
         content,
         image_url: image_url || null,
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       .from('user_activities')
       .insert([{
         user_id: user.id,
-        campaign_id,
+        issue_id,
         action: 'manual_article_created',
         details: { article_id: article.id, title }
       }])
@@ -78,16 +78,16 @@ export async function GET(request: NextRequest) {
     }
 
     const url = new URL(request.url)
-    const campaign_id = url.searchParams.get('campaign_id')
+    const issue_id = url.searchParams.get('issue_id')
 
-    if (!campaign_id) {
-      return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
+    if (!issue_id) {
+      return NextResponse.json({ error: 'issue_id is required' }, { status: 400 })
     }
 
     const { data: articles, error } = await supabaseAdmin
       .from('manual_articles')
       .select('*')
-      .eq('campaign_id', campaign_id)
+      .eq('issue_id', issue_id)
       .order('created_at', { ascending: false })
 
     if (error) {

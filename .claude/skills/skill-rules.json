@@ -1,0 +1,208 @@
+{
+    "version": "1.0",
+    "description": "Skill activation triggers for Claude Code. Controls when skills automatically suggest or block actions.",
+    "skills": {
+        "skill-developer": {
+            "type": "domain",
+            "enforcement": "suggest",
+            "priority": "high",
+            "description": "Meta-skill for creating and managing Claude Code skills",
+            "promptTriggers": {
+                "keywords": [
+                    "skill system",
+                    "create skill",
+                    "add skill",
+                    "skill triggers",
+                    "skill rules",
+                    "hook system",
+                    "skill development",
+                    "skill-rules.json"
+                ],
+                "intentPatterns": [
+                    "(how do|how does|explain).*?skill",
+                    "(create|add|modify|build).*?skill",
+                    "skill.*?(work|trigger|activate|system)"
+                ]
+            }
+        },
+        "newsletter-campaign-workflow": {
+            "type": "domain",
+            "enforcement": "suggest",
+            "priority": "high",
+            "description": "Newsletter campaign workflow, RSS processing, article generation, and automation guidance",
+            "promptTriggers": {
+                "keywords": [
+                    "campaign",
+                    "workflow",
+                    "RSS",
+                    "RSS feed",
+                    "RSS processing",
+                    "article generation",
+                    "MailerLite",
+                    "newsletter automation",
+                    "advertorial",
+                    "process-rss-workflow",
+                    "campaign status",
+                    "newsletter_campaigns",
+                    "vercel workflow"
+                ],
+                "intentPatterns": [
+                    "(create|build|generate).*?(campaign|newsletter)",
+                    "(process|run|trigger).*?workflow",
+                    "(generate|create).*?article",
+                    "(send|publish).*?(newsletter|campaign)",
+                    "workflow.*?(step|stage|processing)",
+                    "campaign.*?(status|lifecycle)"
+                ]
+            },
+            "pathTriggers": {
+                "patterns": [
+                    "**/workflows/**/*.ts",
+                    "**/api/workflows/**/*.ts",
+                    "**/api/cron/**/*.ts",
+                    "**/lib/workflows/**/*.ts",
+                    "**/lib/rss-processor.ts",
+                    "**/lib/mailerlite.ts",
+                    "**/lib/newsletter-templates.ts"
+                ]
+            }
+        },
+        "supabase-database-ops": {
+            "type": "guardrail",
+            "enforcement": "suggest",
+            "priority": "critical",
+            "description": "CRITICAL: Ensures publication_id filtering in all database queries to prevent multi-tenant data leakage",
+            "promptTriggers": {
+                "keywords": [
+                    "database",
+                    "supabase",
+                    "supabaseAdmin",
+                    "query",
+                    ".from(",
+                    "publication_id",
+                    "database query",
+                    "select",
+                    "insert",
+                    "update",
+                    "delete",
+                    "tenant",
+                    "multi-tenant"
+                ],
+                "intentPatterns": [
+                    "(query|fetch|get|retrieve).*?(database|data)",
+                    "(insert|create|add).*?(record|row|data)",
+                    "(update|modify|change).*?(database|record)",
+                    "(delete|remove).*?(record|data)",
+                    "database.*?(operation|query|access)"
+                ]
+            },
+            "pathTriggers": {
+                "patterns": [
+                    "**/api/**/*.ts",
+                    "**/lib/**/*.ts",
+                    "**/app/actions/**/*.ts",
+                    "**/workflows/**/*.ts"
+                ]
+            },
+            "contentTriggers": {
+                "patterns": [
+                    "supabaseAdmin\\.from\\(",
+                    "\\.from\\(['\"]newsletter_campaigns",
+                    "\\.from\\(['\"]articles",
+                    "\\.from\\(['\"]rss_posts",
+                    "\\.from\\(['\"]app_settings"
+                ]
+            }
+        },
+        "nextjs-api-routes": {
+            "type": "domain",
+            "enforcement": "suggest",
+            "priority": "high",
+            "description": "Next.js 15 API route patterns, request handling, error management, and configuration",
+            "promptTriggers": {
+                "keywords": [
+                    "API route",
+                    "NextRequest",
+                    "NextResponse",
+                    "API endpoint",
+                    "route handler",
+                    "maxDuration",
+                    "request handler",
+                    "HTTP method",
+                    "GET",
+                    "POST",
+                    "PUT",
+                    "DELETE"
+                ],
+                "intentPatterns": [
+                    "(create|build|add).*?(API route|endpoint)",
+                    "(handle|process).*?(request|API)",
+                    "(configure|set).*?(timeout|maxDuration)",
+                    "API.*?(route|endpoint|handler)"
+                ]
+            },
+            "pathTriggers": {
+                "patterns": [
+                    "**/app/api/**/*.ts",
+                    "**/api/**/*.ts"
+                ]
+            },
+            "contentTriggers": {
+                "patterns": [
+                    "NextRequest",
+                    "NextResponse",
+                    "export async function (GET|POST|PUT|DELETE)",
+                    "export const maxDuration"
+                ]
+            }
+        },
+        "ai-content-generation": {
+            "type": "domain",
+            "enforcement": "suggest",
+            "priority": "high",
+            "description": "AI content generation with OpenAI/Claude, prompt management, and structured outputs",
+            "promptTriggers": {
+                "keywords": [
+                    "AI",
+                    "OpenAI",
+                    "Claude",
+                    "callAIWithPrompt",
+                    "AI prompt",
+                    "content generation",
+                    "AI content",
+                    "generate content",
+                    "AI scoring",
+                    "multi-criteria",
+                    "fact check",
+                    "response format",
+                    "JSON schema",
+                    "structured output"
+                ],
+                "intentPatterns": [
+                    "(generate|create).*?(content|article|headline)",
+                    "(call|use).*?(AI|OpenAI|Claude)",
+                    "(score|rate|evaluate).*?(content|article|post)",
+                    "AI.*?(prompt|generation|call)",
+                    "(create|modify|update).*?prompt"
+                ]
+            },
+            "pathTriggers": {
+                "patterns": [
+                    "**/lib/openai.ts",
+                    "**/lib/rss-processor.ts",
+                    "**/workflows/**/*.ts",
+                    "**/api/workflows/**/*.ts"
+                ]
+            },
+            "contentTriggers": {
+                "patterns": [
+                    "callAIWithPrompt",
+                    "ai_prompt_",
+                    "app_settings.*ai_",
+                    "response_format.*json_schema",
+                    "post_ratings"
+                ]
+            }
+        }
+    }
+}

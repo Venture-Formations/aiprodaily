@@ -46,11 +46,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { provider, promptJson, newsletter_id, prompt_type, limit = 10 } = body
+    const { provider, promptJson, publication_id, prompt_type, limit = 10 } = body
 
-    if (!provider || !promptJson || !newsletter_id || !prompt_type) {
+    if (!provider || !promptJson || !publication_id || !prompt_type) {
       return NextResponse.json(
-        { error: 'Missing required fields: provider, promptJson, newsletter_id, prompt_type' },
+        { error: 'Missing required fields: provider, promptJson, publication_id, prompt_type' },
         { status: 400 }
       )
     }
@@ -66,13 +66,13 @@ export async function POST(request: NextRequest) {
 
     // Look up the newsletter UUID from the slug
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
-      .eq('slug', newsletter_id)
+      .eq('slug', publication_id)
       .single()
 
     if (newsletterError || !newsletter) {
-      console.error('[AI Test Multiple] Newsletter not found for slug:', newsletter_id, newsletterError)
+      console.error('[AI Test Multiple] Newsletter not found for slug:', publication_id, newsletterError)
       return NextResponse.json(
         { error: 'Newsletter not found' },
         { status: 404 }
@@ -81,31 +81,31 @@ export async function POST(request: NextRequest) {
 
     const newsletterUuid = newsletter.id
 
-    // Get recent campaigns for this newsletter
-    const { data: campaigns, error: campaignsError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Get recent issues for this newsletter
+    const { data: issues, error: issuesError } = await supabaseAdmin
+      .from('publication_issues')
       .select('id')
-      .eq('newsletter_id', newsletterUuid)
+      .eq('publication_id', newsletterUuid)
       .order('date', { ascending: false })
-      .limit(10) // Get last 10 campaigns
+      .limit(10) // Get last 10 issues
 
-    if (campaignsError) {
-      console.error('[AI Test Multiple] Error fetching campaigns:', campaignsError)
+    if (issuesError) {
+      console.error('[AI Test Multiple] Error fetching issues:', issuesError)
       return NextResponse.json(
-        { error: 'Failed to fetch campaigns' },
+        { error: 'Failed to fetch issues' },
         { status: 500 }
       )
     }
 
-    if (!campaigns || campaigns.length === 0) {
-      console.log('[AI Test Multiple] No campaigns found')
+    if (!issues || issues.length === 0) {
+      console.log('[AI Test Multiple] No issues found')
       return NextResponse.json(
-        { error: 'No campaigns found for this newsletter' },
+        { error: 'No issues found for this newsletter' },
         { status: 404 }
       )
     }
 
-    const campaignIds = campaigns.map(c => c.id)
+    const issueIds = issues.map(c => c.id)
 
     // Get section based on prompt type
     const section = getSection(prompt_type)
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
     let query = supabaseAdmin
       .from('rss_posts')
       .select('id, title, description, full_article_text, source_url, publication_date')
-      .in('campaign_id', campaignIds)
+      .in('issue_id', issueIds)
       .not('full_article_text', 'is', null)  // Exclude posts without full text
       .order('publication_date', { ascending: false })
       .limit(limit)
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
       const { data: feeds, error: feedsError } = await supabaseAdmin
         .from('rss_feeds')
         .select('id')
-        .eq('newsletter_id', newsletterUuid)
+        .eq('publication_id', newsletterUuid)
         .eq(sectionField, true)
         .eq('active', true)
 

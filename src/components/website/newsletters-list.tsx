@@ -10,7 +10,7 @@ const NEWSLETTERS_PER_PAGE = 6
 
 interface Newsletter {
   id: string
-  campaign_date: string
+  issue_date: string
   subject_line: string
   send_date: string
   metadata?: {
@@ -101,7 +101,7 @@ export function NewslettersList({ newsletters, imageOverride }: NewslettersListP
             const placeholderSvg = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600"%3E%3Crect width="800" height="600" fill="%23e5e7eb"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="24" fill="%239ca3af"%3EAI Accounting Daily%3C/text%3E%3C/svg%3E'
 
             return (
-              <Link key={newsletter.id} href={`/newsletter/${newsletter.campaign_date}`}>
+              <Link key={newsletter.id} href={`/newsletter/${newsletter.issue_date}`}>
                 <Card className="group cursor-pointer hover:shadow-lg transition-shadow overflow-hidden p-0 bg-white border-border h-full flex flex-col">
                   {/* Image */}
                   <div className="relative w-full h-48 bg-gray-100 overflow-hidden">

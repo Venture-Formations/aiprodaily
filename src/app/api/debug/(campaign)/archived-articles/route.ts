@@ -4,7 +4,7 @@ import { ArticleArchiveService } from '@/lib/article-archive'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const campaignId = searchParams.get('campaign_id')
+    const issueId = searchParams.get('issue_id')
     const startDate = searchParams.get('start_date')
     const endDate = searchParams.get('end_date')
     const statsOnly = searchParams.get('stats_only') === 'true'
@@ -21,13 +21,13 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Get archived articles by campaign ID
-    if (campaignId) {
-      const archivedArticles = await archiveService.getArchivedArticles(campaignId)
+    // Get archived articles by issue ID
+    if (issueId) {
+      const archivedArticles = await archiveService.getArchivedArticles(issueId)
 
       return NextResponse.json({
         success: true,
-        campaign_id: campaignId,
+        issue_id: issueId,
         archived_articles_count: archivedArticles.length,
         articles_with_positions: archivedArticles.filter(a =>
           a.review_position !== null || a.final_position !== null
@@ -41,8 +41,8 @@ export async function GET(request: NextRequest) {
           is_active: article.is_active,
           archived_at: article.archived_at,
           archive_reason: article.archive_reason,
-          campaign_date: article.campaign_date,
-          campaign_status: article.campaign_status
+          issue_date: article.issue_date,
+          issue_status: article.issue_status
         })),
         timestamp: new Date().toISOString()
       })
@@ -59,19 +59,19 @@ export async function GET(request: NextRequest) {
         articles_with_positions: archivedArticles.filter(a =>
           a.review_position !== null || a.final_position !== null
         ).length,
-        campaigns_archived: Array.from(new Set(archivedArticles.map(a => a.campaign_id))).length,
+        issues_archived: Array.from(new Set(archivedArticles.map(a => a.issue_id))).length,
         archived_articles: archivedArticles.map(article => ({
           id: article.id,
           original_article_id: article.original_article_id,
-          campaign_id: article.campaign_id,
+          issue_id: article.issue_id,
           headline: article.headline,
           review_position: article.review_position,
           final_position: article.final_position,
           is_active: article.is_active,
           archived_at: article.archived_at,
           archive_reason: article.archive_reason,
-          campaign_date: article.campaign_date,
-          campaign_status: article.campaign_status
+          issue_date: article.issue_date,
+          issue_status: article.issue_status
         })),
         timestamp: new Date().toISOString()
       })
@@ -82,10 +82,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Article Archive API - provide campaign_id, date range (start_date & end_date), or stats_only=true',
+      message: 'Article Archive API - provide issueId, date range (start_date & end_date), or stats_only=true',
       stats,
       examples: {
-        by_campaign: '/api/debug/archived-articles?campaign_id=YOUR_CAMPAIGN_ID',
+        by_issue: '/api/debug/archived-articles?issueId=YOUR_issue_ID',
         by_date_range: '/api/debug/archived-articles?start_date=2025-09-01&end_date=2025-09-30',
         stats_only: '/api/debug/archived-articles?stats_only=true'
       },

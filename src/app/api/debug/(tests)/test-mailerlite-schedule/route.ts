@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
         alternativeMethod: mailerliteFormat2,
         localTimeISO: mailerliteFormat3,
         unixTimestamp,
-        testCampaignData: {
+        testissueData: {
           name: `Test Schedule Debug`,
           type: 'regular',
           emails: [{

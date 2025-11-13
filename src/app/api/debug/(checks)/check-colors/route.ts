@@ -20,7 +20,7 @@ export async function GET() {
 
     // Also check newsletters table for newsletter-specific colors
     const { data: newsletters, error: newslettersError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id, slug, name, primary_color')
 
     return NextResponse.json({

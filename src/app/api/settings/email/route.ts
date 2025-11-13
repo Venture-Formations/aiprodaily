@@ -11,9 +11,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's newsletter_id (use first active newsletter for now)
+    // Get user's publication_id (use first active newsletter for now)
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('is_active', true)
       .limit(1)
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     const { data: settingsRows, error } = await supabaseAdmin
       .from('app_settings')
       .select('key, value')
-      .eq('newsletter_id', newsletter.id)
+      .eq('publication_id', newsletter.id)
       .or('key.like.email_%,key.like.criteria_%,key.like.secondary_criteria_%,key.like.primary_criteria_%,key.eq.max_top_articles,key.eq.max_bottom_articles,key.eq.max_secondary_articles,key.eq.primary_article_lookback_hours,key.eq.secondary_article_lookback_hours,key.eq.dedup_historical_lookback_days,key.eq.dedup_strictness_threshold,key.eq.next_ad_position')
 
     if (error) {
@@ -61,10 +61,10 @@ export async function GET(request: NextRequest) {
       senderName: 'St. Cloud Scoop',
       reviewScheduleEnabled: 'true',
       rssProcessingTime: '20:30',  // 8:30 PM CT
-      campaignCreationTime: '20:50',  // 8:50 PM CT
+      issueCreationTime: '20:50',  // 8:50 PM CT
       scheduledSendTime: '21:00',  // 9:00 PM CT
       dailyScheduleEnabled: 'false',
-      dailyCampaignCreationTime: '04:30',  // 4:30 AM CT
+      dailyissueCreationTime: '04:30',  // 4:30 AM CT
       dailyScheduledSendTime: '04:55',  // 4:55 AM CT
       primary_article_lookback_hours: '72',  // 72 hours for primary RSS
       secondary_article_lookback_hours: '36',  // 36 hours for secondary RSS
@@ -79,17 +79,17 @@ export async function GET(request: NextRequest) {
 
     console.log('BACKEND GET: Default schedule times:', {
       rssProcessingTime: defaultSettings.rssProcessingTime,
-      campaignCreationTime: defaultSettings.campaignCreationTime,
+      issueCreationTime: defaultSettings.issueCreationTime,
       scheduledSendTime: defaultSettings.scheduledSendTime
     })
     console.log('BACKEND GET: Saved schedule times:', {
       rssProcessingTime: savedSettings.rssProcessingTime,
-      campaignCreationTime: savedSettings.campaignCreationTime,
+      issueCreationTime: savedSettings.issueCreationTime,
       scheduledSendTime: savedSettings.scheduledSendTime
     })
     console.log('BACKEND GET: Final schedule times:', {
       rssProcessingTime: finalSettings.rssProcessingTime,
-      campaignCreationTime: finalSettings.campaignCreationTime,
+      issueCreationTime: finalSettings.issueCreationTime,
       scheduledSendTime: finalSettings.scheduledSendTime
     })
 
@@ -121,9 +121,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's newsletter_id (use first active newsletter for now)
+    // Get user's publication_id (use first active newsletter for now)
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('is_active', true)
       .limit(1)
@@ -163,11 +163,11 @@ export async function POST(request: NextRequest) {
           .upsert({
             key: setting.key,
             value: setting.value,
-            newsletter_id: newsletterId,
+            publication_id: newsletterId,
             description: `Article lookback hours: ${setting.key}`,
             updated_at: new Date().toISOString()
           }, {
-            onConflict: 'newsletter_id,key'
+            onConflict: 'publication_id,key'
           })
 
         if (error) {
@@ -206,13 +206,13 @@ export async function POST(request: NextRequest) {
           .upsert({
             key: setting.key,
             value: setting.value,
-            newsletter_id: newsletterId,
+            publication_id: newsletterId,
             description: setting.key === 'dedup_historical_lookback_days'
               ? 'Number of days of sent newsletters to check for duplicate articles'
               : 'Similarity threshold for all deduplication checks (0.0-1.0)',
             updated_at: new Date().toISOString()
           }, {
-            onConflict: 'newsletter_id,key'
+            onConflict: 'publication_id,key'
           })
 
         if (error) {
@@ -252,11 +252,11 @@ export async function POST(request: NextRequest) {
           .upsert({
             key: setting.key,
             value: setting.value,
-            newsletter_id: newsletterId,
+            publication_id: newsletterId,
             description: `Max articles setting: ${setting.key}`,
             updated_at: new Date().toISOString()
           }, {
-            onConflict: 'newsletter_id,key'
+            onConflict: 'publication_id,key'
           })
 
         if (error) {
@@ -271,16 +271,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if this is a schedule time update request
-    const scheduleFields = ['rssProcessingTime', 'campaignCreationTime', 'scheduledSendTime',
-                           'dailyCampaignCreationTime', 'dailyScheduledSendTime',
+    const scheduleFields = ['rssProcessingTime', 'issueCreationTime', 'scheduledSendTime',
+                           'dailyissueCreationTime', 'dailyScheduledSendTime',
                            'reviewScheduleEnabled', 'dailyScheduleEnabled']
     const isScheduleUpdate = scheduleFields.some(field => settings[field] !== undefined) &&
                             !settings.fromEmail && !settings.senderName
 
     if (isScheduleUpdate) {
       // Validate time formats (HH:MM)
-      const timeFields = ['rssProcessingTime', 'campaignCreationTime', 'scheduledSendTime',
-                         'dailyCampaignCreationTime', 'dailyScheduledSendTime']
+      const timeFields = ['rssProcessingTime', 'issueCreationTime', 'scheduledSendTime',
+                         'dailyissueCreationTime', 'dailyScheduledSendTime']
       for (const field of timeFields) {
         if (settings[field] && !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(settings[field])) {
           return NextResponse.json({
@@ -294,14 +294,14 @@ export async function POST(request: NextRequest) {
       if (settings.rssProcessingTime !== undefined) {
         settingsToSave.push({ key: 'email_rssProcessingTime', value: settings.rssProcessingTime })
       }
-      if (settings.campaignCreationTime !== undefined) {
-        settingsToSave.push({ key: 'email_campaignCreationTime', value: settings.campaignCreationTime })
+      if (settings.issueCreationTime !== undefined) {
+        settingsToSave.push({ key: 'email_issueCreationTime', value: settings.issueCreationTime })
       }
       if (settings.scheduledSendTime !== undefined) {
         settingsToSave.push({ key: 'email_scheduledSendTime', value: settings.scheduledSendTime })
       }
-      if (settings.dailyCampaignCreationTime !== undefined) {
-        settingsToSave.push({ key: 'email_dailyCampaignCreationTime', value: settings.dailyCampaignCreationTime })
+      if (settings.dailyissueCreationTime !== undefined) {
+        settingsToSave.push({ key: 'email_dailyissueCreationTime', value: settings.dailyissueCreationTime })
       }
       if (settings.dailyScheduledSendTime !== undefined) {
         settingsToSave.push({ key: 'email_dailyScheduledSendTime', value: settings.dailyScheduledSendTime })
@@ -320,11 +320,11 @@ export async function POST(request: NextRequest) {
           .upsert({
             key: setting.key,
             value: setting.value,
-            newsletter_id: newsletterId,
+            publication_id: newsletterId,
             description: `Email schedule: ${setting.key.replace('email_', '')}`,
             updated_at: new Date().toISOString()
           }, {
-            onConflict: 'newsletter_id,key'
+            onConflict: 'publication_id,key'
           })
 
         if (error) {
@@ -346,7 +346,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate time formats (HH:MM)
-    const timeFields = ['rssProcessingTime', 'campaignCreationTime', 'scheduledSendTime', 'dailyCampaignCreationTime', 'dailyScheduledSendTime']
+    const timeFields = ['rssProcessingTime', 'issueCreationTime', 'scheduledSendTime', 'dailyissueCreationTime', 'dailyScheduledSendTime']
     for (const field of timeFields) {
       if (settings[field] && !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(settings[field])) {
         return NextResponse.json({
@@ -363,10 +363,10 @@ export async function POST(request: NextRequest) {
       { key: 'email_senderName', value: settings.senderName },
       { key: 'email_reviewScheduleEnabled', value: settings.reviewScheduleEnabled ? 'true' : 'false' },
       { key: 'email_rssProcessingTime', value: settings.rssProcessingTime },
-      { key: 'email_campaignCreationTime', value: settings.campaignCreationTime },
+      { key: 'email_issueCreationTime', value: settings.issueCreationTime },
       { key: 'email_scheduledSendTime', value: settings.scheduledSendTime },
       { key: 'email_dailyScheduleEnabled', value: settings.dailyScheduleEnabled ? 'true' : 'false' },
-      { key: 'email_dailyCampaignCreationTime', value: settings.dailyCampaignCreationTime },
+      { key: 'email_dailyissueCreationTime', value: settings.dailyissueCreationTime },
       { key: 'email_dailyScheduledSendTime', value: settings.dailyScheduledSendTime }
     ]
 
@@ -380,11 +380,11 @@ export async function POST(request: NextRequest) {
         .upsert({
           key: setting.key,
           value: setting.value,
-          newsletter_id: newsletterId,
+          publication_id: newsletterId,
           description: `Email configuration: ${setting.key.replace('email_', '')}`,
           updated_at: new Date().toISOString()
         }, {
-          onConflict: 'newsletter_id,key'
+          onConflict: 'publication_id,key'
         })
         .select()
 
@@ -415,7 +415,7 @@ export async function POST(request: NextRequest) {
               scheduling_updated: true,
               times: {
                 rss: settings.rssProcessingTime,
-                campaign: settings.campaignCreationTime,
+                issue: settings.issueCreationTime,
                 send: settings.scheduledSendTime
               },
               note: 'Subject line generation fixed at RSS+15min'

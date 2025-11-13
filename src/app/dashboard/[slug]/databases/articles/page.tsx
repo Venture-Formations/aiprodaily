@@ -47,7 +47,7 @@ interface Article {
   wordCount: number | null
   finalPosition: number | null
   createdAt: string
-  campaignDate: string
+  issueDate: string
 }
 
 interface Column {
@@ -76,7 +76,7 @@ export default function ArticlesPage() {
 
   // Column visibility states
   const [columns, setColumns] = useState<Column[]>([
-    { key: 'campaignDate', label: 'Campaign Date', enabled: true, exportable: true },
+    { key: 'issueDate', label: 'issue Date', enabled: true, exportable: true },
     { key: 'finalPosition', label: 'Position', enabled: true, exportable: true },
     { key: 'feedType', label: 'Feed Type', enabled: true, exportable: true },
     { key: 'feedName', label: 'Feed Name', enabled: false, exportable: true },
@@ -120,7 +120,7 @@ export default function ArticlesPage() {
   const fetchArticles = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/databases/articles?newsletter_id=${slug}`)
+      const response = await fetch(`/api/databases/articles?publication_id=${slug}`)
       if (!response.ok) {
         throw new Error('Failed to fetch articles')
       }
@@ -242,7 +242,7 @@ export default function ArticlesPage() {
 
   const renderCellContent = (article: Article, columnKey: string) => {
     switch (columnKey) {
-      case 'campaignDate':
+      case 'issueDate':
       case 'publicationDate':
       case 'createdAt':
         return formatDate(article[columnKey as keyof Article] as string)

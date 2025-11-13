@@ -4,24 +4,24 @@ import { AppSelector } from '@/lib/app-selector'
 
 export async function GET() {
   try {
-    // Get the latest campaign
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Get the latest issue
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select('id, date, status')
       .order('date', { ascending: false })
       .limit(1)
       .single()
 
-    if (campaignError || !campaign) {
+    if (issueError || !issue) {
       return NextResponse.json({
-        error: 'No campaign found',
-        details: campaignError
+        error: 'No issue found',
+        details: issueError
       }, { status: 404 })
     }
 
     // Get accounting newsletter ID
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id, slug, name')
       .eq('slug', 'accounting')
       .single()
@@ -35,28 +35,28 @@ export async function GET() {
 
     // Check existing selections
     const { data: existingSelections } = await supabaseAdmin
-      .from('campaign_ai_app_selections')
+      .from('issue_ai_app_selections')
       .select('*')
-      .eq('campaign_id', campaign.id)
+      .eq('issue_id', issue.id)
 
-    console.log(`Existing selections for campaign ${campaign.id}:`, existingSelections?.length || 0)
+    console.log(`Existing selections for issue ${issue.id}:`, existingSelections?.length || 0)
 
-    // Force select apps for this campaign
-    const selectedApps = await AppSelector.selectAppsForCampaign(campaign.id, newsletter.id)
+    // Force select apps for this issue
+    const selectedApps = await AppSelector.selectAppsForissue(issue.id, newsletter.id)
 
     // Get the final selections from database
     const { data: finalSelections } = await supabaseAdmin
-      .from('campaign_ai_app_selections')
+      .from('issue_ai_app_selections')
       .select('*, app:ai_applications(*)')
-      .eq('campaign_id', campaign.id)
+      .eq('issue_id', issue.id)
       .order('selection_order', { ascending: true })
 
     return NextResponse.json({
       success: true,
-      campaign: {
-        id: campaign.id,
-        date: campaign.date,
-        status: campaign.status
+      issue: {
+        id: issue.id,
+        date: issue.date,
+        status: issue.status
       },
       newsletter: {
         id: newsletter.id,

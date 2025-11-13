@@ -4,17 +4,17 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const campaignId = searchParams.get('campaign_id')
+    const issueId = searchParams.get('issue_id')
 
-    if (!campaignId) {
-      return NextResponse.json({ error: 'campaign_id parameter required' }, { status: 400 })
+    if (!issueId) {
+      return NextResponse.json({ error: 'issueId parameter required' }, { status: 400 })
     }
 
     // Check if the position columns exist by trying to select them
     const { data: articles, error } = await supabaseAdmin
       .from('articles')
       .select('id, headline, rank, is_active, review_position, final_position')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .eq('is_active', true)
       .order('rank', { ascending: true })
       .limit(5)
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const { data: manualArticles, error: manualError } = await supabaseAdmin
       .from('manual_articles')
       .select('id, title, rank, is_active, review_position, final_position')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .eq('is_active', true)
       .order('rank', { ascending: true })
       .limit(5)
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      campaign_id: campaignId,
+      issue_id: issueId,
       articles: {
         count: articles?.length || 0,
         data: articles?.map((a, index) => ({

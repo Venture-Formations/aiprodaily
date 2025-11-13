@@ -7,21 +7,21 @@ export async function GET() {
     const tenDaysAgo = new Date()
     tenDaysAgo.setDate(tenDaysAgo.getDate() - 10)
 
-    const { data: campaigns, error: campaignsError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    const { data: campaigns, error: issuesError } = await supabaseAdmin
+      .from('publication_issues')
       .select('id, date, status, created_at')
       .gte('created_at', tenDaysAgo.toISOString())
       .order('created_at', { ascending: false })
 
-    if (campaignsError) throw campaignsError
+    if (issuesError) throw issuesError
 
-    // Get article counts for each campaign
+    // Get article counts for each issue
     const campaignsWithCounts = await Promise.all(
-      (campaigns || []).map(async (campaign) => {
+      (campaigns || []).map(async (issue) => {
         const { data: articles, error: articlesError } = await supabaseAdmin
           .from('articles')
           .select('id, is_active')
-          .eq('campaign_id', campaign.id)
+          .eq('issue_id', issue.id)
 
         const activeCount = articles?.filter(a => a.is_active).length || 0
         const totalCount = articles?.length || 0
@@ -32,7 +32,7 @@ export async function GET() {
           .select('created_at, message, context')
           .eq('source', 'slack_service')
           .ilike('message', '%Low Article Count%')
-          .eq('context->>campaignId', campaign.id)
+          .eq('context->>issueId', issue.id)
           .order('created_at', { ascending: false })
           .limit(1)
 
@@ -42,15 +42,15 @@ export async function GET() {
           .select('created_at, message, context')
           .eq('source', 'slack_service')
           .ilike('message', '%RSS Processing%')
-          .or(`context->>campaignId.eq.${campaign.id}`)
+          .or(`context->>issueId.eq.${issue.id}`)
           .order('created_at', { ascending: false })
           .limit(5)
 
         return {
-          campaign_id: campaign.id,
-          date: campaign.date,
-          status: campaign.status,
-          created_at: campaign.created_at,
+          issue_id: issue.id,
+          date: issue.date,
+          status: issue.status,
+          created_at: issue.created_at,
           active_articles: activeCount,
           total_articles: totalCount,
           low_count_alert_sent: lowCountLogs && lowCountLogs.length > 0,
@@ -82,7 +82,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       summary: {
-        total_campaigns: campaigns?.length || 0,
+        total_issues: campaigns?.length || 0,
         campaigns_with_low_article_count: campaignsWithCounts.filter(c => c.active_articles <= 6).length,
         alerts_sent: campaignsWithCounts.filter(c => c.low_count_alert_sent).length,
         missed_alerts: missedAlerts.length
@@ -93,7 +93,7 @@ export async function GET() {
         low_article_count_setting_exists: !!notificationSetting,
         rss_processing_setting_exists: !!rssProcessingSetting
       },
-      campaigns: campaignsWithCounts,
+      issues: campaignsWithCounts,
       missed_alerts: missedAlerts
     })
   } catch (error) {

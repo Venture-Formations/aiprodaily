@@ -3,53 +3,53 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export async function GET() {
   try {
-    // Get latest campaign
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Get latest issue
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
 
-    if (campaignError || !campaign) {
-      return NextResponse.json({ error: 'No campaign found' }, { status: 404 })
+    if (issueError || !issue) {
+      return NextResponse.json({ error: 'No issue found' }, { status: 404 })
     }
 
     // Check AI app selections
     const { data: aiApps, error: appsError } = await supabaseAdmin
-      .from('campaign_ai_app_selections')
+      .from('issue_ai_app_selections')
       .select('*, app:ai_applications(*)')
-      .eq('campaign_id', campaign.id)
+      .eq('issue_id', issue.id)
 
     // Check prompt selections
     const { data: prompts, error: promptsError } = await supabaseAdmin
-      .from('campaign_prompt_selections')
+      .from('issue_prompt_selections')
       .select('*, prompt:prompt_ideas(*)')
-      .eq('campaign_id', campaign.id)
+      .eq('issue_id', issue.id)
 
-    // Check email metrics for MailerLite campaign ID
+    // Check email metrics for MailerLite issue ID
     const { data: metrics, error: metricsError } = await supabaseAdmin
       .from('email_metrics')
       .select('*')
-      .eq('campaign_id', campaign.id)
+      .eq('issue_id', issue.id)
 
-    // Get system logs for this campaign
+    // Get system logs for this issue
     const { data: logs, error: logsError } = await supabaseAdmin
       .from('system_logs')
       .select('*')
-      .eq('context->>campaignId', campaign.id)
+      .eq('context->>issueId', issue.id)
       .order('timestamp', { ascending: false })
       .limit(20)
 
     return NextResponse.json({
       success: true,
-      campaign: {
-        id: campaign.id,
-        date: campaign.date,
-        status: campaign.status,
-        subject_line: campaign.subject_line,
-        review_sent_at: campaign.review_sent_at,
-        created_at: campaign.created_at
+      issue: {
+        id: issue.id,
+        date: issue.date,
+        status: issue.status,
+        subject_line: issue.subject_line,
+        review_sent_at: issue.review_sent_at,
+        created_at: issue.created_at
       },
       ai_apps: {
         count: aiApps?.length || 0,
@@ -69,7 +69,7 @@ export async function GET() {
       },
       email_metrics: {
         found: !!metrics,
-        mailerlite_campaign_id: metrics?.[0]?.mailerlite_campaign_id || null,
+        mailerlite_issue_id: metrics?.[0]?.mailerlite_issue_id || null,
         error: metricsError?.message || null
       },
       recent_logs: logs || []

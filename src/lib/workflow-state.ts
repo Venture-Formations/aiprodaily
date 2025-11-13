@@ -13,18 +13,18 @@ import { WorkflowState, STATE_TRANSITIONS } from '@/types/workflow-states'
  * Returns false if another process already started this step (race condition)
  */
 export async function startWorkflowStep(
-  campaignId: string,
+  issueId: string,
   currentState: WorkflowState
 ): Promise<{ success: boolean; message?: string }> {
   try {
     // Atomic update: only transition if state is still in "pending_*" state
     const { data, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .update({
         workflow_state: STATE_TRANSITIONS[currentState],
         workflow_state_started_at: new Date().toISOString()
       })
-      .eq('id', campaignId)
+      .eq('id', issueId)
       .eq('workflow_state', currentState) // Only update if still in expected state
       .select('workflow_state')
       .single()
@@ -42,7 +42,7 @@ export async function startWorkflowStep(
       }
     }
 
-    console.log(`[Workflow] Campaign ${campaignId}: ${currentState} → ${STATE_TRANSITIONS[currentState]}`)
+    console.log(`[Workflow] issue ${issueId}: ${currentState} → ${STATE_TRANSITIONS[currentState]}`)
     return { success: true }
 
   } catch (error) {
@@ -58,27 +58,27 @@ export async function startWorkflowStep(
  * Complete a workflow step - transitions to next "pending_*" state
  */
 export async function completeWorkflowStep(
-  campaignId: string,
+  issueId: string,
   currentState: WorkflowState
 ): Promise<{ success: boolean; message?: string }> {
   try {
     const nextState = STATE_TRANSITIONS[currentState]
 
     const { error } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .update({
         workflow_state: nextState,
         workflow_state_started_at: new Date().toISOString(),
         workflow_error: null // Clear any previous errors
       })
-      .eq('id', campaignId)
+      .eq('id', issueId)
 
     if (error) {
       console.error(`Failed to complete workflow step ${currentState}:`, error)
       return { success: false, message: error.message }
     }
 
-    console.log(`[Workflow] Campaign ${campaignId}: ${currentState} → ${nextState}`)
+    console.log(`[Workflow] issue ${issueId}: ${currentState} → ${nextState}`)
     return { success: true }
 
   } catch (error) {
@@ -94,20 +94,20 @@ export async function completeWorkflowStep(
  * Mark workflow as failed
  */
 export async function failWorkflow(
-  campaignId: string,
+  issueId: string,
   error: string
 ): Promise<void> {
   try {
     await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .update({
         workflow_state: 'failed',
         workflow_error: error.substring(0, 500), // Limit error message length
         status: 'failed'
       })
-      .eq('id', campaignId)
+      .eq('id', issueId)
 
-    console.error(`[Workflow] Campaign ${campaignId} failed:`, error)
+    console.error(`[Workflow] issue ${issueId} failed:`, error)
 
   } catch (updateError) {
     console.error('Failed to mark workflow as failed:', updateError)
@@ -115,16 +115,16 @@ export async function failWorkflow(
 }
 
 /**
- * Get current workflow state for a campaign
+ * Get current workflow state for an issue
  */
 export async function getWorkflowState(
-  campaignId: string
+  issueId: string
 ): Promise<WorkflowState | null> {
   try {
     const { data, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .select('workflow_state')
-      .eq('id', campaignId)
+      .eq('id', issueId)
       .single()
 
     if (error || !data) {

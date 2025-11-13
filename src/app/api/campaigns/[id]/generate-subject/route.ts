@@ -19,12 +19,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
-    // Fetch campaign with active articles
-    let { data: campaign, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Fetch issue with active articles
+    let { data: issue, error } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         *,
-        newsletter_id,
+        publication_id,
         articles:articles(
           headline,
           content,
@@ -40,13 +40,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .single()
 
     if (error) {
-      console.error('Campaign fetch error:', error)
+      console.error('issue fetch error:', error)
 
       // If the error is about the skipped column not existing, try without it
       if (error.message?.includes('column "skipped" of relation "articles" does not exist')) {
         console.log('Skipped column does not exist, trying without it...')
-        const { data: campaignFallback, error: fallbackError } = await supabaseAdmin
-          .from('newsletter_campaigns')
+        const { data: issueFallback, error: fallbackError } = await supabaseAdmin
+          .from('publication_issues')
           .select(`
             *,
             articles:articles(
@@ -62,24 +62,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           .eq('id', id)
           .single()
 
-        if (fallbackError || !campaignFallback) {
-          return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+        if (fallbackError || !issueFallback) {
+          return NextResponse.json({ error: 'issue not found' }, { status: 404 })
         }
 
         // Use fallback data and filter without skipped check
-        campaign = campaignFallback
+        issue = issueFallback
       } else {
-        return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+        return NextResponse.json({ error: 'issue not found' }, { status: 404 })
       }
     }
 
-    if (!campaign) {
-      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+    if (!issue) {
+      return NextResponse.json({ error: 'issue not found' }, { status: 404 })
     }
 
     // Get active articles sorted by rank (custom order, rank 1 = #1 position)
     // Exclude skipped articles to ensure we use the current #1 article (if skipped field exists)
-    const activeArticles = campaign.articles
+    const activeArticles = issue.articles
       .filter((article: any) => {
         // Always check is_active
         if (!article.is_active) return false
@@ -109,11 +109,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       skipped: topArticle.skipped
     })
 
-    // Get newsletter_id from campaign
-    const newsletterId = campaign.newsletter_id
+    // Get publication_id from issue
+    const newsletterId = issue.publication_id
     if (!newsletterId) {
       return NextResponse.json({
-        error: 'Campaign missing newsletter_id'
+        error: 'issue missing publication_id'
       }, { status: 400 })
     }
 
@@ -146,16 +146,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     console.log(`Processed subject line: "${subjectLine}" (${subjectLine.length} chars)`)
 
-    // Update campaign with generated subject line
+    // Update issue with generated subject line
     const { error: updateError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .update({
         subject_line: subjectLine
       })
       .eq('id', id)
 
     if (updateError) {
-      console.error('Failed to update campaign with subject line:', updateError)
+      console.error('Failed to update issue with subject line:', updateError)
       // Continue anyway - we still return the generated subject line
     }
 
@@ -174,7 +174,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           .from('user_activities')
           .insert([{
             user_id: user.id,
-            campaign_id: id,
+            issue_id: id,
             action: 'subject_line_generated',
             details: {
               subject_line: subjectLine,

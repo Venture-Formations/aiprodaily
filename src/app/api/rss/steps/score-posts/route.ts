@@ -7,18 +7,18 @@ import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/wor
  * Processes both primary and secondary sections sequentially
  */
 export async function POST(request: NextRequest) {
-  let campaign_id: string | undefined
+  let issue_id: string | undefined
 
   try {
     const body = await request.json()
-    campaign_id = body.campaign_id
+    issue_id = body.issue_id
 
-    if (!campaign_id) {
-      return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
+    if (!issue_id) {
+      return NextResponse.json({ error: 'issue_id is required' }, { status: 400 })
     }
 
 
-    const startResult = await startWorkflowStep(campaign_id, 'pending_score')
+    const startResult = await startWorkflowStep(issue_id, 'pending_score')
     if (!startResult.success) {
       return NextResponse.json({
         success: false,
@@ -32,22 +32,22 @@ export async function POST(request: NextRequest) {
 
     // Score primary posts first
     const primaryStartTime = Date.now()
-    const primaryResults = await processor.scorePostsForSection(campaign_id, 'primary')
+    const primaryResults = await processor.scorePostsForSection(issue_id, 'primary')
     const primaryDuration = ((Date.now() - primaryStartTime) / 1000).toFixed(1)
 
     // Score secondary posts
     const secondaryStartTime = Date.now()
-    const secondaryResults = await processor.scorePostsForSection(campaign_id, 'secondary')
+    const secondaryResults = await processor.scorePostsForSection(issue_id, 'secondary')
     const secondaryDuration = ((Date.now() - secondaryStartTime) / 1000).toFixed(1)
 
     const totalDuration = ((Date.now() - overallStartTime) / 1000).toFixed(1)
 
-    await completeWorkflowStep(campaign_id, 'scoring')
+    await completeWorkflowStep(issue_id, 'scoring')
 
     return NextResponse.json({
       success: true,
       message: 'Score posts step completed',
-      campaign_id,
+      issue_id,
       primary: primaryResults,
       secondary: secondaryResults,
       total_scored: primaryResults.scored + secondaryResults.scored,
@@ -60,9 +60,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[Step 4] Score posts failed:', error)
 
-    if (campaign_id) {
+    if (issue_id) {
       await failWorkflow(
-        campaign_id,
+        issue_id,
         `Score posts step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
     }

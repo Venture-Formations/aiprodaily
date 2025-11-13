@@ -103,14 +103,14 @@ CREATE TABLE newsletters (
 -- All content tables include newsletter_id
 CREATE TABLE rss_feeds (
   id UUID PRIMARY KEY,
-  newsletter_id UUID REFERENCES newsletters(id),
+  newsletter_id UUID REFERENCES publications(id),
   url TEXT NOT NULL,
   -- other fields
 );
 
 CREATE TABLE ai_applications (
   id UUID PRIMARY KEY,
-  newsletter_id UUID REFERENCES newsletters(id),
+  newsletter_id UUID REFERENCES publications(id),
   app_name TEXT NOT NULL,
   -- other fields
 );

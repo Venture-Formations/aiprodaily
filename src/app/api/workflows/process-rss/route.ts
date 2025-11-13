@@ -15,23 +15,23 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { newsletter_id } = body
+    const { publication_id } = body
 
-    if (!newsletter_id) {
+    if (!publication_id) {
       return NextResponse.json({
-        error: 'newsletter_id is required'
+        error: 'publication_id is required'
       }, { status: 400 })
     }
 
     // Start the workflow using the API from workflow/api
     // Arguments must be passed as an array
     // Workflows execute asynchronously across multiple steps
-    await start(processRSSWorkflow, [{ trigger: 'cron', newsletter_id }])
+    await start(processRSSWorkflow, [{ trigger: 'cron', publication_id }])
 
     return NextResponse.json({
       success: true,
       message: 'Workflow started successfully',
-      newsletter_id,
+      publication_id,
       timestamp: new Date().toISOString()
     })
   } catch (error) {

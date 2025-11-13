@@ -152,7 +152,7 @@ export function getEventEmoji(title: string, venue: string): string {
 
 // ==================== HEADER ====================
 
-export async function generateNewsletterHeader(formattedDate: string, campaignDate?: string, campaignId?: string): Promise<string> {
+export async function generateNewsletterHeader(formattedDate: string, issueDate?: string, issueId?: string): Promise<string> {
   // Fetch business settings for header image, primary color, and website URL
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
@@ -169,9 +169,9 @@ export async function generateNewsletterHeader(formattedDate: string, campaignDa
   const newsletterName = settingsMap.newsletter_name || 'St. Cloud Scoop'
   const websiteUrl = settingsMap.website_url || 'https://www.aiaccountingdaily.com'
 
-  // Add tracking to Sign Up link if campaign info available
-  const signUpUrl = campaignDate
-    ? wrapTrackingUrl(websiteUrl, 'Header', campaignDate, campaignId)
+  // Add tracking to Sign Up link if issue info available
+  const signUpUrl = issueDate
+    ? wrapTrackingUrl(websiteUrl, 'Header', issueDate, issueId)
     : websiteUrl
 
   return `<html style="margin:0;padding:0;background-color:#f7f7f7;">
@@ -343,7 +343,7 @@ export async function generateWelcomeSection(
 
 // ==================== PRIMARY ARTICLES SECTION ====================
 
-export async function generatePrimaryArticlesSection(articles: any[], campaignDate: string, campaignId: string | undefined, sectionName: string): Promise<string> {
+export async function generatePrimaryArticlesSection(articles: any[], issueDate: string, issueId: string | undefined, sectionName: string): Promise<string> {
   if (!articles || articles.length === 0) {
     return ''
   }
@@ -358,7 +358,7 @@ export async function generatePrimaryArticlesSection(articles: any[], campaignDa
     const emoji = getArticleEmoji(headline, content)
 
     // Wrap URL with tracking
-    const trackedUrl = sourceUrl !== '#' ? wrapTrackingUrl(sourceUrl, sectionName, campaignDate, campaignId) : '#'
+    const trackedUrl = sourceUrl !== '#' ? wrapTrackingUrl(sourceUrl, sectionName, issueDate, issueId) : '#'
 
     return `
       <div style='padding: 16px 0; border-bottom: 1px solid #e0e0e0;'>
@@ -393,8 +393,8 @@ export async function generatePrimaryArticlesSection(articles: any[], campaignDa
 
 // ==================== SECONDARY ARTICLES SECTION ====================
 
-export async function generateSecondaryArticlesSection(campaign: any, sectionName: string): Promise<string> {
-  // Fetch secondary articles for this campaign
+export async function generateSecondaryArticlesSection(issue: any, sectionName: string): Promise<string> {
+  // Fetch secondary articles for this issue
   const { data: secondaryArticles } = await supabaseAdmin
     .from('secondary_articles')
     .select(`
@@ -407,7 +407,7 @@ export async function generateSecondaryArticlesSection(campaign: any, sectionNam
         source_url
       )
     `)
-    .eq('campaign_id', campaign.id)
+    .eq('issue_id', issue.id)
     .eq('is_active', true)
     .order('rank', { ascending: true })
 
@@ -426,7 +426,7 @@ export async function generateSecondaryArticlesSection(campaign: any, sectionNam
     const emoji = getArticleEmoji(headline, content)
 
     // Wrap URL with tracking
-    const trackedUrl = sourceUrl !== '#' ? wrapTrackingUrl(sourceUrl, sectionName, campaign.date, campaign.mailerlite_campaign_id) : '#'
+    const trackedUrl = sourceUrl !== '#' ? wrapTrackingUrl(sourceUrl, sectionName, issue.date, issue.mailerlite_issue_id) : '#'
 
     return `
       <div style='padding: 16px 0; border-bottom: 1px solid #e0e0e0;'>
@@ -462,7 +462,7 @@ export async function generateSecondaryArticlesSection(campaign: any, sectionNam
 // ==================== LOCAL EVENTS ====================
 // Feature not needed in this newsletter
 
-export async function generateLocalEventsSection(campaign: any): Promise<string> {
+export async function generateLocalEventsSection(issue: any): Promise<string> {
   console.log('Local Events section disabled for AI Accounting Daily')
   return ''
 }
@@ -470,7 +470,7 @@ export async function generateLocalEventsSection(campaign: any): Promise<string>
 // ==================== WORDLE ====================
 // Feature not needed in this newsletter
 
-export async function generateWordleSection(campaign: any): Promise<string> {
+export async function generateWordleSection(issue: any): Promise<string> {
   console.log('Wordle section disabled for AI Accounting Daily')
   return ''
 }
@@ -478,14 +478,14 @@ export async function generateWordleSection(campaign: any): Promise<string> {
 // ==================== MINNESOTA GETAWAYS ====================
 // Feature not needed in this newsletter
 
-export async function generateMinnesotaGetawaysSection(campaign: any): Promise<string> {
+export async function generateMinnesotaGetawaysSection(issue: any): Promise<string> {
   console.log('Minnesota Getaways section disabled for AI Accounting Daily')
   return ''
 }
 
 // ==================== POLL SECTION ====================
 
-export async function generatePollSection(campaignId: string): Promise<string> {
+export async function generatePollSection(issueId: string): Promise<string> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.aiaccountingdaily.com'
 
   try {
@@ -513,7 +513,7 @@ export async function generatePollSection(campaignId: string): Promise<string> {
       return `
               <tr>
                 <td style="${paddingStyle}">
-                  <a href="${baseUrl}/api/polls/${pollData.id}/respond?option=${encodeURIComponent(option)}&amp;campaign_id=${campaignId}&amp;email={$email}"
+                  <a href="${baseUrl}/api/polls/${pollData.id}/respond?option=${encodeURIComponent(option)}&amp;issueId=${issueId}&amp;email={$email}"
                      style="display:block; text-decoration:none; background:${primaryColor}; color:#ffffff; font-weight:bold;
                             font-size:16px; line-height:20px; padding:12px; border-radius:8px; text-align:center;">${option}</a>
                 </td>
@@ -565,25 +565,25 @@ ${optionsHtml}
 // ==================== DINING DEALS ====================
 // Feature not needed in this newsletter
 
-export async function generateDiningDealsSection(campaign: any): Promise<string> {
+export async function generateDiningDealsSection(issue: any): Promise<string> {
   console.log('Dining Deals section disabled for AI Accounting Daily')
   return ''
 }
 
 // ==================== ADVERTORIAL ====================
 
-export async function generateAdvertorialSection(campaign: any, recordUsage: boolean = false, sectionName: string = 'Advertorial'): Promise<string> {
+export async function generateAdvertorialSection(issue: any, recordUsage: boolean = false, sectionName: string = 'Advertorial'): Promise<string> {
   try {
-    console.log('Generating Advertorial section for campaign:', campaign?.id, 'recordUsage:', recordUsage)
+    console.log('Generating Advertorial section for issue:', issue?.id, 'recordUsage:', recordUsage)
 
     // Fetch colors from business settings
     const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
 
-    // Check if ad already selected for this campaign (get most recent if multiple)
+    // Check if ad already selected for this issue (get most recent if multiple)
     const { data: existingAd } = await supabaseAdmin
-      .from('campaign_advertisements')
+      .from('issue_advertisements')
       .select('*, advertisement:advertisements(*)')
-      .eq('campaign_id', campaign.id)
+      .eq('issue_id', issue.id)
       .order('used_at', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -592,7 +592,7 @@ export async function generateAdvertorialSection(campaign: any, recordUsage: boo
 
     // If no ad selected, return empty (RSS processing should have selected one)
     if (!selectedAd) {
-      console.log('No ad selected for this campaign (RSS processing may not have completed)')
+      console.log('No ad selected for this issue (RSS processing may not have completed)')
       return ''
     }
 
@@ -614,7 +614,7 @@ export async function generateAdvertorialSection(campaign: any, recordUsage: boo
             .from('advertisements')
             .update({
               times_used: (currentAd.times_used || 0) + 1,
-              last_used_date: campaign.date,
+              last_used_date: issue.date,
               updated_at: new Date().toISOString()
             })
             .eq('id', selectedAd.id)
@@ -655,7 +655,7 @@ export async function generateAdvertorialSection(campaign: any, recordUsage: boo
 
     // If no ad available, return empty section
     if (!selectedAd) {
-      console.log('No advertisement available for this campaign')
+      console.log('No advertisement available for this issue')
       return ''
     }
 
@@ -664,7 +664,7 @@ export async function generateAdvertorialSection(campaign: any, recordUsage: boo
     const buttonText = selectedAd.button_text || 'Learn More'
 
     const trackedUrl = buttonUrl !== '#'
-      ? wrapTrackingUrl(buttonUrl, 'Advertorial', campaign.date, campaign.mailerlite_campaign_id)
+      ? wrapTrackingUrl(buttonUrl, 'Advertorial', issue.date, issue.mailerlite_issue_id)
       : '#'
 
     const imageUrl = selectedAd.image_url || ''
@@ -800,16 +800,16 @@ function getBreakingNewsEmoji(title: string, description: string): string {
   return '🔴'
 }
 
-export async function generateBreakingNewsSection(campaign: any): Promise<string> {
+export async function generateBreakingNewsSection(issue: any): Promise<string> {
   try {
-    console.log('Generating Breaking News section for campaign:', campaign?.id)
+    console.log('Generating Breaking News section for issue:', issue?.id)
 
     // Fetch colors from business settings
     const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
 
     // Fetch selected Breaking News articles
     const { data: selections } = await supabaseAdmin
-      .from('campaign_breaking_news')
+      .from('issue_breaking_news')
       .select(`
         *,
         post:rss_posts(
@@ -822,7 +822,7 @@ export async function generateBreakingNewsSection(campaign: any): Promise<string
           breaking_news_score
         )
       `)
-      .eq('campaign_id', campaign.id)
+      .eq('issue_id', issue.id)
       .eq('section', 'breaking')
       .order('position', { ascending: true })
       .limit(3)
@@ -844,7 +844,7 @@ export async function generateBreakingNewsSection(campaign: any): Promise<string
 
       // Wrap URL with tracking
       const trackedUrl = sourceUrl !== '#'
-        ? wrapTrackingUrl(sourceUrl, 'Breaking News', campaign.date, campaign.mailerlite_campaign_id)
+        ? wrapTrackingUrl(sourceUrl, 'Breaking News', issue.date, issue.mailerlite_issue_id)
         : '#'
 
       return `
@@ -883,16 +883,16 @@ export async function generateBreakingNewsSection(campaign: any): Promise<string
 
 // ==================== BEYOND THE FEED ====================
 
-export async function generateBeyondTheFeedSection(campaign: any): Promise<string> {
+export async function generateBeyondTheFeedSection(issue: any): Promise<string> {
   try {
-    console.log('Generating Beyond the Feed section for campaign:', campaign?.id)
+    console.log('Generating Beyond the Feed section for issue:', issue?.id)
 
     // Fetch colors from business settings
     const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
 
     // Fetch selected Beyond the Feed articles
     const { data: selections } = await supabaseAdmin
-      .from('campaign_breaking_news')
+      .from('issue_breaking_news')
       .select(`
         *,
         post:rss_posts(
@@ -905,7 +905,7 @@ export async function generateBeyondTheFeedSection(campaign: any): Promise<strin
           breaking_news_score
         )
       `)
-      .eq('campaign_id', campaign.id)
+      .eq('issue_id', issue.id)
       .eq('section', 'beyond_feed')
       .order('position', { ascending: true })
       .limit(3)
@@ -927,7 +927,7 @@ export async function generateBeyondTheFeedSection(campaign: any): Promise<strin
 
       // Wrap URL with tracking
       const trackedUrl = sourceUrl !== '#'
-        ? wrapTrackingUrl(sourceUrl, 'Beyond the Feed', campaign.date, campaign.mailerlite_campaign_id)
+        ? wrapTrackingUrl(sourceUrl, 'Beyond the Feed', issue.date, issue.mailerlite_issue_id)
         : '#'
 
       return `
@@ -996,9 +996,9 @@ function getAIAppEmoji(appName: string, category: string, description: string): 
   return '🔧'
 }
 
-export async function generateAIAppsSection(campaign: any): Promise<string> {
+export async function generateAIAppsSection(issue: any): Promise<string> {
   try {
-    console.log('Generating AI Apps section for campaign:', campaign?.id)
+    console.log('Generating AI Apps section for issue:', issue?.id)
 
     // Import AppSelector
     const { AppSelector } = await import('./app-selector')
@@ -1006,15 +1006,15 @@ export async function generateAIAppsSection(campaign: any): Promise<string> {
     // Fetch colors and fonts from business settings
     const { primaryColor, secondaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
 
-    // Get the selected apps for this campaign
-    const apps = await AppSelector.getAppsForCampaign(campaign.id)
+    // Get the selected apps for this issue
+    const apps = await AppSelector.getAppsForissue(issue.id)
 
     if (!apps || apps.length === 0) {
-      console.log('No AI apps selected for this campaign, skipping AI Apps section')
+      console.log('No AI apps selected for this issue, skipping AI Apps section')
       return ''
     }
 
-    console.log(`Found ${apps.length} AI apps for campaign`)
+    console.log(`Found ${apps.length} AI apps for issue`)
 
     // Generate numbered list HTML
     const appsHtml = apps.map((app, index) => {
@@ -1023,7 +1023,7 @@ export async function generateAIAppsSection(campaign: any): Promise<string> {
 
       // Wrap URL with tracking
       const trackedUrl = appUrl !== '#'
-        ? wrapTrackingUrl(appUrl, 'AI Apps', campaign.date, campaign.mailerlite_campaign_id)
+        ? wrapTrackingUrl(appUrl, 'AI Apps', issue.date, issue.mailerlite_issue_id)
         : '#'
 
       // Format: number. emoji Title - Description
@@ -1062,9 +1062,9 @@ export async function generateAIAppsSection(campaign: any): Promise<string> {
 
 // ==================== PROMPT IDEAS ====================
 
-export async function generatePromptIdeasSection(campaign: any): Promise<string> {
+export async function generatePromptIdeasSection(issue: any): Promise<string> {
   try {
-    console.log('Generating Prompt Ideas section for campaign:', campaign?.id)
+    console.log('Generating Prompt Ideas section for issue:', issue?.id)
 
     // Import PromptSelector
     const { PromptSelector } = await import('./prompt-selector')
@@ -1072,11 +1072,11 @@ export async function generatePromptIdeasSection(campaign: any): Promise<string>
     // Fetch colors from business settings
     const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
 
-    // Get the selected prompt for this campaign
-    const prompt = await PromptSelector.getPromptForCampaign(campaign.id)
+    // Get the selected prompt for this issue
+    const prompt = await PromptSelector.getPromptForissue(issue.id)
 
     if (!prompt) {
-      console.log('No prompt selected for this campaign, skipping Prompt Ideas section')
+      console.log('No prompt selected for this issue, skipping Prompt Ideas section')
       return ''
     }
 
@@ -1127,14 +1127,14 @@ export async function generatePromptIdeasSection(campaign: any): Promise<string>
 // ==================== ROAD WORK ====================
 // Feature not needed in this newsletter
 
-export async function generateRoadWorkSection(campaign: any): Promise<string> {
+export async function generateRoadWorkSection(issue: any): Promise<string> {
   console.log('Road Work section disabled for AI Accounting Daily')
   return ''
 }
 
 // ==================== FOOTER ====================
 
-export async function generateNewsletterFooter(campaignDate?: string, campaignId?: string): Promise<string> {
+export async function generateNewsletterFooter(issueDate?: string, issueId?: string): Promise<string> {
   // Fetch business settings for primary color, newsletter name, business name, and social media settings
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
@@ -1162,7 +1162,7 @@ export async function generateNewsletterFooter(campaignDate?: string, campaignId
 
   // Facebook
   if (settingsMap.facebook_enabled === 'true' && settingsMap.facebook_url) {
-    const trackedUrl = campaignDate ? wrapTrackingUrl(settingsMap.facebook_url, 'Footer', campaignDate, campaignId) : settingsMap.facebook_url
+    const trackedUrl = issueDate ? wrapTrackingUrl(settingsMap.facebook_url, 'Footer', issueDate, issueId) : settingsMap.facebook_url
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
@@ -1173,7 +1173,7 @@ export async function generateNewsletterFooter(campaignDate?: string, campaignId
 
   // Twitter/X
   if (settingsMap.twitter_enabled === 'true' && settingsMap.twitter_url) {
-    const trackedUrl = campaignDate ? wrapTrackingUrl(settingsMap.twitter_url, 'Footer', campaignDate, campaignId) : settingsMap.twitter_url
+    const trackedUrl = issueDate ? wrapTrackingUrl(settingsMap.twitter_url, 'Footer', issueDate, issueId) : settingsMap.twitter_url
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
@@ -1184,7 +1184,7 @@ export async function generateNewsletterFooter(campaignDate?: string, campaignId
 
   // LinkedIn
   if (settingsMap.linkedin_enabled === 'true' && settingsMap.linkedin_url) {
-    const trackedUrl = campaignDate ? wrapTrackingUrl(settingsMap.linkedin_url, 'Footer', campaignDate, campaignId) : settingsMap.linkedin_url
+    const trackedUrl = issueDate ? wrapTrackingUrl(settingsMap.linkedin_url, 'Footer', issueDate, issueId) : settingsMap.linkedin_url
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
@@ -1195,7 +1195,7 @@ export async function generateNewsletterFooter(campaignDate?: string, campaignId
 
   // Instagram
   if (settingsMap.instagram_enabled === 'true' && settingsMap.instagram_url) {
-    const trackedUrl = campaignDate ? wrapTrackingUrl(settingsMap.instagram_url, 'Footer', campaignDate, campaignId) : settingsMap.instagram_url
+    const trackedUrl = issueDate ? wrapTrackingUrl(settingsMap.instagram_url, 'Footer', issueDate, issueId) : settingsMap.instagram_url
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">

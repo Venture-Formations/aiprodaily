@@ -9,15 +9,15 @@ export async function GET(request: NextRequest) {
       .select('key, value, updated_at')
       .in('key', [
         'last_rss_processing_run',
-        'last_campaign_creation_run',
+        'last_issue_creation_run',
         'last_final_send_run',
         'last_subject_generation_run'
       ])
       .order('key')
 
-    // Also get recent campaigns to compare
+    // Also get recent issues to compare
     const { data: recentCampaigns } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .select('id, date, created_at, status')
       .order('created_at', { ascending: false })
       .limit(5)

@@ -36,9 +36,9 @@ export async function PATCH(
       }, { status: 400 })
     }
 
-    // Update the campaign's subject line
+    // Update the issue's subject line
     const { data, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .update({
         subject_line: trimmedSubjectLine,
         updated_at: new Date().toISOString()
@@ -56,7 +56,7 @@ export async function PATCH(
 
     if (!data) {
       return NextResponse.json({
-        error: 'Campaign not found'
+        error: 'issue not found'
       }, { status: 404 })
     }
 

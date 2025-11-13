@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     // Get the accounting newsletter ID
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('slug', 'accounting')
       .single()
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
         const isAffiliate = ['yes', 'true', '1', 'y'].includes(affiliateValue)
 
         const app: any = {
-          newsletter_id: newsletter.id,
+          publication_id: newsletter.id,
           app_name: row['Tool Name']?.trim() || row['tool name']?.trim() || row['App Name']?.trim() || null,
           category: row['Category']?.trim() || null,
           tool_type: row['Tool Type']?.trim() || row['tool type']?.trim() || 'Client',
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
       const { data: existingApps } = await supabaseAdmin
         .from('ai_applications')
         .select('id, app_name, app_url')
-        .eq('newsletter_id', newsletter.id)
+        .eq('publication_id', newsletter.id)
 
       const existingAppMap = new Map(
         existingApps?.map(app => [app.app_name.toLowerCase(), app]) || []

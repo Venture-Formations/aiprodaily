@@ -5,14 +5,14 @@ import { GitHubImageStorage } from '@/lib/github-storage'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const campaignId = searchParams.get('campaign_id')
+    const issueId = searchParams.get('issue_id')
 
-    if (!campaignId) {
-      return NextResponse.json({ error: 'campaign_id parameter required' }, { status: 400 })
+    if (!issueId) {
+      return NextResponse.json({ error: 'issueId parameter required' }, { status: 400 })
     }
 
     console.log('=== MANUAL IMAGE PROCESSING DEBUG ===')
-    console.log('Campaign ID:', campaignId)
+    console.log('issue ID:', issueId)
 
     const githubStorage = new GitHubImageStorage()
 
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
           title
         )
       `)
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .eq('is_active', true)
 
     if (error || !articles) {
@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       debug: 'Manual Image Processing',
-      campaignId,
+      issueId,
       articlesFound: articles.length,
       results,
       summary: {

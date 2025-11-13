@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
         title,
         image_url,
         publication_date,
-        campaign_id,
+        issueId,
         rss_feed:rss_feeds(name)
       `)
       .order('publication_date', { ascending: false })
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
         id,
         headline,
         is_active,
-        campaign_id,
+        issueId,
         rss_post:rss_posts(
           id,
           title,

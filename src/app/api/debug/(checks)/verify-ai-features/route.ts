@@ -39,25 +39,25 @@ export async function GET() {
     }
     results.sample_data.prompt_ideas = prompts || []
 
-    // Check campaign_ai_app_selections table
+    // Check issue_ai_app_selections table
     const { data: appSelections, error: appSelectionsError } = await supabaseAdmin
-      .from('campaign_ai_app_selections')
+      .from('issue_ai_app_selections')
       .select('*')
       .limit(5)
 
-    results.tables.campaign_ai_app_selections = {
+    results.tables.issue_ai_app_selections = {
       exists: !appSelectionsError,
       error: appSelectionsError?.message || null,
       count: appSelections?.length || 0
     }
 
-    // Check campaign_prompt_selections table
+    // Check issue_prompt_selections table
     const { data: promptSelections, error: promptSelectionsError } = await supabaseAdmin
-      .from('campaign_prompt_selections')
+      .from('issue_prompt_selections')
       .select('*')
       .limit(5)
 
-    results.tables.campaign_prompt_selections = {
+    results.tables.issue_prompt_selections = {
       exists: !promptSelectionsError,
       error: promptSelectionsError?.message || null,
       count: promptSelections?.length || 0
@@ -67,8 +67,8 @@ export async function GET() {
     const allTablesExist =
       results.tables.ai_applications.exists &&
       results.tables.prompt_ideas.exists &&
-      results.tables.campaign_ai_app_selections.exists &&
-      results.tables.campaign_prompt_selections.exists
+      results.tables.issue_ai_app_selections.exists &&
+      results.tables.issue_prompt_selections.exists
 
     results.status = allTablesExist ? 'READY' : 'INCOMPLETE'
     results.message = allTablesExist

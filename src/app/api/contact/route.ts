@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
         name,
         email,
         message,
-        newsletter_id: 'accounting',
+        publication_id: 'accounting',
         status: 'new'
       }])
 

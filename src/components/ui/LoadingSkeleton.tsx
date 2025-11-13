@@ -38,7 +38,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
   )
 }
 
-export const CampaignCardSkeleton: React.FC = () => {
+export const IssueCardSkeleton: React.FC = () => {
   return (
     <div className="p-6 space-y-3">
       <Skeleton variant="text" width="60%" height={20} />

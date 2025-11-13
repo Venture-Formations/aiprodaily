@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS contact_submissions (
   status TEXT DEFAULT 'new' CHECK (status IN ('new', 'read', 'archived')),
   CONSTRAINT fk_newsletter
     FOREIGN KEY (newsletter_id)
-    REFERENCES newsletters(slug)
+    REFERENCES publications(slug)
     ON DELETE CASCADE
 );
 

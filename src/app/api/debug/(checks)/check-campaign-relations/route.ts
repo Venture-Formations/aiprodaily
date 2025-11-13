@@ -1,25 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// Debug endpoint to check what's preventing campaign deletion
+// Debug endpoint to check what's preventing issue deletion
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const campaignId = searchParams.get('campaign_id')
+    const issueId = searchParams.get('issue_id')
 
-    if (!campaignId) {
+    if (!issueId) {
       return NextResponse.json({
-        error: 'campaign_id parameter required'
+        error: 'issueId parameter required'
       }, { status: 400 })
     }
 
-    console.log(`Checking relations for campaign: ${campaignId}`)
+    console.log(`Checking relations for issue: ${issueId}`)
 
     const results: Record<string, any> = {}
 
-    // Check all tables that might reference this campaign
+    // Check all tables that might reference this issue
     const tables = [
-      'campaign_events',
+      'issue_events',
       'articles',
       'rss_posts',
       'road_work_data',
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
         const { data, error, count } = await supabaseAdmin
           .from(table)
           .select('*', { count: 'exact', head: false })
-          .eq('campaign_id', campaignId)
+          .eq('issue_id', issueId)
 
         if (error) {
           results[table] = { error: error.message, code: error.code }
@@ -51,17 +51,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Check the campaign itself
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Check the issue itself
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select('*')
-      .eq('id', campaignId)
+      .eq('id', issueId)
       .single()
 
     return NextResponse.json({
       success: true,
-      campaign_id: campaignId,
-      campaign: campaign || { error: campaignError?.message },
+      issue_id: issueId,
+      issue: issue || { error: issueError?.message },
       related_data: results,
       summary: {
         tables_with_data: Object.entries(results)
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Error checking campaign relations:', error)
+    console.error('Error checking issue relations:', error)
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'

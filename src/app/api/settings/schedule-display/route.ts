@@ -11,15 +11,15 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const newsletter_id = searchParams.get('newsletter_id')
+    const publication_id = searchParams.get('publication_id')
 
-    if (!newsletter_id) {
+    if (!publication_id) {
       return NextResponse.json({
-        error: 'newsletter_id query parameter is required'
+        error: 'publication_id query parameter is required'
       }, { status: 400 })
     }
 
-    const scheduleDisplay = await ScheduleChecker.getScheduleDisplay(newsletter_id)
+    const scheduleDisplay = await ScheduleChecker.getScheduleDisplay(publication_id)
 
     return NextResponse.json(scheduleDisplay)
 

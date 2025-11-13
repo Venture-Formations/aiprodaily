@@ -57,7 +57,21 @@
       "Bash(node:*)",
       "Bash(timeout /t 15)",
       "Bash(del \"C:\\Users\\dpenn\\Documents\\AI_Pros_Newsletter\\test-ad-assign.js\")",
-      "Bash(npx vercel:*)"
+      "Bash(npx vercel:*)",
+      "Bash(npx tsx:*)",
+      "Bash(find:*)",
+      "Bash(/tmp/api_files_to_update.txt)",
+      "Bash(while read file)",
+      "Bash(do if grep -q newsletter_id $file)",
+      "Bash(then sed -i s/newsletter_id/publication_id/g $file)",
+      "Bash(fi)",
+      "Bash(done)",
+      "Bash(/dev/null -exec sed -i \"s/\\.from(''newsletters'')/\\.from(''publications'')/g\" {} ;)",
+      "Bash(/dev/null -exec sed -i 's/REFERENCES newsletters/REFERENCES publications/g' {} ;)",
+      "Bash(/dev/null -exec sed -i 's/newsletters(id)/publications(id)/g' {} ;)",
+      "Bash(/dev/null -exec sed -i 's/newsletters(slug)/publications(slug)/g' {} ;)",
+      "Bash(FROM)",
+      "Bash(cut:*)"
     ],
     "deny": [],
     "ask": []
@@ -66,5 +80,17 @@
   "enabledMcpjsonServers": [
     "vercel",
     "memory"
-  ]
+  ],
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/skill-activation-prompt.bat"
+          }
+        ]
+      }
+    ]
+  }
 }

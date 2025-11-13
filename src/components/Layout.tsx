@@ -76,7 +76,7 @@ export default function Layout({ children }: LayoutProps) {
   // In staging, skip loading state and show content immediately
   if (isStaging) {
     const dashboardUrl = newsletterSlug ? `/dashboard/${newsletterSlug}` : '/dashboard'
-    const campaignsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/campaigns` : '/dashboard/campaigns'
+    const campaignsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/issues` : '/dashboard/issues'
     const analyticsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/analytics` : '/dashboard/analytics'
     const databasesUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/databases` : '/dashboard/databases'
     const settingsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/settings` : '/dashboard/settings'
@@ -163,7 +163,7 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   const dashboardUrl = newsletterSlug ? `/dashboard/${newsletterSlug}` : '/dashboard'
-  const campaignsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/campaigns` : '/dashboard/campaigns'
+  const campaignsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/issues` : '/dashboard/issues'
   const analyticsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/analytics` : '/dashboard/analytics'
   const databasesUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/databases` : '/dashboard/databases'
   const settingsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/settings` : '/dashboard/settings'

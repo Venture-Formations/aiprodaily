@@ -8,18 +8,18 @@ import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/wor
  * Processes both primary and secondary sections
  */
 export async function POST(request: NextRequest) {
-  let campaign_id: string | undefined
+  let issue_id: string | undefined
 
   try {
     const body = await request.json()
-    campaign_id = body.campaign_id
+    issue_id = body.issue_id
 
-    if (!campaign_id) {
-      return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
+    if (!issue_id) {
+      return NextResponse.json({ error: 'issue_id is required' }, { status: 400 })
     }
 
 
-    const startResult = await startWorkflowStep(campaign_id, 'pending_generate')
+    const startResult = await startWorkflowStep(issue_id, 'pending_generate')
     if (!startResult.success) {
       return NextResponse.json({
         success: false,
@@ -32,21 +32,21 @@ export async function POST(request: NextRequest) {
 
     // Generate primary articles
     console.log('Generating primary newsletter articles...')
-    await processor.generateArticlesForSection(campaign_id, 'primary')
+    await processor.generateArticlesForSection(issue_id, 'primary')
 
     // Generate secondary articles
-    await processor.generateArticlesForSection(campaign_id, 'secondary')
+    await processor.generateArticlesForSection(issue_id, 'secondary')
 
     // Count generated articles
     const { data: primaryArticles } = await supabaseAdmin
       .from('articles')
       .select('id, fact_check_score')
-      .eq('campaign_id', campaign_id)
+      .eq('issue_id', issue_id)
 
     const { data: secondaryArticles } = await supabaseAdmin
       .from('secondary_articles')
       .select('id, fact_check_score')
-      .eq('campaign_id', campaign_id)
+      .eq('issue_id', issue_id)
 
     const primaryCount = primaryArticles?.length || 0
     const secondaryCount = secondaryArticles?.length || 0
@@ -58,12 +58,12 @@ export async function POST(request: NextRequest) {
     const totalPassed = primaryPassed + secondaryPassed
 
 
-    await completeWorkflowStep(campaign_id, 'generating')
+    await completeWorkflowStep(issue_id, 'generating')
 
     return NextResponse.json({
       success: true,
       message: 'Generate articles step completed',
-      campaign_id,
+      issue_id,
       primary_articles: primaryCount,
       secondary_articles: secondaryCount,
       total_articles: totalArticles,
@@ -75,9 +75,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[Step 5] Generate articles failed:', error)
 
-    if (campaign_id) {
+    if (issue_id) {
       await failWorkflow(
-        campaign_id,
+        issue_id,
         `Generate articles step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
     }

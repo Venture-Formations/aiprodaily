@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     // Sync logo_url to newsletters table if it was updated
     if (body.logo_url !== undefined) {
       await supabaseAdmin
-        .from('newsletters')
+        .from('publications')
         .update({ logo_url: body.logo_url })
         .eq('slug', 'accounting') // Update the accounting newsletter
     }

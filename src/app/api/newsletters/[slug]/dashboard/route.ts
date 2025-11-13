@@ -17,7 +17,7 @@ export async function GET(
 
     // Get newsletter
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('*')
       .eq('slug', slug)
       .single()
@@ -29,14 +29,14 @@ export async function GET(
       )
     }
 
-    // Get campaign counts by status
+    // Get issue counts by status
     const { data: campaigns } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .select('id, status, date, subject_line, created_at')
-      .eq('newsletter_id', newsletter.id)
+      .eq('publication_id', newsletter.id)
       .order('created_at', { ascending: false })
 
-    const campaignCounts = {
+    const issueCounts = {
       draft: campaigns?.filter(c => c.status === 'draft').length || 0,
       in_review: campaigns?.filter(c => c.status === 'in_review').length || 0,
       ready_to_send: campaigns?.filter(c => c.status === 'ready_to_send').length || 0,
@@ -48,7 +48,7 @@ export async function GET(
     const { data: aiApps, count: aiAppsCount } = await supabaseAdmin
       .from('ai_applications')
       .select('id, app_name, category, is_active, times_used, created_at', { count: 'exact' })
-      .eq('newsletter_id', newsletter.id)
+      .eq('publication_id', newsletter.id)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(5)
@@ -57,21 +57,21 @@ export async function GET(
     const { data: prompts, count: promptsCount } = await supabaseAdmin
       .from('prompt_ideas')
       .select('id, title, category, is_active, times_used, created_at', { count: 'exact' })
-      .eq('newsletter_id', newsletter.id)
+      .eq('publication_id', newsletter.id)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(5)
 
-    // Get recent campaigns with article counts
+    // Get recent issues with article counts
     const recentCampaigns = await Promise.all(
-      (campaigns?.slice(0, 5) || []).map(async (campaign) => {
+      (campaigns?.slice(0, 5) || []).map(async (issue) => {
         const { count: articleCount } = await supabaseAdmin
           .from('articles')
           .select('id', { count: 'exact' })
-          .eq('campaign_id', campaign.id)
+          .eq('issue_id', issue.id)
 
         return {
-          ...campaign,
+          ...issue,
           article_count: articleCount || 0
         }
       })
@@ -81,7 +81,7 @@ export async function GET(
       success: true,
       data: {
         newsletter,
-        campaign_counts: campaignCounts,
+        issue_counts: issueCounts,
         ai_apps: {
           total: aiAppsCount || 0,
           recent: aiApps || []
@@ -90,7 +90,7 @@ export async function GET(
           total: promptsCount || 0,
           recent: prompts || []
         },
-        recent_campaigns: recentCampaigns
+        recent_issues: recentCampaigns
       }
     })
 

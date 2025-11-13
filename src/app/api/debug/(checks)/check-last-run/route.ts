@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     const { data: lastRunSettings } = await supabaseAdmin
       .from('app_settings')
       .select('key, value, updated_at')
-      .or('key.eq.last_rss_processing_run,key.eq.last_campaign_creation_run,key.eq.last_review_send_run,key.eq.last_final_send_run,key.eq.last_event_population_run')
+      .or('key.eq.last_rss_processing_run,key.eq.last_issue_creation_run,key.eq.last_review_send_run,key.eq.last_final_send_run,key.eq.last_event_population_run')
       .order('key')
 
     // Get current date in Central Time

@@ -2,13 +2,13 @@ import { supabaseAdmin } from './supabase'
 import type { Advertisement } from '@/types/database'
 
 interface ScheduleContext {
-  campaignDate: string // YYYY-MM-DD format
-  campaignId: string
+  issueDate: string // YYYY-MM-DD format
+  issueId: string
   newsletterId: string // UUID - needed for app_settings storage
 }
 
 /**
- * Ad Scheduler - Selects which advertisement should appear in a given campaign
+ * Ad Scheduler - Selects which advertisement should appear in a given issue
  *
  * New Sequential Ordering System:
  * - Ads are selected based on display_order (1, 2, 3, etc.)
@@ -20,15 +20,15 @@ export class AdScheduler {
   /**
    * Select the next ad in the rotation queue
    */
-  static async selectAdForCampaign(context: ScheduleContext): Promise<Advertisement | null> {
-    const { campaignId, newsletterId } = context
+  static async selectAdForissue(context: ScheduleContext): Promise<Advertisement | null> {
+    const { issueId, newsletterId } = context
 
     try {
       // Get the current next_ad_position from app_settings (per newsletter)
       const { data: settingsData, error: settingsError } = await supabaseAdmin
         .from('app_settings')
         .select('value')
-        .eq('newsletter_id', newsletterId)
+        .eq('publication_id', newsletterId)
         .eq('key', 'next_ad_position')
         .maybeSingle()
 
@@ -44,7 +44,7 @@ export class AdScheduler {
       const { data: activeAds, error: adsError } = await supabaseAdmin
         .from('advertisements')
         .select('*')
-        .eq('newsletter_id', newsletterId)
+        .eq('publication_id', newsletterId)
         .eq('status', 'active')
         .not('display_order', 'is', null)
         .order('display_order', { ascending: true })
@@ -87,12 +87,12 @@ export class AdScheduler {
   }
 
   /**
-   * Record that an ad was used in a campaign and increment next_ad_position
+   * Record that an ad was used in a issue and increment next_ad_position
    */
   static async recordAdUsage(
-    campaignId: string,
+    issueId: string,
     adId: string,
-    campaignDate: string,
+    issueDate: string,
     newsletterId: string
   ): Promise<void> {
     try {
@@ -110,25 +110,25 @@ export class AdScheduler {
 
       console.log(`[AdScheduler] Recording usage for ad at position ${usedAd.display_order}`)
 
-      // Check if ad already assigned to this campaign
+      // Check if ad already assigned to this issue
       const { data: existingAssignment } = await supabaseAdmin
-        .from('campaign_advertisements')
+        .from('issue_advertisements')
         .select('id')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .maybeSingle()
 
       if (existingAssignment) {
-        console.log('[AdScheduler] Ad already assigned to this campaign, skipping insert')
+        console.log('[AdScheduler] Ad already assigned to this issue, skipping insert')
         return
       }
 
-      // Insert into campaign_advertisements
+      // Insert into issue_advertisements
       const { error: insertError } = await supabaseAdmin
-        .from('campaign_advertisements')
+        .from('issue_advertisements')
         .insert({
-          campaign_id: campaignId,
+          issue_id: issueId,
           advertisement_id: adId,
-          campaign_date: campaignDate,
+          issue_date: issueDate,
           used_at: new Date().toISOString()
         })
 
@@ -143,7 +143,7 @@ export class AdScheduler {
         .from('advertisements')
         .update({
           times_used: newTimesUsed,
-          last_used_date: campaignDate,
+          last_used_date: issueDate,
           updated_at: new Date().toISOString()
         })
         .eq('id', adId)
@@ -159,7 +159,7 @@ export class AdScheduler {
       const { data: activeAds, error: adsError } = await supabaseAdmin
         .from('advertisements')
         .select('display_order')
-        .eq('newsletter_id', newsletterId)
+        .eq('publication_id', newsletterId)
         .eq('status', 'active')
         .not('display_order', 'is', null)
         .order('display_order', { ascending: true })
@@ -182,17 +182,17 @@ export class AdScheduler {
       }
 
       // Update next_ad_position in app_settings (upsert in case it doesn't exist)
-      // Store per newsletter_id due to app_settings table constraints
+      // Store per publication_id due to app_settings table constraints
       const { error: settingsError } = await supabaseAdmin
         .from('app_settings')
         .upsert({
           key: 'next_ad_position',
-          newsletter_id: newsletterId,
+          publication_id: newsletterId,
           value: nextPosition.toString(),
           updated_at: new Date().toISOString(),
           description: 'Next position in ad rotation sequence'
         }, {
-          onConflict: 'newsletter_id,key',
+          onConflict: 'publication_id,key',
           ignoreDuplicates: false
         })
 

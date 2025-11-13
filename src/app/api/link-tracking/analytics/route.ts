@@ -32,8 +32,8 @@ export async function GET(request: NextRequest) {
     const { data: clicks, error } = await supabaseAdmin
       .from('link_clicks')
       .select('*')
-      .gte('campaign_date', startDate.toISOString().split('T')[0])
-      .lte('campaign_date', endDate.toISOString().split('T')[0])
+      .gte('issue_date', startDate.toISOString().split('T')[0])
+      .lte('issue_date', endDate.toISOString().split('T')[0])
       .order('clicked_at', { ascending: false })
 
     if (error) {
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     // Calculate daily click counts
     const dailyClicks: { [key: string]: number } = {}
     clicks?.forEach(click => {
-      const date = click.campaign_date
+      const date = click.issue_date
       dailyClicks[date] = (dailyClicks[date] || 0) + 1
     })
 
@@ -89,16 +89,16 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.clicks - a.clicks)
       .slice(0, 10)
 
-    // Calculate click-through rate by campaign
-    const clicksByCampaign: { [key: string]: number } = {}
+    // Calculate click-through rate by issue
+    const clicksByissue: { [key: string]: number } = {}
     clicks?.forEach(click => {
-      const campaignId = click.campaign_id || click.campaign_date
-      clicksByCampaign[campaignId] = (clicksByCampaign[campaignId] || 0) + 1
+      const issueId = click.issue_id || click.issue_date
+      clicksByissue[issueId] = (clicksByissue[issueId] || 0) + 1
     })
 
     // Get recent clicks for display
     const recentClicks = clicks?.slice(0, 20).map(click => ({
-      campaign_date: click.campaign_date,
+      issue_date: click.issue_date,
       link_section: click.link_section,
       link_url: click.link_url,
       clicked_at: click.clicked_at
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
         uniqueUsersBySection: uniqueUsersCount,
         dailyClicks,
         topUrls,
-        clicksByCampaign,
+        clicksByissue,
         recentClicks,
         dateRange: {
           start: startDate.toISOString().split('T')[0],

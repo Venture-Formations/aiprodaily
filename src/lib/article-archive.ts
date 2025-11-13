@@ -3,33 +3,33 @@ import type { ArchivedArticle, ArchivedRssPost, ArchivedPostRating } from '@/typ
 
 export class ArticleArchiveService {
   /**
-   * Archives all articles and related data for a campaign before RSS processing clears them
+   * Archives all articles and related data for a issue before RSS processing clears them
    * This preserves important data like review_position and final_position
    */
-  async archiveCampaignArticles(campaignId: string, archiveReason: string = 'rss_processing_clear'): Promise<{
+  async archiveissueArticles(issueId: string, archiveReason: string = 'rss_processing_clear'): Promise<{
     archivedArticlesCount: number;
     archivedPostsCount: number;
     archivedRatingsCount: number;
   }> {
-    console.log(`=== ARCHIVING ARTICLES FOR CAMPAIGN ${campaignId} ===`)
+    console.log(`=== ARCHIVING ARTICLES FOR issue ${issueId} ===`)
     console.log(`Archive reason: ${archiveReason}`)
 
     try {
-      // Get campaign info for denormalized data
-      const { data: campaign } = await supabaseAdmin
-        .from('newsletter_campaigns')
+      // Get issue info for denormalized data
+      const { data: issue } = await supabaseAdmin
+        .from('publication_issues')
         .select('date, status')
-        .eq('id', campaignId)
+        .eq('id', issueId)
         .single()
 
-      const campaignDate = campaign?.date || null
-      const campaignStatus = campaign?.status || null
+      const issueDate = issue?.date || null
+      const campaignStatus = issue?.status || null
 
       // Step 1: Archive articles with their position data
-      const archivedArticlesCount = await this.archiveArticles(campaignId, archiveReason, campaignDate, campaignStatus)
+      const archivedArticlesCount = await this.archiveArticles(issueId, archiveReason, issueDate, campaignStatus)
 
       // Step 2: Archive RSS posts and their ratings
-      const { archivedPostsCount, archivedRatingsCount } = await this.archiveRssPosts(campaignId, archiveReason, campaignDate)
+      const { archivedPostsCount, archivedRatingsCount } = await this.archiveRssPosts(issueId, archiveReason, issueDate)
 
       console.log(`✅ Archive complete: ${archivedArticlesCount} articles, ${archivedPostsCount} posts, ${archivedRatingsCount} ratings`)
 
@@ -40,25 +40,25 @@ export class ArticleArchiveService {
       }
 
     } catch (error) {
-      console.error('❌ Failed to archive campaign articles:', error)
+      console.error('❌ Failed to archive issue articles:', error)
       throw new Error(`Archive failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
   /**
-   * Archive all articles for a campaign
+   * Archive all articles for an issue
    */
   private async archiveArticles(
-    campaignId: string,
+    issueId: string,
     archiveReason: string,
-    campaignDate: string | null,
+    issueDate: string | null,
     campaignStatus: string | null
   ): Promise<number> {
     // Get articles to archive
     const { data: articles, error: articlesError } = await supabaseAdmin
       .from('articles')
       .select('*')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     if (articlesError) {
       throw new Error(`Failed to fetch articles: ${articlesError.message}`)
@@ -75,7 +75,7 @@ export class ArticleArchiveService {
     const archiveData = articles.map(article => ({
       original_article_id: article.id,
       post_id: article.post_id,
-      campaign_id: article.campaign_id,
+      issue_id: article.issue_id,
       headline: article.headline,
       content: article.content,
       rank: article.rank,
@@ -86,8 +86,8 @@ export class ArticleArchiveService {
       review_position: article.review_position, // PRESERVE POSITION DATA
       final_position: article.final_position,   // PRESERVE POSITION DATA
       archive_reason: archiveReason,
-      campaign_date: campaignDate,
-      campaign_status: campaignStatus,
+      issue_date: issueDate,
+      issue_status: campaignStatus,
       original_created_at: article.created_at,
       original_updated_at: article.updated_at
     }))
@@ -107,12 +107,12 @@ export class ArticleArchiveService {
   }
 
   /**
-   * Archive all RSS posts and their ratings for a campaign
+   * Archive all RSS posts and their ratings for an issue
    */
   private async archiveRssPosts(
-    campaignId: string,
+    issueId: string,
     archiveReason: string,
-    campaignDate: string | null
+    issueDate: string | null
   ): Promise<{ archivedPostsCount: number; archivedRatingsCount: number }> {
     // Get posts to archive with their ratings
     const { data: posts, error: postsError } = await supabaseAdmin
@@ -121,7 +121,7 @@ export class ArticleArchiveService {
         *,
         post_ratings:post_ratings(*)
       `)
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     if (postsError) {
       throw new Error(`Failed to fetch posts: ${postsError.message}`)
@@ -138,7 +138,7 @@ export class ArticleArchiveService {
     const archivePostsData = posts.map(post => ({
       original_post_id: post.id,
       feed_id: post.feed_id,
-      campaign_id: post.campaign_id,
+      issue_id: post.issue_id,
       external_id: post.external_id,
       title: post.title,
       description: post.description,
@@ -149,7 +149,7 @@ export class ArticleArchiveService {
       image_url: post.image_url,
       processed_at: post.processed_at,
       archive_reason: archiveReason,
-      campaign_date: campaignDate
+      issue_date: issueDate
     }))
 
     // Insert archived posts
@@ -218,13 +218,13 @@ export class ArticleArchiveService {
   }
 
   /**
-   * Get archived articles for a campaign (useful for debugging/viewing historical data)
+   * Get archived articles for a issue (useful for debugging/viewing historical data)
    */
-  async getArchivedArticles(campaignId: string): Promise<ArchivedArticle[]> {
+  async getArchivedArticles(issueId: string): Promise<ArchivedArticle[]> {
     const { data, error } = await supabaseAdmin
       .from('archived_articles')
       .select('*')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .order('archived_at', { ascending: false })
 
     if (error) {
@@ -241,9 +241,9 @@ export class ArticleArchiveService {
     const { data, error } = await supabaseAdmin
       .from('archived_articles')
       .select('*')
-      .gte('campaign_date', startDate)
-      .lte('campaign_date', endDate)
-      .order('campaign_date', { ascending: false })
+      .gte('issue_date', startDate)
+      .lte('issue_date', endDate)
+      .order('issue_date', { ascending: false })
 
     if (error) {
       throw new Error(`Failed to fetch archived articles by date: ${error.message}`)

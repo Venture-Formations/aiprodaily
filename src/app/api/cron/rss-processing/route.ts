@@ -4,12 +4,12 @@ import { ScheduleChecker } from '@/lib/schedule-checker'
 import { PromptSelector } from '@/lib/prompt-selector'
 
 async function processRSSWorkflow(request: NextRequest, force: boolean = false) {
-  let campaignId: string | undefined
+  let issueId: string | undefined
 
   // TODO: This legacy route should be deprecated in favor of trigger-workflow
   // Get first active newsletter for backward compatibility
   const { data: activeNewsletter } = await supabaseAdmin
-    .from('newsletters')
+    .from('publications')
     .select('id')
     .eq('is_active', true)
     .limit(1)
@@ -46,7 +46,7 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
     console.log('[Cron] Force mode enabled - bypassing schedule check')
   }
 
-  // Get tomorrow's date for campaign creation (RSS processing is for next day)
+  // Get tomorrow's date for issue creation (RSS processing is for next day)
   // IMPORTANT: Calculate tomorrow based on Central Time, not UTC
   const now = new Date()
   const centralFormatter = new Intl.DateTimeFormat('en-CA', {
@@ -60,11 +60,11 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
   const centralToday = new Date(centralDate + 'T00:00:00')
   const centralTomorrow = new Date(centralToday)
   centralTomorrow.setDate(centralToday.getDate() + 1)
-  const campaignDate = centralTomorrow.toISOString().split('T')[0]
+  const issueDate = centralTomorrow.toISOString().split('T')[0]
 
   // Get newsletter ID
   const { data: newsletter, error: newsletterError } = await supabaseAdmin
-    .from('newsletters')
+    .from('publications')
     .select('id, name, slug')
     .eq('is_active', true)
     .limit(1)
@@ -74,32 +74,32 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
     throw new Error(`Failed to fetch newsletter: ${newsletterError?.message || 'No active newsletter found'}`)
   }
 
-  // Create campaign
-  const { data: newCampaign, error: campaignError } = await supabaseAdmin
-    .from('newsletter_campaigns')
+  // Create issue
+  const { data: newissue, error: issueError } = await supabaseAdmin
+    .from('publication_issues')
     .insert([{
-      date: campaignDate,
+      date: issueDate,
       status: 'processing',
-      newsletter_id: newsletter.id
+      publication_id: newsletter.id
     }])
     .select()
     .single()
 
-  if (campaignError || !newCampaign) {
-    throw new Error(`Failed to create campaign: ${campaignError?.message}`)
+  if (issueError || !newissue) {
+    throw new Error(`Failed to create issue: ${issueError?.message}`)
   }
 
-  campaignId = newCampaign.id
+  issueId = newissue.id
 
-  if (!campaignId) {
-    throw new Error('campaignId is required but was not set')
+  if (!issueId) {
+    throw new Error('issueId is required but was not set')
   }
 
-  // Select prompt and AI apps for the campaign
-  await PromptSelector.selectPromptForCampaign(campaignId)
+  // Select prompt and AI apps for the issue
+  await PromptSelector.selectPromptForissue(issueId)
   try {
     const { AppSelector } = await import('@/lib/app-selector')
-    await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
+    await AppSelector.selectAppsForissue(issueId, newsletter.id)
   } catch (appSelectionError) {
     console.error('AI app selection failed:', appSelectionError instanceof Error ? appSelectionError.message : 'Unknown error')
   }
@@ -116,7 +116,7 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
   }
 
   // Phase 1: Archive, Fetch+Extract, Score (steps 1-3)
-  console.log(`[Cron] Phase 1 starting for campaign: ${campaignId}`)
+  console.log(`[Cron] Phase 1 starting for issue: ${issueId}`)
   console.log(`[Cron] Using baseUrl: ${baseUrl}`)
   
   const phase1Url = `${baseUrl}/api/rss/process-phase1`
@@ -136,7 +136,7 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${process.env.CRON_SECRET}`
         },
-        body: JSON.stringify({ campaign_id: campaignId }),
+        body: JSON.stringify({ issue_id: issueId }),
         signal: controller.signal
       })
       clearTimeout(timeoutId)
@@ -180,12 +180,12 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
     throw new Error(`Phase 1 failed: ${phase1Result.message || JSON.stringify(phase1Result)}`)
   }
 
-  console.log(`[Cron] Phase 1 completed for campaign: ${campaignId}`)
+  console.log(`[Cron] Phase 1 completed for issue: ${issueId}`)
   console.log(`[Cron] Phase 1 result:`, JSON.stringify(phase1Result).substring(0, 200))
 
   // Phase 2: Deduplicate, Generate, Select+Subject, Welcome, Finalize (steps 4-8)
   // Trigger Phase 2 immediately after Phase 1 completes
-  console.log(`[Cron] Phase 2 starting for campaign: ${campaignId}`)
+  console.log(`[Cron] Phase 2 starting for issue: ${issueId}`)
   console.log(`[Cron] Preparing Phase 2 request...`)
   
   const phase2Url = `${baseUrl}/api/rss/process-phase2`
@@ -206,7 +206,7 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${process.env.CRON_SECRET}`
         },
-        body: JSON.stringify({ campaign_id: campaignId }),
+        body: JSON.stringify({ issue_id: issueId }),
         signal: controller2.signal
       })
       clearTimeout(timeoutId2)
@@ -243,25 +243,25 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
     throw new Error(`Phase 2 failed: ${phase2Result.message || JSON.stringify(phase2Result)}`)
   }
 
-  console.log(`[Cron] Phase 2 completed for campaign: ${campaignId}`)
+  console.log(`[Cron] Phase 2 completed for issue: ${issueId}`)
 
   return {
     skipped: false,
     response: NextResponse.json({
       success: true,
       message: 'Full RSS processing workflow completed successfully',
-      campaignId: campaignId,
-      campaignDate: campaignDate,
+      issueId: issueId,
+      issueDate: issueDate,
       phase1_results: phase1Result.results,
       phase2_results: phase2Result.results,
       timestamp: new Date().toISOString()
     }),
-    campaignId
+    issueId
   }
 }
 
 export async function POST(request: NextRequest) {
-  let campaignId: string | undefined
+  let issueId: string | undefined
 
   try {
     // Verify this is a legitimate cron request
@@ -281,21 +281,21 @@ export async function POST(request: NextRequest) {
       return result.response
     }
     
-    campaignId = result.campaignId
+    issueId = result.issueId
     return result.response
 
   } catch (error) {
     console.error('RSS processing failed:', error instanceof Error ? error.message : 'Unknown error')
 
-    // Try to mark campaign as failed if campaign_id is available
-    if (campaignId) {
+    // Try to mark issue as failed if issueId is available
+    if (issueId) {
       try {
         await supabaseAdmin
-          .from('newsletter_campaigns')
+          .from('publication_issues')
           .update({ status: 'failed' })
-          .eq('id', campaignId)
+          .eq('id', issueId)
       } catch (updateError) {
-        console.error('Failed to update campaign status:', updateError)
+        console.error('Failed to update issue status:', updateError)
       }
     }
 
@@ -303,7 +303,7 @@ export async function POST(request: NextRequest) {
       success: false,
       error: 'RSS processing failed',
       message: error instanceof Error ? error.message : 'Unknown error',
-      campaign_id: campaignId,
+      issue_id: issueId,
       timestamp: new Date().toISOString()
     }, { status: 500 })
   }
@@ -311,7 +311,7 @@ export async function POST(request: NextRequest) {
 
 // Handle GET requests from Vercel cron (no auth header, uses URL secret)
 export async function GET(request: NextRequest) {
-  let campaignId: string | undefined
+  let issueId: string | undefined
 
   try {
     // For Vercel cron: check secret in URL params, for manual: require secret param
@@ -335,21 +335,21 @@ export async function GET(request: NextRequest) {
       return result.response
     }
     
-    campaignId = result.campaignId
+    issueId = result.issueId
     return result.response
 
   } catch (error) {
     console.error('RSS processing failed:', error instanceof Error ? error.message : 'Unknown error')
 
-    // Try to mark campaign as failed if campaign_id is available
-    if (campaignId) {
+    // Try to mark issue as failed if issueId is available
+    if (issueId) {
       try {
         await supabaseAdmin
-          .from('newsletter_campaigns')
+          .from('publication_issues')
           .update({ status: 'failed' })
-          .eq('id', campaignId)
+          .eq('id', issueId)
       } catch (updateError) {
-        console.error('Failed to update campaign status:', updateError)
+        console.error('Failed to update issue status:', updateError)
       }
     }
 
@@ -357,7 +357,7 @@ export async function GET(request: NextRequest) {
       success: false,
       error: 'RSS processing failed',
       message: error instanceof Error ? error.message : 'Unknown error',
-      campaign_id: campaignId,
+      issue_id: issueId,
       timestamp: new Date().toISOString()
     }, { status: 500 })
   }

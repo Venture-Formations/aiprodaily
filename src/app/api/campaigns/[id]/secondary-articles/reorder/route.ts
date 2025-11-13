@@ -14,7 +14,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id: campaignId } = await params
+    const { id: issueId } = await params
     const body = await request.json()
     const { articleOrders } = body
 
@@ -30,7 +30,7 @@ export async function POST(
         .from('secondary_articles')
         .update({ rank })
         .eq('id', articleId)
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
     )
 
     const results = await Promise.all(updatePromises)
@@ -61,7 +61,7 @@ export async function POST(
             user_id: user.id,
             action: 'secondary_articles_reordered',
             details: {
-              campaign_id: campaignId,
+              issue_id: issueId,
               article_orders: articleOrders,
               reordered_by: session.user?.email,
               reordered_at: new Date().toISOString()
@@ -75,7 +75,7 @@ export async function POST(
 
     // Auto-regenerate welcome section (fire and forget - don't wait)
     console.log('Auto-regenerating welcome section after secondary articles reorder...')
-    autoRegenerateWelcome(campaignId, session.user?.email || undefined).then(result => {
+    autoRegenerateWelcome(issueId, session.user?.email || undefined).then(result => {
       if (result.success) {
         console.log('Welcome section auto-regenerated successfully after secondary reorder')
       } else {

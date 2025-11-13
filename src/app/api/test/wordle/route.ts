@@ -3,18 +3,18 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
-async function generateWordleSection(campaignDate?: string): Promise<string> {
+async function generateWordleSection(issueDate?: string): Promise<string> {
   try {
     console.log('Testing Wordle section generation...')
 
-    // Get yesterday's date from campaign date (since this is for "Yesterday's Wordle")
+    // Get yesterday's date from issue date (since this is for "Yesterday's Wordle")
     let yesterday: Date
-    if (campaignDate) {
-      const newsletterDate = new Date(campaignDate + 'T00:00:00')
+    if (issueDate) {
+      const newsletterDate = new Date(issueDate + 'T00:00:00')
       yesterday = new Date(newsletterDate)
       yesterday.setDate(yesterday.getDate() - 1)
     } else {
-      // Fallback to current date minus 1 day if no campaign date provided
+      // Fallback to current date minus 1 day if no issue date provided
       yesterday = new Date()
       yesterday.setDate(yesterday.getDate() - 1)
     }
@@ -73,18 +73,18 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const format = searchParams.get('format') || 'json'
-    const campaignDate = searchParams.get('campaign_date')
+    const issueDate = searchParams.get('issue_date')
 
-    console.log('🧩 Testing Wordle section, format:', format, 'campaign_date:', campaignDate)
+    console.log('🧩 Testing Wordle section, format:', format, 'issue_date:', issueDate)
 
-    // Get yesterday's date from campaign date (since this is for "Yesterday's Wordle")
+    // Get yesterday's date from issue date (since this is for "Yesterday's Wordle")
     let yesterday: Date
-    if (campaignDate) {
-      const newsletterDate = new Date(campaignDate + 'T00:00:00')
+    if (issueDate) {
+      const newsletterDate = new Date(issueDate + 'T00:00:00')
       yesterday = new Date(newsletterDate)
       yesterday.setDate(yesterday.getDate() - 1)
     } else {
-      // Fallback to current date minus 1 day if no campaign date provided
+      // Fallback to current date minus 1 day if no issue date provided
       yesterday = new Date()
       yesterday.setDate(yesterday.getDate() - 1)
     }
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
 
     // Return HTML format for email preview
     if (format === 'html') {
-      const html = await generateWordleSection(campaignDate || undefined)
+      const html = await generateWordleSection(issueDate || undefined)
       return new Response(html, {
         headers: {
           'Content-Type': 'text/html',
@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Return JSON format for campaign page
+    // Return JSON format for issue page
     return NextResponse.json({
       success: true,
       wordle: finalWordleData,

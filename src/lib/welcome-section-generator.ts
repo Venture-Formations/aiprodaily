@@ -2,35 +2,35 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { AI_CALL } from '@/lib/openai'
 
 /**
- * Auto-regenerate welcome section for a campaign
+ * Auto-regenerate welcome section for an issue
  * Called whenever articles are changed (activated, deactivated, reordered)
  */
 export async function autoRegenerateWelcome(
-  campaignId: string,
+  issueId: string,
   userEmail?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    console.log('[WELCOME] Auto-regenerating welcome section for campaign:', campaignId)
+    console.log('[WELCOME] Auto-regenerating welcome section for issue:', issueId)
 
-    // Get newsletter_id from campaign
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
-      .select('newsletter_id')
-      .eq('id', campaignId)
+    // Get publication_id from issue
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
+      .select('publication_id')
+      .eq('id', issueId)
       .single()
 
-    if (campaignError || !campaign || !campaign.newsletter_id) {
-      console.error('[WELCOME] Failed to get newsletter_id for campaign:', campaignError)
-      return { success: false, error: 'Failed to get campaign newsletter_id' }
+    if (issueError || !issue || !issue.publication_id) {
+      console.error('[WELCOME] Failed to get publication_id for issue:', issueError)
+      return { success: false, error: 'Failed to get issue publication_id' }
     }
 
-    const newsletterId = campaign.newsletter_id
+    const newsletterId = issue.publication_id
 
-    // Fetch ALL active PRIMARY articles for this campaign
+    // Fetch ALL active PRIMARY articles for this issue
     const { data: primaryArticles, error: primaryError } = await supabaseAdmin
       .from('articles')
       .select('headline, content')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .eq('is_active', true)
       .order('rank', { ascending: true })
 
@@ -39,11 +39,11 @@ export async function autoRegenerateWelcome(
       return { success: false, error: primaryError.message }
     }
 
-    // Fetch ALL active SECONDARY articles for this campaign
+    // Fetch ALL active SECONDARY articles for this issue
     const { data: secondaryArticles, error: secondaryError } = await supabaseAdmin
       .from('secondary_articles')
       .select('headline, content')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .eq('is_active', true)
       .order('rank', { ascending: true })
 
@@ -89,15 +89,15 @@ export async function autoRegenerateWelcome(
       return { success: false, error: 'Failed to generate welcome section' }
     }
 
-    // Save all 3 parts to campaign
+    // Save all 3 parts to issue
     const { error: updateError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .update({
         welcome_intro: welcomeIntro,
         welcome_tagline: welcomeTagline,
         welcome_summary: welcomeSummary
       })
-      .eq('id', campaignId)
+      .eq('id', issueId)
 
     if (updateError) {
       console.error('[WELCOME] Error saving welcome section:', updateError)
@@ -117,7 +117,7 @@ export async function autoRegenerateWelcome(
           .from('user_activities')
           .insert([{
             user_id: user.id,
-            campaign_id: campaignId,
+            issue_id: issueId,
             action: 'welcome_auto_regenerated',
             details: {
               article_count: allArticles.length,

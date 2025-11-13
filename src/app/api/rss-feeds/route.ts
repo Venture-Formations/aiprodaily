@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     // Get newsletter context (for now, using first newsletter)
     const { data: newsletters } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('is_active', true)
       .limit(1)
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     const { data: feeds, error } = await supabaseAdmin
       .from('rss_feeds')
       .select('*')
-      .eq('newsletter_id', newsletters.id)
+      .eq('publication_id', newsletters.id)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
 
     // Get newsletter context
     const { data: newsletters } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('is_active', true)
       .limit(1)
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     const { data: feed, error } = await supabaseAdmin
       .from('rss_feeds')
       .insert({
-        newsletter_id: newsletters.id,
+        publication_id: newsletters.id,
         url,
         name,
         description: description || null,

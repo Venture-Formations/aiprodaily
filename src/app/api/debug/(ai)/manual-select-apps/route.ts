@@ -4,17 +4,17 @@ import { AppSelector } from '@/lib/app-selector'
 
 export async function POST(request: Request) {
   try {
-    const { campaignId } = await request.json()
+    const { issueId } = await request.json()
 
-    if (!campaignId) {
-      return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
+    if (!issueId) {
+      return NextResponse.json({ error: 'issueId required' }, { status: 400 })
     }
 
-    console.log('Manual AI app selection for campaign:', campaignId)
+    console.log('Manual AI app selection for issue:', issueId)
 
     // Get accounting newsletter ID
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id, slug')
       .eq('slug', 'accounting')
       .single()
@@ -28,15 +28,15 @@ export async function POST(request: Request) {
 
     console.log('Found newsletter:', newsletter.id)
 
-    // Select apps for campaign
-    const selectedApps = await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
+    // Select apps for issue
+    const selectedApps = await AppSelector.selectAppsForissue(issueId, newsletter.id)
 
     console.log(`Selected ${selectedApps.length} AI applications`)
 
     return NextResponse.json({
       success: true,
-      campaign_id: campaignId,
-      newsletter_id: newsletter.id,
+      issue_id: issueId,
+      publication_id: newsletter.id,
       apps_selected: selectedApps.length,
       apps: selectedApps.map(app => ({
         id: app.id,

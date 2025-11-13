@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const futureUnix = Math.floor(tomorrow.getTime() / 1000)
 
     // Show what would be sent to MailerLite
-    const testCampaignData = {
+    const testissueData = {
       name: `Test Schedule Debug`,
       type: 'regular',
       emails: [{
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
           now: new Date().toISOString(),
           nowUnix: Math.floor(Date.now() / 1000)
         },
-        mailerlitePayload: testCampaignData,
+        mailerlitePayload: testissueData,
         possibleIssues: [
           'MailerLite might reject past timestamps',
           'MailerLite might expect Unix timestamp instead of ISO string',

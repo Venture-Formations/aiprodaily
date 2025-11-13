@@ -3,7 +3,7 @@ import { RSSProcessor } from '@/lib/rss-processor'
 
 /**
  * RSS Ingestion Cron (runs every 15 minutes)
- * Fetches new posts, extracts full text, scores them, stores with campaign_id = NULL
+ * Fetches new posts, extracts full text, scores them, stores with issueId = NULL
  */
 export async function POST(request: NextRequest) {
   // Verify cron secret

@@ -2,20 +2,20 @@ import { supabaseAdmin } from './supabase'
 
 export class PromptSelector {
   /**
-   * Select one random prompt for a campaign
+   * Select one random prompt for an issue
    * Ensures all prompts are used before cycling through again
    */
-  static async selectPromptForCampaign(campaignId: string): Promise<any | null> {
+  static async selectPromptForissue(issueId: string): Promise<any | null> {
     try {
-      // Check if prompt already selected for this campaign
+      // Check if prompt already selected for this issue
       const { data: existing } = await supabaseAdmin
-        .from('campaign_prompt_selections')
+        .from('issue_prompt_selections')
         .select('*, prompt:prompt_ideas(*)')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .single()
 
       if (existing) {
-        console.log('Prompt already selected for campaign:', campaignId)
+        console.log('Prompt already selected for issue:', issueId)
         return existing.prompt
       }
 
@@ -30,9 +30,9 @@ export class PromptSelector {
         return null
       }
 
-      // Get prompts that have been used recently (in campaign_prompt_selections)
+      // Get prompts that have been used recently (in issue_prompt_selections)
       const { data: usedPrompts } = await supabaseAdmin
-        .from('campaign_prompt_selections')
+        .from('issue_prompt_selections')
         .select('prompt_id, created_at')
         .order('created_at', { ascending: false })
         .limit(allPrompts.length)
@@ -70,37 +70,37 @@ export class PromptSelector {
 
       // Record selection
       await supabaseAdmin
-        .from('campaign_prompt_selections')
+        .from('issue_prompt_selections')
         .insert({
-          campaign_id: campaignId,
+          issue_id: issueId,
           prompt_id: selectedPromptId,
           selection_order: 1,
           is_featured: false
         })
 
-      console.log('Prompt selected and recorded for campaign:', campaignId)
+      console.log('Prompt selected and recorded for issue:', issueId)
       return selectedPrompt
 
     } catch (error) {
-      console.error('Error selecting prompt for campaign:', error)
+      console.error('Error selecting prompt for issue:', error)
       return null
     }
   }
 
   /**
-   * Get the selected prompt for a campaign
+   * Get the selected prompt for an issue
    */
-  static async getPromptForCampaign(campaignId: string): Promise<any | null> {
+  static async getPromptForissue(issueId: string): Promise<any | null> {
     try {
       const { data } = await supabaseAdmin
-        .from('campaign_prompt_selections')
+        .from('issue_prompt_selections')
         .select('*, prompt:prompt_ideas(*)')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .single()
 
       return data?.prompt || null
     } catch (error) {
-      console.error('Error getting prompt for campaign:', error)
+      console.error('Error getting prompt for issue:', error)
       return null
     }
   }

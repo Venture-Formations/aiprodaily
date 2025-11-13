@@ -11,18 +11,18 @@ export async function GET(request: NextRequest) {
 
     // Check if supabaseAdmin is working
     const { data: testQuery, error: testError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .select('count(*)')
 
     console.log('Test query result:', testQuery, 'Error:', testError)
 
     // Get all campaigns to see what exists
-    const { data: allCampaigns, error: campaignsError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    const { data: allCampaigns, error: issuesError } = await supabaseAdmin
+      .from('publication_issues')
       .select('id, date, status')
       .order('date', { ascending: false })
 
-    console.log('Campaigns query result:', allCampaigns, 'Error:', campaignsError)
+    console.log('Campaigns query result:', allCampaigns, 'Error:', issuesError)
 
     // Get RSS feeds to see if they're configured
     const { data: feeds } = await supabaseAdmin
@@ -31,22 +31,22 @@ export async function GET(request: NextRequest) {
 
     if (!allCampaigns || allCampaigns.length === 0) {
       return NextResponse.json({
-        error: 'No campaigns found',
-        campaigns: [],
+        error: 'No issues found',
+        issues: [],
         feeds: feeds || [],
         debug: 'RSS processing has never run or campaigns are not being created'
       })
     }
 
-    const campaign = allCampaigns[0]
+    const issue = allCampaigns[0]
 
-    // Get RSS posts with images for this campaign
+    // Get RSS posts with images for this issue
     const { data: posts } = await supabaseAdmin
       .from('rss_posts')
-      .select('id, title, image_url, campaign_id')
-      .eq('campaign_id', campaign.id)
+      .select('id, title, image_url, issue_id')
+      .eq('issue_id', issue.id)
 
-    // Get articles for this campaign
+    // Get articles for this issue
     const { data: articles } = await supabaseAdmin
       .from('articles')
       .select(`
@@ -59,11 +59,11 @@ export async function GET(request: NextRequest) {
           image_url
         )
       `)
-      .eq('campaign_id', campaign.id)
+      .eq('issue_id', issue.id)
 
     return NextResponse.json({
-      campaigns: allCampaigns,
-      currentCampaign: campaign,
+      issues: allCampaigns,
+      currentissue: issue,
       feeds: feeds || [],
       posts: posts || [],
       articles: articles || [],

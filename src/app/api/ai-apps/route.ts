@@ -6,7 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase'
  */
 export async function GET(request: NextRequest) {
   try {
-    // Get all apps for now (can filter by newsletter_id later if needed)
+    // Get all apps for now (can filter by publication_id later if needed)
     const { data: apps, error } = await supabaseAdmin
       .from('ai_applications')
       .select('*')
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     // Get the accounting newsletter ID
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('slug', 'accounting')
       .single()
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     const { data: app, error } = await supabaseAdmin
       .from('ai_applications')
       .insert({
-        newsletter_id: newsletter.id,
+        publication_id: newsletter.id,
         ...body
       })
       .select()

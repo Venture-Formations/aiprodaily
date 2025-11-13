@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     const { newsletterId, dryRun = false, timeWindow = 'all' } = body
 
     if (!newsletterId) {
-      return NextResponse.json({ error: 'newsletter_id required' }, { status: 400 })
+      return NextResponse.json({ error: 'publication_id required' }, { status: 400 })
     }
 
     // Validate timeWindow
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     const { data: feeds, error: feedsError } = await supabaseAdmin
       .from('rss_feeds')
       .select('id')
-      .eq('newsletter_id', newsletterId)
+      .eq('publication_id', newsletterId)
       .eq('use_for_primary_section', true)
 
     if (feedsError || !feeds || feeds.length === 0) {
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
     const { data: weightSettings } = await supabaseAdmin
       .from('app_settings')
       .select('key, value')
-      .eq('newsletter_id', newsletterId)
+      .eq('publication_id', newsletterId)
       .in('key', [
         'criteria_1_weight',
         'criteria_2_weight',

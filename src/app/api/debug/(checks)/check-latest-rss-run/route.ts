@@ -3,60 +3,60 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export async function GET() {
   try {
-    // Get the most recent campaign
+    // Get the most recent issue
     const { data: recentCampaigns } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(3)
 
     if (!recentCampaigns || recentCampaigns.length === 0) {
-      return NextResponse.json({ error: 'No campaigns found' })
+      return NextResponse.json({ error: 'No issues found' })
     }
 
-    const latestCampaign = recentCampaigns[0]
+    const latestissue = recentCampaigns[0]
 
     // Check for articles
     const { data: articles, count: articleCount } = await supabaseAdmin
       .from('articles')
       .select('*', { count: 'exact' })
-      .eq('campaign_id', latestCampaign.id)
+      .eq('issue_id', latestissue.id)
 
     // Check for RSS posts
     const { data: rssPosts, count: rssPostCount } = await supabaseAdmin
       .from('rss_posts')
       .select('*', { count: 'exact' })
-      .eq('campaign_id', latestCampaign.id)
+      .eq('issue_id', latestissue.id)
 
     // Check for prompt selection
     const { data: promptSelection } = await supabaseAdmin
-      .from('campaign_prompts')
+      .from('issue_prompt_selections')
       .select('*, prompt:prompt_ideas(*)')
-      .eq('campaign_id', latestCampaign.id)
+      .eq('issue_id', latestissue.id)
       .single()
 
     // Check for AI app selections
     const { data: appSelections, count: appCount } = await supabaseAdmin
-      .from('campaign_ai_app_selections')
+      .from('issue_ai_app_selections')
       .select('*, app:ai_applications(*)', { count: 'exact' })
-      .eq('campaign_id', latestCampaign.id)
+      .eq('issue_id', latestissue.id)
 
-    // Check system logs for this campaign
+    // Check system logs for this issue
     const { data: logs } = await supabaseAdmin
       .from('system_logs')
       .select('*')
-      .or(`context->>campaignId.eq.${latestCampaign.id},message.ilike.%${latestCampaign.id}%`)
+      .or(`context->>issueId.eq.${latestissue.id},message.ilike.%${latestissue.id}%`)
       .order('created_at', { ascending: false })
       .limit(20)
 
     return NextResponse.json({
-      latestCampaign: {
-        id: latestCampaign.id,
-        date: latestCampaign.date,
-        status: latestCampaign.status,
-        subject_line: latestCampaign.subject_line,
-        created_at: latestCampaign.created_at,
-        updated_at: latestCampaign.updated_at
+      latestissue: {
+        id: latestissue.id,
+        date: latestissue.date,
+        status: latestissue.status,
+        subject_line: latestissue.subject_line,
+        created_at: latestissue.created_at,
+        updated_at: latestissue.updated_at
       },
       articleCount: articleCount || 0,
       rssPostCount: rssPostCount || 0,

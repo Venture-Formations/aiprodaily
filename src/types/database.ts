@@ -1,6 +1,10 @@
-export type CampaignStatus = 'draft' | 'in_review' | 'changes_made' | 'sent' | 'failed' | 'processing'
+export type IssueStatus = 'draft' | 'in_review' | 'changes_made' | 'sent' | 'failed' | 'processing'
 export type UserRole = 'admin' | 'reviewer'
 export type LogLevel = 'info' | 'warn' | 'error' | 'debug'
+
+// Deprecated aliases for backward compatibility during migration
+/** @deprecated Use IssueStatus instead */
+export type CampaignStatus = IssueStatus
 
 // Multi-Tenant Newsletter Interfaces
 export interface Newsletter {
@@ -19,7 +23,7 @@ export interface Newsletter {
 
 export interface NewsletterSetting {
   id: string
-  newsletter_id: string
+  publication_id: string
   key: string
   value: string | null
   custom_default: string | null
@@ -35,7 +39,7 @@ export type AIAppCategory = 'Payroll' | 'HR' | 'Accounting System' | 'Finance' |
 
 export interface AIApplication {
   id: string
-  newsletter_id: string
+  publication_id: string
   app_name: string
   tagline: string | null
   description: string
@@ -57,9 +61,9 @@ export interface AIApplication {
   updated_at: string
 }
 
-export interface CampaignAIAppSelection {
+export interface IssueAIAppSelection {
   id: string
-  campaign_id: string
+  issue_id: string
   app_id: string
   selection_order: number
   is_featured: boolean
@@ -67,9 +71,12 @@ export interface CampaignAIAppSelection {
   app?: AIApplication
 }
 
+/** @deprecated Use IssueAIAppSelection instead */
+export type issueAIAppSelection = IssueAIAppSelection
+
 export interface PromptIdea {
   id: string
-  newsletter_id: string
+  publication_id: string
   title: string
   prompt_text: string
   category: string | null
@@ -86,9 +93,9 @@ export interface PromptIdea {
   updated_at: string
 }
 
-export interface CampaignPromptSelection {
+export interface IssuePromptSelection {
   id: string
-  campaign_id: string
+  issue_id: string
   prompt_id: string
   selection_order: number
   is_featured: boolean
@@ -96,10 +103,14 @@ export interface CampaignPromptSelection {
   prompt?: PromptIdea
 }
 
-export interface NewsletterCampaign {
+/** @deprecated Use IssuePromptSelection instead */
+export type issuePromptSelection = IssuePromptSelection
+
+export interface PublicationIssue {
   id: string
+  publication_id: string
   date: string
-  status: CampaignStatus
+  status: IssueStatus
   subject_line: string | null
   welcome_intro: string | null
   welcome_tagline: string | null
@@ -109,7 +120,7 @@ export interface NewsletterCampaign {
   last_action: 'changes_made' | 'approved' | null
   last_action_at: string | null
   last_action_by: string | null
-  status_before_send: CampaignStatus | null
+  status_before_send: IssueStatus | null
   metrics: Record<string, any>
   workflow_state: string | null
   workflow_state_started_at: string | null
@@ -118,16 +129,22 @@ export interface NewsletterCampaign {
   updated_at: string
 }
 
+/** @deprecated Use PublicationIssue instead */
+export type Newsletterissue = PublicationIssue
+
+/** @deprecated Use PublicationIssue instead */
+export type NewsletterCampaign = PublicationIssue
+
 export interface ArchivedNewsletter {
   id: string
-  campaign_id: string
-  newsletter_id: string
-  campaign_date: string  // Date in YYYY-MM-DD format for URL
+  issue_id: string
+  publication_id: string
+  issue_date: string  // Date in YYYY-MM-DD format for URL
   subject_line: string
   send_date: string  // Timestamp when sent
   recipient_count: number
   html_backup: string | null  // Full HTML for backup/reference
-  metadata: Record<string, any>  // Campaign metadata (settings, etc)
+  metadata: Record<string, any>  // Issue metadata (settings, etc)
   articles: any[]  // Array of article data with full content
   secondary_articles?: any[]  // Array of secondary article data
   events: any[]  // Array of event data
@@ -138,7 +155,7 @@ export interface ArchivedNewsletter {
 
 export interface RssFeed {
   id: string
-  newsletter_id: string | null
+  publication_id: string | null
   url: string
   name: string
   description: string | null
@@ -155,7 +172,7 @@ export interface RssFeed {
 export interface RssPost {
   id: string
   feed_id: string
-  campaign_id: string
+  issue_id: string
   external_id: string
   title: string
   description: string | null
@@ -215,7 +232,7 @@ export interface PostRating {
 export interface Article {
   id: string
   post_id: string
-  campaign_id: string
+  issue_id: string
   headline: string
   content: string
   rank: number | null
@@ -237,7 +254,7 @@ export interface Article {
 export interface SecondaryArticle {
   id: string
   post_id: string
-  campaign_id: string
+  issue_id: string
   headline: string
   content: string
   rank: number | null
@@ -260,7 +277,7 @@ export interface ArchivedSecondaryArticle {
   id: string
   original_article_id: string
   post_id: string | null
-  campaign_id: string
+  issue_id: string
   headline: string
   content: string
   rank: number | null
@@ -273,8 +290,8 @@ export interface ArchivedSecondaryArticle {
   final_position: number | null
   archived_at: string
   archive_reason: string
-  campaign_date: string | null
-  campaign_status: string | null
+  issue_date: string | null
+  issue_status: string | null
   original_created_at: string
   original_updated_at: string
   created_at: string
@@ -282,7 +299,7 @@ export interface ArchivedSecondaryArticle {
 
 export interface ManualArticle {
   id: string
-  campaign_id: string
+  issue_id: string
   title: string
   content: string
   image_url: string | null
@@ -300,7 +317,7 @@ export interface ArchivedArticle {
   id: string
   original_article_id: string
   post_id: string | null
-  campaign_id: string
+  issue_id: string
   headline: string
   content: string
   rank: number | null
@@ -313,8 +330,8 @@ export interface ArchivedArticle {
   final_position: number | null
   archived_at: string
   archive_reason: string
-  campaign_date: string | null
-  campaign_status: string | null
+  issue_date: string | null
+  issue_status: string | null
   original_created_at: string
   original_updated_at: string
   created_at: string
@@ -324,7 +341,7 @@ export interface ArchivedRssPost {
   id: string
   original_post_id: string
   feed_id: string
-  campaign_id: string
+  issue_id: string
   external_id: string
   title: string
   description: string | null
@@ -336,7 +353,7 @@ export interface ArchivedRssPost {
   processed_at: string
   archived_at: string
   archive_reason: string
-  campaign_date: string | null
+  issue_date: string | null
   created_at: string
 }
 
@@ -376,7 +393,7 @@ export interface SystemLog {
 
 export interface DuplicateGroup {
   id: string
-  campaign_id: string
+  issue_id: string
   primary_post_id: string
   topic_signature: string
   created_at: string
@@ -393,8 +410,8 @@ export interface DuplicatePost {
 
 export interface EmailMetrics {
   id: string
-  campaign_id: string
-  mailerlite_campaign_id: string | null
+  issue_id: string
+  mailerlite_issue_id: string | null
   sent_count: number
   delivered_count: number
   opened_count: number
@@ -421,7 +438,7 @@ export interface ArticlePerformance {
 export interface UserActivity {
   id: string
   user_id: string
-  campaign_id: string
+  issue_id: string
   action: string
   details: Record<string, any>
   timestamp: string
@@ -438,8 +455,8 @@ export interface AppSetting {
 
 export interface LinkClick {
   id: string
-  campaign_date: string
-  campaign_id: string | null
+  issue_date: string
+  issue_id: string | null
   subscriber_email: string
   subscriber_id: string | null
   link_url: string
@@ -463,7 +480,7 @@ export interface Poll {
 export interface PollResponse {
   id: string
   poll_id: string
-  campaign_id: string | null
+  issue_id: string | null
   subscriber_email: string
   selected_option: string
   responded_at: string
@@ -533,7 +550,7 @@ export interface PendingEventSubmission {
 // Normalized road work item (now stored in separate table rows)
 export interface RoadWorkItem {
   id: string
-  campaign_id: string
+  issue_id: string
   road_name: string
   road_range: string | null
   city_or_township: string | null
@@ -550,7 +567,7 @@ export interface RoadWorkItem {
 // Legacy interface for backward compatibility (deprecated)
 export interface RoadWorkData {
   id: string
-  campaign_id: string
+  issue_id: string
   generated_at: string
   road_work_data: Array<{
     road_name: string
@@ -567,9 +584,9 @@ export interface RoadWorkData {
   updated_at: string
 }
 
-export interface CampaignEvent {
+export interface IssueEvent {
   id: string
-  campaign_id: string
+  issue_id: string
   event_id: string
   event_date: string
   is_selected: boolean
@@ -579,6 +596,9 @@ export interface CampaignEvent {
   event?: Event
 }
 
+/** @deprecated Use IssueEvent instead */
+export type issueEvent = IssueEvent
+
 export interface NewsletterSection {
   id: string
   name: string
@@ -587,16 +607,22 @@ export interface NewsletterSection {
   created_at: string
 }
 
-export interface CampaignWithArticles extends NewsletterCampaign {
+export interface IssueWithArticles extends PublicationIssue {
   articles: ArticleWithPost[]
   secondary_articles: SecondaryArticleWithPost[]
   manual_articles: ManualArticle[]
   email_metrics: EmailMetrics | null
 }
 
-export interface CampaignWithEvents extends CampaignWithArticles {
-  campaign_events: CampaignEvent[]
+export interface IssueWithEvents extends IssueWithArticles {
+  issue_events: IssueEvent[]
 }
+
+/** @deprecated Use IssueWithArticles instead */
+export type issueWithArticles = IssueWithArticles
+
+/** @deprecated Use IssueWithEvents instead */
+export type issueWithEvents = IssueWithEvents
 
 // AI Processing types
 export interface ContentEvaluation {
@@ -649,14 +675,17 @@ export interface VrboListing {
   updated_at: string
 }
 
-export interface CampaignVrboSelection {
+export interface IssueVrboSelection {
   id: string
-  campaign_id: string
+  issue_id: string
   listing_id: string
   selection_order: number  // 1, 2, 3 for display order
   created_at: string
   listing?: VrboListing
 }
+
+/** @deprecated Use IssueVrboSelection instead */
+export type issueVrboSelection = IssueVrboSelection
 
 export interface VrboSelectionState {
   id: string
@@ -681,15 +710,18 @@ export interface DiningDeal {
   updated_at: string
 }
 
-export interface CampaignDiningSelection {
+export interface IssueDiningSelection {
   id: string
-  campaign_id: string
+  issue_id: string
   deal_id: string
   selection_order: number  // 1-8 for display order
-  is_featured_in_campaign: boolean  // Whether this deal is featured in this campaign
+  is_featured_in_issue: boolean  // Whether this deal is featured in this issue
   created_at: string
   deal?: DiningDeal
 }
+
+/** @deprecated Use IssueDiningSelection instead */
+export type issueDiningSelection = IssueDiningSelection
 
 // Images Database types
 export interface ImageTag {
@@ -864,15 +896,18 @@ export interface Advertisement {
   updated_at: string
 }
 
-export interface CampaignAdvertisement {
+export interface IssueAdvertisement {
   id: string
-  campaign_id: string  // UUID stored as string in TypeScript
+  issue_id: string  // UUID stored as string in TypeScript
   advertisement_id: string  // UUID stored as string in TypeScript
-  campaign_date: string
+  issue_date: string
   used_at: string
   created_at: string
   advertisement?: Advertisement
 }
+
+/** @deprecated Use IssueAdvertisement instead */
+export type issueAdvertisement = IssueAdvertisement
 
 export interface AdPricingTier {
   id: string

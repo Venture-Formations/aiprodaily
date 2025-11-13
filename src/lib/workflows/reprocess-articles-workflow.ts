@@ -3,7 +3,7 @@ import { RSSProcessor } from '@/lib/rss-processor'
 
 /**
  * Reprocess Articles Workflow
- * Regenerates all articles for an existing campaign
+ * Regenerates all articles for an existing issue
  *
  * Steps:
  * 1. Cleanup (delete articles, null posts, set processing status)
@@ -18,59 +18,59 @@ import { RSSProcessor } from '@/lib/rss-processor'
  * 10. Finalize (select top 3 each, regenerate welcome, set draft)
  */
 export async function reprocessArticlesWorkflow(input: {
-  campaign_id: string
-  newsletter_id: string
+  issue_id: string
+  publication_id: string
 }) {
   "use workflow"
 
-  const { campaign_id, newsletter_id } = input
+  const { issue_id, publication_id } = input
 
-  console.log(`[Reprocess Workflow] Starting for campaign: ${campaign_id}`)
+  console.log(`[Reprocess Workflow] Starting for issue: ${issue_id}`)
 
   // STEP 1: Cleanup
-  await cleanupCampaign(campaign_id)
+  await cleanupissue(issue_id)
 
   // STEP 2: Select & Dedupe
-  await selectAndDedupe(campaign_id, newsletter_id)
+  await selectAndDedupe(issue_id, publication_id)
 
   // PRIMARY SECTION
   // STEP 3: Generate all 6 primary titles
-  await generatePrimaryTitles(campaign_id)
+  await generatePrimaryTitles(issue_id)
 
   // STEP 4-5: Generate primary bodies in 2 batches (3 articles each)
-  await generatePrimaryBodiesBatch1(campaign_id)
-  await generatePrimaryBodiesBatch2(campaign_id)
+  await generatePrimaryBodiesBatch1(issue_id)
+  await generatePrimaryBodiesBatch2(issue_id)
 
   // SECONDARY SECTION
   // STEP 6: Generate all 6 secondary titles
-  await generateSecondaryTitles(campaign_id)
+  await generateSecondaryTitles(issue_id)
 
   // STEP 7-8: Generate secondary bodies in 2 batches (3 articles each)
-  await generateSecondaryBodiesBatch1(campaign_id)
-  await generateSecondaryBodiesBatch2(campaign_id)
+  await generateSecondaryBodiesBatch1(issue_id)
+  await generateSecondaryBodiesBatch2(issue_id)
 
   // STEP 9: Fact-check all articles
-  await factCheckAllArticles(campaign_id)
+  await factCheckAllArticles(issue_id)
 
   // STEP 10: Finalize
-  await finalizeCampaign(campaign_id)
+  await finalizeIssue(issue_id)
 
   console.log('[Reprocess Workflow] ✓ Complete')
 
-  return { campaign_id, success: true }
+  return { issue_id, success: true }
 }
 
 // Step 1: Cleanup
-async function cleanupCampaign(campaignId: string) {
+async function cleanupissue(issueId: string) {
   "use step"
 
-  console.log('[Reprocess Step 1/10] Cleaning up campaign...')
+  console.log('[Reprocess Step 1/10] Cleaning up issue...')
 
   // Delete all existing articles
   const { error: deleteArticlesError } = await supabaseAdmin
     .from('articles')
     .delete()
-    .eq('campaign_id', campaignId)
+    .eq('issue_id', issueId)
 
   if (deleteArticlesError) {
     console.error('[Reprocess Step 1/10] Error deleting articles:', deleteArticlesError)
@@ -80,27 +80,27 @@ async function cleanupCampaign(campaignId: string) {
   const { error: deleteSecondaryError } = await supabaseAdmin
     .from('secondary_articles')
     .delete()
-    .eq('campaign_id', campaignId)
+    .eq('issue_id', issueId)
 
   if (deleteSecondaryError) {
     console.error('[Reprocess Step 1/10] Error deleting secondary articles:', deleteSecondaryError)
   }
 
-  // Unassign all posts (set campaign_id to null)
+  // Unassign all posts (set issue_id to null)
   const { error: nullPostsError } = await supabaseAdmin
     .from('rss_posts')
-    .update({ campaign_id: null })
-    .eq('campaign_id', campaignId)
+    .update({ issue_id: null })
+    .eq('issue_id', issueId)
 
   if (nullPostsError) {
     console.error('[Reprocess Step 1/10] Error nulling posts:', nullPostsError)
   }
 
-  // Set campaign status to processing
+  // Set issue status to processing
   const { error: updateStatusError } = await supabaseAdmin
-    .from('newsletter_campaigns')
+    .from('publication_issues')
     .update({ status: 'processing' })
-    .eq('id', campaignId)
+    .eq('id', issueId)
 
   if (updateStatusError) {
     console.error('[Reprocess Step 1/10] Error updating status:', updateStatusError)
@@ -110,7 +110,7 @@ async function cleanupCampaign(campaignId: string) {
 }
 
 // Step 2: Select & Dedupe
-async function selectAndDedupe(campaignId: string, newsletterId: string) {
+async function selectAndDedupe(issueId: string, newsletterId: string) {
   "use step"
 
   console.log('[Reprocess Step 2/10] Selecting and deduplicating posts...')
@@ -135,7 +135,7 @@ async function selectAndDedupe(campaignId: string, newsletterId: string) {
   const { data: lookbackSetting } = await supabaseAdmin
     .from('app_settings')
     .select('value')
-    .eq('newsletter_id', newsletterId)
+    .eq('publication_id', newsletterId)
     .eq('key', 'primary_article_lookback_hours')
     .single()
 
@@ -149,7 +149,7 @@ async function selectAndDedupe(campaignId: string, newsletterId: string) {
     .from('rss_posts')
     .select('id, post_ratings(total_score)')
     .in('feed_id', primaryFeedIds)
-    .is('campaign_id', null)
+    .is('issue_id', null)
     .gte('processed_at', lookbackTimestamp)
     .not('post_ratings', 'is', null)
 
@@ -166,7 +166,7 @@ async function selectAndDedupe(campaignId: string, newsletterId: string) {
     .from('rss_posts')
     .select('id, post_ratings(total_score)')
     .in('feed_id', secondaryFeedIds)
-    .is('campaign_id', null)
+    .is('issue_id', null)
     .gte('processed_at', lookbackTimestamp)
     .not('post_ratings', 'is', null)
 
@@ -178,18 +178,18 @@ async function selectAndDedupe(campaignId: string, newsletterId: string) {
     })
     .slice(0, 12) || []
 
-  // Assign to campaign
+  // Assign to issue
   if (topPrimary.length > 0) {
     await supabaseAdmin
       .from('rss_posts')
-      .update({ campaign_id: campaignId })
+      .update({ issue_id: issueId })
       .in('id', topPrimary.map(p => p.id))
   }
 
   if (topSecondary.length > 0) {
     await supabaseAdmin
       .from('rss_posts')
-      .update({ campaign_id: campaignId })
+      .update({ issue_id: issueId })
       .in('id', topSecondary.map(p => p.id))
   }
 
@@ -197,135 +197,135 @@ async function selectAndDedupe(campaignId: string, newsletterId: string) {
 
   // Deduplicate
   const processor = new RSSProcessor()
-  const dedupeResult = await processor.handleDuplicatesForCampaign(campaignId)
+  const dedupeResult = await processor.handleDuplicatesForissue(issueId)
   console.log(`[Reprocess Step 2/10] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicates found`)
   console.log('[Reprocess Step 2/10] ✓ Select & dedupe complete')
 }
 
 // PRIMARY SECTION
-async function generatePrimaryTitles(campaignId: string) {
+async function generatePrimaryTitles(issueId: string) {
   "use step"
 
   console.log('[Reprocess Step 3/10] Generating 6 primary titles...')
   const processor = new RSSProcessor()
-  await processor.generateTitlesOnly(campaignId, 'primary', 6)
+  await processor.generateTitlesOnly(issueId, 'primary', 6)
 
   const { data: articles } = await supabaseAdmin
     .from('articles')
     .select('id, headline')
-    .eq('campaign_id', campaignId)
+    .eq('issue_id', issueId)
     .not('headline', 'is', null)
 
   console.log(`[Reprocess Step 3/10] ✓ Generated ${articles?.length || 0} primary titles`)
 }
 
-async function generatePrimaryBodiesBatch1(campaignId: string) {
+async function generatePrimaryBodiesBatch1(issueId: string) {
   "use step"
 
   console.log('[Reprocess Step 4/10] Generating 3 primary bodies (batch 1)...')
   const processor = new RSSProcessor()
-  await processor.generateBodiesOnly(campaignId, 'primary', 0, 3)
+  await processor.generateBodiesOnly(issueId, 'primary', 0, 3)
 
   const { data: articles } = await supabaseAdmin
     .from('articles')
     .select('id, content')
-    .eq('campaign_id', campaignId)
+    .eq('issue_id', issueId)
     .not('content', 'is', null)
 
   console.log(`[Reprocess Step 4/10] ✓ Total bodies generated: ${articles?.length || 0}`)
 }
 
-async function generatePrimaryBodiesBatch2(campaignId: string) {
+async function generatePrimaryBodiesBatch2(issueId: string) {
   "use step"
 
   console.log('[Reprocess Step 5/10] Generating 3 more primary bodies (batch 2)...')
   const processor = new RSSProcessor()
-  await processor.generateBodiesOnly(campaignId, 'primary', 3, 3)
+  await processor.generateBodiesOnly(issueId, 'primary', 3, 3)
 
   const { data: articles } = await supabaseAdmin
     .from('articles')
     .select('id, content')
-    .eq('campaign_id', campaignId)
+    .eq('issue_id', issueId)
     .not('content', 'is', null)
 
   console.log(`[Reprocess Step 5/10] ✓ Total primary bodies: ${articles?.length || 0}`)
 }
 
 // SECONDARY SECTION
-async function generateSecondaryTitles(campaignId: string) {
+async function generateSecondaryTitles(issueId: string) {
   "use step"
 
   console.log('[Reprocess Step 6/10] Generating 6 secondary titles...')
   const processor = new RSSProcessor()
-  await processor.generateTitlesOnly(campaignId, 'secondary', 6)
+  await processor.generateTitlesOnly(issueId, 'secondary', 6)
 
   const { data: articles } = await supabaseAdmin
     .from('secondary_articles')
     .select('id, headline')
-    .eq('campaign_id', campaignId)
+    .eq('issue_id', issueId)
     .not('headline', 'is', null)
 
   console.log(`[Reprocess Step 6/10] ✓ Generated ${articles?.length || 0} secondary titles`)
 }
 
-async function generateSecondaryBodiesBatch1(campaignId: string) {
+async function generateSecondaryBodiesBatch1(issueId: string) {
   "use step"
 
   console.log('[Reprocess Step 7/10] Generating 3 secondary bodies (batch 1)...')
   const processor = new RSSProcessor()
-  await processor.generateBodiesOnly(campaignId, 'secondary', 0, 3)
+  await processor.generateBodiesOnly(issueId, 'secondary', 0, 3)
 
   const { data: articles } = await supabaseAdmin
     .from('secondary_articles')
     .select('id, content')
-    .eq('campaign_id', campaignId)
+    .eq('issue_id', issueId)
     .not('content', 'is', null)
 
   console.log(`[Reprocess Step 7/10] ✓ Total bodies generated: ${articles?.length || 0}`)
 }
 
-async function generateSecondaryBodiesBatch2(campaignId: string) {
+async function generateSecondaryBodiesBatch2(issueId: string) {
   "use step"
 
   console.log('[Reprocess Step 8/10] Generating 3 more secondary bodies (batch 2)...')
   const processor = new RSSProcessor()
-  await processor.generateBodiesOnly(campaignId, 'secondary', 3, 3)
+  await processor.generateBodiesOnly(issueId, 'secondary', 3, 3)
 
   const { data: articles } = await supabaseAdmin
     .from('secondary_articles')
     .select('id, content')
-    .eq('campaign_id', campaignId)
+    .eq('issue_id', issueId)
     .not('content', 'is', null)
 
   console.log(`[Reprocess Step 8/10] ✓ Total secondary bodies: ${articles?.length || 0}`)
 }
 
 // FACT-CHECK
-async function factCheckAllArticles(campaignId: string) {
+async function factCheckAllArticles(issueId: string) {
   "use step"
 
   console.log('[Reprocess Step 9/10] Fact-checking all articles...')
   const processor = new RSSProcessor()
 
   // Fact-check primary articles
-  await processor.factCheckArticles(campaignId, 'primary')
+  await processor.factCheckArticles(issueId, 'primary')
 
   const { data: primaryArticles } = await supabaseAdmin
     .from('articles')
     .select('id, fact_check_score')
-    .eq('campaign_id', campaignId)
+    .eq('issue_id', issueId)
     .not('fact_check_score', 'is', null)
 
   const primaryAvg = (primaryArticles?.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) || 0) / (primaryArticles?.length || 1)
   console.log(`[Reprocess Step 9/10] Fact-checked ${primaryArticles?.length || 0} primary articles (avg: ${primaryAvg.toFixed(1)}/10)`)
 
   // Fact-check secondary articles
-  await processor.factCheckArticles(campaignId, 'secondary')
+  await processor.factCheckArticles(issueId, 'secondary')
 
   const { data: secondaryArticles } = await supabaseAdmin
     .from('secondary_articles')
     .select('id, fact_check_score')
-    .eq('campaign_id', campaignId)
+    .eq('issue_id', issueId)
     .not('fact_check_score', 'is', null)
 
   const secondaryAvg = (secondaryArticles?.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) || 0) / (secondaryArticles?.length || 1)
@@ -334,39 +334,39 @@ async function factCheckAllArticles(campaignId: string) {
 }
 
 // FINALIZE
-async function finalizeCampaign(campaignId: string) {
+async function finalizeIssue(issueId: string) {
   "use step"
 
-  console.log('[Reprocess Step 10/10] Finalizing campaign...')
+  console.log('[Reprocess Step 10/10] Finalizing issue...')
   const processor = new RSSProcessor()
 
   // Auto-select top 3 per section
-  await processor.selectTopArticlesForCampaign(campaignId)
+  await processor.selectTopArticlesForissue(issueId)
 
   const { data: activeArticles } = await supabaseAdmin
     .from('articles')
     .select('id')
-    .eq('campaign_id', campaignId)
+    .eq('issue_id', issueId)
     .eq('is_active', true)
 
   const { data: activeSecondary } = await supabaseAdmin
     .from('secondary_articles')
     .select('id')
-    .eq('campaign_id', campaignId)
+    .eq('issue_id', issueId)
     .eq('is_active', true)
 
   console.log(`[Reprocess Step 10/10] Selected ${activeArticles?.length || 0} primary, ${activeSecondary?.length || 0} secondary`)
 
   // Generate welcome section
-  await processor.generateWelcomeSection(campaignId)
+  await processor.generateWelcomeSection(issueId)
 
   // Set status to draft
   await supabaseAdmin
-    .from('newsletter_campaigns')
+    .from('publication_issues')
     .update({ status: 'draft' })
-    .eq('id', campaignId)
+    .eq('id', issueId)
 
   // Unassign unused posts
-  const unassignResult = await processor.unassignUnusedPosts(campaignId)
+  const unassignResult = await processor.unassignUnusedPosts(issueId)
   console.log(`[Reprocess Step 10/10] ✓ Finalized. Unassigned ${unassignResult.unassigned} unused posts`)
 }

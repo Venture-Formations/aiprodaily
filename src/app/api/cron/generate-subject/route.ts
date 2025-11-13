@@ -29,16 +29,16 @@ export async function POST(request: NextRequest) {
     console.log('=== SUBJECT LINE GENERATION STARTED (Time Matched) ===')
     console.log('Central Time:', new Date().toLocaleString("en-US", {timeZone: "America/Chicago"}))
 
-    // Get tomorrow's campaign (created by RSS processing 15 minutes ago)
+    // Get tomorrow's issue (created by RSS processing 15 minutes ago)
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
-    const campaignDate = tomorrow.toISOString().split('T')[0]
+    const issueDate = tomorrow.toISOString().split('T')[0]
 
-    console.log('Generating subject line for tomorrow\'s campaign date:', campaignDate)
+    console.log('Generating subject line for tomorrow\'s issue date:', issueDate)
 
-    // Find tomorrow's campaign
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Find tomorrow's issue
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         id,
         date,
@@ -54,43 +54,43 @@ export async function POST(request: NextRequest) {
           )
         )
       `)
-      .eq('date', campaignDate)
+      .eq('date', issueDate)
       .single()
 
-    if (campaignError || !campaign) {
+    if (issueError || !issue) {
       return NextResponse.json({
         success: false,
-        error: 'No campaign found for tomorrow',
-        campaignDate: campaignDate
+        error: 'No issue found for tomorrow',
+        issueDate: issueDate
       }, { status: 404 })
     }
 
-    console.log('Found campaign:', campaign.id, 'Status:', campaign.status)
+    console.log('Found issue:', issue.id, 'Status:', issue.status)
 
-    // Only generate if campaign is in draft status
-    if (campaign.status !== 'draft') {
+    // Only generate if issue is in draft status
+    if (issue.status !== 'draft') {
       return NextResponse.json({
         success: true,
-        message: `Campaign status is ${campaign.status}, skipping subject line generation`,
-        campaignId: campaign.id,
+        message: `issue status is ${issue.status}, skipping subject line generation`,
+        issueId: issue.id,
         skipped: true
       })
     }
 
     // Check if subject line already exists
-    if (campaign.subject_line && campaign.subject_line.trim() !== '') {
-      console.log('Subject line already exists:', campaign.subject_line)
+    if (issue.subject_line && issue.subject_line.trim() !== '') {
+      console.log('Subject line already exists:', issue.subject_line)
       return NextResponse.json({
         success: true,
         message: 'Subject line already exists',
-        campaignId: campaign.id,
-        existingSubjectLine: campaign.subject_line,
+        issueId: issue.id,
+        existingSubjectLine: issue.subject_line,
         skipped: true
       })
     }
 
     // Get active articles sorted by rank (custom order, rank 1 = #1 position)
-    const activeArticles = campaign.articles
+    const activeArticles = issue.articles
       .filter((article: any) => article.is_active)
       .sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999))
 
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: false,
         error: 'No active articles found for subject line generation',
-        campaignId: campaign.id
+        issueId: issue.id
       }, { status: 400 })
     }
 
@@ -116,16 +116,16 @@ export async function POST(request: NextRequest) {
 
     console.log(`Generated subject line: "${result.subject_line}" (${result.character_count} chars)`)
 
-    // Update campaign with generated subject line
+    // Update issue with generated subject line
     const { error: updateError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .update({
         subject_line: result.subject_line
       })
-      .eq('id', campaign.id)
+      .eq('id', issue.id)
 
     if (updateError) {
-      throw new Error(`Failed to update campaign: ${updateError.message}`)
+      throw new Error(`Failed to update issue: ${updateError.message}`)
     }
 
     console.log('=== SUBJECT LINE GENERATION COMPLETED ===')
@@ -133,8 +133,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Subject line generated successfully',
-      campaignId: campaign.id,
-      campaignDate: campaignDate,
+      issueId: issue.id,
+      issueDate: issueDate,
       subjectLine: result.subject_line,
       characterCount: result.character_count,
       topArticleUsed: topArticle.headline,

@@ -31,10 +31,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   return {
     title: `${newsletter.subject_line} - AI Accounting Daily`,
-    description: `AI Accounting Daily newsletter from ${new Date(newsletter.campaign_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`,
+    description: `AI Accounting Daily newsletter from ${new Date(newsletter.issue_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`,
     openGraph: {
       title: newsletter.subject_line,
-      description: `AI Accounting Daily newsletter from ${new Date(newsletter.campaign_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`,
+      description: `AI Accounting Daily newsletter from ${new Date(newsletter.issue_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`,
       type: 'article',
       publishedTime: newsletter.send_date,
     }
@@ -68,7 +68,7 @@ export default async function NewsletterPage({ params }: PageProps) {
   const primaryColor = settings?.find(s => s.key === 'primary_color')?.value || '#1877F2'
   const currentYear = new Date().getFullYear()
 
-  const formattedDate = new Date(newsletter.campaign_date).toLocaleDateString('en-US', {
+  const formattedDate = new Date(newsletter.issue_date).toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',

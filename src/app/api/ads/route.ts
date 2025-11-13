@@ -7,9 +7,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
 
-    // Get the first active newsletter for newsletter_id
+    // Get the first active newsletter for publication_id
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('is_active', true)
       .limit(1)
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     let query = supabaseAdmin
       .from('advertisements')
       .select('*')
-      .eq('newsletter_id', newsletter.id)
+      .eq('publication_id', newsletter.id)
       .order('created_at', { ascending: false })
 
     if (status) {
@@ -72,9 +72,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // Get the first active newsletter for newsletter_id
+    // Get the first active newsletter for publication_id
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('is_active', true)
       .limit(1)
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
         const { data: settingsData, error: settingsError } = await supabaseAdmin
           .from('app_settings')
           .select('value')
-          .eq('newsletter_id', newsletterId)
+          .eq('publication_id', newsletterId)
           .eq('key', 'next_ad_position')
           .maybeSingle()
 
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
         const { data: adsToShift, error: fetchAdsError } = await supabaseAdmin
           .from('advertisements')
           .select('id, display_order')
-          .eq('newsletter_id', newsletterId)
+          .eq('publication_id', newsletterId)
           .eq('status', 'active')
           .gte('display_order', nextAdPosition)
           .not('display_order', 'is', null)
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
         const { data: activeAds, error: fetchError } = await supabaseAdmin
           .from('advertisements')
           .select('display_order')
-          .eq('newsletter_id', newsletterId)
+          .eq('publication_id', newsletterId)
           .eq('status', 'active')
           .not('display_order', 'is', null)
           .order('display_order', { ascending: false })
@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
         paid: body.paid !== undefined ? body.paid : true,
         image_url: body.image_url || null,
         submission_date: new Date().toISOString(),
-        newsletter_id: newsletterId // Associate ad with newsletter
+        publication_id: newsletterId // Associate ad with newsletter
       })
       .select()
       .single()

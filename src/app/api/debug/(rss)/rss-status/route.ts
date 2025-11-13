@@ -12,16 +12,16 @@ export async function GET(request: NextRequest) {
       .from('rss_posts')
       .select('*', { count: 'exact', head: true })
 
-    // Get unassigned posts (campaign_id IS NULL)
+    // Get unassigned posts (issueId IS NULL)
     const { count: unassignedPosts } = await supabaseAdmin
       .from('rss_posts')
       .select('*', { count: 'exact', head: true })
-      .is('campaign_id', null)
+      .is('issue_id', null)
 
     // Get most recent posts
     const { data: recentPosts } = await supabaseAdmin
       .from('rss_posts')
-      .select('title, created_at, processed_at, campaign_id, feed:rss_feeds(name)')
+      .select('title, created_at, processed_at, issue_id, feed:rss_feeds(name)')
       .order('created_at', { ascending: false })
       .limit(10)
 
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
         feedName: post.feed?.name,
         createdAt: post.created_at,
         processedAt: post.processed_at,
-        assigned: post.campaign_id !== null
+        assigned: post.issue_id !== null
       })),
       timestamp: new Date().toISOString(),
       diagnostics: {

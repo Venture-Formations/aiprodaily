@@ -12,30 +12,30 @@ export async function POST(request: NextRequest) {
   try {
     console.log('=== ACTIVATING TOP ARTICLES ===')
 
-    // Get latest campaign or specified campaign ID
+    // Get latest issue or specified issue ID
     const body = await request.json().catch(() => ({}))
-    let campaignId = body.campaignId
+    let issueId = body.issueId
 
-    if (!campaignId) {
-      const { data: campaign, error } = await supabaseAdmin
-        .from('newsletter_campaigns')
+    if (!issueId) {
+      const { data: issue, error } = await supabaseAdmin
+        .from('publication_issues')
         .select('id, date, status')
         .order('created_at', { ascending: false })
         .limit(1)
         .single()
 
-      if (error || !campaign) {
+      if (error || !issue) {
         return NextResponse.json({
           success: false,
-          error: 'No campaign found'
+          error: 'No issue found'
         }, { status: 404 })
       }
 
-      campaignId = campaign.id
-      console.log('Using latest campaign:', campaignId)
+      issueId = issue.id
+      console.log('Using latest issue:', issueId)
     }
 
-    // Get all articles for this campaign with ratings
+    // Get all articles for this issue with ratings
     const { data: articles, error: articlesError } = await supabaseAdmin
       .from('articles')
       .select(`
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
           post_rating:post_ratings(total_score)
         )
       `)
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     if (articlesError || !articles) {
       return NextResponse.json({
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
-    console.log(`Found ${articles.length} articles for campaign ${campaignId}`)
+    console.log(`Found ${articles.length} articles for issue ${issueId}`)
 
     // Sort articles by score
     const sortedArticles = articles
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Articles activated successfully',
-      campaignId,
+      issueId,
       totalArticles: articles.length,
       activatedArticles: top5ArticleIds.length,
       deactivatedArticles: remainingArticleIds.length,

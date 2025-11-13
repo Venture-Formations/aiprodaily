@@ -4,16 +4,16 @@ import { supabaseAdmin } from '@/lib/supabase'
 export const maxDuration = 600
 
 /**
- * Check OpenAI posts in campaign for full_article_text
+ * Check OpenAI posts in issue for full_article_text
  *
- * Usage: GET /api/debug/check-openai-posts?campaign_id=XXX
+ * Usage: GET /api/debug/check-openai-posts?issueId=XXX
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  const campaignId = searchParams.get('campaign_id')
+  const issueId = searchParams.get('issue_id')
 
-  if (!campaignId) {
-    return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
+  if (!issueId) {
+    return NextResponse.json({ error: 'issueId required' }, { status: 400 })
   }
 
   try {
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const { data: posts, error } = await supabaseAdmin
       .from('rss_posts')
       .select('id, title, description, full_article_text, source_url')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .ilike('title', '%OpenAI%')
       .order('title')
 
@@ -32,8 +32,8 @@ export async function GET(request: NextRequest) {
     if (!posts || posts.length === 0) {
       return NextResponse.json({
         status: 'success',
-        message: 'No OpenAI posts found in this campaign',
-        campaign_id: campaignId
+        message: 'No OpenAI posts found in this issue',
+        issue_id: issueId
       })
     }
 
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       status: 'success',
-      campaign_id: campaignId,
+      issue_id: issueId,
       total_openai_posts: posts.length,
       with_full_text: withFullText,
       without_full_text: withoutFullText,

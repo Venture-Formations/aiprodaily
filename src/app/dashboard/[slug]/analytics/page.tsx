@@ -2,9 +2,9 @@
 
 import { use, useEffect, useState } from 'react'
 import Layout from '@/components/Layout'
-import type { EmailMetrics, NewsletterCampaign } from '@/types/database'
+import type { EmailMetrics, Newsletterissue } from '@/types/database'
 
-interface CampaignWithMetrics extends NewsletterCampaign {
+interface issueWithMetrics extends Newsletterissue {
   email_metrics?: EmailMetrics
 }
 
@@ -25,14 +25,14 @@ interface LinkClickAnalytics {
   uniqueUsersBySection: { [key: string]: number }
   dailyClicks: { [key: string]: number }
   topUrls: { url: string; section: string; clicks: number }[]
-  clicksByCampaign: { [key: string]: number }
+  clicksByissue: { [key: string]: number }
   recentClicks: any[]
   dateRange: { start: string; end: string }
 }
 
 export default function AnalyticsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params)
-  const [campaigns, setCampaigns] = useState<CampaignWithMetrics[]>([])
+  const [issues, setIssues] = useState<issueWithMetrics[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedTimeframe, setSelectedTimeframe] = useState('30')
@@ -56,7 +56,7 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
         throw new Error('Failed to fetch analytics data')
       }
       const data = await response.json()
-      setCampaigns(data.campaigns)
+      setIssues(data.campaigns)
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error')
     } finally {
@@ -94,9 +94,9 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
     }
   }
 
-  const refreshMetrics = async (campaignId: string) => {
+  const refreshMetrics = async (issueId: string) => {
     try {
-      const response = await fetch(`/api/analytics/${campaignId}`, {
+      const response = await fetch(`/api/analytics/${issueId}`, {
         method: 'POST'
       })
       if (response.ok) {
@@ -108,11 +108,11 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
   }
 
   const calculateAverages = () => {
-    const campaignsWithMetrics = campaigns.filter(c => c.email_metrics)
-    if (campaignsWithMetrics.length === 0) return null
+    const issuesWithMetrics = issues.filter(c => c.email_metrics)
+    if (issuesWithMetrics.length === 0) return null
 
-    const totals = campaignsWithMetrics.reduce((acc, campaign) => {
-      const metrics = campaign.email_metrics!
+    const totals = issuesWithMetrics.reduce((acc, issue) => {
+      const metrics = issue.email_metrics!
       return {
         sent: acc.sent + metrics.sent_count,
         delivered: acc.delivered + metrics.delivered_count,
@@ -132,7 +132,7 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
       totalDelivered: totals.delivered,
       totalOpened: totals.opened,
       totalClicked: totals.clicked,
-      campaignCount: campaignsWithMetrics.length
+      issueCount: issuesWithMetrics.length
     }
   }
 
@@ -214,7 +214,7 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
                   </div>
                   <div className="text-sm text-gray-600">Total Sent</div>
                   <div className="text-xs text-gray-500 mt-1">
-                    {averages.campaignCount} campaigns
+                    {averages.issueCount} campaigns
                   </div>
                 </div>
                 <div className="bg-white p-6 rounded-lg shadow">
@@ -229,20 +229,20 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
               </div>
             )}
 
-            {/* Campaign Performance Table */}
+            {/* issue Performance Table */}
             <div className="bg-white shadow rounded-lg">
               <div className="px-6 py-4 border-b border-gray-200">
                 <h2 className="text-lg font-medium text-gray-900">
-                  Campaign Performance
+                  issue Performance
                 </h2>
                 <p className="text-sm text-gray-600">
                   Detailed metrics for each sent newsletter
                 </p>
               </div>
 
-              {campaigns.length === 0 ? (
+              {issues.length === 0 ? (
                 <div className="p-8 text-center text-gray-500">
-                  No sent campaigns found
+                  No sent issues found
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -270,46 +270,46 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {campaigns.map((campaign) => (
-                        <tr key={campaign.id} className="hover:bg-gray-50">
+                      {issues.map((issue) => (
+                        <tr key={issue.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {formatDate(campaign.date)}
+                            {formatDate(issue.date)}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
-                            {campaign.subject_line || (
+                            {issue.subject_line || (
                               <span className="italic text-gray-400">No subject</span>
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {campaign.email_metrics?.sent_count?.toLocaleString() || 'N/A'}
+                            {issue.email_metrics?.sent_count?.toLocaleString() || 'N/A'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <span className={`font-medium ${
-                              (campaign.email_metrics?.open_rate || 0) > 0.25 ? 'text-green-600' :
-                              (campaign.email_metrics?.open_rate || 0) > 0.15 ? 'text-yellow-600' :
+                              (issue.email_metrics?.open_rate || 0) > 0.25 ? 'text-green-600' :
+                              (issue.email_metrics?.open_rate || 0) > 0.15 ? 'text-yellow-600' :
                               'text-red-600'
                             }`}>
-                              {formatPercentage(campaign.email_metrics?.open_rate)}
+                              {formatPercentage(issue.email_metrics?.open_rate)}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <span className={`font-medium ${
-                              (campaign.email_metrics?.click_rate || 0) > 0.05 ? 'text-green-600' :
-                              (campaign.email_metrics?.click_rate || 0) > 0.02 ? 'text-yellow-600' :
+                              (issue.email_metrics?.click_rate || 0) > 0.05 ? 'text-green-600' :
+                              (issue.email_metrics?.click_rate || 0) > 0.02 ? 'text-yellow-600' :
                               'text-red-600'
                             }`}>
-                              {formatPercentage(campaign.email_metrics?.click_rate)}
+                              {formatPercentage(issue.email_metrics?.click_rate)}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <button
-                              onClick={() => refreshMetrics(campaign.id)}
+                              onClick={() => refreshMetrics(issue.id)}
                               className="text-brand-primary hover:text-blue-700 mr-3"
                             >
                               Refresh
                             </button>
                             <a
-                              href={`/dashboard/campaigns/${campaign.id}`}
+                              href={`/dashboard/campaigns/${issue.id}`}
                               className="text-gray-600 hover:text-gray-900"
                             >
                               View
@@ -404,7 +404,7 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
                           {feedbackAnalytics.recentResponses.map((response, idx) => (
                             <tr key={idx}>
                               <td className="px-4 py-2 text-sm text-gray-900">
-                                {formatDate(response.campaign_date)}
+                                {formatDate(response.issue_date)}
                               </td>
                               <td className="px-4 py-2 text-sm text-gray-900">
                                 {response.section_choice}

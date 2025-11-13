@@ -5,7 +5,7 @@ export async function GET() {
   try {
     // Check newsletters table
     const { data: newsletters, error: newslettersError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('*')
 
     if (newslettersError) {
@@ -30,11 +30,11 @@ export async function GET() {
     // Check active apps for each newsletter
     const appsByNewsletter = newsletters?.map(newsletter => {
       const newsletterApps = allApps?.filter(app =>
-        app.newsletter_id === newsletter.id && app.is_active
+        app.publication_id === newsletter.id && app.is_active
       ) || []
 
       return {
-        newsletter_id: newsletter.id,
+        publication_id: newsletter.id,
         newsletter_slug: newsletter.slug,
         newsletter_name: newsletter.name,
         total_apps: newsletterApps.length,

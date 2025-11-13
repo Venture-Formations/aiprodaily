@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const newsletterId = searchParams.get('newsletter_id')
+    const newsletterId = searchParams.get('publication_id')
     const limit = parseInt(searchParams.get('limit') || '50')
     const section = searchParams.get('section') || 'all' // 'primary', 'secondary', or 'all'
 
@@ -23,14 +23,14 @@ export async function GET(request: NextRequest) {
 
     if (!newsletterId) {
       return NextResponse.json(
-        { error: 'Missing newsletter_id parameter' },
+        { error: 'Missing publication_id parameter' },
         { status: 400 }
       )
     }
 
     // First, look up the newsletter UUID from the slug
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('slug', newsletterId)
       .single()
@@ -76,24 +76,24 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get recent campaigns for this newsletter
-    const { data: campaigns, error: campaignsError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Get recent issues for this newsletter
+    const { data: issues, error: issuesError } = await supabaseAdmin
+      .from('publication_issues')
       .select('id')
-      .eq('newsletter_id', newsletter.id)
+      .eq('publication_id', newsletter.id)
       .order('date', { ascending: false })
-      .limit(10) // Get last 10 campaigns
+      .limit(10) // Get last 10 issues
 
-    if (campaignsError) {
-      console.error('[API] Error fetching campaigns:', campaignsError)
+    if (issuesError) {
+      console.error('[API] Error fetching issues:', issuesError)
       return NextResponse.json(
-        { error: 'Failed to fetch campaigns', details: campaignsError.message },
+        { error: 'Failed to fetch issues', details: issuesError.message },
         { status: 500 }
       )
     }
 
-    if (!campaigns || campaigns.length === 0) {
-      console.log('[API] No campaigns found for newsletter:', newsletterId)
+    if (!issues || issues.length === 0) {
+      console.log('[API] No issues found for newsletter:', newsletterId)
       return NextResponse.json({
         success: true,
         posts: [],
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const campaignIds = campaigns.map(c => c.id)
+    const issueIds = issues.map(c => c.id)
 
     // Get list of duplicate post IDs to exclude
     const { data: duplicatePosts, error: duplicatesError } = await supabaseAdmin
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
     let query = supabaseAdmin
       .from('rss_posts')
       .select('id, title, description, full_article_text, source_url, publication_date')
-      .in('campaign_id', campaignIds)
+      .in('issue_id', issueIds)
       .not('full_article_text', 'is', null)  // Exclude posts without full text
 
     // Exclude duplicate posts

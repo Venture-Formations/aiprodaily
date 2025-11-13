@@ -31,7 +31,7 @@ WHERE slug = 'accounting';
 
     // Update the accounting newsletter with its domain
     const { error: updateError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .update({ website_domain: 'aiaccountingdaily.com' })
       .eq('slug', 'accounting')
 

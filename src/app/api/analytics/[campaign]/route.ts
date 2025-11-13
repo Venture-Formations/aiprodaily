@@ -5,7 +5,7 @@ import { MailerLiteService } from '@/lib/mailerlite'
 
 interface RouteParams {
   params: Promise<{
-    campaign: string
+    issue: string
   }>
 }
 
@@ -16,13 +16,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { campaign } = await params
+    const { issue } = await params
 
-    // Fetch campaign metrics
+    // Fetch issue metrics
     const { data: metrics, error } = await supabaseAdmin
       .from('email_metrics')
       .select('*')
-      .eq('campaign_id', campaign)
+      .eq('issue_id', issue)
       .single()
 
     if (error) {
@@ -47,11 +47,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { campaign } = await params
+    const { issue } = await params
 
     // Import fresh metrics from MailerLite
     const mailerLiteService = new MailerLiteService()
-    const metrics = await mailerLiteService.importCampaignMetrics(campaign)
+    const metrics = await mailerLiteService.importissueMetrics(issue)
 
     return NextResponse.json({
       success: true,

@@ -5,17 +5,17 @@ import { getCurrentTopArticle } from '@/lib/subject-line-generator'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const campaignId = searchParams.get('campaign_id')
+    const issueId = searchParams.get('issue_id')
 
-    if (!campaignId) {
-      return NextResponse.json({ error: 'campaign_id parameter required' }, { status: 400 })
+    if (!issueId) {
+      return NextResponse.json({ error: 'issueId parameter required' }, { status: 400 })
     }
 
-    console.log(`Testing reorder logic for campaign: ${campaignId}`)
+    console.log(`Testing reorder logic for issue: ${issueId}`)
 
-    // Get current campaign and articles
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Get current issue and articles
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         id,
         subject_line,
@@ -30,20 +30,20 @@ export async function GET(request: NextRequest) {
           )
         )
       `)
-      .eq('id', campaignId)
+      .eq('id', issueId)
       .single()
 
-    if (campaignError || !campaign) {
+    if (issueError || !issue) {
       return NextResponse.json({
-        error: 'Campaign not found',
-        details: campaignError?.message
+        error: 'issue not found',
+        details: issueError?.message
       }, { status: 404 })
     }
 
-    console.log('Raw campaign data:', JSON.stringify(campaign, null, 2))
+    console.log('Raw issue data:', JSON.stringify(issue, null, 2))
 
     // Test getCurrentTopArticle function
-    const { article: currentTopArticle, error: topArticleError } = await getCurrentTopArticle(campaignId)
+    const { article: currentTopArticle, error: topArticleError } = await getCurrentTopArticle(issueId)
 
     if (topArticleError) {
       console.error('Error getting current top article:', topArticleError)
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     console.log('Current top article from function:', currentTopArticle)
 
     // Manual filtering logic to debug
-    const activeArticles = campaign.articles
+    const activeArticles = issue.articles
       .filter((article: any) => {
         console.log(`Checking article: ${article.headline}`)
         console.log(`  is_active: ${article.is_active}`)
@@ -89,9 +89,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      campaign_id: campaignId,
-      current_subject_line: campaign.subject_line,
-      total_articles: campaign.articles.length,
+      issue_id: issueId,
+      current_subject_line: issue.subject_line,
+      total_articles: issue.articles.length,
       active_articles_count: activeArticles.length,
       current_top_article: currentTopArticle,
       top_article_error: topArticleError,
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
         is_active: a.is_active,
         skipped: a.skipped
       })),
-      all_articles: campaign.articles.map((a: any) => ({
+      all_articles: issue.articles.map((a: any) => ({
         id: a.id,
         headline: a.headline,
         rank: a.rank,

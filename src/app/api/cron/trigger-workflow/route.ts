@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
     // Get all active newsletters
     const { data: newsletters, error: newslettersError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id, name, slug')
       .eq('is_active', true)
 
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 
         await start(processRSSWorkflow, [{
           trigger: 'cron',
-          newsletter_id: newsletter.id
+          publication_id: newsletter.id
         }])
 
         startedWorkflows.push(newsletter.name)

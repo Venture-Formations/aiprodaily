@@ -5,22 +5,22 @@ import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/wor
 import { AdScheduler } from '@/lib/ad-scheduler'
 
 /**
- * Step 6: Finalize campaign
- * Updates campaign status to draft and sends Slack notifications
+ * Step 6: Finalize issue
+ * Updates issue status to draft and sends Slack notifications
  */
 export async function POST(request: NextRequest) {
-  let campaign_id: string | undefined
+  let issue_id: string | undefined
 
   try {
     const body = await request.json()
-    campaign_id = body.campaign_id
+    issue_id = body.issue_id
 
-    if (!campaign_id) {
-      return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
+    if (!issue_id) {
+      return NextResponse.json({ error: 'issue_id is required' }, { status: 400 })
     }
 
 
-    const startResult = await startWorkflowStep(campaign_id, 'pending_finalize')
+    const startResult = await startWorkflowStep(issue_id, 'pending_finalize')
     if (!startResult.success) {
       return NextResponse.json({
         success: false,
@@ -32,54 +32,54 @@ export async function POST(request: NextRequest) {
     const errorHandler = new ErrorHandler()
     const slack = new SlackNotificationService()
 
-    // Update campaign status from processing to draft
+    // Update issue status from processing to draft
     await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .update({ status: 'draft' })
-      .eq('id', campaign_id)
+      .eq('id', issue_id)
 
-    console.log('Campaign status updated to draft')
+    console.log('issue status updated to draft')
 
-    // Select and assign advertisement for this campaign
+    // Select and assign advertisement for this issue
     try {
-      const { data: campaignData } = await supabaseAdmin
-        .from('newsletter_campaigns')
-        .select('date, newsletter_id')
-        .eq('id', campaign_id)
+      const { data: issueData } = await supabaseAdmin
+        .from('publication_issues')
+        .select('date, publication_id')
+        .eq('id', issue_id)
         .single()
 
-      if (campaignData) {
-        const selectedAd = await AdScheduler.selectAdForCampaign({
-          campaignId: campaign_id,
-          campaignDate: campaignData.date,
-          newsletterId: campaignData.newsletter_id
+      if (issueData) {
+        const selectedAd = await AdScheduler.selectAdForissue({
+          issueId: issue_id,
+          issueDate: issueData.date,
+          newsletterId: issueData.publication_id
         })
 
         if (selectedAd) {
           // Check if ad already assigned to prevent duplicates
           const { data: existingAssignment } = await supabaseAdmin
-            .from('campaign_advertisements')
+            .from('issue_advertisements')
             .select('id')
-            .eq('campaign_id', campaign_id)
+            .eq('issue_id', issue_id)
             .single()
 
           if (!existingAssignment) {
             // Store the selected ad (without recording usage yet)
             await supabaseAdmin
-              .from('campaign_advertisements')
+              .from('issue_advertisements')
               .insert({
-                campaign_id: campaign_id,
+                issue_id: issue_id,
                 advertisement_id: selectedAd.id,
-                campaign_date: campaignData.date,
+                issue_date: issueData.date,
                 used_at: new Date().toISOString()
               })
 
             console.log(`[Finalize] Selected ad: ${selectedAd.title} (ID: ${selectedAd.id})`)
           } else {
-            console.log('[Finalize] Ad already assigned to this campaign')
+            console.log('[Finalize] Ad already assigned to this issue')
           }
         } else {
-          console.log('[Finalize] No active ads available for this campaign')
+          console.log('[Finalize] No active ads available for this issue')
         }
       }
     } catch (adError) {
@@ -91,31 +91,31 @@ export async function POST(request: NextRequest) {
     const { data: finalArticles } = await supabaseAdmin
       .from('articles')
       .select('id')
-      .eq('campaign_id', campaign_id)
+      .eq('issue_id', issue_id)
 
     const articleCount = finalArticles?.length || 0
 
-    // Get campaign date for notifications
-    const { data: campaignInfo } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Get issue date for notifications
+    const { data: issueInfo } = await supabaseAdmin
+      .from('publication_issues')
       .select('date')
-      .eq('id', campaign_id)
+      .eq('id', issue_id)
       .maybeSingle()
 
-    const campaignDate = campaignInfo?.date || 'Unknown'
+    const issueDate = issueInfo?.date || 'Unknown'
 
     await errorHandler.logInfo('RSS processing completed successfully', {
-      campaignId: campaign_id,
+      issueId: issue_id,
       articleCount,
-      campaignDate
+      issueDate
     }, 'rss_step_finalize')
 
     // Send Slack notification
     try {
       await slack.sendRSSProcessingCompleteAlert(
-        campaign_id,
+        issue_id,
         articleCount,
-        campaignDate
+        issueDate
       )
     } catch (slackError) {
       console.error('Failed to send Slack notification:', slackError)
@@ -123,14 +123,14 @@ export async function POST(request: NextRequest) {
     }
 
 
-    await completeWorkflowStep(campaign_id, 'finalizing')
+    await completeWorkflowStep(issue_id, 'finalizing')
 
     return NextResponse.json({
       success: true,
       message: 'RSS processing workflow complete!',
-      campaign_id,
+      issue_id,
       article_count: articleCount,
-      campaign_date: campaignDate,
+      issue_date: issueDate,
       status: 'draft',
       workflow_state: 'complete',
       step: '7/7'
@@ -139,9 +139,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[Step 7] Finalize failed:', error)
 
-    if (campaign_id) {
+    if (issue_id) {
       await failWorkflow(
-        campaign_id,
+        issue_id,
         `Finalize step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
     }

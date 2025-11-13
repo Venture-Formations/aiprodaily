@@ -626,9 +626,9 @@ function SystemStatus() {
           </div>
           <div className="flex justify-between items-center py-2 border-b">
             <div>
-              <div className="font-medium">Campaign Creation</div>
+              <div className="font-medium">issue Creation</div>
               <div className="text-sm text-gray-600">
-                Daily at {scheduleDisplay?.campaignCreation || '20:50'} CT
+                Daily at {scheduleDisplay?.issueCreation || '20:50'} CT
               </div>
             </div>
             <span className={`text-sm ${scheduleDisplay?.reviewEnabled ? 'text-green-600' : 'text-gray-500'}`}>
@@ -1111,7 +1111,7 @@ function Notifications() {
           <h4 className="font-medium mb-2">Notification Types:</h4>
           <ul className="space-y-1 text-sm text-gray-600">
             <li>• RSS processing completion/failure</li>
-            <li>• Email campaign delivery status</li>
+            <li>• Email issue delivery status</li>
             <li>• System health alerts</li>
             <li>• Error monitoring</li>
           </ul>
@@ -1132,12 +1132,12 @@ function EmailSettings() {
     // Review Schedule Settings (Central Time)
     reviewScheduleEnabled: true,
     rssProcessingTime: '20:30',  // 8:30 PM
-    campaignCreationTime: '20:50',  // 8:50 PM
+    issueCreationTime: '20:50',  // 8:50 PM
     scheduledSendTime: '21:00',  // 9:00 PM
 
     // Daily Newsletter Settings (Central Time)
     dailyScheduleEnabled: false,
-    dailyCampaignCreationTime: '04:30',  // 4:30 AM
+    dailyissueCreationTime: '04:30',  // 4:30 AM
     dailyScheduledSendTime: '04:55'  // 4:55 AM
   })
   const [saving, setSaving] = useState(false)
@@ -1574,18 +1574,18 @@ function EmailSettings() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Campaign Creation Time
+              issue Creation Time
             </label>
             <div className="flex space-x-2 items-center">
               <select
                 value={(() => {
-                  const hour24 = parseInt(settings.campaignCreationTime.split(':')[0])
+                  const hour24 = parseInt(settings.issueCreationTime.split(':')[0])
                   return hour24 === 0 ? '12' : hour24 > 12 ? (hour24 - 12).toString() : hour24.toString()
                 })()}
                 onChange={(e) => {
-                  const minutes = settings.campaignCreationTime.split(':')[1] || '00'
+                  const minutes = settings.issueCreationTime.split(':')[1] || '00'
                   const hour12 = parseInt(e.target.value)
-                  const currentHour24 = parseInt(settings.campaignCreationTime.split(':')[0])
+                  const currentHour24 = parseInt(settings.issueCreationTime.split(':')[0])
                   const isAM = currentHour24 < 12
                   let hour24
                   if (hour12 === 12) {
@@ -1593,7 +1593,7 @@ function EmailSettings() {
                   } else {
                     hour24 = isAM ? hour12 : hour12 + 12
                   }
-                  handleChange('campaignCreationTime', `${hour24.toString().padStart(2, '0')}:${minutes}`)
+                  handleChange('issueCreationTime', `${hour24.toString().padStart(2, '0')}:${minutes}`)
                 }}
                 disabled={!settings.reviewScheduleEnabled}
                 className="w-20 px-2 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary disabled:bg-gray-100 appearance-none bg-white"
@@ -1610,10 +1610,10 @@ function EmailSettings() {
               </select>
               <span>:</span>
               <select
-                value={settings.campaignCreationTime.split(':')[1] || '00'}
+                value={settings.issueCreationTime.split(':')[1] || '00'}
                 onChange={(e) => {
-                  const hour24 = parseInt(settings.campaignCreationTime.split(':')[0])
-                  handleChange('campaignCreationTime', `${hour24.toString().padStart(2, '0')}:${e.target.value}`)
+                  const hour24 = parseInt(settings.issueCreationTime.split(':')[0])
+                  handleChange('issueCreationTime', `${hour24.toString().padStart(2, '0')}:${e.target.value}`)
                 }}
                 disabled={!settings.reviewScheduleEnabled}
                 className="w-20 px-2 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary disabled:bg-gray-100 appearance-none bg-white"
@@ -1633,10 +1633,10 @@ function EmailSettings() {
                 <option value="55">55</option>
               </select>
               <select
-                value={parseInt(settings.campaignCreationTime.split(':')[0]) < 12 ? 'AM' : 'PM'}
+                value={parseInt(settings.issueCreationTime.split(':')[0]) < 12 ? 'AM' : 'PM'}
                 onChange={(e) => {
-                  const minutes = settings.campaignCreationTime.split(':')[1] || '00'
-                  const currentHour24 = parseInt(settings.campaignCreationTime.split(':')[0])
+                  const minutes = settings.issueCreationTime.split(':')[1] || '00'
+                  const currentHour24 = parseInt(settings.issueCreationTime.split(':')[0])
                   const currentHour12 = currentHour24 === 0 ? 12 : currentHour24 > 12 ? currentHour24 - 12 : currentHour24
                   let newHour24
                   if (e.target.value === 'AM') {
@@ -1644,7 +1644,7 @@ function EmailSettings() {
                   } else {
                     newHour24 = currentHour12 === 12 ? 12 : currentHour12 + 12
                   }
-                  handleChange('campaignCreationTime', `${newHour24.toString().padStart(2, '0')}:${minutes}`)
+                  handleChange('issueCreationTime', `${newHour24.toString().padStart(2, '0')}:${minutes}`)
                 }}
                 disabled={!settings.reviewScheduleEnabled}
                 className="w-20 px-2 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary disabled:bg-gray-100 appearance-none bg-white"
@@ -1654,7 +1654,7 @@ function EmailSettings() {
                 <option value="PM">PM</option>
               </select>
             </div>
-            <p className="text-xs text-gray-500 mt-1">Publication campaign setup and review (5-minute increments)</p>
+            <p className="text-xs text-gray-500 mt-1">Publication issue setup and review (5-minute increments)</p>
           </div>
 
           <div>
@@ -1746,8 +1746,8 @@ function EmailSettings() {
         <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <h4 className="font-medium text-blue-900 mb-2">Review Workflow Overview</h4>
           <div className="text-sm text-blue-800 space-y-1">
-            <div>1. <strong>{settings.rssProcessingTime}</strong> - Create tomorrow's campaign, process RSS feeds, and generate AI subject line</div>
-            <div>2. <strong>{settings.campaignCreationTime}</strong> - Create review campaign and schedule for delivery</div>
+            <div>1. <strong>{settings.rssProcessingTime}</strong> - Create tomorrow's issue, process RSS feeds, and generate AI subject line</div>
+            <div>2. <strong>{settings.issueCreationTime}</strong> - Create review issue and schedule for delivery</div>
             <div>3. <strong>{settings.scheduledSendTime}</strong> - MailerLite sends review to review group only</div>
           </div>
         </div>
@@ -1785,18 +1785,18 @@ function EmailSettings() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Campaign Creation Time
+              issue Creation Time
             </label>
             <div className="flex space-x-2 items-center">
               <select
                 value={(() => {
-                  const hour24 = parseInt(settings.dailyCampaignCreationTime.split(':')[0])
+                  const hour24 = parseInt(settings.dailyissueCreationTime.split(':')[0])
                   return hour24 === 0 ? '12' : hour24 > 12 ? (hour24 - 12).toString() : hour24.toString()
                 })()}
                 onChange={(e) => {
-                  const minutes = settings.dailyCampaignCreationTime.split(':')[1] || '00'
+                  const minutes = settings.dailyissueCreationTime.split(':')[1] || '00'
                   const hour12 = parseInt(e.target.value)
-                  const currentHour24 = parseInt(settings.dailyCampaignCreationTime.split(':')[0])
+                  const currentHour24 = parseInt(settings.dailyissueCreationTime.split(':')[0])
                   const isAM = currentHour24 < 12
                   let hour24
                   if (hour12 === 12) {
@@ -1804,7 +1804,7 @@ function EmailSettings() {
                   } else {
                     hour24 = isAM ? hour12 : hour12 + 12
                   }
-                  handleChange('dailyCampaignCreationTime', `${hour24.toString().padStart(2, '0')}:${minutes}`)
+                  handleChange('dailyissueCreationTime', `${hour24.toString().padStart(2, '0')}:${minutes}`)
                 }}
                 disabled={!settings.dailyScheduleEnabled}
                 className="w-20 px-2 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary disabled:bg-gray-100 appearance-none bg-white"
@@ -1821,10 +1821,10 @@ function EmailSettings() {
               </select>
               <span>:</span>
               <select
-                value={settings.dailyCampaignCreationTime.split(':')[1] || '00'}
+                value={settings.dailyissueCreationTime.split(':')[1] || '00'}
                 onChange={(e) => {
-                  const hour24 = parseInt(settings.dailyCampaignCreationTime.split(':')[0])
-                  handleChange('dailyCampaignCreationTime', `${hour24.toString().padStart(2, '0')}:${e.target.value}`)
+                  const hour24 = parseInt(settings.dailyissueCreationTime.split(':')[0])
+                  handleChange('dailyissueCreationTime', `${hour24.toString().padStart(2, '0')}:${e.target.value}`)
                 }}
                 disabled={!settings.dailyScheduleEnabled}
                 className="w-20 px-2 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary disabled:bg-gray-100 appearance-none bg-white"
@@ -1844,10 +1844,10 @@ function EmailSettings() {
                 <option value="55">55</option>
               </select>
               <select
-                value={parseInt(settings.dailyCampaignCreationTime.split(':')[0]) < 12 ? 'AM' : 'PM'}
+                value={parseInt(settings.dailyissueCreationTime.split(':')[0]) < 12 ? 'AM' : 'PM'}
                 onChange={(e) => {
-                  const minutes = settings.dailyCampaignCreationTime.split(':')[1] || '00'
-                  const currentHour24 = parseInt(settings.dailyCampaignCreationTime.split(':')[0])
+                  const minutes = settings.dailyissueCreationTime.split(':')[1] || '00'
+                  const currentHour24 = parseInt(settings.dailyissueCreationTime.split(':')[0])
                   const currentHour12 = currentHour24 === 0 ? 12 : currentHour24 > 12 ? currentHour24 - 12 : currentHour24
                   let newHour24
                   if (e.target.value === 'AM') {
@@ -1855,7 +1855,7 @@ function EmailSettings() {
                   } else {
                     newHour24 = currentHour12 === 12 ? 12 : currentHour12 + 12
                   }
-                  handleChange('dailyCampaignCreationTime', `${newHour24.toString().padStart(2, '0')}:${minutes}`)
+                  handleChange('dailyissueCreationTime', `${newHour24.toString().padStart(2, '0')}:${minutes}`)
                 }}
                 disabled={!settings.dailyScheduleEnabled}
                 className="w-20 px-2 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary disabled:bg-gray-100 appearance-none bg-white"
@@ -1865,7 +1865,7 @@ function EmailSettings() {
                 <option value="PM">PM</option>
               </select>
             </div>
-            <p className="text-xs text-gray-500 mt-1">Final newsletter campaign creation with any review changes (5-minute increments)</p>
+            <p className="text-xs text-gray-500 mt-1">Final newsletter issue creation with any review changes (5-minute increments)</p>
           </div>
 
           <div>
@@ -1957,7 +1957,7 @@ function EmailSettings() {
         <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
           <h4 className="font-medium text-green-900 mb-2">Daily Publication Workflow</h4>
           <div className="text-sm text-green-800 space-y-1">
-            <div>1. <strong>{settings.dailyCampaignCreationTime}</strong> - Create final publication with any changes made during review</div>
+            <div>1. <strong>{settings.dailyissueCreationTime}</strong> - Create final publication with any changes made during review</div>
             <div>2. <strong>{settings.dailyScheduledSendTime}</strong> - Send final publication to main subscriber group</div>
           </div>
         </div>
@@ -1988,7 +1988,7 @@ function EmailSettings() {
       <div className="bg-white shadow rounded-lg p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Article Limit Settings</h3>
         <p className="text-sm text-gray-600 mb-6">
-          Configure the maximum number of articles that can be selected for the Primary Articles and Secondary Articles sections in each newsletter campaign.
+          Configure the maximum number of articles that can be selected for the Primary Articles and Secondary Articles sections in each newsletter issue.
         </p>
 
         <div className="space-y-4">
@@ -2135,7 +2135,7 @@ function EmailSettings() {
                 <strong>Current configuration:</strong> Checking {dedupLookbackDays} days of past newsletters with {Math.round(dedupStrictnessThreshold * 100)}% similarity threshold
               </p>
               <p className="text-xs text-blue-700 mt-2">
-                <strong>How it works:</strong> Stage 1 checks against articles used in the last {dedupLookbackDays} sent newsletters. Stages 2-4 check exact content matches (100% similarity), title similarity (&gt;{Math.round(dedupStrictnessThreshold * 100)}%), and AI semantic analysis (&gt;{Math.round(dedupStrictnessThreshold * 100)}%) within the current campaign's articles.
+                <strong>How it works:</strong> Stage 1 checks against articles used in the last {dedupLookbackDays} sent newsletters. Stages 2-4 check exact content matches (100% similarity), title similarity (&gt;{Math.round(dedupStrictnessThreshold * 100)}%), and AI semantic analysis (&gt;{Math.round(dedupStrictnessThreshold * 100)}%) within the current issue's articles.
               </p>
             </div>
           </div>
@@ -2206,7 +2206,7 @@ function AIPromptsSettings() {
     if (!newsletterSlug) return
 
     try {
-      const response = await fetch(`/api/settings/criteria?newsletter_id=${newsletterSlug}`)
+      const response = await fetch(`/api/settings/criteria?publication_id=${newsletterSlug}`)
       if (response.ok) {
         const data = await response.json()
         setPrimaryCriteria(data.primaryCriteria || [])
@@ -3998,7 +3998,7 @@ function AIPromptsSettings() {
           <p><code className="bg-blue-100 px-2 py-0.5 rounded">{'{'}title{'}'}</code> - Article/event title</p>
           <p><code className="bg-blue-100 px-2 py-0.5 rounded">{'{'}description{'}'}</code> - Article/event description</p>
           <p><code className="bg-blue-100 px-2 py-0.5 rounded">{'{'}content{'}'}</code> - Full article content</p>
-          <p><code className="bg-blue-100 px-2 py-0.5 rounded">{'{'}date{'}'}</code> - Campaign date</p>
+          <p><code className="bg-blue-100 px-2 py-0.5 rounded">{'{'}date{'}'}</code> - issue date</p>
           <p><code className="bg-blue-100 px-2 py-0.5 rounded">{'{'}headline{'}'}</code> - Newsletter article headline</p>
           <p className="mt-3 text-xs text-blue-700">
             ⚠️ <strong>Important:</strong> Changes take effect immediately. Test prompts carefully before saving.
@@ -4272,11 +4272,11 @@ function SlackSettings() {
   const notificationTypes = [
     {
       id: 'campaignStatusUpdates',
-      name: 'Campaign Status Updates',
+      name: 'issue Status Updates',
       description: 'Notifications when campaigns are marked as "Changes Made" by reviewers',
       examples: [
-        'Campaign marked as "Changes Made" for Dec 15 by John Doe',
-        'Campaign requires review before proceeding to send',
+        'issue marked as "Changes Made" for Dec 15 by John Doe',
+        'issue requires review before proceeding to send',
         'Manual edits detected - status updated to "Changes Made"'
       ]
     },
@@ -4285,9 +4285,9 @@ function SlackSettings() {
       name: 'Workflow Failures',
       description: 'Critical alerts when automated workflows fail after all retry attempts',
       examples: [
-        'Workflow failed after retries - Campaign ID: abc123',
+        'Workflow failed after retries - issue ID: abc123',
         'RSS processing workflow terminated due to repeated errors',
-        'Campaign creation workflow failed - manual intervention required'
+        'issue creation workflow failed - manual intervention required'
       ]
     },
     {
@@ -4295,7 +4295,7 @@ function SlackSettings() {
       name: 'RSS Processing Completion',
       description: 'Success notifications when RSS processing completes',
       examples: [
-        'RSS Processing Complete - Campaign abc123 - 8 articles generated',
+        'RSS Processing Complete - issue abc123 - 8 articles generated',
         'Archive: 12 articles, 45 posts preserved',
         'Ready for review and scheduling'
       ]
@@ -4306,7 +4306,7 @@ function SlackSettings() {
       description: 'Alerts when RSS processing fails partway through steps',
       examples: [
         'RSS Processing Incomplete - Completed: Archive, Fetch - Failed at: Score Posts',
-        'Campaign may be missing content or in invalid state',
+        'issue may be missing content or in invalid state',
         'Error: OpenAI API timeout during article generation'
       ]
     },
@@ -4325,7 +4325,7 @@ function SlackSettings() {
       name: 'Scheduled Send Failures',
       description: 'Alerts when scheduled sends fail to deliver to MailerLite',
       examples: [
-        'Scheduled Send Failed - Campaign abc123',
+        'Scheduled Send Failed - issue abc123',
         'Send triggered but no email delivered to MailerLite',
         'MailerLite API authentication failed during scheduled send'
       ]
@@ -4335,7 +4335,7 @@ function SlackSettings() {
       name: 'Scheduled Send Timing Issues',
       description: 'Warnings when scheduling logic detects configuration problems',
       examples: [
-        'Found 2 campaigns with ready_to_send status but shouldRun returned false',
+        'Found 2 issues with ready_to_send status but shouldRun returned false',
         'Timing configuration issue detected',
         'Send window may be misconfigured'
       ]
@@ -4343,10 +4343,10 @@ function SlackSettings() {
     {
       id: 'emailDeliveryUpdates',
       name: 'Email Delivery Success',
-      description: 'MailerLite campaign delivery confirmations',
+      description: 'MailerLite issue delivery confirmations',
       examples: [
-        'Review campaign sent successfully for campaign abc123',
-        'Final campaign sent successfully for campaign xyz789',
+        'Review issue sent successfully for issue abc123',
+        'Final issue sent successfully for issue xyz789',
         'MailerLite delivery confirmed'
       ]
     },
@@ -5044,7 +5044,7 @@ function AdsSettings() {
       <div className="bg-white shadow rounded-lg p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Article Limit Settings</h3>
         <p className="text-sm text-gray-600 mb-6">
-          Configure the maximum number of articles that can be selected for the Primary Articles and Secondary Articles sections in each newsletter campaign.
+          Configure the maximum number of articles that can be selected for the Primary Articles and Secondary Articles sections in each newsletter issue.
         </p>
 
         <div className="space-y-4">
@@ -5090,7 +5090,7 @@ function AdsSettings() {
             <strong>Current configuration:</strong> Primary Articles: {maxTopArticles}, Secondary Articles: {maxBottomArticles}
           </p>
           <p className="text-xs text-blue-700 mt-2">
-            These limits control how many articles can be selected during RSS processing and on the campaign detail page.
+            These limits control how many articles can be selected during RSS processing and on the issue detail page.
           </p>
         </div>
       </div>
@@ -5775,7 +5775,7 @@ function AIAppsSettings() {
       <h2 className="text-xl font-bold text-gray-900 mb-4">AI Applications Selection Settings</h2>
 
       <p className="text-gray-600 mb-6">
-        Configure how many apps from each category are selected for each newsletter campaign.
+        Configure how many apps from each category are selected for each newsletter issue.
         Set count to 0 for "filler" categories (used to fill remaining slots).
       </p>
 
@@ -5847,7 +5847,7 @@ function AIAppsSettings() {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
         <h4 className="font-semibold text-blue-900 mb-2">How it works:</h4>
         <ul className="text-sm text-blue-800 space-y-1">
-          <li>• Apps are selected automatically when creating a new campaign</li>
+          <li>• Apps are selected automatically when creating a new issue</li>
           <li>• Categories with count &gt; 0 are "must-have" (always included)</li>
           <li>• Categories with count = 0 are "fillers" (used to reach total apps)</li>
           <li>• <strong>Affiliate apps have 3x higher selection priority</strong> (more likely to appear)</li>

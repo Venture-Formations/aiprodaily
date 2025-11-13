@@ -37,42 +37,42 @@ export class RSSProcessor {
   }
 
   /**
-   * Helper: Get newsletter_id from campaign_id
+   * Helper: Get publication_id from issueId
    */
-  private async getNewsletterIdFromCampaign(campaignId: string): Promise<string> {
-    const { data: campaign, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
-      .select('newsletter_id')
-      .eq('id', campaignId)
+  private async getNewsletterIdFromissue(issueId: string): Promise<string> {
+    const { data: issue, error } = await supabaseAdmin
+      .from('publication_issues')
+      .select('publication_id')
+      .eq('id', issueId)
       .single()
 
-    if (error || !campaign || !campaign.newsletter_id) {
-      throw new Error(`Failed to get newsletter_id for campaign ${campaignId}`)
+    if (error || !issue || !issue.publication_id) {
+      throw new Error(`Failed to get publication_id for issue ${issueId}`)
     }
 
-    return campaign.newsletter_id
+    return issue.publication_id
   }
 
   /**
    * Public method to process a single feed - used by step-based processing
    */
-  async processSingleFeed(feed: RssFeed, campaignId: string, section: 'primary' | 'secondary' = 'primary') {
-    return await this.processFeed(feed, campaignId, section)
+  async processSingleFeed(feed: RssFeed, issueId: string, section: 'primary' | 'secondary' = 'primary') {
+    return await this.processFeed(feed, issueId, section)
   }
 
   /**
    * Public method to extract full article text - used by step-based processing
    */
-  async extractFullArticleText(campaignId: string) {
-    return await this.enrichRecentPostsWithFullContent(campaignId)
+  async extractFullArticleText(issueId: string) {
+    return await this.enrichRecentPostsWithFullContent(issueId)
   }
 
   /**
    * Public method to score/evaluate posts - used by step-based processing
    */
-  async scorePostsForSection(campaignId: string, section: 'primary' | 'secondary' = 'primary') {
-    // Get newsletter_id from campaign
-    const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+  async scorePostsForSection(issueId: string, section: 'primary' | 'secondary' = 'primary') {
+    // Get publication_id from issue
+    const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
     // Get feeds for this section
     const { data: feeds, error: feedsError } = await supabaseAdmin
@@ -87,12 +87,12 @@ export class RSSProcessor {
 
     const feedIds = feeds.map(f => f.id)
 
-    // Get posts for this campaign from feeds in this section
+    // Get posts for this issue from feeds in this section
     // Limit to 12 most recent posts (processing sequentially to handle full article text)
     const { data: posts, error } = await supabaseAdmin
       .from('rss_posts')
       .select('*')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .in('feed_id', feedIds)
       .order('processed_at', { ascending: false })
       .limit(12)
@@ -177,16 +177,16 @@ export class RSSProcessor {
   /**
    * Public method to generate newsletter articles - used by step-based processing
    */
-  async generateArticlesForSection(campaignId: string, section: 'primary' | 'secondary' = 'primary', limit: number = 12) {
-    return await this.generateNewsletterArticles(campaignId, section, limit)
+  async generateArticlesForSection(issueId: string, section: 'primary' | 'secondary' = 'primary', limit: number = 12) {
+    return await this.generateNewsletterArticles(issueId, section, limit)
   }
 
   /**
    * NEW WORKFLOW: Generate titles only (Step 1 of article generation)
    * Creates article records with headlines but no content
    */
-  async generateTitlesOnly(campaignId: string, section: 'primary' | 'secondary' = 'primary', limit: number = 6) {
-    const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+  async generateTitlesOnly(issueId: string, section: 'primary' | 'secondary' = 'primary', limit: number = 6) {
+    const newsletterId = await this.getNewsletterIdFromissue(issueId)
     const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
 
     // Get feeds for this section
@@ -203,15 +203,15 @@ export class RSSProcessor {
 
     const feedIds = feeds.map(f => f.id)
 
-    // Get top posts assigned to this campaign
+    // Get top posts assigned to this issue
     const { data: topPosts } = await supabaseAdmin
       .from('rss_posts')
       .select('*, post_ratings(*)')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .in('feed_id', feedIds)
 
     if (!topPosts || topPosts.length === 0) {
-      console.log(`[Titles] No posts assigned to campaign for ${section} section`)
+      console.log(`[Titles] No posts assigned to issue for ${section} section`)
       return
     }
 
@@ -219,7 +219,7 @@ export class RSSProcessor {
     const { data: duplicateGroups } = await supabaseAdmin
       .from('duplicate_groups')
       .select('id')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     const groupIds = duplicateGroups?.map(g => g.id) || []
     let duplicatePostIds = new Set<string>()
@@ -232,7 +232,7 @@ export class RSSProcessor {
       duplicatePostIds = new Set(duplicatePosts?.map(d => d.post_id) || [])
     }
 
-    console.log(`[Titles] Campaign has ${topPosts.length} total posts for ${section} section`)
+    console.log(`[Titles] issue has ${topPosts.length} total posts for ${section} section`)
     console.log(`[Titles] Excluding ${duplicatePostIds.size} duplicate posts`)
 
     // Filter and sort posts
@@ -264,7 +264,7 @@ export class RSSProcessor {
             .from(tableName)
             .select('id')
             .eq('post_id', post.id)
-            .eq('campaign_id', campaignId)
+            .eq('issue_id', issueId)
             .maybeSingle()
 
           if (checkError) {
@@ -304,7 +304,7 @@ export class RSSProcessor {
             .from(tableName)
             .insert([{
               post_id: post.id,
-              campaign_id: campaignId,
+              issue_id: issueId,
               headline: headline,
               content: '', // Empty placeholder - will be filled by body generation step
               rank: null,
@@ -348,8 +348,8 @@ export class RSSProcessor {
    * excludes processed articles. Batch 1 updates first 3, so batch 2 automatically
    * gets the next 3 without needing offset logic.
    */
-  async generateBodiesOnly(campaignId: string, section: 'primary' | 'secondary' = 'primary', offset: number = 0, limit: number = 3) {
-    const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+  async generateBodiesOnly(issueId: string, section: 'primary' | 'secondary' = 'primary', offset: number = 0, limit: number = 3) {
+    const newsletterId = await this.getNewsletterIdFromissue(issueId)
     const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
 
     // Get articles with titles but empty/placeholder content
@@ -357,7 +357,7 @@ export class RSSProcessor {
     const { data: articles } = await supabaseAdmin
       .from(tableName)
       .select('*, rss_posts(*)')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .eq('content', '') // Empty placeholder from title generation step
       .not('headline', 'is', null)
       .order('post_id', { ascending: true })
@@ -431,15 +431,15 @@ export class RSSProcessor {
    * NEW WORKFLOW: Fact-check articles (Step 3 of article generation)
    * Fact-checks all articles that have content but no fact-check score
    */
-  async factCheckArticles(campaignId: string, section: 'primary' | 'secondary' = 'primary') {
-    const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+  async factCheckArticles(issueId: string, section: 'primary' | 'secondary' = 'primary') {
+    const newsletterId = await this.getNewsletterIdFromissue(issueId)
     const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
 
     // Get articles with actual content (not empty placeholder) but no fact-check
     const { data: articles } = await supabaseAdmin
       .from(tableName)
       .select('*, rss_posts(*)')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .neq('content', '') // Has actual content (not empty placeholder)
       .not('content', 'is', null)
       .is('fact_check_score', null)
@@ -507,7 +507,7 @@ export class RSSProcessor {
     // Starting RSS processing (HYBRID MODE)
 
     try {
-      // Use hybrid workflow (creates campaign and processes pre-scored posts)
+      // Use hybrid workflow (creates issue and processes pre-scored posts)
       await this.processAllFeedsHybrid()
     } catch (error) {
       await this.errorHandler.handleError(error, {
@@ -521,13 +521,13 @@ export class RSSProcessor {
 
   /**
    * Ingest and score new posts (runs every 15 minutes)
-   * Does NOT generate articles or assign to campaigns
+   * Does NOT generate articles or assign to issues
    */
   async ingestNewPosts(): Promise<{ fetched: number; scored: number }> {
     // Get first active newsletter for backward compatibility
-    // (ingestion happens without campaign context)
+    // (ingestion happens without issue context)
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('is_active', true)
       .limit(1)
@@ -586,7 +586,7 @@ export class RSSProcessor {
     for (const item of recentPosts) {
       const externalId = item.guid || item.link || ''
 
-      // Check if already exists (any campaign or no campaign)
+      // Check if already exists (any issue or no issue)
       const { data: existing } = await supabaseAdmin
         .from('rss_posts')
         .select('id')
@@ -624,12 +624,12 @@ export class RSSProcessor {
 
       if (blockImages) imageUrl = null
 
-      // Insert new post (campaign_id = null)
+      // Insert new post (issueId = null)
       const { data: newPost, error: insertError } = await supabaseAdmin
         .from('rss_posts')
         .insert([{
           feed_id: feed.id,
-          campaign_id: null, // ← Not assigned to campaign yet
+          issue_id: null, // ← Not assigned to issue yet
           external_id: externalId,
           title: item.title || '',
           description: item.contentSnippet || item.content || '',
@@ -792,37 +792,37 @@ export class RSSProcessor {
   }
 
   /**
-   * HYBRID WORKFLOW: Process campaign using pre-scored posts from ingestion
+   * HYBRID WORKFLOW: Process issue using pre-scored posts from ingestion
    * This is the main workflow for nightly batch processing
    */
   async processAllFeedsHybrid() {
     console.log('=== HYBRID RSS PROCESSING START ===')
 
-    let campaignId = ''
+    let issueId = ''
 
     try {
-      // STEP 1: Create NEW campaign
-      console.log('[Step 1/10] Creating new campaign...')
+      // STEP 1: Create NEW issue
+      console.log('[Step 1/10] Creating new issue...')
 
-      // Calculate campaign date (Central Time + 12 hours)
+      // Calculate issue date (Central Time + 12 hours)
       const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
       const centralDate = new Date(nowCentral)
       centralDate.setHours(centralDate.getHours() + 12)
-      const campaignDate = centralDate.toISOString().split('T')[0]
+      const issueDate = centralDate.toISOString().split('T')[0]
 
-      // Create new campaign with processing status
-      const { data: newCampaign, error: createError } = await supabaseAdmin
-        .from('newsletter_campaigns')
-        .insert([{ date: campaignDate, status: 'processing' }])
+      // Create new issue with processing status
+      const { data: newissue, error: createError } = await supabaseAdmin
+        .from('publication_issues')
+        .insert([{ date: issueDate, status: 'processing' }])
         .select('id')
         .single()
 
-      if (createError || !newCampaign) {
-        throw new Error('Failed to create campaign')
+      if (createError || !newissue) {
+        throw new Error('Failed to create issue')
       }
 
-      campaignId = newCampaign.id
-      console.log(`[Step 1/10] ✓ Campaign created: ${campaignId} for ${campaignDate}`)
+      issueId = newissue.id
+      console.log(`[Step 1/10] ✓ issue created: ${issueId} for ${issueDate}`)
 
       // STEP 2: Select AI applications and prompts
       console.log('[Step 2/10] Selecting AI apps and prompts...')
@@ -831,15 +831,15 @@ export class RSSProcessor {
         const { AppSelector } = await import('./app-selector')
         const { PromptSelector } = await import('./prompt-selector')
         const { data: newsletter } = await supabaseAdmin
-          .from('newsletters')
+          .from('publications')
           .select('id, name, slug')
           .eq('is_active', true)
           .limit(1)
           .single()
 
         if (newsletter) {
-          await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
-          await PromptSelector.selectPromptForCampaign(campaignId)
+          await AppSelector.selectAppsForissue(issueId, newsletter.id)
+          await PromptSelector.selectPromptForissue(issueId)
         }
       } catch (error) {
         console.log('[Step 2/10] ⚠️ AI selection failed (non-critical):', error)
@@ -849,72 +849,72 @@ export class RSSProcessor {
 
       // STEP 3: Assign top 12 rated posts from pool for each section
       console.log('[Step 3/10] Assigning top 12 posts per section from pool...')
-      const assignResult = await this.assignTopPostsToCampaign(campaignId)
+      const assignResult = await this.assignTopPostsToissue(issueId)
       console.log(`[Step 3/10] ✓ Assigned ${assignResult.primary} primary, ${assignResult.secondary} secondary posts`)
 
       // STEP 4: Run deduplication
       console.log('[Step 4/10] Deduplicating posts...')
-      await this.handleDuplicatesForCampaign(campaignId)
+      await this.handleDuplicatesForissue(issueId)
       const { data: duplicateGroups } = await supabaseAdmin
         .from('duplicate_groups')
         .select('id')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
       const groupsCount = duplicateGroups ? duplicateGroups.length : 0
       console.log(`[Step 4/10] ✓ Deduplicated: ${groupsCount} duplicate groups`)
 
       // STEP 5: Generate articles from top 6 remaining posts per section
       console.log('[Step 5/10] Generating articles from top 6 posts per section...')
-      await this.generateArticlesForSection(campaignId, 'primary', 6)
-      await this.generateArticlesForSection(campaignId, 'secondary', 6)
+      await this.generateArticlesForSection(issueId, 'primary', 6)
+      await this.generateArticlesForSection(issueId, 'secondary', 6)
       const { data: generatedPrimary } = await supabaseAdmin
         .from('articles')
         .select('id')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
       const { data: generatedSecondary } = await supabaseAdmin
         .from('secondary_articles')
         .select('id')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
       console.log(`[Step 5/10] ✓ Generated ${generatedPrimary?.length || 0} primary, ${generatedSecondary?.length || 0} secondary`)
 
       // STEP 6: Auto-select top 3 articles per section
       console.log('[Step 6/10] Auto-selecting top 3 articles per section...')
-      await this.selectTopArticlesForCampaign(campaignId)
+      await this.selectTopArticlesForissue(issueId)
       const { data: activeArticles } = await supabaseAdmin
         .from('articles')
         .select('id')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .eq('is_active', true)
       const { data: activeSecondary } = await supabaseAdmin
         .from('secondary_articles')
         .select('id')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .eq('is_active', true)
       console.log(`[Step 6/10] ✓ Selected ${activeArticles?.length || 0} primary, ${activeSecondary?.length || 0} secondary`)
 
       // STEP 7: Generate welcome section
       console.log('[Step 7/10] Generating welcome section...')
-      await this.generateWelcomeSection(campaignId)
+      await this.generateWelcomeSection(issueId)
       console.log('[Step 7/10] ✓ Welcome section generated')
 
       // STEP 8: Subject line is already generated in selectTopArticlesForCampaign
-      const { data: campaign } = await supabaseAdmin
-        .from('newsletter_campaigns')
+      const { data: issue } = await supabaseAdmin
+        .from('publication_issues')
         .select('subject_line')
-        .eq('id', campaignId)
+        .eq('id', issueId)
         .single()
-      console.log(`[Step 8/10] ✓ Subject line: "${campaign?.subject_line?.substring(0, 50) || 'Not found'}..."`)
+      console.log(`[Step 8/10] ✓ Subject line: "${issue?.subject_line?.substring(0, 50) || 'Not found'}..."`)
 
-      // STEP 9: Set campaign status to draft
-      console.log('[Step 9/10] Setting campaign status to draft...')
+      // STEP 9: Set issue status to draft
+      console.log('[Step 9/10] Setting issue status to draft...')
       await supabaseAdmin
-        .from('newsletter_campaigns')
+        .from('publication_issues')
         .update({ status: 'draft' })
-        .eq('id', campaignId)
+        .eq('id', issueId)
       console.log('[Step 9/10] ✓ Status: draft')
 
       // STEP 10: Stage 1 Unassignment (posts without articles)
       console.log('[Step 10/10] Stage 1 unassignment for unused posts...')
-      const unassignResult = await this.unassignUnusedPosts(campaignId)
+      const unassignResult = await this.unassignUnusedPosts(issueId)
       console.log(`[Step 10/10] ✓ Unassigned ${unassignResult.unassigned} posts back to pool`)
 
       console.log('=== HYBRID RSS PROCESSING COMPLETE ===')
@@ -923,12 +923,12 @@ export class RSSProcessor {
       console.error('=== HYBRID RSS PROCESSING FAILED ===')
       console.error('Error:', error)
 
-      // Mark campaign as failed (only if campaign was created)
-      if (campaignId) {
+      // Mark issue as failed (only if issue was created)
+      if (issueId) {
         await supabaseAdmin
-          .from('newsletter_campaigns')
+          .from('publication_issues')
           .update({ status: 'failed' })
-          .eq('id', campaignId)
+          .eq('id', issueId)
       }
 
       throw error
@@ -936,9 +936,9 @@ export class RSSProcessor {
   }
 
   /**
-   * Assign top-scoring posts from pool to campaign
+   * Assign top-scoring posts from pool to issue
    */
-  private async assignTopPostsToCampaign(campaignId: string): Promise<{ primary: number; secondary: number }> {
+  private async assignTopPostsToissue(issueId: string): Promise<{ primary: number; secondary: number }> {
     // Get lookback window
     const { data: lookbackSetting } = await supabaseAdmin
       .from('app_settings')
@@ -978,7 +978,7 @@ export class RSSProcessor {
         post_ratings(total_score)
       `)
       .in('feed_id', primaryFeedIds)
-      .is('campaign_id', null)
+      .is('issue_id', null)
       .gte('processed_at', lookbackTimestamp)
       .not('post_ratings', 'is', null)
 
@@ -999,7 +999,7 @@ export class RSSProcessor {
         post_ratings(total_score)
       `)
       .in('feed_id', secondaryFeedIds)
-      .is('campaign_id', null)
+      .is('issue_id', null)
       .gte('processed_at', lookbackTimestamp)
       .not('post_ratings', 'is', null)
 
@@ -1012,21 +1012,21 @@ export class RSSProcessor {
       })
       .slice(0, 12) || []
 
-    // Assign to campaign
+    // Assign to issue
     const primaryIds = topPrimary?.map(p => p.id) || []
     const secondaryIds = topSecondary?.map(p => p.id) || []
 
     if (primaryIds.length > 0) {
       await supabaseAdmin
         .from('rss_posts')
-        .update({ campaign_id: campaignId })
+        .update({ issue_id: issueId })
         .in('id', primaryIds)
     }
 
     if (secondaryIds.length > 0) {
       await supabaseAdmin
         .from('rss_posts')
-        .update({ campaign_id: campaignId })
+        .update({ issue_id: issueId })
         .in('id', secondaryIds)
     }
 
@@ -1036,12 +1036,12 @@ export class RSSProcessor {
   /**
    * Stage 1 Unassignment: Unassign posts that were assigned but no articles generated
    */
-  async unassignUnusedPosts(campaignId: string): Promise<{ unassigned: number }> {
-    // Find all posts assigned to this campaign
+  async unassignUnusedPosts(issueId: string): Promise<{ unassigned: number }> {
+    // Find all posts assigned to this issue
     const { data: assignedPosts } = await supabaseAdmin
       .from('rss_posts')
       .select('id')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     const assignedPostIds = assignedPosts?.map(p => p.id) || []
 
@@ -1053,13 +1053,13 @@ export class RSSProcessor {
     const { data: primaryArticles } = await supabaseAdmin
       .from('articles')
       .select('post_id')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     // Find posts used in secondary articles
     const { data: secondaryArticles } = await supabaseAdmin
       .from('secondary_articles')
       .select('post_id')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     const usedPostIds = [
       ...(primaryArticles?.map(a => a.post_id) || []),
@@ -1076,13 +1076,13 @@ export class RSSProcessor {
     // Unassign unused posts back to pool
     await supabaseAdmin
       .from('rss_posts')
-      .update({ campaign_id: null })
+      .update({ issue_id: null })
       .in('id', unusedPostIds)
 
     return { unassigned: unusedPostIds.length }
   }
 
-  async processAllFeedsForCampaign(campaignId: string) {
+  async processAllFeedsForissue(issueId: string) {
 
     let archiveResult: any = null
 
@@ -1090,34 +1090,34 @@ export class RSSProcessor {
       // STEP 0: Archive existing articles and posts before clearing (PRESERVES POSITION DATA!)
 
       try {
-        archiveResult = await this.archiveService.archiveCampaignArticles(campaignId, 'rss_processing_clear')
+        archiveResult = await this.archiveService.archiveissueArticles(issueId, 'rss_processing_clear')
       } catch (archiveError) {
         // Archive failure shouldn't block RSS processing, but we should log it
         await this.errorHandler.logInfo('Archive failed but RSS processing continuing', {
-          campaignId,
+          issueId,
           archiveError: archiveError instanceof Error ? archiveError.message : 'Unknown error'
         }, 'rss_processor')
       }
 
-      // Clear previous articles and posts for this campaign to allow fresh processing
+      // Clear previous articles and posts for this issue to allow fresh processing
 
-      // Delete existing articles for this campaign
+      // Delete existing articles for this issue
       await supabaseAdmin
         .from('articles')
         .delete()
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
 
-      // Delete existing secondary articles for this campaign
+      // Delete existing secondary articles for this issue
       await supabaseAdmin
         .from('secondary_articles')
         .delete()
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
 
-      // Delete existing posts for this campaign
+      // Delete existing posts for this issue
       await supabaseAdmin
         .from('rss_posts')
         .delete()
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
 
       // Get active RSS feeds - separate primary and secondary
       const { data: allFeeds, error: feedsError } = await supabaseAdmin
@@ -1142,7 +1142,7 @@ export class RSSProcessor {
       // Process primary feeds
       for (const feed of primaryFeeds) {
         try {
-          await this.processFeed(feed, campaignId, 'primary')
+          await this.processFeed(feed, issueId, 'primary')
         } catch (error) {
           await this.logError(`Failed to process primary feed ${feed.name}`, {
             feedId: feed.id,
@@ -1162,7 +1162,7 @@ export class RSSProcessor {
       // Process secondary feeds
       for (const feed of secondaryFeeds) {
         try {
-          await this.processFeed(feed, campaignId, 'secondary')
+          await this.processFeed(feed, issueId, 'secondary')
         } catch (error) {
           await this.logError(`Failed to process secondary feed ${feed.name}`, {
             feedId: feed.id,
@@ -1181,56 +1181,56 @@ export class RSSProcessor {
 
       // Extract full article text for posts from past 24 hours (before AI processing)
       try {
-        await this.enrichRecentPostsWithFullContent(campaignId)
+        await this.enrichRecentPostsWithFullContent(issueId)
       } catch (extractionError) {
         // Don't fail the entire RSS processing if article extraction fails
       }
 
       // Process posts with AI for both sections (using full article text if available)
       // Generates title + content, applies scoring criteria, and fact checks
-      await this.processPostsWithAI(campaignId, 'primary')
-      await this.processPostsWithAI(campaignId, 'secondary')
+      await this.processPostsWithAI(issueId, 'primary')
+      await this.processPostsWithAI(issueId, 'secondary')
 
       // Generate welcome section after all articles are processed
-      await this.generateWelcomeSection(campaignId)
+      await this.generateWelcomeSection(issueId)
 
-      // Campaign remains in 'draft' status for MailerLite cron to process
-      // Status will be updated to 'in_review' by create-campaign cron after MailerLite send
+      // issue remains in 'draft' status for MailerLite cron to process
+      // Status will be updated to 'in_review' by create-issue cron after MailerLite send
 
-      // Update campaign status from processing to draft
+      // Update issue status from processing to draft
       await supabaseAdmin
-        .from('newsletter_campaigns')
+        .from('publication_issues')
         .update({ status: 'draft' })
-        .eq('id', campaignId)
+        .eq('id', issueId)
 
       // Get final article count to report to Slack (total articles, not just active)
       const { data: finalArticles, error: countError } = await supabaseAdmin
         .from('articles')
         .select('id')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
 
       const articleCount = finalArticles?.length || 0
 
-      // Get campaign date for notifications
-      const { data: campaignInfo } = await supabaseAdmin
-        .from('newsletter_campaigns')
+      // Get issue date for notifications
+      const { data: issueInfo } = await supabaseAdmin
+        .from('publication_issues')
         .select('date')
-        .eq('id', campaignId)
+        .eq('id', issueId)
         .single()
 
-      const campaignDate = campaignInfo?.date || 'Unknown'
+      const issueDate = issueInfo?.date || 'Unknown'
 
       await this.errorHandler.logInfo('RSS processing completed successfully', {
-        campaignId,
+        issueId,
         articleCount,
-        campaignDate
+        issueDate
       }, 'rss_processor')
 
       // Enhanced Slack notification with article count monitoring
       await this.slack.sendRSSProcessingCompleteAlert(
-        campaignId,
+        issueId,
         articleCount,
-        campaignDate,
+        issueDate,
         archiveResult ? {
           archivedArticles: archiveResult.archivedArticlesCount,
           archivedPosts: archiveResult.archivedPostsCount,
@@ -1243,78 +1243,78 @@ export class RSSProcessor {
       const completedSteps = []
       const failedStep = 'Unknown step'
 
-      // Check what got completed by examining campaign state
-      const { data: campaignCheck } = await supabaseAdmin
-        .from('newsletter_campaigns')
+      // Check what got completed by examining issue state
+      const { data: issueCheck } = await supabaseAdmin
+        .from('publication_issues')
         .select('status')
-        .eq('id', campaignId)
+        .eq('id', issueId)
         .single()
 
       // Check if articles exist
       const { data: articlesCheck } = await supabaseAdmin
         .from('articles')
         .select('id')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .limit(1)
 
       // Check if posts exist
       const { data: postsCheck } = await supabaseAdmin
         .from('rss_posts')
         .select('id')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .limit(1)
 
       // Determine what was completed
       if (archiveResult) completedSteps.push('Archive')
       if (postsCheck?.length) completedSteps.push('RSS Feed Processing')
       if (articlesCheck?.length) completedSteps.push('Article Generation')
-      if (campaignCheck?.status === 'draft') completedSteps.push('Status Update')
+      if (issueCheck?.status === 'draft') completedSteps.push('Status Update')
 
       // Determine likely failure point
       let failedStepGuess = 'RSS Processing Start'
       if (postsCheck?.length && !articlesCheck?.length) failedStepGuess = 'AI Article Processing'
-      else if (articlesCheck?.length && campaignCheck?.status !== 'draft') failedStepGuess = 'Campaign Status Update'
+      else if (articlesCheck?.length && issueCheck?.status !== 'draft') failedStepGuess = 'issue Status Update'
       else if (completedSteps.length === 0) failedStepGuess = 'Archive or Initial Setup'
 
       await this.errorHandler.handleError(error, {
         source: 'rss_processor',
-        operation: 'processAllFeedsForCampaign',
-        campaignId,
+        operation: 'processAllFeedsForissue',
+        issueId,
         completedSteps,
         failedStep: failedStepGuess
       })
 
       // Enhanced failure notification
       await this.slack.sendRSSIncompleteAlert(
-        campaignId,
+        issueId,
         completedSteps,
         failedStepGuess,
         error instanceof Error ? error.message : 'Unknown error'
       )
 
       // Also send the traditional alert
-      await this.slack.sendRSSProcessingAlert(false, campaignId, error instanceof Error ? error.message : 'Unknown error')
+      await this.slack.sendRSSProcessingAlert(false, issueId, error instanceof Error ? error.message : 'Unknown error')
 
       throw error
     }
   }
 
-  private async getOrCreateTodaysCampaign(): Promise<string> {
+  private async getOrCreateTodaysissue(): Promise<string> {
     // Use Central Time + 12 hours for consistent date calculations
-    // This ensures evening runs (8pm+) create campaigns for tomorrow
+    // This ensures evening runs (8pm+) create issues for tomorrow
     const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
     const centralDate = new Date(nowCentral)
-    // Add 12 hours to determine campaign date
+    // Add 12 hours to determine issue date
     centralDate.setHours(centralDate.getHours() + 12)
-    const campaignDate = centralDate.toISOString().split('T')[0]
+    const issueDate = centralDate.toISOString().split('T')[0]
 
 
-    // Check if campaign exists for this date that is NOT sent or in_review
+    // Check if issue exists for this date that is NOT sent or in_review
     // Only process campaigns in 'draft' or 'processing' status
     const { data: existing, error: existingError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .select('id, status')
-      .eq('date', campaignDate)
+      .eq('date', issueDate)
       .in('status', ['draft', 'processing'])
       .order('created_at', { ascending: true })
       .limit(1)
@@ -1326,31 +1326,31 @@ export class RSSProcessor {
         : typeof existingError === 'object' && existingError !== null
           ? JSON.stringify(existingError, null, 2)
           : String(existingError)
-      console.error('Error checking for existing campaign:', errorMsg)
+      console.error('Error checking for existing issue:', errorMsg)
     }
 
-    let campaignId: string
-    let isNewCampaign = false
+    let issueId: string
+    let isNewissue = false
 
     if (existing) {
-      // Found a draft/processing campaign for this date
-      campaignId = existing.id
-      console.log(`Using existing campaign ${campaignId} (status: ${existing.status})`)
+      // Found a draft/processing issue for this date
+      issueId = existing.id
+      console.log(`Using existing issue ${issueId} (status: ${existing.status})`)
     } else {
-      // Create new campaign with processing status
-      const { data: newCampaign, error } = await supabaseAdmin
-        .from('newsletter_campaigns')
-        .insert([{ date: campaignDate, status: 'processing' }])
+      // Create new issue with processing status
+      const { data: newissue, error } = await supabaseAdmin
+        .from('publication_issues')
+        .insert([{ date: issueDate, status: 'processing' }])
         .select('id')
         .single()
 
-      if (error || !newCampaign) {
-        throw new Error('Failed to create campaign')
+      if (error || !newissue) {
+        throw new Error('Failed to create issue')
       }
 
-      campaignId = newCampaign.id
-      isNewCampaign = true
-      console.log(`Created new campaign ${campaignId} for date ${campaignDate}`)
+      issueId = newissue.id
+      isNewissue = true
+      console.log(`Created new issue ${issueId} for date ${issueDate}`)
     }
 
     // Initialize AI Applications and Prompt Ideas if not already done
@@ -1360,16 +1360,16 @@ export class RSSProcessor {
 
       // Check if AI Apps already selected
       const { data: existingApps } = await supabaseAdmin
-        .from('campaign_ai_app_selections')
+        .from('issue_ai_app_selections')
         .select('id')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .limit(1)
 
       // Check if Prompt already selected
       const { data: existingPrompt } = await supabaseAdmin
-        .from('campaign_prompt_selections')
+        .from('issue_prompt_selections')
         .select('id')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .limit(1)
 
       const needsApps = !existingApps || existingApps.length === 0
@@ -1377,7 +1377,7 @@ export class RSSProcessor {
 
       if (needsApps || needsPrompt) {
         const { data: newsletter } = await supabaseAdmin
-          .from('newsletters')
+          .from('publications')
           .select('id, name, slug')
           .eq('is_active', true)
           .limit(1)
@@ -1385,10 +1385,10 @@ export class RSSProcessor {
 
         if (newsletter) {
           if (needsApps) {
-            await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
+            await AppSelector.selectAppsForissue(issueId, newsletter.id)
           }
           if (needsPrompt) {
-            await PromptSelector.selectPromptForCampaign(campaignId)
+            await PromptSelector.selectPromptForissue(issueId)
           }
         }
       }
@@ -1398,14 +1398,14 @@ export class RSSProcessor {
         : typeof initError === 'object' && initError !== null
           ? JSON.stringify(initError, null, 2)
           : String(initError)
-      console.error('Error initializing campaign content:', errorMsg)
+      console.error('Error initializing issue content:', errorMsg)
       // Don't throw - continue with RSS processing even if initialization fails
     }
 
-    return campaignId
+    return issueId
   }
 
-  private async processFeed(feed: RssFeed, campaignId: string, section: 'primary' | 'secondary' = 'primary') {
+  private async processFeed(feed: RssFeed, issueId: string, section: 'primary' | 'secondary' = 'primary') {
     try {
       // Get excluded RSS sources from settings
       const { data: excludedSettings } = await supabaseAdmin
@@ -1492,18 +1492,18 @@ export class RSSProcessor {
             imageUrl = itemAny.thumbnail || itemAny.image || itemAny['media:thumbnail']?.url || null
           }
 
-          // Check if post already exists FOR THIS CAMPAIGN
+          // Check if post already exists FOR THIS ISSUE
           // This allows the same RSS post to be used by multiple campaigns
           const { data: existingPost } = await supabaseAdmin
             .from('rss_posts')
             .select('id')
             .eq('feed_id', feed.id)
-            .eq('campaign_id', campaignId)
+            .eq('issue_id', issueId)
             .eq('external_id', item.guid || item.link || '')
             .maybeSingle()
 
           if (existingPost) {
-            continue // Skip if already processed for this campaign
+            continue // Skip if already processed for this issue
           }
 
           // Attempt to download and re-host image immediately if it's a Facebook URL
@@ -1530,7 +1530,7 @@ export class RSSProcessor {
             .from('rss_posts')
             .insert([{
               feed_id: feed.id,
-              campaign_id: campaignId,
+              issue_id: issueId,
               external_id: item.guid || item.link || '',
               title: item.title || '',
               description: item.contentSnippet || item.content || '',
@@ -1566,9 +1566,9 @@ export class RSSProcessor {
     }
   }
 
-  private async processPostsWithAI(campaignId: string, section: 'primary' | 'secondary' = 'primary') {
-    // Get newsletter_id from campaign
-    const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+  private async processPostsWithAI(issueId: string, section: 'primary' | 'secondary' = 'primary') {
+    // Get publication_id from issue
+    const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
     // Get feeds for this section
     const { data: feeds, error: feedsError } = await supabaseAdmin
@@ -1583,11 +1583,11 @@ export class RSSProcessor {
 
     const feedIds = feeds.map(f => f.id)
 
-    // Get posts for this campaign from feeds in this section
+    // Get posts for this issue from feeds in this section
     const { data: posts, error } = await supabaseAdmin
       .from('rss_posts')
       .select('*')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .in('feed_id', feedIds)
 
     if (error || !posts) {
@@ -1673,11 +1673,11 @@ export class RSSProcessor {
     }
 
     // Step 2: Detect and handle duplicates
-    await this.handleDuplicates(posts, campaignId)
+    await this.handleDuplicates(posts, issueId)
 
     // Step 3: Generate newsletter articles for top posts
-    await this.logInfo(`Starting ${section} newsletter article generation...`, { campaignId, section })
-    await this.generateNewsletterArticles(campaignId, section)
+    await this.logInfo(`Starting ${section} newsletter article generation...`, { issueId, section })
+    await this.generateNewsletterArticles(issueId, section)
   }
 
   private async evaluatePost(post: RssPost, newsletterId: string, section: 'primary' | 'secondary' = 'primary'): Promise<ContentEvaluation> {
@@ -1688,7 +1688,7 @@ export class RSSProcessor {
     const { data: criteriaConfig, error: configError } = await supabaseAdmin
       .from('app_settings')
       .select('key, value')
-      .eq('newsletter_id', newsletterId)
+      .eq('publication_id', newsletterId)
       .or(`key.eq.${enabledCountKey},key.eq.criteria_enabled_count,key.like.${criteriaPrefix}%_name,key.like.${criteriaPrefix}%_weight,key.like.criteria_%_name,key.like.criteria_%_weight`)
 
     if (configError) {
@@ -1791,22 +1791,22 @@ export class RSSProcessor {
     } as any
   }
 
-  async handleDuplicatesForCampaign(campaignId: string) {
+  async handleDuplicatesForissue(issueId: string) {
     const { data: allPosts, error } = await supabaseAdmin
       .from('rss_posts')
       .select('*')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     if (error || !allPosts || allPosts.length === 0) {
       return { groups: 0, duplicates: 0 }
     }
 
-    await this.handleDuplicates(allPosts, campaignId)
+    await this.handleDuplicates(allPosts, issueId)
     
     const { data: duplicateGroups } = await supabaseAdmin
       .from('duplicate_groups')
       .select('id')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     const { data: duplicatePosts } = await supabaseAdmin
       .from('duplicate_posts')
@@ -1819,13 +1819,13 @@ export class RSSProcessor {
     }
   }
 
-  private async handleDuplicates(posts: RssPost[], campaignId: string) {
+  private async handleDuplicates(posts: RssPost[], issueId: string) {
     try {
-      // Check if already deduplicated for this campaign
+      // Check if already deduplicated for this issue
       const { data: existingGroups } = await supabaseAdmin
         .from('duplicate_groups')
         .select('id')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .limit(1)
 
       if (existingGroups && existingGroups.length > 0) {
@@ -1835,20 +1835,20 @@ export class RSSProcessor {
       const { data: allPosts, error } = await supabaseAdmin
         .from('rss_posts')
         .select('*')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
 
       if (error || !allPosts || allPosts.length === 0) {
         return
       }
 
-      // Get newsletter_id from campaign for multi-tenant filtering
-      const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+      // Get publication_id from issue for multi-tenant filtering
+      const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
       // Load deduplication settings
       const { data: settings } = await supabaseAdmin
         .from('app_settings')
         .select('key, value')
-        .eq('newsletter_id', newsletterId)
+        .eq('publication_id', newsletterId)
         .in('key', ['dedup_historical_lookback_days', 'dedup_strictness_threshold'])
 
       const settingsMap = new Map(settings?.map(s => [s.key, s.value]) || [])
@@ -1861,7 +1861,7 @@ export class RSSProcessor {
         historicalLookbackDays,
         strictnessThreshold
       })
-      const result = await deduplicator.detectAllDuplicates(allPosts, campaignId)
+      const result = await deduplicator.detectAllDuplicates(allPosts, issueId)
 
       console.log(`[Dedup] AI found ${result.groups?.length || 0} duplicate groups`)
       console.log(`[Dedup] Full result:`, JSON.stringify(result, null, 2))
@@ -1888,7 +1888,7 @@ export class RSSProcessor {
         const { data: duplicateGroup, error: groupError } = await supabaseAdmin
           .from('duplicate_groups')
           .insert([{
-            campaign_id: campaignId,
+            issue_id: issueId,
             primary_post_id: primaryPost.id,
             topic_signature: group.topic_signature
           }])
@@ -1952,7 +1952,7 @@ export class RSSProcessor {
     }
   }
 
-  private async generateNewsletterArticles(campaignId: string, section: 'primary' | 'secondary' = 'primary', limit: number = 12) {
+  private async generateNewsletterArticles(issueId: string, section: 'primary' | 'secondary' = 'primary', limit: number = 12) {
 
     // Get feeds for this section
     const { data: feeds, error: feedsError } = await supabaseAdmin
@@ -1974,16 +1974,16 @@ export class RSSProcessor {
         *,
         post_ratings(*)
       `)
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .in('feed_id', feedIds)
-      // NO LIMIT - Get ALL posts for this campaign section
+      // NO LIMIT - Get ALL posts for this issue section
 
     // Get duplicate post IDs to exclude (two-step query for proper filtering)
-    // Step 1: Get duplicate groups for this campaign
+    // Step 1: Get duplicate groups for this issue
     const { data: duplicateGroups } = await supabaseAdmin
       .from('duplicate_groups')
       .select('id')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     const groupIds = duplicateGroups?.map(g => g.id) || []
 
@@ -2027,7 +2027,7 @@ export class RSSProcessor {
           *,
           post_ratings(*)
         `)
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .not('post_ratings', 'is', null)
 
       if (allRatedPosts && allRatedPosts.length > 0) {
@@ -2051,7 +2051,7 @@ export class RSSProcessor {
           const batch = limitedPosts.slice(i, i + BATCH_SIZE)
           const batchPromises = batch.map(async (post) => {
             try {
-              await this.processPostIntoArticle(post, campaignId, section)
+              await this.processPostIntoArticle(post, issueId, section)
             } catch (error) {
               // Silent failure
             }
@@ -2080,7 +2080,7 @@ export class RSSProcessor {
       // Process batch concurrently (headline → body → fact check is sequential within each post)
       const batchPromises = batch.map(async (post) => {
         try {
-          await this.processPostIntoArticle(post, campaignId, section)
+          await this.processPostIntoArticle(post, issueId, section)
           processedCount++
         } catch (error) {
           errorCount++
@@ -2098,27 +2098,27 @@ export class RSSProcessor {
 
     // Note: Article selection and subject line generation moved to separate steps
     // Download and store images for articles
-    await this.processArticleImages(campaignId)
+    await this.processArticleImages(issueId)
   }
 
   /**
    * Public method to select top articles - used by step-based processing
    */
-  async selectTopArticlesForCampaign(campaignId: string) {
-    await this.selectTop5Articles(campaignId)
-    await this.selectTopSecondaryArticles(campaignId)
+  async selectTopArticlesForissue(issueId: string) {
+    await this.selectTop5Articles(issueId)
+    await this.selectTopSecondaryArticles(issueId)
   }
 
-  private async selectTop5Articles(campaignId: string) {
+  private async selectTop5Articles(issueId: string) {
     try {
-      // Get newsletter_id from campaign for multi-tenant filtering
-      const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+      // Get publication_id from issue for multi-tenant filtering
+      const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
       // Get max_top_articles setting (defaults to 3)
       const { data: maxTopArticlesSetting } = await supabaseAdmin
         .from('app_settings')
         .select('value')
-        .eq('newsletter_id', newsletterId)
+        .eq('publication_id', newsletterId)
         .eq('key', 'max_top_articles')
         .single()
 
@@ -2128,7 +2128,7 @@ export class RSSProcessor {
       const { data: lookbackSetting } = await supabaseAdmin
         .from('app_settings')
         .select('value')
-        .eq('newsletter_id', newsletterId)
+        .eq('publication_id', newsletterId)
         .eq('key', 'primary_article_lookback_hours')
         .single()
 
@@ -2138,12 +2138,12 @@ export class RSSProcessor {
       const lookbackTimestamp = lookbackDate.toISOString()
 
       // Query ALL articles from the lookback window that haven't been used in sent newsletters
-      // This gives us the best articles regardless of which campaign they were originally processed for
+      // This gives us the best articles regardless of which issue they were originally processed for
       const { data: availableArticles, error } = await supabaseAdmin
         .from('articles')
         .select(`
           id,
-          campaign_id,
+          issueId,
           fact_check_score,
           created_at,
           final_position,
@@ -2174,7 +2174,7 @@ export class RSSProcessor {
       const sortedArticles = availableArticles
         .map((article: any) => ({
           id: article.id,
-          current_campaign_id: article.campaign_id,
+          current_issue_id: article.issue_id,
           score: article.rss_post?.post_rating?.[0]?.total_score || 0,
           created_at: article.created_at
         }))
@@ -2191,24 +2191,24 @@ export class RSSProcessor {
         return
       }
 
-      // Update all selected articles to belong to current campaign and activate them
+      // Update all selected articles to belong to current issue and activate them
       for (let i = 0; i < sortedArticles.length; i++) {
         const article = sortedArticles[i]
 
         await supabaseAdmin
           .from('articles')
           .update({
-            campaign_id: campaignId,
+            issue_id: issueId,
             is_active: true,
             rank: i + 1  // Rank 1, 2, 3...
           })
           .eq('id', article.id)
       }
 
-      console.log(`[Primary Selection] ✓ Activated ${sortedArticles.length} primary articles for campaign`)
+      console.log(`[Primary Selection] ✓ Activated ${sortedArticles.length} primary articles for issue`)
 
       // Generate subject line using the top-ranked article
-      await this.generateSubjectLineForCampaign(campaignId)
+      await this.generateSubjectLineForissue(issueId)
 
     } catch (error) {
       const errorMsg = error instanceof Error 
@@ -2221,16 +2221,16 @@ export class RSSProcessor {
   }
 
 
-  private async selectTopSecondaryArticles(campaignId: string) {
+  private async selectTopSecondaryArticles(issueId: string) {
     try {
-      // Get newsletter_id from campaign for multi-tenant filtering
-      const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+      // Get publication_id from issue for multi-tenant filtering
+      const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
       // Get max_secondary_articles setting (defaults to 3)
       const { data: maxSecondaryArticlesSetting } = await supabaseAdmin
         .from('app_settings')
         .select('value')
-        .eq('newsletter_id', newsletterId)
+        .eq('publication_id', newsletterId)
         .eq('key', 'max_secondary_articles')
         .single()
 
@@ -2240,7 +2240,7 @@ export class RSSProcessor {
       const { data: lookbackSetting } = await supabaseAdmin
         .from('app_settings')
         .select('value')
-        .eq('newsletter_id', newsletterId)
+        .eq('publication_id', newsletterId)
         .eq('key', 'secondary_article_lookback_hours')
         .single()
 
@@ -2254,7 +2254,7 @@ export class RSSProcessor {
         .from('secondary_articles')
         .select(`
           id,
-          campaign_id,
+          issueId,
           fact_check_score,
           created_at,
           final_position,
@@ -2285,7 +2285,7 @@ export class RSSProcessor {
       const sortedArticles = availableArticles
         .map((article: any) => ({
           id: article.id,
-          current_campaign_id: article.campaign_id,
+          current_issue_id: article.issue_id,
           score: article.rss_post?.post_rating?.[0]?.total_score || 0,
           created_at: article.created_at
         }))
@@ -2302,21 +2302,21 @@ export class RSSProcessor {
         return
       }
 
-      // Update all selected articles to belong to current campaign and activate them
+      // Update all selected articles to belong to current issue and activate them
       for (let i = 0; i < sortedArticles.length; i++) {
         const article = sortedArticles[i]
 
         await supabaseAdmin
           .from('secondary_articles')
           .update({
-            campaign_id: campaignId,
+            issue_id: issueId,
             is_active: true,
             rank: i + 1  // Rank 1, 2, 3...
           })
           .eq('id', article.id)
       }
 
-      console.log(`[Secondary Selection] ✓ Activated ${sortedArticles.length} secondary articles for campaign`)
+      console.log(`[Secondary Selection] ✓ Activated ${sortedArticles.length} secondary articles for issue`)
 
     } catch (error) {
       const errorMsg = error instanceof Error 
@@ -2327,7 +2327,7 @@ export class RSSProcessor {
       console.error('Error selecting top secondary articles:', errorMsg)
     }
   }
-  private async processArticleImages(campaignId: string) {
+  private async processArticleImages(issueId: string) {
     try {
       // Get active articles with their RSS post image URLs
       const { data: articles, error } = await supabaseAdmin
@@ -2340,7 +2340,7 @@ export class RSSProcessor {
             title
           )
         `)
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .eq('is_active', true)
 
       if (error || !articles) {
@@ -2385,9 +2385,9 @@ export class RSSProcessor {
   }
 
 
-  private async processPostIntoArticle(post: any, campaignId: string, section: 'primary' | 'secondary' = 'primary') {
-    // Get newsletter_id from campaign
-    const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+  private async processPostIntoArticle(post: any, issueId: string, section: 'primary' | 'secondary' = 'primary') {
+    // Get publication_id from issue
+    const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
     // Check if article already exists for this post (prevents duplicates when running in batches)
     const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
@@ -2395,7 +2395,7 @@ export class RSSProcessor {
       .from(tableName)
       .select('id')
       .eq('post_id', post.id)
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .single()
 
     if (existingArticle) {
@@ -2446,7 +2446,7 @@ export class RSSProcessor {
         .from(tableName)
         .insert([{
           post_id: post.id,
-          campaign_id: campaignId,
+          issue_id: issueId,
           headline: content.headline,
           content: content.content,
           rank: null, // Will be set by ranking algorithm
@@ -2569,16 +2569,16 @@ export class RSSProcessor {
     return result as FactCheckResult
   }
 
-  async generateWelcomeSection(campaignId: string): Promise<string> {
+  async generateWelcomeSection(issueId: string): Promise<string> {
     try {
-      // Get newsletter_id from campaign
-      const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+      // Get publication_id from issue
+      const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
-      // Fetch ALL active PRIMARY articles for this campaign
+      // Fetch ALL active PRIMARY articles for this issue
       const { data: primaryArticles, error: primaryError } = await supabaseAdmin
         .from('articles')
         .select('headline, content')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .eq('is_active', true)
         .order('rank', { ascending: true })
 
@@ -2586,11 +2586,11 @@ export class RSSProcessor {
         throw primaryError
       }
 
-      // Fetch ALL active SECONDARY articles for this campaign
+      // Fetch ALL active SECONDARY articles for this issue
       const { data: secondaryArticles, error: secondaryError } = await supabaseAdmin
         .from('secondary_articles')
         .select('headline, content')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .eq('is_active', true)
         .order('rank', { ascending: true })
 
@@ -2658,15 +2658,15 @@ export class RSSProcessor {
         throw new Error(`Failed to parse welcome section response: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`)
       }
 
-      // Save all 3 parts to campaign
+      // Save all 3 parts to issue
       const { error: updateError } = await supabaseAdmin
-        .from('newsletter_campaigns')
+        .from('publication_issues')
         .update({
           welcome_intro: welcomeIntro,
           welcome_tagline: welcomeTagline,
           welcome_summary: welcomeSummary
         })
-        .eq('id', campaignId)
+        .eq('id', issueId)
 
       if (updateError) {
         throw updateError
@@ -2700,14 +2700,14 @@ export class RSSProcessor {
       }])
   }
 
-  async generateSubjectLineForCampaign(campaignId: string) {
+  async generateSubjectLineForissue(issueId: string) {
     try {
-      // Get newsletter_id from campaign
-      const newsletterId = await this.getNewsletterIdFromCampaign(campaignId)
+      // Get publication_id from issue
+      const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
-      // Get the campaign with its articles for subject line generation
-      const { data: campaignWithArticles, error: campaignError } = await supabaseAdmin
-        .from('newsletter_campaigns')
+      // Get the issue with its articles for subject line generation
+      const { data: issueWithArticles, error: issueError } = await supabaseAdmin
+        .from('publication_issues')
         .select(`
           id,
           date,
@@ -2722,20 +2722,20 @@ export class RSSProcessor {
             )
           )
         `)
-        .eq('id', campaignId)
+        .eq('id', issueId)
         .single()
 
-      if (campaignError || !campaignWithArticles) {
-        throw new Error(`Campaign not found: ${campaignError?.message}`)
+      if (issueError || !issueWithArticles) {
+        throw new Error(`issue not found: ${issueError?.message}`)
       }
 
       // Check if subject line already exists
-      if (campaignWithArticles.subject_line && campaignWithArticles.subject_line.trim()) {
+      if (issueWithArticles.subject_line && issueWithArticles.subject_line.trim()) {
         return
       }
 
       // Get active articles sorted by AI score
-      const activeArticles = campaignWithArticles.articles
+      const activeArticles = issueWithArticles.articles
         ?.filter((article: any) => article.is_active)
         ?.sort((a: any, b: any) => {
           const scoreA = a.rss_post?.post_rating?.[0]?.total_score || 0
@@ -2780,14 +2780,14 @@ export class RSSProcessor {
       if (generatedSubject && generatedSubject.trim()) {
         generatedSubject = generatedSubject.trim()
 
-        // Update campaign with generated subject line
+        // Update issue with generated subject line
         const { error: updateError } = await supabaseAdmin
-          .from('newsletter_campaigns')
+          .from('publication_issues')
           .update({
             subject_line: generatedSubject,
             updated_at: new Date().toISOString()
           })
-          .eq('id', campaignId)
+          .eq('id', issueId)
 
         if (updateError) {
           throw updateError
@@ -2801,30 +2801,30 @@ export class RSSProcessor {
     }
   }
 
-  async populateEventsForCampaignSmart(campaignId: string) {
+  async populateEventsForIssueSmart(issueId: string) {
     try {
 
-      // Get campaign info to determine the date
-      const { data: campaign, error: campaignError } = await supabaseAdmin
-        .from('newsletter_campaigns')
+      // Get issue info to determine the date
+      const { data: issue, error: issueError } = await supabaseAdmin
+        .from('publication_issues')
         .select('*')
-        .eq('id', campaignId)
+        .eq('id', issueId)
         .single()
 
-        if (campaignError || !campaign) {
-          const errorMsg = campaignError instanceof Error 
-            ? campaignError.message 
-            : typeof campaignError === 'object' && campaignError !== null
-              ? JSON.stringify(campaignError, null, 2)
-              : String(campaignError)
-          console.error('Failed to fetch campaign for event population:', errorMsg)
+        if (issueError || !issue) {
+          const errorMsg = issueError instanceof Error 
+            ? issueError.message 
+            : typeof issueError === 'object' && issueError !== null
+              ? JSON.stringify(issueError, null, 2)
+              : String(issueError)
+          console.error('Failed to fetch issue for event population:', errorMsg)
         return
       }
 
-      const campaignDate = campaign.date
+      const issueDate = issue.date
 
-      // Calculate 3-day range starting from campaign date
-      const baseDate = new Date(campaignDate)
+      // Calculate 3-day range starting from issue date
+      const baseDate = new Date(issueDate)
       const dates: string[] = []
       for (let i = 0; i <= 2; i++) {
         const date = new Date(baseDate)
@@ -2833,11 +2833,11 @@ export class RSSProcessor {
       }
 
 
-      // Check if events already exist for this campaign
+      // Check if events already exist for this issue
       const { data: existingEvents, error: existingError } = await supabaseAdmin
-        .from('campaign_events')
+        .from('issue_events')
         .select('*, event:events(*)')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
 
       if (existingError) {
         const errorMsg = existingError instanceof Error 
@@ -2899,7 +2899,7 @@ export class RSSProcessor {
       })
 
       // Process each date
-      const newCampaignEvents: any[] = []
+      const newissueEvents: any[] = []
 
       for (const date of dates) {
         const eventsForDate = eventsByDate[date] || []
@@ -2999,10 +2999,10 @@ export class RSSProcessor {
 
         }
 
-        // Add all selected events to campaign_events
+        // Add all selected events to issue_events
         selectedForDate.forEach(({ event, is_featured, display_order }) => {
-          newCampaignEvents.push({
-            campaign_id: campaignId,
+          newissueEvents.push({
+            issue_id: issueId,
             event_id: event.id,
             event_date: date,
             is_selected: true,
@@ -3013,10 +3013,10 @@ export class RSSProcessor {
 
       }
 
-      if (newCampaignEvents.length > 0) {
+      if (newissueEvents.length > 0) {
         const { error: insertError } = await supabaseAdmin
-          .from('campaign_events')
-          .insert(newCampaignEvents)
+          .from('issue_events')
+          .insert(newissueEvents)
 
         if (insertError) {
           throw insertError
@@ -3030,37 +3030,37 @@ export class RSSProcessor {
         : typeof error === 'object' && error !== null
           ? JSON.stringify(error, null, 2)
           : String(error)
-      console.error('Error in populateEventsForCampaignSmart:', errorMsg)
-      await this.logError('Failed to populate events for campaign (smart)', {
-        campaignId,
+      console.error('Error in populateEventsForIssueSmart:', errorMsg)
+      await this.logError('Failed to populate events for issue (smart)', {
+        issueId,
         error: error instanceof Error ? error.message : 'Unknown error'
       })
     }
   }
 
-  async populateEventsForCampaign(campaignId: string) {
+  async populateEventsForissue(issueId: string) {
     try {
 
-      // Get campaign info
-      const { data: campaign, error: campaignError } = await supabaseAdmin
-        .from('newsletter_campaigns')
+      // Get issue info
+      const { data: issue, error: issueError } = await supabaseAdmin
+        .from('publication_issues')
         .select('*')
-        .eq('id', campaignId)
+        .eq('id', issueId)
         .single()
 
-        if (campaignError || !campaign) {
-          const errorMsg = campaignError instanceof Error 
-            ? campaignError.message 
-            : typeof campaignError === 'object' && campaignError !== null
-              ? JSON.stringify(campaignError, null, 2)
-              : String(campaignError)
-          console.error('Failed to fetch campaign for event population:', errorMsg)
+        if (issueError || !issue) {
+          const errorMsg = issueError instanceof Error 
+            ? issueError.message 
+            : typeof issueError === 'object' && issueError !== null
+              ? JSON.stringify(issueError, null, 2)
+              : String(issueError)
+          console.error('Failed to fetch issue for event population:', errorMsg)
         return
       }
 
-      // Calculate 3-day range starting from the newsletter date (campaign.date)
+      // Calculate 3-day range starting from the newsletter date (issue.date)
       // Day 1: Newsletter date, Day 2: Next day, Day 3: Day after that
-      const newsletterDate = new Date(campaign.date + 'T00:00:00') // Parse as local date
+      const newsletterDate = new Date(issue.date + 'T00:00:00') // Parse as local date
 
       const dates = []
       for (let i = 0; i <= 2; i++) {
@@ -3097,11 +3097,11 @@ export class RSSProcessor {
       }
 
 
-      // Clear existing campaign events
+      // Clear existing issue events
       const { error: deleteError } = await supabaseAdmin
-        .from('campaign_events')
+        .from('issue_events')
         .delete()
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
 
       if (deleteError) {
       }
@@ -3150,8 +3150,8 @@ export class RSSProcessor {
         }
       })
 
-      // Insert campaign events
-      const campaignEventsData: any[] = []
+      // Insert issue events
+      const issueEventsData: any[] = []
       let totalSelected = 0
 
       Object.entries(eventsByDate).forEach(([date, events]) => {
@@ -3159,7 +3159,7 @@ export class RSSProcessor {
         const dbFeaturedCount = events.filter(e => e.featured).length
 
         events.forEach((event, index) => {
-          // Determine if this should be featured in the campaign:
+          // Determine if this should be featured in the issue:
           // - MUST be featured: event.featured=true in database
           // - MUST NOT be featured: event.paid_placement=true (unless also featured=true)
           // - If no featured events exist, first regular event becomes featured (not paid placement)
@@ -3178,8 +3178,8 @@ export class RSSProcessor {
           }
           // Note: paid_placement events without featured=true will NEVER be featured
 
-          campaignEventsData.push({
-            campaign_id: campaignId,
+          issueEventsData.push({
+            issue_id: issueId,
             event_id: event.id,
             event_date: date,
             is_selected: true,
@@ -3190,17 +3190,17 @@ export class RSSProcessor {
         })
       })
 
-      if (campaignEventsData.length > 0) {
+      if (issueEventsData.length > 0) {
         const { error: insertError } = await supabaseAdmin
-          .from('campaign_events')
-          .insert(campaignEventsData)
+          .from('issue_events')
+          .insert(issueEventsData)
 
         if (insertError) {
           return
         }
       }
-      await this.logInfo(`Auto-populated ${totalSelected} events for campaign`, {
-        campaignId,
+      await this.logInfo(`Auto-populated ${totalSelected} events for issue`, {
+        issueId,
         totalSelected,
         daysWithEvents: Object.keys(eventsByDate).length,
         dateRange: dates
@@ -3212,9 +3212,9 @@ export class RSSProcessor {
         : typeof error === 'object' && error !== null
           ? JSON.stringify(error, null, 2)
           : String(error)
-      console.error('Error in populateEventsForCampaign:', errorMsg)
-      await this.logError('Failed to auto-populate events for campaign', {
-        campaignId,
+      console.error('Error in populateEventsForissue:', errorMsg)
+      await this.logError('Failed to auto-populate events for issue', {
+        issueId,
         error: error instanceof Error ? error.message : 'Unknown error'
       })
     }
@@ -3224,7 +3224,7 @@ export class RSSProcessor {
    * Extract full article text ONLY for posts from past 24 hours
    * This is much faster than processing all posts (typically 5-10 vs 30-50)
    */
-  private async enrichRecentPostsWithFullContent(campaignId: string) {
+  private async enrichRecentPostsWithFullContent(issueId: string) {
     try {
       // Calculate 24 hours ago
       const yesterday = new Date()
@@ -3235,7 +3235,7 @@ export class RSSProcessor {
       const { data: posts, error } = await supabaseAdmin
         .from('rss_posts')
         .select('id, source_url, title, full_article_text, processed_at')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .not('source_url', 'is', null)
         .gte('processed_at', yesterdayTimestamp)
 
@@ -3302,14 +3302,14 @@ export class RSSProcessor {
    * Extract full article text from RSS posts using Readability.js
    * Runs in parallel batches to improve performance
    */
-  private async enrichPostsWithFullContent(campaignId: string) {
+  private async enrichPostsWithFullContent(issueId: string) {
     try {
 
-      // Get all posts for this campaign that have source URLs
+      // Get all posts for this issue that have source URLs
       const { data: posts, error } = await supabaseAdmin
         .from('rss_posts')
         .select('id, source_url, title, full_article_text')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .not('source_url', 'is', null)
 
       if (error) {
@@ -3378,7 +3378,7 @@ export class RSSProcessor {
       }
 
       await this.logInfo(`Article extraction complete`, {
-        campaignId,
+        issueId,
         totalPosts: posts.length,
         alreadyExtracted: postsAlreadyExtracted,
         successfulExtractions: successCount,
@@ -3387,7 +3387,7 @@ export class RSSProcessor {
 
     } catch (error) {
       await this.logError('Failed to enrich posts with full article text', {
-        campaignId,
+        issueId,
         error: error instanceof Error ? error.message : 'Unknown error'
       })
       // Don't throw - article extraction is optional, RSS processing should continue

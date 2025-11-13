@@ -30,7 +30,7 @@ export async function PATCH(request: NextRequest) {
 
     // Convert slug to UUID
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('slug', newsletterSlug)
       .single()
@@ -62,7 +62,7 @@ export async function PATCH(request: NextRequest) {
       .from('app_settings')
       .select('key')
       .eq('key', key)
-      .eq('newsletter_id', newsletterId)
+      .eq('publication_id', newsletterId)
       .single()
 
     if (existing) {
@@ -74,7 +74,7 @@ export async function PATCH(request: NextRequest) {
           updated_at: new Date().toISOString()
         })
         .eq('key', key)
-        .eq('newsletter_id', newsletterId)
+        .eq('publication_id', newsletterId)
 
       if (error) throw error
     } else {
@@ -84,7 +84,7 @@ export async function PATCH(request: NextRequest) {
         .insert({
           key,
           value: weight.toString(),
-          newsletter_id: newsletterId,
+          publication_id: newsletterId,
           description: `Weight for ${type === 'secondary' ? 'secondary ' : ''}criteria ${criteriaNumber}`
         })
 

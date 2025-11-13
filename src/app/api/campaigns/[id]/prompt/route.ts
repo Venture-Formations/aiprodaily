@@ -16,11 +16,11 @@ export async function GET(
     const { id } = await props.params
 
     // Try to get existing selection first
-    let prompt = await PromptSelector.getPromptForCampaign(id)
+    let prompt = await PromptSelector.getPromptForissue(id)
 
     // If no prompt selected yet, select one
     if (!prompt) {
-      prompt = await PromptSelector.selectPromptForCampaign(id)
+      prompt = await PromptSelector.selectPromptForissue(id)
     }
 
     if (!prompt) {
@@ -36,7 +36,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Error fetching campaign prompt:', error)
+    console.error('Error fetching issue prompt:', error)
     return NextResponse.json({
       error: 'Failed to fetch prompt',
       details: error instanceof Error ? error.message : 'Unknown error'

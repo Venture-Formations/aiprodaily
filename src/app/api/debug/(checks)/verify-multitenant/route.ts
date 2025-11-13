@@ -14,7 +14,7 @@ export async function GET() {
 
     // Check 1: newsletters table exists
     const { data: newsletters, error: newslettersError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('*')
       .limit(5)
 
@@ -38,9 +38,9 @@ export async function GET() {
       sample: settings || []
     }
 
-    // Check 3: Verify newsletter_id columns exist on key tables
+    // Check 3: Verify publication_id columns exist on key tables
     const tablesToCheck = [
-      'newsletter_campaigns',
+      'publication_issues',
       'rss_feeds',
       'events',
       'dining_deals',
@@ -51,18 +51,18 @@ export async function GET() {
     for (const tableName of tablesToCheck) {
       const { data, error } = await supabaseAdmin
         .from(tableName)
-        .select('newsletter_id')
+        .select('publication_id')
         .limit(1)
 
-      results.checks[`${tableName}_has_newsletter_id`] = {
+      results.checks[`${tableName}_has_publication_id`] = {
         exists: !error,
         error: error?.message || null
       }
     }
 
     // Check 4: Count existing data
-    const { count: campaignCount } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    const { count: issueCount } = await supabaseAdmin
+      .from('publication_issues')
       .select('*', { count: 'exact', head: true })
 
     const { count: articleCount } = await supabaseAdmin
@@ -70,7 +70,7 @@ export async function GET() {
       .select('*', { count: 'exact', head: true })
 
     results.data_counts = {
-      campaigns: campaignCount || 0,
+      issues: issueCount || 0,
       articles: articleCount || 0
     }
 

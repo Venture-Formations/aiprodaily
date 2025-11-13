@@ -5,7 +5,7 @@ import { z } from 'zod'
  * Validates all required fields and types
  */
 export const CreateManualArticleSchema = z.object({
-  campaign_id: z.string().uuid('campaign_id must be a valid UUID'),
+  issue_id: z.string().uuid('issueId must be a valid UUID'),
   title: z.string()
     .min(1, 'Title is required')
     .max(500, 'Title must be less than 500 characters'),
@@ -32,7 +32,7 @@ export const CreateManualArticleSchema = z.object({
  * Schema for querying manual articles
  */
 export const GetManualArticlesSchema = z.object({
-  campaign_id: z.string().uuid('campaign_id must be a valid UUID')
+  issue_id: z.string().uuid('issueId must be a valid UUID')
 })
 
 /**

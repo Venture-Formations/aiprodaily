@@ -134,10 +134,10 @@ export class SlackNotificationService {
     }
   }
 
-  async sendRSSProcessingAlert(success: boolean, campaignId?: string, error?: string) {
+  async sendRSSProcessingAlert(success: boolean, issueId?: string, error?: string) {
     if (success) {
       await this.sendAlert(
-        `RSS processing completed successfully${campaignId ? ` for campaign ${campaignId}` : ''}`,
+        `RSS processing completed successfully${issueId ? ` for issue ${issueId}` : ''}`,
         'info',
         'rss_processing_updates'
       )
@@ -150,18 +150,18 @@ export class SlackNotificationService {
     }
   }
 
-  async sendEmailCampaignAlert(type: 'review' | 'final', success: boolean, campaignId: string, error?: string) {
-    const actionText = type === 'review' ? 'Review campaign' : 'Final campaign'
+  async sendEmailIssueAlert(type: 'review' | 'final', success: boolean, issueId: string, error?: string) {
+    const actionText = type === 'review' ? 'Review issue' : 'Final issue'
 
     if (success) {
       await this.sendAlert(
-        `${actionText} sent successfully for campaign ${campaignId}`,
+        `${actionText} sent successfully for issue ${issueId}`,
         'info',
         'email_delivery_updates'
       )
     } else {
       await this.sendAlert(
-        `${actionText} failed for campaign ${campaignId}: ${error}`,
+        `${actionText} failed for issue ${issueId}: ${error}`,
         'error',
         'email_delivery_updates'
       )
@@ -182,29 +182,29 @@ export class SlackNotificationService {
   /**
    * Alert when RSS processing doesn't complete fully
    */
-  async sendRSSIncompleteAlert(campaignId: string, completedSteps: string[], failedStep: string, error?: string) {
+  async sendRSSIncompleteAlert(issueId: string, completedSteps: string[], failedStep: string, error?: string) {
     const message = [
-      `🚨 RSS Processing Incomplete for Campaign ${campaignId}`,
+      `🚨 RSS Processing Incomplete for issue ${issueId}`,
       ``,
       `✅ Completed: ${completedSteps.join(', ')}`,
       `❌ Failed at: ${failedStep}`,
       error ? `Error: ${error}` : '',
       ``,
-      `⚠️ Campaign may be missing content or in invalid state`
+      `⚠️ issue may be missing content or in invalid state`
     ].filter(Boolean).join('\n')
 
     await this.sendAlert(message, 'error', 'rss_processing_incomplete')
   }
 
   /**
-   * Alert when campaign has 6 or fewer articles available
+   * Alert when issue has 6 or fewer articles available
    */
-  async sendLowArticleCountAlert(campaignId: string, articleCount: number, campaignDate: string) {
+  async sendLowArticleCountAlert(issueId: string, articleCount: number, issueDate: string) {
     const message = [
       `⚠️ 📰 Low Article Count Alert`,
       ``,
-      `Campaign: ${campaignId}`,
-      `Date: ${campaignDate}`,
+      `issue: ${issueId}`,
+      `Date: ${issueDate}`,
       `Article Count: ${articleCount} articles (≤6 threshold)`,
       ``,
       `⚠️ Newsletter may not have enough content for quality delivery`,
@@ -217,16 +217,16 @@ export class SlackNotificationService {
   /**
    * Alert when scheduled send fires but nothing was sent to MailerLite
    */
-  async sendScheduledSendFailureAlert(campaignId: string, scheduledTime: string, reason?: string, details?: any) {
+  async sendScheduledSendFailureAlert(issueId: string, scheduledTime: string, reason?: string, details?: any) {
     const message = [
       `📅 Scheduled Send Failed`,
       ``,
-      `Campaign: ${campaignId}`,
+      `issue: ${issueId}`,
       `Scheduled Time: ${scheduledTime}`,
       `Status: Send triggered but no email delivered to MailerLite`,
       reason ? `Reason: ${reason}` : '',
       ``,
-      `🔍 Check campaign status, MailerLite configuration, and logs`,
+      `🔍 Check issue status, MailerLite configuration, and logs`,
       details ? `Details: ${JSON.stringify(details, null, 2)}` : ''
     ].filter(Boolean).join('\n')
 
@@ -236,14 +236,14 @@ export class SlackNotificationService {
   /**
    * Enhanced RSS processing alert with article count monitoring
    */
-  async sendRSSProcessingCompleteAlert(campaignId: string, articleCount: number, campaignDate: string, includeArchiveInfo?: { archivedArticles: number; archivedPosts: number; archivedRatings: number }) {
+  async sendRSSProcessingCompleteAlert(issueId: string, articleCount: number, issueDate: string, includeArchiveInfo?: { archivedArticles: number; archivedPosts: number; archivedRatings: number }) {
     const lowCountWarning = articleCount <= 6
 
     const message = [
       `${lowCountWarning ? '⚠️' : '✅'} RSS Processing Complete`,
       ``,
-      `Campaign: ${campaignId}`,
-      `Date: ${campaignDate}`,
+      `issue: ${issueId}`,
+      `Date: ${issueDate}`,
       `Articles Generated: ${articleCount}`,
       lowCountWarning ? `⚠️ Warning: Low article count (≤6)` : '',
       ``,
@@ -256,7 +256,7 @@ export class SlackNotificationService {
 
     // Send separate low article count alert if needed
     if (lowCountWarning) {
-      await this.sendLowArticleCountAlert(campaignId, articleCount, campaignDate)
+      await this.sendLowArticleCountAlert(issueId, articleCount, issueDate)
     }
   }
 }
@@ -272,7 +272,7 @@ export class ErrorHandler {
   async handleError(error: Error | unknown, context: {
     source: string
     operation?: string
-    campaignId?: string
+    issueId?: string
     userId?: string
     [key: string]: any
   }) {
@@ -407,23 +407,23 @@ export class HealthMonitor {
       const yesterday = new Date()
       yesterday.setDate(yesterday.getDate() - 1)
 
-      const { data: campaigns, error } = await supabaseAdmin
-        .from('newsletter_campaigns')
+      const { data: issues, error } = await supabaseAdmin
+        .from('publication_issues')
         .select('*')
         .gte('created_at', yesterday.toISOString())
 
       if (error) throw error
 
-      if (campaigns.length === 0) {
+      if (issues.length === 0) {
         await this.slack.sendHealthCheckAlert(
           'RSS Processing',
           'degraded',
-          'No campaigns created in the last 24 hours'
+          'No issues created in the last 24 hours'
         )
-        return { healthy: false, reason: 'No recent campaigns' }
+        return { healthy: false, reason: 'No recent issues' }
       }
 
-      return { healthy: true, recentCampaigns: campaigns.length }
+      return { healthy: true, recentCampaigns: issues.length }
     } catch (error) {
       await this.errorHandler.handleError(error, {
         source: 'health_monitor',

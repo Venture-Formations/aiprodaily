@@ -4,35 +4,35 @@ import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('=== COMPLETING INTERRUPTED CAMPAIGN ===')
+    console.log('=== COMPLETING INTERRUPTED issue ===')
 
-    // Get the campaign ID from request body or find latest
+    // Get the issue ID from request body or find latest
     const body = await request.json().catch(() => ({}))
-    let campaignId = body.campaignId
+    let issueId = body.issueId
 
-    if (!campaignId) {
-      // Find the most recent campaign
-      const { data: latestCampaign, error } = await supabaseAdmin
-        .from('newsletter_campaigns')
+    if (!issueId) {
+      // Find the most recent issue
+      const { data: latestissue, error } = await supabaseAdmin
+        .from('publication_issues')
         .select('id, date, status')
         .order('created_at', { ascending: false })
         .limit(1)
         .single()
 
-      if (error || !latestCampaign) {
+      if (error || !latestissue) {
         return NextResponse.json({
           success: false,
-          error: 'No campaign found to complete'
+          error: 'No issue found to complete'
         }, { status: 404 })
       }
 
-      campaignId = latestCampaign.id
-      console.log('Found latest campaign:', campaignId, 'Status:', latestCampaign.status)
+      issueId = latestissue.id
+      console.log('Found latest issue:', issueId, 'Status:', latestissue.status)
     }
 
-    // Get campaign with articles
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Get issue with articles
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         *,
         articles:articles(
@@ -44,38 +44,38 @@ export async function POST(request: NextRequest) {
           )
         )
       `)
-      .eq('id', campaignId)
+      .eq('id', issueId)
       .single()
 
-    if (campaignError || !campaign) {
+    if (issueError || !issue) {
       return NextResponse.json({
         success: false,
-        error: 'Campaign not found',
-        campaignId
+        error: 'issue not found',
+        issueId
       }, { status: 404 })
     }
 
     const fixes = []
 
     // Fix 1: Reset status to draft
-    if (campaign.status !== 'draft') {
+    if (issue.status !== 'draft') {
       await supabaseAdmin
-        .from('newsletter_campaigns')
+        .from('publication_issues')
         .update({
           status: 'draft',
           review_sent_at: null
         })
-        .eq('id', campaignId)
+        .eq('id', issueId)
 
-      fixes.push(`Status changed from '${campaign.status}' to 'draft'`)
+      fixes.push(`Status changed from '${issue.status}' to 'draft'`)
     }
 
     // Fix 2: Generate subject line if missing
-    let generatedSubject = campaign.subject_line
-    if (!campaign.subject_line) {
+    let generatedSubject = issue.subject_line
+    if (!issue.subject_line) {
       console.log('Generating missing subject line...')
 
-      const activeArticles = campaign.articles
+      const activeArticles = issue.articles
         ?.filter((article: any) => article.is_active)
         ?.sort((a: any, b: any) => {
           const scoreA = a.rss_post?.post_rating?.[0]?.total_score || 0
@@ -93,12 +93,12 @@ export async function POST(request: NextRequest) {
             generatedSubject = aiResponse.trim()
 
             await supabaseAdmin
-              .from('newsletter_campaigns')
+              .from('publication_issues')
               .update({
                 subject_line: generatedSubject,
                 updated_at: new Date().toISOString()
               })
-              .eq('id', campaignId)
+              .eq('id', issueId)
 
             fixes.push(`Generated subject line: "${generatedSubject}"`)
           }
@@ -110,18 +110,18 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Campaign completion fixes applied',
-      campaignId,
-      originalStatus: campaign.status,
+      message: 'issue completion fixes applied',
+      issueId,
+      originalStatus: issue.status,
       subjectLine: generatedSubject,
-      activeArticles: campaign.articles?.filter((a: any) => a.is_active).length || 0,
-      totalArticles: campaign.articles?.length || 0,
+      activeArticles: issue.articles?.filter((a: any) => a.is_active).length || 0,
+      totalArticles: issue.articles?.length || 0,
       fixesApplied: fixes,
       timestamp: new Date().toISOString()
     })
 
   } catch (error) {
-    console.error('Complete campaign error:', error)
+    console.error('Complete issue error:', error)
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'

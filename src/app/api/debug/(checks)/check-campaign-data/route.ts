@@ -4,19 +4,19 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url)
-    const campaignId = url.searchParams.get('campaign_id')
+    const issueId = url.searchParams.get('issue_id')
 
-    if (!campaignId) {
-      return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
+    if (!issueId) {
+      return NextResponse.json({ error: 'issueId required' }, { status: 400 })
     }
 
-    console.log('Fetching campaign data for:', campaignId)
+    console.log('Fetching issue data for:', issueId)
 
-    // Test 1: Check campaign_ai_app_selections table directly
+    // Test 1: Check issue_ai_app_selections table directly
     const { data: selections, error: selectionsError } = await supabaseAdmin
-      .from('campaign_ai_app_selections')
+      .from('issue_ai_app_selections')
       .select('*')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     console.log('Direct selections query:', selections?.length || 0, 'results')
     if (selectionsError) {
@@ -25,18 +25,18 @@ export async function GET(request: Request) {
 
     // Test 2: Check with join to ai_applications
     const { data: selectionsWithApps, error: joinError } = await supabaseAdmin
-      .from('campaign_ai_app_selections')
+      .from('issue_ai_app_selections')
       .select('*, app:ai_applications(*)')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     console.log('Selections with apps join:', selectionsWithApps?.length || 0, 'results')
     if (joinError) {
       console.error('Join error:', joinError)
     }
 
-    // Test 3: Full campaign query (same as campaign detail page)
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Test 3: Full issue query (same as issue detail page)
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         *,
         articles:articles(
@@ -57,26 +57,26 @@ export async function GET(request: Request) {
         ),
         manual_articles:manual_articles(*),
         email_metrics(*),
-        campaign_ai_app_selections(
+        issue_ai_app_selections(
           *,
           app:ai_applications(*)
         )
       `)
-      .eq('id', campaignId)
+      .eq('id', issueId)
       .single()
 
-    console.log('Full campaign query:', {
-      found: !!campaign,
-      ai_apps_count: campaign?.campaign_ai_app_selections?.length || 0
+    console.log('Full issue query:', {
+      found: !!issue,
+      ai_apps_count: issue?.issue_ai_app_selections?.length || 0
     })
 
-    if (campaignError) {
-      console.error('Campaign error:', campaignError)
+    if (issueError) {
+      console.error('issue error:', issueError)
     }
 
     return NextResponse.json({
       success: true,
-      campaign_id: campaignId,
+      issue_id: issueId,
       test_results: {
         direct_selections: {
           count: selections?.length || 0,
@@ -88,17 +88,17 @@ export async function GET(request: Request) {
           error: joinError?.message || null,
           data: selectionsWithApps
         },
-        full_campaign: {
-          found: !!campaign,
-          ai_apps_count: campaign?.campaign_ai_app_selections?.length || 0,
-          error: campaignError?.message || null,
-          ai_apps: campaign?.campaign_ai_app_selections
+        full_issue: {
+          found: !!issue,
+          ai_apps_count: issue?.issue_ai_app_selections?.length || 0,
+          error: issueError?.message || null,
+          ai_apps: issue?.issue_ai_app_selections
         }
       }
     })
 
   } catch (error) {
-    console.error('Check campaign data error:', error)
+    console.error('Check issue data error:', error)
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

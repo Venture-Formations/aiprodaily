@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function GET(request: NextRequest) {
   try {
     const searchParams = new URL(request.url).searchParams
-    const campaignId = searchParams.get('campaign_id')
+    const issueId = searchParams.get('issue_id')
 
     // Get all AI apps
     const { data: allApps, error: appsError } = await supabaseAdmin
@@ -17,27 +17,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: appsError.message }, { status: 500 })
     }
 
-    // If campaign ID provided, get selections for that campaign
-    let campaignSelections = null
-    if (campaignId) {
+    // If issue ID provided, get selections for that issue
+    let issueSelections = null
+    if (issueId) {
       const { data: selections, error: selectionsError } = await supabaseAdmin
-        .from('campaign_ai_app_selections')
+        .from('issue_ai_app_selections')
         .select(`
           *,
           app:ai_applications(*)
         `)
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
 
       if (selectionsError) {
         return NextResponse.json({ error: selectionsError.message }, { status: 500 })
       }
 
-      campaignSelections = selections
+      issueSelections = selections
     }
 
     // Check if accounting newsletter exists
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id, name, slug')
       .eq('slug', 'accounting')
       .single()
@@ -49,12 +49,12 @@ export async function GET(request: NextRequest) {
         id: app.id,
         name: app.app_name,
         is_active: app.is_active,
-        newsletter_id: app.newsletter_id
+        publication_id: app.publication_id
       })),
       newsletter: newsletter || null,
-      campaign_id: campaignId,
-      campaign_selections: campaignSelections?.length || 0,
-      selected_apps: campaignSelections?.map(s => ({
+      issue_id: issueId,
+      issue_selections: issueSelections?.length || 0,
+      selected_apps: issueSelections?.map(s => ({
         app_id: s.app_id,
         selection_order: s.selection_order,
         app_name: s.app?.app_name

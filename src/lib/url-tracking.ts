@@ -7,27 +7,27 @@
  * Wraps a URL with click tracking parameters
  * @param url - Destination URL
  * @param section - Newsletter section name
- * @param campaignDate - Campaign date (YYYY-MM-DD)
- * @param campaignId - Optional MailerLite campaign ID
+ * @param issueDate - issue date (YYYY-MM-DD)
+ * @param issueId - Optional MailerLite issue ID
  * @returns Tracking URL that redirects to destination
  */
 export function wrapTrackingUrl(
   url: string,
   section: string,
-  campaignDate: string,
-  campaignId?: string
+  issueDate: string,
+  issueId?: string
 ): string {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.aiaccountingdaily.com'
 
   const params = new URLSearchParams({
     url: url,
     section: section,
-    date: campaignDate,
+    date: issueDate,
     email: '{$email}', // MailerLite variable
   })
 
-  if (campaignId) {
-    params.append('campaign_id', campaignId)
+  if (issueId) {
+    params.append('issue_id', issueId)
   }
 
   // Add MailerLite subscriber ID if available

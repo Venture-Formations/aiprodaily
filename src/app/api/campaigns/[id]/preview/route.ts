@@ -23,7 +23,7 @@ export async function GET(
   try {
     console.log('Preview API called')
     const { id } = await props.params
-    console.log('Campaign ID:', id)
+    console.log('issue ID:', id)
 
     const session = await getServerSession(authOptions)
     console.log('Session check:', !!session?.user?.email)
@@ -33,10 +33,10 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    console.log('Fetching campaign with ID:', id)
-    // Fetch campaign with active articles and events
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    console.log('Fetching issue with ID:', id)
+    // Fetch issue with active articles and events
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         *,
         articles(
@@ -54,7 +54,7 @@ export async function GET(
             rss_feed:rss_feeds(name)
           )
         ),
-        campaign_events(
+        issue_events(
           id,
           event_date,
           is_selected,
@@ -78,45 +78,45 @@ export async function GET(
       .eq('id', id)
       .single()
 
-    console.log('Campaign query result:', { campaign: !!campaign, error: campaignError })
+    console.log('issue query result:', { issue: !!issue, error: issueError })
 
-    if (campaignError) {
-      console.error('Campaign fetch error:', campaignError)
-      return NextResponse.json({ error: `Campaign fetch failed: ${campaignError.message}` }, { status: 404 })
+    if (issueError) {
+      console.error('issue fetch error:', issueError)
+      return NextResponse.json({ error: `issue fetch failed: ${issueError.message}` }, { status: 404 })
     }
 
-    if (!campaign) {
-      console.log('No campaign found')
-      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+    if (!issue) {
+      console.log('No issue found')
+      return NextResponse.json({ error: 'issue not found' }, { status: 404 })
     }
 
-    console.log('Campaign found, articles count:', campaign.articles?.length || 0)
-    console.log('Campaign events count:', campaign.campaign_events?.length || 0)
+    console.log('issue found, articles count:', issue.articles?.length || 0)
+    console.log('issue events count:', issue.issue_events?.length || 0)
 
     // Filter to only active articles (max 5)
-    if (campaign.articles) {
-      const beforeFilter = campaign.articles.length
-      campaign.articles = campaign.articles
+    if (issue.articles) {
+      const beforeFilter = issue.articles.length
+      issue.articles = issue.articles
         .filter((article: any) => article.is_active)
         .sort((a: any, b: any) => (b.rss_post?.post_rating?.[0]?.total_score || 0) - (a.rss_post?.post_rating?.[0]?.total_score || 0))
         .slice(0, 5) // Limit to 5 articles maximum
-      console.log('Active articles after filter:', campaign.articles.length, 'from', beforeFilter, '(max 5)')
+      console.log('Active articles after filter:', issue.articles.length, 'from', beforeFilter, '(max 5)')
     }
 
     // Filter to only selected events and group by date
-    const eventsData = (campaign.campaign_events || [])
+    const eventsData = (issue.issue_events || [])
       .filter((ce: any) => ce.is_selected && ce.event)
       .sort((a: any, b: any) => (a.display_order || 999) - (b.display_order || 999))
     console.log('Selected events after filter:', eventsData.length)
 
     console.log('Generating HTML newsletter')
     // Generate HTML newsletter
-    const newsletterHtml = await generateNewsletterHtml(campaign)
+    const newsletterHtml = await generateNewsletterHtml(issue)
     console.log('HTML generated, length:', newsletterHtml.length)
 
     return NextResponse.json({
       success: true,
-      campaign,
+      issue,
       html: newsletterHtml
     })
 
@@ -130,12 +130,12 @@ export async function GET(
   }
 }
 
-async function generateNewsletterHtml(campaign: any): Promise<string> {
+async function generateNewsletterHtml(issue: any): Promise<string> {
   try {
-    console.log('Generating HTML for campaign:', campaign?.id)
+    console.log('Generating HTML for issue:', issue?.id)
 
     // Filter active articles and sort by rank (custom order)
-    const activeArticles = (campaign.articles || [])
+    const activeArticles = (issue.articles || [])
       .filter((article: any) => article.is_active)
       .sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999))
 
@@ -171,20 +171,20 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
       }
     }
 
-    const formattedDate = formatDate(campaign.date)
+    const formattedDate = formatDate(issue.date)
     console.log('Formatted date:', formattedDate)
 
     // Generate modular HTML sections with tracking parameters
-    // mailerlite_campaign_id might not exist yet, so it's optional
-    const mailerliteId = (campaign as any).mailerlite_campaign_id || undefined
-    const header = await generateNewsletterHeader(formattedDate, campaign.date, mailerliteId)
-    const footer = await generateNewsletterFooter(campaign.date, mailerliteId)
+    // mailerlite_issue_id might not exist yet, so it's optional
+    const mailerliteId = (issue as any).mailerlite_issue_id || undefined
+    const header = await generateNewsletterHeader(formattedDate, issue.date, mailerliteId)
+    const footer = await generateNewsletterFooter(issue.date, mailerliteId)
 
     // Generate welcome section (if it exists)
     const welcomeHtml = await generateWelcomeSection(
-      campaign.welcome_intro || null,
-      campaign.welcome_tagline || null,
-      campaign.welcome_summary || null
+      issue.welcome_intro || null,
+      issue.welcome_tagline || null,
+      issue.welcome_summary || null
     )
 
     // Section ID constants (reference IDs from newsletter_sections table)
@@ -201,48 +201,48 @@ async function generateNewsletterHtml(campaign: any): Promise<string> {
       for (const section of sections) {
         // Check if this is a primary articles section (display_order 3)
         if (section.display_order === 3 && activeArticles.length > 0) {
-          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, campaign.date, campaign.id, section.name)
+          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, issue.date, issue.id, section.name)
           sectionsHtml += primaryHtml
         }
         // Check if this is a secondary articles section (display_order 5)
         else if (section.display_order === 5) {
-          const secondaryHtml = await generateSecondaryArticlesSection(campaign, section.name)
+          const secondaryHtml = await generateSecondaryArticlesSection(issue, section.name)
           sectionsHtml += secondaryHtml
         }
         // Use section ID for AI Applications (stable across name changes)
         else if (section.id === SECTION_IDS.AI_APPLICATIONS) {
-          const aiAppsHtml = await generateAIAppsSection(campaign)
+          const aiAppsHtml = await generateAIAppsSection(issue)
           if (aiAppsHtml) {
             sectionsHtml += aiAppsHtml
           }
         }
         // Use section ID for Prompt Ideas (stable across name changes)
         else if (section.id === SECTION_IDS.PROMPT_IDEAS) {
-          const promptHtml = await generatePromptIdeasSection(campaign)
+          const promptHtml = await generatePromptIdeasSection(issue)
           if (promptHtml) {
             sectionsHtml += promptHtml
           }
         }
         // Legacy name-based matching for other sections
         else if (section.name === 'Poll') {
-          const pollHtml = await generatePollSection(campaign.id)
+          const pollHtml = await generatePollSection(issue.id)
           if (pollHtml) {
             sectionsHtml += pollHtml
           }
         } else if (section.name === 'Breaking News') {
-          const breakingNewsHtml = await generateBreakingNewsSection(campaign)
+          const breakingNewsHtml = await generateBreakingNewsSection(issue)
           if (breakingNewsHtml) {
             sectionsHtml += breakingNewsHtml
           }
         } else if (section.name === 'Beyond the Feed') {
-          const beyondFeedHtml = await generateBeyondTheFeedSection(campaign)
+          const beyondFeedHtml = await generateBeyondTheFeedSection(issue)
           if (beyondFeedHtml) {
             sectionsHtml += beyondFeedHtml
           }
         }
         // Use section ID for Advertisement (stable across name changes)
         else if (section.id === SECTION_IDS.ADVERTISEMENT) {
-          const advertorialHtml = await generateAdvertorialSection(campaign, false, section.name) // Don't record usage during preview, pass section name
+          const advertorialHtml = await generateAdvertorialSection(issue, false, section.name) // Don't record usage during preview, pass section name
           if (advertorialHtml) {
             sectionsHtml += advertorialHtml
           }

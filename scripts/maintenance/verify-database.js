@@ -17,7 +17,7 @@ async function verifyDatabase() {
   try {
     // Check newsletters
     const { data: newsletters, error: nlError } = await supabase
-      .from('newsletters')
+      .from('publications')
       .select('*');
 
     if (nlError) throw nlError;

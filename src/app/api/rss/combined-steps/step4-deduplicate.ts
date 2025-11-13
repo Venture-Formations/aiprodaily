@@ -4,16 +4,16 @@ import { RSSProcessor } from '@/lib/rss-processor'
  * Step 4: Deduplicate
  * - Run 4-stage deduplication to identify duplicate posts
  */
-export async function executeStep4(campaignId: string) {
+export async function executeStep4(issueId: string) {
   const processor = new RSSProcessor()
 
-  await processor.handleDuplicatesForCampaign(campaignId)
+  await processor.handleDuplicatesForissue(issueId)
 
   const { supabaseAdmin } = await import('@/lib/supabase')
   const { data: duplicateGroups } = await supabaseAdmin
     .from('duplicate_groups')
     .select('id')
-    .eq('campaign_id', campaignId)
+    .eq('issue_id', issueId)
 
   const { data: duplicatePosts } = await supabaseAdmin
     .from('duplicate_posts')

@@ -6,15 +6,15 @@ export async function GET() {
     // Drop the existing constraint
     const { error: dropError } = await supabaseAdmin.rpc('exec_sql', {
       sql: `
-        ALTER TABLE newsletter_campaigns
-        DROP CONSTRAINT IF EXISTS newsletter_campaigns_status_check;
+        ALTER TABLE publication_issues
+        DROP CONSTRAINT IF EXISTS publication_issues_status_check;
       `
     })
 
     if (dropError) {
       // Try alternative approach - direct query
       const { error: altDropError } = await supabaseAdmin
-        .from('newsletter_campaigns')
+        .from('publication_issues')
         .select('id')
         .limit(0) // Just to test connection
 
@@ -24,8 +24,8 @@ export async function GET() {
     // Add new constraint with additional statuses
     const { error: addError } = await supabaseAdmin.rpc('exec_sql', {
       sql: `
-        ALTER TABLE newsletter_campaigns
-        ADD CONSTRAINT newsletter_campaigns_status_check
+        ALTER TABLE publication_issues
+        ADD CONSTRAINT publication_issues_status_check
         CHECK (status IN ('draft', 'processing', 'pending_phase2', 'in_review', 'changes_made', 'ready_to_send', 'sent', 'failed'));
       `
     })

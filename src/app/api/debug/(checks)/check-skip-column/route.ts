@@ -7,7 +7,7 @@ export async function GET() {
     console.log('Testing article query without skipped column...')
     const { data: articlesBasic, error: basicError } = await supabaseAdmin
       .from('articles')
-      .select('id, campaign_id, headline')
+      .select('id, issue_id, headline')
       .limit(1)
 
     if (basicError) {
@@ -24,7 +24,7 @@ export async function GET() {
     console.log('Testing article query with skipped column...')
     const { data: articlesWithSkipped, error: skippedError } = await supabaseAdmin
       .from('articles')
-      .select('id, campaign_id, headline, skipped')
+      .select('id, issue_id, headline, skipped')
       .limit(1)
 
     if (skippedError) {
@@ -50,7 +50,7 @@ export async function GET() {
       console.log('Column added, retesting...')
       const { data: retestArticles, error: retestError } = await supabaseAdmin
         .from('articles')
-        .select('id, campaign_id, headline, skipped')
+        .select('id, issue_id, headline, skipped')
         .limit(1)
 
       return NextResponse.json({

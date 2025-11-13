@@ -5,24 +5,24 @@ import { ErrorHandler } from '@/lib/slack'
 import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/workflow-state'
 
 /**
- * Step 1: Archive old campaign data and clear previous articles/posts
+ * Step 1: Archive old issue data and clear previous articles/posts
  * This is the first step in the RSS processing workflow
  * Uses state machine pattern - coordinator triggers this when state = 'pending_archive'
  */
 export async function POST(request: NextRequest) {
-  let campaign_id: string | undefined
+  let issue_id: string | undefined
 
   try {
     const body = await request.json()
-    campaign_id = body.campaign_id
+    issue_id = body.issue_id
 
-    if (!campaign_id) {
-      return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
+    if (!issue_id) {
+      return NextResponse.json({ error: 'issue_id is required' }, { status: 400 })
     }
 
 
     // Start workflow step - marks as "archiving" and prevents race conditions
-    const startResult = await startWorkflowStep(campaign_id, 'pending_archive')
+    const startResult = await startWorkflowStep(issue_id, 'pending_archive')
     if (!startResult.success) {
       return NextResponse.json({
         success: false,
@@ -36,44 +36,44 @@ export async function POST(request: NextRequest) {
 
     // Archive existing articles and posts before clearing (PRESERVES POSITION DATA!)
     try {
-      await archiveService.archiveCampaignArticles(campaign_id, 'rss_processing_clear')
+      await archiveService.archiveissueArticles(issue_id, 'rss_processing_clear')
     } catch (archiveError) {
       await errorHandler.logInfo('Archive failed but RSS processing continuing', {
-        campaignId: campaign_id,
+        issueId: issue_id,
         archiveError: archiveError instanceof Error ? archiveError.message : 'Unknown error'
       }, 'rss_step_archive')
     }
 
 
-    // Delete existing articles for this campaign
+    // Delete existing articles for this issue
     const { error: articlesDeleteError } = await supabaseAdmin
       .from('articles')
       .delete()
-      .eq('campaign_id', campaign_id)
+      .eq('issue_id', issue_id)
 
 
-    // Delete existing secondary articles for this campaign
+    // Delete existing secondary articles for this issue
     const { error: secondaryDeleteError } = await supabaseAdmin
       .from('secondary_articles')
       .delete()
-      .eq('campaign_id', campaign_id)
+      .eq('issue_id', issue_id)
 
 
-    // Delete existing posts for this campaign
+    // Delete existing posts for this issue
     const { error: postsDeleteError } = await supabaseAdmin
       .from('rss_posts')
       .delete()
-      .eq('campaign_id', campaign_id)
+      .eq('issue_id', issue_id)
 
 
 
     // Complete workflow step - transitions to 'pending_fetch_feeds'
-    await completeWorkflowStep(campaign_id, 'archiving')
+    await completeWorkflowStep(issue_id, 'archiving')
 
     return NextResponse.json({
       success: true,
       message: 'Archive step completed',
-      campaign_id,
+      issue_id: issue_id,
       next_state: 'pending_fetch_feeds',
       step: '1/7'
     })
@@ -81,10 +81,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[Step 1] Archive failed:', error)
 
-    // Mark workflow as failed if we have campaign_id
-    if (campaign_id) {
+    // Mark workflow as failed if we have issue_id
+    if (issue_id) {
       await failWorkflow(
-        campaign_id,
+        issue_id,
         `Archive step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
     }

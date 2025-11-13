@@ -6,14 +6,14 @@ export const maxDuration = 600
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const campaignId = searchParams.get('campaign_id')
+  const issueId = searchParams.get('issue_id')
 
-  if (!campaignId) {
-    return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
+  if (!issueId) {
+    return NextResponse.json({ error: 'issueId required' }, { status: 400 })
   }
 
   try {
-    // Get all rated posts for this campaign
+    // Get all rated posts for this issue
     const { data: posts, error } = await supabaseAdmin
       .from('rss_posts')
       .select(`
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
         full_article_text,
         post_ratings!inner(total_score)
       `)
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
     if (!posts || posts.length === 0) {
       return NextResponse.json({
         success: false,
-        message: 'No rated posts found for this campaign'
+        message: 'No rated posts found for this issue'
       })
     }
 
@@ -67,7 +67,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      campaign_id: campaignId,
+      issue_id: issueId,
       total_posts: posts.length,
       post_titles: postSummaries.map((p, i) => ({ index: i, title: p.title })),
       deduper_result: result,

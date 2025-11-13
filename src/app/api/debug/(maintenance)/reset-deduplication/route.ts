@@ -5,32 +5,32 @@ import { Deduplicator } from '@/lib/deduplicator'
 export const maxDuration = 600
 
 /**
- * Reset deduplication for a campaign and re-run with current prompt
+ * Reset deduplication for a issue and re-run with current prompt
  *
- * Usage: GET /api/debug/reset-deduplication?campaign_id=XXX&dry_run=true
+ * Usage: GET /api/debug/reset-deduplication?issueId=XXX&dry_run=true
  *
  * This will:
- * 1. Delete existing duplicate_groups and duplicate_posts for campaign
+ * 1. Delete existing duplicate_groups and duplicate_posts for issue
  * 2. Re-run deduplication with current database prompt
  * 3. Show which posts are now marked as duplicates
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  const campaignId = searchParams.get('campaign_id')
+  const issueId = searchParams.get('issue_id')
   const dryRun = searchParams.get('dry_run') !== 'false' // Default true
 
-  if (!campaignId) {
-    return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
+  if (!issueId) {
+    return NextResponse.json({ error: 'issueId required' }, { status: 400 })
   }
 
   try {
-    console.log(`[RESET-DEDUP] ${dryRun ? 'DRY RUN:' : ''} Resetting deduplication for campaign ${campaignId}`)
+    console.log(`[RESET-DEDUP] ${dryRun ? 'DRY RUN:' : ''} Resetting deduplication for issue ${issueId}`)
 
     // Step 1: Get existing duplicate groups
     const { data: existingGroups } = await supabaseAdmin
       .from('duplicate_groups')
       .select('id, topic_signature, primary_post_id')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     const groupIds = existingGroups?.map(g => g.id) || []
 
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
       const { error: groupsError } = await supabaseAdmin
         .from('duplicate_groups')
         .delete()
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
 
       if (groupsError) {
         console.error('[RESET-DEDUP] Error deleting duplicate_groups:', groupsError)
@@ -77,12 +77,12 @@ export async function GET(request: NextRequest) {
     const { data: allPosts, error: postsError } = await supabaseAdmin
       .from('rss_posts')
       .select('*')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     if (postsError || !allPosts || allPosts.length === 0) {
       return NextResponse.json({
         status: 'error',
-        message: 'No posts found for campaign'
+        message: 'No posts found for issue'
       }, { status: 404 })
     }
 
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
       strictnessThreshold
     })
 
-    const result = await deduplicator.detectAllDuplicates(allPosts, campaignId)
+    const result = await deduplicator.detectAllDuplicates(allPosts, issueId)
 
     // Step 4: Save new results (if not dry run)
     let newGroupIds: string[] = []
@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
         const { data: duplicateGroup, error: groupError } = await supabaseAdmin
           .from('duplicate_groups')
           .insert([{
-            campaign_id: campaignId,
+            issue_id: issueId,
             primary_post_id: primaryPost.id,
             topic_signature: group.topic_signature
           }])

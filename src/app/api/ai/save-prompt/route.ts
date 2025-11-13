@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const {
-      newsletter_id,
+      publication_id,
       provider,
       model,
       prompt_type,
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       parameters
     } = body
 
-    if (!newsletter_id || !provider || !model || !prompt_type || !prompt) {
+    if (!publication_id || !provider || !model || !prompt_type || !prompt) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       .from('ai_prompt_tests')
       .upsert({
         user_id: session.user.email,
-        newsletter_id,
+        publication_id,
         provider,
         model,
         prompt_type,
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
         parameters: parameters || {},
         updated_at: new Date().toISOString()
       }, {
-        onConflict: 'user_id,newsletter_id,provider,model,prompt_type'
+        onConflict: 'user_id,publication_id,provider,model,prompt_type'
       })
       .select()
       .single()

@@ -5,7 +5,7 @@ import { headers } from 'next/headers'
  * Newsletter context extracted from middleware
  */
 export interface NewsletterContext {
-  newsletter_id: string
+  publication_id: string
   newsletter_slug: string
 }
 
@@ -29,7 +29,7 @@ export async function getNewsletterContext(request?: NextRequest): Promise<Newsl
 
       if (newsletterId && newsletterSlug) {
         return {
-          newsletter_id: newsletterId,
+          publication_id: newsletterId,
           newsletter_slug: newsletterSlug
         }
       }
@@ -42,7 +42,7 @@ export async function getNewsletterContext(request?: NextRequest): Promise<Newsl
 
       if (newsletterId && newsletterSlug) {
         return {
-          newsletter_id: newsletterId,
+          publication_id: newsletterId,
           newsletter_slug: newsletterSlug
         }
       }

@@ -9,7 +9,7 @@ export async function GET() {
     // 1. Check if AI applications exist
     const { data: allApps, error: appsError } = await supabaseAdmin
       .from('ai_applications')
-      .select('id, app_name, newsletter_id, is_active')
+      .select('id, app_name, publication_id, is_active')
       .order('app_name')
 
     console.log('Total AI apps in database:', allApps?.length || 0)
@@ -17,40 +17,40 @@ export async function GET() {
       console.error('Error fetching apps:', appsError)
     }
 
-    // 2. Get latest campaign
-    const { data: latestCampaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // 2. Get latest issue
+    const { data: latestissue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select('id, date, status')
       .order('date', { ascending: false })
       .limit(1)
       .single()
 
-    console.log('Latest campaign:', latestCampaign)
-    if (campaignError) {
-      console.error('Error fetching campaign:', campaignError)
+    console.log('Latest issue:', latestissue)
+    if (issueError) {
+      console.error('Error fetching issue:', issueError)
     }
 
-    // 3. Check selections for latest campaign
-    let campaignSelections = null
+    // 3. Check selections for latest issue
+    let issueSelections = null
     let newsletterInfo = null
     let manualSelectionResult = null
 
-    if (latestCampaign) {
+    if (latestissue) {
       const { data: selections, error: selectionsError } = await supabaseAdmin
-        .from('campaign_ai_app_selections')
+        .from('issue_ai_app_selections')
         .select('*, app:ai_applications(*)')
-        .eq('campaign_id', latestCampaign.id)
+        .eq('issue_id', latestissue.id)
         .order('selection_order')
 
-      console.log('Selections for latest campaign:', selections?.length || 0)
+      console.log('Selections for latest issue:', selections?.length || 0)
       if (selectionsError) {
         console.error('Error fetching selections:', selectionsError)
       }
-      campaignSelections = selections
+      issueSelections = selections
 
       // 4. Get newsletter info
       const { data: newsletter } = await supabaseAdmin
-        .from('newsletters')
+        .from('publications')
         .select('id, name, slug')
         .eq('slug', 'accounting')
         .single()
@@ -62,7 +62,7 @@ export async function GET() {
       if (newsletter && (!selections || selections.length === 0)) {
         console.log('Attempting manual app selection...')
         try {
-          const selectedApps = await AppSelector.selectAppsForCampaign(latestCampaign.id, newsletter.id)
+          const selectedApps = await AppSelector.selectAppsForissue(latestissue.id, newsletter.id)
           manualSelectionResult = {
             success: true,
             count: selectedApps.length,
@@ -84,12 +84,12 @@ export async function GET() {
 
         // Fetch selections again after manual selection
         const { data: newSelections } = await supabaseAdmin
-          .from('campaign_ai_app_selections')
+          .from('issue_ai_app_selections')
           .select('*, app:ai_applications(*)')
-          .eq('campaign_id', latestCampaign.id)
+          .eq('issue_id', latestissue.id)
           .order('selection_order')
 
-        campaignSelections = newSelections
+        issueSelections = newSelections
         console.log('Selections after manual attempt:', newSelections?.length || 0)
       }
     }
@@ -104,18 +104,18 @@ export async function GET() {
           id: app.id,
           name: app.app_name,
           active: app.is_active,
-          newsletter_id: app.newsletter_id
+          publication_id: app.publication_id
         }))
       },
-      latest_campaign: latestCampaign ? {
-        id: latestCampaign.id,
-        date: latestCampaign.date,
-        status: latestCampaign.status
+      latest_issue: latestissue ? {
+        id: latestissue.id,
+        date: latestissue.date,
+        status: latestissue.status
       } : null,
       newsletter: newsletterInfo,
-      campaign_selections: {
-        count: campaignSelections?.length || 0,
-        selections: campaignSelections?.map(s => ({
+      issue_selections: {
+        count: issueSelections?.length || 0,
+        selections: issueSelections?.map(s => ({
           app_id: s.app_id,
           app_name: s.app?.app_name,
           category: s.app?.category,
@@ -125,7 +125,7 @@ export async function GET() {
       manual_selection_attempt: manualSelectionResult,
       errors: {
         apps_error: appsError?.message,
-        campaign_error: campaignError?.message
+        issue_error: issueError?.message
       }
     })
 

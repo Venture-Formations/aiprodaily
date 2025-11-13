@@ -5,7 +5,7 @@ export const maxDuration = 600
 
 /**
  * Migrates existing criteria settings to be newsletter-specific.
- * Adds newsletter_id to existing criteria settings that don't have one.
+ * Adds publication_id to existing criteria settings that don't have one.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
     // Get newsletter UUID
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id, name, slug')
       .eq('slug', newsletterSlug)
       .single()
@@ -32,12 +32,12 @@ export async function GET(request: NextRequest) {
     const newsletterId = newsletter.id
     console.log('[MIGRATE-CRITERIA] Newsletter:', newsletter.name, '→ UUID:', newsletterId)
 
-    // Find all criteria settings WITHOUT newsletter_id
+    // Find all criteria settings WITHOUT publication_id
     const { data: existingSettings, error: selectError } = await supabaseAdmin
       .from('app_settings')
       .select('key, value, description')
       .or('key.like.criteria_%_name,key.like.criteria_%_weight,key.like.secondary_criteria_%_name,key.like.secondary_criteria_%_weight,key.eq.criteria_enabled_count')
-      .is('newsletter_id', null)
+      .is('publication_id', null)
 
     if (selectError) {
       console.error('[MIGRATE-CRITERIA] Error finding settings:', selectError)
@@ -49,24 +49,24 @@ export async function GET(request: NextRequest) {
     if (!existingSettings || existingSettings.length === 0) {
       return NextResponse.json({
         success: true,
-        message: 'No criteria settings found to migrate (already have newsletter_id)',
+        message: 'No criteria settings found to migrate (already have publication_id)',
         settingsMigrated: []
       })
     }
 
-    // Update each setting to include newsletter_id
+    // Update each setting to include publication_id
     const migrated: Array<{ key: string; value: string; description: string | null }> = []
     const failed: Array<{ key: string; error: string }> = []
 
     for (const setting of existingSettings) {
       console.log(`[MIGRATE-CRITERIA] Migrating: ${setting.key} = ${setting.value}`)
 
-      // Delete the old row (without newsletter_id)
+      // Delete the old row (without publication_id)
       const { error: deleteError } = await supabaseAdmin
         .from('app_settings')
         .delete()
         .eq('key', setting.key)
-        .is('newsletter_id', null)
+        .is('publication_id', null)
 
       if (deleteError) {
         console.error(`[MIGRATE-CRITERIA] Error deleting ${setting.key}:`, deleteError)
@@ -74,14 +74,14 @@ export async function GET(request: NextRequest) {
         continue
       }
 
-      // Insert new row with newsletter_id
+      // Insert new row with publication_id
       const { error: insertError } = await supabaseAdmin
         .from('app_settings')
         .insert({
           key: setting.key,
           value: setting.value,
           description: setting.description,
-          newsletter_id: newsletterId
+          publication_id: newsletterId
         })
 
       if (insertError) {

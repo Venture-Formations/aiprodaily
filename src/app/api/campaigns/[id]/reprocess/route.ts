@@ -6,7 +6,7 @@ import { reprocessArticlesWorkflow } from '@/lib/workflows/reprocess-articles-wo
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
- * Reprocess Articles for an Existing Campaign
+ * Reprocess Articles for an Existing Issue
  *
  * This endpoint triggers the reprocess workflow which:
  * 1. Deletes existing articles
@@ -26,43 +26,43 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id: campaignId } = await params
+    const { id: issueId } = await params
 
-    if (!campaignId) {
-      return NextResponse.json({ error: 'Campaign ID required' }, { status: 400 })
+    if (!issueId) {
+      return NextResponse.json({ error: 'issue ID required' }, { status: 400 })
     }
 
-    // Get campaign and newsletter info
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
-      .select('id, newsletter_id, status')
-      .eq('id', campaignId)
+    // Get issue and newsletter info
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
+      .select('id, publication_id, status')
+      .eq('id', issueId)
       .single()
 
-    if (campaignError || !campaign) {
-      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+    if (issueError || !issue) {
+      return NextResponse.json({ error: 'issue not found' }, { status: 404 })
     }
 
     // Prevent reprocessing if already processing
-    if (campaign.status === 'processing') {
+    if (issue.status === 'processing') {
       return NextResponse.json({
-        error: 'Campaign is already processing',
-        status: campaign.status
+        error: 'issue is already processing',
+        status: issue.status
       }, { status: 409 })
     }
 
-    console.log(`[Reprocess API] Starting reprocess for campaign ${campaignId}`)
+    console.log(`[Reprocess API] Starting reprocess for issue ${issueId}`)
 
     // Start the workflow
     await start(reprocessArticlesWorkflow, [{
-      campaign_id: campaignId,
-      newsletter_id: campaign.newsletter_id
+      issue_id: issueId,
+      publication_id: issue.publication_id
     }])
 
     return NextResponse.json({
       success: true,
       message: 'Reprocess workflow started',
-      campaign_id: campaignId
+      issue_id: issueId
     })
 
   } catch (error) {

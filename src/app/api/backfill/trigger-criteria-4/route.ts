@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const secret = searchParams.get('secret')
-    const newsletterId = searchParams.get('newsletter_id')
+    const newsletterId = searchParams.get('publication_id')
     const dryRun = searchParams.get('dry_run') === 'true'
 
     // Auth check
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     if (!newsletterId) {
       return NextResponse.json({
-        error: 'newsletter_id query parameter is required'
+        error: 'publication_id query parameter is required'
       }, { status: 400 })
     }
 

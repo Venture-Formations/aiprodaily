@@ -3,9 +3,9 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
   try {
-    // Get the first active newsletter for newsletter_id
+    // Get the first active newsletter for publication_id
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('is_active', true)
       .limit(1)
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const { error } = await supabaseAdmin
       .from('app_settings')
       .update({ value: '1', updated_at: new Date().toISOString() })
-      .eq('newsletter_id', newsletter.id)
+      .eq('publication_id', newsletter.id)
       .eq('key', 'next_ad_position')
 
     if (error) throw error

@@ -13,7 +13,7 @@ import { executeStep8 } from '../combined-steps/step8-finalize'
 /**
  * RSS Processing Endpoint
  *
- * Runs 8 workflow steps sequentially for ONE campaign:
+ * Runs 8 workflow steps sequentially for ONE issue:
  * 1. Archive old data
  * 2. Fetch RSS feeds and extract full text
  * 3. Score posts with AI
@@ -26,10 +26,10 @@ import { executeStep8 } from '../combined-steps/step8-finalize'
  * Features:
  * - Minimal logging to prevent log overflow
  * - Retry logic for each step
- * - Single campaign processing
+ * - Single issue processing
  */
 export async function POST(request: NextRequest) {
-  let campaign_id: string | undefined
+  let issue_id: string | undefined
 
   try {
     // Check for cron secret OR authenticated session
@@ -44,23 +44,23 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    campaign_id = body.campaign_id
+    issue_id = body.issue_id
 
-    if (!campaign_id) {
-      return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
+    if (!issue_id) {
+      return NextResponse.json({ error: 'issue_id is required' }, { status: 400 })
     }
 
-    console.log(`[RSS] Start: ${campaign_id}`)
+    console.log(`[RSS] Start: ${issue_id}`)
 
     const steps = [
-      { name: 'Archive', fn: () => executeStep1(campaign_id!) },
-      { name: 'Fetch+Extract', fn: () => executeStep2(campaign_id!) },
-      { name: 'Score', fn: () => executeStep3(campaign_id!) },
-      { name: 'Deduplicate', fn: () => executeStep4(campaign_id!) },
-      { name: 'Generate', fn: () => executeStep5(campaign_id!) },
-      { name: 'Select+Subject', fn: () => executeStep6(campaign_id!) },
-      { name: 'Welcome', fn: () => executeStep7(campaign_id!) },
-      { name: 'Finalize', fn: () => executeStep8(campaign_id!) }
+      { name: 'Archive', fn: () => executeStep1(issue_id!) },
+      { name: 'Fetch+Extract', fn: () => executeStep2(issue_id!) },
+      { name: 'Score', fn: () => executeStep3(issue_id!) },
+      { name: 'Deduplicate', fn: () => executeStep4(issue_id!) },
+      { name: 'Generate', fn: () => executeStep5(issue_id!) },
+      { name: 'Select+Subject', fn: () => executeStep6(issue_id!) },
+      { name: 'Welcome', fn: () => executeStep7(issue_id!) },
+      { name: 'Finalize', fn: () => executeStep8(issue_id!) }
     ]
 
     const results = []
@@ -87,17 +87,17 @@ export async function POST(request: NextRequest) {
         console.error(`[RSS] Failed: ${step.name}`)
         results.push({ step: step.name, status: 'failed', error: lastError })
 
-        // Mark campaign as failed
+        // Mark issue as failed
         const { supabaseAdmin } = await import('@/lib/supabase')
         await supabaseAdmin
-          .from('newsletter_campaigns')
+          .from('publication_issues')
           .update({ status: 'failed' })
-          .eq('id', campaign_id)
+          .eq('id', issue_id)
 
         return NextResponse.json({
           success: false,
           message: 'RSS processing failed',
-          campaign_id,
+          issue_id: issue_id,
           results
         }, { status: 500 })
       }
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'RSS processing completed',
-      campaign_id,
+      issue_id: issue_id,
       results
     })
 
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       error: 'RSS processing failed',
       message: error instanceof Error ? error.message : 'Unknown error',
-      campaign_id
+      issue_id
     }, { status: 500 })
   }
 }

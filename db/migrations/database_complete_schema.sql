@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS newsletters (
 -- Newsletter Settings (per-newsletter configuration)
 CREATE TABLE IF NOT EXISTS newsletter_settings (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  newsletter_id UUID NOT NULL REFERENCES newsletters(id) ON DELETE CASCADE,
+  newsletter_id UUID NOT NULL REFERENCES publications(id) ON DELETE CASCADE,
   key TEXT NOT NULL,
   value TEXT,
   custom_default TEXT,
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS newsletter_settings (
 -- Newsletter Campaigns
 CREATE TABLE IF NOT EXISTS newsletter_campaigns (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE,
+  newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE,
   date DATE NOT NULL,
   status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'in_review', 'changes_made', 'ready_to_send', 'sent', 'failed')),
   subject_line TEXT,
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS newsletter_campaigns (
 -- RSS Feeds
 CREATE TABLE IF NOT EXISTS rss_feeds (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE,
+  newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE,
   url TEXT NOT NULL,
   name TEXT NOT NULL,
   description TEXT,
@@ -331,7 +331,7 @@ CREATE TABLE IF NOT EXISTS feedback_responses (
 -- Newsletter Sections (per-newsletter content structure)
 CREATE TABLE IF NOT EXISTS newsletter_sections (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE,
+  newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   display_order INTEGER NOT NULL,
   is_active BOOLEAN DEFAULT true,

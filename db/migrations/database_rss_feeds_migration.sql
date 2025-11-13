@@ -9,7 +9,7 @@
 -- ============================================
 
 -- Add newsletter_id for multi-tenant support
-ALTER TABLE rss_feeds ADD COLUMN IF NOT EXISTS newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE rss_feeds ADD COLUMN IF NOT EXISTS newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 
 -- Add description field
 ALTER TABLE rss_feeds ADD COLUMN IF NOT EXISTS description TEXT;

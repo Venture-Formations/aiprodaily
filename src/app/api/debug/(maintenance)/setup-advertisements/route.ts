@@ -40,7 +40,7 @@ export async function POST() {
       success: true,
       message: 'Advertisement tables created successfully',
       instructions: [
-        '1. Tables created: advertisements, campaign_advertisements, ad_pricing_tiers',
+        '1. Tables created: advertisements, issue_advertisements, ad_pricing_tiers',
         '2. Default pricing tiers added',
         '3. Community Business Spotlight section added to newsletter',
         '4. You can now configure pricing in Settings > Ads'

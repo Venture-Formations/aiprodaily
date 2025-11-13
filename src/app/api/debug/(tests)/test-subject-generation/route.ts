@@ -6,33 +6,33 @@ export async function POST(request: NextRequest) {
   try {
     console.log('=== TESTING SUBJECT LINE GENERATION ===')
 
-    // Get campaign ID from request or use latest
+    // Get issue ID from request or use latest
     const body = await request.json().catch(() => ({}))
-    let campaignId = body.campaignId
+    let issueId = body.issueId
 
-    if (!campaignId) {
-      const { data: campaign, error } = await supabaseAdmin
-        .from('newsletter_campaigns')
+    if (!issueId) {
+      const { data: issue, error } = await supabaseAdmin
+        .from('publication_issues')
         .select('id')
         .order('created_at', { ascending: false })
         .limit(1)
         .single()
 
-      if (error || !campaign) {
+      if (error || !issue) {
         return NextResponse.json({
           success: false,
-          error: 'No campaign found'
+          error: 'No issue found'
         }, { status: 404 })
       }
 
-      campaignId = campaign.id
+      issueId = issue.id
     }
 
-    console.log('Testing subject line generation for campaign:', campaignId)
+    console.log('Testing subject line generation for issue:', issueId)
 
-    // Get the campaign with its articles for subject line generation
-    const { data: campaignWithArticles, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Get the issue with its articles for subject line generation
+    const { data: issueWithArticles, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         id,
         date,
@@ -47,25 +47,25 @@ export async function POST(request: NextRequest) {
           )
         )
       `)
-      .eq('id', campaignId)
+      .eq('id', issueId)
       .single()
 
-    if (campaignError || !campaignWithArticles) {
-      console.error('Failed to fetch campaign for subject generation:', campaignError)
+    if (issueError || !issueWithArticles) {
+      console.error('Failed to fetch issue for subject generation:', issueError)
       return NextResponse.json({
         success: false,
-        error: `Campaign not found: ${campaignError?.message}`
+        error: `issue not found: ${issueError?.message}`
       }, { status: 404 })
     }
 
-    console.log('Campaign found:', {
-      id: campaignWithArticles.id,
-      currentSubject: campaignWithArticles.subject_line,
-      totalArticles: campaignWithArticles.articles?.length || 0
+    console.log('issue found:', {
+      id: issueWithArticles.id,
+      currentSubject: issueWithArticles.subject_line,
+      totalArticles: issueWithArticles.articles?.length || 0
     })
 
     // Get active articles sorted by AI score
-    const activeArticles = campaignWithArticles.articles
+    const activeArticles = issueWithArticles.articles
       ?.filter((article: any) => article.is_active)
       ?.sort((a: any, b: any) => {
         const scoreA = a.rss_post?.post_rating?.[0]?.total_score || 0
@@ -79,8 +79,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: false,
         error: 'No active articles found for subject line generation',
-        campaignData: {
-          totalArticles: campaignWithArticles.articles?.length || 0,
+        issueData: {
+          totalArticles: issueWithArticles.articles?.length || 0,
           activeArticles: 0
         }
       })
@@ -136,20 +136,20 @@ export async function POST(request: NextRequest) {
       generatedSubject = generatedSubject.trim()
       console.log('Generated subject line:', generatedSubject)
 
-      // Update campaign with generated subject line
+      // Update issue with generated subject line
       const { error: updateError } = await supabaseAdmin
-        .from('newsletter_campaigns')
+        .from('publication_issues')
         .update({
           subject_line: generatedSubject,
           updated_at: new Date().toISOString()
         })
-        .eq('id', campaignId)
+        .eq('id', issueId)
 
       if (updateError) {
-        console.error('Failed to update campaign with subject line:', updateError)
+        console.error('Failed to update issue with subject line:', updateError)
         return NextResponse.json({
           success: false,
-          error: 'Failed to update campaign with subject line',
+          error: 'Failed to update issue with subject line',
           details: updateError.message,
           generatedSubject
         }, { status: 500 })
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: 'Subject line generated and updated successfully',
-        campaignId,
+        issueId,
         generatedSubject,
         topArticle: {
           headline: topArticle.headline,

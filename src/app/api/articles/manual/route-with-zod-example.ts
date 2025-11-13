@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const validated = CreateManualArticleSchema.parse(body)
 
     // ✅ TypeScript now knows exact types:
-    // - validated.campaign_id is a valid UUID string
+    // - validated.issue_id is a valid UUID string
     // - validated.title is a string (1-500 chars)
     // - validated.content is a string (1-50k chars)
     // - validated.rank is a number (1-100) or undefined
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     const { data: article, error } = await supabaseAdmin
       .from('manual_articles')
       .insert([{
-        campaign_id: validated.campaign_id,
+        issue_id: validated.issue_id,
         title: validated.title,
         content: validated.content,
         image_url: validated.image_url || null,
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       .from('user_activities')
       .insert([{
         user_id: user.id,
-        campaign_id: validated.campaign_id,
+        issue_id: validated.issue_id,
         action: 'manual_article_created',
         details: { article_id: article.id, title: validated.title }
       }])
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET /api/articles/manual?campaign_id=xxx
+ * GET /api/articles/manual?issue_id=xxx
  * Fetch manual articles with Zod validation
  */
 export async function GET(request: NextRequest) {
@@ -104,15 +104,15 @@ export async function GET(request: NextRequest) {
     }
 
     const url = new URL(request.url)
-    const campaign_id = url.searchParams.get('campaign_id')
+    const issue_id = url.searchParams.get('issue_id')
 
     // ✅ Zod validates query params
-    const validated = GetManualArticlesSchema.parse({ campaign_id })
+    const validated = GetManualArticlesSchema.parse({ issue_id })
 
     const { data: articles, error } = await supabaseAdmin
       .from('manual_articles')
       .select('*')
-      .eq('campaign_id', validated.campaign_id)
+      .eq('issue_id', validated.issue_id)
       .order('created_at', { ascending: false })
 
     if (error) {

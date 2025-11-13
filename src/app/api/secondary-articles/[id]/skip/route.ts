@@ -18,7 +18,7 @@ export async function POST(
     // Get the article to verify it exists
     const { data: article, error: articleError } = await supabaseAdmin
       .from('secondary_articles')
-      .select('id, campaign_id, headline, rank, is_active')
+      .select('id, issue_id, headline, rank, is_active')
       .eq('id', articleId)
       .single()
 
@@ -76,7 +76,7 @@ export async function POST(
             action: 'secondary_article_skipped',
             details: {
               article_id: articleId,
-              campaign_id: article.campaign_id,
+              issue_id: article.issue_id,
               article_headline: article.headline,
               skipped_by: session.user?.email,
               skipped_at: new Date().toISOString()

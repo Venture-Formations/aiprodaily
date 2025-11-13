@@ -5,22 +5,22 @@ import { RSSProcessor } from '@/lib/rss-processor'
  * Step 5: Generate Headlines/Bodies
  * - Generate newsletter article headlines and bodies from scored posts
  */
-export async function executeStep5(campaignId: string) {
+export async function executeStep5(issueId: string) {
   const processor = new RSSProcessor()
 
   // Generate articles for both sections
-  await processor.generateArticlesForSection(campaignId, 'primary')
-  await processor.generateArticlesForSection(campaignId, 'secondary')
+  await processor.generateArticlesForSection(issueId, 'primary')
+  await processor.generateArticlesForSection(issueId, 'secondary')
 
   const { data: articles } = await supabaseAdmin
     .from('articles')
     .select('id')
-    .eq('campaign_id', campaignId)
+    .eq('issue_id', issueId)
 
   const { data: secondaryArticles } = await supabaseAdmin
     .from('secondary_articles')
     .select('id')
-    .eq('campaign_id', campaignId)
+    .eq('issue_id', issueId)
 
   const articlesCount = articles ? articles.length : 0
   const secondaryCount = secondaryArticles ? secondaryArticles.length : 0

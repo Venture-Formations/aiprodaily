@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { supabaseAdmin } from './supabase'
 import { ErrorHandler, SlackNotificationService } from './slack'
-import type { CampaignWithArticles, CampaignWithEvents, Article } from '@/types/database'
+import type { issueWithArticles, issueWithEvents, Article } from '@/types/database'
 import {
   generateNewsletterHeader,
   generateNewsletterFooter,
@@ -30,18 +30,18 @@ export class MailerLiteService {
     this.slack = new SlackNotificationService()
   }
 
-  async createReviewCampaign(campaign: CampaignWithEvents, forcedSubjectLine?: string) {
+  async createReviewissue(issue: issueWithEvents, forcedSubjectLine?: string) {
     try {
-      console.log(`Creating review campaign for ${campaign.date}`)
+      console.log(`Creating review issue for ${issue.date}`)
 
-      // Get newsletter slug for campaign naming
-      const { data: dbCampaign } = await supabaseAdmin
-        .from('newsletter_campaigns')
+      // Get newsletter slug for issue naming
+      const { data: dbissue } = await supabaseAdmin
+        .from('publication_issues')
         .select('newsletters(slug)')
-        .eq('id', campaign.id)
+        .eq('id', issue.id)
         .single()
 
-      const newsletterSlug = (dbCampaign as any)?.newsletters?.slug || 'accounting'
+      const newsletterSlug = (dbissue as any)?.newsletters?.slug || 'accounting'
       const newsletterName = newsletterSlug.charAt(0).toUpperCase() + newsletterSlug.slice(1)
 
       // Get sender and group settings from database
@@ -66,19 +66,19 @@ export class MailerLiteService {
 
       console.log('Using database settings:', { senderName, fromEmail, reviewGroupId })
 
-      const emailContent = await this.generateEmailHTML(campaign, true)
+      const emailContent = await this.generateEmailHTML(issue, true)
 
       // Log subject line status
-      console.log('Campaign subject line:', campaign.subject_line)
+      console.log('issue subject line:', issue.subject_line)
       console.log('Forced subject line parameter:', forcedSubjectLine)
 
-      // Use forced subject line if provided, otherwise fall back to campaign subject line
-      const subjectLine = forcedSubjectLine || campaign.subject_line || `Newsletter Review - ${new Date(campaign.date).toLocaleDateString()}`
+      // Use forced subject line if provided, otherwise fall back to issue subject line
+      const subjectLine = forcedSubjectLine || issue.subject_line || `Newsletter Review - ${new Date(issue.date).toLocaleDateString()}`
 
       console.log('Final subject line being sent to MailerLite:', subjectLine)
 
-      const campaignData = {
-        name: `${newsletterName} Review: ${campaign.date}`,
+      const issueData = {
+        name: `${newsletterName} Review: ${issue.date}`,
         type: 'regular',
         emails: [{
           subject: `${subjectEmoji} ${subjectLine}`,
@@ -90,9 +90,9 @@ export class MailerLiteService {
         // Note: Removed delivery_schedule - we'll schedule separately after creation
       }
 
-      console.log('Sending MailerLite API request with data:', JSON.stringify(campaignData, null, 2))
+      console.log('Sending MailerLite API request with data:', JSON.stringify(issueData, null, 2))
 
-      const response = await mailerliteClient.post('/campaigns', campaignData)
+      const response = await mailerliteClient.post('/campaigns', issueData)
 
       console.log('MailerLite API response:', {
         status: response.status,
@@ -101,21 +101,21 @@ export class MailerLiteService {
       })
 
       if (response.status === 201) {
-        const campaignId = response.data.data.id
-        console.log('Campaign created successfully with ID:', campaignId)
+        const issueId = response.data.data.id
+        console.log('issue created successfully with ID:', issueId)
 
-        // Step 2: Schedule the campaign using the campaign ID
+        // Step 2: Schedule the issue using the issue ID
         let scheduleData
         try {
           // Schedule review for TODAY at scheduled send time
-          // Campaign is created at Campaign Creation Time (8:50pm) and scheduled to send same day at Scheduled Send Time
+          // issue is created at issue Creation Time (8:50pm) and scheduled to send same day at Scheduled Send Time
           const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
           const centralDate = new Date(nowCentral)
           const today = centralDate.toISOString().split('T')[0] // Today's date in YYYY-MM-DD
           scheduleData = await this.getReviewScheduleData(today)
-          console.log('Scheduling review campaign for today with data:', scheduleData)
+          console.log('Scheduling review issue for today with data:', scheduleData)
 
-          const scheduleResponse = await mailerliteClient.post(`/campaigns/${campaignId}/schedule`, scheduleData)
+          const scheduleResponse = await mailerliteClient.post(`/campaigns/${issueId}/schedule`, scheduleData)
 
           console.log('MailerLite schedule response:', {
             status: scheduleResponse.status,
@@ -124,12 +124,12 @@ export class MailerLiteService {
           })
 
           if (scheduleResponse.status === 200 || scheduleResponse.status === 201) {
-            console.log('Campaign scheduled successfully')
+            console.log('issue scheduled successfully')
           } else {
-            console.error('Failed to schedule campaign:', scheduleResponse.status, scheduleResponse.data)
+            console.error('Failed to schedule issue:', scheduleResponse.status, scheduleResponse.data)
           }
         } catch (scheduleError) {
-          console.error('Error scheduling campaign:', scheduleError)
+          console.error('Error scheduling issue:', scheduleError)
 
           // Log detailed error information for debugging
           if (scheduleError && typeof scheduleError === 'object' && 'response' in scheduleError) {
@@ -146,74 +146,74 @@ export class MailerLiteService {
             })
 
             // Log to database for persistent tracking
-            await this.logError('Failed to schedule review campaign', {
-              campaignId: campaign.id,
-              mailerliteCampaignId: campaignId,
+            await this.logError('Failed to schedule review issue', {
+              issueId: issue.id,
+              mailerliteissueId: issueId,
               scheduleData,
               errorStatus: axiosError.response?.status,
               errorData: axiosError.response?.data
             })
           }
 
-          // Don't fail the whole process if scheduling fails - campaign is still created
+          // Don't fail the whole process if scheduling fails - issue is still created
         }
 
-        // Store MailerLite campaign ID in email_metrics table
+        // Store MailerLite issue ID in email_metrics table
         // Check if metrics record exists first
         const { data: existingMetrics } = await supabaseAdmin
           .from('email_metrics')
           .select('id')
-          .eq('campaign_id', campaign.id)
+          .eq('issue_id', issue.id)
           .single()
 
         if (existingMetrics) {
           // Update existing record
           const { error: updateError } = await supabaseAdmin
             .from('email_metrics')
-            .update({ mailerlite_campaign_id: campaignId })
+            .update({ mailerlite_issue_id: issueId })
             .eq('id', existingMetrics.id)
 
           if (updateError) {
-            console.error('Failed to update MailerLite campaign ID:', updateError)
+            console.error('Failed to update MailerLite issue ID:', updateError)
           } else {
-            console.log(`Updated MailerLite campaign ID ${campaignId} in email_metrics`)
+            console.log(`Updated MailerLite issue ID ${issueId} in email_metrics`)
           }
         } else {
           // Insert new record
           const { error: insertError } = await supabaseAdmin
             .from('email_metrics')
             .insert({
-              campaign_id: campaign.id,
-              mailerlite_campaign_id: campaignId
+              issue_id: issue.id,
+              mailerlite_issue_id: issueId
             })
 
           if (insertError) {
-            console.error('Failed to insert MailerLite campaign ID:', insertError)
+            console.error('Failed to insert MailerLite issue ID:', insertError)
           } else {
-            console.log(`Stored MailerLite campaign ID ${campaignId} in email_metrics`)
+            console.log(`Stored MailerLite issue ID ${issueId} in email_metrics`)
           }
         }
 
-        // Update campaign with review sent timestamp
+        // Update issue with review sent timestamp
         await supabaseAdmin
-          .from('newsletter_campaigns')
+          .from('publication_issues')
           .update({
             status: 'in_review',
             review_sent_at: new Date().toISOString()
           })
-          .eq('id', campaign.id)
+          .eq('id', issue.id)
 
-        await this.errorHandler.logInfo('Review campaign created successfully', {
-          campaignId: campaign.id,
-          mailerliteCampaignId: campaignId
+        await this.errorHandler.logInfo('Review issue created successfully', {
+          issueId: issue.id,
+          mailerliteissueId: issueId
         }, 'mailerlite_service')
 
-        await this.slack.sendEmailCampaignAlert('review', true, campaign.id)
+        await this.slack.sendEmailIssueAlert('review', true, issue.id)
 
-        return { success: true, campaignId }
+        return { success: true, issueId }
       }
 
-      throw new Error('Failed to create review campaign')
+      throw new Error('Failed to create review issue')
 
     } catch (error) {
       console.error('MailerLite API error details:', error)
@@ -243,29 +243,29 @@ export class MailerLiteService {
 
       await this.errorHandler.handleError(error, {
         source: 'mailerlite_service',
-        operation: 'createReviewCampaign',
-        campaignId: campaign.id,
+        operation: 'createReviewissue',
+        issueId: issue.id,
         errorDetails
       })
-      await this.slack.sendEmailCampaignAlert('review', false, campaign.id, errorMessage)
+      await this.slack.sendEmailIssueAlert('review', false, issue.id, errorMessage)
       throw new Error(errorMessage)
     }
   }
 
 
-  async importCampaignMetrics(campaignId: string) {
+  async importissueMetrics(issueId: string) {
     try {
       const { data: metrics } = await supabaseAdmin
         .from('email_metrics')
-        .select('mailerlite_campaign_id')
-        .eq('campaign_id', campaignId)
+        .select('mailerlite_issue_id')
+        .eq('issue_id', issueId)
         .single()
 
-      if (!metrics?.mailerlite_campaign_id) {
-        throw new Error('MailerLite campaign ID not found')
+      if (!metrics?.mailerlite_issue_id) {
+        throw new Error('MailerLite issue ID not found')
       }
 
-      const response = await mailerliteClient.get(`/campaigns/${metrics.mailerlite_campaign_id}/reports`)
+      const response = await mailerliteClient.get(`/campaigns/${metrics.mailerlite_issue_id}/reports`)
 
       if (response.status === 200) {
         const data = response.data.data
@@ -286,7 +286,7 @@ export class MailerLiteService {
         await supabaseAdmin
           .from('email_metrics')
           .update(metricsUpdate)
-          .eq('campaign_id', campaignId)
+          .eq('issue_id', issueId)
 
         return metricsUpdate
       }
@@ -294,8 +294,8 @@ export class MailerLiteService {
       throw new Error('Failed to fetch metrics from MailerLite')
 
     } catch (error) {
-      await this.logError('Failed to import campaign metrics', {
-        campaignId,
+      await this.logError('Failed to import issue metrics', {
+        issueId,
         error: error instanceof Error ? error.message : 'Unknown error'
       })
       throw error
@@ -303,9 +303,9 @@ export class MailerLiteService {
   }
 
 
-  private async generateEmailHTML(campaign: CampaignWithEvents, isReview: boolean): Promise<string> {
+  private async generateEmailHTML(issue: issueWithEvents, isReview: boolean): Promise<string> {
     // Filter active articles and sort by rank (custom order)
-    const activeArticles = campaign.articles
+    const activeArticles = issue.articles
       .filter(article => article.is_active)
       .sort((a, b) => (a.rank || 999) - (b.rank || 999))
 
@@ -322,7 +322,7 @@ export class MailerLiteService {
     console.log('MailerLite - Active newsletter sections:', sections?.map(s => `${s.name} (order: ${s.display_order})`).join(', '))
 
     // Format date using local date parsing (same as preview)
-    const [year, month, day] = campaign.date.split('-').map(Number)
+    const [year, month, day] = issue.date.split('-').map(Number)
     const date = new Date(year, month - 1, day) // month is 0-indexed
     const formattedDate = date.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -332,19 +332,19 @@ export class MailerLiteService {
     })
 
     // Use the modular template functions with tracking - SAME AS PREVIEW
-    // mailerlite_campaign_id might not exist yet during review, so it's optional
-    const mailerliteId = (campaign as any).mailerlite_campaign_id || undefined
-    const header = await generateNewsletterHeader(formattedDate, campaign.date, mailerliteId)
-    const footer = await generateNewsletterFooter(campaign.date, mailerliteId)
+    // mailerlite_issue_id might not exist yet during review, so it's optional
+    const mailerliteId = (issue as any).mailerlite_issue_id || undefined
+    const header = await generateNewsletterHeader(formattedDate, issue.date, mailerliteId)
+    const footer = await generateNewsletterFooter(issue.date, mailerliteId)
 
     // Generate welcome section (if it exists)
     const welcomeHtml = await generateWelcomeSection(
-      campaign.welcome_intro || null,
-      campaign.welcome_tagline || null,
-      campaign.welcome_summary || null
+      issue.welcome_intro || null,
+      issue.welcome_tagline || null,
+      issue.welcome_summary || null
     )
 
-    // Review banner for review campaigns
+    // Review banner for review issues
     const reviewBanner = isReview ? `
 <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin: 10px auto; max-width: 750px; background-color: #FEF3C7; font-family: Arial, sans-serif;">
   <tr>
@@ -372,19 +372,19 @@ export class MailerLiteService {
         // Check if this is a primary articles section (display_order 3)
         if (section.display_order === 3 && activeArticles.length > 0) {
           const { generatePrimaryArticlesSection } = await import('./newsletter-templates')
-          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, campaign.date, campaign.id, section.name)
+          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, issue.date, issue.id, section.name)
           sectionsHtml += primaryHtml
         }
         // Check if this is a secondary articles section (display_order 5)
         else if (section.display_order === 5) {
           const { generateSecondaryArticlesSection } = await import('./newsletter-templates')
-          const secondaryHtml = await generateSecondaryArticlesSection(campaign, section.name)
+          const secondaryHtml = await generateSecondaryArticlesSection(issue, section.name)
           sectionsHtml += secondaryHtml
         }
         // Use section ID for AI Applications (stable across name changes)
         else if (section.id === SECTION_IDS.AI_APPLICATIONS) {
           const { generateAIAppsSection } = await import('./newsletter-templates')
-          const aiAppsHtml = await generateAIAppsSection(campaign)
+          const aiAppsHtml = await generateAIAppsSection(issue)
           if (aiAppsHtml) {
             sectionsHtml += aiAppsHtml
           }
@@ -392,33 +392,33 @@ export class MailerLiteService {
         // Use section ID for Prompt Ideas (stable across name changes)
         else if (section.id === SECTION_IDS.PROMPT_IDEAS) {
           const { generatePromptIdeasSection } = await import('./newsletter-templates')
-          const promptHtml = await generatePromptIdeasSection(campaign)
+          const promptHtml = await generatePromptIdeasSection(issue)
           if (promptHtml) {
             sectionsHtml += promptHtml
           }
         }
         // Legacy name-based matching for other sections
         else if (section.name === 'Poll') {
-          const pollHtml = await generatePollSection(campaign.id)
+          const pollHtml = await generatePollSection(issue.id)
           if (pollHtml) {
             sectionsHtml += pollHtml
           }
         } else if (section.name === 'Breaking News') {
           const { generateBreakingNewsSection } = await import('./newsletter-templates')
-          const breakingNewsHtml = await generateBreakingNewsSection(campaign)
+          const breakingNewsHtml = await generateBreakingNewsSection(issue)
           if (breakingNewsHtml) {
             sectionsHtml += breakingNewsHtml
           }
         } else if (section.name === 'Beyond the Feed') {
           const { generateBeyondTheFeedSection } = await import('./newsletter-templates')
-          const beyondFeedHtml = await generateBeyondTheFeedSection(campaign)
+          const beyondFeedHtml = await generateBeyondTheFeedSection(issue)
           if (beyondFeedHtml) {
             sectionsHtml += beyondFeedHtml
           }
         }
         // Use section ID for Advertisement (stable across name changes)
         else if (section.id === SECTION_IDS.ADVERTISEMENT) {
-          const advertorialHtml = await generateAdvertorialSection(campaign, !isReview, section.name) // Record usage for final campaigns only, pass section name
+          const advertorialHtml = await generateAdvertorialSection(issue, !isReview, section.name) // Record usage for final issues only, pass section name
           if (advertorialHtml) {
             sectionsHtml += advertorialHtml
           }
@@ -494,7 +494,7 @@ export class MailerLiteService {
       // Parse the time (format: "HH:MM")
       const [hours, minutes] = finalTime.split(':')
 
-      // MailerLite scheduling format for final campaign
+      // MailerLite scheduling format for final issue
       const scheduleData = {
         delivery: 'scheduled',
         schedule: {
@@ -505,7 +505,7 @@ export class MailerLiteService {
         }
       }
 
-      console.log('Final campaign schedule data:', JSON.stringify(scheduleData, null, 2))
+      console.log('Final issue schedule data:', JSON.stringify(scheduleData, null, 2))
       return scheduleData
 
     } catch (error) {
@@ -523,18 +523,18 @@ export class MailerLiteService {
     }
   }
 
-  async createFinalCampaign(campaign: CampaignWithEvents, mainGroupId: string) {
+  async createFinalissue(issue: issueWithEvents, mainGroupId: string) {
     try {
-      console.log(`Creating final campaign for ${campaign.date}`)
+      console.log(`Creating final issue for ${issue.date}`)
 
-      // Get newsletter slug for campaign naming
-      const { data: dbCampaign } = await supabaseAdmin
-        .from('newsletter_campaigns')
+      // Get newsletter slug for issue naming
+      const { data: dbissue } = await supabaseAdmin
+        .from('publication_issues')
         .select('newsletters(slug)')
-        .eq('id', campaign.id)
+        .eq('id', issue.id)
         .single()
 
-      const newsletterSlug = (dbCampaign as any)?.newsletters?.slug || 'accounting'
+      const newsletterSlug = (dbissue as any)?.newsletters?.slug || 'accounting'
       const newsletterName = newsletterSlug.charAt(0).toUpperCase() + newsletterSlug.slice(1)
 
       // Get sender settings
@@ -552,15 +552,15 @@ export class MailerLiteService {
       const fromEmail = settingsMap['email_fromEmail'] || 'scoop@stcscoop.com'
       const subjectEmoji = settingsMap['subject_line_emoji'] || '🧮'
 
-      const emailContent = await this.generateEmailHTML(campaign, false) // Not a review
+      const emailContent = await this.generateEmailHTML(issue, false) // Not a review
 
-      const subjectLine = campaign.subject_line || `Newsletter - ${new Date(campaign.date).toLocaleDateString()}`
+      const subjectLine = issue.subject_line || `Newsletter - ${new Date(issue.date).toLocaleDateString()}`
 
-      console.log('Creating final campaign with subject line:', subjectLine)
+      console.log('Creating final issue with subject line:', subjectLine)
       console.log('Using sender settings:', { senderName, fromEmail })
 
-      const campaignData = {
-        name: `${newsletterName} Newsletter: ${campaign.date}`,
+      const issueData = {
+        name: `${newsletterName} Newsletter: ${issue.date}`,
         type: 'regular',
         emails: [{
           subject: `${subjectEmoji} ${subjectLine}`,
@@ -571,43 +571,43 @@ export class MailerLiteService {
         groups: [mainGroupId]
       }
 
-      console.log('Creating MailerLite campaign with data:', {
-        name: campaignData.name,
-        subject: campaignData.emails[0].subject,
+      console.log('Creating MailerLite issue with data:', {
+        name: issueData.name,
+        subject: issueData.emails[0].subject,
         groupId: mainGroupId
       })
 
-      const response = await mailerliteClient.post('/campaigns', campaignData)
+      const response = await mailerliteClient.post('/campaigns', issueData)
 
       if (response.data && response.data.data && response.data.data.id) {
-        const campaignId = response.data.data.id
+        const issueId = response.data.data.id
 
-        console.log('Final campaign created successfully:', campaignId)
+        console.log('Final issue created successfully:', issueId)
 
-        // Schedule the final campaign for TODAY at scheduled send time
-        // Campaign is created at Campaign Creation Time and scheduled to send same day at Scheduled Send Time
+        // Schedule the final issue for TODAY at scheduled send time
+        // issue is created at issue Creation Time and scheduled to send same day at Scheduled Send Time
         try {
           const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
           const centralDate = new Date(nowCentral)
           const today = centralDate.toISOString().split('T')[0] // Today's date in YYYY-MM-DD
           const finalScheduleData = await this.getFinalScheduleData(today)
-          console.log('Scheduling final campaign for today with data:', finalScheduleData)
+          console.log('Scheduling final issue for today with data:', finalScheduleData)
 
-          const scheduleResponse = await mailerliteClient.post(`/campaigns/${campaignId}/schedule`, finalScheduleData)
+          const scheduleResponse = await mailerliteClient.post(`/campaigns/${issueId}/schedule`, finalScheduleData)
 
-          console.log('Final campaign schedule response:', {
+          console.log('Final issue schedule response:', {
             status: scheduleResponse.status,
             statusText: scheduleResponse.statusText,
             data: scheduleResponse.data
           })
 
           if (scheduleResponse.status === 200 || scheduleResponse.status === 201) {
-            console.log('Final campaign scheduled successfully')
+            console.log('Final issue scheduled successfully')
           } else {
-            console.error('Failed to schedule final campaign:', scheduleResponse.status, scheduleResponse.data)
+            console.error('Failed to schedule final issue:', scheduleResponse.status, scheduleResponse.data)
           }
         } catch (scheduleError) {
-          console.error('Error scheduling final campaign:', scheduleError)
+          console.error('Error scheduling final issue:', scheduleError)
 
           // Log detailed error information for debugging
           if (scheduleError && typeof scheduleError === 'object' && 'response' in scheduleError) {
@@ -624,79 +624,79 @@ export class MailerLiteService {
             })
 
             // Log to database for persistent tracking
-            const finalScheduleData = await this.getFinalScheduleData(campaign.date)
-            await this.logError('Failed to schedule final campaign', {
-              campaignId: campaign.id,
-              mailerliteCampaignId: campaignId,
+            const finalScheduleData = await this.getFinalScheduleData(issue.date)
+            await this.logError('Failed to schedule final issue', {
+              issueId: issue.id,
+              mailerliteissueId: issueId,
               scheduleData: finalScheduleData,
               errorStatus: axiosError.response?.status,
               errorData: axiosError.response?.data
             })
           }
 
-          // Don't fail the whole process if scheduling fails - campaign is still created
+          // Don't fail the whole process if scheduling fails - issue is still created
         }
 
-        // Store MailerLite campaign ID in email_metrics table
+        // Store MailerLite issue ID in email_metrics table
         // Check if metrics record exists first
         const { data: existingMetrics } = await supabaseAdmin
           .from('email_metrics')
           .select('id')
-          .eq('campaign_id', campaign.id)
+          .eq('issue_id', issue.id)
           .single()
 
         if (existingMetrics) {
           // Update existing record
           const { error: updateError } = await supabaseAdmin
             .from('email_metrics')
-            .update({ mailerlite_campaign_id: campaignId })
+            .update({ mailerlite_issue_id: issueId })
             .eq('id', existingMetrics.id)
 
           if (updateError) {
-            console.error('Failed to update MailerLite campaign ID:', updateError)
+            console.error('Failed to update MailerLite issue ID:', updateError)
           } else {
-            console.log(`Updated MailerLite campaign ID ${campaignId} in email_metrics`)
+            console.log(`Updated MailerLite issue ID ${issueId} in email_metrics`)
           }
         } else {
           // Insert new record
           const { error: insertError } = await supabaseAdmin
             .from('email_metrics')
             .insert({
-              campaign_id: campaign.id,
-              mailerlite_campaign_id: campaignId
+              issue_id: issue.id,
+              mailerlite_issue_id: issueId
             })
 
           if (insertError) {
-            console.error('Failed to insert MailerLite campaign ID:', insertError)
+            console.error('Failed to insert MailerLite issue ID:', insertError)
           } else {
-            console.log(`Stored MailerLite campaign ID ${campaignId} in email_metrics`)
+            console.log(`Stored MailerLite issue ID ${issueId} in email_metrics`)
           }
         }
 
-        await this.logInfo('Final campaign created successfully', {
-          campaignId: campaign.id,
-          mailerliteCampaignId: campaignId,
+        await this.logInfo('Final issue created successfully', {
+          issueId: issue.id,
+          mailerliteissueId: issueId,
           mainGroupId: mainGroupId
         })
 
-        await this.slack.sendEmailCampaignAlert('final', true, campaign.id)
+        await this.slack.sendEmailIssueAlert('final', true, issue.id)
 
-        return { success: true, campaignId }
+        return { success: true, issueId }
       }
 
-      throw new Error('Failed to create final campaign')
+      throw new Error('Failed to create final issue')
 
     } catch (error) {
-      console.error('Failed to create final campaign:', error)
+      console.error('Failed to create final issue:', error)
 
       if (error instanceof Error) {
-        await this.logError('Failed to create final campaign', {
+        await this.logError('Failed to create final issue', {
           error: error.message,
-          campaignId: campaign.id,
+          issueId: issue.id,
           mainGroupId: mainGroupId
         })
 
-        await this.slack.sendEmailCampaignAlert('final', false, campaign.id, error.message)
+        await this.slack.sendEmailIssueAlert('final', false, issue.id, error.message)
       }
 
       throw error

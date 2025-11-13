@@ -16,19 +16,19 @@ export async function POST(request: NextRequest) {
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-    const { data: campaigns, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    const { data: issues, error } = await supabaseAdmin
+      .from('publication_issues')
       .select('id')
       .eq('status', 'sent')
       .gte('final_sent_at', thirtyDaysAgo.toISOString())
 
     if (error) {
-      throw new Error(`Failed to fetch campaigns: ${error.message}`)
+      throw new Error(`Failed to fetch issues: ${error.message}`)
     }
 
-    if (!campaigns || campaigns.length === 0) {
+    if (!issues || issues.length === 0) {
       return NextResponse.json({
-        message: 'No sent campaigns to import metrics for',
+        message: 'No sent issues to import metrics for',
         timestamp: new Date().toISOString()
       })
     }
@@ -37,13 +37,13 @@ export async function POST(request: NextRequest) {
     let successCount = 0
     let errorCount = 0
 
-    // Import metrics for each campaign
-    for (const campaign of campaigns) {
+    // Import metrics for each issue
+    for (const issue of issues) {
       try {
-        await mailerLiteService.importCampaignMetrics(campaign.id)
+        await mailerLiteService.importissueMetrics(issue.id)
         successCount++
       } catch (error) {
-        console.error(`Failed to import metrics for campaign ${campaign.id}:`, error)
+        console.error(`Failed to import metrics for issue ${issue.id}:`, error)
         errorCount++
       }
     }
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Metrics import completed',
-      processed: campaigns.length,
+      processed: issues.length,
       successful: successCount,
       failed: errorCount,
       timestamp: new Date().toISOString()

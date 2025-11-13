@@ -8,19 +8,19 @@ import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/wor
  * Processes both primary and secondary feeds
  */
 export async function POST(request: NextRequest) {
-  let campaign_id: string | undefined
+  let issue_id: string | undefined
 
   try {
     const body = await request.json()
-    campaign_id = body.campaign_id
+    issue_id = body.issue_id
 
-    if (!campaign_id) {
-      return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
+    if (!issue_id) {
+      return NextResponse.json({ error: 'issue_id is required' }, { status: 400 })
     }
 
 
     // Start workflow step
-    const startResult = await startWorkflowStep(campaign_id, 'pending_fetch_feeds')
+    const startResult = await startWorkflowStep(issue_id, 'pending_fetch_feeds')
     if (!startResult.success) {
       return NextResponse.json({
         success: false,
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       try {
         // Use the existing processFeed method via a helper
         // We'll need to expose this method or refactor it
-        await processor.processSingleFeed(feed, campaign_id, 'primary')
+        await processor.processSingleFeed(feed, issue_id, 'primary')
       } catch (error) {
         console.error(`Failed to process primary feed ${feed.name}:`, error)
 
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
     // Process secondary feeds
     for (const feed of secondaryFeeds) {
       try {
-        await processor.processSingleFeed(feed, campaign_id, 'secondary')
+        await processor.processSingleFeed(feed, issue_id, 'secondary')
       } catch (error) {
         console.error(`Failed to process secondary feed ${feed.name}:`, error)
 
@@ -94,18 +94,18 @@ export async function POST(request: NextRequest) {
     const { data: posts } = await supabaseAdmin
       .from('rss_posts')
       .select('id')
-      .eq('campaign_id', campaign_id)
+      .eq('issue_id', issue_id)
 
     totalPosts = posts?.length || 0
 
 
     // Complete workflow step
-    await completeWorkflowStep(campaign_id, 'fetching_feeds')
+    await completeWorkflowStep(issue_id, 'fetching_feeds')
 
     return NextResponse.json({
       success: true,
       message: 'Fetch feeds step completed',
-      campaign_id,
+      issue_id,
       posts_count: totalPosts,
       feeds_processed: allFeeds.length,
       next_state: 'pending_extract',
@@ -115,9 +115,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[Step 2] Fetch feeds failed:', error)
 
-    if (campaign_id) {
+    if (issue_id) {
       await failWorkflow(
-        campaign_id,
+        issue_id,
         `Fetch feeds step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
     }

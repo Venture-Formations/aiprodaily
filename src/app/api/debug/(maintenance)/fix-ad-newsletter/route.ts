@@ -2,15 +2,15 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
- * Debug endpoint to update advertisements with newsletter_id
+ * Debug endpoint to update advertisements with publication_id
  *
- * This fixes ads that were created without newsletter_id (NULL values)
+ * This fixes ads that were created without publication_id (NULL values)
  */
 export async function POST() {
   try {
     // Get accounting newsletter UUID
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('slug', 'accounting')
       .single()
@@ -24,11 +24,11 @@ export async function POST() {
 
     console.log(`[Fix Ad] Accounting newsletter ID: ${newsletter.id}`)
 
-    // Get all ads with NULL newsletter_id
+    // Get all ads with NULL publication_id
     const { data: adsWithoutNewsletter, error: fetchError } = await supabaseAdmin
       .from('advertisements')
-      .select('id, title, newsletter_id')
-      .is('newsletter_id', null)
+      .select('id, title, publication_id')
+      .is('publication_id', null)
 
     if (fetchError) {
       return NextResponse.json({
@@ -37,7 +37,7 @@ export async function POST() {
       }, { status: 500 })
     }
 
-    console.log(`[Fix Ad] Found ${adsWithoutNewsletter?.length || 0} ads without newsletter_id`)
+    console.log(`[Fix Ad] Found ${adsWithoutNewsletter?.length || 0} ads without publication_id`)
 
     if (!adsWithoutNewsletter || adsWithoutNewsletter.length === 0) {
       return NextResponse.json({
@@ -47,11 +47,11 @@ export async function POST() {
       })
     }
 
-    // Update all ads to have the accounting newsletter_id
+    // Update all ads to have the accounting publication_id
     const { data: updatedAds, error: updateError } = await supabaseAdmin
       .from('advertisements')
-      .update({ newsletter_id: newsletter.id })
-      .is('newsletter_id', null)
+      .update({ publication_id: newsletter.id })
+      .is('publication_id', null)
       .select('id, title')
 
     if (updateError) {
@@ -66,7 +66,7 @@ export async function POST() {
     return NextResponse.json({
       success: true,
       message: 'Advertisements updated successfully',
-      newsletter_id: newsletter.id,
+      publication_id: newsletter.id,
       newsletter_slug: 'accounting',
       updated_count: updatedAds?.length || 0,
       updated_ads: updatedAds

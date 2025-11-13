@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const { newsletterId } = body
 
     if (!newsletterId) {
-      return NextResponse.json({ error: 'newsletter_id required' }, { status: 400 })
+      return NextResponse.json({ error: 'publication_id required' }, { status: 400 })
     }
 
     console.log(`[Check C1-3] Checking backfill needs for: ${newsletterId}`)
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const { data: feeds, error: feedsError } = await supabaseAdmin
       .from('rss_feeds')
       .select('id')
-      .eq('newsletter_id', newsletterId)
+      .eq('publication_id', newsletterId)
       .eq('use_for_primary_section', true)
 
     if (feedsError || !feeds || feeds.length === 0) {

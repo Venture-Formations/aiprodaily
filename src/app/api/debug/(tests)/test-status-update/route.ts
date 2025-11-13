@@ -13,14 +13,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url)
-    const campaignId = searchParams.get('campaign_id')
+    const issueId = searchParams.get('issue_id')
 
-    if (!campaignId) {
-      return NextResponse.json({ error: 'campaign_id parameter required' }, { status: 400 })
+    if (!issueId) {
+      return NextResponse.json({ error: 'issueId parameter required' }, { status: 400 })
     }
 
     console.log('=== STATUS UPDATE DEBUG ===')
-    console.log('Campaign ID:', campaignId)
+    console.log('issue ID:', issueId)
 
     // Check session
     const session = await getServerSession(authOptions)
@@ -33,42 +33,42 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No session found' }, { status: 401 })
     }
 
-    // Check if campaign exists
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Check if issue exists
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select('*')
-      .eq('id', campaignId)
+      .eq('id', issueId)
       .single()
 
-    console.log('Campaign lookup:', {
-      found: !!campaign,
-      error: campaignError?.message || 'none',
-      status: campaign?.status || 'none'
+    console.log('issue lookup:', {
+      found: !!issue,
+      error: issueError?.message || 'none',
+      status: issue?.status || 'none'
     })
 
-    if (campaignError) {
+    if (issueError) {
       return NextResponse.json({
-        error: 'Campaign lookup failed',
-        details: campaignError.message,
-        code: campaignError.code
+        error: 'issue lookup failed',
+        details: issueError.message,
+        code: issueError.code
       }, { status: 500 })
     }
 
-    if (!campaign) {
-      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+    if (!issue) {
+      return NextResponse.json({ error: 'issue not found' }, { status: 404 })
     }
 
     // Test the update operation
     console.log('Testing status update...')
     const { error: updateError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .update({
         status: 'changes_made',
         last_action: 'changes_made',
         last_action_at: new Date().toISOString(),
         last_action_by: session.user?.email || 'unknown'
       })
-      .eq('id', campaignId)
+      .eq('id', issueId)
 
     console.log('Update result:', {
       success: !updateError,
@@ -88,9 +88,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Status update test completed successfully',
-      campaign: {
-        id: campaignId,
-        current_status: campaign.status,
+      issue: {
+        id: issueId,
+        current_status: issue.status,
         updated_status: 'changes_made'
       }
     })

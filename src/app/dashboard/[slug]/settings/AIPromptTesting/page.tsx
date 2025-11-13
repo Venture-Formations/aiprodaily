@@ -125,7 +125,7 @@ export default function AIPromptTestingPage() {
     try {
       const section = getSection(promptType)
       console.log('[Frontend] Fetching posts for newsletter:', slug, 'section:', section)
-      const res = await fetch(`/api/rss/recent-posts?newsletter_id=${slug}&limit=50&section=${section}`)
+      const res = await fetch(`/api/rss/recent-posts?publication_id=${slug}&limit=50&section=${section}`)
       const data = await res.json()
 
       console.log('[Frontend] Response status:', res.status, 'data:', data)
@@ -152,7 +152,7 @@ export default function AIPromptTestingPage() {
     // STEP 1: Try to load LIVE prompt first (from app_settings)
     try {
       const res = await fetch(
-        `/api/ai/load-live-prompt?newsletter_id=${slug}&provider=${provider}&prompt_type=${promptType}`
+        `/api/ai/load-live-prompt?publication_id=${slug}&provider=${provider}&prompt_type=${promptType}`
       )
       const data = await res.json()
 
@@ -188,7 +188,7 @@ export default function AIPromptTestingPage() {
     // STEP 2: Try to load saved prompt from database (ai_prompt_tests table)
     try {
       const res = await fetch(
-        `/api/ai/load-prompt?newsletter_id=${slug}&provider=${provider}&prompt_type=${promptType}`
+        `/api/ai/load-prompt?publication_id=${slug}&provider=${provider}&prompt_type=${promptType}`
       )
       const data = await res.json()
 
@@ -264,7 +264,7 @@ export default function AIPromptTestingPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          newsletter_id: slug,
+          publication_id: slug,
           provider,
           model,
           prompt_type: promptType,
@@ -391,7 +391,7 @@ export default function AIPromptTestingPage() {
         body: JSON.stringify({
           provider,
           promptJson,
-          newsletter_id: slug,
+          publication_id: slug,
           prompt_type: promptType,
           limit: 10
         })

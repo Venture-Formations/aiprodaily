@@ -5,7 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 interface RouteParams {
   params: Promise<{
-    campaignId: string
+    issueId: string
   }>
 }
 
@@ -16,32 +16,32 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { campaignId } = await params
+    const { issueId } = await params
 
-    // Get campaign info
-    const { data: campaign } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Get issue info
+    const { data: issue } = await supabaseAdmin
+      .from('publication_issues')
       .select('*')
-      .eq('id', campaignId)
+      .eq('id', issueId)
       .single()
 
-    if (!campaign) {
-      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+    if (!issue) {
+      return NextResponse.json({ error: 'issue not found' }, { status: 404 })
     }
 
     // Get articles count
     const { data: articles } = await supabaseAdmin
       .from('articles')
       .select('id')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     // Get RSS posts count
     const { data: posts } = await supabaseAdmin
       .from('rss_posts')
       .select('id')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
-    // Get recent system logs for this campaign
+    // Get recent system logs for this issue
     const { data: logs } = await supabaseAdmin
       .from('system_logs')
       .select('*')
@@ -51,10 +51,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .limit(10)
 
     return NextResponse.json({
-      campaign: {
-        id: campaign.id,
-        status: campaign.status,
-        date: campaign.date
+      issue: {
+        id: issue.id,
+        status: issue.status,
+        date: issue.date
       },
       counts: {
         articles: articles?.length || 0,

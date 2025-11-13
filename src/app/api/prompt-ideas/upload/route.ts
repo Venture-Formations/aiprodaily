@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
 
     // Get accounting newsletter ID
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('slug', 'accounting')
       .single()
@@ -180,10 +180,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Newsletter not found' }, { status: 404 })
     }
 
-    // Add newsletter_id and times_used to all prompts
+    // Add publication_id and times_used to all prompts
     const promptsWithNewsletterId = prompts.map(prompt => ({
       ...prompt,
-      newsletter_id: newsletter.id,
+      publication_id: newsletter.id,
       times_used: 0
     }))
 

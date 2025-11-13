@@ -1,6 +1,6 @@
 export { Button, type ButtonProps } from './Button'
 export { Badge, type BadgeProps } from './Badge'
-export { StatusBadge, type StatusBadgeProps, type CampaignStatus } from './StatusBadge'
+export { StatusBadge, type StatusBadgeProps, type IssueStatus } from './StatusBadge'
 export { Card, CardHeader, CardTitle, type CardProps, type CardHeaderProps, type CardTitleProps } from './Card'
-export { Skeleton, CampaignCardSkeleton, StatCardSkeleton, type SkeletonProps } from './LoadingSkeleton'
+export { Skeleton, IssueCardSkeleton, StatCardSkeleton, type SkeletonProps } from './LoadingSkeleton'
 export { EmptyState, type EmptyStateProps } from './EmptyState'

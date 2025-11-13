@@ -39,7 +39,7 @@ async function getPromptJSON(key: string, newsletterId: string, fallbackText?: s
     const { data, error } = await supabaseAdmin
       .from('app_settings')
       .select('value, ai_provider')
-      .eq('newsletter_id', newsletterId)
+      .eq('publication_id', newsletterId)
       .eq('key', key)
       .single()
 
@@ -413,19 +413,19 @@ ${articlesText}
 Return ONLY the welcome text (no additional formatting or explanation).`
   },
 
-  roadWorkGenerator: (campaignDate: string) => `
-Find CURRENT and ACTIVE road, lane, or bridge closures, detours, or traffic restrictions in effect on ${campaignDate} within 10 miles of ZIP code 56303 (St. Cloud, MN metro area).
+  roadWorkGenerator: (issueDate: string) => `
+Find CURRENT and ACTIVE road, lane, or bridge closures, detours, or traffic restrictions in effect on ${issueDate} within 10 miles of ZIP code 56303 (St. Cloud, MN metro area).
 
 CRITICAL DATE REQUIREMENT:
-- ONLY include projects that are ACTIVE on ${campaignDate}
-- Expected reopen date must be AFTER ${campaignDate} (not completed yet)
-- Start date must be ON OR BEFORE ${campaignDate} (already begun)
+- ONLY include projects that are ACTIVE on ${issueDate}
+- Expected reopen date must be AFTER ${issueDate} (not completed yet)
+- Start date must be ON OR BEFORE ${issueDate} (already begun)
 - Do NOT include completed projects from summer 2025 or earlier
 - MUST have CONFIRMED specific dates (e.g., "Oct 15", "Nov 30") - NO vague ranges like "Fall 2026" or "TBD"
 - REJECT any items with unconfirmed or vague date ranges
 
 SEARCH CRITERIA:
-- Date: ${campaignDate}
+- Date: ${issueDate}
 - Location: Within 10 miles of ZIP 56303 (St. Cloud, MN metro area)
 
 INCLUDE ALL TYPES:
@@ -446,11 +446,11 @@ EXPLICITLY INCLUDE:
 - Closures in nearby cities: Sartell, Waite Park, St. Joseph, St. Augusta, Sauk Rapids
 - Metro Bus route detours and schedule changes
 - All types of construction projects (roundabouts, bridges, resurfacing)
-- Projects that started before ${campaignDate} but are still ongoing
+- Projects that started before ${issueDate} but are still ongoing
 
 STRICTLY EXCLUDE:
-- Completed closures (reopen date before ${campaignDate})
-- Planned/future closures (start date after ${campaignDate})
+- Completed closures (reopen date before ${issueDate})
+- Planned/future closures (start date after ${issueDate})
 - Summer 2025 projects that ended in August or earlier
 - Shoulder-only work with no traffic impact
 
@@ -1139,9 +1139,9 @@ export const AI_PROMPTS = {
     return FALLBACK_PROMPTS.subjectLineGenerator(top_article)
   },
 
-  roadWorkGenerator: async (campaignDate: string) => {
+  roadWorkGenerator: async (issueDate: string) => {
     // roadWorkGenerator doesn't support database templates - always use fallback
-    return FALLBACK_PROMPTS.roadWorkGenerator(campaignDate)
+    return FALLBACK_PROMPTS.roadWorkGenerator(issueDate)
   },
 
   imageAnalyzer: async () => {

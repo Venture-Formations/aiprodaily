@@ -59,7 +59,7 @@ export class AppSelector {
 
   /**
    * Get unused apps for a specific category
-   * Apps are considered "used" if they appear in campaign_ai_app_selections
+   * Apps are considered "used" if they appear in issue_ai_app_selections
    */
   private static async getUnusedAppsForCategory(
     category: AIAppCategory,
@@ -129,19 +129,19 @@ export class AppSelector {
   }
 
   /**
-   * Select apps for a campaign based on category counts and rotation
+   * Select apps for a issue based on category counts and rotation
    * Ensures variety by tracking which apps have been used across all campaigns
    */
-  static async selectAppsForCampaign(campaignId: string, newsletterId: string): Promise<AIApplication[]> {
+  static async selectAppsForissue(issueId: string, newsletterId: string): Promise<AIApplication[]> {
     try {
-      // Check if apps already selected for this campaign
+      // Check if apps already selected for this issue
       const { data: existingSelections } = await supabaseAdmin
-        .from('campaign_ai_app_selections')
+        .from('issue_ai_app_selections')
         .select('*, app:ai_applications(*)')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
 
       if (existingSelections && existingSelections.length > 0) {
-        console.log('Apps already selected for campaign:', campaignId)
+        console.log('Apps already selected for issue:', issueId)
         return existingSelections.map(s => s.app).filter(Boolean)
       }
 
@@ -152,7 +152,7 @@ export class AppSelector {
       const { data: allApps } = await supabaseAdmin
         .from('ai_applications')
         .select('*')
-        .eq('newsletter_id', newsletterId)
+        .eq('publication_id', newsletterId)
         .eq('is_active', true)
 
       if (!allApps || allApps.length === 0) {
@@ -162,7 +162,7 @@ export class AppSelector {
 
       // Get recently used app IDs across all campaigns
       const { data: recentSelections } = await supabaseAdmin
-        .from('campaign_ai_app_selections')
+        .from('issue_ai_app_selections')
         .select('app_id')
         .order('created_at', { ascending: false })
         .limit(allApps.length * 2) // Look back at last 2 full cycles
@@ -234,14 +234,14 @@ export class AppSelector {
       // 4. Record selections in database
       if (selectedApps.length > 0) {
         const selections = selectedApps.map((app, index) => ({
-          campaign_id: campaignId,
+          issue_id: issueId,
           app_id: app.id,
           selection_order: index + 1,
           is_featured: app.is_featured
         }))
 
         await supabaseAdmin
-          .from('campaign_ai_app_selections')
+          .from('issue_ai_app_selections')
           .insert(selections)
 
         // Update last_used_date and times_used
@@ -256,31 +256,31 @@ export class AppSelector {
             .eq('id', app.id)
         }
 
-        console.log(`Selected ${selectedApps.length} apps for campaign:`, campaignId)
+        console.log(`Selected ${selectedApps.length} apps for issue:`, issueId)
       }
 
       return selectedApps
 
     } catch (error) {
-      console.error('Error selecting apps for campaign:', error)
+      console.error('Error selecting apps for issue:', error)
       return []
     }
   }
 
   /**
-   * Get the selected apps for a campaign
+   * Get the selected apps for an issue
    */
-  static async getAppsForCampaign(campaignId: string): Promise<AIApplication[]> {
+  static async getAppsForissue(issueId: string): Promise<AIApplication[]> {
     try {
       const { data } = await supabaseAdmin
-        .from('campaign_ai_app_selections')
+        .from('issue_ai_app_selections')
         .select('*, app:ai_applications(*)')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .order('selection_order', { ascending: true })
 
       return data?.map(s => s.app).filter(Boolean) || []
     } catch (error) {
-      console.error('Error getting apps for campaign:', error)
+      console.error('Error getting apps for issue:', error)
       return []
     }
   }

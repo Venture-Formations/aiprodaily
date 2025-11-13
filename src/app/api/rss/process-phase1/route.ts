@@ -13,10 +13,10 @@ import { executeStep3 } from '../combined-steps/step3-score'
  * 2. Fetch RSS feeds and extract full text
  * 3. Score posts with AI
  * 
- * After this completes, call /api/rss/process-phase2 with the campaign_id
+ * After this completes, call /api/rss/process-phase2 with the issue_id
  */
 export async function POST(request: NextRequest) {
-  let campaign_id: string | undefined
+  let issue_id: string | undefined
 
   try {
     // Check for cron secret OR authenticated session
@@ -31,18 +31,18 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    campaign_id = body.campaign_id
+    issue_id = body.issue_id
 
-    if (!campaign_id) {
-      return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
+    if (!issue_id) {
+      return NextResponse.json({ error: 'issue_id is required' }, { status: 400 })
     }
 
-    console.log(`[RSS Phase 1] Start: ${campaign_id}`)
+    console.log(`[RSS Phase 1] Start: ${issue_id}`)
 
     const steps = [
-      { name: 'Archive', fn: () => executeStep1(campaign_id!) },
-      { name: 'Fetch+Extract', fn: () => executeStep2(campaign_id!) },
-      { name: 'Score', fn: () => executeStep3(campaign_id!) }
+      { name: 'Archive', fn: () => executeStep1(issue_id!) },
+      { name: 'Fetch+Extract', fn: () => executeStep2(issue_id!) },
+      { name: 'Score', fn: () => executeStep3(issue_id!) }
     ]
 
     const results = []
@@ -69,38 +69,38 @@ export async function POST(request: NextRequest) {
 
         const { supabaseAdmin } = await import('@/lib/supabase')
         await supabaseAdmin
-          .from('newsletter_campaigns')
+          .from('publication_issues')
           .update({ status: 'failed' })
-          .eq('id', campaign_id)
+          .eq('id', issue_id)
 
         return NextResponse.json({
           success: false,
           message: 'RSS processing phase 1 failed',
-          campaign_id,
+          issue_id: issue_id,
           results
         }, { status: 500 })
       }
     }
 
-    console.log(`[RSS Phase 1] All steps completed successfully for campaign: ${campaign_id}`)
+    console.log(`[RSS Phase 1] All steps completed successfully for issue: ${issue_id}`)
 
-    // Update campaign status to pending_phase2
+    // Update issue status to pending_phase2
     // Phase 2 will be triggered by a separate cron job after delay
     const { supabaseAdmin } = await import('@/lib/supabase')
     await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .update({
         status: 'pending_phase2',
         updated_at: new Date().toISOString()
       })
-      .eq('id', campaign_id)
+      .eq('id', issue_id)
 
-    console.log(`[RSS Phase 1] Campaign marked as pending_phase2 - Phase 2 will start automatically after delay`)
+    console.log(`[RSS Phase 1] issue marked as pending_phase2 - Phase 2 will start automatically after delay`)
 
     return NextResponse.json({
       success: true,
       message: 'RSS processing phase 1 completed - phase 2 will start automatically',
-      campaign_id,
+      issue_id: issue_id,
       results,
       next_step: 'Phase 2 will be triggered by cron job after 5-minute delay'
     })
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       error: 'RSS processing phase 1 failed',
       message: error instanceof Error ? error.message : 'Unknown error',
-      campaign_id
+      issue_id
     }, { status: 500 })
   }
 }

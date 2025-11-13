@@ -10,7 +10,7 @@
 -- Insert Breaking News section (display_order 3 - after Ad)
 INSERT INTO newsletter_sections (newsletter_id, name, display_order, is_active, created_at, updated_at)
 VALUES (
-  (SELECT id FROM newsletters WHERE name = 'AI Accounting Daily' LIMIT 1),
+  (SELECT id FROM publications WHERE name = 'AI Accounting Daily' LIMIT 1),
   'Breaking News',
   3,
   true,
@@ -23,7 +23,7 @@ SET display_order = 3, is_active = true, updated_at = NOW();
 -- Insert Beyond the Feed section (display_order 5 - after Apps)
 INSERT INTO newsletter_sections (newsletter_id, name, display_order, is_active, created_at, updated_at)
 VALUES (
-  (SELECT id FROM newsletters WHERE name = 'AI Accounting Daily' LIMIT 1),
+  (SELECT id FROM publications WHERE name = 'AI Accounting Daily' LIMIT 1),
   'Beyond the Feed',
   5,
   true,
@@ -44,12 +44,12 @@ SET display_order = 5, is_active = true, updated_at = NOW();
 UPDATE newsletter_sections
 SET display_order = 2, updated_at = NOW()
 WHERE name = 'Community Business Spotlight'
-AND newsletter_id = (SELECT id FROM newsletters WHERE name = 'AI Accounting Daily' LIMIT 1);
+AND newsletter_id = (SELECT id FROM publications WHERE name = 'AI Accounting Daily' LIMIT 1);
 
 UPDATE newsletter_sections
 SET display_order = 6, updated_at = NOW()
 WHERE name = 'AI Prompt Ideas'
-AND newsletter_id = (SELECT id FROM newsletters WHERE name = 'AI Accounting Daily' LIMIT 1);
+AND newsletter_id = (SELECT id FROM publications WHERE name = 'AI Accounting Daily' LIMIT 1);
 
 -- Add comments for clarity
 COMMENT ON COLUMN newsletter_sections.display_order IS 'Section order in newsletter: 1=Welcome, 2=Ad, 3=Breaking News, 4=Apps, 5=Beyond Feed, 6=AI Prompts';

@@ -5,14 +5,14 @@ import { authOptions } from '@/lib/auth'
 import { PromptSelector } from '@/lib/prompt-selector'
 import { AppSelector } from '@/lib/app-selector'
 
-// Helper function to initialize AI app selection for a new campaign
-async function initializeAIAppSelection(campaignId: string) {
+// Helper function to initialize AI app selection for a new issue
+async function initializeAIAppSelection(issueId: string) {
   try {
-    console.log(`Initializing AI app selection for campaign ${campaignId}`)
+    console.log(`Initializing AI app selection for issue ${issueId}`)
 
     // Get accounting newsletter ID
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('slug', 'accounting')
       .single()
@@ -23,7 +23,7 @@ async function initializeAIAppSelection(campaignId: string) {
     }
 
     // Use AppSelector to select apps with proper category rotation logic
-    const selectedApps = await AppSelector.selectAppsForCampaign(campaignId, newsletter.id)
+    const selectedApps = await AppSelector.selectAppsForissue(issueId, newsletter.id)
 
     if (selectedApps.length > 0) {
       console.log(`Successfully selected ${selectedApps.length} AI applications`)
@@ -35,13 +35,13 @@ async function initializeAIAppSelection(campaignId: string) {
   }
 }
 
-// Helper function to initialize prompt ideas selection for a new campaign
-async function initializePromptSelection(campaignId: string) {
+// Helper function to initialize prompt ideas selection for a new issue
+async function initializePromptSelection(issueId: string) {
   try {
-    console.log(`Initializing prompt ideas selection for campaign ${campaignId}`)
+    console.log(`Initializing prompt ideas selection for issue ${issueId}`)
 
     // Use PromptSelector to select ONE prompt with proper rotation logic
-    const selectedPrompt = await PromptSelector.selectPromptForCampaign(campaignId)
+    const selectedPrompt = await PromptSelector.selectPromptForissue(issueId)
 
     if (selectedPrompt) {
       console.log(`Successfully selected prompt: ${selectedPrompt.title}`)
@@ -67,11 +67,11 @@ export async function GET(request: NextRequest) {
     const newsletterSlug = url.searchParams.get('newsletter_slug')
     const days = url.searchParams.get('days')
 
-    // Get newsletter_id from slug (REQUIRED for multi-tenant isolation)
+    // Get publication_id from slug (REQUIRED for multi-tenant isolation)
     let newsletterId: string | undefined
     if (newsletterSlug) {
       const { data: newsletter, error: newsletterError } = await supabaseAdmin
-        .from('newsletters')
+        .from('publications')
         .select('id')
         .eq('slug', newsletterSlug)
         .single()
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
     }
 
     let query = supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .select(`
         *,
         articles:articles(
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
 
     // CRITICAL: Multi-tenant filtering (REQUIRED)
     if (newsletterId) {
-      query = query.eq('newsletter_id', newsletterId)
+      query = query.eq('publication_id', newsletterId)
     }
 
     if (status) {
@@ -134,14 +134,14 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      campaigns: campaigns || [],
+      issues: campaigns || [],
       total: campaigns?.length || 0
     })
 
   } catch (error) {
-    console.error('[API] Failed to fetch campaigns:', error)
+    console.error('[API] Failed to fetch issues:', error)
     return NextResponse.json({
-      error: 'Failed to fetch campaigns',
+      error: 'Failed to fetch issues',
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
 
     // Get accounting newsletter ID
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('slug', 'accounting')
       .single()
@@ -174,13 +174,13 @@ export async function POST(request: NextRequest) {
       }, { status: 404 })
     }
 
-    // Create new campaign (duplicate dates are now allowed)
-    const { data: campaign, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Create new issue (duplicate dates are now allowed)
+    const { data: issue, error } = await supabaseAdmin
+      .from('publication_issues')
       .insert([{
         date,
         status: 'draft',
-        newsletter_id: newsletter.id
+        publication_id: newsletter.id
       }])
       .select('*')
       .single()
@@ -189,23 +189,23 @@ export async function POST(request: NextRequest) {
       throw error
     }
 
-    // Initialize all content selections for the new campaign
-    console.log('Initializing campaign content selections...')
+    // Initialize all content selections for the new issue
+    console.log('Initializing issue content selections...')
 
     // Run all initializations in parallel for better performance
     await Promise.all([
-      initializeAIAppSelection(campaign.id),
-      initializePromptSelection(campaign.id)
+      initializeAIAppSelection(issue.id),
+      initializePromptSelection(issue.id)
     ])
 
-    console.log('Campaign content initialization completed')
+    console.log('issue content initialization completed')
 
-    return NextResponse.json({ campaign }, { status: 201 })
+    return NextResponse.json({ issue }, { status: 201 })
 
   } catch (error) {
-    console.error('Failed to create campaign:', error)
+    console.error('Failed to create issue:', error)
     return NextResponse.json({
-      error: 'Failed to create campaign',
+      error: 'Failed to create issue',
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }

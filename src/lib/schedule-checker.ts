@@ -4,9 +4,9 @@ interface ScheduleSettings {
   reviewScheduleEnabled: boolean
   dailyScheduleEnabled: boolean
   rssProcessingTime: string
-  campaignCreationTime: string
+  issueCreationTime: string
   scheduledSendTime: string
-  dailyCampaignCreationTime: string
+  dailyissueCreationTime: string
   dailyScheduledSendTime: string
 }
 
@@ -15,14 +15,14 @@ export class ScheduleChecker {
     const { data: settings } = await supabaseAdmin
       .from('app_settings')
       .select('key, value')
-      .eq('newsletter_id', newsletterId)
+      .eq('publication_id', newsletterId)
       .in('key', [
         'email_reviewScheduleEnabled',
         'email_dailyScheduleEnabled',
         'email_rssProcessingTime',
-        'email_campaignCreationTime',
+        'email_issueCreationTime',
         'email_scheduledSendTime',
-        'email_dailyCampaignCreationTime',
+        'email_dailyissueCreationTime',
         'email_dailyScheduledSendTime'
       ])
 
@@ -35,9 +35,9 @@ export class ScheduleChecker {
       reviewScheduleEnabled: settingsMap['email_reviewScheduleEnabled'] === 'true',
       dailyScheduleEnabled: settingsMap['email_dailyScheduleEnabled'] === 'true',
       rssProcessingTime: settingsMap['email_rssProcessingTime'] || '20:30',
-      campaignCreationTime: settingsMap['email_campaignCreationTime'] || '20:50',
+      issueCreationTime: settingsMap['email_issueCreationTime'] || '20:50',
       scheduledSendTime: settingsMap['email_scheduledSendTime'] || '21:00',
-      dailyCampaignCreationTime: settingsMap['email_dailyCampaignCreationTime'] || '04:30',
+      dailyissueCreationTime: settingsMap['email_dailyissueCreationTime'] || '04:30',
       dailyScheduledSendTime: settingsMap['email_dailyScheduledSendTime'] || '04:55'
     }
   }
@@ -88,7 +88,7 @@ export class ScheduleChecker {
         await supabaseAdmin
           .from('app_settings')
           .upsert({
-            newsletter_id: newsletterId,
+            publication_id: newsletterId,
             key: lastRunKey,
             value: today,
             description: `Last run date for ${lastRunKey}`,
@@ -128,7 +128,7 @@ export class ScheduleChecker {
     }
   }
 
-  static async shouldRunCampaignCreation(newsletterId: string): Promise<boolean> {
+  static async shouldRunissueCreation(newsletterId: string): Promise<boolean> {
     try {
       const settings = await this.getScheduleSettings(newsletterId)
 
@@ -137,16 +137,16 @@ export class ScheduleChecker {
       }
 
       const currentTime = this.getCurrentTimeInCT()
-      console.log(`Campaign Creation check: Current CT time ${currentTime.timeString}, Scheduled: ${settings.campaignCreationTime}`)
+      console.log(`issue Creation check: Current CT time ${currentTime.timeString}, Scheduled: ${settings.issueCreationTime}`)
 
       return await this.isTimeToRun(
         currentTime.timeString,
-        settings.campaignCreationTime,
-        'last_campaign_creation_run',
+        settings.issueCreationTime,
+        'last_issue_creation_run',
         newsletterId
       )
     } catch (error) {
-      console.error('Error checking campaign creation schedule:', error)
+      console.error('Error checking issue creation schedule:', error)
       return false
     }
   }
@@ -160,11 +160,11 @@ export class ScheduleChecker {
       }
 
       const currentTime = this.getCurrentTimeInCT()
-      console.log(`Review Send check: Current CT time ${currentTime.timeString}, Campaign Creation Time: ${settings.campaignCreationTime}`)
+      console.log(`Review Send check: Current CT time ${currentTime.timeString}, issue Creation Time: ${settings.issueCreationTime}`)
 
       return await this.isTimeToRun(
         currentTime.timeString,
-        settings.campaignCreationTime,
+        settings.issueCreationTime,
         'last_review_send_run',
         newsletterId
       )
@@ -212,11 +212,11 @@ export class ScheduleChecker {
       }
 
       const currentTime = this.getCurrentTimeInCT()
-      console.log(`Final Send check: Current CT time ${currentTime.timeString}, Daily Campaign Creation Time: ${settings.dailyCampaignCreationTime}`)
+      console.log(`Final Send check: Current CT time ${currentTime.timeString}, Daily issue Creation Time: ${settings.dailyissueCreationTime}`)
 
       return await this.isTimeToRun(
         currentTime.timeString,
-        settings.dailyCampaignCreationTime,
+        settings.dailyissueCreationTime,
         'last_final_send_run',
         newsletterId
       )
@@ -236,7 +236,7 @@ export class ScheduleChecker {
   static async getScheduleDisplay(newsletterId: string): Promise<{
     rssProcessing: string
     subjectGeneration: string
-    campaignCreation: string
+    issueCreation: string
     reviewSend: string
     finalSend: string
     reviewEnabled: boolean
@@ -251,7 +251,7 @@ export class ScheduleChecker {
       return {
         rssProcessing: settings.rssProcessingTime,
         subjectGeneration: subjectGeneration,
-        campaignCreation: settings.campaignCreationTime,
+        issueCreation: settings.issueCreationTime,
         reviewSend: settings.scheduledSendTime,
         finalSend: settings.dailyScheduledSendTime,
         reviewEnabled: settings.reviewScheduleEnabled,
@@ -262,7 +262,7 @@ export class ScheduleChecker {
       return {
         rssProcessing: '20:30',
         subjectGeneration: '20:30 (integrated)',
-        campaignCreation: '20:50',
+        issueCreation: '20:50',
         reviewSend: '21:00',
         finalSend: '04:55',
         reviewEnabled: false,

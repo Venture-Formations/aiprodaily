@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS newsletter_sections (
 -- AFTER:
 CREATE TABLE IF NOT EXISTS newsletter_sections (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE,
+  newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   display_order INTEGER NOT NULL,
   is_active BOOLEAN DEFAULT true,

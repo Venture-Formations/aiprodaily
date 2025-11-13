@@ -8,18 +8,18 @@ import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/wor
  * Uses Readability.js to get full content from past 24 hours posts
  */
 export async function POST(request: NextRequest) {
-  let campaign_id: string | undefined
+  let issue_id: string | undefined
 
   try {
     const body = await request.json()
-    campaign_id = body.campaign_id
+    issue_id = body.issue_id
 
-    if (!campaign_id) {
-      return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
+    if (!issue_id) {
+      return NextResponse.json({ error: 'issue_id is required' }, { status: 400 })
     }
 
 
-    const startResult = await startWorkflowStep(campaign_id, 'pending_extract')
+    const startResult = await startWorkflowStep(issue_id, 'pending_extract')
     if (!startResult.success) {
       return NextResponse.json({
         success: false,
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     const { data: posts } = await supabaseAdmin
       .from('rss_posts')
       .select('id')
-      .eq('campaign_id', campaign_id)
+      .eq('issue_id', issue_id)
       .not('source_url', 'is', null)
       .gte('processed_at', yesterdayTimestamp)
 
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     const processor = new RSSProcessor()
 
     try {
-      await processor.extractFullArticleText(campaign_id)
+      await processor.extractFullArticleText(issue_id)
     } catch (extractionError) {
       console.error('Failed to extract full articles, but continuing with RSS summaries:', extractionError)
       // Don't fail the entire process if article extraction fails
@@ -57,18 +57,18 @@ export async function POST(request: NextRequest) {
     const { data: extractedPosts } = await supabaseAdmin
       .from('rss_posts')
       .select('id, full_article_text')
-      .eq('campaign_id', campaign_id)
+      .eq('issue_id', issue_id)
       .not('full_article_text', 'is', null)
 
     const extractedCount = extractedPosts?.length || 0
 
 
-    await completeWorkflowStep(campaign_id, 'extracting')
+    await completeWorkflowStep(issue_id, 'extracting')
 
     return NextResponse.json({
       success: true,
       message: 'Extract articles step completed',
-      campaign_id,
+      issue_id,
       posts_to_extract: postsToExtract,
       extracted_count: extractedCount,
       next_state: 'pending_score',
@@ -78,9 +78,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[Step 3] Extract articles failed:', error)
 
-    if (campaign_id) {
+    if (issue_id) {
       await failWorkflow(
-        campaign_id,
+        issue_id,
         `Extract articles step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
     }

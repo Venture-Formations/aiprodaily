@@ -9,7 +9,7 @@ interface RouteParams {
 }
 
 /**
- * Get events for a campaign (stub endpoint - accounting newsletter doesn't use events)
+ * Get events for a issue (stub endpoint - accounting newsletter doesn't use events)
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
@@ -20,20 +20,20 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Return empty events for newsletters that don't use this feature
     return NextResponse.json({
-      campaign_events: []
+      issue_events: []
     })
 
   } catch (error) {
-    console.error('Failed to fetch campaign events:', error)
+    console.error('Failed to fetch issue events:', error)
     return NextResponse.json({
-      error: 'Failed to fetch campaign events',
+      error: 'Failed to fetch issue events',
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
 }
 
 /**
- * Update events for a campaign (stub endpoint)
+ * Update events for a issue (stub endpoint)
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
@@ -45,13 +45,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // Return success for newsletters that don't use this feature
     return NextResponse.json({
       success: true,
-      campaign_events: []
+      issue_events: []
     })
 
   } catch (error) {
-    console.error('Failed to update campaign events:', error)
+    console.error('Failed to update issue events:', error)
     return NextResponse.json({
-      error: 'Failed to update campaign events',
+      error: 'Failed to update issue events',
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }

@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     let columnsError = null
     try {
       const result = await supabaseAdmin
-        .rpc('get_columns', { table_name: 'newsletter_campaigns' })
+        .rpc('get_columns', { table_name: 'publication_issues' })
       columns = result.data
       columnsError = result.error
     } catch (error) {
@@ -25,13 +25,13 @@ export async function GET(request: NextRequest) {
 
     // Try a direct query to see what columns exist
     const { data: schemaTest, error: schemaError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .select('id, status, last_action, last_action_at, last_action_by')
       .limit(1)
 
     // Check status constraint
     const { data: constraintTest, error: constraintError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .select('status')
       .eq('status', 'changes_made')
       .limit(1)

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Layout from '@/components/Layout'
 
-export default function NewCampaignPage() {
+export default function NewissuePage() {
   const router = useRouter()
   const params = useParams()
   const slug = params.slug as string
@@ -33,12 +33,12 @@ export default function NewCampaignPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || data.error || 'Failed to create campaign')
+        throw new Error(data.message || data.error || 'Failed to create issue')
       }
 
-      // Redirect to the newly created campaign
-      console.log('Redirecting with slug:', slug, 'campaign ID:', data.campaign.id)
-      router.push(`/dashboard/${slug}/campaigns/${data.campaign.id}`)
+      // Redirect to the newly created issue
+      console.log('Redirecting with slug:', slug, 'issue ID:', data.issue.id)
+      router.push(`/dashboard/${slug}/issues/${data.issue.id}`)
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error')
     } finally {
@@ -51,10 +51,10 @@ export default function NewCampaignPage() {
       <div className="px-4 py-6 sm:px-0">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">
-            Create New Campaign
+            Create New Issue
           </h1>
           <p className="mt-2 text-sm text-gray-600">
-            Create a newsletter campaign for a specific date.
+            Create a newsletter issue for a specific date.
           </p>
         </div>
 
@@ -62,7 +62,7 @@ export default function NewCampaignPage() {
           <form onSubmit={handleSubmit} className="p-6">
             <div className="mb-6">
               <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-2">
-                Campaign Date
+                issue Date
               </label>
               <input
                 type="date"
@@ -73,7 +73,7 @@ export default function NewCampaignPage() {
                 className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-primary focus:border-brand-primary sm:text-sm"
               />
               <p className="mt-1 text-xs text-gray-500">
-                Select the date for this newsletter campaign. Only one campaign per date is allowed.
+                Select the date for this newsletter issue. Only one issue per date is allowed.
               </p>
             </div>
 
@@ -96,7 +96,7 @@ export default function NewCampaignPage() {
                 disabled={loading}
                 className="px-4 py-2 text-sm font-medium text-white bg-brand-primary border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Creating...' : 'Create Campaign'}
+                {loading ? 'Creating...' : 'Create issue'}
               </button>
             </div>
           </form>
@@ -105,7 +105,7 @@ export default function NewCampaignPage() {
         <div className="mt-6 bg-blue-50 border border-blue-200 rounded-md p-4">
           <h3 className="text-sm font-medium text-blue-800 mb-2">Next Steps</h3>
           <p className="text-sm text-blue-700">
-            After creating the campaign, you can:
+            After creating the issue, you can:
           </p>
           <ul className="mt-2 text-sm text-blue-700 list-disc list-inside space-y-1">
             <li>Process RSS feeds to gather articles</li>

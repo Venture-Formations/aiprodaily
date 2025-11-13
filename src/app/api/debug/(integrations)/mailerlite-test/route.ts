@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     // Test 1: Simple API authentication test
     try {
-      // Try the campaigns endpoint first (most commonly available)
+      // Try the issues endpoint first (most commonly available)
       const campaignsResponse = await mailerliteClient.get('/campaigns?limit=1')
       console.log('Campaigns endpoint test successful:', campaignsResponse.status)
 
@@ -120,9 +120,9 @@ export async function GET(request: NextRequest) {
       }, { status: 500 })
     }
 
-    // Test 3: Try creating a minimal test campaign (but don't send it)
-    const testCampaignData = {
-      name: `Test Campaign - ${new Date().toISOString()}`,
+    // Test 3: Try creating a minimal test issue (but don't send it)
+    const testIssueData = {
+      name: `Test issue - ${new Date().toISOString()}`,
       type: 'regular',
       emails: [{
         subject: '🍦 Test Subject',
@@ -135,28 +135,28 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-      console.log('Testing campaign creation...')
-      const campaignResponse = await mailerliteClient.post('/campaigns', testCampaignData)
-      console.log('Campaign creation test successful:', campaignResponse.status)
+      console.log('Testing issue creation...')
+      const issueResponse = await mailerliteClient.post('/campaigns', testIssueData)
+      console.log('issue creation test successful:', issueResponse.status)
 
-      // Immediately delete the test campaign
-      const campaignId = campaignResponse.data.data.id
-      await mailerliteClient.delete(`/campaigns/${campaignId}`)
-      console.log('Test campaign deleted')
+      // Immediately delete the test issue
+      const issueId = issueResponse.data.data.id
+      await mailerliteClient.delete(`/campaigns/${issueId}`)
+      console.log('Test issue deleted')
 
     } catch (error: any) {
-      console.error('Campaign creation test failed:', {
+      console.error('issue creation test failed:', {
         status: error.response?.status,
         data: error.response?.data,
         message: error.message
       })
       return NextResponse.json({
         success: false,
-        error: 'Failed to create test campaign',
+        error: 'Failed to create test issue',
         details: {
           status: error.response?.status,
           data: error.response?.data,
-          requestData: testCampaignData
+          requestData: testIssueData
         }
       }, { status: 500 })
     }

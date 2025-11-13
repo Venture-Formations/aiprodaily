@@ -21,7 +21,7 @@ export async function GET() {
 
     // Update newsletters table with logo_url
     const { error: updateError } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .update({ logo_url: logoUrl })
       .eq('slug', 'accounting')
 

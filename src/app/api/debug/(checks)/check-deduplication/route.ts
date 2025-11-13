@@ -3,42 +3,42 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * Debug endpoint to check deduplication status
- * Usage: GET /api/debug/check-deduplication?campaign_id=xxx
- * Or without campaign_id to check the most recent campaign
+ * Usage: GET /api/debug/check-deduplication?issueId=xxx
+ * Or without issueId to check the most recent issue
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    let campaignId = searchParams.get('campaign_id')
+    let issueId = searchParams.get('issue_id')
 
-    // If no campaign_id provided, get the most recent one
-    if (!campaignId) {
-      const { data: recentCampaign } = await supabaseAdmin
-        .from('newsletter_campaigns')
+    // If no issueId provided, get the most recent one
+    if (!issueId) {
+      const { data: recentissue } = await supabaseAdmin
+        .from('publication_issues')
         .select('id, date, status')
         .order('date', { ascending: false })
         .limit(1)
         .single()
 
-      if (!recentCampaign) {
-        return NextResponse.json({ error: 'No campaigns found' }, { status: 404 })
+      if (!recentissue) {
+        return NextResponse.json({ error: 'No issues found' }, { status: 404 })
       }
 
-      campaignId = recentCampaign.id
+      issueId = recentissue.id
     }
 
-    // Get campaign info
-    const { data: campaign } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Get issue info
+    const { data: issue } = await supabaseAdmin
+      .from('publication_issues')
       .select('id, date, status, subject_line')
-      .eq('id', campaignId)
+      .eq('id', issueId)
       .single()
 
-    if (!campaign) {
-      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+    if (!issue) {
+      return NextResponse.json({ error: 'issue not found' }, { status: 404 })
     }
 
-    // Get ALL duplicate groups for this campaign
+    // Get ALL duplicate groups for this issue
     const { data: duplicateGroups } = await supabaseAdmin
       .from('duplicate_groups')
       .select(`
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
           description
         )
       `)
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     // Get ALL duplicate posts (the ones that should be filtered out)
     const groupIds = duplicateGroups?.map(g => g.id) || []
@@ -76,25 +76,25 @@ export async function GET(request: NextRequest) {
     const { data: articlesFromDuplicates } = await supabaseAdmin
       .from('articles')
       .select('id, headline, post_id')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .in('post_id', duplicatePostIds)
 
     const { data: secondaryArticlesFromDuplicates } = await supabaseAdmin
       .from('secondary_articles')
       .select('id, headline, post_id')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .in('post_id', duplicatePostIds)
 
-    // Get all articles for this campaign
+    // Get all articles for this issue
     const { data: allArticles } = await supabaseAdmin
       .from('articles')
       .select('id, headline, post_id, is_active')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     const { data: allSecondaryArticles } = await supabaseAdmin
       .from('secondary_articles')
       .select('id, headline, post_id, is_active')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     // Format duplicate groups with their duplicates
     const groupsFormatted = duplicateGroups?.map(group => ({
@@ -116,11 +116,11 @@ export async function GET(request: NextRequest) {
     })) || []
 
     return NextResponse.json({
-      campaign: {
-        id: campaign.id,
-        date: campaign.date,
-        status: campaign.status,
-        subject_line: campaign.subject_line
+      issue: {
+        id: issue.id,
+        date: issue.date,
+        status: issue.status,
+        subject_line: issue.subject_line
       },
       deduplication_summary: {
         total_duplicate_groups: duplicateGroups?.length || 0,

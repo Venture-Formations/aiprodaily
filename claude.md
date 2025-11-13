@@ -13,7 +13,7 @@ This is the authoritative playbook for Claude Code when building or updating AIP
 6. Run appropriate tests/checklists before handing off.
 
 ## 2. Critical Rules
-- **Multi-tenant isolation:** Every query must filter by `newsletter_id`.
+- **Multi-tenant isolation:** Every query must filter by `publication_id`.
 - **Date comparisons:** Use local date strings (`date.split('T')[0]`). Never rely on `toISOString()` or `toUTCString()` for logic.
 - **Logging:** One-line summaries with prefixes (`[Workflow]`, `[RSS]`, `[AI]`, `[DB]`, `[CRON]`). Stay under 10MB per invocation.
 - **Timeouts:** Vercel workflow step 800s, API route 600s, cron durations as defined in `vercel.json`.
@@ -25,7 +25,7 @@ This is the authoritative playbook for Claude Code when building or updating AIP
 |---------------------|-----------------------|-----------|
 | RSS ingestion or campaign workflow | docs/workflows/rss-processing.md, docs/workflows/RSS_INGESTION_IMPLEMENTATION.md, docs/workflows/MULTI_CRITERIA_SCORING_GUIDE.md | Verify step runtime, scoring prompts, dedupe logic. |
 | AI prompts / content generation | docs/ai/prompt-system.md, docs/AI_PROMPT_SYSTEM_GUIDE.md, docs/OPENAI_RESPONSES_API_GUIDE.md | Ensure prompt keys exist per tenant, JSON schema matches parser, provider settings valid. |
-| Database/schema updates | docs/architecture/system-overview.md, docs/migrations/MULTI_TENANT_MIGRATION_GUIDE.md, docs/migrations/DATABASE_SETUP_GUIDE.md | Maintain `newsletter_id` filters, update migrations + status docs. |
+| Database/schema updates | docs/architecture/system-overview.md, docs/migrations/MULTI_TENANT_MIGRATION_GUIDE.md, docs/migrations/DATABASE_SETUP_GUIDE.md | Maintain `publication_id` filters, update migrations + status docs. |
 | Advertorials / ads | docs/guides/IMPLEMENTATION_COMPLETE_HYBRID_RSS.md, docs/guides/SECONDARY_ARTICLES_IMPLEMENTATION_GUIDE.md | Confirm Stage 1/2 unassignment behaviors and ad rotation settings. |
 | Campaign dashboard or admin UI | docs/feature-summary.md, docs/guides/FEATURE_WELCOME_SECTION.md | Keep React server components aligned with workflow data. |
 | Cron / automation | docs/operations/cron-jobs.md, docs/vercel-api.md | Check schedule, secrets, and failure recovery steps. |
@@ -71,7 +71,7 @@ This is the authoritative playbook for Claude Code when building or updating AIP
 ## 9. Testing & Verification
 Before completing work, confirm:
 - `npm run type-check` passes and affected tests are updated/added.
-- All new/updated queries filter by `newsletter_id` and avoid `SELECT *`.
+- All new/updated queries filter by `publication_id` and avoid `SELECT *`.
 - No UTC conversions introduced for logical comparisons.
 - Logging remains concise (one-line summaries, no sensitive data).
 - Error handling uses retry loops or graceful fallbacks where appropriate.

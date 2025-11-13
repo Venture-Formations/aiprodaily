@@ -11,12 +11,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const newsletter_id = searchParams.get('newsletter_id')
+    const publication_id = searchParams.get('publication_id')
     const provider = searchParams.get('provider')
     const model = searchParams.get('model') // Optional now
     const prompt_type = searchParams.get('prompt_type')
 
-    if (!newsletter_id || !provider || !prompt_type) {
+    if (!publication_id || !provider || !prompt_type) {
       return NextResponse.json(
         { error: 'Missing required parameters' },
         { status: 400 }
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       .from('ai_prompt_tests')
       .select('*')
       .eq('user_id', session.user.email)
-      .eq('newsletter_id', newsletter_id)
+      .eq('publication_id', publication_id)
       .eq('provider', provider)
       .eq('prompt_type', prompt_type)
       .order('updated_at', { ascending: false })

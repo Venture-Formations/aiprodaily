@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     // Get accounting newsletter ID
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('slug', 'accounting')
       .single()
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     const { data: prompt, error } = await supabaseAdmin
       .from('prompt_ideas')
       .insert({
-        newsletter_id: newsletter.id,
+        publication_id: newsletter.id,
         title: body.title,
         prompt_text: body.prompt_text,
         category: body.category || null,

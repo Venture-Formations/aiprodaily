@@ -20,7 +20,7 @@ import { executeStep8 } from '../combined-steps/step8-finalize'
  * Requires phase 1 to be completed first.
  */
 export async function POST(request: NextRequest) {
-  let campaign_id: string | undefined
+  let issue_id: string | undefined
 
   try {
     // Check for cron secret OR authenticated session
@@ -35,20 +35,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    campaign_id = body.campaign_id
+    issue_id = body.issue_id
 
-    if (!campaign_id) {
-      return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
+    if (!issue_id) {
+      return NextResponse.json({ error: 'issue_id is required' }, { status: 400 })
     }
 
-    console.log(`[RSS Phase 2] Start: ${campaign_id}`)
+    console.log(`[RSS Phase 2] Start: ${issue_id}`)
 
     const steps = [
-      { name: 'Deduplicate', fn: () => executeStep4(campaign_id!) },
-      { name: 'Generate', fn: () => executeStep5(campaign_id!) },
-      { name: 'Select+Subject', fn: () => executeStep6(campaign_id!) },
-      { name: 'Welcome', fn: () => executeStep7(campaign_id!) },
-      { name: 'Finalize', fn: () => executeStep8(campaign_id!) }
+      { name: 'Deduplicate', fn: () => executeStep4(issue_id!) },
+      { name: 'Generate', fn: () => executeStep5(issue_id!) },
+      { name: 'Select+Subject', fn: () => executeStep6(issue_id!) },
+      { name: 'Welcome', fn: () => executeStep7(issue_id!) },
+      { name: 'Finalize', fn: () => executeStep8(issue_id!) }
     ]
 
     const results = []
@@ -75,14 +75,14 @@ export async function POST(request: NextRequest) {
 
         const { supabaseAdmin } = await import('@/lib/supabase')
         await supabaseAdmin
-          .from('newsletter_campaigns')
+          .from('publication_issues')
           .update({ status: 'failed' })
-          .eq('id', campaign_id)
+          .eq('id', issue_id)
 
         return NextResponse.json({
           success: false,
           message: 'RSS processing phase 2 failed',
-          campaign_id,
+          issue_id: issue_id,
           results
         }, { status: 500 })
       }
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'RSS processing phase 2 completed',
-      campaign_id,
+      issue_id: issue_id,
       results
     })
 
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       error: 'RSS processing phase 2 failed',
       message: error instanceof Error ? error.message : 'Unknown error',
-      campaign_id
+      issue_id
     }, { status: 500 })
   }
 }

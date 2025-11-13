@@ -22,36 +22,36 @@ export async function POST(
       }, { status: 400 })
     }
 
-    const { id: campaignId } = await params
+    const { id: issueId } = await params
 
-    // Get current campaign
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Get current issue
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select('*')
-      .eq('id', campaignId)
+      .eq('id', issueId)
       .single()
 
-    if (campaignError || !campaign) {
+    if (issueError || !issue) {
       return NextResponse.json({
-        error: 'Campaign not found'
+        error: 'issue not found'
       }, { status: 404 })
     }
 
-    // Update campaign status to changes_made and record the action
+    // Update issue status to changes_made and record the action
     const { error: updateError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .update({
         status: 'changes_made',
         last_action: action,
         last_action_at: new Date().toISOString(),
         last_action_by: session.user?.email || 'unknown'
       })
-      .eq('id', campaignId)
+      .eq('id', issueId)
 
     if (updateError) {
-      console.error('Failed to update campaign status:', updateError)
+      console.error('Failed to update issue status:', updateError)
       return NextResponse.json({
-        error: 'Failed to update campaign status',
+        error: 'Failed to update issue status',
         details: updateError.message || 'Unknown database error',
         code: updateError.code || 'UNKNOWN'
       }, { status: 500 })
@@ -65,7 +65,7 @@ export async function POST(
 
         // Format date like the dashboard: "Wednesday, September 17, 2025"
         // Parse date as local date to avoid timezone offset issues
-        const [year, month, day] = campaign.date.split('-').map(Number)
+        const [year, month, day] = issue.date.split('-').map(Number)
         const date = new Date(year, month - 1, day) // month is 0-indexed
         const formattedDate = date.toLocaleDateString('en-US', {
           weekday: 'long',
@@ -75,9 +75,9 @@ export async function POST(
         })
 
         await slack.sendAlert(
-          `Campaign marked as "Changes Made" for ${formattedDate} by ${userName}`,
+          `issue marked as "Changes Made" for ${formattedDate} by ${userName}`,
           'warn',
-          'campaign_status_updates'
+          'issue_status_updates'
         )
       } catch (slackError) {
         console.error('Failed to send Slack notification:', slackError)
@@ -98,12 +98,12 @@ export async function POST(
           .from('user_activities')
           .insert([{
             user_id: user.id,
-            action: `campaign_${action}`,
+            action: `issue_${action}`,
             details: {
-              campaign_id: campaignId,
-              campaign_date: campaign.date,
+              issue_id: issueId,
+              issue_date: issue.date,
               action: action,
-              previous_status: campaign.status
+              previous_status: issue.status
             }
           }])
       }
@@ -114,9 +114,9 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: 'Campaign marked as having changes made',
-      campaign: {
-        id: campaignId,
+      message: 'issue marked as having changes made',
+      issue: {
+        id: issueId,
         status: 'changes_made',
         last_action: action,
         last_action_at: new Date().toISOString(),
@@ -125,9 +125,9 @@ export async function POST(
     })
 
   } catch (error) {
-    console.error('Campaign status update failed:', error)
+    console.error('issue status update failed:', error)
     return NextResponse.json({
-      error: 'Failed to update campaign status',
+      error: 'Failed to update issue status',
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }

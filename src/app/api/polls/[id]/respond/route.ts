@@ -12,7 +12,7 @@ export async function GET(
     const searchParams = request.nextUrl.searchParams
     const option = searchParams.get('option')
     const email = searchParams.get('email')
-    const campaignId = searchParams.get('campaign_id')
+    const issueId = searchParams.get('issue_id')
 
     if (!option || !email) {
       return NextResponse.redirect(
@@ -27,7 +27,7 @@ export async function GET(
         poll_id: id,
         subscriber_email: email,
         selected_option: option,
-        campaign_id: campaignId || null
+        issue_id: issueId || null
       }, {
         onConflict: 'poll_id,subscriber_email'
       })

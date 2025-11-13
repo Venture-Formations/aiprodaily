@@ -24,9 +24,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     console.log('=== SEND REVIEW REQUEST ===')
     console.log('Forced subject line from frontend:', forcedSubjectLine)
 
-    // Fetch campaign with articles and events
-    const { data: campaign, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Fetch issue with articles and events
+    const { data: issue, error } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         *,
         articles:articles(
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           )
         ),
         manual_articles:manual_articles(*),
-        campaign_events(
+        issue_events(
           id,
           event_date,
           is_selected,
@@ -59,24 +59,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .eq('id', id)
       .single()
 
-    if (error || !campaign) {
-      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+    if (error || !issue) {
+      return NextResponse.json({ error: 'issue not found' }, { status: 404 })
     }
 
-    if (campaign.status !== 'draft' && campaign.status !== 'in_review' && campaign.status !== 'changes_made') {
+    if (issue.status !== 'draft' && issue.status !== 'in_review' && issue.status !== 'changes_made') {
       return NextResponse.json({
-        error: 'Campaign cannot be sent for review in current status'
+        error: 'issue cannot be sent for review in current status'
       }, { status: 400 })
     }
 
     console.log('=== SEND FOR REVIEW DEBUG ===')
-    console.log('Campaign object received:', {
-      id: campaign.id,
-      date: campaign.date,
-      subject_line: campaign.subject_line,
-      subject_line_type: typeof campaign.subject_line,
-      subject_line_length: campaign.subject_line?.length || 0,
-      active_articles_count: campaign.articles?.filter((a: any) => a.is_active).length || 0
+    console.log('issue object received:', {
+      id: issue.id,
+      date: issue.date,
+      subject_line: issue.subject_line,
+      subject_line_type: typeof issue.subject_line,
+      subject_line_length: issue.subject_line?.length || 0,
+      active_articles_count: issue.articles?.filter((a: any) => a.is_active).length || 0
     })
 
     // IMPORTANT: Log article positions FIRST, before MailerLite service call
@@ -84,12 +84,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     console.log('=== LOGGING ARTICLE POSITIONS FOR REVIEW SEND ===')
 
     // Get active articles sorted by rank (same logic as MailerLite service)
-    const activeArticles = campaign.articles
+    const activeArticles = issue.articles
       .filter((article: any) => article.is_active)
       .sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999))
       .slice(0, 5) // Only log positions 1-5
 
-    const activeManualArticles = campaign.manual_articles
+    const activeManualArticles = issue.manual_articles
       .filter((article: any) => article.is_active)
       .sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999))
       .slice(0, 5) // Only log positions 1-5
@@ -151,19 +151,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     })
 
     const mailerLiteService = new MailerLiteService()
-    console.log('Calling createReviewCampaign with campaign subject_line:', campaign.subject_line)
+    console.log('Calling createReviewissue with issue subject_line:', issue.subject_line)
     console.log('Using forced subject line:', forcedSubjectLine)
 
-    // Use forced subject line if provided, otherwise fall back to campaign subject line
-    const finalSubjectLine = forcedSubjectLine || campaign.subject_line
+    // Use forced subject line if provided, otherwise fall back to issue subject line
+    const finalSubjectLine = forcedSubjectLine || issue.subject_line
     console.log('Final subject line for MailerLite:', finalSubjectLine)
 
-    const result = await mailerLiteService.createReviewCampaign(campaign, finalSubjectLine)
+    const result = await mailerLiteService.createReviewissue(issue, finalSubjectLine)
     console.log('MailerLite result:', result)
 
-    // Update campaign status to in_review and log review sent timestamp
+    // Update issue status to in_review and log review sent timestamp
     await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .update({
         status: 'in_review',
         review_sent_at: new Date().toISOString()
@@ -183,23 +183,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           .from('user_activities')
           .insert([{
             user_id: user.id,
-            campaign_id: id,
-            action: 'review_campaign_sent',
-            details: { mailerlite_campaign_id: result.campaignId }
+            issue_id: id,
+            action: 'review_issue_sent',
+            details: { mailerlite_issue_id: result.issueId }
           }])
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Review campaign sent successfully',
-      mailerlite_campaign_id: result.campaignId
+      message: 'Review issue sent successfully',
+      mailerlite_issue_id: result.issueId
     })
 
   } catch (error) {
-    console.error('Failed to send review campaign:', error)
+    console.error('Failed to send review issue:', error)
     return NextResponse.json({
-      error: 'Failed to send review campaign',
+      error: 'Failed to send review issue',
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }

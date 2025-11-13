@@ -6,13 +6,13 @@ export async function GET(request: NextRequest) {
     // Get tomorrow's date
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
-    const campaignDate = tomorrow.toISOString().split('T')[0]
+    const issueDate = tomorrow.toISOString().split('T')[0]
 
-    console.log('Checking for campaign on date:', campaignDate)
+    console.log('Checking for issue on date:', issueDate)
 
-    // Check if campaign exists for tomorrow
-    const { data: campaign, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Check if issue exists for tomorrow
+    const { data: issue, error } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         *,
         articles:articles(
@@ -24,33 +24,33 @@ export async function GET(request: NextRequest) {
           )
         )
       `)
-      .eq('date', campaignDate)
+      .eq('date', issueDate)
       .single()
 
     if (error) {
       return NextResponse.json({
-        debug: 'Tomorrow Campaign Check',
-        campaignDate,
+        debug: 'Tomorrow issue Check',
+        issueDate,
         exists: false,
         error: error.message,
-        recommendation: 'RSS processing needs to run to create tomorrow\'s campaign'
+        recommendation: 'RSS processing needs to run to create tomorrow\'s issue'
       })
     }
 
-    const activeArticles = campaign.articles?.filter((article: any) => article.is_active) || []
+    const activeArticles = issue.articles?.filter((article: any) => article.is_active) || []
 
     return NextResponse.json({
-      debug: 'Tomorrow Campaign Check',
-      campaignDate,
+      debug: 'Tomorrow issue Check',
+      issueDate,
       exists: true,
-      campaign: {
-        id: campaign.id,
-        status: campaign.status,
-        subject_line: campaign.subject_line,
-        created_at: campaign.created_at,
-        total_articles: campaign.articles?.length || 0,
+      issue: {
+        id: issue.id,
+        status: issue.status,
+        subject_line: issue.subject_line,
+        created_at: issue.created_at,
+        total_articles: issue.articles?.length || 0,
         active_articles: activeArticles.length,
-        review_sent_at: campaign.review_sent_at
+        review_sent_at: issue.review_sent_at
       },
       activeArticles: activeArticles.map((article: any) => ({
         id: article.id,
@@ -58,24 +58,24 @@ export async function GET(request: NextRequest) {
         ai_score: article.rss_post?.post_rating?.[0]?.total_score || 0
       })),
       issues: {
-        no_subject_line: !campaign.subject_line || campaign.subject_line.trim() === '',
+        no_subject_line: !issue.subject_line || issue.subject_line.trim() === '',
         no_active_articles: activeArticles.length === 0,
-        wrong_status: campaign.status !== 'draft',
-        already_sent_review: !!campaign.review_sent_at
+        wrong_status: issue.status !== 'draft',
+        already_sent_review: !!issue.review_sent_at
       },
-      recommendation: campaign.status !== 'draft' ?
-        `Campaign status is ${campaign.status}, should be 'draft' for creation` :
-        (!campaign.subject_line || campaign.subject_line.trim() === '') ?
+      recommendation: issue.status !== 'draft' ?
+        `issue status is ${issue.status}, should be 'draft' for creation` :
+        (!issue.subject_line || issue.subject_line.trim() === '') ?
         'No subject line - run subject line generation' :
         activeArticles.length === 0 ?
         'No active articles found' :
-        'Campaign appears ready for creation'
+        'issue appears ready for creation'
     })
 
   } catch (error) {
-    console.error('Tomorrow campaign debug error:', error)
+    console.error('Tomorrow issue debug error:', error)
     return NextResponse.json({
-      debug: 'Tomorrow Campaign Check',
+      debug: 'Tomorrow issue Check',
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }

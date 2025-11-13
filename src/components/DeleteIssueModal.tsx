@@ -3,19 +3,19 @@
 import { useState } from 'react'
 import type { NewsletterCampaign } from '@/types/database'
 
-interface DeleteCampaignModalProps {
-  campaign: NewsletterCampaign
+interface DeleteIssueModalProps {
+  issue: NewsletterCampaign
   isOpen: boolean
   onClose: () => void
   onConfirm: () => void
 }
 
-export default function DeleteCampaignModal({
-  campaign,
+export default function DeleteIssueModal({
+  issue,
   isOpen,
   onClose,
   onConfirm
-}: DeleteCampaignModalProps) {
+}: DeleteIssueModalProps) {
   const [confirmText, setConfirmText] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -26,19 +26,19 @@ export default function DeleteCampaignModal({
 
     setIsDeleting(true)
     try {
-      const response = await fetch(`/api/campaigns/${campaign.id}/delete`, {
+      const response = await fetch(`/api/campaigns/${issue.id}/delete`, {
         method: 'DELETE'
       })
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to delete campaign')
+        throw new Error(errorData.error || 'Failed to delete issue')
       }
 
       onConfirm()
     } catch (error) {
-      console.error('Error deleting campaign:', error)
-      alert(error instanceof Error ? error.message : 'Failed to delete campaign')
+      console.error('Error deleting issue:', error)
+      alert(error instanceof Error ? error.message : 'Failed to delete issue')
     } finally {
       setIsDeleting(false)
     }
@@ -67,13 +67,13 @@ export default function DeleteCampaignModal({
       <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
         <div className="mb-4">
           <h3 className="text-lg font-semibold text-red-600 mb-2">
-            Delete Campaign
+            Delete Issue
           </h3>
           <div className="text-sm text-gray-600 space-y-2">
-            <p><strong>Date:</strong> {formatDate(campaign.date)}</p>
-            <p><strong>Status:</strong> {campaign.status}</p>
-            {campaign.subject_line && (
-              <p><strong>Subject:</strong> {campaign.subject_line}</p>
+            <p><strong>Date:</strong> {formatDate(issue.date)}</p>
+            <p><strong>Status:</strong> {issue.status}</p>
+            {issue.subject_line && (
+              <p><strong>Subject:</strong> {issue.subject_line}</p>
             )}
           </div>
         </div>
@@ -92,9 +92,9 @@ export default function DeleteCampaignModal({
               <div className="mt-2 text-sm text-red-700">
                 <p>This will permanently delete:</p>
                 <ul className="list-disc list-inside mt-1">
-                  <li>The campaign and all its settings</li>
-                  <li>All articles associated with this campaign</li>
-                  <li>All event associations for this campaign</li>
+                  <li>The issue and all its settings</li>
+                  <li>All articles associated with this issue</li>
+                  <li>All event associations for this issue</li>
                 </ul>
               </div>
             </div>
@@ -128,7 +128,7 @@ export default function DeleteCampaignModal({
             disabled={confirmText !== 'DELETE' || isDeleting}
             className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isDeleting ? 'Deleting...' : 'Delete Campaign'}
+            {isDeleting ? 'Deleting...' : 'Delete issue'}
           </button>
         </div>
       </div>

@@ -9,7 +9,7 @@ function ErrorContent() {
 
   const errorMessages: { [key: string]: string } = {
     'missing-params': 'Required information is missing from your request.',
-    'invalid-date': 'The campaign date is invalid.',
+    'invalid-date': 'The issue date is invalid.',
     'invalid-email': 'The email address is invalid.',
     'invalid-choice': 'The section choice is invalid.',
     'server-error': 'A server error occurred while processing your feedback.'

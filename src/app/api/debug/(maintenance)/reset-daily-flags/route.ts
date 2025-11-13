@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     // Reset all daily run flags to allow re-running today
     const resetKeys = [
       'last_rss_processing_run',
-      'last_campaign_creation_run',
+      'last_issue_creation_run',
       'last_subject_generation_run',
       'last_final_send_run'
     ]
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       message: 'Daily run flags reset - processes can run again today',
       resetKeys,
       today,
-      note: 'RSS processing and campaign creation should now be able to run when scheduled'
+      note: 'RSS processing and issue creation should now be able to run when scheduled'
     })
 
   } catch (error) {

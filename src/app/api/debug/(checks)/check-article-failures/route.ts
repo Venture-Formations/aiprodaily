@@ -4,10 +4,10 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const campaignId = searchParams.get('campaign_id')
+    const issueId = searchParams.get('issue_id')
 
-    if (!campaignId) {
-      return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
+    if (!issueId) {
+      return NextResponse.json({ error: 'issueId required' }, { status: 400 })
     }
 
     // Get all posts with ratings
@@ -18,13 +18,13 @@ export async function GET(request: NextRequest) {
         title,
         post_ratings(total_score, interest_level, local_relevance, community_impact)
       `)
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     // Get all articles
     const { data: articles } = await supabaseAdmin
       .from('articles')
       .select('id, post_id, headline, is_active')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     const articlePostIds = new Set(articles?.map(a => a.post_id) || [])
 
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
         primary_post_id,
         duplicate_posts(post_id)
       `)
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     const duplicatePostIds = new Set()
     duplicateGroups?.forEach(g => {
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      campaign_id: campaignId,
+      issue_id: issueId,
       summary: {
         total_rated_posts: postsWithRatings.length,
         total_articles: articles?.length || 0,

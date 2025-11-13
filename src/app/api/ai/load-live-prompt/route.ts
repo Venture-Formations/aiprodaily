@@ -17,13 +17,13 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const newsletter_id = searchParams.get('newsletter_id')
+    const publication_id = searchParams.get('publication_id')
     const provider = searchParams.get('provider')
     const prompt_type = searchParams.get('prompt_type')
 
-    if (!newsletter_id || !provider || !prompt_type) {
+    if (!publication_id || !provider || !prompt_type) {
       return NextResponse.json(
-        { error: 'Missing required parameters: newsletter_id, provider, prompt_type' },
+        { error: 'Missing required parameters: publication_id, provider, prompt_type' },
         { status: 400 }
       )
     }

@@ -4,38 +4,41 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Layout from '@/components/Layout'
 import Link from 'next/link'
-import DeleteCampaignModal from '@/components/DeleteCampaignModal'
-import type { NewsletterCampaign } from '@/types/database'
+import DeleteIssueModal from '@/components/DeleteIssueModal'
+import type { Newsletterissue } from '@/types/database'
 
 export default function CampaignsPage() {
   const params = useParams()
   const router = useRouter()
   const slug = params.slug as string
-  const [campaigns, setCampaigns] = useState<NewsletterCampaign[]>([])
+  const [issues, setIssues] = useState<Newsletterissue[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<string>('all')
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean
-    campaign: NewsletterCampaign | null
-  }>({ isOpen: false, campaign: null })
+    issue: Newsletterissue | null
+  }>({ isOpen: false, issue: null })
   const [createModal, setCreateModal] = useState(false)
   const [selectedDate, setSelectedDate] = useState('')
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
-    fetchCampaigns()
-  }, [filter])
+    fetchIssues()
+  }, [filter, slug])
 
-  const fetchCampaigns = async () => {
+  const fetchIssues = async () => {
     try {
-      const url = filter === 'all' ? '/api/campaigns?limit=50' : `/api/campaigns?status=${filter}&limit=50`
+      const baseParams = `newsletter_slug=${slug}&limit=50`
+      const url = filter === 'all'
+        ? `/api/campaigns?${baseParams}`
+        : `/api/campaigns?${baseParams}&status=${filter}`
       const response = await fetch(url)
       if (!response.ok) {
-        throw new Error('Failed to fetch campaigns')
+        throw new Error('Failed to fetch issues')
       }
       const data = await response.json()
-      setCampaigns(data.campaigns)
+      setIssues(data.campaigns)
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error')
     } finally {
@@ -77,20 +80,20 @@ export default function CampaignsPage() {
     })
   }
 
-  const handleDeleteClick = (campaign: NewsletterCampaign) => {
-    setDeleteModal({ isOpen: true, campaign })
+  const handleDeleteClick = (issue: Newsletterissue) => {
+    setDeleteModal({ isOpen: true, issue })
   }
 
   const handleDeleteConfirm = () => {
-    setDeleteModal({ isOpen: false, campaign: null })
-    fetchCampaigns() // Refresh the campaigns list
+    setDeleteModal({ isOpen: false, issue: null })
+    fetchIssues() // Refresh the issues list
   }
 
   const handleDeleteCancel = () => {
-    setDeleteModal({ isOpen: false, campaign: null })
+    setDeleteModal({ isOpen: false, issue: null })
   }
 
-  const handleCreateNewCampaign = () => {
+  const handleCreateNewissue = () => {
     // Set default date to tomorrow
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
@@ -114,24 +117,24 @@ export default function CampaignsPage() {
         },
         body: JSON.stringify({
           date: selectedDate,
-          newsletter_id: 'accounting' // TODO: Get from context/params
+          publication_id: 'accounting' // TODO: Get from context/params
         })
       })
 
       if (!response.ok) {
         const data = await response.json()
-        throw new Error(data.error || 'Failed to create campaign')
+        throw new Error(data.error || 'Failed to create issue')
       }
 
       const data = await response.json()
-      console.log('Campaign created:', data)
+      console.log('issue created:', data)
 
-      // Close modal and redirect to campaign page
+      // Close modal and redirect to issue page
       setCreateModal(false)
-      router.push(`/dashboard/${slug}/campaigns/${data.campaign_id}`)
+      router.push(`/dashboard/${slug}/issues/${data.issue_id}`)
     } catch (error) {
-      console.error('Error creating campaign:', error)
-      alert('Failed to create campaign: ' + (error instanceof Error ? error.message : 'Unknown error'))
+      console.error('Error creating issue:', error)
+      alert('Failed to create issue: ' + (error instanceof Error ? error.message : 'Unknown error'))
     } finally {
       setCreating(false)
     }
@@ -148,20 +151,20 @@ export default function CampaignsPage() {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-2xl font-bold text-gray-900">
-              Publication Campaigns
+              Publication Issues
             </h1>
             <div className="flex space-x-2">
               <Link
-                href={`/dashboard/${slug}/campaigns/new`}
+                href={`/dashboard/${slug}/issues/new`}
                 className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium"
               >
-                Create Blank Campaign
+                Create Blank Issue
               </Link>
               <button
-                onClick={handleCreateNewCampaign}
+                onClick={handleCreateNewissue}
                 className="bg-brand-primary hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
               >
-                Create New Campaign
+                Create New Issue
               </button>
             </div>
           </div>
@@ -187,15 +190,15 @@ export default function CampaignsPage() {
         <div className="bg-white shadow rounded-lg">
           {loading ? (
             <div className="p-8 text-center text-gray-500">
-              Loading campaigns...
+              Loading issues...
             </div>
           ) : error ? (
             <div className="p-8 text-center text-red-600">
               Error: {error}
             </div>
-          ) : campaigns.length === 0 ? (
+          ) : issues.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
-              No campaigns found
+              No issues found
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -220,23 +223,23 @@ export default function CampaignsPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {campaigns.map((campaign) => (
-                    <tr key={campaign.id} className="hover:bg-gray-50">
+                  {issues.map((issue) => (
+                    <tr key={issue.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {formatDate(campaign.date)}
+                        {formatDate(issue.date)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {campaign.subject_line || (
+                        {issue.subject_line || (
                           <span className="italic text-gray-400">No subject line</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(campaign.status)}`}>
-                          {formatStatus(campaign.status)}
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(issue.status)}`}>
+                          {formatStatus(issue.status)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(campaign.created_at).toLocaleDateString('en-US', {
+                        {new Date(issue.created_at).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
                           year: 'numeric'
@@ -245,13 +248,13 @@ export default function CampaignsPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-3">
                           <Link
-                            href={`/dashboard/${slug}/campaigns/${campaign.id}`}
+                            href={`/dashboard/${slug}/issues/${issue.id}`}
                             className="text-brand-primary hover:text-blue-700"
                           >
                             View
                           </Link>
                           <button
-                            onClick={() => handleDeleteClick(campaign)}
+                            onClick={() => handleDeleteClick(issue)}
                             className="text-red-600 hover:text-red-800"
                           >
                             Delete
@@ -266,31 +269,31 @@ export default function CampaignsPage() {
           )}
         </div>
 
-        {/* Delete Campaign Modal */}
-        {deleteModal.campaign && (
-          <DeleteCampaignModal
-            campaign={deleteModal.campaign}
+        {/* Delete issue Modal */}
+        {deleteModal.issue && (
+          <DeleteIssueModal
+            issue={deleteModal.issue}
             isOpen={deleteModal.isOpen}
             onClose={handleDeleteCancel}
             onConfirm={handleDeleteConfirm}
           />
         )}
 
-        {/* Create New Campaign Modal */}
+        {/* Create New issue Modal */}
         {createModal && (
           <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
             <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
               <div className="mt-3">
                 <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
-                  Create New Campaign
+                  Create New Issue
                 </h3>
                 <div className="mb-4">
-                  <label htmlFor="campaign-date" className="block text-sm font-medium text-gray-700 mb-2">
-                    Campaign Date
+                  <label htmlFor="issue-date" className="block text-sm font-medium text-gray-700 mb-2">
+                    issue Date
                   </label>
                   <input
                     type="date"
-                    id="campaign-date"
+                    id="issue-date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
@@ -312,7 +315,7 @@ export default function CampaignsPage() {
                     disabled={creating || !selectedDate}
                     className="px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
                   >
-                    {creating ? 'Creating...' : 'Create Campaign'}
+                    {creating ? 'Creating...' : 'Create issue'}
                   </button>
                 </div>
               </div>

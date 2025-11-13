@@ -258,7 +258,7 @@ INSERT INTO newsletters (slug, name, subdomain, description) VALUES
 -- Per-newsletter configuration (replaces global app_settings for multi-tenant)
 CREATE TABLE newsletter_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  newsletter_id UUID NOT NULL REFERENCES newsletters(id) ON DELETE CASCADE,
+  newsletter_id UUID NOT NULL REFERENCES publications(id) ON DELETE CASCADE,
   key TEXT NOT NULL,
   value TEXT,
   custom_default TEXT, -- For AI prompts
@@ -271,14 +271,14 @@ CREATE TABLE newsletter_settings (
 
 -- Example: St. Cloud's RSS feed
 INSERT INTO newsletter_settings (newsletter_id, key, value, description) VALUES
-((SELECT id FROM newsletters WHERE slug = 'stcloud'),
+((SELECT id FROM publications WHERE slug = 'stcloud'),
  'rss_feed_url',
  'https://rss.app/feeds/_flJgCqGgmZncd9Sk.xml',
  'Primary RSS feed URL');
 
 -- Example: Detroit's RSS feed
 INSERT INTO newsletter_settings (newsletter_id, key, value, description) VALUES
-((SELECT id FROM newsletters WHERE slug = 'detroit'),
+((SELECT id FROM publications WHERE slug = 'detroit'),
  'rss_feed_url',
  'https://example.com/detroit-rss.xml',
  'Primary RSS feed URL');
@@ -290,51 +290,51 @@ All tables that currently don't have `newsletter_id` need to be updated:
 
 ```sql
 -- Add newsletter_id to campaign table
-ALTER TABLE newsletter_campaigns ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE newsletter_campaigns ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_campaigns_newsletter ON newsletter_campaigns(newsletter_id);
 
 -- Add newsletter_id to rss_feeds table
-ALTER TABLE rss_feeds ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE rss_feeds ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_rss_feeds_newsletter ON rss_feeds(newsletter_id);
 
 -- Add newsletter_id to events table
-ALTER TABLE events ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE events ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_events_newsletter ON events(newsletter_id);
 
 -- Add newsletter_id to dining_deals table
-ALTER TABLE dining_deals ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE dining_deals ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_dining_deals_newsletter ON dining_deals(newsletter_id);
 
 -- Add newsletter_id to vrbo_listings table
-ALTER TABLE vrbo_listings ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE vrbo_listings ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_vrbo_listings_newsletter ON vrbo_listings(newsletter_id);
 
 -- Add newsletter_id to wordles table
-ALTER TABLE wordles ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE wordles ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_wordles_newsletter ON wordles(newsletter_id);
 
 -- Add newsletter_id to weather_forecasts table
-ALTER TABLE weather_forecasts ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE weather_forecasts ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_weather_forecasts_newsletter ON weather_forecasts(newsletter_id);
 
 -- Add newsletter_id to road_work_items table
-ALTER TABLE road_work_items ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE road_work_items ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_road_work_items_newsletter ON road_work_items(newsletter_id);
 
 -- Add newsletter_id to advertisements table
-ALTER TABLE advertisements ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE advertisements ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_advertisements_newsletter ON advertisements(newsletter_id);
 
 -- Add newsletter_id to polls table
-ALTER TABLE polls ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE polls ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_polls_newsletter ON polls(newsletter_id);
 
 -- Add newsletter_id to images table (optional - for newsletter-specific image libraries)
-ALTER TABLE images ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE SET NULL;
+ALTER TABLE images ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE SET NULL;
 CREATE INDEX idx_images_newsletter ON images(newsletter_id);
 
 -- Add newsletter_id to newsletter_sections table
-ALTER TABLE newsletter_sections ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE newsletter_sections ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_newsletter_sections_newsletter ON newsletter_sections(newsletter_id);
 ```
 
@@ -372,7 +372,7 @@ CREATE TABLE newsletters (
 
 CREATE TABLE newsletter_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  newsletter_id UUID NOT NULL REFERENCES newsletters(id) ON DELETE CASCADE,
+  newsletter_id UUID NOT NULL REFERENCES publications(id) ON DELETE CASCADE,
   key TEXT NOT NULL,
   value TEXT,
   custom_default TEXT,
@@ -391,51 +391,51 @@ CREATE INDEX idx_newsletter_settings_key ON newsletter_settings(key);
 -- ============================================
 
 -- Campaigns
-ALTER TABLE newsletter_campaigns ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE newsletter_campaigns ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_campaigns_newsletter ON newsletter_campaigns(newsletter_id);
 
 -- RSS Feeds
-ALTER TABLE rss_feeds ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE rss_feeds ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_rss_feeds_newsletter ON rss_feeds(newsletter_id);
 
 -- Events
-ALTER TABLE events ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE events ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_events_newsletter ON events(newsletter_id);
 
 -- Dining Deals
-ALTER TABLE dining_deals ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE dining_deals ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_dining_deals_newsletter ON dining_deals(newsletter_id);
 
 -- VRBO Listings
-ALTER TABLE vrbo_listings ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE vrbo_listings ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_vrbo_listings_newsletter ON vrbo_listings(newsletter_id);
 
 -- Wordles
-ALTER TABLE wordles ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE wordles ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_wordles_newsletter ON wordles(newsletter_id);
 
 -- Weather Forecasts
-ALTER TABLE weather_forecasts ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE weather_forecasts ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_weather_forecasts_newsletter ON weather_forecasts(newsletter_id);
 
 -- Road Work Items
-ALTER TABLE road_work_items ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE road_work_items ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_road_work_items_newsletter ON road_work_items(newsletter_id);
 
 -- Advertisements
-ALTER TABLE advertisements ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE advertisements ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_advertisements_newsletter ON advertisements(newsletter_id);
 
 -- Polls
-ALTER TABLE polls ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE polls ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_polls_newsletter ON polls(newsletter_id);
 
 -- Images (nullable - can be shared across newsletters)
-ALTER TABLE images ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE SET NULL;
+ALTER TABLE images ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE SET NULL;
 CREATE INDEX idx_images_newsletter ON images(newsletter_id);
 
 -- Newsletter Sections
-ALTER TABLE newsletter_sections ADD COLUMN newsletter_id UUID REFERENCES newsletters(id) ON DELETE CASCADE;
+ALTER TABLE newsletter_sections ADD COLUMN newsletter_id UUID REFERENCES publications(id) ON DELETE CASCADE;
 CREATE INDEX idx_newsletter_sections_newsletter ON newsletter_sections(newsletter_id);
 
 -- ============================================
@@ -446,7 +446,7 @@ CREATE INDEX idx_newsletter_sections_newsletter ON newsletter_sections(newslette
 CREATE OR REPLACE FUNCTION get_newsletter_by_subdomain(subdomain_input TEXT)
 RETURNS newsletters AS $$
 BEGIN
-  RETURN (SELECT * FROM newsletters WHERE subdomain = subdomain_input AND is_active = true);
+  RETURN (SELECT * FROM publications WHERE subdomain = subdomain_input AND is_active = true);
 END;
 $$ LANGUAGE plpgsql;
 
@@ -477,11 +477,11 @@ INSERT INTO newsletters (slug, name, subdomain, description) VALUES
 
 -- Insert sample settings for St. Cloud
 INSERT INTO newsletter_settings (newsletter_id, key, value, description) VALUES
-((SELECT id FROM newsletters WHERE slug = 'stcloud'), 'rss_feed_url', 'https://rss.app/feeds/_flJgCqGgmZncd9Sk.xml', 'Primary RSS feed URL'),
-((SELECT id FROM newsletters WHERE slug = 'stcloud'), 'mailerlite_review_group_id', '162626524274493402', 'MailerLite review group ID'),
-((SELECT id FROM newsletters WHERE slug = 'stcloud'), 'mailerlite_main_group_id', '163807731192431717', 'MailerLite main subscriber group ID'),
-((SELECT id FROM newsletters WHERE slug = 'stcloud'), 'from_email', 'scoop@stcscoop.com', 'Email sender address'),
-((SELECT id FROM newsletters WHERE slug = 'stcloud'), 'sender_name', 'St. Cloud Scoop', 'Email sender name');
+((SELECT id FROM publications WHERE slug = 'stcloud'), 'rss_feed_url', 'https://rss.app/feeds/_flJgCqGgmZncd9Sk.xml', 'Primary RSS feed URL'),
+((SELECT id FROM publications WHERE slug = 'stcloud'), 'mailerlite_review_group_id', '162626524274493402', 'MailerLite review group ID'),
+((SELECT id FROM publications WHERE slug = 'stcloud'), 'mailerlite_main_group_id', '163807731192431717', 'MailerLite main subscriber group ID'),
+((SELECT id FROM publications WHERE slug = 'stcloud'), 'from_email', 'scoop@stcscoop.com', 'Email sender address'),
+((SELECT id FROM publications WHERE slug = 'stcloud'), 'sender_name', 'St. Cloud Scoop', 'Email sender name');
 
 -- ============================================
 -- MIGRATION COMPLETE
@@ -690,7 +690,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function GET(request: NextRequest) {
   try {
     const { data: newsletters, error } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('*')
       .eq('is_active', true)
       .order('name', { ascending: true })
@@ -726,7 +726,7 @@ export async function POST(request: NextRequest) {
 
     // Insert newsletter
     const { data: newsletter, error } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .insert({
         slug,
         name,
@@ -774,7 +774,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: newsletter, error } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('*')
       .eq('subdomain', subdomain)
       .eq('is_active', true)
@@ -1210,7 +1210,7 @@ INSERT INTO newsletters (slug, name, subdomain, description) VALUES
 
 # Add settings
 INSERT INTO newsletter_settings (newsletter_id, key, value, description) VALUES
-((SELECT id FROM newsletters WHERE slug = 'your-city'),
+((SELECT id FROM publications WHERE slug = 'your-city'),
  'rss_feed_url',
  'https://your-rss-feed.com/feed.xml',
  'Primary RSS feed URL');
@@ -1222,7 +1222,7 @@ If you want to move St. Cloud Scoop into the new platform:
 
 ```sql
 -- Get St. Cloud newsletter ID
-SELECT id FROM newsletters WHERE slug = 'stcloud';
+SELECT id FROM publications WHERE slug = 'stcloud';
 
 -- Update all campaigns with newsletter_id
 UPDATE newsletter_campaigns

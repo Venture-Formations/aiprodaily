@@ -34,12 +34,12 @@ export class BreakingNewsProcessor {
   }
 
   /**
-   * Process Breaking News RSS feeds for a campaign
+   * Process Breaking News RSS feeds for an issue
    * This fetches articles from configured RSS feeds, scores them for relevance to accounting,
    * and prepares them for selection in the Breaking News and Beyond the Feed sections
    */
-  async processBreakingNewsFeeds(campaignId: string) {
-    console.log('Starting Breaking News RSS processing for campaign:', campaignId)
+  async processBreakingNewsFeeds(issueId: string) {
+    console.log('Starting Breaking News RSS processing for issue:', issueId)
 
     try {
       // Get active Breaking News RSS feeds
@@ -47,7 +47,7 @@ export class BreakingNewsProcessor {
         .from('rss_feeds')
         .select('*')
         .eq('active', true)
-        .not('newsletter_id', 'is', null) // Only feeds associated with a newsletter
+        .not('publication_id', 'is', null) // Only feeds associated with a newsletter
 
       if (feedsError) {
         throw new Error(`Failed to fetch Breaking News feeds: ${feedsError.message}`)
@@ -63,7 +63,7 @@ export class BreakingNewsProcessor {
       // Process each feed
       for (const feed of feeds) {
         try {
-          await this.processFeed(feed, campaignId)
+          await this.processFeed(feed, issueId)
         } catch (error) {
           console.error(`Failed to process feed ${feed.name}:`, error)
           await this.logError(`Failed to process Breaking News feed ${feed.name}`, {
@@ -83,7 +83,7 @@ export class BreakingNewsProcessor {
       }
 
       // Score and categorize articles
-      await this.scoreAndCategorizeArticles(campaignId)
+      await this.scoreAndCategorizeArticles(issueId)
 
       console.log('Breaking News RSS processing completed')
 
@@ -92,13 +92,13 @@ export class BreakingNewsProcessor {
       await this.errorHandler.handleError(error, {
         source: 'breaking_news_processor',
         operation: 'processBreakingNewsFeeds',
-        campaignId
+        issueId
       })
       throw error
     }
   }
 
-  private async processFeed(feed: RssFeed, campaignId: string) {
+  private async processFeed(feed: RssFeed, issueId: string) {
     console.log(`Processing Breaking News feed: ${feed.name}`)
 
     try {
@@ -147,7 +147,7 @@ export class BreakingNewsProcessor {
             .from('rss_posts')
             .insert([{
               feed_id: feed.id,
-              campaign_id: campaignId,
+              issue_id: issueId,
               external_id: item.guid || item.link || '',
               title: item.title || '',
               description: item.contentSnippet || item.content || '',
@@ -188,14 +188,14 @@ export class BreakingNewsProcessor {
     }
   }
 
-  private async scoreAndCategorizeArticles(campaignId: string) {
+  private async scoreAndCategorizeArticles(issueId: string) {
     console.log('Starting Breaking News scoring and categorization...')
 
-    // Get all posts for this campaign that haven't been scored yet
+    // Get all posts for this issue that haven't been scored yet
     const { data: posts, error } = await supabaseAdmin
       .from('rss_posts')
       .select('*')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .is('breaking_news_score', null) // Only score unscored posts
 
     if (error || !posts) {
@@ -278,7 +278,7 @@ export class BreakingNewsProcessor {
 
     console.log(`Breaking News scoring complete: ${successCount} successful, ${errorCount} errors`)
     await this.logInfo(`Breaking News scoring complete: ${successCount} successful, ${errorCount} errors`, {
-      campaignId,
+      issueId,
       successCount,
       errorCount
     })

@@ -9,7 +9,7 @@ import { supabaseAdmin } from '@/lib/supabase'
  * Body params:
  * - mode: 'all' | 'affiliates' | 'non-affiliates' | 'specific'
  * - appIds: (optional) Array of app IDs to reset (when mode='specific')
- * - clearSelections: (optional) Also clear campaign_ai_app_selections
+ * - clearSelections: (optional) Also clear issue_ai_app_selections
  */
 export async function POST(request: NextRequest) {
   try {
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     // Get newsletter
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('slug', 'accounting')
       .single()
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
             last_used_date: null,
             times_used: 0
           })
-          .eq('newsletter_id', newsletter.id)
+          .eq('publication_id', newsletter.id)
           .select('id')
 
         resetCount = allApps?.length || 0
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
             last_used_date: null,
             times_used: 0
           })
-          .eq('newsletter_id', newsletter.id)
+          .eq('publication_id', newsletter.id)
           .eq('is_affiliate', true)
           .select('id')
 
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
             last_used_date: null,
             times_used: 0
           })
-          .eq('newsletter_id', newsletter.id)
+          .eq('publication_id', newsletter.id)
           .eq('is_affiliate', false)
           .select('id')
 
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
             times_used: 0
           })
           .in('id', appIds)
-          .eq('newsletter_id', newsletter.id)
+          .eq('publication_id', newsletter.id)
           .select('id')
 
         resetCount = specificApps?.length || 0
@@ -104,21 +104,21 @@ export async function POST(request: NextRequest) {
         )
     }
 
-    // Clear campaign selections if requested
+    // Clear issue selections if requested
     let selectionsCleared = 0
     if (clearSelections) {
-      const { data: campaigns } = await supabaseAdmin
-        .from('newsletter_campaigns')
+      const { data: issues } = await supabaseAdmin
+        .from('publication_issues')
         .select('id')
-        .eq('newsletter_id', newsletter.id)
+        .eq('publication_id', newsletter.id)
 
-      if (campaigns && campaigns.length > 0) {
-        const campaignIds = campaigns.map(c => c.id)
+      if (issues && issues.length > 0) {
+        const issueIds = issues.map(c => c.id)
 
         const { data: deleted } = await supabaseAdmin
-          .from('campaign_ai_app_selections')
+          .from('issue_ai_app_selections')
           .delete()
-          .in('campaign_id', campaignIds)
+          .in('issue_id', issueIds)
           .select('id')
 
         selectionsCleared = deleted?.length || 0

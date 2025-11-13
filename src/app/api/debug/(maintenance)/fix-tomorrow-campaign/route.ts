@@ -11,17 +11,17 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    console.log('=== FIXING TOMORROW\'S CAMPAIGN ===')
+    console.log('=== FIXING TOMORROW\'S issue ===')
 
-    // Get tomorrow's campaign
+    // Get tomorrow's issue
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
-    const campaignDate = tomorrow.toISOString().split('T')[0]
+    const issueDate = tomorrow.toISOString().split('T')[0]
 
-    console.log('Fixing campaign for date:', campaignDate)
+    console.log('Fixing issue for date:', issueDate)
 
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         *,
         articles:articles(
@@ -33,42 +33,42 @@ export async function POST(request: NextRequest) {
           )
         )
       `)
-      .eq('date', campaignDate)
+      .eq('date', issueDate)
       .single()
 
-    if (campaignError || !campaign) {
+    if (issueError || !issue) {
       return NextResponse.json({
         success: false,
-        error: 'Campaign not found for tomorrow',
-        campaignDate
+        error: 'issue not found for tomorrow',
+        issueDate
       }, { status: 404 })
     }
 
-    console.log('Found campaign:', campaign.id, 'Status:', campaign.status)
+    console.log('Found issue:', issue.id, 'Status:', issue.status)
 
     const fixes = []
 
     // Fix 1: Reset status to draft
-    if (campaign.status !== 'draft') {
+    if (issue.status !== 'draft') {
       await supabaseAdmin
-        .from('newsletter_campaigns')
+        .from('publication_issues')
         .update({
           status: 'draft',
           review_sent_at: null // Clear previous review timestamp
         })
-        .eq('id', campaign.id)
+        .eq('id', issue.id)
 
-      fixes.push(`Status changed from '${campaign.status}' to 'draft'`)
-      console.log('Reset campaign status to draft')
+      fixes.push(`Status changed from '${issue.status}' to 'draft'`)
+      console.log('Reset issue status to draft')
     }
 
     // Fix 2: Generate subject line if missing
-    let generatedSubject = campaign.subject_line
-    if (!campaign.subject_line || (typeof campaign.subject_line === 'string' && campaign.subject_line.trim() === '')) {
+    let generatedSubject = issue.subject_line
+    if (!issue.subject_line || (typeof issue.subject_line === 'string' && issue.subject_line.trim() === '')) {
       console.log('Generating missing subject line...')
 
       // Get active articles sorted by AI score
-      const activeArticles = campaign.articles
+      const activeArticles = issue.articles
         ?.filter((article: any) => article.is_active)
         ?.sort((a: any, b: any) => {
           const scoreA = a.rss_post?.post_rating?.[0]?.total_score || 0
@@ -91,14 +91,14 @@ export async function POST(request: NextRequest) {
           generatedSubject = aiResponse.trim()
           console.log('Generated subject line:', generatedSubject)
 
-          // Update campaign with generated subject line
+          // Update issue with generated subject line
           await supabaseAdmin
-            .from('newsletter_campaigns')
+            .from('publication_issues')
             .update({
               subject_line: generatedSubject,
               updated_at: new Date().toISOString()
             })
-            .eq('id', campaign.id)
+            .eq('id', issue.id)
 
           fixes.push(`Generated subject line: "${generatedSubject}"`)
         } else {
@@ -111,19 +111,19 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Campaign fixes applied',
-      campaignId: campaign.id,
-      campaignDate,
-      originalStatus: campaign.status,
-      originalSubjectLine: campaign.subject_line,
+      message: 'issue fixes applied',
+      issueId: issue.id,
+      issueDate,
+      originalStatus: issue.status,
+      originalSubjectLine: issue.subject_line,
       newSubjectLine: generatedSubject,
       fixesApplied: fixes,
-      nextStep: 'Campaign should now be ready for MailerLite creation',
+      nextStep: 'issue should now be ready for MailerLite creation',
       timestamp: new Date().toISOString()
     })
 
   } catch (error) {
-    console.error('Fix campaign error:', error)
+    console.error('Fix issue error:', error)
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

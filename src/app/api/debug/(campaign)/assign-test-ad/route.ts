@@ -2,52 +2,52 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
- * Debug endpoint to assign a specific ad to a campaign for testing
+ * Debug endpoint to assign a specific ad to a issue for testing
  * Does NOT update ad usage statistics
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { campaignId, adId } = body
+    const { issueId, adId } = body
 
-    if (!campaignId || !adId) {
+    if (!issueId || !adId) {
       return NextResponse.json(
-        { error: 'Missing campaignId or adId' },
+        { error: 'Missing issueId or adId' },
         { status: 400 }
       )
     }
 
-    // Get campaign date
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Get issue date
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select('date')
-      .eq('id', campaignId)
+      .eq('id', issueId)
       .single()
 
-    if (campaignError || !campaign) {
+    if (issueError || !issue) {
       return NextResponse.json(
-        { error: 'Campaign not found', details: campaignError },
+        { error: 'issue not found', details: issueError },
         { status: 404 }
       )
     }
 
     // Check if already assigned
     const { data: existing } = await supabaseAdmin
-      .from('campaign_advertisements')
+      .from('issue_advertisements')
       .select('id')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .maybeSingle()
 
     if (existing) {
       // Update existing assignment
       const { error: updateError } = await supabaseAdmin
-        .from('campaign_advertisements')
+        .from('issue_advertisements')
         .update({
           advertisement_id: adId,
-          campaign_date: campaign.date,
+          issue_date: issue.date,
           used_at: new Date().toISOString()
         })
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
 
       if (updateError) {
         return NextResponse.json(
@@ -59,17 +59,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: 'Updated existing ad assignment (no usage stats changed)',
-        campaignId,
+        issueId,
         adId
       })
     } else {
       // Insert new assignment
       const { error: insertError } = await supabaseAdmin
-        .from('campaign_advertisements')
+        .from('issue_advertisements')
         .insert({
-          campaign_id: campaignId,
+          issue_id: issueId,
           advertisement_id: adId,
-          campaign_date: campaign.date,
+          issue_date: issue.date,
           used_at: new Date().toISOString()
         })
 
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: 'Created new ad assignment (no usage stats changed)',
-        campaignId,
+        issueId,
         adId
       })
     }

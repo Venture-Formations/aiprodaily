@@ -80,7 +80,7 @@ private async evaluatePost(post: RssPost, newsletterId?: string): Promise<Conten
   if (!newsletterId) {
     // Get from first active newsletter as fallback
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id')
       .eq('is_active', true)
       .limit(1)
@@ -106,7 +106,7 @@ private async scoreAndStorePost(post: any, newsletterId: string): Promise<void> 
 async ingestNewPosts(): Promise<{ fetched: number; scored: number }> {
   // Get first active newsletter
   const { data: newsletter } = await supabaseAdmin
-    .from('newsletters')
+    .from('publications')
     .select('id')
     .eq('is_active', true)
     .limit(1)

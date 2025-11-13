@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 /**
  * Cron job to automatically trigger Phase 2 for campaigns that completed Phase 1
  *
- * Runs every 3 minutes, checks for campaigns with status = 'pending_phase2'
+ * Runs every 3 minutes, checks for issues with status = 'pending_phase2'
  * and triggers Phase 2 for them.
  */
 export async function GET(request: NextRequest) {
@@ -21,42 +21,42 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    console.log('[Cron] Checking for campaigns ready for Phase 2...')
+    console.log('[Cron] Checking for issues ready for Phase 2...')
 
-    // Find campaigns with status = 'pending_phase2'
-    const { data: campaigns, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Find issues with status = 'pending_phase2'
+    const { data: issues, error } = await supabaseAdmin
+      .from('publication_issues')
       .select('id, date, updated_at')
       .eq('status', 'pending_phase2')
       .order('updated_at', { ascending: true })
 
     if (error) {
-      console.error('[Cron] Error fetching pending campaigns:', error)
+      console.error('[Cron] Error fetching pending issues:', error)
       throw error
     }
 
-    if (!campaigns || campaigns.length === 0) {
-      console.log('[Cron] No campaigns ready for Phase 2')
+    if (!issues || issues.length === 0) {
+      console.log('[Cron] No issues ready for Phase 2')
       return NextResponse.json({
         success: true,
-        message: 'No campaigns ready for Phase 2',
-        campaigns_checked: 0
+        message: 'No issues ready for Phase 2',
+        issues_checked: 0
       })
     }
 
-    console.log(`[Cron] Found ${campaigns.length} campaign(s) ready for Phase 2`)
+    console.log(`[Cron] Found ${issues.length} issue(s) ready for Phase 2`)
 
-    // Trigger Phase 2 for each campaign
+    // Trigger Phase 2 for each issue
     const results = []
 
-    for (const campaign of campaigns) {
-      console.log(`[Cron] Triggering Phase 2 for campaign: ${campaign.id}`)
+    for (const issue of issues) {
+      console.log(`[Cron] Triggering Phase 2 for issue: ${issue.id}`)
 
       // Mark as processing to prevent duplicate triggers
       await supabaseAdmin
-        .from('newsletter_campaigns')
+        .from('publication_issues')
         .update({ status: 'processing' })
-        .eq('id', campaign.id)
+        .eq('id', issue.id)
 
       // Trigger Phase 2
       const baseUrl = process.env.NEXTAUTH_URL ||
@@ -72,16 +72,16 @@ export async function GET(request: NextRequest) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${process.env.CRON_SECRET}`
         },
-        body: JSON.stringify({ campaign_id: campaign.id })
+        body: JSON.stringify({ issue_id: issue.id })
       }).catch(error => {
         // Log error but don't fail the cron
-        console.error(`[Cron] Failed to trigger Phase 2 for campaign ${campaign.id}:`, error)
+        console.error(`[Cron] Failed to trigger Phase 2 for issue ${issue.id}:`, error)
         // Phase 2 will handle its own status updates, including failures
       })
 
-      console.log(`[Cron] Phase 2 trigger sent for campaign: ${campaign.id}`)
+      console.log(`[Cron] Phase 2 trigger sent for issue: ${issue.id}`)
       results.push({
-        campaign_id: campaign.id,
+        issue_id: issue.id,
         status: 'triggered',
         message: 'Phase 2 trigger sent (fire-and-forget)'
       })
@@ -89,8 +89,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Processed ${campaigns.length} campaign(s)`,
-      campaigns_checked: campaigns.length,
+      message: `Processed ${issues.length} issue(s)`,
+      issues_checked: issues.length,
       results
     })
 

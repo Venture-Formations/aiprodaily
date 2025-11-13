@@ -12,7 +12,7 @@ interface RouteParams {
 /**
  * Cleanup Duplicate Articles
  *
- * Removes duplicate articles from a campaign:
+ * Removes duplicate articles from a issue:
  * 1. Identifies articles with the same post_id (true duplicates)
  * 2. Keeps the first occurrence (highest fact_check_score, earliest created_at)
  * 3. Deletes subsequent duplicates
@@ -25,23 +25,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id: campaignId } = await params
+    const { id: issueId } = await params
 
-    console.log(`[Cleanup] Starting duplicate cleanup for campaign: ${campaignId}`)
+    console.log(`[Cleanup] Starting duplicate cleanup for issue: ${issueId}`)
 
-    // Get all primary articles for this campaign
+    // Get all primary articles for this issue
     const { data: primaryArticles } = await supabaseAdmin
       .from('articles')
       .select('id, headline, fact_check_score, created_at, post_id')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .order('fact_check_score', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: true })
 
-    // Get all secondary articles for this campaign
+    // Get all secondary articles for this issue
     const { data: secondaryArticles } = await supabaseAdmin
       .from('secondary_articles')
       .select('id, headline, fact_check_score, created_at, post_id')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .order('fact_check_score', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: true })
 
@@ -172,7 +172,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           .from('user_activities')
           .insert([{
             user_id: user.id,
-            campaign_id: campaignId,
+            issue_id: issueId,
             action: 'duplicates_cleaned',
             details: {
               primary_deleted: deletedPrimary,

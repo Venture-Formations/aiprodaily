@@ -13,16 +13,16 @@ export async function POST(request: NextRequest) {
     console.log('=== AUTOMATED FINAL NEWSLETTER SEND STARTED ===')
     console.log('Time:', new Date().toISOString())
 
-    // Get tomorrow's campaign (review should have been scheduled by create-campaign cron)
+    // Get tomorrow's issue (review should have been scheduled by create-issue cron)
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
-    const campaignDate = tomorrow.toISOString().split('T')[0]
+    const issueDate = tomorrow.toISOString().split('T')[0]
 
-    console.log('Sending final newsletter for tomorrow\'s campaign date:', campaignDate)
+    console.log('Sending final newsletter for tomorrow\'s issue date:', issueDate)
 
-    // Find tomorrow's campaign with articles
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Find tomorrow's issue with articles
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         *,
         articles:articles(
@@ -34,62 +34,62 @@ export async function POST(request: NextRequest) {
         ),
         manual_articles:manual_articles(*)
       `)
-      .eq('date', campaignDate)
+      .eq('date', issueDate)
       .single()
 
-    if (campaignError || !campaign) {
+    if (issueError || !issue) {
       return NextResponse.json({
         success: false,
-        error: 'No campaign found for tomorrow',
-        campaignDate: campaignDate
+        error: 'No issue found for tomorrow',
+        issueDate: issueDate
       }, { status: 404 })
     }
 
-    console.log('Found campaign:', campaign.id, 'Status:', campaign.status)
+    console.log('Found issue:', issue.id, 'Status:', issue.status)
 
-    // Only send if campaign is in_review or changes_made status
-    if (campaign.status !== 'in_review' && campaign.status !== 'changes_made') {
+    // Only send if issue is in_review or changes_made status
+    if (issue.status !== 'in_review' && issue.status !== 'changes_made') {
       return NextResponse.json({
         success: true,
-        message: `Campaign status is ${campaign.status}, skipping newsletter send`,
-        campaignId: campaign.id,
+        message: `issue status is ${issue.status}, skipping newsletter send`,
+        issueId: issue.id,
         skipped: true
       })
     }
 
     // Check if already sent
-    if (campaign.final_sent_at) {
+    if (issue.final_sent_at) {
       return NextResponse.json({
         success: true,
         message: 'Newsletter already sent',
-        campaignId: campaign.id,
-        sentAt: campaign.final_sent_at,
+        issueId: issue.id,
+        sentAt: issue.final_sent_at,
         skipped: true
       })
     }
 
-    // Check if campaign has active articles
-    const activeArticles = campaign.articles.filter((article: any) => article.is_active)
+    // Check if issue has active articles
+    const activeArticles = issue.articles.filter((article: any) => article.is_active)
     if (activeArticles.length === 0) {
       return NextResponse.json({
         success: false,
         error: 'No active articles found for newsletter send',
-        campaignId: campaign.id
+        issueId: issue.id
       }, { status: 400 })
     }
 
-    console.log(`Campaign has ${activeArticles.length} active articles`)
+    console.log(`issue has ${activeArticles.length} active articles`)
 
     // Check if subject line exists
-    if (!campaign.subject_line || campaign.subject_line.trim() === '') {
+    if (!issue.subject_line || issue.subject_line.trim() === '') {
       return NextResponse.json({
         success: false,
-        error: 'No subject line found for campaign',
-        campaignId: campaign.id
+        error: 'No subject line found for issue',
+        issueId: issue.id
       }, { status: 400 })
     }
 
-    console.log('Using subject line:', campaign.subject_line)
+    console.log('Using subject line:', issue.subject_line)
 
     // Send final newsletter via MailerLite
     const mailerLiteService = new MailerLiteService()
@@ -107,29 +107,29 @@ export async function POST(request: NextRequest) {
       throw new Error('Main group ID not found in settings or environment')
     }
 
-    // Create final campaign for main audience
-    const result = await mailerLiteService.createFinalCampaign(campaign, mainGroupId)
+    // Create final issue for main audience
+    const result = await mailerLiteService.createFinalissue(issue, mainGroupId)
 
-    console.log('MailerLite final campaign created:', result.campaignId)
+    console.log('MailerLite final issue created:', result.issueId)
 
-    // Update campaign status to sent and capture the previous status
+    // Update issue status to sent and capture the previous status
     const { error: updateError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .update({
         status: 'sent',
-        status_before_send: campaign.status, // Capture the status before sending
+        status_before_send: issue.status, // Capture the status before sending
         final_sent_at: new Date().toISOString(),
         metrics: {
-          ...campaign.metrics,
-          mailerlite_campaign_id: result.campaignId,
+          ...issue.metrics,
+          mailerlite_issue_id: result.issueId,
           sent_timestamp: new Date().toISOString()
         }
       })
-      .eq('id', campaign.id)
+      .eq('id', issue.id)
 
     if (updateError) {
-      console.error('Failed to update campaign status:', updateError)
-      // Continue anyway since MailerLite campaign was created
+      console.error('Failed to update issue status:', updateError)
+      // Continue anyway since MailerLite issue was created
     }
 
     console.log('=== FINAL NEWSLETTER SEND COMPLETED ===')
@@ -137,10 +137,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Final newsletter sent successfully to main group',
-      campaignId: campaign.id,
-      campaignDate: campaignDate,
-      mailerliteCampaignId: result.campaignId,
-      subjectLine: campaign.subject_line,
+      issueId: issue.id,
+      issueDate: issueDate,
+      mailerliteissueId: result.issueId,
+      subjectLine: issue.subject_line,
       activeArticlesCount: activeArticles.length,
       mainGroupId: mainGroupId,
       timestamp: new Date().toISOString()
@@ -150,17 +150,17 @@ export async function POST(request: NextRequest) {
     console.error('=== NEWSLETTER SEND FAILED ===')
     console.error('Error:', error)
 
-    // Update campaign status to failed if we can identify the campaign
+    // Update issue status to failed if we can identify the issue
     const today = new Date()
-    const campaignDate = today.toISOString().split('T')[0]
+    const issueDate = today.toISOString().split('T')[0]
 
     try {
       await supabaseAdmin
-        .from('newsletter_campaigns')
+        .from('publication_issues')
         .update({ status: 'failed' })
-        .eq('date', campaignDate)
+        .eq('date', issueDate)
     } catch (updateError) {
-      console.error('Failed to update campaign status to failed:', updateError)
+      console.error('Failed to update issue status to failed:', updateError)
     }
 
     return NextResponse.json({

@@ -20,49 +20,49 @@ import { AdScheduler } from '@/lib/ad-scheduler'
  */
 export async function processRSSWorkflow(input: {
   trigger: 'cron' | 'manual'
-  newsletter_id: string
+  publication_id: string
 }) {
   "use workflow"
 
-  let campaignId: string
+  let issueId: string
 
-  console.log(`[Workflow] Starting for newsletter: ${input.newsletter_id}`)
+  console.log(`[Workflow] Starting for newsletter: ${input.publication_id}`)
 
-  // STEP 1: Setup - Create campaign, assign posts, deduplicate
-  campaignId = await setupCampaign(input.newsletter_id)
+  // STEP 1: Setup - Create issue, assign posts, deduplicate
+  issueId = await setupissue(input.publication_id)
 
   // PRIMARY SECTION
   // STEP 2: Generate all 6 primary titles (fast, batched)
-  await generatePrimaryTitles(campaignId)
+  await generatePrimaryTitles(issueId)
 
   // STEP 3-4: Generate primary bodies in 2 batches (3 articles each)
-  await generatePrimaryBodiesBatch1(campaignId)
-  await generatePrimaryBodiesBatch2(campaignId)
+  await generatePrimaryBodiesBatch1(issueId)
+  await generatePrimaryBodiesBatch2(issueId)
 
   // STEP 5: Fact-check all primary articles
-  await factCheckPrimary(campaignId)
+  await factCheckPrimary(issueId)
 
   // SECONDARY SECTION
   // STEP 6: Generate all 6 secondary titles (fast, batched)
-  await generateSecondaryTitles(campaignId)
+  await generateSecondaryTitles(issueId)
 
   // STEP 7-8: Generate secondary bodies in 2 batches (3 articles each)
-  await generateSecondaryBodiesBatch1(campaignId)
-  await generateSecondaryBodiesBatch2(campaignId)
+  await generateSecondaryBodiesBatch1(issueId)
+  await generateSecondaryBodiesBatch2(issueId)
 
   // STEP 9: Fact-check all secondary articles
-  await factCheckSecondary(campaignId)
+  await factCheckSecondary(issueId)
 
   // STEP 10: Finalize
-  await finalizeCampaign(campaignId)
+  await finalizeIssue(issueId)
 
   console.log('=== WORKFLOW COMPLETE ===')
 
-  return { campaignId, success: true }
+  return { issueId, success: true }
 }
 
 // Step functions with retry logic
-async function setupCampaign(newsletterId: string) {
+async function setupissue(newsletterId: string) {
   "use step"
 
   let retryCount = 0
@@ -70,13 +70,13 @@ async function setupCampaign(newsletterId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 1/10] Setting up campaign...')
+      console.log('[Workflow Step 1/10] Setting up issue...')
 
       const processor = new RSSProcessor()
 
       // Get the newsletter
       const { data: newsletter, error: newsletterError } = await supabaseAdmin
-        .from('newsletters')
+        .from('publications')
         .select('id, name, slug')
         .eq('id', newsletterId)
         .single()
@@ -87,37 +87,37 @@ async function setupCampaign(newsletterId: string) {
 
       console.log(`[Workflow Step 1/10] Using newsletter: ${newsletter.name} (${newsletter.id})`)
 
-      // Calculate campaign date (Central Time + 12 hours)
+      // Calculate issue date (Central Time + 12 hours)
       const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
       const centralDate = new Date(nowCentral)
       centralDate.setHours(centralDate.getHours() + 12)
-      const campaignDate = centralDate.toISOString().split('T')[0]
+      const issueDate = centralDate.toISOString().split('T')[0]
 
-      // Create new campaign with newsletter_id
-      const { data: newCampaign, error: createError } = await supabaseAdmin
-        .from('newsletter_campaigns')
+      // Create new issue with publication_id
+      const { data: newissue, error: createError } = await supabaseAdmin
+        .from('publication_issues')
         .insert([{
-          date: campaignDate,
+          date: issueDate,
           status: 'processing',
-          newsletter_id: newsletter.id
+          publication_id: newsletter.id
         }])
         .select('id')
         .single()
 
-      if (createError || !newCampaign) {
-        throw new Error('Failed to create campaign')
+      if (createError || !newissue) {
+        throw new Error('Failed to create issue')
       }
 
-      const id = newCampaign.id
-      console.log(`[Workflow Step 1/10] Campaign created: ${id} for ${campaignDate}`)
+      const id = newissue.id
+      console.log(`[Workflow Step 1/10] issue created: ${id} for ${issueDate}`)
 
       // Select AI apps and prompts
       try {
         const { AppSelector } = await import('@/lib/app-selector')
         const { PromptSelector } = await import('@/lib/prompt-selector')
 
-        await AppSelector.selectAppsForCampaign(id, newsletter.id)
-        await PromptSelector.selectPromptForCampaign(id)
+        await AppSelector.selectAppsForissue(id, newsletter.id)
+        await PromptSelector.selectPromptForissue(id)
       } catch (error) {
         console.log('[Workflow Step 1/10] AI selection failed (non-critical)')
       }
@@ -142,7 +142,7 @@ async function setupCampaign(newsletterId: string) {
       const { data: lookbackSetting } = await supabaseAdmin
         .from('app_settings')
         .select('value')
-        .eq('newsletter_id', newsletterId)
+        .eq('publication_id', newsletterId)
         .eq('key', 'primary_article_lookback_hours')
         .single()
 
@@ -156,7 +156,7 @@ async function setupCampaign(newsletterId: string) {
         .from('rss_posts')
         .select('id, post_ratings(total_score)')
         .in('feed_id', primaryFeedIds)
-        .is('campaign_id', null)
+        .is('issue_id', null)
         .gte('processed_at', lookbackTimestamp)
         .not('post_ratings', 'is', null)
 
@@ -173,7 +173,7 @@ async function setupCampaign(newsletterId: string) {
         .from('rss_posts')
         .select('id, post_ratings(total_score)')
         .in('feed_id', secondaryFeedIds)
-        .is('campaign_id', null)
+        .is('issue_id', null)
         .gte('processed_at', lookbackTimestamp)
         .not('post_ratings', 'is', null)
 
@@ -185,25 +185,25 @@ async function setupCampaign(newsletterId: string) {
         })
         .slice(0, 12) || []
 
-      // Assign to campaign
+      // Assign to issue
       if (topPrimary.length > 0) {
         await supabaseAdmin
           .from('rss_posts')
-          .update({ campaign_id: id })
+          .update({ issue_id: id })
           .in('id', topPrimary.map(p => p.id))
       }
 
       if (topSecondary.length > 0) {
         await supabaseAdmin
           .from('rss_posts')
-          .update({ campaign_id: id })
+          .update({ issue_id: id })
           .in('id', topSecondary.map(p => p.id))
       }
 
       console.log(`[Workflow Step 1/10] Assigned ${topPrimary.length} primary, ${topSecondary.length} secondary posts`)
 
       // Deduplicate
-      const dedupeResult = await processor.handleDuplicatesForCampaign(id)
+      const dedupeResult = await processor.handleDuplicatesForissue(id)
       console.log(`[Workflow Step 1/10] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicate posts found`)
       console.log('[Workflow Step 1/10] ✓ Setup complete')
 
@@ -224,7 +224,7 @@ async function setupCampaign(newsletterId: string) {
 }
 
 // PRIMARY SECTION
-async function generatePrimaryTitles(campaignId: string) {
+async function generatePrimaryTitles(issueId: string) {
   "use step"
 
   let retryCount = 0
@@ -234,12 +234,12 @@ async function generatePrimaryTitles(campaignId: string) {
     try {
       console.log('[Workflow Step 2/10] Generating 6 primary titles...')
       const processor = new RSSProcessor()
-      await processor.generateTitlesOnly(campaignId, 'primary', 6)
+      await processor.generateTitlesOnly(issueId, 'primary', 6)
 
       const { data: articles } = await supabaseAdmin
         .from('articles')
         .select('id, headline')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .not('headline', 'is', null)
 
       console.log(`[Workflow Step 2/10] ✓ Generated ${articles?.length || 0} primary titles`)
@@ -257,7 +257,7 @@ async function generatePrimaryTitles(campaignId: string) {
   }
 }
 
-async function generatePrimaryBodiesBatch1(campaignId: string) {
+async function generatePrimaryBodiesBatch1(issueId: string) {
   "use step"
 
   let retryCount = 0
@@ -267,12 +267,12 @@ async function generatePrimaryBodiesBatch1(campaignId: string) {
     try {
       console.log('[Workflow Step 3/10] Generating 3 primary bodies (batch 1)...')
       const processor = new RSSProcessor()
-      await processor.generateBodiesOnly(campaignId, 'primary', 0, 3)
+      await processor.generateBodiesOnly(issueId, 'primary', 0, 3)
 
       const { data: articles } = await supabaseAdmin
         .from('articles')
         .select('id, content')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .not('content', 'is', null)
 
       console.log(`[Workflow Step 3/10] ✓ Total bodies generated: ${articles?.length || 0}`)
@@ -290,7 +290,7 @@ async function generatePrimaryBodiesBatch1(campaignId: string) {
   }
 }
 
-async function generatePrimaryBodiesBatch2(campaignId: string) {
+async function generatePrimaryBodiesBatch2(issueId: string) {
   "use step"
 
   let retryCount = 0
@@ -300,12 +300,12 @@ async function generatePrimaryBodiesBatch2(campaignId: string) {
     try {
       console.log('[Workflow Step 4/10] Generating 3 more primary bodies (batch 2)...')
       const processor = new RSSProcessor()
-      await processor.generateBodiesOnly(campaignId, 'primary', 3, 3)
+      await processor.generateBodiesOnly(issueId, 'primary', 3, 3)
 
       const { data: articles } = await supabaseAdmin
         .from('articles')
         .select('id, content')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .not('content', 'is', null)
 
       console.log(`[Workflow Step 4/10] ✓ Total primary bodies: ${articles?.length || 0}`)
@@ -323,7 +323,7 @@ async function generatePrimaryBodiesBatch2(campaignId: string) {
   }
 }
 
-async function factCheckPrimary(campaignId: string) {
+async function factCheckPrimary(issueId: string) {
   "use step"
 
   let retryCount = 0
@@ -333,12 +333,12 @@ async function factCheckPrimary(campaignId: string) {
     try {
       console.log('[Workflow Step 5/10] Fact-checking all primary articles...')
       const processor = new RSSProcessor()
-      await processor.factCheckArticles(campaignId, 'primary')
+      await processor.factCheckArticles(issueId, 'primary')
 
       const { data: articles } = await supabaseAdmin
         .from('articles')
         .select('id, fact_check_score')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .not('fact_check_score', 'is', null)
 
       const avgScore = (articles?.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) || 0) / (articles?.length || 1)
@@ -358,7 +358,7 @@ async function factCheckPrimary(campaignId: string) {
 }
 
 // SECONDARY SECTION
-async function generateSecondaryTitles(campaignId: string) {
+async function generateSecondaryTitles(issueId: string) {
   "use step"
 
   let retryCount = 0
@@ -368,12 +368,12 @@ async function generateSecondaryTitles(campaignId: string) {
     try {
       console.log('[Workflow Step 6/10] Generating 6 secondary titles...')
       const processor = new RSSProcessor()
-      await processor.generateTitlesOnly(campaignId, 'secondary', 6)
+      await processor.generateTitlesOnly(issueId, 'secondary', 6)
 
       const { data: articles } = await supabaseAdmin
         .from('secondary_articles')
         .select('id, headline')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .not('headline', 'is', null)
 
       console.log(`[Workflow Step 6/10] ✓ Generated ${articles?.length || 0} secondary titles`)
@@ -391,7 +391,7 @@ async function generateSecondaryTitles(campaignId: string) {
   }
 }
 
-async function generateSecondaryBodiesBatch1(campaignId: string) {
+async function generateSecondaryBodiesBatch1(issueId: string) {
   "use step"
 
   let retryCount = 0
@@ -401,12 +401,12 @@ async function generateSecondaryBodiesBatch1(campaignId: string) {
     try {
       console.log('[Workflow Step 7/10] Generating 3 secondary bodies (batch 1)...')
       const processor = new RSSProcessor()
-      await processor.generateBodiesOnly(campaignId, 'secondary', 0, 3)
+      await processor.generateBodiesOnly(issueId, 'secondary', 0, 3)
 
       const { data: articles } = await supabaseAdmin
         .from('secondary_articles')
         .select('id, content')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .not('content', 'is', null)
 
       console.log(`[Workflow Step 7/10] ✓ Total bodies generated: ${articles?.length || 0}`)
@@ -424,7 +424,7 @@ async function generateSecondaryBodiesBatch1(campaignId: string) {
   }
 }
 
-async function generateSecondaryBodiesBatch2(campaignId: string) {
+async function generateSecondaryBodiesBatch2(issueId: string) {
   "use step"
 
   let retryCount = 0
@@ -434,12 +434,12 @@ async function generateSecondaryBodiesBatch2(campaignId: string) {
     try {
       console.log('[Workflow Step 8/10] Generating 3 more secondary bodies (batch 2)...')
       const processor = new RSSProcessor()
-      await processor.generateBodiesOnly(campaignId, 'secondary', 3, 3)
+      await processor.generateBodiesOnly(issueId, 'secondary', 3, 3)
 
       const { data: articles } = await supabaseAdmin
         .from('secondary_articles')
         .select('id, content')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .not('content', 'is', null)
 
       console.log(`[Workflow Step 8/10] ✓ Total secondary bodies: ${articles?.length || 0}`)
@@ -457,7 +457,7 @@ async function generateSecondaryBodiesBatch2(campaignId: string) {
   }
 }
 
-async function factCheckSecondary(campaignId: string) {
+async function factCheckSecondary(issueId: string) {
   "use step"
 
   let retryCount = 0
@@ -467,12 +467,12 @@ async function factCheckSecondary(campaignId: string) {
     try {
       console.log('[Workflow Step 9/10] Fact-checking all secondary articles...')
       const processor = new RSSProcessor()
-      await processor.factCheckArticles(campaignId, 'secondary')
+      await processor.factCheckArticles(issueId, 'secondary')
 
       const { data: articles } = await supabaseAdmin
         .from('secondary_articles')
         .select('id, fact_check_score')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .not('fact_check_score', 'is', null)
 
       const avgScore = (articles?.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) || 0) / (articles?.length || 1)
@@ -492,7 +492,7 @@ async function factCheckSecondary(campaignId: string) {
 }
 
 // FINALIZE
-async function finalizeCampaign(campaignId: string) {
+async function finalizeIssue(issueId: string) {
   "use step"
 
   let retryCount = 0
@@ -500,69 +500,69 @@ async function finalizeCampaign(campaignId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 10/10] Finalizing campaign...')
+      console.log('[Workflow Step 10/10] Finalizing issue...')
       const processor = new RSSProcessor()
 
       // Auto-select top 3 per section
-      await processor.selectTopArticlesForCampaign(campaignId)
+      await processor.selectTopArticlesForissue(issueId)
 
       const { data: activeArticles } = await supabaseAdmin
         .from('articles')
         .select('id')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .eq('is_active', true)
 
       const { data: activeSecondary } = await supabaseAdmin
         .from('secondary_articles')
         .select('id')
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
         .eq('is_active', true)
 
       console.log(`Selected ${activeArticles?.length || 0} primary, ${activeSecondary?.length || 0} secondary`)
 
       // Generate welcome section
-      await processor.generateWelcomeSection(campaignId)
+      await processor.generateWelcomeSection(issueId)
 
-      // Subject line (generated in selectTopArticlesForCampaign)
-      const { data: campaign } = await supabaseAdmin
-        .from('newsletter_campaigns')
+      // Subject line (generated in selectTopArticlesForissue)
+      const { data: issue } = await supabaseAdmin
+        .from('publication_issues')
         .select('subject_line')
-        .eq('id', campaignId)
+        .eq('id', issueId)
         .single()
 
-      console.log(`Subject line: "${campaign?.subject_line?.substring(0, 50) || 'Not found'}..."`)
+      console.log(`Subject line: "${issue?.subject_line?.substring(0, 50) || 'Not found'}..."`)
 
-      // Select and assign advertisement for this campaign
+      // Select and assign advertisement for this issue
       try {
-        const { data: campaignData } = await supabaseAdmin
-          .from('newsletter_campaigns')
-          .select('date, newsletter_id')
-          .eq('id', campaignId)
+        const { data: issueData } = await supabaseAdmin
+          .from('publication_issues')
+          .select('date, publication_id')
+          .eq('id', issueId)
           .single()
 
-        if (campaignData) {
-          const selectedAd = await AdScheduler.selectAdForCampaign({
-            campaignId: campaignId,
-            campaignDate: campaignData.date,
-            newsletterId: campaignData.newsletter_id
+        if (issueData) {
+          const selectedAd = await AdScheduler.selectAdForissue({
+            issueId: issueId,
+            issueDate: issueData.date,
+            newsletterId: issueData.publication_id
           })
 
           if (selectedAd) {
             // Check if ad already assigned to prevent duplicates
             const { data: existingAssignment } = await supabaseAdmin
-              .from('campaign_advertisements')
+              .from('issue_advertisements')
               .select('id')
-              .eq('campaign_id', campaignId)
+              .eq('issue_id', issueId)
               .maybeSingle()
 
             if (!existingAssignment) {
               // Store the selected ad
               await supabaseAdmin
-                .from('campaign_advertisements')
+                .from('issue_advertisements')
                 .insert({
-                  campaign_id: campaignId,
+                  issue_id: issueId,
                   advertisement_id: selectedAd.id,
-                  campaign_date: campaignData.date,
+                  issue_date: issueData.date,
                   used_at: new Date().toISOString()
                 })
 
@@ -581,12 +581,12 @@ async function finalizeCampaign(campaignId: string) {
 
       // Set status to draft
       await supabaseAdmin
-        .from('newsletter_campaigns')
+        .from('publication_issues')
         .update({ status: 'draft' })
-        .eq('id', campaignId)
+        .eq('id', issueId)
 
       // Stage 1 unassignment
-      const unassignResult = await processor.unassignUnusedPosts(campaignId)
+      const unassignResult = await processor.unassignUnusedPosts(issueId)
       console.log(`[Workflow Step 10/10] ✓ Finalized. Unassigned ${unassignResult.unassigned} unused posts`)
       return
 

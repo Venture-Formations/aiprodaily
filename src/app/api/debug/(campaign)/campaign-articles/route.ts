@@ -4,15 +4,15 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const campaignId = searchParams.get('campaign_id')
+    const issueId = searchParams.get('issue_id')
 
-    if (!campaignId) {
-      return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
+    if (!issueId) {
+      return NextResponse.json({ error: 'issueId required' }, { status: 400 })
     }
 
-    // Fetch campaign with active articles
-    const { data: campaign, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Fetch issue with active articles
+    const { data: issue, error } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         *,
         articles:articles(
@@ -27,24 +27,24 @@ export async function GET(request: NextRequest) {
           )
         )
       `)
-      .eq('id', campaignId)
+      .eq('id', issueId)
       .single()
 
-    if (error || !campaign) {
-      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+    if (error || !issue) {
+      return NextResponse.json({ error: 'issue not found' }, { status: 404 })
     }
 
-    // Get total RSS posts count for this campaign
+    // Get total RSS posts count for this issue
     const { data: allPosts, error: postsError } = await supabaseAdmin
       .from('rss_posts')
       .select('id, title, post_ratings(total_score)')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     // Get duplicate posts count (two-step query for proper filtering)
     const { data: duplicateGroups } = await supabaseAdmin
       .from('duplicate_groups')
       .select('id')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     const groupIds = duplicateGroups?.map(g => g.id) || []
 
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get active articles sorted by rating (highest first)
-    const activeArticles = campaign.articles
+    const activeArticles = issue.articles
       .filter((article: any) => article.is_active)
       .sort((a: any, b: any) => {
         const scoreA = a.rss_post?.post_rating?.[0]?.total_score || 0
@@ -72,13 +72,13 @@ export async function GET(request: NextRequest) {
     const nonDuplicatePosts = postsWithRatings.filter(p => !duplicatePostIds.has(p.id))
 
     return NextResponse.json({
-      campaign_id: campaignId,
-      campaign_date: campaign.date,
+      issue_id: issueId,
+      issue_date: issue.date,
       total_rss_posts: allPosts?.length || 0,
       posts_with_ratings: postsWithRatings.length,
       duplicate_posts: duplicatePostIds.size,
       non_duplicate_posts: nonDuplicatePosts.length,
-      total_articles: campaign.articles.length,
+      total_articles: issue.articles.length,
       active_articles: activeArticles.length,
       all_posts: allPosts?.map((post: any) => ({
         id: post.id,
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
         has_rating: !!post.post_ratings?.[0],
         score: post.post_ratings?.[0]?.total_score || null,
         is_duplicate: duplicatePostIds.has(post.id),
-        has_article: campaign.articles.some((a: any) => a.rss_post?.title === post.title)
+        has_article: issue.articles.some((a: any) => a.rss_post?.title === post.title)
       })),
       top_article: activeArticles[0] ? {
         headline: activeArticles[0].headline,
@@ -105,9 +105,9 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Debug campaign articles error:', error)
+    console.error('Debug issue articles error:', error)
     return NextResponse.json({
-      error: 'Failed to fetch campaign articles',
+      error: 'Failed to fetch issue articles',
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }

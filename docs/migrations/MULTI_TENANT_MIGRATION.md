@@ -28,7 +28,7 @@
 SELECT
   n.name as newsletter_name,
   COUNT(s.*) as settings_count
-FROM newsletters n
+FROM publications n
 LEFT JOIN app_settings s ON s.newsletter_id = n.id
 GROUP BY n.id, n.name
 ORDER BY n.name;

@@ -11,12 +11,12 @@ import { callAIWithPrompt } from '@/lib/openai'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { criterion = 1, newsletter_id, title = 'Test Article Title', description = 'Test description', content = 'Test article content here...' } = body
+    const { criterion = 1, publication_id, title = 'Test Article Title', description = 'Test description', content = 'Test article content here...' } = body
 
-    if (!newsletter_id) {
+    if (!publication_id) {
       return NextResponse.json({
         success: false,
-        error: 'newsletter_id is required in request body'
+        error: 'publication_id is required in request body'
       }, { status: 400 })
     }
 
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     console.log(`[TEST] Input:`, { title, description, contentLength: content?.length || 0 })
 
     try {
-      const result = await callAIWithPrompt(promptKey, newsletter_id, {
+      const result = await callAIWithPrompt(promptKey, publication_id, {
         title,
         description: description || '',
         content: content || ''
@@ -91,12 +91,12 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const criterion = parseInt(searchParams.get('criterion') || '1')
-  const newsletter_id = searchParams.get('newsletter_id')
+  const publication_id = searchParams.get('publication_id')
 
-  if (!newsletter_id) {
+  if (!publication_id) {
     return NextResponse.json({
       success: false,
-      error: 'newsletter_id query parameter is required'
+      error: 'publication_id query parameter is required'
     }, { status: 400 })
   }
 
@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
     console.log(`[TEST] Testing AI call for ${promptKey} (GET request)`)
     console.log(`[TEST] Using sample data:`, sampleData)
 
-    const result = await callAIWithPrompt(promptKey, newsletter_id, {
+    const result = await callAIWithPrompt(promptKey, publication_id, {
       title: sampleData.title,
       description: sampleData.description || '',
       content: sampleData.content || ''

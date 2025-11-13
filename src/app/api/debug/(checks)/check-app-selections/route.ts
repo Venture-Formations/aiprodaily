@@ -3,43 +3,43 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export async function GET(request: NextRequest) {
   try {
-    // Get the 5 most recent campaigns
-    const { data: campaigns, error: campaignsError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Get the 5 most recent issues
+    const { data: issues, error: issuesError } = await supabaseAdmin
+      .from('publication_issues')
       .select('id, date, created_at, status')
       .order('created_at', { ascending: false })
       .limit(5)
 
-    if (campaignsError) {
-      return NextResponse.json({ error: campaignsError.message }, { status: 500 })
+    if (issuesError) {
+      return NextResponse.json({ error: issuesError.message }, { status: 500 })
     }
 
-    // For each campaign, get the AI app selections
+    // For each issue, get the AI app selections
     const results = await Promise.all(
-      campaigns.map(async (campaign) => {
+      issues.map(async (issue) => {
         const { data: appSelections, error: appError } = await supabaseAdmin
-          .from('campaign_ai_app_selections')
+          .from('issue_ai_app_selections')
           .select(`
             *,
             app:ai_applications(id, app_name, category)
           `)
-          .eq('campaign_id', campaign.id)
+          .eq('issue_id', issue.id)
           .order('selection_order', { ascending: true })
 
         const { data: promptSelection, error: promptError } = await supabaseAdmin
-          .from('campaign_prompt_selections')
+          .from('issue_prompt_selections')
           .select(`
             *,
             prompt:prompt_ideas(id, title, category)
           `)
-          .eq('campaign_id', campaign.id)
+          .eq('issue_id', issue.id)
           .single()
 
         return {
-          campaign_id: campaign.id,
-          campaign_date: campaign.date,
-          campaign_status: campaign.status,
-          created_at: campaign.created_at,
+          issue_id: issue.id,
+          issue_date: issue.date,
+          issue_status: issue.status,
+          created_at: issue.created_at,
           app_count: appSelections?.length || 0,
           apps: appSelections?.map(s => ({
             name: s.app?.app_name,
@@ -57,9 +57,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      campaigns: results,
+      issues: results,
       summary: {
-        total_campaigns: campaigns.length,
+        total_issues: issues.length,
         campaigns_with_apps: results.filter(r => r.app_count > 0).length,
         campaigns_with_prompts: results.filter(r => r.prompt_selected).length,
         campaigns_without_apps: results.filter(r => r.app_count === 0).length,

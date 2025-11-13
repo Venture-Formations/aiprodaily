@@ -11,18 +11,18 @@ export interface SubjectLineResult {
 }
 
 /**
- * Generates a subject line for a campaign using the current #1 ranked active non-skipped article
+ * Generates a subject line for a issue using the current #1 ranked active non-skipped article
  */
-export async function generateSubjectLine(campaignId: string, userEmail?: string): Promise<SubjectLineResult> {
+export async function generateSubjectLine(issueId: string, userEmail?: string): Promise<SubjectLineResult> {
   try {
-    console.log(`Auto-generating subject line for campaign: ${campaignId}`)
+    console.log(`Auto-generating subject line for issue: ${issueId}`)
 
-    // Fetch campaign with active articles
-    let { data: campaign, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Fetch issue with active articles
+    let { data: issue, error } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         *,
-        newsletter_id,
+        publication_id,
         articles:articles(
           headline,
           content,
@@ -34,17 +34,17 @@ export async function generateSubjectLine(campaignId: string, userEmail?: string
           )
         )
       `)
-      .eq('id', campaignId)
+      .eq('id', issueId)
       .single()
 
     if (error) {
-      console.error('Campaign fetch error:', error)
+      console.error('issue fetch error:', error)
 
       // If the error is about the skipped column not existing, try without it
       if (error.message?.includes('column "skipped" of relation "articles" does not exist')) {
         console.log('Skipped column does not exist, trying without it...')
-        const { data: campaignFallback, error: fallbackError } = await supabaseAdmin
-          .from('newsletter_campaigns')
+        const { data: issueFallback, error: fallbackError } = await supabaseAdmin
+          .from('publication_issues')
           .select(`
             *,
             articles:articles(
@@ -57,31 +57,31 @@ export async function generateSubjectLine(campaignId: string, userEmail?: string
               )
             )
           `)
-          .eq('id', campaignId)
+          .eq('id', issueId)
           .single()
 
-        if (fallbackError || !campaignFallback) {
-          return { success: false, error: 'Campaign not found' }
+        if (fallbackError || !issueFallback) {
+          return { success: false, error: 'issue not found' }
         }
 
-        campaign = campaignFallback
+        issue = issueFallback
       } else {
-        return { success: false, error: 'Campaign not found' }
+        return { success: false, error: 'issue not found' }
       }
     }
 
-    if (!campaign) {
-      return { success: false, error: 'Campaign not found' }
+    if (!issue) {
+      return { success: false, error: 'issue not found' }
     }
 
-    // Get and validate newsletter_id
-    const newsletterId = campaign.newsletter_id
+    // Get and validate publication_id
+    const newsletterId = issue.publication_id
     if (!newsletterId) {
-      return { success: false, error: 'Campaign missing newsletter_id' }
+      return { success: false, error: 'issue missing publication_id' }
     }
 
     // Get active articles sorted by rank (excluding skipped)
-    const activeArticles = campaign.articles
+    const activeArticles = issue.articles
       .filter((article: any) => {
         // Always check is_active
         if (!article.is_active) return false
@@ -123,16 +123,16 @@ export async function generateSubjectLine(campaignId: string, userEmail?: string
       return { success: false, error: 'Empty subject line response from AI' }
     }
 
-    // Update campaign with generated subject line
+    // Update issue with generated subject line
     const { error: updateError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .update({
         subject_line: subjectLine
       })
-      .eq('id', campaignId)
+      .eq('id', issueId)
 
     if (updateError) {
-      console.error('Failed to update campaign with subject line:', updateError)
+      console.error('Failed to update issue with subject line:', updateError)
       return { success: false, error: 'Failed to save subject line' }
     }
 
@@ -150,7 +150,7 @@ export async function generateSubjectLine(campaignId: string, userEmail?: string
             .from('user_activities')
             .insert([{
               user_id: user.id,
-              campaign_id: campaignId,
+              issue_id: issueId,
               action: 'subject_line_auto_generated',
               details: {
                 subject_line: subjectLine,
@@ -187,13 +187,13 @@ export async function generateSubjectLine(campaignId: string, userEmail?: string
 }
 
 /**
- * Gets the current #1 ranked active non-skipped article for a campaign
+ * Gets the current #1 ranked active non-skipped article for an issue
  */
-export async function getCurrentTopArticle(campaignId: string): Promise<{ article: any | null, error?: string }> {
+export async function getCurrentTopArticle(issueId: string): Promise<{ article: any | null, error?: string }> {
   try {
-    // Fetch campaign articles
-    let { data: campaign, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Fetch issue articles
+    let { data: issue, error } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         articles:articles(
           id,
@@ -203,14 +203,14 @@ export async function getCurrentTopArticle(campaignId: string): Promise<{ articl
           rank
         )
       `)
-      .eq('id', campaignId)
+      .eq('id', issueId)
       .single()
 
     if (error) {
       // Try without skipped column if it doesn't exist
       if (error.message?.includes('column "skipped" of relation "articles" does not exist')) {
-        const { data: campaignFallback, error: fallbackError } = await supabaseAdmin
-          .from('newsletter_campaigns')
+        const { data: issueFallback, error: fallbackError } = await supabaseAdmin
+          .from('publication_issues')
           .select(`
             articles:articles(
               id,
@@ -219,31 +219,31 @@ export async function getCurrentTopArticle(campaignId: string): Promise<{ articl
               rank
             )
           `)
-          .eq('id', campaignId)
+          .eq('id', issueId)
           .single()
 
-        if (fallbackError || !campaignFallback) {
-          return { article: null, error: 'Campaign not found' }
+        if (fallbackError || !issueFallback) {
+          return { article: null, error: 'issue not found' }
         }
 
         // Add skipped: false to each article since the column doesn't exist
-        campaignFallback.articles = campaignFallback.articles.map((article: any) => ({
+        issueFallback.articles = issueFallback.articles.map((article: any) => ({
           ...article,
           skipped: false
         }))
 
-        campaign = campaignFallback as any
+        issue = issueFallback as any
       } else {
-        return { article: null, error: 'Campaign not found' }
+        return { article: null, error: 'issue not found' }
       }
     }
 
-    if (!campaign) {
-      return { article: null, error: 'Campaign not found' }
+    if (!issue) {
+      return { article: null, error: 'issue not found' }
     }
 
     // Get the current #1 article (active, non-skipped, lowest rank)
-    const activeArticles = campaign.articles
+    const activeArticles = issue.articles
       .filter((article: any) => {
         if (!article.is_active) return false
         if (article.hasOwnProperty('skipped') && article.skipped) return false

@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     console.log('[Backfill] Request body:', { newsletterId, dryRun })
 
     if (!newsletterId) {
-      return NextResponse.json({ error: 'newsletter_id required' }, { status: 400 })
+      return NextResponse.json({ error: 'publication_id required' }, { status: 400 })
     }
 
     console.log(`[Backfill] Starting criteria 4 backfill for newsletter: ${newsletterId}`)
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     const { data: feeds, error: feedsError } = await supabaseAdmin
       .from('rss_feeds')
       .select('id')
-      .eq('newsletter_id', newsletterId)
+      .eq('publication_id', newsletterId)
 
     if (feedsError || !feeds || feeds.length === 0) {
       console.error('[Backfill] Error fetching feeds:', feedsError)
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
     const { data: weightSetting } = await supabaseAdmin
       .from('app_settings')
       .select('value')
-      .eq('newsletter_id', newsletterId)
+      .eq('publication_id', newsletterId)
       .eq('key', 'criteria_4_weight')
       .single()
 

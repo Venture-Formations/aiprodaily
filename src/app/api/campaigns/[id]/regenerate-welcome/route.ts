@@ -17,29 +17,29 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id: campaignId } = await params
+    const { id: issueId } = await params
 
-    console.log('[API] Regenerating welcome section for campaign:', campaignId)
+    console.log('[API] Regenerating welcome section for issue:', issueId)
 
-    // Fetch campaign to verify it exists
-    const { data: campaign, error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
-      .select('id, date, newsletter_id')
-      .eq('id', campaignId)
+    // Fetch issue to verify it exists
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
+      .select('id, date, publication_id')
+      .eq('id', issueId)
       .single()
 
-    if (campaignError || !campaign) {
+    if (issueError || !issue) {
       return NextResponse.json(
-        { error: 'Campaign not found' },
+        { error: 'issue not found' },
         { status: 404 }
       )
     }
 
-    // Fetch ALL active PRIMARY articles for this campaign
+    // Fetch ALL active PRIMARY articles for this issue
     const { data: primaryArticles, error: primaryError } = await supabaseAdmin
       .from('articles')
       .select('headline, content')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .eq('is_active', true)
       .order('rank', { ascending: true })
 
@@ -48,11 +48,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       throw primaryError
     }
 
-    // Fetch ALL active SECONDARY articles for this campaign
+    // Fetch ALL active SECONDARY articles for this issue
     const { data: secondaryArticles, error: secondaryError } = await supabaseAdmin
       .from('secondary_articles')
       .select('headline, content')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .eq('is_active', true)
       .order('rank', { ascending: true })
 
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     console.log(`[API] Generating welcome from ${primaryArticles?.length || 0} primary and ${secondaryArticles?.length || 0} secondary articles`)
 
     // Generate welcome text using AI with the standardized AI_CALL interface
-    const result = await AI_CALL.welcomeSection(allArticles, campaign.newsletter_id)
+    const result = await AI_CALL.welcomeSection(allArticles, issue.publication_id)
 
     console.log('[API] AI_CALL.welcomeSection result type:', typeof result)
 
@@ -105,15 +105,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       throw new Error('Failed to generate welcome section')
     }
 
-    // Save all 3 parts to campaign
+    // Save all 3 parts to issue
     const { error: updateError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .update({
         welcome_intro: welcomeIntro,
         welcome_tagline: welcomeTagline,
         welcome_summary: welcomeSummary
       })
-      .eq('id', campaignId)
+      .eq('id', issueId)
 
     if (updateError) {
       console.error('[API] Error saving welcome section:', updateError)
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           .from('user_activities')
           .insert([{
             user_id: user.id,
-            campaign_id: campaignId,
+            issue_id: issueId,
             action: 'welcome_regenerated',
             details: {
               article_count: allArticles.length,

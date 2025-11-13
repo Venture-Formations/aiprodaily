@@ -4,7 +4,7 @@
 
 -- Step 1: Add newsletter_id column (nullable initially)
 ALTER TABLE app_settings
-  ADD COLUMN IF NOT EXISTS newsletter_id UUID REFERENCES newsletters(id);
+  ADD COLUMN IF NOT EXISTS newsletter_id UUID REFERENCES publications(id);
 
 -- Step 2: Get the first active newsletter to use as default
 -- (You'll need to replace this with the correct newsletter_id)
@@ -14,7 +14,7 @@ DECLARE
 BEGIN
   -- Get the first active newsletter
   SELECT id INTO default_newsletter_id
-  FROM newsletters
+  FROM publications
   WHERE is_active = true
   ORDER BY created_at ASC
   LIMIT 1;
@@ -22,7 +22,7 @@ BEGIN
   -- If no active newsletter found, use the first newsletter
   IF default_newsletter_id IS NULL THEN
     SELECT id INTO default_newsletter_id
-    FROM newsletters
+    FROM publications
     ORDER BY created_at ASC
     LIMIT 1;
   END IF;
@@ -62,7 +62,7 @@ COMMENT ON COLUMN app_settings.newsletter_id IS 'Newsletter this setting belongs
 -- SELECT
 --   n.name as newsletter_name,
 --   COUNT(s.*) as settings_count
--- FROM newsletters n
+-- FROM publications n
 -- LEFT JOIN app_settings s ON s.newsletter_id = n.id
 -- GROUP BY n.id, n.name
 -- ORDER BY n.name;

@@ -4,19 +4,19 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const campaignId = body.campaignId
+    const issueId = body.issueId
 
-    if (!campaignId) {
-      return NextResponse.json({ error: 'campaignId required' }, { status: 400 })
+    if (!issueId) {
+      return NextResponse.json({ error: 'issueId required' }, { status: 400 })
     }
 
-    console.log('Resetting campaign:', campaignId)
+    console.log('Resetting issue:', issueId)
 
     // 1. Delete articles
     const { error: articlesError } = await supabaseAdmin
       .from('articles')
       .delete()
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     if (articlesError) {
       console.error('Error deleting articles:', articlesError)
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     const { data: posts } = await supabaseAdmin
       .from('rss_posts')
       .select('id')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     if (posts && posts.length > 0) {
       const postIds = posts.map(p => p.id)
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     const { data: duplicateGroups } = await supabaseAdmin
       .from('duplicate_groups')
       .select('id')
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     if (duplicateGroups && duplicateGroups.length > 0) {
       const groupIds = duplicateGroups.map(g => g.id)
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
       await supabaseAdmin
         .from('duplicate_groups')
         .delete()
-        .eq('campaign_id', campaignId)
+        .eq('issue_id', issueId)
 
       console.log('✓ Deleted duplicate groups')
     }
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     const { error: postsError } = await supabaseAdmin
       .from('rss_posts')
       .delete()
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
 
     if (postsError) {
       console.error('Error deleting posts:', postsError)
@@ -79,31 +79,31 @@ export async function POST(request: NextRequest) {
       console.log('✓ Deleted RSS posts')
     }
 
-    // 5. Reset campaign subject line
-    const { error: campaignError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // 5. Reset issue subject line
+    const { error: issueError } = await supabaseAdmin
+      .from('publication_issues')
       .update({
         subject_line: '',
         updated_at: new Date().toISOString()
       })
-      .eq('id', campaignId)
+      .eq('id', issueId)
 
-    if (campaignError) {
-      console.error('Error resetting campaign:', campaignError)
+    if (issueError) {
+      console.error('Error resetting issue:', issueError)
     } else {
-      console.log('✓ Reset campaign subject line')
+      console.log('✓ Reset issue subject line')
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Campaign reset - ready for fresh RSS processing with updated prompts',
-      campaign_id: campaignId
+      message: 'issue reset - ready for fresh RSS processing with updated prompts',
+      issue_id: issueId
     })
 
   } catch (error) {
-    console.error('Reset campaign error:', error)
+    console.error('Reset issue error:', error)
     return NextResponse.json({
-      error: 'Failed to reset campaign',
+      error: 'Failed to reset issue',
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }

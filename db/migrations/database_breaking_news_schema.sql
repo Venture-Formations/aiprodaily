@@ -10,7 +10,7 @@
 
 CREATE TABLE breaking_news_feeds (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  newsletter_id UUID NOT NULL REFERENCES newsletters(id) ON DELETE CASCADE,
+  newsletter_id UUID NOT NULL REFERENCES publications(id) ON DELETE CASCADE,
 
   -- Feed Details
   feed_url TEXT NOT NULL,

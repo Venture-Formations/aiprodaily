@@ -57,7 +57,7 @@ export async function POST(
   try {
     const { id } = await params
     const body = await request.json()
-    const { subscriber_email, selected_option, campaign_id } = body
+    const { subscriber_email, selected_option, issue_id } = body
 
     if (!subscriber_email || !selected_option) {
       return NextResponse.json(
@@ -73,7 +73,7 @@ export async function POST(
         poll_id: id,
         subscriber_email,
         selected_option,
-        campaign_id: campaign_id || null
+        issue_id: issue_id || null
       }, {
         onConflict: 'poll_id,subscriber_email'
       })

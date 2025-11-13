@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = new URL(request.url).searchParams
     const secret = searchParams.get('secret')
-    const newsletterId = searchParams.get('newsletter_id')
+    const newsletterId = searchParams.get('publication_id')
 
     // Auth check
     if (secret !== process.env.CRON_SECRET) {
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     if (!newsletterId) {
       return NextResponse.json({
-        error: 'newsletter_id query parameter is required'
+        error: 'publication_id query parameter is required'
       }, { status: 400 })
     }
 
@@ -28,13 +28,13 @@ export async function GET(request: NextRequest) {
     // Start the workflow
     await start(processRSSWorkflow, [{
       trigger: 'manual',
-      newsletter_id: newsletterId
+      publication_id: newsletterId
     }])
 
     return NextResponse.json({
       success: true,
       message: 'Workflow started successfully',
-      newsletter_id: newsletterId,
+      publication_id: newsletterId,
       trigger: 'manual',
       timestamp: new Date().toISOString()
     })

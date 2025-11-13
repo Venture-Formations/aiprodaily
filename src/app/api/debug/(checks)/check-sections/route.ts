@@ -10,7 +10,7 @@ export async function GET() {
   try {
     // Get accounting newsletter
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id, slug')
       .eq('slug', 'accounting')
       .single()
@@ -25,7 +25,7 @@ export async function GET() {
     const { data: sections } = await supabaseAdmin
       .from('newsletter_sections')
       .select('*')
-      .eq('newsletter_id', newsletter.id)
+      .eq('publication_id', newsletter.id)
       .order('display_order', { ascending: true })
 
     // Check if Advertorial section exists
@@ -33,7 +33,7 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      newsletter_id: newsletter.id,
+      publication_id: newsletter.id,
       newsletter_slug: newsletter.slug,
       sections: sections || [],
       has_advertorial: !!advertorialSection,
@@ -57,7 +57,7 @@ export async function POST() {
   try {
     // Get accounting newsletter
     const { data: newsletter } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('id, slug')
       .eq('slug', 'accounting')
       .single()
@@ -72,7 +72,7 @@ export async function POST() {
     const { data: existingSection } = await supabaseAdmin
       .from('newsletter_sections')
       .select('*')
-      .eq('newsletter_id', newsletter.id)
+      .eq('publication_id', newsletter.id)
       .eq('name', 'Advertorial')
       .maybeSingle()
 
@@ -88,7 +88,7 @@ export async function POST() {
     const { data: sections } = await supabaseAdmin
       .from('newsletter_sections')
       .select('display_order')
-      .eq('newsletter_id', newsletter.id)
+      .eq('publication_id', newsletter.id)
       .order('display_order', { ascending: false })
       .limit(1)
 
@@ -98,7 +98,7 @@ export async function POST() {
     const { data: newSection, error: insertError } = await supabaseAdmin
       .from('newsletter_sections')
       .insert({
-        newsletter_id: newsletter.id,
+        publication_id: newsletter.id,
         name: 'Advertorial',
         display_order: nextOrder,
         is_active: true

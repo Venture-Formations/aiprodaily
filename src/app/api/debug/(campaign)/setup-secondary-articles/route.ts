@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
           CREATE TABLE IF NOT EXISTS secondary_articles (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             post_id TEXT NOT NULL REFERENCES rss_posts(id) ON DELETE CASCADE,
-            campaign_id TEXT NOT NULL REFERENCES newsletter_campaigns(id) ON DELETE CASCADE,
+            issueId TEXT NOT NULL REFERENCES publication_issues(id) ON DELETE CASCADE,
             headline TEXT NOT NULL,
             content TEXT NOT NULL,
             rank INTEGER,
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
             updated_at TIMESTAMPTZ DEFAULT NOW()
           );
 
-          CREATE INDEX IF NOT EXISTS idx_secondary_articles_campaign ON secondary_articles(campaign_id);
+          CREATE INDEX IF NOT EXISTS idx_secondary_articles_issue ON secondary_articles(issueId);
           CREATE INDEX IF NOT EXISTS idx_secondary_articles_post ON secondary_articles(post_id);
           CREATE INDEX IF NOT EXISTS idx_secondary_articles_active ON secondary_articles(is_active) WHERE is_active = true;
         `
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             original_article_id TEXT NOT NULL,
             post_id TEXT,
-            campaign_id TEXT NOT NULL,
+            issueId TEXT NOT NULL,
             headline TEXT NOT NULL,
             content TEXT NOT NULL,
             rank INTEGER,
@@ -112,14 +112,14 @@ export async function GET(request: NextRequest) {
             final_position INTEGER,
             archived_at TIMESTAMPTZ DEFAULT NOW(),
             archive_reason TEXT NOT NULL,
-            campaign_date DATE,
-            campaign_status TEXT,
+            issue_date DATE,
+            issue_status TEXT,
             original_created_at TIMESTAMPTZ,
             original_updated_at TIMESTAMPTZ,
             created_at TIMESTAMPTZ DEFAULT NOW()
           );
 
-          CREATE INDEX IF NOT EXISTS idx_archived_secondary_articles_campaign ON archived_secondary_articles(campaign_id);
+          CREATE INDEX IF NOT EXISTS idx_archived_secondary_articles_issue ON archived_secondary_articles(issueId);
         `
       })
 

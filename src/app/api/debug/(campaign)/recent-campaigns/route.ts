@@ -3,9 +3,9 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export async function GET() {
   try {
-    // Get recent campaigns
-    const { data: campaigns, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Get recent issues
+    const { data: issues, error } = await supabaseAdmin
+      .from('publication_issues')
       .select('id, date, status, subject_line, created_at')
       .order('created_at', { ascending: false })
       .limit(10)
@@ -14,12 +14,12 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // For the most recent campaign, get detailed info
-    if (campaigns && campaigns.length > 0) {
-      const latestCampaign = campaigns[0]
+    // For the most recent issue, get detailed info
+    if (issues && issues.length > 0) {
+      const latestIssue = issues[0]
 
-      const { data: detailedCampaign, error: detailError } = await supabaseAdmin
-        .from('newsletter_campaigns')
+      const { data: detailedIssue, error: detailError } = await supabaseAdmin
+        .from('publication_issues')
         .select(`
           *,
           articles:articles(
@@ -34,12 +34,12 @@ export async function GET() {
             )
           )
         `)
-        .eq('id', latestCampaign.id)
+        .eq('id', latestIssue.id)
         .single()
 
-      if (!detailError && detailedCampaign) {
+      if (!detailError && detailedIssue) {
         // Get active articles sorted by rating
-        const activeArticles = detailedCampaign.articles
+        const activeArticles = detailedIssue.articles
           .filter((article: any) => article.is_active)
           .sort((a: any, b: any) => {
             const scoreA = a.rss_post?.post_rating?.[0]?.total_score || 0
@@ -48,13 +48,13 @@ export async function GET() {
           })
 
         return NextResponse.json({
-          recent_campaigns: campaigns,
-          latest_campaign_details: {
-            id: detailedCampaign.id,
-            date: detailedCampaign.date,
-            status: detailedCampaign.status,
-            subject_line: detailedCampaign.subject_line,
-            total_articles: detailedCampaign.articles.length,
+          recent_issues: issues,
+          latest_issue_details: {
+            id: detailedIssue.id,
+            date: detailedIssue.date,
+            status: detailedIssue.status,
+            subject_line: detailedIssue.subject_line,
+            total_articles: detailedIssue.articles.length,
             active_articles_count: activeArticles.length,
             top_article: activeArticles[0] ? {
               id: activeArticles[0].id,
@@ -77,12 +77,12 @@ export async function GET() {
       }
     }
 
-    return NextResponse.json({ recent_campaigns: campaigns })
+    return NextResponse.json({ recent_issues: issues })
 
   } catch (error) {
-    console.error('Debug recent campaigns error:', error)
+    console.error('Debug recent issues error:', error)
     return NextResponse.json({
-      error: 'Failed to fetch campaigns',
+      error: 'Failed to fetch issues',
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }

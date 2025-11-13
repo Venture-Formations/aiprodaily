@@ -54,13 +54,13 @@ export async function GET(request: NextRequest) {
     const { data: feedback, error: dbError } = await supabaseAdmin
       .from('feedback_responses')
       .upsert({
-        campaign_date: date,
+        issue_date: date,
         subscriber_email: email,
         section_choice: choice,
         mailerlite_updated: false,
         created_at: new Date().toISOString()
       }, {
-        onConflict: 'campaign_date,subscriber_email'
+        onConflict: 'issue_date,subscriber_email'
       })
       .select()
       .single()

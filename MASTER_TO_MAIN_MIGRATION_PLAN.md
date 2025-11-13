@@ -252,7 +252,7 @@ AND value LIKE '%master%';
 #### 2. **newsletters** (Logo references)
 ```sql
 SELECT id, name, logo_url
-FROM newsletters
+FROM publications
 WHERE logo_url LIKE '%master%';
 ```
 
@@ -685,7 +685,7 @@ WHERE logo_url LIKE '%master%';
 
 -- Verify changes
 SELECT id, name, logo_url
-FROM newsletters;
+FROM publications;
 ```
 
 **Checklist:**
@@ -1045,7 +1045,7 @@ SELECT
   'newsletters' as table_name,
   'logo_url' as field,
   logo_url as value
-FROM newsletters
+FROM publications
 WHERE logo_url LIKE '%master%'
 
 UNION ALL
@@ -1320,7 +1320,7 @@ SELECT * FROM app_settings
 WHERE key IN ('header_image_url', 'logo_url', 'website_header_url');
 
 -- Export newsletters
-SELECT id, name, logo_url FROM newsletters;
+SELECT id, name, logo_url FROM publications;
 
 -- Export articles with images
 SELECT id, headline, image_url

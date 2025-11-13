@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: newsletter, error } = await supabaseAdmin
-      .from('newsletters')
+      .from('publications')
       .select('*')
       .eq('subdomain', subdomain)
       .eq('is_active', true)

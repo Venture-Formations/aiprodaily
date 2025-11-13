@@ -19,9 +19,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
-    // Fetch campaign with articles
-    const { data: campaign, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
+    // Fetch issue with articles
+    const { data: issue, error } = await supabaseAdmin
+      .from('publication_issues')
       .select(`
         *,
         articles:articles(
@@ -36,21 +36,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .eq('id', id)
       .single()
 
-    if (error || !campaign) {
-      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+    if (error || !issue) {
+      return NextResponse.json({ error: 'issue not found' }, { status: 404 })
     }
 
-    if (campaign.status !== 'approved' && campaign.status !== 'in_review') {
+    if (issue.status !== 'approved' && issue.status !== 'in_review') {
       return NextResponse.json({
-        error: 'Campaign must be approved before sending final version'
+        error: 'issue must be approved before sending final version'
       }, { status: 400 })
     }
 
     // Check if we have active articles
-    const activeArticles = campaign.articles.filter((article: any) => article.is_active)
+    const activeArticles = issue.articles.filter((article: any) => article.is_active)
     if (activeArticles.length === 0) {
       return NextResponse.json({
-        error: 'Cannot send campaign with no active articles'
+        error: 'Cannot send issue with no active articles'
       }, { status: 400 })
     }
 
@@ -65,14 +65,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }, { status: 500 })
     }
 
-    const result = await mailerLiteService.createFinalCampaign(campaign, mainGroupId)
+    const result = await mailerLiteService.createFinalissue(issue, mainGroupId)
 
     // Archive the newsletter for website display
     try {
       const archiveResult = await newsletterArchiver.archiveNewsletter({
-        campaignId: campaign.id,
-        campaignDate: campaign.date,
-        subjectLine: campaign.subject_line || 'Newsletter',
+        issueId: issue.id,
+        issueDate: issue.date,
+        subjectLine: issue.subject_line || 'Newsletter',
         recipientCount: 0 // Will be updated with actual stats later
       })
 
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         console.error('Failed to archive newsletter:', archiveResult.error)
         // Don't fail the send if archiving fails
       } else {
-        console.log('✓ Newsletter archived successfully for', campaign.date)
+        console.log('✓ Newsletter archived successfully for', issue.date)
       }
     } catch (archiveError) {
       console.error('Error archiving newsletter:', archiveError)
@@ -100,23 +100,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           .from('user_activities')
           .insert([{
             user_id: user.id,
-            campaign_id: id,
-            action: 'final_campaign_sent',
-            details: { mailerlite_campaign_id: result.campaignId }
+            issue_id: id,
+            action: 'final_issue_sent',
+            details: { mailerlite_issue_id: result.issueId }
           }])
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Final campaign scheduled successfully',
-      mailerlite_campaign_id: result.campaignId
+      message: 'Final issue scheduled successfully',
+      mailerlite_issue_id: result.issueId
     })
 
   } catch (error) {
-    console.error('Failed to send final campaign:', error)
+    console.error('Failed to send final issue:', error)
     return NextResponse.json({
-      error: 'Failed to send final campaign',
+      error: 'Failed to send final issue',
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }

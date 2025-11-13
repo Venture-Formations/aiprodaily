@@ -4,10 +4,10 @@ import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 
 export async function GET() {
   try {
-    const campaignId = '3c1c8063-806a-483d-a00a-0eab54d721a5'
+    const issueId = '3c1c8063-806a-483d-a00a-0eab54d721a5'
 
     console.log('=== TESTING ARTICLE GENERATION ===')
-    console.log('Campaign ID:', campaignId)
+    console.log('issue ID:', issueId)
 
     // Get the highest rated post
     const { data: posts, error: postsError } = await supabaseAdmin
@@ -25,7 +25,7 @@ export async function GET() {
           community_impact
         )
       `)
-      .eq('campaign_id', campaignId)
+      .eq('issue_id', issueId)
       .not('post_ratings', 'is', null)
       .limit(10)
 

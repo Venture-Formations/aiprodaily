@@ -19,7 +19,7 @@ export async function POST(
     // Get the article to verify it exists and check its rank
     const { data: article, error: articleError } = await supabaseAdmin
       .from('articles')
-      .select('id, campaign_id, headline, rank, is_active')
+      .select('id, issue_id, headline, rank, is_active')
       .eq('id', articleId)
       .single()
 
@@ -32,7 +32,7 @@ export async function POST(
     }
 
     // Check if this article is currently the #1 article (for subject line regeneration)
-    const { article: currentTopArticle } = await getCurrentTopArticle(article.campaign_id)
+    const { article: currentTopArticle } = await getCurrentTopArticle(article.issue_id)
     const isCurrentTopArticle = currentTopArticle?.id === articleId
 
     console.log(`Skipping article: "${article.headline}" (rank: ${article.rank})`)
@@ -84,7 +84,7 @@ export async function POST(
             action: 'article_skipped',
             details: {
               article_id: articleId,
-              campaign_id: article.campaign_id,
+              issue_id: article.issue_id,
               article_headline: article.headline,
               skipped_by: session.user?.email,
               skipped_at: new Date().toISOString()
@@ -100,7 +100,7 @@ export async function POST(
     let subjectLineResult = null
     if (isCurrentTopArticle) {
       console.log('Auto-regenerating subject line since #1 article was skipped...')
-      subjectLineResult = await generateSubjectLine(article.campaign_id, session.user?.email || undefined)
+      subjectLineResult = await generateSubjectLine(article.issue_id, session.user?.email || undefined)
 
       if (subjectLineResult.success) {
         console.log(`Subject line auto-regenerated: "${subjectLineResult.subject_line}"`)
