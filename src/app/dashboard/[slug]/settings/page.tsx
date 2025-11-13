@@ -532,8 +532,10 @@ function SystemStatus() {
   }
 
   const fetchScheduleDisplay = async () => {
+    if (!newsletterSlug) return
+
     try {
-      const response = await fetch('/api/settings/schedule-display')
+      const response = await fetch(`/api/settings/schedule-display?publication_id=${newsletterSlug}`)
       if (response.ok) {
         const data = await response.json()
         setScheduleDisplay(data)
