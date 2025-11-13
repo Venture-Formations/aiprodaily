@@ -214,7 +214,7 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
                   </div>
                   <div className="text-sm text-gray-600">Total Sent</div>
                   <div className="text-xs text-gray-500 mt-1">
-                    {averages.issueCount} campaigns
+                    {averages.issueCount} issues
                   </div>
                 </div>
                 <div className="bg-white p-6 rounded-lg shadow">
@@ -309,7 +309,7 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
                               Refresh
                             </button>
                             <a
-                              href={`/dashboard/campaigns/${issue.id}`}
+                              href={`/dashboard/${slug}/issues/${issue.id}`}
                               className="text-gray-600 hover:text-gray-900"
                             >
                               View
