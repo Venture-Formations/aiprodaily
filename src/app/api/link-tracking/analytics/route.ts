@@ -21,20 +21,25 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const days = parseInt(searchParams.get('days') || '30')
 
-    // Calculate date range
+    // Calculate date range using local timezone
     const endDate = new Date()
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
 
-    console.log(`Fetching link click analytics for last ${days} days`)
+    // Use local date strings (NO UTC conversion - per CLAUDE.md)
+    const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`
+    const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
 
-    // Fetch link clicks within date range
+    console.log(`Fetching link click analytics for last ${days} days (${startDateStr} to ${endDateStr})`)
+
+    // Fetch ALL link clicks within date range (no limit to avoid 1000 row cap)
     const { data: clicks, error } = await supabaseAdmin
       .from('link_clicks')
       .select('*')
-      .gte('issue_date', startDate.toISOString().split('T')[0])
-      .lte('issue_date', endDate.toISOString().split('T')[0])
+      .gte('issue_date', startDateStr)
+      .lte('issue_date', endDateStr)
       .order('clicked_at', { ascending: false })
+      .limit(50000) // Set high limit to avoid Supabase default 1000 row cap
 
     if (error) {
       console.error('Error fetching link clicks:', error)
@@ -119,8 +124,8 @@ export async function GET(request: NextRequest) {
         clicksByissue,
         recentClicks,
         dateRange: {
-          start: startDate.toISOString().split('T')[0],
-          end: endDate.toISOString().split('T')[0]
+          start: startDateStr,
+          end: endDateStr
         }
       }
     })
