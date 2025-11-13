@@ -13,14 +13,17 @@ export async function POST(request: NextRequest) {
     console.log('Starting scheduled metrics import...')
 
     // Get campaigns that were sent in the last 30 days
+    // final_sent_at is stored as a timestamp, so we use ISO string for comparison
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    const thirtyDaysAgoISO = thirtyDaysAgo.toISOString()
 
     const { data: issues, error } = await supabaseAdmin
       .from('publication_issues')
-      .select('id')
+      .select('id, final_sent_at')
       .eq('status', 'sent')
-      .gte('final_sent_at', thirtyDaysAgo.toISOString())
+      .not('final_sent_at', 'is', null)
+      .gte('final_sent_at', thirtyDaysAgoISO)
 
     if (error) {
       throw new Error(`Failed to fetch issues: ${error.message}`)
@@ -33,17 +36,24 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    console.log(`Found ${issues.length} sent issues to import metrics for`)
+
     const mailerLiteService = new MailerLiteService()
     let successCount = 0
     let errorCount = 0
+    const errors: string[] = []
 
     // Import metrics for each issue
     for (const issue of issues) {
       try {
+        console.log(`Importing metrics for issue ${issue.id}...`)
         await mailerLiteService.importissueMetrics(issue.id)
         successCount++
+        console.log(`Successfully imported metrics for issue ${issue.id}`)
       } catch (error) {
-        console.error(`Failed to import metrics for issue ${issue.id}:`, error)
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error(`Failed to import metrics for issue ${issue.id}:`, errorMessage)
+        errors.push(`Issue ${issue.id}: ${errorMessage}`)
         errorCount++
       }
     }
@@ -54,6 +64,7 @@ export async function POST(request: NextRequest) {
       processed: issues.length,
       successful: successCount,
       failed: errorCount,
+      errors: errors.length > 0 ? errors : undefined,
       timestamp: new Date().toISOString()
     })
 
