@@ -60,7 +60,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'issue not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ issue })
+    // Transform email_metrics from array to single object (or null)
+    // Supabase returns email_metrics(*) as an array even for one-to-one relationships
+    const transformedIssue = {
+      ...issue,
+      email_metrics: Array.isArray(issue.email_metrics) && issue.email_metrics.length > 0
+        ? issue.email_metrics[0]
+        : null
+    }
+
+    return NextResponse.json({ issue: transformedIssue })
 
   } catch (error) {
     console.error('Failed to fetch issue:', error)

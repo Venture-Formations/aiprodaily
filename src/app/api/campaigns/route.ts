@@ -133,9 +133,18 @@ export async function GET(request: NextRequest) {
       throw error
     }
 
+    // Transform email_metrics from array to single object (or null)
+    // Supabase returns email_metrics(*) as an array even for one-to-one relationships
+    const transformedCampaigns = (campaigns || []).map((campaign: any) => ({
+      ...campaign,
+      email_metrics: Array.isArray(campaign.email_metrics) && campaign.email_metrics.length > 0
+        ? campaign.email_metrics[0]
+        : null
+    }))
+
     return NextResponse.json({
-      issues: campaigns || [],
-      total: campaigns?.length || 0
+      issues: transformedCampaigns,
+      total: transformedCampaigns.length
     })
 
   } catch (error) {
