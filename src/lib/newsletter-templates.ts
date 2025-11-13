@@ -676,13 +676,35 @@ export async function generateAdvertorialSection(issue: any, recordUsage: boolea
 
     // Function to normalize HTML for email clients
     const normalizeEmailHtml = (html: string): string => {
-      return html
-        // Remove newlines and extra whitespace between tags
+      // First, convert HTML lists to email-safe format
+      let processed = html
+
+      // Handle ordered lists first (track list item numbers)
+      let olCounter = 0
+      processed = processed.replace(/<ol[^>]*>/gi, () => {
+        olCounter = 0
+        return '<div style="margin: 0; padding: 0;">'
+      })
+      processed = processed.replace(/<\/ol>/gi, '</div>')
+
+      // Convert unordered lists
+      processed = processed
+        .replace(/<ul[^>]*>/gi, '<div style="margin: 0; padding: 0;">')
+        .replace(/<\/ul>/gi, '</div>')
+
+      // Convert <li> tags - check context for whether it's in ol or ul
+      // For simplicity, use bullet points (we already converted ol to div)
+      processed = processed.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (match, content) => {
+        // Clean up the content and ensure proper spacing
+        const cleanContent = content.trim()
+        return `<p style="margin: 0 0 8px 0; padding: 0; line-height: 24px;">• ${cleanContent}</p>`
+      })
+
+      return processed
+        // Remove excessive newlines but keep some for readability
+        .replace(/\n{3,}/g, '\n\n')
+        // Normalize spacing around tags
         .replace(/>\s+</g, '><')
-        // Remove newlines within text content but preserve intentional spaces
-        .replace(/\n+/g, ' ')
-        // Collapse multiple spaces into one
-        .replace(/\s{2,}/g, ' ')
         // Trim whitespace at start/end
         .trim()
     }
@@ -760,7 +782,7 @@ export async function generateAdvertorialSection(issue: any, recordUsage: boolea
         </tr>
         <tr><td style='padding: 10px 10px 4px; font-size: 20px; font-weight: bold; text-align: left;'>${selectedAd.title}</td></tr>
         ${imageHtml}
-        <tr><td style='padding: 0 10px 10px;'>${processedBody}</td></tr>
+        <tr><td style='padding: 0 10px 10px; font-family: ${bodyFont}; font-size: 16px; line-height: 24px; color: #333;'>${processedBody}</td></tr>
       </table>
     </td>
   </tr>
