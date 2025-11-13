@@ -17,6 +17,9 @@ export default function NewsletterDashboard() {
   const [issues, setIssues] = useState<Newsletterissue[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [createModal, setCreateModal] = useState(false)
+  const [selectedDate, setSelectedDate] = useState('')
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     if (slug) {
@@ -69,6 +72,58 @@ export default function NewsletterDashboard() {
       month: 'long',
       day: 'numeric'
     })
+  }
+
+  const handleCreateNewIssue = () => {
+    // Set default date to tomorrow
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const dateString = tomorrow.toISOString().split('T')[0]
+    setSelectedDate(dateString)
+    setCreateModal(true)
+  }
+
+  const handleCreateConfirm = async () => {
+    if (!selectedDate) {
+      alert('Please select a date')
+      return
+    }
+
+    setCreating(true)
+    try {
+      const response = await fetch('/api/campaigns/create-with-workflow', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          date: selectedDate,
+          publication_id: slug
+        })
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to create issue')
+      }
+
+      const data = await response.json()
+      console.log('Issue created:', data)
+
+      // Close modal and redirect to issue page
+      setCreateModal(false)
+      router.push(`/dashboard/${slug}/issues/${data.issue_id}`)
+    } catch (error) {
+      console.error('Error creating issue:', error)
+      alert('Failed to create issue: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleCreateCancel = () => {
+    setCreateModal(false)
+    setSelectedDate('')
   }
 
   const statCards = [
@@ -182,9 +237,9 @@ export default function NewsletterDashboard() {
           <section aria-label="Quick actions">
             <h2 className="sr-only">Quick Actions</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              <Link
-                href={`/dashboard/${slug}/issues/new`}
-                className="group focus:outline-none focus:ring-2 focus:ring-brand-primary rounded-lg"
+              <button
+                onClick={handleCreateNewIssue}
+                className="group focus:outline-none focus:ring-2 focus:ring-brand-primary rounded-lg text-left"
                 aria-label="Create a new issue"
               >
                 <Card hover padding="lg" className="h-full">
@@ -198,7 +253,7 @@ export default function NewsletterDashboard() {
                     </div>
                   </div>
                 </Card>
-              </Link>
+              </button>
               <Link
                 href={`/dashboard/${slug}/analytics`}
                 className="group focus:outline-none focus:ring-2 focus:ring-brand-primary rounded-lg"
@@ -237,6 +292,50 @@ export default function NewsletterDashboard() {
           </section>
         </div>
       </div>
+
+      {/* Create New Issue Modal */}
+      {createModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
+                Create New Issue
+              </h3>
+              <div className="mb-4">
+                <label htmlFor="issue-date" className="block text-sm font-medium text-gray-700 mb-2">
+                  Issue Date
+                </label>
+                <input
+                  type="date"
+                  id="issue-date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="mt-2 text-sm text-gray-500">
+                  This will start the full RSS workflow to create articles for this date.
+                </p>
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={handleCreateCancel}
+                  disabled={creating}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateConfirm}
+                  disabled={creating || !selectedDate}
+                  className="px-4 py-2 bg-brand-primary text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {creating ? 'Creating...' : 'Create Issue'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   )
 }
