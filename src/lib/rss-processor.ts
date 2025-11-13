@@ -2143,7 +2143,7 @@ export class RSSProcessor {
         .from('articles')
         .select(`
           id,
-          issueId,
+          issue_id,
           fact_check_score,
           created_at,
           final_position,
@@ -2254,7 +2254,7 @@ export class RSSProcessor {
         .from('secondary_articles')
         .select(`
           id,
-          issueId,
+          issue_id,
           fact_check_score,
           created_at,
           final_position,
