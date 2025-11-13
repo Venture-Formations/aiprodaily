@@ -32,19 +32,38 @@ export async function GET(request: NextRequest) {
 
     console.log(`Fetching link click analytics for last ${days} days (${startDateStr} to ${endDateStr})`)
 
-    // Fetch ALL link clicks within date range (no limit to avoid 1000 row cap)
-    const { data: clicks, error } = await supabaseAdmin
-      .from('link_clicks')
-      .select('*')
-      .gte('issue_date', startDateStr)
-      .lte('issue_date', endDateStr)
-      .order('clicked_at', { ascending: false })
-      .limit(50000) // Set high limit to avoid Supabase default 1000 row cap
+    // Fetch ALL link clicks within date range using pagination (Supabase has 1000 row limit per query)
+    const BATCH_SIZE = 1000
+    let allClicks: any[] = []
+    let offset = 0
+    let hasMore = true
 
-    if (error) {
-      console.error('Error fetching link clicks:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    while (hasMore) {
+      const { data: clicks, error } = await supabaseAdmin
+        .from('link_clicks')
+        .select('*')
+        .gte('issue_date', startDateStr)
+        .lte('issue_date', endDateStr)
+        .order('clicked_at', { ascending: false })
+        .range(offset, offset + BATCH_SIZE - 1)
+
+      if (error) {
+        console.error('Error fetching link clicks:', error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+
+      if (clicks && clicks.length > 0) {
+        allClicks = allClicks.concat(clicks)
+        offset += BATCH_SIZE
+        hasMore = clicks.length === BATCH_SIZE // Continue if we got a full batch
+      } else {
+        hasMore = false
+      }
     }
+
+    console.log(`[Link Analytics] Fetched ${allClicks.length} total clicks`)
+
+    const clicks = allClicks
 
     // Calculate total clicks
     const totalClicks = clicks?.length || 0
