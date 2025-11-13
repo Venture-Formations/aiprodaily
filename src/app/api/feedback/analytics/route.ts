@@ -32,7 +32,15 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('Error fetching feedback responses:', error)
       // If table doesn't exist or other DB error, return empty analytics
-      if (error.code === 'PGRST116' || error.message.includes('relation') || error.message.includes('does not exist')) {
+      // Check multiple error conditions that indicate missing table
+      const isMissingTable =
+        error.code === 'PGRST116' ||
+        error.code === '42P01' ||
+        error.message?.includes('relation') ||
+        error.message?.includes('does not exist') ||
+        error.message?.includes('feedback_responses')
+
+      if (isMissingTable) {
         console.log('Feedback responses table not found - returning empty analytics')
         return NextResponse.json({
           success: true,
