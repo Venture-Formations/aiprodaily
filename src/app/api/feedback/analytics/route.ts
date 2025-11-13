@@ -31,6 +31,25 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching feedback responses:', error)
+      // If table doesn't exist or other DB error, return empty analytics
+      if (error.code === 'PGRST116' || error.message.includes('relation') || error.message.includes('does not exist')) {
+        console.log('Feedback responses table not found - returning empty analytics')
+        return NextResponse.json({
+          success: true,
+          analytics: {
+            totalResponses: 0,
+            successfulSyncs: 0,
+            syncSuccessRate: 0,
+            sectionCounts: {},
+            dailyResponses: {},
+            recentResponses: [],
+            dateRange: {
+              start: startDate.toISOString().split('T')[0],
+              end: endDate.toISOString().split('T')[0]
+            }
+          }
+        })
+      }
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
