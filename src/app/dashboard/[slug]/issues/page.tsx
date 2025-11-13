@@ -38,7 +38,7 @@ export default function CampaignsPage() {
         throw new Error('Failed to fetch issues')
       }
       const data = await response.json()
-      setIssues(data.campaigns)
+      setIssues(data.issues)
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error')
     } finally {

@@ -56,7 +56,7 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
         throw new Error('Failed to fetch analytics data')
       }
       const data = await response.json()
-      setIssues(data.campaigns)
+      setIssues(data.issues)
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error')
     } finally {
