@@ -42,7 +42,7 @@ export default function SettingsPage() {
               {[
                 { id: 'system', name: 'System Status' },
                 { id: 'business', name: 'Publication Settings' },
-                { id: 'newsletter', name: 'Newsletter' },
+                { id: 'newsletter', name: 'Sections' },
                 { id: 'email', name: 'Email' },
                 { id: 'slack', name: 'Slack' },
                 { id: 'ai-prompts', name: 'AI Prompts' },
