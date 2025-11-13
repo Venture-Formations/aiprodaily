@@ -98,7 +98,7 @@ export default function Layout({ children }: LayoutProps) {
                       Dashboard
                     </Link>
                     <Link href={campaignsUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
-                      Campaigns
+                      Issues
                     </Link>
                     <Link href={analyticsUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
                       Analytics
@@ -185,7 +185,7 @@ export default function Layout({ children }: LayoutProps) {
                     Dashboard
                   </Link>
                   <Link href={campaignsUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
-                    Campaigns
+                    Issues
                   </Link>
                   <Link href={analyticsUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
                     Analytics

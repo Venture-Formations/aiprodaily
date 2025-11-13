@@ -2426,7 +2426,7 @@ export default function issueDetailPage() {
           <div className="flex justify-between items-start">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                Publication for {formatDate(issue.date)}
+                Issue for {formatDate(issue.date)}
               </h1>
               <div className="flex items-center space-x-4">
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -2469,7 +2469,7 @@ export default function issueDetailPage() {
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                 )}
-                <span>{previewLoading ? 'Loading...' : 'Preview Publication'}</span>
+                <span>{previewLoading ? 'Loading...' : 'Preview Email'}</span>
               </button>
             </div>
           </div>
@@ -2601,7 +2601,7 @@ export default function issueDetailPage() {
             </div>
             <div className="flex items-center justify-between mt-2">
               <p className="text-sm text-gray-600">
-                Check articles to select them for the newsletter. Drag to reorder selected articles.
+                Check articles to select them for the issue. Drag to reorder selected articles.
               </p>
               <div className="text-sm">
                 <span className={`font-medium ${issue.articles.filter(a => a.is_active && !a.skipped).length === maxTopArticles ? 'text-green-600' : 'text-yellow-600'}`}>
@@ -2789,7 +2789,7 @@ export default function issueDetailPage() {
             <div className="bg-white rounded-lg max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col">
               <div className="flex justify-between items-center p-4 border-b">
                 <h3 className="text-lg font-medium text-gray-900">
-                  Newsletter Preview
+                  Email Preview
                 </h3>
                 <div className="flex space-x-2">
                   <button
@@ -2821,7 +2821,7 @@ export default function issueDetailPage() {
                   <iframe
                     srcDoc={previewHtml}
                     className="w-full h-full min-h-[600px]"
-                    title="Newsletter Preview"
+                    title="Email Preview"
                   />
                 )}
               </div>
