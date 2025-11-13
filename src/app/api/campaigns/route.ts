@@ -117,9 +117,9 @@ export async function GET(request: NextRequest) {
       const startDate = new Date()
       startDate.setDate(startDate.getDate() - daysNum)
 
-      // Use string comparison (NO UTC conversion - per CLAUDE.md)
-      const startDateStr = startDate.toISOString().split('T')[0]
-      const endDateStr = endDate.toISOString().split('T')[0]
+      // Use local date strings (NO UTC conversion - per CLAUDE.md)
+      const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`
+      const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
 
       query = query
         .gte('date', startDateStr)
