@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
         source_url,
         publication_date,
         processed_at,
-        issueId,
+        issue_id,
         feed_id,
         rss_feed:rss_feeds!inner(name, use_for_primary_section, use_for_secondary_section, publication_id)
       `)
