@@ -229,11 +229,11 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
               </div>
             )}
 
-            {/* issue Performance Table */}
+            {/* Issue Performance Table */}
             <div className="bg-white shadow rounded-lg">
               <div className="px-6 py-4 border-b border-gray-200">
                 <h2 className="text-lg font-medium text-gray-900">
-                  issue Performance
+                  Issue Performance
                 </h2>
                 <p className="text-sm text-gray-600">
                   Detailed metrics for each sent newsletter

@@ -632,7 +632,7 @@ function SystemStatus() {
           </div>
           <div className="flex justify-between items-center py-2 border-b">
             <div>
-              <div className="font-medium">issue Creation</div>
+              <div className="font-medium">Issue Creation</div>
               <div className="text-sm text-gray-600">
                 Daily at {scheduleDisplay?.issueCreation || '20:50'} CT
               </div>
@@ -1495,7 +1495,7 @@ function EmailSettings() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              RSS Processing Time
+              Issue Processing Time
             </label>
             <div className="flex space-x-2 items-center">
               <select
@@ -1575,12 +1575,12 @@ function EmailSettings() {
                 <option value="PM">PM</option>
               </select>
             </div>
-            <p className="text-xs text-gray-500 mt-1">Daily RSS feed processing and article rating (5-minute increments)</p>
+            <p className="text-xs text-gray-500 mt-1">Daily issue creation and processing</p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              issue Creation Time
+              Campaign Creation Time
             </label>
             <div className="flex space-x-2 items-center">
               <select
@@ -1660,7 +1660,7 @@ function EmailSettings() {
                 <option value="PM">PM</option>
               </select>
             </div>
-            <p className="text-xs text-gray-500 mt-1">Publication issue setup and review (5-minute increments)</p>
+            <p className="text-xs text-gray-500 mt-1">MailerLite campaign setup and review</p>
           </div>
 
           <div>
@@ -1753,7 +1753,7 @@ function EmailSettings() {
           <h4 className="font-medium text-blue-900 mb-2">Review Workflow Overview</h4>
           <div className="text-sm text-blue-800 space-y-1">
             <div>1. <strong>{settings.rssProcessingTime}</strong> - Create tomorrow's issue, process RSS feeds, and generate AI subject line</div>
-            <div>2. <strong>{settings.issueCreationTime}</strong> - Create review issue and schedule for delivery</div>
+            <div>2. <strong>{settings.issueCreationTime}</strong> - Create review campaign and schedule for delivery</div>
             <div>3. <strong>{settings.scheduledSendTime}</strong> - MailerLite sends review to review group only</div>
           </div>
         </div>
@@ -1791,7 +1791,7 @@ function EmailSettings() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              issue Creation Time
+              Campaign Creation Time
             </label>
             <div className="flex space-x-2 items-center">
               <select
@@ -1871,7 +1871,7 @@ function EmailSettings() {
                 <option value="PM">PM</option>
               </select>
             </div>
-            <p className="text-xs text-gray-500 mt-1">Final newsletter issue creation with any review changes (5-minute increments)</p>
+            <p className="text-xs text-gray-500 mt-1">Final campaign creation with any review changes</p>
           </div>
 
           <div>
@@ -1963,8 +1963,8 @@ function EmailSettings() {
         <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
           <h4 className="font-medium text-green-900 mb-2">Daily Publication Workflow</h4>
           <div className="text-sm text-green-800 space-y-1">
-            <div>1. <strong>{settings.dailyissueCreationTime}</strong> - Create final publication with any changes made during review</div>
-            <div>2. <strong>{settings.dailyScheduledSendTime}</strong> - Send final publication to main subscriber group</div>
+            <div>1. <strong>{settings.dailyissueCreationTime}</strong> - Create final campaign with any changes made to issue during review</div>
+            <div>2. <strong>{settings.dailyScheduledSendTime}</strong> - Send final issue to main subscriber group</div>
           </div>
         </div>
       </div>
@@ -4004,7 +4004,7 @@ function AIPromptsSettings() {
           <p><code className="bg-blue-100 px-2 py-0.5 rounded">{'{'}title{'}'}</code> - Article/event title</p>
           <p><code className="bg-blue-100 px-2 py-0.5 rounded">{'{'}description{'}'}</code> - Article/event description</p>
           <p><code className="bg-blue-100 px-2 py-0.5 rounded">{'{'}content{'}'}</code> - Full article content</p>
-          <p><code className="bg-blue-100 px-2 py-0.5 rounded">{'{'}date{'}'}</code> - issue date</p>
+          <p><code className="bg-blue-100 px-2 py-0.5 rounded">{'{'}date{'}'}</code> - Issue date</p>
           <p><code className="bg-blue-100 px-2 py-0.5 rounded">{'{'}headline{'}'}</code> - Newsletter article headline</p>
           <p className="mt-3 text-xs text-blue-700">
             ⚠️ <strong>Important:</strong> Changes take effect immediately. Test prompts carefully before saving.
@@ -4278,7 +4278,7 @@ function SlackSettings() {
   const notificationTypes = [
     {
       id: 'campaignStatusUpdates',
-      name: 'issue Status Updates',
+      name: 'Issue Status Updates',
       description: 'Notifications when campaigns are marked as "Changes Made" by reviewers',
       examples: [
         'issue marked as "Changes Made" for Dec 15 by John Doe',
