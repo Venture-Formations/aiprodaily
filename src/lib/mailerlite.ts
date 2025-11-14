@@ -255,20 +255,39 @@ export class MailerLiteService {
 
   async importissueMetrics(issueId: string) {
     try {
-      const { data: metrics } = await supabaseAdmin
+      console.log(`[MailerLite] Fetching email_metrics for issue ${issueId}...`)
+      const { data: metrics, error: metricsError } = await supabaseAdmin
         .from('email_metrics')
         .select('mailerlite_issue_id')
         .eq('issue_id', issueId)
         .single()
 
+      if (metricsError) {
+        console.error(`[MailerLite] Error fetching email_metrics:`, metricsError)
+        throw new Error(`Failed to fetch email_metrics: ${metricsError.message}`)
+      }
+
       if (!metrics?.mailerlite_issue_id) {
+        console.log(`[MailerLite] No mailerlite_issue_id found for issue ${issueId}`)
         throw new Error('MailerLite issue ID not found')
       }
 
-      const response = await mailerliteClient.get(`/campaigns/${metrics.mailerlite_issue_id}/reports`)
+      const mailerliteCampaignId = metrics.mailerlite_issue_id
+      console.log(`[MailerLite] Found mailerlite_issue_id: ${mailerliteCampaignId} for issue ${issueId}`)
+      console.log(`[MailerLite] Calling MailerLite API: /campaigns/${mailerliteCampaignId}/reports`)
+
+      const response = await mailerliteClient.get(`/campaigns/${mailerliteCampaignId}/reports`)
+
+      console.log(`[MailerLite] Response status: ${response.status} for campaign ${mailerliteCampaignId}`)
 
       if (response.status === 200) {
         const data = response.data.data
+        console.log(`[MailerLite] Received metrics data for campaign ${mailerliteCampaignId}:`, {
+          sent: data.sent,
+          delivered: data.delivered,
+          opened: data.opened?.count,
+          clicked: data.clicked?.count
+        })
 
         const metricsUpdate = {
           sent_count: data.sent || 0,
@@ -283,20 +302,41 @@ export class MailerLiteService {
           unsubscribe_rate: data.unsubscribed?.rate || 0,
         }
 
-        await supabaseAdmin
+        const { error: updateError } = await supabaseAdmin
           .from('email_metrics')
           .update(metricsUpdate)
           .eq('issue_id', issueId)
 
+        if (updateError) {
+          console.error(`[MailerLite] Error updating metrics for issue ${issueId}:`, updateError)
+          throw new Error(`Failed to update metrics: ${updateError.message}`)
+        }
+
+        console.log(`[MailerLite] Successfully updated metrics for issue ${issueId}`)
         return metricsUpdate
       }
 
-      throw new Error('Failed to fetch metrics from MailerLite')
+      console.error(`[MailerLite] Unexpected response status ${response.status} for campaign ${mailerliteCampaignId}`)
+      throw new Error(`Failed to fetch metrics from MailerLite: Status ${response.status}`)
 
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error(`[MailerLite] Error importing metrics for issue ${issueId}:`, errorMessage)
+      
+      // Log more details if it's an Axios error
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as any
+        console.error(`[MailerLite] Axios error details:`, {
+          status: axiosError.response?.status,
+          statusText: axiosError.response?.statusText,
+          data: axiosError.response?.data,
+          url: axiosError.config?.url
+        })
+      }
+
       await this.logError('Failed to import issue metrics', {
         issueId,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: errorMessage
       })
       throw error
     }
