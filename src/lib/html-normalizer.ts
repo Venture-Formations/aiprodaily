@@ -39,7 +39,7 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
   })
 
   // Remove any existing table-based bullets first (from previous normalization)
-  processed = processed.replace(/<table[^>]*width="100%"[^>]*cellpadding="0"[^>]*>[\s\S]*?<td[^>]*>•<\/td>[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>[\s\S]*?<\/table>/gi, '• $1<br>')
+  processed = processed.replace(/<table[^>]*width="100%"[^>]*cellpadding="0"[^>]*>[\s\S]*?<td[^>]*>•<\/td>[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>[\s\S]*?<\/table>/gi, ' • $1<br>')
 
   // Convert <ul> and <ol> lists to simple text with bullets
   processed = processed.replace(/<[ou]l[^>]*>/gi, '')
@@ -56,7 +56,7 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
     // Replace remaining <br> tags with spaces to keep text inline
     cleanContent = cleanContent.replace(/<br\s*\/?>/gi, ' ')
 
-    return `• ${cleanContent}<br>`
+    return ` • ${cleanContent}<br>`
   })
 
   // Handle manual bullet points (from Google Docs paste or manual entry)
@@ -81,10 +81,10 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
       const bulletMatch = textContent.match(/^\s*([•\-\*])\s+(.+)/)
 
       if (bulletMatch && bulletMatch[2].length > 5) {
-        // This is a bullet point line - keep it simple with just "• text"
+        // This is a bullet point line - keep it simple with " • text" (space before bullet for slight indent)
         const bulletText = bulletMatch[2].trim()
         hasBullets = true
-        convertedLines.push(`• ${bulletText}<br>`)
+        convertedLines.push(` • ${bulletText}<br>`)
       } else if (textContent.length > 0) {
         // Regular line within paragraph, keep as is (already trimmed)
         convertedLines.push(line)
@@ -98,13 +98,9 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
     return match
   })
 
-  // Clean up already-normalized bullets that have leading whitespace and extra spaces
-  // This fixes bullets that are like "<br>  •  text" to be "<br>• text"
-  processed = processed.replace(/(<br\s*\/?>)\s+•\s+/gi, '$1• ')
-
-  // Also fix bullets that have 2+ spaces after the bullet symbol (anywhere, not just after <br>)
-  // This fixes "•  text" to be "• text"
-  processed = processed.replace(/•\s{2,}/g, '• ')
+  // Clean up already-normalized bullets to ensure consistent spacing with one space before and after
+  // This handles all variations: "•text", "  •  text", etc. and normalizes to " • text"
+  processed = processed.replace(/\s*•\s*/g, ' • ')
 
   // Remove empty bold/strong tags that contain only <br> (causes extra line breaks)
   processed = processed.replace(/<(b|strong)>\s*<br\s*\/?>\s*<\/(b|strong)>/gi, '')
