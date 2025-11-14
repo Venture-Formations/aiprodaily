@@ -94,14 +94,22 @@ export class MailerLiteService {
 
       const response = await mailerliteClient.post('/campaigns', issueData)
 
-      console.log('MailerLite API response:', {
+      console.log('[MailerLite] Full create review campaign response:', JSON.stringify({
         status: response.status,
         statusText: response.statusText,
+        headers: response.headers,
         data: response.data
-      })
+      }, null, 2))
 
       if (response.status === 201) {
         const issueId = response.data.data.id
+        console.log('[MailerLite] Extracted review campaign ID:', issueId)
+        console.log('[MailerLite] ID type:', typeof issueId)
+        console.log('[MailerLite] Full response.data structure:', {
+          hasData: !!response.data.data,
+          dataKeys: response.data.data ? Object.keys(response.data.data) : [],
+          fullData: response.data.data
+        })
         console.log('issue created successfully with ID:', issueId)
 
         // Step 2: Schedule the issue using the issue ID
@@ -639,8 +647,22 @@ export class MailerLiteService {
 
       const response = await mailerliteClient.post('/campaigns', issueData)
 
+      console.log('[MailerLite] Full create campaign response:', JSON.stringify({
+        status: response.status,
+        headers: response.headers,
+        data: response.data
+      }, null, 2))
+
       if (response.data && response.data.data && response.data.data.id) {
         const issueId = response.data.data.id
+
+        console.log('[MailerLite] Extracted campaign ID:', issueId)
+        console.log('[MailerLite] ID type:', typeof issueId)
+        console.log('[MailerLite] Full response.data structure:', {
+          hasData: !!response.data.data,
+          dataKeys: response.data.data ? Object.keys(response.data.data) : [],
+          fullData: response.data.data
+        })
 
         console.log('Final issue created successfully:', issueId)
 
