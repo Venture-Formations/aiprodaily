@@ -282,52 +282,96 @@ export class MailerLiteService {
 
       const mailerliteCampaignId = metrics.mailerlite_issue_id
       console.log(`[MailerLite] Found mailerlite_issue_id: ${mailerliteCampaignId} for issue ${issueId}`)
-      console.log(`[MailerLite] Calling MailerLite API: /campaigns/${mailerliteCampaignId}/reports`)
-
+      
+      // Try multiple possible endpoints for campaign reports
+      // MailerLite API might use different endpoint formats
       let response
+      let lastError: any = null
+      
+      // Try endpoint 1: /campaigns/{id}/reports (current)
       try {
+        console.log(`[MailerLite] Trying endpoint: /campaigns/${mailerliteCampaignId}/reports`)
         response = await mailerliteClient.get(`/campaigns/${mailerliteCampaignId}/reports`)
+        console.log(`[MailerLite] Success with /reports endpoint`)
       } catch (error: any) {
-        // Handle 404 errors gracefully - campaign doesn't exist (likely deleted)
-        if (error?.response?.status === 404) {
-          console.log(`[MailerLite] Campaign ${mailerliteCampaignId} not found in MailerLite (404) - likely deleted`)
-          console.log(`[MailerLite] Clearing mailerlite_issue_id for issue ${issueId} since campaign no longer exists`)
+        lastError = error
+        console.log(`[MailerLite] /reports endpoint failed: ${error?.response?.status} ${error?.response?.statusText}`)
+        console.log(`[MailerLite] Error response data:`, JSON.stringify(error?.response?.data, null, 2))
+        
+        // Try endpoint 2: /campaigns/{id} (stats might be included in campaign data)
+        try {
+          console.log(`[MailerLite] Trying alternative endpoint: /campaigns/${mailerliteCampaignId}`)
+          const campaignResponse = await mailerliteClient.get(`/campaigns/${mailerliteCampaignId}`)
+          console.log(`[MailerLite] Campaign data keys:`, Object.keys(campaignResponse.data?.data || {}))
+          console.log(`[MailerLite] Full campaign response:`, JSON.stringify(campaignResponse.data, null, 2))
           
-          // Clear the mailerlite_issue_id so we don't keep trying
-          await supabaseAdmin
-            .from('email_metrics')
-            .update({ mailerlite_issue_id: null })
-            .eq('issue_id', issueId)
+          // Check if stats are in the campaign response
+          if (campaignResponse.data?.data?.stats || campaignResponse.data?.data?.statistics) {
+            console.log(`[MailerLite] Found stats in campaign data`)
+            response = campaignResponse // Use this response
+          } else {
+            throw new Error('Stats not found in campaign response')
+          }
+        } catch (campaignError: any) {
+          console.log(`[MailerLite] /campaigns/{id} endpoint also failed: ${campaignError?.response?.status}`)
+          console.log(`[MailerLite] Campaign error response:`, JSON.stringify(campaignError?.response?.data, null, 2))
           
-          // Return a special result indicating campaign was deleted
-          return { deleted: true, message: 'Campaign no longer exists in MailerLite' }
+          // Handle 404 - but now we know campaigns exist, so this is likely an endpoint issue
+          if (error?.response?.status === 404) {
+            console.error(`[MailerLite] Campaign ${mailerliteCampaignId} exists but reports endpoint returns 404`)
+            console.error(`[MailerLite] This suggests the reports endpoint format may be incorrect`)
+            console.error(`[MailerLite] Full error:`, JSON.stringify({
+              url: error.config?.url,
+              method: error.config?.method,
+              status: error.response?.status,
+              statusText: error.response?.statusText,
+              data: error.response?.data
+            }, null, 2))
+            
+            // Don't clear the ID - campaigns exist, this is an API endpoint issue
+            throw new Error(`Campaign exists but reports endpoint not found. Possible API format change. Status: 404`)
+          }
+          throw error // Re-throw original error
         }
-        // Re-throw other errors
-        throw error
       }
 
       console.log(`[MailerLite] Response status: ${response.status} for campaign ${mailerliteCampaignId}`)
 
       if (response.status === 200) {
         const data = response.data.data
+        
+        // Handle different response formats
+        // Format 1: Direct reports endpoint (data contains stats directly)
+        // Format 2: Campaign endpoint (data.stats or data.statistics contains stats)
+        let stats = data
+        
+        if (data.stats) {
+          console.log(`[MailerLite] Found stats in data.stats`)
+          stats = data.stats
+        } else if (data.statistics) {
+          console.log(`[MailerLite] Found stats in data.statistics`)
+          stats = data.statistics
+        }
+        
         console.log(`[MailerLite] Received metrics data for campaign ${mailerliteCampaignId}:`, {
-          sent: data.sent,
-          delivered: data.delivered,
-          opened: data.opened?.count,
-          clicked: data.clicked?.count
+          sent: stats.sent,
+          delivered: stats.delivered,
+          opened: stats.opened?.count || stats.opened,
+          clicked: stats.clicked?.count || stats.clicked
         })
+        console.log(`[MailerLite] Full stats object:`, JSON.stringify(stats, null, 2))
 
         const metricsUpdate = {
-          sent_count: data.sent || 0,
-          delivered_count: data.delivered || 0,
-          opened_count: data.opened?.count || 0,
-          clicked_count: data.clicked?.count || 0,
-          bounced_count: data.bounced?.count || 0,
-          unsubscribed_count: data.unsubscribed?.count || 0,
-          open_rate: data.opened?.rate || 0,
-          click_rate: data.clicked?.rate || 0,
-          bounce_rate: data.bounced?.rate || 0,
-          unsubscribe_rate: data.unsubscribed?.rate || 0,
+          sent_count: stats.sent || 0,
+          delivered_count: stats.delivered || 0,
+          opened_count: stats.opened?.count || stats.opened || 0,
+          clicked_count: stats.clicked?.count || stats.clicked || 0,
+          bounced_count: stats.bounced?.count || stats.bounced || 0,
+          unsubscribed_count: stats.unsubscribed?.count || stats.unsubscribed || 0,
+          open_rate: stats.opened?.rate || stats.open_rate || 0,
+          click_rate: stats.clicked?.rate || stats.click_rate || 0,
+          bounce_rate: stats.bounced?.rate || stats.bounce_rate || 0,
+          unsubscribe_rate: stats.unsubscribed?.rate || stats.unsubscribe_rate || 0,
         }
 
         const { error: updateError } = await supabaseAdmin
