@@ -11,6 +11,9 @@
 export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans-serif'): string {
   let processed = html
 
+  // Remove dir="ltr" attribute from all tags (causes left indentation in Apple Mail and Thunderbird)
+  processed = processed.replace(/\s+dir="ltr"/gi, '')
+
   // Strip ALL margins and padding from Google Docs <p> tags to remove indentation
   processed = processed.replace(/<p([^>]*?)style="([^"]*?)"([^>]*)>/gi, (match, before, styleContent, after) => {
     // Remove all margin and padding properties
@@ -28,14 +31,23 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
     }
   })
 
-  // Remove leading/trailing whitespace from span content BEFORE processing bullets
-  // This fixes the indent issue where bullets have extra spaces before them
-  processed = processed.replace(/<span([^>]*)>([\s\S]*?)<\/span>/gi, (match, attrs, content) => {
-    // Only trim if the span has white-space-collapse: preserve
-    if (attrs.includes('white-space-collapse: preserve')) {
-      return `<span${attrs}>${content.trim()}</span>`
+  // Remove white-space-collapse from span styles (not supported in Apple Mail/Thunderbird)
+  processed = processed.replace(/<span([^>]*?)style="([^"]*?)"([^>]*)>([\s\S]*?)<\/span>/gi, (match, before, styleContent, after, content) => {
+    // Check if it had white-space-collapse
+    const hadWhiteSpaceCollapse = styleContent.includes('white-space-collapse')
+
+    // Remove white-space-collapse property
+    let cleanedStyle = styleContent.replace(/white-space-collapse:\s*[^;]+;?\s*/gi, '')
+    cleanedStyle = cleanedStyle.replace(/;;+/g, ';').replace(/;\s*$/, '').trim()
+
+    // Trim content if it had white-space-collapse: preserve
+    const trimmedContent = hadWhiteSpaceCollapse ? content.trim() : content
+
+    if (cleanedStyle) {
+      return `<span${before}style="${cleanedStyle}"${after}>${trimmedContent}</span>`
+    } else {
+      return `<span${before}${after}>${trimmedContent}</span>`
     }
-    return match
   })
 
   // Remove any existing table-based bullets first (from previous normalization)
