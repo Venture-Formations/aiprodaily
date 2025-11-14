@@ -268,19 +268,106 @@ export class MailerLiteService {
         .from('email_metrics')
         .select('mailerlite_issue_id')
         .eq('issue_id', issueId)
+        .maybeSingle()
+
+      // Handle case where email_metrics doesn't exist - try to find MailerLite campaign
+      if (metricsError || !metrics) {
+        console.log(`[MailerLite] email_metrics record not found for issue ${issueId}, attempting to find MailerLite campaign...`)
+        
+        // Get issue details to search for matching MailerLite campaign
+        const { data: issue, error: issueError } = await supabaseAdmin
+          .from('publication_issues')
+          .select('id, date, newsletters(slug, name)')
+          .eq('id', issueId)
+          .single()
+
+        if (issueError || !issue) {
+          throw new Error(`Failed to fetch issue details: ${issueError?.message || 'Issue not found'}`)
+        }
+
+        const newsletterSlug = (issue as any)?.newsletters?.slug || 'accounting'
+        // Get newsletter name from slug or use default
+        const newsletterNameFromSlug = newsletterSlug.charAt(0).toUpperCase() + newsletterSlug.slice(1)
+        const newsletterName = (issue as any)?.newsletters?.name || newsletterNameFromSlug
+        const issueDate = issue.date
+
+        console.log(`[MailerLite] Searching for MailerLite campaign matching issue date ${issueDate}...`)
+        
+        // Search MailerLite for campaigns matching the issue date
+        // Campaign names are typically formatted like "Accounting Newsletter: 2025-11-14"
+        const expectedCampaignName = `${newsletterName} Newsletter: ${issueDate}`
+        
+        let mailerliteCampaignId: string | null = null
+        let page = 1
+        const perPage = 100
+        
+        while (!mailerliteCampaignId && page <= 5) { // Search up to 5 pages
+          try {
+            const campaignsResponse = await mailerliteClient.get('/campaigns', {
+              params: {
+                page: page,
+                limit: perPage
+              }
+            })
+
+            const campaigns = campaignsResponse?.data?.data || []
+            console.log(`[MailerLite] Searching page ${page}, found ${campaigns.length} campaigns`)
+            
+            // Look for exact name match
+            const matchingCampaign = campaigns.find((campaign: any) => 
+              campaign.name === expectedCampaignName || 
+              campaign.name?.includes(issueDate)
+            )
+
+            if (matchingCampaign) {
+              mailerliteCampaignId = String(matchingCampaign.id)
+              console.log(`[MailerLite] Found matching campaign: ${matchingCampaign.name} (ID: ${mailerliteCampaignId})`)
+              break
+            }
+
+            if (campaigns.length < perPage) {
+              break // Last page
+            }
+            page++
+          } catch (campaignsError: any) {
+            console.error(`[MailerLite] Error searching campaigns:`, campaignsError?.response?.data || campaignsError?.message)
+            break
+          }
+        }
+
+        if (!mailerliteCampaignId) {
+          throw new Error(`MailerLite campaign not found for issue ${issueId} (searched for: "${expectedCampaignName}")`)
+        }
+
+        // Create email_metrics record with the found MailerLite campaign ID
+        console.log(`[MailerLite] Creating email_metrics record for issue ${issueId} with mailerlite_issue_id ${mailerliteCampaignId}...`)
+        const { error: insertError } = await supabaseAdmin
+          .from('email_metrics')
+          .insert({
+            issue_id: issueId,
+            mailerlite_issue_id: mailerliteCampaignId
+          })
+
+        if (insertError) {
+          console.error(`[MailerLite] Failed to create email_metrics record:`, insertError)
+          throw new Error(`Failed to create email_metrics record: ${insertError.message}`)
+        }
+
+        console.log(`[MailerLite] Successfully created email_metrics record for issue ${issueId}`)
+      }
+
+      // Now fetch metrics again to get the mailerlite_issue_id
+      const { data: finalMetrics, error: finalMetricsError } = await supabaseAdmin
+        .from('email_metrics')
+        .select('mailerlite_issue_id')
+        .eq('issue_id', issueId)
         .single()
 
-      if (metricsError) {
-        console.error(`[MailerLite] Error fetching email_metrics:`, metricsError)
-        throw new Error(`Failed to fetch email_metrics: ${metricsError.message}`)
+      if (finalMetricsError || !finalMetrics?.mailerlite_issue_id) {
+        throw new Error(`Failed to fetch mailerlite_issue_id: ${finalMetricsError?.message || 'ID not found'}`)
       }
 
-      if (!metrics?.mailerlite_issue_id) {
-        console.log(`[MailerLite] No mailerlite_issue_id found for issue ${issueId}`)
-        throw new Error('MailerLite issue ID not found')
-      }
-
-      const mailerliteCampaignId = metrics.mailerlite_issue_id
+      const mailerliteCampaignId = finalMetrics.mailerlite_issue_id
       console.log(`[MailerLite] Found mailerlite_issue_id: ${mailerliteCampaignId} for issue ${issueId}`)
       
       // Try multiple possible endpoints for campaign reports
