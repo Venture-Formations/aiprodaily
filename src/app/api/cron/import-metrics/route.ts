@@ -49,12 +49,21 @@ async function executeMetricsImport() {
   const errors: string[] = []
 
   // Import metrics for each issue
+  let skippedCount = 0
+  
   for (const issue of issues) {
     try {
       console.log(`[Import Metrics] Processing issue ${issue.id} (${issue.final_sent_at})...`)
-      await mailerLiteService.importissueMetrics(issue.id)
-      successCount++
-      console.log(`[Import Metrics] ✓ Successfully imported metrics for issue ${issue.id}`)
+      const result = await mailerLiteService.importissueMetrics(issue.id)
+      
+      // Check if campaign was deleted (404 handled gracefully)
+      if (result && typeof result === 'object' && 'deleted' in result && result.deleted) {
+        skippedCount++
+        console.log(`[Import Metrics] ⊘ Skipped issue ${issue.id}: Campaign no longer exists in MailerLite`)
+      } else {
+        successCount++
+        console.log(`[Import Metrics] ✓ Successfully imported metrics for issue ${issue.id}`)
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       console.error(`[Import Metrics] ✗ Failed to import metrics for issue ${issue.id}:`, errorMessage)
@@ -69,6 +78,7 @@ async function executeMetricsImport() {
     message: 'Metrics import completed',
     processed: issues.length,
     successful: successCount,
+    skipped: skippedCount,
     failed: errorCount,
     errors: errors.length > 0 ? errors : undefined,
     timestamp: new Date().toISOString()

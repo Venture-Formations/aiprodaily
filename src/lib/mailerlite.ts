@@ -276,7 +276,27 @@ export class MailerLiteService {
       console.log(`[MailerLite] Found mailerlite_issue_id: ${mailerliteCampaignId} for issue ${issueId}`)
       console.log(`[MailerLite] Calling MailerLite API: /campaigns/${mailerliteCampaignId}/reports`)
 
-      const response = await mailerliteClient.get(`/campaigns/${mailerliteCampaignId}/reports`)
+      let response
+      try {
+        response = await mailerliteClient.get(`/campaigns/${mailerliteCampaignId}/reports`)
+      } catch (error: any) {
+        // Handle 404 errors gracefully - campaign doesn't exist (likely deleted)
+        if (error?.response?.status === 404) {
+          console.log(`[MailerLite] Campaign ${mailerliteCampaignId} not found in MailerLite (404) - likely deleted`)
+          console.log(`[MailerLite] Clearing mailerlite_issue_id for issue ${issueId} since campaign no longer exists`)
+          
+          // Clear the mailerlite_issue_id so we don't keep trying
+          await supabaseAdmin
+            .from('email_metrics')
+            .update({ mailerlite_issue_id: null })
+            .eq('issue_id', issueId)
+          
+          // Return a special result indicating campaign was deleted
+          return { deleted: true, message: 'Campaign no longer exists in MailerLite' }
+        }
+        // Re-throw other errors
+        throw error
+      }
 
       console.log(`[MailerLite] Response status: ${response.status} for campaign ${mailerliteCampaignId}`)
 

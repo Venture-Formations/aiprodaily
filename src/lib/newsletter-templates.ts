@@ -683,21 +683,28 @@ export async function generateAdvertorialSection(issue: any, recordUsage: boolea
       let olCounter = 0
       processed = processed.replace(/<ol[^>]*>/gi, () => {
         olCounter = 0
-        return '<div style="margin: 0; padding: 0;">'
+        return '<table width="100%" cellpadding="0" cellspacing="0" style="margin: 0; padding: 0;">'
       })
-      processed = processed.replace(/<\/ol>/gi, '</div>')
+      processed = processed.replace(/<\/ol>/gi, '</table>')
 
       // Convert unordered lists
       processed = processed
-        .replace(/<ul[^>]*>/gi, '<div style="margin: 0; padding: 0;">')
-        .replace(/<\/ul>/gi, '</div>')
+        .replace(/<ul[^>]*>/gi, '<table width="100%" cellpadding="0" cellspacing="0" style="margin: 0; padding: 0;">')
+        .replace(/<\/ul>/gi, '</table>')
 
-      // Convert <li> tags - check context for whether it's in ol or ul
-      // For simplicity, use bullet points (we already converted ol to div)
+      // Convert <li> tags to table rows for better email client compatibility
       processed = processed.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (match, content) => {
-        // Clean up the content and ensure proper spacing
-        const cleanContent = content.trim()
-        return `<p style="margin: 0 0 8px 0; padding: 0; line-height: 24px;">• ${cleanContent}</p>`
+        // Strip any leading/trailing <br> tags and whitespace
+        let cleanContent = content.trim()
+          .replace(/^(<br\s*\/?>)+/gi, '')
+          .replace(/(<br\s*\/?>)+$/gi, '')
+          .trim()
+
+        // Replace remaining <br> tags with spaces to keep text inline
+        cleanContent = cleanContent.replace(/<br\s*\/?>/gi, ' ')
+
+        // Use table-based layout for reliable bullet point rendering across email clients
+        return `<tr><td valign="top" style="padding: 0 0 8px 0; font-family: ${bodyFont}; font-size: 16px; line-height: 24px; color: #333;"><table width="100%" cellpadding="0" cellspacing="0"><tr><td width="20" valign="top" style="padding: 0; font-size: 16px; line-height: 24px;">•</td><td valign="top" style="padding: 0; font-size: 16px; line-height: 24px;">${cleanContent}</td></tr></table></td></tr>`
       })
 
       return processed
