@@ -72,7 +72,8 @@
       "Bash(/dev/null -exec sed -i 's/newsletters(slug)/publications(slug)/g' {} ;)",
       "Bash(FROM)",
       "Bash(cut:*)",
-      "Bash(ping:*)"
+      "Bash(ping:*)",
+      "Bash(npm uninstall:*)"
     ],
     "deny": [],
     "ask": []
