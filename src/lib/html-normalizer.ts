@@ -11,12 +11,12 @@
 export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans-serif'): string {
   let processed = html
 
-  // Strip excessive margins from Google Docs <p> tags (keeps paragraph structure but removes indentation)
+  // Strip ALL margins and padding from Google Docs <p> tags to remove indentation
   processed = processed.replace(/<p([^>]*?)style="([^"]*?)"([^>]*)>/gi, (match, before, styleContent, after) => {
-    // Remove margin-top and margin-bottom from style
+    // Remove all margin and padding properties
     const cleanedStyle = styleContent
-      .replace(/margin-top:\s*[^;]+;?/gi, '')
-      .replace(/margin-bottom:\s*[^;]+;?/gi, '')
+      .replace(/margin(?:-top|-bottom|-left|-right)?:\s*[^;]+;?/gi, '')
+      .replace(/padding(?:-top|-bottom|-left|-right)?:\s*[^;]+;?/gi, '')
       .replace(/;;+/g, ';') // Clean up double semicolons
       .replace(/;\s*$/, '') // Remove trailing semicolon
       .trim()

@@ -745,9 +745,9 @@ export async function generateAdvertorialSection(issue: any, recordUsage: boolea
             <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">${sectionName}</h2>
           </td>
         </tr>
-        <tr><td style='padding: 10px 10px 4px; font-size: 20px; font-weight: bold; text-align: left;'>${selectedAd.title}</td></tr>
+        <tr><td style='padding: 10px 4px 4px; font-size: 20px; font-weight: bold; text-align: left;'>${selectedAd.title}</td></tr>
         ${imageHtml}
-        <tr><td style='padding: 0 10px 10px; font-family: ${bodyFont}; font-size: 16px; line-height: 24px; color: #333;'>${processedBody}</td></tr>
+        <tr><td style='padding: 0 4px 10px; font-family: ${bodyFont}; font-size: 16px; line-height: 24px; color: #333;'>${processedBody}</td></tr>
       </table>
     </td>
   </tr>
