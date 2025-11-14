@@ -22,7 +22,44 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
   // Remove ALL other spans - keep just the text content
   processed = processed.replace(/<span[^>]*>(.*?)<\/span>/gi, '$1')
 
-  // Remove ALL attributes from tags (except href on links and list tags)
+  // IMPORTANT: Handle React Quill list formats BEFORE removing attributes
+  // React Quill uses <ol><li data-list="bullet"> for bullet lists
+  // React Quill uses <ol><li data-list="ordered"> for numbered lists
+
+  // Convert React Quill bullet lists (ol with data-list="bullet") to table format
+  processed = processed.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (match, content) => {
+    // Check if this is a React Quill bullet list
+    if (/<li[^>]*data-list="bullet"/.test(content)) {
+      const items = content.match(/<li[^>]*>(.*?)<\/li>/gi)
+      if (!items) return match
+
+      const tableRows = items.map((item: string) => {
+        const text = item.replace(/<li[^>]*>/gi, '').replace(/<\/li>/gi, '').trim()
+        return `<tr><td valign="top" style="padding-right:8px;">•</td><td>${text}</td></tr>`
+      }).join('')
+
+      return `<table cellpadding="0" cellspacing="0" style="margin:8px 0;">${tableRows}</table>`
+    }
+
+    // Check if this is a React Quill numbered list or standard numbered list
+    if (/<li[^>]*data-list="ordered"/.test(content) || !/<li[^>]*data-list=/.test(content)) {
+      let counter = 0
+      const items = content.match(/<li[^>]*>(.*?)<\/li>/gi)
+      if (!items) return match
+
+      const tableRows = items.map((item: string) => {
+        counter++
+        const text = item.replace(/<li[^>]*>/gi, '').replace(/<\/li>/gi, '').trim()
+        return `<tr><td valign="top" style="padding-right:8px;">${counter}.</td><td>${text}</td></tr>`
+      }).join('')
+
+      return `<table cellpadding="0" cellspacing="0" style="margin:8px 0;">${tableRows}</table>`
+    }
+
+    return match
+  })
+
+  // Remove ALL attributes from tags (except href on links - list tags already processed above)
   processed = processed.replace(/<p[^>]*>/gi, '<p>')
   processed = processed.replace(/<br[^>]*>/gi, '<br>')
   processed = processed.replace(/<strong[^>]*>/gi, '<strong>')
@@ -32,30 +69,13 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
   processed = processed.replace(/<a\s+[^>]*href="([^"]*)"[^>]*>/gi, '<a href="$1">')
 
   // Convert <ul> lists to table-based format for proper bullet indentation
-  processed = processed.replace(/<ul>([\s\S]*?)<\/ul>/gi, (match, content) => {
-    // Convert each <li> to a table row with bullet and content
-    const items = content.match(/<li>(.*?)<\/li>/gi)
+  processed = processed.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (match, content) => {
+    const items = content.match(/<li[^>]*>(.*?)<\/li>/gi)
     if (!items) return match
 
     const tableRows = items.map((item: string) => {
-      const text = item.replace(/<\/?li>/gi, '').trim()
+      const text = item.replace(/<li[^>]*>/gi, '').replace(/<\/li>/gi, '').trim()
       return `<tr><td valign="top" style="padding-right:8px;">•</td><td>${text}</td></tr>`
-    }).join('')
-
-    return `<table cellpadding="0" cellspacing="0" style="margin:8px 0;">${tableRows}</table>`
-  })
-
-  // Convert <ol> lists to table-based format for proper number indentation
-  let olCounter = 0
-  processed = processed.replace(/<ol>([\s\S]*?)<\/ol>/gi, (match, content) => {
-    olCounter = 0
-    const items = content.match(/<li>(.*?)<\/li>/gi)
-    if (!items) return match
-
-    const tableRows = items.map((item: string) => {
-      olCounter++
-      const text = item.replace(/<\/?li>/gi, '').trim()
-      return `<tr><td valign="top" style="padding-right:8px;">${olCounter}.</td><td>${text}</td></tr>`
     }).join('')
 
     return `<table cellpadding="0" cellspacing="0" style="margin:8px 0;">${tableRows}</table>`
