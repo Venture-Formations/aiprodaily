@@ -109,10 +109,21 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
 
   const calculateAverages = () => {
     const issuesWithMetrics = issues.filter(c => c.email_metrics)
+    console.log('[Analytics] Total issues:', issues.length)
+    console.log('[Analytics] Issues with metrics:', issuesWithMetrics.length)
+
     if (issuesWithMetrics.length === 0) return null
 
     const totals = issuesWithMetrics.reduce((acc, issue) => {
       const metrics = issue.email_metrics!
+      console.log('[Analytics] Issue metrics:', {
+        id: issue.id,
+        date: issue.date,
+        sent: metrics.sent_count,
+        delivered: metrics.delivered_count,
+        opened: metrics.opened_count,
+        clicked: metrics.clicked_count
+      })
       return {
         sent: acc.sent + (metrics.sent_count || 0),
         delivered: acc.delivered + (metrics.delivered_count || 0),
@@ -123,7 +134,9 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
       }
     }, { sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, unsubscribed: 0 })
 
-    return {
+    console.log('[Analytics] Totals:', totals)
+
+    const result = {
       avgOpenRate: totals.delivered > 0 ? (totals.opened / totals.delivered) * 100 : 0,
       avgClickRate: totals.delivered > 0 ? (totals.clicked / totals.delivered) * 100 : 0,
       avgBounceRate: totals.sent > 0 ? (totals.bounced / totals.sent) * 100 : 0,
@@ -134,6 +147,9 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
       totalClicked: totals.clicked,
       issueCount: issuesWithMetrics.length
     }
+
+    console.log('[Analytics] Calculated averages:', result)
+    return result
   }
 
   const formatDate = (dateString: string) => {
