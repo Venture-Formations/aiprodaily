@@ -2,133 +2,38 @@
 // Used when saving advertorial content to the database
 
 /**
- * Normalizes HTML content for email clients by converting lists and manual bullets
- * to simple text with bullet prefixes ("• ").
- *
- * This should be called when SAVING advertorial content to the database,
- * not during email generation.
+ * Normalizes HTML content by stripping Google Docs formatting and creating clean, simple HTML.
+ * This should be called when SAVING advertorial content to the database.
  */
 export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans-serif'): string {
   let processed = html
 
-  // Remove dir="ltr" attribute from all tags (causes left indentation in Apple Mail and Thunderbird)
-  processed = processed.replace(/\s+dir="ltr"/gi, '')
+  // Convert font-weight: 700 spans to <strong> tags before removing spans
+  processed = processed.replace(/<span([^>]*?)font-weight:\s*700([^>]*?)>(.*?)<\/span>/gi, '<strong>$3</strong>')
 
-  // Strip ALL margins and padding from Google Docs <p> tags to remove indentation
-  processed = processed.replace(/<p([^>]*?)style="([^"]*?)"([^>]*)>/gi, (match, before, styleContent, after) => {
-    // Remove all margin and padding properties
-    const cleanedStyle = styleContent
-      .replace(/margin(?:-top|-bottom|-left|-right)?:\s*[^;]+;?/gi, '')
-      .replace(/padding(?:-top|-bottom|-left|-right)?:\s*[^;]+;?/gi, '')
-      .replace(/;;+/g, ';') // Clean up double semicolons
-      .replace(/;\s*$/, '') // Remove trailing semicolon
-      .trim()
+  // Strip the outer Google Docs wrapper span
+  processed = processed.replace(/<span[^>]*docs-internal-guid[^>]*>([\s\S]*?)<\/span>\s*$/gi, '$1')
 
-    if (cleanedStyle) {
-      return `<p${before}style="${cleanedStyle}"${after}>`
-    } else {
-      return `<p${before}${after}>`
-    }
-  })
+  // Convert divs to paragraphs
+  processed = processed.replace(/<div[^>]*>/gi, '<p>')
+  processed = processed.replace(/<\/div>/gi, '</p>')
 
-  // Remove white-space-collapse from span styles (not supported in Apple Mail/Thunderbird)
-  processed = processed.replace(/<span([^>]*?)style="([^"]*?)"([^>]*)>([\s\S]*?)<\/span>/gi, (match, before, styleContent, after, content) => {
-    // Check if it had white-space-collapse
-    const hadWhiteSpaceCollapse = styleContent.includes('white-space-collapse')
+  // Remove ALL other spans - keep just the text content
+  processed = processed.replace(/<span[^>]*>(.*?)<\/span>/gi, '$1')
 
-    // Remove white-space-collapse property
-    let cleanedStyle = styleContent.replace(/white-space-collapse:\s*[^;]+;?\s*/gi, '')
-    cleanedStyle = cleanedStyle.replace(/;;+/g, ';').replace(/;\s*$/, '').trim()
+  // Remove ALL attributes from tags (except href on links)
+  processed = processed.replace(/<p[^>]*>/gi, '<p>')
+  processed = processed.replace(/<br[^>]*>/gi, '<br>')
+  processed = processed.replace(/<strong[^>]*>/gi, '<strong>')
+  processed = processed.replace(/<b[^>]*>/gi, '<b>')
 
-    // Trim content if it had white-space-collapse: preserve
-    const trimmedContent = hadWhiteSpaceCollapse ? content.trim() : content
+  // Handle links - keep href but remove other attributes
+  processed = processed.replace(/<a\s+[^>]*href="([^"]*)"[^>]*>/gi, '<a href="$1">')
 
-    if (cleanedStyle) {
-      return `<span${before}style="${cleanedStyle}"${after}>${trimmedContent}</span>`
-    } else {
-      return `<span${before}${after}>${trimmedContent}</span>`
-    }
-  })
-
-  // Remove any existing table-based bullets first (from previous normalization)
-  processed = processed.replace(/<table[^>]*width="100%"[^>]*cellpadding="0"[^>]*>[\s\S]*?<td[^>]*>•<\/td>[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>[\s\S]*?<\/table>/gi, ' • $1<br>')
-
-  // Convert <ul> and <ol> lists to simple text with bullets
-  processed = processed.replace(/<[ou]l[^>]*>/gi, '')
-  processed = processed.replace(/<\/[ou]l>/gi, '')
-
-  // Convert <li> tags to simple bullet points
-  processed = processed.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (match, content) => {
-    // Strip any leading/trailing <br> tags and whitespace
-    let cleanContent = content.trim()
-      .replace(/^(<br\s*\/?>)+/gi, '')
-      .replace(/(<br\s*\/?>)+$/gi, '')
-      .trim()
-
-    // Replace remaining <br> tags with spaces to keep text inline
-    cleanContent = cleanContent.replace(/<br\s*\/?>/gi, ' ')
-
-    return ` • ${cleanContent}<br>`
-  })
-
-  // Handle manual bullet points (from Google Docs paste or manual entry)
-  // Process paragraph by paragraph to preserve structure
-  processed = processed.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, (match, paragraphContent) => {
-    // Split paragraph content by <br> tags
-    const lines = paragraphContent.split(/(<br\s*\/?>)/gi)
-    const convertedLines: string[] = []
-    let hasBullets = false
-
-    for (let i = 0; i < lines.length; i++) {
-      // Trim each line to remove leading/trailing whitespace
-      const line = lines[i].trim()
-
-      // Skip <br> tags and empty lines
-      if (!line || line.match(/^<br\s*\/?>$/i)) {
-        continue
-      }
-
-      // Check if this line contains a bullet point at the start (after stripping tags)
-      const textContent = line.replace(/<[^>]+>/g, ' ').trim()
-      const bulletMatch = textContent.match(/^\s*([•\-\*])\s+(.+)/)
-
-      if (bulletMatch && bulletMatch[2].length > 5) {
-        // This is a bullet point line - keep it simple with " • text" (space before bullet for slight indent)
-        const bulletText = bulletMatch[2].trim()
-        hasBullets = true
-        convertedLines.push(` • ${bulletText}<br>`)
-      } else if (textContent.length > 0) {
-        // Regular line within paragraph, keep as is (already trimmed)
-        convertedLines.push(line)
-      }
-    }
-
-    // If we found bullets, return just the bullets
-    if (hasBullets) {
-      return convertedLines.join('')
-    }
-    return match
-  })
-
-  // Clean up already-normalized bullets to ensure consistent spacing with one space before and after
-  // This handles all variations: "•text", "  •  text", etc. and normalizes to " • text"
-  processed = processed.replace(/\s*•\s*/g, ' • ')
-
-  // Remove empty bold/strong tags that contain only <br> (causes extra line breaks)
-  processed = processed.replace(/<(b|strong)>\s*<br\s*\/?>\s*<\/(b|strong)>/gi, '')
-
-  // Remove standalone <br> tags that break sentences
-  // Pattern 1: Between spans
-  processed = processed.replace(/(<\/span>)\s*<br\s*\/?>\s*(<span[^>]*>)/gi, '$1 $2')
-
-  // Pattern 2: Inside a span that contains only a <br> tag (common in Google Docs paste)
-  processed = processed.replace(/<span([^>]*)>\s*<br\s*\/?>\s*<\/span>/gi, '')
+  // Normalize whitespace (but preserve structure)
+  processed = processed
+    .replace(/>\s+</g, '><') // Remove spaces between tags
+    .trim()
 
   return processed
-    // Remove excessive newlines but keep some for readability
-    .replace(/\n{3,}/g, '\n\n')
-    // Normalize spacing around tags
-    .replace(/>\s+</g, '><')
-    // Trim whitespace at start/end
-    .trim()
 }
