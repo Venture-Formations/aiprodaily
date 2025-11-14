@@ -28,6 +28,16 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
     }
   })
 
+  // Remove leading/trailing whitespace from span content BEFORE processing bullets
+  // This fixes the indent issue where bullets have extra spaces before them
+  processed = processed.replace(/<span([^>]*)>([\s\S]*?)<\/span>/gi, (match, attrs, content) => {
+    // Only trim if the span has white-space-collapse: preserve
+    if (attrs.includes('white-space-collapse: preserve')) {
+      return `<span${attrs}>${content.trim()}</span>`
+    }
+    return match
+  })
+
   // Remove any existing table-based bullets first (from previous normalization)
   processed = processed.replace(/<table[^>]*width="100%"[^>]*cellpadding="0"[^>]*>[\s\S]*?<td[^>]*>•<\/td>[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>[\s\S]*?<\/table>/gi, '• $1<br>')
 
@@ -58,10 +68,11 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
     let hasBullets = false
 
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]
+      // Trim each line to remove leading/trailing whitespace
+      const line = lines[i].trim()
 
-      // Skip <br> tags themselves
-      if (line.match(/^<br\s*\/?>$/i)) {
+      // Skip <br> tags and empty lines
+      if (!line || line.match(/^<br\s*\/?>$/i)) {
         continue
       }
 
@@ -75,17 +86,28 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
         hasBullets = true
         convertedLines.push(`• ${bulletText}<br>`)
       } else if (textContent.length > 0) {
-        // Regular line within paragraph, keep as is
+        // Regular line within paragraph, keep as is (already trimmed)
         convertedLines.push(line)
       }
     }
 
-    // If we found bullets, return just the bullets without paragraph wrapper
+    // If we found bullets, return just the bullets
     if (hasBullets) {
       return convertedLines.join('')
     }
     return match
   })
+
+  // Clean up already-normalized bullets that have leading whitespace and extra spaces
+  // This fixes bullets that are like "<br>  •  text" to be "<br>• text"
+  processed = processed.replace(/(<br\s*\/?>)\s+•\s+/gi, '$1• ')
+
+  // Also fix bullets that have 2+ spaces after the bullet symbol (anywhere, not just after <br>)
+  // This fixes "•  text" to be "• text"
+  processed = processed.replace(/•\s{2,}/g, '• ')
+
+  // Remove empty bold/strong tags that contain only <br> (causes extra line breaks)
+  processed = processed.replace(/<(b|strong)>\s*<br\s*\/?>\s*<\/(b|strong)>/gi, '')
 
   // Remove standalone <br> tags that break sentences
   // Pattern 1: Between spans
