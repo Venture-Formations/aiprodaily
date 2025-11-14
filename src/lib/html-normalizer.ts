@@ -11,6 +11,23 @@
 export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans-serif'): string {
   let processed = html
 
+  // Strip excessive margins from Google Docs <p> tags (keeps paragraph structure but removes indentation)
+  processed = processed.replace(/<p([^>]*?)style="([^"]*?)"([^>]*)>/gi, (match, before, styleContent, after) => {
+    // Remove margin-top and margin-bottom from style
+    const cleanedStyle = styleContent
+      .replace(/margin-top:\s*[^;]+;?/gi, '')
+      .replace(/margin-bottom:\s*[^;]+;?/gi, '')
+      .replace(/;;+/g, ';') // Clean up double semicolons
+      .replace(/;\s*$/, '') // Remove trailing semicolon
+      .trim()
+
+    if (cleanedStyle) {
+      return `<p${before}style="${cleanedStyle}"${after}>`
+    } else {
+      return `<p${before}${after}>`
+    }
+  })
+
   // Handle ordered lists (<ol>) - convert to table
   processed = processed.replace(/<ol[^>]*>/gi, () => {
     return '<table width="100%" cellpadding="0" cellspacing="0" style="margin: 0; padding: 0;">'
@@ -82,6 +99,13 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
     }
     return match
   })
+
+  // Remove standalone <br> tags that break sentences
+  // Pattern 1: Between spans
+  processed = processed.replace(/(<\/span>)\s*<br\s*\/?>\s*(<span[^>]*>)/gi, '$1 $2')
+
+  // Pattern 2: Inside a span that contains only a <br> tag (common in Google Docs paste)
+  processed = processed.replace(/<span([^>]*)>\s*<br\s*\/?>\s*<\/span>/gi, '')
 
   return processed
     // Remove excessive newlines but keep some for readability
