@@ -56,6 +56,10 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
   }
 
   const execCommand = (command: string, value?: string) => {
+    // Ensure editor is focused before executing command
+    if (editorRef.current) {
+      editorRef.current.focus()
+    }
     document.execCommand(command, false, value)
     handleInput()
   }
