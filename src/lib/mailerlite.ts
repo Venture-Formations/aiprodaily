@@ -356,22 +356,45 @@ export class MailerLiteService {
         console.log(`[MailerLite] Received metrics data for campaign ${mailerliteCampaignId}:`, {
           sent: stats.sent,
           delivered: stats.delivered,
-          opened: stats.opened?.count || stats.opened,
-          clicked: stats.clicked?.count || stats.clicked
+          opened: stats.opened?.count || stats.opens_count || stats.opened,
+          clicked: stats.clicked?.count || stats.clicks_count || stats.clicked
         })
         console.log(`[MailerLite] Full stats object:`, JSON.stringify(stats, null, 2))
 
+        // Helper function to extract numeric value from rate fields
+        // MailerLite returns rates as objects with { float: number, string: string }
+        // or sometimes as direct numbers
+        const extractRateValue = (value: any): number => {
+          if (typeof value === 'number') return value
+          if (value && typeof value === 'object' && 'float' in value) {
+            return typeof value.float === 'number' ? value.float : 0
+          }
+          return 0
+        }
+
+        // Helper function to extract count values
+        // MailerLite can return counts as nested objects (opened.count) or direct fields (opens_count)
+        const extractCountValue = (nested: any, direct: any, directAlt?: any): number => {
+          if (typeof nested === 'number') return nested
+          if (typeof direct === 'number') return direct
+          if (typeof directAlt === 'number') return directAlt
+          if (nested && typeof nested === 'object' && 'count' in nested && typeof nested.count === 'number') {
+            return nested.count
+          }
+          return 0
+        }
+
         const metricsUpdate = {
           sent_count: stats.sent || 0,
-          delivered_count: stats.delivered || 0,
-          opened_count: stats.opened?.count || stats.opened || 0,
-          clicked_count: stats.clicked?.count || stats.clicked || 0,
-          bounced_count: stats.bounced?.count || stats.bounced || 0,
-          unsubscribed_count: stats.unsubscribed?.count || stats.unsubscribed || 0,
-          open_rate: stats.opened?.rate || stats.open_rate || 0,
-          click_rate: stats.clicked?.rate || stats.click_rate || 0,
-          bounce_rate: stats.bounced?.rate || stats.bounce_rate || 0,
-          unsubscribe_rate: stats.unsubscribed?.rate || stats.unsubscribe_rate || 0,
+          delivered_count: stats.delivered || stats.delivered_count || 0,
+          opened_count: extractCountValue(stats.opened, stats.opens_count, stats.opened),
+          clicked_count: extractCountValue(stats.clicked, stats.clicks_count, stats.clicked),
+          bounced_count: extractCountValue(stats.bounced, stats.bounces_count, (stats.hard_bounces_count || 0) + (stats.soft_bounces_count || 0)),
+          unsubscribed_count: extractCountValue(stats.unsubscribed, stats.unsubscribes_count),
+          open_rate: extractRateValue(stats.opened?.rate || stats.open_rate),
+          click_rate: extractRateValue(stats.clicked?.rate || stats.click_rate),
+          bounce_rate: extractRateValue(stats.bounced?.rate || stats.bounce_rate || stats.hard_bounce_rate),
+          unsubscribe_rate: extractRateValue(stats.unsubscribed?.rate || stats.unsubscribe_rate),
         }
 
         const { error: updateError } = await supabaseAdmin

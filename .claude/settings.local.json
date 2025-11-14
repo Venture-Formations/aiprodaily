@@ -71,7 +71,8 @@
       "Bash(/dev/null -exec sed -i 's/newsletters(id)/publications(id)/g' {} ;)",
       "Bash(/dev/null -exec sed -i 's/newsletters(slug)/publications(slug)/g' {} ;)",
       "Bash(FROM)",
-      "Bash(cut:*)"
+      "Bash(cut:*)",
+      "Bash(ping:*)"
     ],
     "deny": [],
     "ask": []
