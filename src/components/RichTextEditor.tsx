@@ -54,7 +54,7 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
 
   const formats = [
     'bold', 'italic', 'underline',
-    'list', 'bullet',
+    'list',
     'link',
     'color'
   ]
