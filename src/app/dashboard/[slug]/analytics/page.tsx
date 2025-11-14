@@ -35,7 +35,7 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
   const [issues, setIssues] = useState<issueWithMetrics[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedTimeframe, setSelectedTimeframe] = useState('30')
+  const [selectedTimeframe, setSelectedTimeframe] = useState('7')
   const [feedbackAnalytics, setFeedbackAnalytics] = useState<FeedbackAnalytics | null>(null)
   const [feedbackLoading, setFeedbackLoading] = useState(true)
   const [linkClickAnalytics, setLinkClickAnalytics] = useState<LinkClickAnalytics | null>(null)
@@ -114,12 +114,12 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
     const totals = issuesWithMetrics.reduce((acc, issue) => {
       const metrics = issue.email_metrics!
       return {
-        sent: acc.sent + metrics.sent_count,
-        delivered: acc.delivered + metrics.delivered_count,
-        opened: acc.opened + metrics.opened_count,
-        clicked: acc.clicked + metrics.clicked_count,
-        bounced: acc.bounced + metrics.bounced_count,
-        unsubscribed: acc.unsubscribed + metrics.unsubscribed_count,
+        sent: acc.sent + (metrics.sent_count || 0),
+        delivered: acc.delivered + (metrics.delivered_count || 0),
+        opened: acc.opened + (metrics.opened_count || 0),
+        clicked: acc.clicked + (metrics.clicked_count || 0),
+        bounced: acc.bounced + (metrics.bounced_count || 0),
+        unsubscribed: acc.unsubscribed + (metrics.unsubscribed_count || 0),
       }
     }, { sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, unsubscribed: 0 })
 
@@ -137,7 +137,11 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    // Parse date string directly to avoid timezone conversion issues
+    // dateString is in YYYY-MM-DD format (local date, no time)
+    const [year, month, day] = dateString.split('T')[0].split('-')
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+    return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric'
     })
