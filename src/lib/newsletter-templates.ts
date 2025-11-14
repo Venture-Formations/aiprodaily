@@ -707,6 +707,52 @@ export async function generateAdvertorialSection(issue: any, recordUsage: boolea
         return `<tr><td valign="top" style="padding: 0 0 8px 0; font-family: ${bodyFont}; font-size: 16px; line-height: 24px; color: #333;"><table width="100%" cellpadding="0" cellspacing="0"><tr><td width="20" valign="top" style="padding: 0; font-size: 16px; line-height: 24px;">•</td><td valign="top" style="padding: 0; font-size: 16px; line-height: 24px;">${cleanContent}</td></tr></table></td></tr>`
       })
 
+      // Handle manual bullet points (from Google Docs paste or manual entry)
+      // Split by <br> tags and check each line for bullet points
+      const lines = processed.split(/(<br\s*\/?>)/gi)
+      const convertedLines: string[] = []
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]
+
+        // Skip <br> tags themselves
+        if (line.match(/^<br\s*\/?>$/i)) {
+          continue
+        }
+
+        // Check if this line contains a bullet point at the start (after stripping tags)
+        const textContent = line.replace(/<[^>]+>/g, ' ').trim()
+        const bulletMatch = textContent.match(/^\s*([•\-\*])\s+(.+)/)
+
+        if (bulletMatch && bulletMatch[2].length > 5) {
+          // This is a bullet point line - convert to table layout
+          const bulletText = bulletMatch[2].trim()
+
+          // Preserve any styling from original spans by extracting style attributes
+          const styleMatch = line.match(/style="([^"]+)"/)
+          const originalStyle = styleMatch ? styleMatch[1] : ''
+
+          convertedLines.push(
+            `<div style="margin: 0 0 8px 0; padding: 0;">` +
+            `<table width="100%" cellpadding="0" cellspacing="0">` +
+            `<tr>` +
+            `<td width="20" valign="top" style="padding: 0; font-size: 11pt; line-height: 1.38; font-family: ${bodyFont};">•</td>` +
+            `<td valign="top" style="padding: 0; font-size: 11pt; line-height: 1.38; font-family: ${bodyFont};">${bulletText}</td>` +
+            `</tr>` +
+            `</table>` +
+            `</div>`
+          )
+        } else if (textContent.length > 0) {
+          // Regular line, keep as is
+          convertedLines.push(line)
+        }
+      }
+
+      // Reassemble the processed content
+      if (convertedLines.length > 0) {
+        processed = convertedLines.join('')
+      }
+
       return processed
         // Remove excessive newlines but keep some for readability
         .replace(/\n{3,}/g, '\n\n')
