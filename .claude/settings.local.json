@@ -73,7 +73,8 @@
       "Bash(FROM)",
       "Bash(cut:*)",
       "Bash(ping:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(del scriptsrenormalize-gusto-ad.ts)"
     ],
     "deny": [],
     "ask": []
