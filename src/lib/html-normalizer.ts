@@ -82,8 +82,8 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
         convertedLines.push(
           `<table width="100%" cellpadding="0" cellspacing="0" style="margin: 0 0 4px 0;">` +
           `<tr>` +
-          `<td width="20" valign="top" style="padding: 0; font-size: 11pt; line-height: 1.38; font-family: ${bodyFont}; color: #333;">•</td>` +
-          `<td valign="top" style="padding: 0; font-size: 11pt; line-height: 1.38; font-family: ${bodyFont}; color: #333;">${bulletText}</td>` +
+          `<td width="20" valign="top" style="padding: 0; font-size: 11pt; line-height: 1.38; font-family: ${bodyFont}; font-weight: normal; color: #333;">•</td>` +
+          `<td valign="top" style="padding: 0; font-size: 11pt; line-height: 1.38; font-family: ${bodyFont}; font-weight: normal; color: #333;">${bulletText}</td>` +
           `</tr>` +
           `</table>`
         )
@@ -99,6 +99,17 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
     }
     return match
   })
+
+  // Fix already-normalized bullets that are missing font-weight: normal
+  // This handles bullets that were previously converted to tables but didn't get the font-weight fix
+  processed = processed.replace(
+    /<td\s+width="20"\s+valign="top"\s+style="padding:\s*0;\s*font-size:\s*11pt;\s*line-height:\s*1\.38;\s*font-family:\s*([^;]+);\s*color:\s*#333;">•<\/td>/gi,
+    '<td width="20" valign="top" style="padding: 0; font-size: 11pt; line-height: 1.38; font-family: $1; font-weight: normal; color: #333;">•</td>'
+  )
+  processed = processed.replace(
+    /<td\s+valign="top"\s+style="padding:\s*0;\s*font-size:\s*11pt;\s*line-height:\s*1\.38;\s*font-family:\s*([^;]+);\s*color:\s*#333;">([^<]+)<\/td>/gi,
+    '<td valign="top" style="padding: 0; font-size: 11pt; line-height: 1.38; font-family: $1; font-weight: normal; color: #333;">$2</td>'
+  )
 
   // Remove standalone <br> tags that break sentences
   // Pattern 1: Between spans
