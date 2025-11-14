@@ -464,7 +464,7 @@ export default function AdsManagementPage() {
                   <div className="mb-4 flex gap-4">
                     <div className="flex-1">
                       <div
-                        className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer [&_table]:my-2 [&_table_tr]:align-top [&_table_td:first-child]:pr-2 [&_table_td:first-child]:font-normal"
+                        className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer [&_ol]:list-none [&_ol]:pl-0 [&_ol_li[data-list='bullet']]:pl-6 [&_ol_li[data-list='bullet']]:relative [&_ol_li[data-list='bullet']]:before:content-['•'] [&_ol_li[data-list='bullet']]:before:absolute [&_ol_li[data-list='bullet']]:before:left-0 [&_ol]:counter-reset-[item] [&_ol_li[data-list='ordered']]:pl-6 [&_ol_li[data-list='ordered']]:relative [&_ol_li[data-list='ordered']]:before:content-[counter(item)_'.'] [&_ol_li[data-list='ordered']]:before:absolute [&_ol_li[data-list='ordered']]:before:left-0 [&_ol_li[data-list='ordered']]:counter-increment-[item]"
                         dangerouslySetInnerHTML={{ __html: ad.body }}
                       />
                     </div>
@@ -540,7 +540,7 @@ export default function AdsManagementPage() {
                   <div className="mb-4 flex gap-4">
                     <div className="flex-1">
                       <div
-                        className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer [&_table]:my-2 [&_table_tr]:align-top [&_table_td:first-child]:pr-2 [&_table_td:first-child]:font-normal"
+                        className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer [&_ol]:list-none [&_ol]:pl-0 [&_ol_li[data-list='bullet']]:pl-6 [&_ol_li[data-list='bullet']]:relative [&_ol_li[data-list='bullet']]:before:content-['•'] [&_ol_li[data-list='bullet']]:before:absolute [&_ol_li[data-list='bullet']]:before:left-0 [&_ol]:counter-reset-[item] [&_ol_li[data-list='ordered']]:pl-6 [&_ol_li[data-list='ordered']]:relative [&_ol_li[data-list='ordered']]:before:content-[counter(item)_'.'] [&_ol_li[data-list='ordered']]:before:absolute [&_ol_li[data-list='ordered']]:before:left-0 [&_ol_li[data-list='ordered']]:counter-increment-[item]"
                         dangerouslySetInnerHTML={{ __html: ad.body }}
                       />
                     </div>
@@ -621,7 +621,7 @@ export default function AdsManagementPage() {
                   <div className="mb-4 flex gap-4">
                     <div className="flex-1">
                       <div
-                        className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer [&_table]:my-2 [&_table_tr]:align-top [&_table_td:first-child]:pr-2 [&_table_td:first-child]:font-normal"
+                        className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer [&_ol]:list-none [&_ol]:pl-0 [&_ol_li[data-list='bullet']]:pl-6 [&_ol_li[data-list='bullet']]:relative [&_ol_li[data-list='bullet']]:before:content-['•'] [&_ol_li[data-list='bullet']]:before:absolute [&_ol_li[data-list='bullet']]:before:left-0 [&_ol]:counter-reset-[item] [&_ol_li[data-list='ordered']]:pl-6 [&_ol_li[data-list='ordered']]:relative [&_ol_li[data-list='ordered']]:before:content-[counter(item)_'.'] [&_ol_li[data-list='ordered']]:before:absolute [&_ol_li[data-list='ordered']]:before:left-0 [&_ol_li[data-list='ordered']]:counter-increment-[item]"
                         dangerouslySetInnerHTML={{ __html: ad.body }}
                       />
                     </div>
