@@ -464,7 +464,7 @@ export default function AdsManagementPage() {
                   <div className="mb-4 flex gap-4">
                     <div className="flex-1">
                       <div
-                        className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer"
+                        className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer [&_table]:my-2 [&_table_tr]:align-top [&_table_td:first-child]:pr-2 [&_table_td:first-child]:font-normal"
                         dangerouslySetInnerHTML={{ __html: ad.body }}
                       />
                     </div>
@@ -540,7 +540,7 @@ export default function AdsManagementPage() {
                   <div className="mb-4 flex gap-4">
                     <div className="flex-1">
                       <div
-                        className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer"
+                        className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer [&_table]:my-2 [&_table_tr]:align-top [&_table_td:first-child]:pr-2 [&_table_td:first-child]:font-normal"
                         dangerouslySetInnerHTML={{ __html: ad.body }}
                       />
                     </div>
@@ -621,7 +621,7 @@ export default function AdsManagementPage() {
                   <div className="mb-4 flex gap-4">
                     <div className="flex-1">
                       <div
-                        className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer"
+                        className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer [&_table]:my-2 [&_table_tr]:align-top [&_table_td:first-child]:pr-2 [&_table_td:first-child]:font-normal"
                         dangerouslySetInnerHTML={{ __html: ad.body }}
                       />
                     </div>
