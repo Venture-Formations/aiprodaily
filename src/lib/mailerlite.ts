@@ -263,190 +263,51 @@ export class MailerLiteService {
 
   async importissueMetrics(issueId: string) {
     try {
-      console.log(`[MailerLite] Fetching email_metrics for issue ${issueId}...`)
       const { data: metrics, error: metricsError } = await supabaseAdmin
         .from('email_metrics')
         .select('mailerlite_issue_id')
         .eq('issue_id', issueId)
         .maybeSingle()
 
-      // Handle case where email_metrics doesn't exist - try to find MailerLite campaign
-      if (metricsError || !metrics) {
-        console.log(`[MailerLite] email_metrics record not found for issue ${issueId}, attempting to find MailerLite campaign...`)
-        
-        // Get issue details to search for matching MailerLite campaign
-        const { data: issue, error: issueError } = await supabaseAdmin
-          .from('publication_issues')
-          .select('id, date, newsletters(slug, name)')
-          .eq('id', issueId)
-          .single()
-
-        if (issueError || !issue) {
-          throw new Error(`Failed to fetch issue details: ${issueError?.message || 'Issue not found'}`)
-        }
-
-        const newsletterSlug = (issue as any)?.newsletters?.slug || 'accounting'
-        // Get newsletter name from slug or use default
-        const newsletterNameFromSlug = newsletterSlug.charAt(0).toUpperCase() + newsletterSlug.slice(1)
-        const newsletterName = (issue as any)?.newsletters?.name || newsletterNameFromSlug
-        const issueDate = issue.date
-
-        console.log(`[MailerLite] Searching for MailerLite campaign matching issue date ${issueDate}...`)
-        
-        // Search MailerLite for campaigns matching the issue date
-        // Campaign names are typically formatted like "Accounting Newsletter: 2025-11-14"
-        const expectedCampaignName = `${newsletterName} Newsletter: ${issueDate}`
-        
-        let mailerliteCampaignId: string | null = null
-        let page = 1
-        const perPage = 100
-        
-        while (!mailerliteCampaignId && page <= 5) { // Search up to 5 pages
-          try {
-            const campaignsResponse = await mailerliteClient.get('/campaigns', {
-              params: {
-                page: page,
-                limit: perPage
-              }
-            })
-
-            const campaigns = campaignsResponse?.data?.data || []
-            console.log(`[MailerLite] Searching page ${page}, found ${campaigns.length} campaigns`)
-            
-            // Look for exact name match
-            const matchingCampaign = campaigns.find((campaign: any) => 
-              campaign.name === expectedCampaignName || 
-              campaign.name?.includes(issueDate)
-            )
-
-            if (matchingCampaign) {
-              mailerliteCampaignId = String(matchingCampaign.id)
-              console.log(`[MailerLite] Found matching campaign: ${matchingCampaign.name} (ID: ${mailerliteCampaignId})`)
-              break
-            }
-
-            if (campaigns.length < perPage) {
-              break // Last page
-            }
-            page++
-          } catch (campaignsError: any) {
-            console.error(`[MailerLite] Error searching campaigns:`, campaignsError?.response?.data || campaignsError?.message)
-            break
-          }
-        }
-
-        if (!mailerliteCampaignId) {
-          throw new Error(`MailerLite campaign not found for issue ${issueId} (searched for: "${expectedCampaignName}")`)
-        }
-
-        // Create email_metrics record with the found MailerLite campaign ID
-        console.log(`[MailerLite] Creating email_metrics record for issue ${issueId} with mailerlite_issue_id ${mailerliteCampaignId}...`)
-        const { error: insertError } = await supabaseAdmin
-          .from('email_metrics')
-          .insert({
-            issue_id: issueId,
-            mailerlite_issue_id: mailerliteCampaignId
-          })
-
-        if (insertError) {
-          console.error(`[MailerLite] Failed to create email_metrics record:`, insertError)
-          throw new Error(`Failed to create email_metrics record: ${insertError.message}`)
-        }
-
-        console.log(`[MailerLite] Successfully created email_metrics record for issue ${issueId}`)
+      // Skip issues without email_metrics records
+      if (metricsError || !metrics || !metrics.mailerlite_issue_id) {
+        return { skipped: true, reason: 'No email_metrics record found' }
       }
 
-      // Now fetch metrics again to get the mailerlite_issue_id
-      const { data: finalMetrics, error: finalMetricsError } = await supabaseAdmin
-        .from('email_metrics')
-        .select('mailerlite_issue_id')
-        .eq('issue_id', issueId)
-        .single()
-
-      if (finalMetricsError || !finalMetrics?.mailerlite_issue_id) {
-        throw new Error(`Failed to fetch mailerlite_issue_id: ${finalMetricsError?.message || 'ID not found'}`)
-      }
-
-      const mailerliteCampaignId = finalMetrics.mailerlite_issue_id
-      console.log(`[MailerLite] Found mailerlite_issue_id: ${mailerliteCampaignId} for issue ${issueId}`)
+      const mailerliteCampaignId = metrics.mailerlite_issue_id
       
       // Try multiple possible endpoints for campaign reports
-      // MailerLite API might use different endpoint formats
       let response
-      let lastError: any = null
       
-      // Try endpoint 1: /campaigns/{id}/reports (current)
+      // Try endpoint 1: /campaigns/{id}/reports
       try {
-        console.log(`[MailerLite] Trying endpoint: /campaigns/${mailerliteCampaignId}/reports`)
         response = await mailerliteClient.get(`/campaigns/${mailerliteCampaignId}/reports`)
-        console.log(`[MailerLite] Success with /reports endpoint`)
       } catch (error: any) {
-        lastError = error
-        console.log(`[MailerLite] /reports endpoint failed: ${error?.response?.status} ${error?.response?.statusText}`)
-        console.log(`[MailerLite] Error response data:`, JSON.stringify(error?.response?.data, null, 2))
-        
         // Try endpoint 2: /campaigns/{id} (stats might be included in campaign data)
         try {
-          console.log(`[MailerLite] Trying alternative endpoint: /campaigns/${mailerliteCampaignId}`)
           const campaignResponse = await mailerliteClient.get(`/campaigns/${mailerliteCampaignId}`)
-          console.log(`[MailerLite] Campaign data keys:`, Object.keys(campaignResponse.data?.data || {}))
-          console.log(`[MailerLite] Full campaign response:`, JSON.stringify(campaignResponse.data, null, 2))
-          
-          // Check if stats are in the campaign response
           if (campaignResponse.data?.data?.stats || campaignResponse.data?.data?.statistics) {
-            console.log(`[MailerLite] Found stats in campaign data`)
-            response = campaignResponse // Use this response
+            response = campaignResponse
           } else {
             throw new Error('Stats not found in campaign response')
           }
         } catch (campaignError: any) {
-          console.log(`[MailerLite] /campaigns/{id} endpoint also failed: ${campaignError?.response?.status}`)
-          console.log(`[MailerLite] Campaign error response:`, JSON.stringify(campaignError?.response?.data, null, 2))
-          
-          // Handle 404 - but now we know campaigns exist, so this is likely an endpoint issue
           if (error?.response?.status === 404) {
-            console.error(`[MailerLite] Campaign ${mailerliteCampaignId} exists but reports endpoint returns 404`)
-            console.error(`[MailerLite] This suggests the reports endpoint format may be incorrect`)
-            console.error(`[MailerLite] Full error:`, JSON.stringify({
-              url: error.config?.url,
-              method: error.config?.method,
-              status: error.response?.status,
-              statusText: error.response?.statusText,
-              data: error.response?.data
-            }, null, 2))
-            
-            // Don't clear the ID - campaigns exist, this is an API endpoint issue
-            throw new Error(`Campaign exists but reports endpoint not found. Possible API format change. Status: 404`)
+            return { skipped: true, reason: 'Campaign not found in MailerLite (404)' }
           }
-          throw error // Re-throw original error
+          throw error
         }
       }
 
-      console.log(`[MailerLite] Response status: ${response.status} for campaign ${mailerliteCampaignId}`)
-
       if (response.status === 200) {
         const data = response.data.data
-        
-        // Handle different response formats
-        // Format 1: Direct reports endpoint (data contains stats directly)
-        // Format 2: Campaign endpoint (data.stats or data.statistics contains stats)
         let stats = data
         
         if (data.stats) {
-          console.log(`[MailerLite] Found stats in data.stats`)
           stats = data.stats
         } else if (data.statistics) {
-          console.log(`[MailerLite] Found stats in data.statistics`)
           stats = data.statistics
         }
-        
-        console.log(`[MailerLite] Received metrics data for campaign ${mailerliteCampaignId}:`, {
-          sent: stats.sent,
-          delivered: stats.delivered,
-          opened: stats.opened?.count || stats.opens_count || stats.opened,
-          clicked: stats.clicked?.count || stats.clicks_count || stats.clicked
-        })
-        console.log(`[MailerLite] Full stats object:`, JSON.stringify(stats, null, 2))
 
         // Helper function to extract numeric value from rate fields
         // MailerLite returns rates as objects with { float: number, string: string }
@@ -490,32 +351,21 @@ export class MailerLiteService {
           .eq('issue_id', issueId)
 
         if (updateError) {
-          console.error(`[MailerLite] Error updating metrics for issue ${issueId}:`, updateError)
           throw new Error(`Failed to update metrics: ${updateError.message}`)
         }
 
-        console.log(`[MailerLite] Successfully updated metrics for issue ${issueId}`)
         return metricsUpdate
       }
 
-      console.error(`[MailerLite] Unexpected response status ${response.status} for campaign ${mailerliteCampaignId}`)
       throw new Error(`Failed to fetch metrics from MailerLite: Status ${response.status}`)
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error(`[MailerLite] Error importing metrics for issue ${issueId}:`, errorMessage)
-      
-      // Log more details if it's an Axios error
-      if (error && typeof error === 'object' && 'response' in error) {
-        const axiosError = error as any
-        console.error(`[MailerLite] Axios error details:`, {
-          status: axiosError.response?.status,
-          statusText: axiosError.response?.statusText,
-          data: axiosError.response?.data,
-          url: axiosError.config?.url
-        })
+      // Re-throw skip indicators as-is
+      if (error && typeof error === 'object' && 'skipped' in error) {
+        throw error
       }
-
+      
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       await this.logError('Failed to import issue metrics', {
         issueId,
         error: errorMessage
