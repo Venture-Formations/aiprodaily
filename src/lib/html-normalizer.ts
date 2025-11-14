@@ -3,7 +3,7 @@
 
 /**
  * Normalizes HTML content for email clients by converting lists and manual bullets
- * to table-based layouts that render consistently across all email clients.
+ * to simple text with bullet prefixes ("• ").
  *
  * This should be called when SAVING advertorial content to the database,
  * not during email generation.
@@ -28,18 +28,14 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
     }
   })
 
-  // Handle ordered lists (<ol>) - convert to table
-  processed = processed.replace(/<ol[^>]*>/gi, () => {
-    return '<table width="100%" cellpadding="0" cellspacing="0" style="margin: 0; padding: 0;">'
-  })
-  processed = processed.replace(/<\/ol>/gi, '</table>')
+  // Remove any existing table-based bullets first (from previous normalization)
+  processed = processed.replace(/<table[^>]*width="100%"[^>]*cellpadding="0"[^>]*>[\s\S]*?<td[^>]*>•<\/td>[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>[\s\S]*?<\/table>/gi, '• $1<br>')
 
-  // Convert unordered lists (<ul>) - convert to table
-  processed = processed
-    .replace(/<ul[^>]*>/gi, '<table width="100%" cellpadding="0" cellspacing="0" style="margin: 0; padding: 0;">')
-    .replace(/<\/ul>/gi, '</table>')
+  // Convert <ul> and <ol> lists to simple text with bullets
+  processed = processed.replace(/<[ou]l[^>]*>/gi, '')
+  processed = processed.replace(/<\/[ou]l>/gi, '')
 
-  // Convert <li> tags to table rows for better email client compatibility
+  // Convert <li> tags to simple bullet points
   processed = processed.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (match, content) => {
     // Strip any leading/trailing <br> tags and whitespace
     let cleanContent = content.trim()
@@ -50,8 +46,7 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
     // Replace remaining <br> tags with spaces to keep text inline
     cleanContent = cleanContent.replace(/<br\s*\/?>/gi, ' ')
 
-    // Use table-based layout for reliable bullet point rendering across email clients
-    return `<tr><td valign="top" style="padding: 0 0 8px 0; font-family: ${bodyFont}; font-size: 16px; line-height: 24px; color: #333;"><table width="100%" cellpadding="0" cellspacing="0"><tr><td width="20" valign="top" style="padding: 0; font-size: 16px; line-height: 24px;">•</td><td valign="top" style="padding: 0; font-size: 16px; line-height: 24px;">${cleanContent}</td></tr></table></td></tr>`
+    return `• ${cleanContent}<br>`
   })
 
   // Handle manual bullet points (from Google Docs paste or manual entry)
@@ -75,41 +70,22 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
       const bulletMatch = textContent.match(/^\s*([•\-\*])\s+(.+)/)
 
       if (bulletMatch && bulletMatch[2].length > 5) {
-        // This is a bullet point line - convert to table layout
+        // This is a bullet point line - keep it simple with just "• text"
         const bulletText = bulletMatch[2].trim()
         hasBullets = true
-
-        convertedLines.push(
-          `<table width="100%" cellpadding="0" cellspacing="0" style="margin: 0 0 4px 0;">` +
-          `<tr>` +
-          `<td width="20" valign="top" style="padding: 0; font-size: 11pt; line-height: 1.38; font-family: ${bodyFont}; font-weight: normal; color: #333;">•</td>` +
-          `<td valign="top" style="padding: 0; font-size: 11pt; line-height: 1.38; font-family: ${bodyFont}; font-weight: normal; color: #333;">${bulletText}</td>` +
-          `</tr>` +
-          `</table>`
-        )
+        convertedLines.push(`• ${bulletText}<br>`)
       } else if (textContent.length > 0) {
         // Regular line within paragraph, keep as is
         convertedLines.push(line)
       }
     }
 
-    // If we found bullets, wrap in a div and return, otherwise return original paragraph
+    // If we found bullets, return just the bullets without paragraph wrapper
     if (hasBullets) {
-      return `<div style="margin: 0; padding: 0;">${convertedLines.join('')}</div>`
+      return convertedLines.join('')
     }
     return match
   })
-
-  // Fix already-normalized bullets that are missing font-weight: normal
-  // This handles bullets that were previously converted to tables but didn't get the font-weight fix
-  processed = processed.replace(
-    /<td\s+width="20"\s+valign="top"\s+style="padding:\s*0;\s*font-size:\s*11pt;\s*line-height:\s*1\.38;\s*font-family:\s*([^;]+);\s*color:\s*#333;">•<\/td>/gi,
-    '<td width="20" valign="top" style="padding: 0; font-size: 11pt; line-height: 1.38; font-family: $1; font-weight: normal; color: #333;">•</td>'
-  )
-  processed = processed.replace(
-    /<td\s+valign="top"\s+style="padding:\s*0;\s*font-size:\s*11pt;\s*line-height:\s*1\.38;\s*font-family:\s*([^;]+);\s*color:\s*#333;">([^<]+)<\/td>/gi,
-    '<td valign="top" style="padding: 0; font-size: 11pt; line-height: 1.38; font-family: $1; font-weight: normal; color: #333;">$2</td>'
-  )
 
   // Remove standalone <br> tags that break sentences
   // Pattern 1: Between spans
