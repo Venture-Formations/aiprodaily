@@ -24,7 +24,7 @@ interface LinkClickAnalytics {
   clicksBySection: { [key: string]: number }
   uniqueUsersBySection: { [key: string]: number }
   dailyClicks: { [key: string]: number }
-  topUrls: { url: string; section: string; clicks: number }[]
+  topUrls: { url: string; section: string; clicks: number; unique_users: number }[]
   clicksByissue: { [key: string]: number }
   recentClicks: any[]
   dateRange: { start: string; end: string }
@@ -136,11 +136,14 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
 
     console.log('[Analytics] Totals:', totals)
 
+    // Use sent_count as denominator when delivered_count is 0 or not available
+    const denominator = totals.delivered > 0 ? totals.delivered : totals.sent
+
     const result = {
-      avgOpenRate: totals.delivered > 0 ? (totals.opened / totals.delivered) * 100 : 0,
-      avgClickRate: totals.delivered > 0 ? (totals.clicked / totals.delivered) * 100 : 0,
+      avgOpenRate: denominator > 0 ? (totals.opened / denominator) * 100 : 0,
+      avgClickRate: denominator > 0 ? (totals.clicked / denominator) * 100 : 0,
       avgBounceRate: totals.sent > 0 ? (totals.bounced / totals.sent) * 100 : 0,
-      avgUnsubscribeRate: totals.delivered > 0 ? (totals.unsubscribed / totals.delivered) * 100 : 0,
+      avgUnsubscribeRate: denominator > 0 ? (totals.unsubscribed / denominator) * 100 : 0,
       totalSent: totals.sent,
       totalDelivered: totals.delivered,
       totalOpened: totals.opened,
@@ -523,7 +526,7 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
                           <tr>
                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">URL</th>
                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Section</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Clicks</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unique Clickers</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -543,7 +546,7 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
                                 {urlData.section}
                               </td>
                               <td className="px-4 py-2 text-sm text-gray-900">
-                                {urlData.clicks}
+                                {urlData.unique_users}
                               </td>
                             </tr>
                           ))}
@@ -567,16 +570,16 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Newsletter industry avg open rate:</span>
-                        <span className="font-medium">21.3%</span>
+                        <span className="font-medium">55%</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Newsletter industry avg click rate:</span>
-                        <span className="font-medium">2.6%</span>
+                        <span className="font-medium">8%</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Your average open rate:</span>
                         <span className={`font-medium ${
-                          averages.avgOpenRate > 21.3 ? 'text-green-600' : 'text-red-600'
+                          averages.avgOpenRate > 55 ? 'text-green-600' : 'text-red-600'
                         }`}>
                           {averages.avgOpenRate.toFixed(1)}%
                         </span>
@@ -584,7 +587,7 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
                       <div className="flex justify-between">
                         <span className="text-gray-600">Your average click rate:</span>
                         <span className={`font-medium ${
-                          averages.avgClickRate > 2.6 ? 'text-green-600' : 'text-red-600'
+                          averages.avgClickRate > 8 ? 'text-green-600' : 'text-red-600'
                         }`}>
                           {averages.avgClickRate.toFixed(1)}%
                         </span>

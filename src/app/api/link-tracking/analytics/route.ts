@@ -95,22 +95,24 @@ export async function GET(request: NextRequest) {
       dailyClicks[date] = (dailyClicks[date] || 0) + 1
     })
 
-    // Calculate top clicked URLs
-    const urlClickCounts: { [key: string]: { count: number; section: string } } = {}
+    // Calculate top clicked URLs with unique users
+    const urlClickCounts: { [key: string]: { count: number; section: string; uniqueUsers: Set<string> } } = {}
     clicks?.forEach(click => {
       if (!urlClickCounts[click.link_url]) {
-        urlClickCounts[click.link_url] = { count: 0, section: click.link_section }
+        urlClickCounts[click.link_url] = { count: 0, section: click.link_section, uniqueUsers: new Set() }
       }
       urlClickCounts[click.link_url].count++
+      urlClickCounts[click.link_url].uniqueUsers.add(click.subscriber_email)
     })
 
     const topUrls = Object.entries(urlClickCounts)
       .map(([url, data]) => ({
         url,
         section: data.section,
-        clicks: data.count
+        clicks: data.count,
+        unique_users: data.uniqueUsers.size
       }))
-      .sort((a, b) => b.clicks - a.clicks)
+      .sort((a, b) => b.unique_users - a.unique_users)
       .slice(0, 10)
 
     // Calculate click-through rate by issue
