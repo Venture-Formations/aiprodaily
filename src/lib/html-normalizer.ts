@@ -66,12 +66,12 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
     // Check if this paragraph contains manual bullets
     if (/•/.test(content)) {
       const lines = content.split(/<br\s*\/?>/gi)
-      const hasManualBullets = lines.some(line => /^\s*•\s+/.test(line.replace(/<[^>]+>/g, '')))
+      const hasManualBullets = lines.some((line: string) => /^\s*•\s+/.test(line.replace(/<[^>]+>/g, '')))
 
       if (hasManualBullets) {
         const tableRows = lines
-          .filter(line => line.trim())
-          .map(line => {
+          .filter((line: string) => line.trim())
+          .map((line: string) => {
             const cleanLine = line.replace(/<[^>]+>/g, '').trim()
             const bulletMatch = cleanLine.match(/^\s*•\s+(.+)/)
             if (bulletMatch) {
