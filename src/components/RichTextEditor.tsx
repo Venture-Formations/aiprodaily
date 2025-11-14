@@ -189,6 +189,23 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
         <div className="w-px h-6 bg-gray-300 mx-1"></div>
         <button
           type="button"
+          onClick={() => execCommand('insertUnorderedList')}
+          className="px-3 py-1 hover:bg-gray-200 rounded"
+          title="Bullet List"
+        >
+          •
+        </button>
+        <button
+          type="button"
+          onClick={() => execCommand('insertOrderedList')}
+          className="px-3 py-1 hover:bg-gray-200 rounded"
+          title="Numbered List"
+        >
+          1.
+        </button>
+        <div className="w-px h-6 bg-gray-300 mx-1"></div>
+        <button
+          type="button"
           onClick={openLinkModal}
           className="px-3 py-1 hover:bg-gray-200 rounded"
           title="Insert Link"
