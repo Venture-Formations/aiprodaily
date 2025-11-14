@@ -7,7 +7,8 @@
     "build": "next build",
     "build:all": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "migrate:normalize-ads": "npx tsx scripts/migrate-normalize-ads.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.67.0",
