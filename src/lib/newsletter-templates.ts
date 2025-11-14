@@ -4,6 +4,7 @@
 import { supabaseAdmin } from './supabase'
 import { wrapTrackingUrl } from './url-tracking'
 import { AdScheduler } from './ad-scheduler'
+import { normalizeEmailHtml } from './html-normalizer'
 
 // ==================== UTILITY FUNCTIONS ====================
 
@@ -674,8 +675,8 @@ export async function generateAdvertorialSection(issue: any, recordUsage: boolea
       ? `<tr><td style='padding: 0 12px; text-align: center;'><a href='${trackedUrl}'><img src='${imageUrl}' alt='${selectedAd.title}' style='max-width: 100%; max-height: 500px; border-radius: 4px; display: block; margin: 0 auto;'></a></td></tr>`
       : ''
 
-    // Process ad body: make the last sentence a hyperlink
-    let processedBody = selectedAd.body || ''
+    // Process ad body: normalize HTML for email compatibility, then make the last sentence a hyperlink
+    let processedBody = normalizeEmailHtml(selectedAd.body || '')
     if (buttonUrl !== '#' && processedBody) {
       // Strip HTML to get plain text
       const plainText = processedBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()

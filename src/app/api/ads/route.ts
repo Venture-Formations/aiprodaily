@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { normalizeEmailHtml } from '@/lib/html-normalizer'
 
 // GET all ads with optional status filter
 export async function GET(request: NextRequest) {
@@ -157,14 +156,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Normalize HTML for email compatibility (convert lists and bullets to table layout)
-    const normalizedBody = normalizeEmailHtml(adBody)
-
     const { data: ad, error } = await supabaseAdmin
       .from('advertisements')
       .insert({
         title,
-        body: normalizedBody,
+        body: adBody,
         word_count,
         button_text: button_text || '',
         button_url,

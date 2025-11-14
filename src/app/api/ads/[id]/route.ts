@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { normalizeEmailHtml } from '@/lib/html-normalizer'
 
 // GET single ad
 export async function GET(
@@ -42,16 +41,10 @@ export async function PATCH(
     const { id } = await context.params
     const body = await request.json()
 
-    // Normalize HTML body if it's being updated (for email compatibility)
-    const updateData = { ...body }
-    if (updateData.body) {
-      updateData.body = normalizeEmailHtml(updateData.body)
-    }
-
     const { data: ad, error } = await supabaseAdmin
       .from('advertisements')
       .update({
-        ...updateData,
+        ...body,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
