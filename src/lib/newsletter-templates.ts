@@ -172,22 +172,37 @@ export function getEventEmoji(title: string, venue: string): string {
 
 // ==================== HEADER ====================
 
-export async function generateNewsletterHeader(formattedDate: string, issueDate?: string, issueId?: string): Promise<string> {
+export async function generateNewsletterHeader(formattedDate: string, issueDate?: string, issueId?: string, publication_id?: string): Promise<string> {
   // Fetch business settings for header image, primary color, and website URL
-  const { data: settings } = await supabaseAdmin
-    .from('app_settings')
-    .select('key, value')
-    .in('key', ['header_image_url', 'primary_color', 'newsletter_name', 'website_url'])
+  let headerImageUrl = 'https://raw.githubusercontent.com/VFDavid/STCScoop/refs/heads/main/STCSCOOP_Logo_824X148_clear.png'
+  let primaryColor = '#1877F2'
+  let newsletterName = 'St. Cloud Scoop'
+  let websiteUrl = 'https://www.aiaccountingdaily.com'
 
-  const settingsMap: Record<string, string> = {}
-  settings?.forEach(setting => {
-    settingsMap[setting.key] = setting.value
-  })
+  if (publication_id) {
+    const settings = await getPublicationBusinessSettings(publication_id)
+    headerImageUrl = settings.header_image_url || headerImageUrl
+    primaryColor = settings.primary_color || primaryColor
+    newsletterName = settings.newsletter_name || newsletterName
+    websiteUrl = settings.website_url || websiteUrl
+  } else {
+    // Fallback to old behavior (logs warning so we know what to update)
+    console.warn('[SETTINGS] generateNewsletterHeader called without publication_id - update caller')
+    const { data: settingsData } = await supabaseAdmin
+      .from('app_settings')
+      .select('key, value')
+      .in('key', ['header_image_url', 'primary_color', 'newsletter_name', 'website_url'])
 
-  const headerImageUrl = settingsMap.header_image_url || 'https://raw.githubusercontent.com/VFDavid/STCScoop/refs/heads/main/STCSCOOP_Logo_824X148_clear.png'
-  const primaryColor = settingsMap.primary_color || '#1877F2'
-  const newsletterName = settingsMap.newsletter_name || 'St. Cloud Scoop'
-  const websiteUrl = settingsMap.website_url || 'https://www.aiaccountingdaily.com'
+    const settingsMap: Record<string, string> = {}
+    settingsData?.forEach(setting => {
+      settingsMap[setting.key] = setting.value
+    })
+
+    headerImageUrl = settingsMap.header_image_url || headerImageUrl
+    primaryColor = settingsMap.primary_color || primaryColor
+    newsletterName = settingsMap.newsletter_name || newsletterName
+    websiteUrl = settingsMap.website_url || websiteUrl
+  }
 
   // Add tracking to Sign Up link if issue info available
   const signUpUrl = issueDate
@@ -330,7 +345,8 @@ async function fetchBusinessSettings(publicationId?: string): Promise<{
 export async function generateWelcomeSection(
   intro: string | null,
   tagline: string | null,
-  summary: string | null
+  summary: string | null,
+  publication_id?: string
 ): Promise<string> {
   // Skip if all 3 parts are empty
   if ((!intro || intro.trim() === '') &&
@@ -340,7 +356,7 @@ export async function generateWelcomeSection(
   }
 
   // Fetch fonts from business settings
-  const { bodyFont } = await fetchBusinessSettings()
+  const { bodyFont } = await fetchBusinessSettings(publication_id)
 
   // Prepend personalized greeting to intro
   const greeting = `Hey, {$name|default('Accounting Pro')}!`
@@ -380,13 +396,13 @@ export async function generateWelcomeSection(
 
 // ==================== PRIMARY ARTICLES SECTION ====================
 
-export async function generatePrimaryArticlesSection(articles: any[], issueDate: string, issueId: string | undefined, sectionName: string): Promise<string> {
+export async function generatePrimaryArticlesSection(articles: any[], issueDate: string, issueId: string | undefined, sectionName: string, publication_id?: string): Promise<string> {
   if (!articles || articles.length === 0) {
     return ''
   }
 
   // Fetch colors and fonts from business settings
-  const { primaryColor, secondaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
+  const { primaryColor, secondaryColor, headingFont, bodyFont } = await fetchBusinessSettings(publication_id)
 
   const articlesHtml = articles.map((article) => {
     const headline = article.headline || 'No headline'
@@ -1161,23 +1177,44 @@ export async function generateRoadWorkSection(issue: any): Promise<string> {
 
 // ==================== FOOTER ====================
 
-export async function generateNewsletterFooter(issueDate?: string, issueId?: string): Promise<string> {
+export async function generateNewsletterFooter(issueDate?: string, issueId?: string, publication_id?: string): Promise<string> {
   // Fetch business settings for primary color, newsletter name, business name, and social media settings
-  const { data: settings } = await supabaseAdmin
-    .from('app_settings')
-    .select('key, value')
-    .in('key', [
-      'primary_color', 'newsletter_name', 'business_name',
-      'facebook_enabled', 'facebook_url',
-      'twitter_enabled', 'twitter_url',
-      'linkedin_enabled', 'linkedin_url',
-      'instagram_enabled', 'instagram_url'
-    ])
+  let settingsMap: Record<string, string> = {}
 
-  const settingsMap: Record<string, string> = {}
-  settings?.forEach(setting => {
-    settingsMap[setting.key] = setting.value
-  })
+  if (publication_id) {
+    const { data: settings } = await supabaseAdmin
+      .from('publication_settings')
+      .select('key, value')
+      .eq('publication_id', publication_id)
+      .in('key', [
+        'primary_color', 'newsletter_name', 'business_name',
+        'facebook_enabled', 'facebook_url',
+        'twitter_enabled', 'twitter_url',
+        'linkedin_enabled', 'linkedin_url',
+        'instagram_enabled', 'instagram_url'
+      ])
+
+    settings?.forEach(setting => {
+      settingsMap[setting.key] = setting.value
+    })
+  } else {
+    // Fallback to old behavior (logs warning so we know what to update)
+    console.warn('[SETTINGS] generateNewsletterFooter called without publication_id - update caller')
+    const { data: settings } = await supabaseAdmin
+      .from('app_settings')
+      .select('key, value')
+      .in('key', [
+        'primary_color', 'newsletter_name', 'business_name',
+        'facebook_enabled', 'facebook_url',
+        'twitter_enabled', 'twitter_url',
+        'linkedin_enabled', 'linkedin_url',
+        'instagram_enabled', 'instagram_url'
+      ])
+
+    settings?.forEach(setting => {
+      settingsMap[setting.key] = setting.value
+    })
+  }
 
   const primaryColor = settingsMap.primary_color || '#1877F2'
   const newsletterName = settingsMap.newsletter_name || 'St. Cloud Scoop'

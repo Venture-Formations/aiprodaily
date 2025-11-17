@@ -398,14 +398,15 @@ export class MailerLiteService {
     // Use the modular template functions with tracking - SAME AS PREVIEW
     // mailerlite_issue_id might not exist yet during review, so it's optional
     const mailerliteId = (issue as any).mailerlite_issue_id || undefined
-    const header = await generateNewsletterHeader(formattedDate, issue.date, mailerliteId)
-    const footer = await generateNewsletterFooter(issue.date, mailerliteId)
+    const header = await generateNewsletterHeader(formattedDate, issue.date, mailerliteId, issue.publication_id)
+    const footer = await generateNewsletterFooter(issue.date, mailerliteId, issue.publication_id)
 
     // Generate welcome section (if it exists)
     const welcomeHtml = await generateWelcomeSection(
       issue.welcome_intro || null,
       issue.welcome_tagline || null,
-      issue.welcome_summary || null
+      issue.welcome_summary || null,
+      issue.publication_id
     )
 
     // Review banner for review issues
@@ -436,7 +437,7 @@ export class MailerLiteService {
         // Check section_type to determine what to render
         if (section.section_type === 'primary_articles' && activeArticles.length > 0) {
           const { generatePrimaryArticlesSection } = await import('./newsletter-templates')
-          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, issue.date, issue.id, section.name)
+          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, issue.date, issue.id, section.name, issue.publication_id)
           sectionsHtml += primaryHtml
         }
         else if (section.section_type === 'secondary_articles') {

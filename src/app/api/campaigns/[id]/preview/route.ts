@@ -177,14 +177,15 @@ async function generateNewsletterHtml(issue: any): Promise<string> {
     // Generate modular HTML sections with tracking parameters
     // mailerlite_issue_id might not exist yet, so it's optional
     const mailerliteId = (issue as any).mailerlite_issue_id || undefined
-    const header = await generateNewsletterHeader(formattedDate, issue.date, mailerliteId)
-    const footer = await generateNewsletterFooter(issue.date, mailerliteId)
+    const header = await generateNewsletterHeader(formattedDate, issue.date, mailerliteId, issue.publication_id)
+    const footer = await generateNewsletterFooter(issue.date, mailerliteId, issue.publication_id)
 
     // Generate welcome section (if it exists)
     const welcomeHtml = await generateWelcomeSection(
       issue.welcome_intro || null,
       issue.welcome_tagline || null,
-      issue.welcome_summary || null
+      issue.welcome_summary || null,
+      issue.publication_id
     )
 
     // Section ID constants (reference IDs from newsletter_sections table)
@@ -201,7 +202,7 @@ async function generateNewsletterHtml(issue: any): Promise<string> {
       for (const section of sections) {
         // Check section_type to determine what to render
         if (section.section_type === 'primary_articles' && activeArticles.length > 0) {
-          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, issue.date, issue.id, section.name)
+          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, issue.date, issue.id, section.name, issue.publication_id)
           sectionsHtml += primaryHtml
         }
         else if (section.section_type === 'secondary_articles') {
