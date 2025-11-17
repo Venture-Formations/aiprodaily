@@ -185,10 +185,8 @@ export async function PATCH(request: NextRequest) {
       updated_at: new Date().toISOString()
     }
 
-    // Only update ai_provider if it was explicitly provided
-    if (ai_provider) {
-      updateData.ai_provider = ai_provider
-    }
+    // Note: ai_provider is not stored in publication_settings table
+    // It's embedded in the prompt JSON itself (e.g., "model": "gpt-4o" or "claude-sonnet")
 
     const { error } = await supabaseAdmin
       .from('publication_settings')
