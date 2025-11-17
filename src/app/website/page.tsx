@@ -29,8 +29,8 @@ export default async function WebsiteHome() {
     publicationId = firstPub?.id || ''
   }
 
-  // Fetch settings from publication_settings
-  const settings = await getPublicationSettings(publicationId, [
+  // Fetch settings from publication_settings (publicationId is guaranteed to be string now)
+  const settings = await getPublicationSettings(publicationId || '', [
     'website_header_url',
     'logo_url',
     'newsletter_name',

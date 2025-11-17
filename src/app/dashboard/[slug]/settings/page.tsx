@@ -2162,7 +2162,7 @@ function AIPromptsSettings() {
   const [saving, setSaving] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [expandedPrompt, setExpandedPrompt] = useState<string | null>(null)
-  const [editingPrompt, setEditingPrompt] = useState<{key: string, value: string, ai_provider: string} | null>(null)
+  const [editingPrompt, setEditingPrompt] = useState<{key: string, value: string} | null>(null)
   const [editingWeight, setEditingWeight] = useState<{key: string, value: string} | null>(null)
   const [editingPrimaryName, setEditingPrimaryName] = useState<{number: number, value: string} | null>(null)
   const [editingSecondaryName, setEditingSecondaryName] = useState<{number: number, value: string} | null>(null)
@@ -2282,6 +2282,20 @@ function AIPromptsSettings() {
     }
   }
 
+  // Helper function to detect AI provider from prompt value (auto-detect from model name)
+  const detectProviderFromPrompt = (value: any): 'openai' | 'claude' => {
+    try {
+      const parsed = typeof value === 'string' ? JSON.parse(value) : value
+      const model = (parsed?.model || '').toLowerCase()
+      if (model.includes('claude') || model.includes('sonnet') || model.includes('opus') || model.includes('haiku')) {
+        return 'claude'
+      }
+    } catch (e) {
+      // Not valid JSON, default to openai
+    }
+    return 'openai'
+  }
+
   // Helper function to format JSON with actual newlines
   const formatJSON = (value: any, prettyPrint: boolean): string => {
     // If value is a string, try to parse it as JSON first
@@ -2332,7 +2346,7 @@ function AIPromptsSettings() {
     } else {
       valueStr = String(prompt.value)
     }
-    setEditingPrompt({ key: prompt.key, value: valueStr, ai_provider: prompt.ai_provider || 'openai' })
+    setEditingPrompt({ key: prompt.key, value: valueStr })
     setExpandedPrompt(prompt.key)
   }
 
@@ -2352,8 +2366,7 @@ function AIPromptsSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           key: editingPrompt.key,
-          value: editingPrompt.value,
-          ai_provider: editingPrompt.ai_provider
+          value: editingPrompt.value
         })
       })
 
@@ -2499,10 +2512,9 @@ function AIPromptsSettings() {
       // If currently editing this prompt, use the current content from the text box
       if (editingPrompt?.key === key && editingPrompt?.value) {
         testUrl += `&promptContent=${encodeURIComponent(editingPrompt.value)}`
-        // Include the selected provider from the dropdown
-        if (editingPrompt.ai_provider) {
-          testUrl += `&provider=${editingPrompt.ai_provider}`
-        }
+        // Auto-detect provider from the model in the prompt JSON
+        const detectedProvider = detectProviderFromPrompt(editingPrompt.value)
+        testUrl += `&provider=${detectedProvider}`
       }
 
       const response = await fetch(testUrl)
@@ -2955,15 +2967,13 @@ function AIPromptsSettings() {
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <h4 className="text-base font-medium text-gray-900">{prompt.name}</h4>
-              {!isEditing && (
-                <span className={`px-2 py-0.5 text-xs font-medium rounded ${
-                  prompt.ai_provider === 'claude'
-                    ? 'bg-purple-100 text-purple-800'
-                    : 'bg-blue-100 text-blue-800'
-                }`}>
-                  {prompt.ai_provider === 'claude' ? 'Claude' : 'OpenAI'}
-                </span>
-              )}
+              <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                detectProviderFromPrompt(isEditing ? editingPrompt?.value : prompt.value) === 'claude'
+                  ? 'bg-purple-100 text-purple-800'
+                  : 'bg-blue-100 text-blue-800'
+              }`}>
+                {detectProviderFromPrompt(isEditing ? editingPrompt?.value : prompt.value) === 'claude' ? 'Claude' : 'OpenAI'}
+              </span>
             </div>
             <p className="text-sm text-gray-600 mt-1">{prompt.description}</p>
           </div>
@@ -2991,35 +3001,6 @@ function AIPromptsSettings() {
             </div>
             {isEditing ? (
               <>
-                {/* AI Provider Selector */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    AI Provider
-                  </label>
-                  <div className="flex gap-4">
-                    <button
-                      onClick={() => editingPrompt && setEditingPrompt({ ...editingPrompt, ai_provider: 'openai' })}
-                      className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
-                        editingPrompt?.ai_provider === 'openai'
-                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
-                      }`}
-                    >
-                      OpenAI
-                    </button>
-                    <button
-                      onClick={() => editingPrompt && setEditingPrompt({ ...editingPrompt, ai_provider: 'claude' })}
-                      className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
-                        editingPrompt?.ai_provider === 'claude'
-                          ? 'border-purple-500 bg-purple-50 text-purple-700'
-                          : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
-                      }`}
-                    >
-                      Claude
-                    </button>
-                  </div>
-                </div>
-
                 <textarea
                   value={editingPrompt?.value || ''}
                   onChange={(e) => editingPrompt && setEditingPrompt({ ...editingPrompt, value: e.target.value })}
@@ -3219,11 +3200,11 @@ function AIPromptsSettings() {
                           <h4 className="text-base font-medium text-gray-900">{criterion.name}</h4>
                           {!isEditing && prompt && (
                             <span className={`px-2 py-0.5 text-xs font-medium rounded ${
-                              prompt.ai_provider === 'claude'
+                              detectProviderFromPrompt(prompt.value) === 'claude'
                                 ? 'bg-purple-100 text-purple-800'
                                 : 'bg-blue-100 text-blue-800'
                             }`}>
-                              {prompt.ai_provider === 'claude' ? 'Claude' : 'OpenAI'}
+                              {detectProviderFromPrompt(prompt.value) === 'claude' ? 'Claude' : 'OpenAI'}
                             </span>
                           )}
                           <button
@@ -3309,35 +3290,6 @@ function AIPromptsSettings() {
                     </div>
                     {isEditing ? (
                       <>
-                        {/* AI Provider Selector */}
-                        <div className="mb-4">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            AI Provider
-                          </label>
-                          <div className="flex gap-4">
-                            <button
-                              onClick={() => editingPrompt && setEditingPrompt({ ...editingPrompt, ai_provider: 'openai' })}
-                              className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
-                                editingPrompt?.ai_provider === 'openai'
-                                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                  : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
-                              }`}
-                            >
-                              OpenAI
-                            </button>
-                            <button
-                              onClick={() => editingPrompt && setEditingPrompt({ ...editingPrompt, ai_provider: 'claude' })}
-                              className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
-                                editingPrompt?.ai_provider === 'claude'
-                                  ? 'border-purple-500 bg-purple-50 text-purple-700'
-                                  : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
-                              }`}
-                            >
-                              Claude
-                            </button>
-                          </div>
-                        </div>
-
                         <textarea
                           value={editingPrompt?.value || ''}
                           onChange={(e) => editingPrompt && setEditingPrompt({ ...editingPrompt, value: e.target.value })}
@@ -3530,11 +3482,11 @@ function AIPromptsSettings() {
                           <h4 className="text-base font-medium text-gray-900">{criterion.secondaryName}</h4>
                           {!isEditing && prompt && (
                             <span className={`px-2 py-0.5 text-xs font-medium rounded ${
-                              prompt.ai_provider === 'claude'
+                              detectProviderFromPrompt(prompt.value) === 'claude'
                                 ? 'bg-purple-100 text-purple-800'
                                 : 'bg-blue-100 text-blue-800'
                             }`}>
-                              {prompt.ai_provider === 'claude' ? 'Claude' : 'OpenAI'}
+                              {detectProviderFromPrompt(prompt.value) === 'claude' ? 'Claude' : 'OpenAI'}
                             </span>
                           )}
                           <button
@@ -3620,35 +3572,6 @@ function AIPromptsSettings() {
                     </div>
                     {isEditing ? (
                       <>
-                        {/* AI Provider Selector */}
-                        <div className="mb-4">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            AI Provider
-                          </label>
-                          <div className="flex gap-4">
-                            <button
-                              onClick={() => editingPrompt && setEditingPrompt({ ...editingPrompt, ai_provider: 'openai' })}
-                              className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
-                                editingPrompt?.ai_provider === 'openai'
-                                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                  : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
-                              }`}
-                            >
-                              OpenAI
-                            </button>
-                            <button
-                              onClick={() => editingPrompt && setEditingPrompt({ ...editingPrompt, ai_provider: 'claude' })}
-                              className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
-                                editingPrompt?.ai_provider === 'claude'
-                                  ? 'border-purple-500 bg-purple-50 text-purple-700'
-                                  : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
-                              }`}
-                            >
-                              Claude
-                            </button>
-                          </div>
-                        </div>
-
                         <textarea
                           value={editingPrompt?.value || ''}
                           onChange={(e) => editingPrompt && setEditingPrompt({ ...editingPrompt, value: e.target.value })}
@@ -3873,15 +3796,13 @@ function AIPromptsSettings() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <h4 className="text-base font-medium text-gray-900">{prompt.name}</h4>
-                        {!isEditing && (
-                          <span className={`px-2 py-0.5 text-xs font-medium rounded ${
-                            prompt.ai_provider === 'claude'
-                              ? 'bg-purple-100 text-purple-800'
-                              : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {prompt.ai_provider === 'claude' ? 'Claude' : 'OpenAI'}
-                          </span>
-                        )}
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                          detectProviderFromPrompt(isEditing ? editingPrompt?.value : prompt.value) === 'claude'
+                            ? 'bg-purple-100 text-purple-800'
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {detectProviderFromPrompt(isEditing ? editingPrompt?.value : prompt.value) === 'claude' ? 'Claude' : 'OpenAI'}
+                        </span>
                       </div>
                       <p className="text-sm text-gray-600 mt-1">{prompt.description}</p>
                     </div>
@@ -3909,35 +3830,6 @@ function AIPromptsSettings() {
                       </div>
                       {isEditing ? (
                         <>
-                          {/* AI Provider Selector */}
-                          <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              AI Provider
-                            </label>
-                            <div className="flex gap-4">
-                              <button
-                                onClick={() => editingPrompt && setEditingPrompt({ ...editingPrompt, ai_provider: 'openai' })}
-                                className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
-                                  editingPrompt?.ai_provider === 'openai'
-                                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                    : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
-                                }`}
-                              >
-                                OpenAI
-                              </button>
-                              <button
-                                onClick={() => editingPrompt && setEditingPrompt({ ...editingPrompt, ai_provider: 'claude' })}
-                                className={`flex-1 py-2 px-4 rounded-lg border-2 transition-colors ${
-                                  editingPrompt?.ai_provider === 'claude'
-                                    ? 'border-purple-500 bg-purple-50 text-purple-700'
-                                    : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
-                                }`}
-                              >
-                                Claude
-                              </button>
-                            </div>
-                          </div>
-
                           <textarea
                             value={editingPrompt?.value || ''}
                             onChange={(e) => editingPrompt && setEditingPrompt({ ...editingPrompt, value: e.target.value })}
