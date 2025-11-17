@@ -8,10 +8,23 @@ export async function GET(request: NextRequest) {
     // Public endpoint - no authentication required for GET
     // This allows the public events submission page to fetch current pricing
 
+    // Get first active newsletter for settings
+    const { data: newsletter } = await supabaseAdmin
+      .from('publications')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (!newsletter) {
+      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    }
+
     // Get current pricing settings from database
     const { data: settingsRows, error } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('key, value')
+      .eq('publication_id', newsletter.id)
       .in('key', ['public_event_paid_placement_price', 'public_event_featured_price'])
 
     if (error) {
@@ -55,6 +68,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Get user's publication_id (use first active newsletter for now)
+    const { data: newsletter } = await supabaseAdmin
+      .from('publications')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (!newsletter) {
+      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    }
+
     const settings = await request.json()
 
     // Validate required fields and ensure they're positive numbers
@@ -90,14 +115,15 @@ export async function POST(request: NextRequest) {
     // Upsert each setting
     for (const setting of settingsToSave) {
       const { error } = await supabaseAdmin
-        .from('app_settings')
+        .from('publication_settings')
         .upsert({
           key: setting.key,
           value: setting.value,
+          publication_id: newsletter.id,
           description: setting.description,
           updated_at: new Date().toISOString()
         }, {
-          onConflict: 'key'
+          onConflict: 'publication_id,key'
         })
 
       if (error) {

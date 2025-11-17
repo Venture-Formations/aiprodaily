@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import nodemailer from 'nodemailer'
+import { headers } from 'next/headers'
+import { getPublicationByDomain, getPublicationSetting } from '@/lib/publication-settings'
 
 // Gmail SMTP transporter for contact form emails
 const gmailTransporter = nodemailer.createTransport({
@@ -33,14 +35,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get contact email from business settings
-    const { data: contactEmailSetting } = await supabaseAdmin
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'contact_email')
-      .single()
+    // Get domain from headers (Next.js 15 requires await)
+    const headersList = await headers()
+    const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'aiaccountingdaily.com'
 
-    const contactEmail = contactEmailSetting?.value || 'noreply@aiaccountingdaily.com'
+    // Get publication ID from domain
+    const publicationId = await getPublicationByDomain(host) || 'accounting'
+
+    // Get contact email from publication_settings
+    const contactEmail = await getPublicationSetting(publicationId, 'contact_email') || 'noreply@aiaccountingdaily.com'
 
     // Store submission in database
     const { error: dbError } = await supabaseAdmin
@@ -49,7 +52,7 @@ export async function POST(request: NextRequest) {
         name,
         email,
         message,
-        publication_id: 'accounting',
+        publication_id: publicationId,
         status: 'new'
       }])
 

@@ -3,21 +3,32 @@ import { Hero } from "@/components/website/hero"
 import { Footer } from "@/components/website/footer"
 import { NewslettersList } from "@/components/website/newsletters-list"
 import { supabaseAdmin } from "@/lib/supabase"
+import { headers } from 'next/headers'
+import { getPublicationByDomain, getPublicationSettings } from '@/lib/publication-settings'
 
 // Force dynamic rendering to fetch fresh data
 export const dynamic = 'force-dynamic'
 
 export default async function WebsiteHome() {
-  // Fetch settings from database
-  const { data: settings } = await supabaseAdmin
-    .from('app_settings')
-    .select('key, value')
-    .in('key', ['website_header_url', 'logo_url', 'newsletter_name', 'business_name'])
+  // Get domain from headers (Next.js 15 requires await)
+  const headersList = await headers()
+  const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'aiaccountingdaily.com'
 
-  const headerImageUrl = settings?.find(s => s.key === 'website_header_url')?.value || '/logo.png'
-  const logoUrl = settings?.find(s => s.key === 'logo_url')?.value || '/logo.png'
-  const newsletterName = settings?.find(s => s.key === 'newsletter_name')?.value || 'AI Accounting Daily'
-  const businessName = settings?.find(s => s.key === 'business_name')?.value || 'AI Accounting Daily'
+  // Get publication ID from domain
+  const publicationId = await getPublicationByDomain(host) || 'accounting'
+
+  // Fetch settings from publication_settings
+  const settings = await getPublicationSettings(publicationId, [
+    'website_header_url',
+    'logo_url',
+    'newsletter_name',
+    'business_name'
+  ])
+
+  const headerImageUrl = settings.website_header_url || '/logo.png'
+  const logoUrl = settings.logo_url || '/logo.png'
+  const newsletterName = settings.newsletter_name || 'AI Accounting Daily'
+  const businessName = settings.business_name || 'AI Accounting Daily'
   const currentYear = new Date().getFullYear()
 
   // Fetch newsletters with articles data for images

@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     console.log('BACKEND GET: Loading email settings from database for newsletter:', newsletter.id)
     // Get current settings from database (key-value structure)
     const { data: settingsRows, error } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('key, value')
       .eq('publication_id', newsletter.id)
       .or('key.like.email_%,key.like.criteria_%,key.like.secondary_criteria_%,key.like.primary_criteria_%,key.eq.max_top_articles,key.eq.max_bottom_articles,key.eq.max_secondary_articles,key.eq.primary_article_lookback_hours,key.eq.secondary_article_lookback_hours,key.eq.dedup_historical_lookback_days,key.eq.dedup_strictness_threshold,key.eq.next_ad_position')
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
       // Upsert lookback hours settings
       for (const setting of settingsToSave) {
         const { error } = await supabaseAdmin
-          .from('app_settings')
+          .from('publication_settings')
           .upsert({
             key: setting.key,
             value: setting.value,
@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
       // Upsert deduplication settings
       for (const setting of settingsToSave) {
         const { error } = await supabaseAdmin
-          .from('app_settings')
+          .from('publication_settings')
           .upsert({
             key: setting.key,
             value: setting.value,
@@ -248,7 +248,7 @@ export async function POST(request: NextRequest) {
       // Upsert max articles settings
       for (const setting of settingsToSave) {
         const { error } = await supabaseAdmin
-          .from('app_settings')
+          .from('publication_settings')
           .upsert({
             key: setting.key,
             value: setting.value,
@@ -316,7 +316,7 @@ export async function POST(request: NextRequest) {
       // Upsert schedule settings
       for (const setting of settingsToSave) {
         const { error } = await supabaseAdmin
-          .from('app_settings')
+          .from('publication_settings')
           .upsert({
             key: setting.key,
             value: setting.value,
@@ -376,7 +376,7 @@ export async function POST(request: NextRequest) {
     for (const setting of settingsToSave) {
       console.log(`BACKEND: Upserting ${setting.key} = ${setting.value}`)
       const { error, data } = await supabaseAdmin
-        .from('app_settings')
+        .from('publication_settings')
         .upsert({
           key: setting.key,
           value: setting.value,

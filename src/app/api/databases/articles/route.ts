@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     // Get scoring criteria settings (newsletter-specific)
     const { data: criteriaSettings } = await supabase
-      .from('app_settings')
+      .from('publication_settings')
       .select('key, value')
       .eq('publication_id', newsletterId)
       .in('key', [

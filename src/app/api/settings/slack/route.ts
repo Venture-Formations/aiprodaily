@@ -26,7 +26,7 @@ export async function GET() {
 
     // Get current Slack settings from database
     const { data: settings } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('key, value')
       .eq('publication_id', newsletterId)
       .like('key', 'slack_%_enabled')
@@ -112,47 +112,24 @@ export async function POST(request: NextRequest) {
 
     // Update or insert each setting
     for (const setting of dbSettings) {
-      // Check if setting exists
-      const { data: existing } = await supabaseAdmin
-        .from('app_settings')
-        .select('key')
-        .eq('key', setting.key)
-        .eq('publication_id', newsletterId)
-        .single()
+      // Upsert the setting
+      const { error } = await supabaseAdmin
+        .from('publication_settings')
+        .upsert({
+          key: setting.key,
+          value: setting.value,
+          publication_id: newsletterId,
+          description: `Slack notification setting: ${setting.key}`,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'publication_id,key'
+        })
 
-      if (existing) {
-        // Update existing setting
-        const { error } = await supabaseAdmin
-          .from('app_settings')
-          .update({
-            value: setting.value,
-            updated_at: new Date().toISOString()
-          })
-          .eq('key', setting.key)
-          .eq('publication_id', newsletterId)
-
-        if (error) {
-          console.error('[API /settings/slack] Update error for', setting.key, ':', error)
-          throw error
-        }
-        console.log('[API /settings/slack] Updated:', setting.key, '=', setting.value)
-      } else {
-        // Insert new setting
-        const { error } = await supabaseAdmin
-          .from('app_settings')
-          .insert({
-            key: setting.key,
-            value: setting.value,
-            publication_id: newsletterId,
-            description: `Slack notification setting: ${setting.key}`
-          })
-
-        if (error) {
-          console.error('[API /settings/slack] Insert error for', setting.key, ':', error)
-          throw error
-        }
-        console.log('[API /settings/slack] Inserted:', setting.key, '=', setting.value)
+      if (error) {
+        console.error('[API /settings/slack] Upsert error for', setting.key, ':', error)
+        throw error
       }
+      console.log('[API /settings/slack] Saved:', setting.key, '=', setting.value)
     }
 
     console.log('[API /settings/slack] All settings saved successfully')

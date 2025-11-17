@@ -8,18 +8,18 @@ interface CategoryCount {
 
 export class AppSelector {
   /**
-   * Get app selection settings from app_settings table
+   * Get app selection settings from publication_settings table
    */
-  private static async getAppSettings(): Promise<{
+  private static async getAppSettings(newsletterId: string): Promise<{
     totalApps: number
     categoryCounts: CategoryCount[]
     affiliateCooldownDays: number
   }> {
     try {
       const { data: settings } = await supabaseAdmin
-        .from('app_settings')
+        .from('publication_settings')
         .select('key, value')
-        .like('key', 'ai_apps_%')
+        .eq('publication_id', newsletterId)
         .or('key.like.ai_apps_%,key.eq.affiliate_cooldown_days')
 
       const settingsMap = new Map(settings?.map(s => [s.key, parseInt(s.value || '0')]) || [])
@@ -146,7 +146,7 @@ export class AppSelector {
       }
 
       // Get selection settings
-      const { totalApps, categoryCounts, affiliateCooldownDays } = await this.getAppSettings()
+      const { totalApps, categoryCounts, affiliateCooldownDays } = await this.getAppSettings(newsletterId)
 
       // Get all active apps for this newsletter
       const { data: allApps } = await supabaseAdmin

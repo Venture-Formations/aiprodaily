@@ -1,5 +1,7 @@
 import { ImageResponse } from 'next/og'
 import { supabaseAdmin } from '@/lib/supabase'
+import { headers } from 'next/headers'
+import { getPublicationByDomain, getPublicationSetting } from '@/lib/publication-settings'
 
 // Image metadata
 export const size = {
@@ -10,14 +12,15 @@ export const contentType = 'image/png'
 
 // Image generation
 export default async function Icon() {
-  // Fetch logo URL from database
-  const { data: logoSetting } = await supabaseAdmin
-    .from('app_settings')
-    .select('value')
-    .eq('key', 'logo_url')
-    .single()
+  // Get domain from headers (Next.js 15 requires await)
+  const headersList = await headers()
+  const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'aiaccountingdaily.com'
 
-  const logoUrl = logoSetting?.value || '/logo.png'
+  // Get publication ID from domain
+  const publicationId = await getPublicationByDomain(host) || 'accounting'
+
+  // Fetch logo URL from publication_settings
+  const logoUrl = await getPublicationSetting(publicationId, 'logo_url') || '/logo.png'
 
   // Fetch the image
   try {

@@ -96,9 +96,9 @@ export async function POST(request: NextRequest) {
 
     if (requestedStatus === 'active') {
       if (useInNextNewsletter) {
-        // Get the current next_ad_position from app_settings (for this newsletter)
+        // Get the current next_ad_position from publication_settings (for this newsletter)
         const { data: settingsData, error: settingsError } = await supabaseAdmin
-          .from('app_settings')
+          .from('publication_settings')
           .select('value')
           .eq('publication_id', newsletterId)
           .eq('key', 'next_ad_position')

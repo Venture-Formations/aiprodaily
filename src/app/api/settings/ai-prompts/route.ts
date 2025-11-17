@@ -11,9 +11,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Get user's publication_id (use first active newsletter for now)
+    const { data: newsletter } = await supabaseAdmin
+      .from('publications')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (!newsletter) {
+      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    }
+
     const { data: prompts, error } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('key, value, description, ai_provider, expected_outputs')
+      .eq('publication_id', newsletter.id)
       .like('key', 'ai_prompt_%')
       .order('key', { ascending: true })
 
@@ -23,8 +36,9 @@ export async function GET(request: NextRequest) {
 
     // Fetch criteria weights and names
     const { data: weights } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('key, value')
+      .eq('publication_id', newsletter.id)
       .or('key.like.criteria_%_weight,key.like.criteria_%_name')
 
     const weightMap: Record<string, string> = {}
@@ -105,6 +119,18 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Get user's publication_id (use first active newsletter for now)
+    const { data: newsletter } = await supabaseAdmin
+      .from('publications')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (!newsletter) {
+      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    }
+
     const body = await request.json()
     const { key, value, ai_provider } = body
 
@@ -165,9 +191,10 @@ export async function PATCH(request: NextRequest) {
     }
 
     const { error } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .update(updateData)
       .eq('key', key)
+      .eq('publication_id', newsletter.id)
 
     if (error) {
       throw error
@@ -198,6 +225,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Get user's publication_id (use first active newsletter for now)
+    const { data: newsletter } = await supabaseAdmin
+      .from('publications')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (!newsletter) {
+      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    }
+
     const body = await request.json()
     const { key, action } = body
 
@@ -214,9 +253,10 @@ export async function POST(request: NextRequest) {
 
       // Get current value
       const { data: current, error: fetchError } = await supabaseAdmin
-        .from('app_settings')
+        .from('publication_settings')
         .select('value')
         .eq('key', key)
+        .eq('publication_id', newsletter.id)
         .single()
 
       console.log('[SAVE_DEFAULT] Fetch result:', {
@@ -246,12 +286,13 @@ export async function POST(request: NextRequest) {
 
       // Save current value as custom default
       const { error: updateError } = await supabaseAdmin
-        .from('app_settings')
+        .from('publication_settings')
         .update({
           custom_default: current.value,
           updated_at: new Date().toISOString()
         })
         .eq('key', key)
+        .eq('publication_id', newsletter.id)
 
       if (updateError) {
         console.error('[SAVE_DEFAULT] Update error:', updateError)
@@ -271,9 +312,10 @@ export async function POST(request: NextRequest) {
 
     // First check if there's a custom default
     const { data: settings, error: fetchError } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('custom_default')
       .eq('key', key)
+      .eq('publication_id', newsletter.id)
       .single()
 
     console.log('[RESET_DEFAULT] Fetch result:', {
@@ -308,12 +350,13 @@ export async function POST(request: NextRequest) {
 
     // Update database with default value
     const { error: updateError } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .update({
         value: defaultValue,
         updated_at: new Date().toISOString()
       })
       .eq('key', key)
+      .eq('publication_id', newsletter.id)
 
     if (updateError) {
       console.error('[RESET_DEFAULT] Update error:', updateError)

@@ -297,8 +297,9 @@ export async function POST(request: NextRequest) {
 
     // Get main group ID from settings
     const { data: mainGroupSetting } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('value')
+      .eq('publication_id', newsletter.id)
       .eq('key', 'email_mainGroupId')
       .single()
 
@@ -553,8 +554,9 @@ export async function GET(request: NextRequest) {
 
     // Get main group ID from settings
     const { data: mainGroupSetting } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('value')
+      .eq('publication_id', newsletter.id)
       .eq('key', 'email_mainGroupId')
       .single()
 

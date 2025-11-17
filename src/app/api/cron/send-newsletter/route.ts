@@ -94,10 +94,22 @@ export async function POST(request: NextRequest) {
     // Send final newsletter via MailerLite
     const mailerLiteService = new MailerLiteService()
 
+    // Get the newsletter/publication ID from the issue
+    const { data: publication } = await supabaseAdmin
+      .from('publication_issues')
+      .select('publication_id')
+      .eq('id', issue.id)
+      .single()
+
+    if (!publication?.publication_id) {
+      throw new Error('Publication ID not found for issue')
+    }
+
     // Get main group ID from settings
     const { data: settingsRows } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('key, value')
+      .eq('publication_id', publication.publication_id)
       .eq('key', 'email_mainGroupId')
       .single()
 

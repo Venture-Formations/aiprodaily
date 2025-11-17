@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { headers } from 'next/headers'
+import { getPublicationByDomain, getPublicationSettings } from '@/lib/publication-settings'
 
 // CORS headers for public API access
 const corsHeaders = {
@@ -14,41 +16,40 @@ export async function OPTIONS() {
 
 export async function GET(request: NextRequest) {
   try {
-    // Fetch all business settings
-    const { data: settings, error } = await supabaseAdmin
-      .from('app_settings')
-      .select('key, value')
-      .in('key', [
-        'newsletter_name',
-        'business_name',
-        'primary_color',
-        'secondary_color',
-        'header_image_url',
-        'logo_url',
-        'contact_email',
-        'website_url',
-        'heading_font',
-        'body_font',
-        'facebook_enabled',
-        'facebook_url',
-        'twitter_enabled',
-        'twitter_url',
-        'linkedin_enabled',
-        'linkedin_url'
-      ])
+    // Get domain from headers (Next.js 15 requires await)
+    const headersList = await headers()
+    const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'aiaccountingdaily.com'
 
-    if (error) {
-      throw error
-    }
+    // Get publication ID from domain
+    const publicationId = await getPublicationByDomain(host) || 'accounting'
 
-    // Convert array to object
+    // Fetch all business settings from publication_settings
+    const settings = await getPublicationSettings(publicationId, [
+      'newsletter_name',
+      'business_name',
+      'primary_color',
+      'secondary_color',
+      'header_image_url',
+      'logo_url',
+      'contact_email',
+      'website_url',
+      'heading_font',
+      'body_font',
+      'facebook_enabled',
+      'facebook_url',
+      'twitter_enabled',
+      'twitter_url',
+      'linkedin_enabled',
+      'linkedin_url'
+    ])
+
+    // Convert string booleans to actual booleans
     const settingsObject: Record<string, any> = {}
-    settings?.forEach(setting => {
-      // Convert string booleans to actual booleans
-      if (setting.value === 'true' || setting.value === 'false') {
-        settingsObject[setting.key] = setting.value === 'true'
+    Object.entries(settings).forEach(([key, value]) => {
+      if (value === 'true' || value === 'false') {
+        settingsObject[key] = value === 'true'
       } else {
-        settingsObject[setting.key] = setting.value
+        settingsObject[key] = value
       }
     })
 

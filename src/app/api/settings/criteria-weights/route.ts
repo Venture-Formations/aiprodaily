@@ -57,39 +57,20 @@ export async function PATCH(request: NextRequest) {
       ? `secondary_criteria_${criteriaNumber}_weight`
       : `criteria_${criteriaNumber}_weight`
 
-    // Check if setting exists
-    const { data: existing } = await supabaseAdmin
-      .from('app_settings')
-      .select('key')
-      .eq('key', key)
-      .eq('publication_id', newsletterId)
-      .single()
+    // Upsert the weight setting
+    const { error } = await supabaseAdmin
+      .from('publication_settings')
+      .upsert({
+        key,
+        value: weight.toString(),
+        publication_id: newsletterId,
+        description: `Weight for ${type === 'secondary' ? 'secondary ' : ''}criteria ${criteriaNumber}`,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'publication_id,key'
+      })
 
-    if (existing) {
-      // Update existing
-      const { error } = await supabaseAdmin
-        .from('app_settings')
-        .update({
-          value: weight.toString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('key', key)
-        .eq('publication_id', newsletterId)
-
-      if (error) throw error
-    } else {
-      // Create new
-      const { error } = await supabaseAdmin
-        .from('app_settings')
-        .insert({
-          key,
-          value: weight.toString(),
-          publication_id: newsletterId,
-          description: `Weight for ${type === 'secondary' ? 'secondary ' : ''}criteria ${criteriaNumber}`
-        })
-
-      if (error) throw error
-    }
+    if (error) throw error
 
     return NextResponse.json({
       success: true,

@@ -132,11 +132,11 @@ export async function POST(request: NextRequest) {
 
     // Get lookback window
     const { data: lookbackSetting } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('value')
       .eq('publication_id', newsletterUuid)
       .eq('key', 'primary_article_lookback_hours')
-      .single()
+      .maybeSingle()
 
     const lookbackHours = lookbackSetting ? parseInt(lookbackSetting.value) : 72
     const lookbackDate = new Date()

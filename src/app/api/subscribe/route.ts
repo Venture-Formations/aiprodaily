@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import axios from 'axios'
+import { headers } from 'next/headers'
+import { getPublicationByDomain, getPublicationSetting } from '@/lib/publication-settings'
 
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
 
@@ -19,21 +21,22 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Get MailerLite Group ID from settings
-    const { data: groupIdSetting } = await supabaseAdmin
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'mailerlite_group_id')
-      .single()
+    // Get domain from headers (Next.js 15 requires await)
+    const headersList = await headers()
+    const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'aiaccountingdaily.com'
 
-    if (!groupIdSetting?.value) {
-      console.error('MailerLite Group ID not configured in database')
+    // Get publication ID from domain
+    const publicationId = await getPublicationByDomain(host) || 'accounting'
+
+    // Get MailerLite Group ID from publication_settings
+    const groupId = await getPublicationSetting(publicationId, 'mailerlite_group_id')
+
+    if (!groupId) {
+      console.error('MailerLite Group ID not configured for publication:', publicationId)
       return NextResponse.json({
         error: 'Subscription service not configured'
       }, { status: 500 })
     }
-
-    const groupId = groupIdSetting.value
 
     // MailerLite API client
     const mailerliteClient = axios.create({

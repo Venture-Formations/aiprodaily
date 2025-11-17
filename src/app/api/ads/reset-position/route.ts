@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     // Reset next_ad_position to 1 for this newsletter
     const { error } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .update({ value: '1', updated_at: new Date().toISOString() })
       .eq('publication_id', newsletter.id)
       .eq('key', 'next_ad_position')

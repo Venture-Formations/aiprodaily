@@ -39,14 +39,14 @@ export async function GET(request: NextRequest) {
 
     // Fetch SEPARATE enabled counts for primary and secondary
     const { data: primaryEnabledData } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('value')
       .eq('key', 'primary_criteria_enabled_count')
       .eq('publication_id', newsletterId)
       .single()
 
     const { data: secondaryEnabledData } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('value')
       .eq('key', 'secondary_criteria_enabled_count')
       .eq('publication_id', newsletterId)
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch all criteria names and weights (both primary and secondary)
     const { data: settingsData } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('key, value')
       .eq('publication_id', newsletterId)
       .or('key.like.criteria_%_name,key.like.criteria_%_weight,key.like.secondary_criteria_%_weight,key.like.secondary_criteria_%_name')
@@ -158,38 +158,18 @@ export async function PATCH(request: NextRequest) {
         ? `secondary_criteria_${criteriaNumber}_name`
         : `criteria_${criteriaNumber}_name`
 
-      // Check if setting exists
-      const { data: existing } = await supabaseAdmin
-        .from('app_settings')
-        .select('key')
-        .eq('key', key)
-        .eq('publication_id', newsletterId)
-        .single()
-
-      let error
-      if (existing) {
-        // Update existing
-        const result = await supabaseAdmin
-          .from('app_settings')
-          .update({
-            value: name,
-            updated_at: new Date().toISOString()
-          })
-          .eq('key', key)
-          .eq('publication_id', newsletterId)
-        error = result.error
-      } else {
-        // Insert new
-        const result = await supabaseAdmin
-          .from('app_settings')
-          .insert({
-            key,
-            value: name,
-            publication_id: newsletterId,
-            description: `Name for ${isSecondary ? 'secondary' : 'primary'} criteria ${criteriaNumber}`
-          })
-        error = result.error
-      }
+      // Upsert the setting
+      const { error } = await supabaseAdmin
+        .from('publication_settings')
+        .upsert({
+          key,
+          value: name,
+          publication_id: newsletterId,
+          description: `Name for ${isSecondary ? 'secondary' : 'primary'} criteria ${criteriaNumber}`,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'publication_id,key'
+        })
 
       if (error) {
         console.error('Database error:', error)
@@ -216,38 +196,18 @@ export async function PATCH(request: NextRequest) {
         ? 'secondary_criteria_enabled_count'
         : 'primary_criteria_enabled_count'
 
-      // Check if setting exists
-      const { data: existing } = await supabaseAdmin
-        .from('app_settings')
-        .select('key')
-        .eq('key', settingKey)
-        .eq('publication_id', newsletterId)
-        .single()
-
-      let error
-      if (existing) {
-        // Update existing
-        const result = await supabaseAdmin
-          .from('app_settings')
-          .update({
-            value: enabledCount.toString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('key', settingKey)
-          .eq('publication_id', newsletterId)
-        error = result.error
-      } else {
-        // Insert new
-        const result = await supabaseAdmin
-          .from('app_settings')
-          .insert({
-            key: settingKey,
-            value: enabledCount.toString(),
-            publication_id: newsletterId,
-            description: `Number of ${isSecondary ? 'secondary' : 'primary'} criteria currently enabled (1-5)`
-          })
-        error = result.error
-      }
+      // Upsert the setting
+      const { error } = await supabaseAdmin
+        .from('publication_settings')
+        .upsert({
+          key: settingKey,
+          value: enabledCount.toString(),
+          publication_id: newsletterId,
+          description: `Number of ${isSecondary ? 'secondary' : 'primary'} criteria currently enabled (1-5)`,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'publication_id,key'
+        })
 
       if (error) {
         console.error('Database error:', error)

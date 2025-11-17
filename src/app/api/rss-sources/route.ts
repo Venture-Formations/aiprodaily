@@ -24,12 +24,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: postsError.message }, { status: 500 })
     }
 
+    // Get the first active newsletter for publication_id
+    const { data: newsletter, error: newsletterError } = await supabaseAdmin
+      .from('publications')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (newsletterError || !newsletter) {
+      return NextResponse.json(
+        { error: 'No active newsletter found' },
+        { status: 404 }
+      )
+    }
+
     // Get excluded sources from settings table
     const { data: excludedSettings, error: settingsError } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('value')
+      .eq('publication_id', newsletter.id)
       .eq('key', 'excluded_rss_sources')
-      .single()
+      .maybeSingle()
 
     const excludedSources: string[] = excludedSettings?.value
       ? JSON.parse(excludedSettings.value)
@@ -87,12 +103,28 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
+    // Get the first active newsletter for publication_id
+    const { data: newsletter, error: newsletterError } = await supabaseAdmin
+      .from('publications')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (newsletterError || !newsletter) {
+      return NextResponse.json(
+        { error: 'No active newsletter found' },
+        { status: 404 }
+      )
+    }
+
     // Get current excluded sources
     const { data: currentSettings, error: fetchError } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('value')
+      .eq('publication_id', newsletter.id)
       .eq('key', 'excluded_rss_sources')
-      .single()
+      .maybeSingle()
 
     console.log('Current settings fetch:', { currentSettings, fetchError })
 
@@ -117,14 +149,15 @@ export async function PATCH(request: NextRequest) {
 
     // Save back to settings
     const { error: updateError } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .upsert({
+        publication_id: newsletter.id,
         key: 'excluded_rss_sources',
         value: JSON.stringify(excludedSources),
         description: 'List of RSS post authors/sources whose images should be blocked (posts still processed, but without images)',
         updated_at: new Date().toISOString()
       }, {
-        onConflict: 'key'
+        onConflict: 'publication_id,key'
       })
 
     if (updateError) {

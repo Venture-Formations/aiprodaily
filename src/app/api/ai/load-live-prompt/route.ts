@@ -6,7 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 /**
  * GET /api/ai/load-live-prompt
  *
- * Fetches the live/production prompt from app_settings table
+ * Fetches the live/production prompt from publication_settings table
  * based on the prompt type and AI provider selected in the playground
  */
 export async function GET(request: NextRequest) {
@@ -50,10 +50,26 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Fetch live prompt from app_settings
+    // Get the first active newsletter for publication_id if not provided
+    let newsletterId = publication_id
+    if (!newsletterId || newsletterId === 'undefined') {
+      const { data: newsletter } = await supabaseAdmin
+        .from('publications')
+        .select('id')
+        .eq('is_active', true)
+        .limit(1)
+        .single()
+
+      if (newsletter) {
+        newsletterId = newsletter.id
+      }
+    }
+
+    // Fetch live prompt from publication_settings
     const { data, error } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('key, value, ai_provider, description, expected_outputs')
+      .eq('publication_id', newsletterId)
       .eq('key', promptKey)
       .maybeSingle()
 

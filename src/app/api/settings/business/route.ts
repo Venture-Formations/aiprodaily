@@ -35,10 +35,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Get user's publication_id (use first active newsletter for now)
+    const { data: newsletter } = await supabaseAdmin
+      .from('publications')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (!newsletter) {
+      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    }
+
     // Fetch all business settings
     const { data: settings, error } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('key, value')
+      .eq('publication_id', newsletter.id)
       .in('key', BUSINESS_SETTINGS_KEYS)
 
     if (error) {
@@ -74,6 +87,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Get user's publication_id (use first active newsletter for now)
+    const { data: newsletter } = await supabaseAdmin
+      .from('publications')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (!newsletter) {
+      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    }
+
     const body = await request.json()
 
     // Update or insert each setting
@@ -81,25 +106,17 @@ export async function POST(request: NextRequest) {
       if (body[key] !== undefined) {
         const value = typeof body[key] === 'boolean' ? String(body[key]) : body[key]
 
-        // Try to update first
-        const { data: existing } = await supabaseAdmin
-          .from('app_settings')
-          .select('id')
-          .eq('key', key)
-          .single()
-
-        if (existing) {
-          // Update existing
-          await supabaseAdmin
-            .from('app_settings')
-            .update({ value })
-            .eq('key', key)
-        } else {
-          // Insert new
-          await supabaseAdmin
-            .from('app_settings')
-            .insert([{ key, value }])
-        }
+        // Upsert setting with publication_id
+        await supabaseAdmin
+          .from('publication_settings')
+          .upsert({
+            key,
+            value,
+            publication_id: newsletter.id,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'publication_id,key'
+          })
       }
     }
 

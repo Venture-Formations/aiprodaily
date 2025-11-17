@@ -133,7 +133,7 @@ async function selectAndDedupe(issueId: string, newsletterId: string) {
 
   // Get lookback window
   const { data: lookbackSetting } = await supabaseAdmin
-    .from('app_settings')
+    .from('publication_settings')
     .select('value')
     .eq('publication_id', newsletterId)
     .eq('key', 'primary_article_lookback_hours')

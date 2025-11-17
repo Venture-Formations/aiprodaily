@@ -1,14 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { authOptions } from '@/lib/auth'
 
 /**
  * GET /api/settings/ai-apps - Get AI app settings
  */
 export async function GET(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's publication_id (use first active newsletter for now)
+    const { data: newsletter } = await supabaseAdmin
+      .from('publications')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (!newsletter) {
+      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    }
+
     const { data: settings } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('key, value, description')
+      .eq('publication_id', newsletter.id)
       .or('key.like.ai_apps_%,key.eq.affiliate_cooldown_days')
       .order('key')
 
@@ -37,6 +57,23 @@ export async function GET(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user's publication_id (use first active newsletter for now)
+    const { data: newsletter } = await supabaseAdmin
+      .from('publications')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+
+    if (!newsletter) {
+      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    }
+
     const body = await request.json()
     const { settings } = body
 
@@ -55,9 +92,15 @@ export async function PATCH(request: NextRequest) {
       }
 
       await supabaseAdmin
-        .from('app_settings')
-        .update({ value: String(value) })
-        .eq('key', key)
+        .from('publication_settings')
+        .upsert({
+          key,
+          value: String(value),
+          publication_id: newsletter.id,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'publication_id,key'
+        })
     }
 
     return NextResponse.json({ success: true })
