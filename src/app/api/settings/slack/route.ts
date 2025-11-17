@@ -46,11 +46,16 @@ export async function GET() {
 
     // Convert database settings to frontend format
     settings?.forEach(setting => {
+      // Strip extra quotes if value was JSON stringified (e.g., '"true"' -> 'true')
+      let cleanValue = setting.value
+      if (cleanValue && cleanValue.startsWith('"') && cleanValue.endsWith('"') && cleanValue.length > 2) {
+        cleanValue = cleanValue.slice(1, -1)
+      }
       const key = setting.key.replace('slack_', '')
       if (key.endsWith('_enabled')) {
         const notificationType = key.replace('_enabled', '')
         const camelCaseKey = notificationType.replace(/_([a-z])/g, (_: string, letter: string) => letter.toUpperCase())
-        ;(slackSettings as any)[camelCaseKey] = setting.value === 'true'
+        ;(slackSettings as any)[camelCaseKey] = cleanValue === 'true'
       }
     })
 

@@ -22,7 +22,12 @@ export async function getPublicationSetting(
     .maybeSingle()
 
   if (data?.value) {
-    return data.value
+    // Strip extra quotes if value was JSON stringified (e.g., '"true"' -> 'true')
+    let cleanValue = data.value
+    if (cleanValue.startsWith('"') && cleanValue.endsWith('"') && cleanValue.length > 2) {
+      cleanValue = cleanValue.slice(1, -1)
+    }
+    return cleanValue
   }
 
   // Fallback to app_settings with WARNING log

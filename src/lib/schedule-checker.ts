@@ -27,7 +27,12 @@ export class ScheduleChecker {
       ])
 
     const settingsMap = (settings || []).reduce((acc, setting) => {
-      acc[setting.key] = setting.value
+      // Strip extra quotes if value was JSON stringified (e.g., '"true"' -> 'true')
+      let cleanValue = setting.value
+      if (cleanValue && cleanValue.startsWith('"') && cleanValue.endsWith('"') && cleanValue.length > 2) {
+        cleanValue = cleanValue.slice(1, -1)
+      }
+      acc[setting.key] = cleanValue
       return acc
     }, {} as Record<string, string>)
 

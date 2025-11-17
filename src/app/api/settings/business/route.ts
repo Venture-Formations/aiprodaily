@@ -61,11 +61,16 @@ export async function GET(request: NextRequest) {
     // Convert array to object
     const settingsObject: Record<string, any> = {}
     settings?.forEach(setting => {
+      // Strip extra quotes if value was JSON stringified (e.g., '"true"' -> 'true')
+      let cleanValue = setting.value
+      if (cleanValue && cleanValue.startsWith('"') && cleanValue.endsWith('"') && cleanValue.length > 2) {
+        cleanValue = cleanValue.slice(1, -1)
+      }
       // Convert string booleans to actual booleans
-      if (setting.value === 'true' || setting.value === 'false') {
-        settingsObject[setting.key] = setting.value === 'true'
+      if (cleanValue === 'true' || cleanValue === 'false') {
+        settingsObject[setting.key] = cleanValue === 'true'
       } else {
-        settingsObject[setting.key] = setting.value
+        settingsObject[setting.key] = cleanValue
       }
     })
 
