@@ -63,7 +63,12 @@ export async function getPublicationSettings(
   const foundKeys = new Set<string>()
   pubSettings?.forEach((setting) => {
     if (setting.value) {
-      result[setting.key] = setting.value
+      // Strip extra quotes if value was JSON stringified (e.g., '"#1C293D"' -> '#1C293D')
+      let cleanValue = setting.value
+      if (cleanValue.startsWith('"') && cleanValue.endsWith('"') && cleanValue.length > 2) {
+        cleanValue = cleanValue.slice(1, -1)
+      }
+      result[setting.key] = cleanValue
       foundKeys.add(setting.key)
     }
   })
