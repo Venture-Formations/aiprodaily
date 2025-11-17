@@ -2284,29 +2284,54 @@ function AIPromptsSettings() {
 
   // Helper function to format JSON with actual newlines
   const formatJSON = (value: any, prettyPrint: boolean): string => {
-    // Handle plain string values
-    if (typeof value !== 'object') {
-      if (prettyPrint && typeof value === 'string') {
-        // Convert literal \n sequences to actual newlines
-        return value.replace(/\\n/g, '\n')
+    // If value is a string, try to parse it as JSON first
+    if (typeof value === 'string') {
+      try {
+        // Try to parse as JSON
+        const parsed = JSON.parse(value)
+        // If successful, format the parsed object
+        const jsonStr = prettyPrint ? JSON.stringify(parsed, null, 2) : JSON.stringify(parsed)
+        if (prettyPrint) {
+          return jsonStr.replace(/\\n/g, '\n')
+        }
+        return jsonStr
+      } catch (e) {
+        // Not valid JSON, treat as plain string
+        if (prettyPrint) {
+          return value.replace(/\\n/g, '\n')
+        }
+        return value
       }
-      return value
     }
 
-    // Handle object values (JSON)
-    const jsonStr = prettyPrint ? JSON.stringify(value, null, 2) : JSON.stringify(value)
-
-    // If pretty-print is enabled, convert escaped \n to actual newlines
-    // This makes prompt content with multiple lines more readable
-    if (prettyPrint) {
-      return jsonStr.replace(/\\n/g, '\n')
+    // Handle object values (already parsed JSON)
+    if (typeof value === 'object' && value !== null) {
+      const jsonStr = prettyPrint ? JSON.stringify(value, null, 2) : JSON.stringify(value)
+      if (prettyPrint) {
+        return jsonStr.replace(/\\n/g, '\n')
+      }
+      return jsonStr
     }
 
-    return jsonStr
+    return String(value)
   }
 
   const handleEdit = (prompt: any) => {
-    const valueStr = typeof prompt.value === 'object' ? JSON.stringify(prompt.value, null, 2) : prompt.value
+    let valueStr: string
+    if (typeof prompt.value === 'object') {
+      valueStr = JSON.stringify(prompt.value, null, 2)
+    } else if (typeof prompt.value === 'string') {
+      // Try to parse as JSON to pretty-print it
+      try {
+        const parsed = JSON.parse(prompt.value)
+        valueStr = JSON.stringify(parsed, null, 2)
+      } catch (e) {
+        // Not JSON, use as-is
+        valueStr = prompt.value
+      }
+    } else {
+      valueStr = String(prompt.value)
+    }
     setEditingPrompt({ key: prompt.key, value: valueStr, ai_provider: prompt.ai_provider || 'openai' })
     setExpandedPrompt(prompt.key)
   }
