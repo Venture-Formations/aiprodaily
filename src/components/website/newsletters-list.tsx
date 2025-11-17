@@ -11,8 +11,9 @@ const NEWSLETTERS_PER_PAGE = 6
 interface Newsletter {
   id: string
   campaign_id?: string
+  campaign_date: string  // The date of the newsletter (YYYY-MM-DD)
   subject_line: string
-  send_date: string
+  send_date: string      // The timestamp when sent
   metadata?: {
     total_articles?: number
     total_secondary_articles?: number
@@ -100,8 +101,8 @@ export function NewslettersList({ newsletters, imageOverride }: NewslettersListP
             const imageUrl = imageOverride || firstArticle?.rss_post?.image_url
             const placeholderSvg = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600"%3E%3Crect width="800" height="600" fill="%23e5e7eb"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="24" fill="%239ca3af"%3EAI Accounting Daily%3C/text%3E%3C/svg%3E'
 
-            // Extract date portion from send_date for the URL
-            const dateForUrl = newsletter.send_date.split('T')[0]
+            // Use campaign_date for the URL (already in YYYY-MM-DD format)
+            const dateForUrl = newsletter.campaign_date
 
             return (
               <Link key={newsletter.id} href={`/newsletter/${dateForUrl}`}>

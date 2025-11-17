@@ -204,10 +204,11 @@ export class NewsletterArchiver {
       }
 
       // 5. Create archive record
-      // Note: Database uses campaign_id column (not issue_id)
+      // Note: Database uses campaign_id and campaign_date columns (not issue_id/issue_date)
       const archiveData = {
         campaign_id: issueId,  // Database column is still campaign_id
         publication_id: issue.publication_id,
+        campaign_date: issueDate,  // Database column is still campaign_date (not issue_date)
         subject_line: subjectLine,
         send_date: new Date().toISOString(),
         recipient_count: recipientCount,
