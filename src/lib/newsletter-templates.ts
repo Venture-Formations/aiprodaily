@@ -547,7 +547,7 @@ export async function generateMinnesotaGetawaysSection(issue: any): Promise<stri
 export async function generatePollSection(issue: { id: string; publication_id: string; status?: string; poll_id?: string | null }): Promise<string> {
   try {
     // Fetch colors and website URL from business settings (using publication_id)
-    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue.publication_id)
+    const { primaryColor, tertiaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue.publication_id)
     // Use the main app domain for poll responses (where the poll pages are hosted)
     const baseUrl = process.env.NEXTAUTH_URL || 'https://www.aiprodaily.com'
 
@@ -583,10 +583,8 @@ export async function generatePollSection(issue: { id: string; publication_id: s
       return ''
     }
 
-    // Create a light background color from the primary color
-    const lightBackground = getLightBackground(primaryColor)
-
     // Generate button HTML for each option
+    // Button background: tertiary color, Button text: primary color
     const optionsHtml = pollData.options.map((option: string, index: number) => {
       const isLast = index === pollData.options.length - 1
       const paddingStyle = isLast ? 'padding:0;' : 'padding:0 0 8px 0;'
@@ -595,7 +593,7 @@ export async function generatePollSection(issue: { id: string; publication_id: s
               <tr>
                 <td style="${paddingStyle}">
                   <a href="${baseUrl}/api/polls/${pollData.id}/respond?option=${encodeURIComponent(option)}&amp;issue_id=${issue.id}&amp;email={$email}"
-                     style="display:block; text-decoration:none; background:${primaryColor}; color:#ffffff; font-weight:bold;
+                     style="display:block; text-decoration:none; background:${tertiaryColor}; color:${primaryColor}; font-weight:bold;
                             font-size:16px; line-height:20px; padding:12px; border-radius:8px; text-align:center;">${option}</a>
                 </td>
               </tr>`
@@ -611,14 +609,14 @@ export async function generatePollSection(issue: { id: string; publication_id: s
           <td style="padding:5px;">
             <!-- Poll Box -->
             <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"
-                   style="width:100%; max-width:650px; margin:10px auto; background-color:${lightBackground};
+                   style="width:100%; max-width:650px; margin:10px auto; background-color:${primaryColor};
                           border:2px solid ${primaryColor}; border-radius:10px; font-family:Arial, sans-serif; box-shadow:0 4px 12px rgba(0,0,0,.15);">
               <tr>
-                <td style="padding:14px; color:#1a1a1a; font-size:16px; line-height:1.5; text-align:center;">
+                <td style="padding:14px; color:#ffffff; font-size:16px; line-height:1.5; text-align:center;">
 
                   <!-- Text Sections -->
-                  <p style="margin:0 0 6px 0; font-weight:bold; font-size:20px; color:${primaryColor}; text-align:center;">${pollData.title}</p>
-                  <p style="margin:0 0 14px 0; font-size:16px; color:#333; text-align:center;">
+                  <p style="margin:0 0 6px 0; font-weight:bold; font-size:20px; color:#ffffff; text-align:center;">${pollData.title}</p>
+                  <p style="margin:0 0 14px 0; font-size:16px; color:#ffffff; text-align:center;">
                     ${pollData.question}
                   </p>
 
