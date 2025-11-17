@@ -541,8 +541,9 @@ export async function generateMinnesotaGetawaysSection(issue: any): Promise<stri
 export async function generatePollSection(issue: { id: string; publication_id: string; status?: string; poll_id?: string | null }): Promise<string> {
   try {
     // Fetch colors and website URL from business settings (using publication_id)
-    const { primaryColor, headingFont, bodyFont, websiteUrl } = await fetchBusinessSettings(issue.publication_id)
-    const baseUrl = websiteUrl
+    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue.publication_id)
+    // Use the main app domain for poll responses (where the poll pages are hosted)
+    const baseUrl = process.env.NEXTAUTH_URL || 'https://www.aiprodaily.com'
 
     let pollData = null
 
