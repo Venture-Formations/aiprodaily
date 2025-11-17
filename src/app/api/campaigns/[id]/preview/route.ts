@@ -173,6 +173,7 @@ async function generateNewsletterHtml(issue: any): Promise<string> {
 
     const formattedDate = formatDate(issue.date)
     console.log('Formatted date:', formattedDate)
+    console.log('PREVIEW DEBUG: issue.publication_id =', issue.publication_id)
 
     // Generate modular HTML sections with tracking parameters
     // mailerlite_issue_id might not exist yet, so it's optional

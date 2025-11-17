@@ -172,6 +172,7 @@ export async function getBusinessSettings(publicationId: string): Promise<{
   newsletter_name: string
   business_name: string
 }> {
+  console.log('[SETTINGS DEBUG] getBusinessSettings called with publicationId:', publicationId)
   const settings = await getPublicationSettings(publicationId, [
     'primary_color',
     'secondary_color',
@@ -184,7 +185,9 @@ export async function getBusinessSettings(publicationId: string): Promise<{
     'business_name',
   ])
 
-  return {
+  console.log('[SETTINGS DEBUG] Raw settings from DB:', settings)
+
+  const result = {
     primary_color: settings.primary_color || '#1877F2',
     secondary_color: settings.secondary_color || '#10B981',
     heading_font: settings.heading_font || 'Arial, sans-serif',
@@ -195,6 +198,9 @@ export async function getBusinessSettings(publicationId: string): Promise<{
     newsletter_name: settings.newsletter_name || 'Newsletter',
     business_name: settings.business_name || 'Business',
   }
+
+  console.log('[SETTINGS DEBUG] Returning business settings:', result)
+  return result
 }
 
 /**
