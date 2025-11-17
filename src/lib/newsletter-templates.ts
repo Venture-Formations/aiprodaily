@@ -288,11 +288,12 @@ async function fetchBusinessSettings(): Promise<{
   secondaryColor: string;
   headingFont: string;
   bodyFont: string;
+  websiteUrl: string;
 }> {
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
     .select('key, value')
-    .in('key', ['primary_color', 'secondary_color', 'heading_font', 'body_font'])
+    .in('key', ['primary_color', 'secondary_color', 'heading_font', 'body_font', 'website_url'])
 
   const settingsMap: Record<string, string> = {}
   settings?.forEach(setting => {
@@ -303,7 +304,8 @@ async function fetchBusinessSettings(): Promise<{
     primaryColor: settingsMap.primary_color || '#1877F2',
     secondaryColor: settingsMap.secondary_color || '#10B981',
     headingFont: settingsMap.heading_font || 'Arial, sans-serif',
-    bodyFont: settingsMap.body_font || 'Arial, sans-serif'
+    bodyFont: settingsMap.body_font || 'Arial, sans-serif',
+    websiteUrl: settingsMap.website_url || 'https://www.aiaccountingdaily.com'
   }
 }
 
@@ -505,11 +507,10 @@ export async function generateMinnesotaGetawaysSection(issue: any): Promise<stri
 // ==================== POLL SECTION ====================
 
 export async function generatePollSection(issue: { id: string; publication_id: string }): Promise<string> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.aiaccountingdaily.com'
-
   try {
-    // Fetch colors from business settings
-    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
+    // Fetch colors and website URL from business settings
+    const { primaryColor, headingFont, bodyFont, websiteUrl } = await fetchBusinessSettings()
+    const baseUrl = websiteUrl
 
     // Get active poll for this publication
     const { data: pollData } = await supabaseAdmin
