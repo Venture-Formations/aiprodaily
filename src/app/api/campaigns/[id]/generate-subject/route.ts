@@ -99,15 +99,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Use the #1 ranked article (rank 1) for subject line generation
     const topArticle = activeArticles[0]
-    console.log(`Generating subject line based on current #1 ranked article (excluding skipped): "${topArticle.headline}" (rank: ${topArticle.rank || 'unranked'}, score: ${topArticle.rss_post?.post_rating?.[0]?.total_score || 0})`)
-    console.log(`Total active non-skipped articles: ${activeArticles.length}`)
-    console.log('Top article full content:', {
-      headline: topArticle.headline,
-      content: topArticle.content,
-      content_length: topArticle.content?.length || 0,
-      is_active: topArticle.is_active,
-      skipped: topArticle.skipped
-    })
+    console.log(`[Subject Line] Using article: "${topArticle.headline}" (rank: ${topArticle.rank || 'unranked'})`)
 
     // Get publication_id from issue
     const newsletterId = issue.publication_id
@@ -119,10 +111,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Generate subject line using AI_CALL (handles prompt + provider + call)
     const result = await AI_CALL.subjectLineGenerator(topArticle, newsletterId, 100, 0.8)
-
-    console.log('=== AI RESPONSE ===')
-    console.log(result)
-    console.log('=== END AI RESPONSE ===')
 
     // Handle both plain text and JSON responses
     let subjectLine = ''
@@ -143,8 +131,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (!subjectLine) {
       throw new Error('Empty subject line response from AI')
     }
-
-    console.log(`Processed subject line: "${subjectLine}" (${subjectLine.length} chars)`)
 
     // Update issue with generated subject line
     const { error: updateError } = await supabaseAdmin
