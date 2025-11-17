@@ -10,12 +10,12 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Archive Missing] Looking for issues since ${sinceDate}, dryRun=${dryRun}`)
 
-    // Find all issues that were sent (has final_send_at) but not archived
+    // Find all issues that were sent (has final_sent_at) but not archived
     const { data: sentIssues, error: issuesError } = await supabaseAdmin
       .from('publication_issues')
-      .select('id, publication_id, date, subject_line, final_send_at')
+      .select('id, publication_id, date, subject_line, final_sent_at')
       .gte('date', sinceDate)
-      .not('final_send_at', 'is', null)
+      .not('final_sent_at', 'is', null)
       .order('date', { ascending: true })
 
     if (issuesError) {
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
           publication_id: issue.publication_id,
           date: issue.date,
           subject_line: issue.subject_line,
-          final_send_at: issue.final_send_at
+          final_sent_at: issue.final_sent_at
         })),
         note: 'Add ?dryRun=false to actually archive these issues'
       })
