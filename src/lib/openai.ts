@@ -132,8 +132,14 @@ async function getPromptJSON(key: string, newsletterId: string, fallbackText?: s
       // Don't delete 'input' - keep it so it can be used directly if needed
     }
 
-    // Add provider info for routing (default to openai, publication_settings doesn't store ai_provider separately)
-    promptJSON._provider = 'openai'
+    // Auto-detect provider from model name
+    const modelName = (promptJSON.model || '').toLowerCase()
+    if (modelName.includes('claude') || modelName.includes('sonnet') || modelName.includes('opus') || modelName.includes('haiku')) {
+      promptJSON._provider = 'claude'
+      console.log(`[AI] Auto-detected Claude provider from model: ${promptJSON.model}`)
+    } else {
+      promptJSON._provider = 'openai'
+    }
 
     return promptJSON
   } catch (error) {
