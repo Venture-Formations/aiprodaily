@@ -345,6 +345,27 @@ export async function getCriteriaSettings(publicationId: string): Promise<{
   }
 }
 
+/**
+ * Get email schedule settings for a publication
+ */
+export async function getScheduleSettings(publicationId: string): Promise<{
+  reviewSendTime: string
+  finalSendTime: string
+  timezoneId: number
+}> {
+  const settings = await getPublicationSettings(publicationId, [
+    'email_scheduledSendTime',
+    'email_dailyScheduledSendTime',
+    'email_timezone_id',
+  ])
+
+  return {
+    reviewSendTime: settings.email_scheduledSendTime || '21:00',
+    finalSendTime: settings.email_dailyScheduledSendTime || '04:55',
+    timezoneId: parseInt(settings.email_timezone_id || '157', 10), // 157 = Central Time
+  }
+}
+
 // ==================== MIGRATION HELPER ====================
 
 /**

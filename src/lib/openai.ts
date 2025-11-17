@@ -36,27 +36,62 @@ async function getPrompt(key: string, fallback: string): Promise<string> {
 // Returns the prompt exactly as stored (complete JSON with model, messages, temperature, etc.)
 async function getPromptJSON(key: string, newsletterId: string, fallbackText?: string): Promise<any> {
   try {
+    // Try publication_settings first (with ai_provider column)
     const { data, error } = await supabaseAdmin
-      .from('app_settings')
-      .select('value, ai_provider')
+      .from('publication_settings')
+      .select('value')
       .eq('publication_id', newsletterId)
       .eq('key', key)
       .single()
 
     if (error || !data) {
-      console.warn(`⚠️  [AI-PROMPT] FALLBACK USED: ${key} (not found in database)`)
-      console.warn(`⚠️  [AI-PROMPT] Run migration: GET /api/debug/migrate-ai-prompts?dry_run=false`)
+      // Fallback to app_settings with WARNING log
+      const { data: fallbackData, error: fallbackError } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', key)
+        .single()
 
-      if (!fallbackText) {
-        throw new Error(`Prompt ${key} not found and no fallback provided`)
+      if (fallbackError || !fallbackData) {
+        console.warn(`⚠️  [AI-PROMPT] FALLBACK USED: ${key} (not found in database)`)
+        console.warn(`⚠️  [AI-PROMPT] Run migration: GET /api/debug/migrate-ai-prompts?dry_run=false`)
+
+        if (!fallbackText) {
+          throw new Error(`Prompt ${key} not found and no fallback provided`)
+        }
+
+        // Wrap fallback text in minimal JSON structure
+        return {
+          model: 'gpt-4o',
+          messages: [{ role: 'user', content: fallbackText }],
+          _provider: 'openai'
+        }
       }
 
-      // Wrap fallback text in minimal JSON structure
-      return {
-        model: 'gpt-4o',
-        messages: [{ role: 'user', content: fallbackText }],
-        _provider: 'openai'
+      console.warn(`[SETTINGS FALLBACK] Using app_settings for key="${key}" (publication=${newsletterId}). Migrate this setting!`)
+      // Use fallback data
+      const valueToProcess = fallbackData.value
+      let promptJSON: any
+      if (typeof valueToProcess === 'string') {
+        try {
+          promptJSON = JSON.parse(valueToProcess)
+        } catch (parseError) {
+          throw new Error(`Prompt ${key} is not valid JSON. It must be structured JSON with a 'messages' array. Error: ${parseError instanceof Error ? parseError.message : 'Parse failed'}`)
+        }
+      } else if (typeof valueToProcess === 'object' && valueToProcess !== null) {
+        promptJSON = valueToProcess
+      } else {
+        throw new Error(`Prompt ${key} has invalid format. Expected structured JSON with a 'messages' array, got ${typeof valueToProcess}`)
       }
+
+      if (!promptJSON.messages && !promptJSON.input) {
+        throw new Error(`Prompt ${key} is missing 'messages' or 'input' array.`)
+      }
+      if (promptJSON.input && !promptJSON.messages) {
+        promptJSON.messages = promptJSON.input
+      }
+      promptJSON._provider = 'openai'
+      return promptJSON
     }
 
     // Parse value - must be valid structured JSON
@@ -97,9 +132,8 @@ async function getPromptJSON(key: string, newsletterId: string, fallbackText?: s
       // Don't delete 'input' - keep it so it can be used directly if needed
     }
 
-    // Add provider info for routing
-    const provider = (data.ai_provider === 'claude' ? 'claude' : 'openai') as 'openai' | 'claude'
-    promptJSON._provider = provider
+    // Add provider info for routing (default to openai, publication_settings doesn't store ai_provider separately)
+    promptJSON._provider = 'openai'
 
     return promptJSON
   } catch (error) {

@@ -6,6 +6,12 @@ import { GitHubImageStorage } from './github-storage'
 import { ArticleArchiveService } from './article-archive'
 import { ArticleExtractor } from './article-extractor'
 import { Deduplicator } from './deduplicator'
+import {
+  getArticleSettings,
+  getExcludedRssSources,
+  getCriteriaSettings,
+  getPublicationSettings
+} from './publication-settings'
 import type {
   RssFeed,
   RssPost,
@@ -595,16 +601,8 @@ export class RSSProcessor {
 
       if (existing) continue
 
-      // Get excluded sources
-      const { data: excludedSettings } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'excluded_rss_sources')
-        .single()
-
-      const excludedSources: string[] = excludedSettings?.value
-        ? JSON.parse(excludedSettings.value)
-        : []
+      // Get excluded sources from publication_settings
+      const excludedSources = await getExcludedRssSources(newsletterId)
 
       const author = item.creator || (item as any)['dc:creator'] || null
       const blockImages = excludedSources.includes(author)
@@ -939,14 +937,12 @@ export class RSSProcessor {
    * Assign top-scoring posts from pool to issue
    */
   private async assignTopPostsToissue(issueId: string): Promise<{ primary: number; secondary: number }> {
-    // Get lookback window
-    const { data: lookbackSetting } = await supabaseAdmin
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'primary_article_lookback_hours')
-      .single()
+    // Get publication_id for multi-tenant settings
+    const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
-    const lookbackHours = lookbackSetting ? parseInt(lookbackSetting.value) : 72
+    // Get lookback window from publication_settings
+    const articleSettings = await getArticleSettings(newsletterId)
+    const lookbackHours = articleSettings.primaryLookbackHours
     const lookbackDate = new Date()
     lookbackDate.setHours(lookbackDate.getHours() - lookbackHours)
     const lookbackTimestamp = lookbackDate.toISOString()
@@ -1407,16 +1403,11 @@ export class RSSProcessor {
 
   private async processFeed(feed: RssFeed, issueId: string, section: 'primary' | 'secondary' = 'primary') {
     try {
-      // Get excluded RSS sources from settings
-      const { data: excludedSettings } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'excluded_rss_sources')
-        .single()
+      // Get publication_id for multi-tenant settings
+      const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
-      const excludedSources: string[] = excludedSettings?.value
-        ? JSON.parse(excludedSettings.value)
-        : []
+      // Get excluded RSS sources from publication_settings
+      const excludedSources = await getExcludedRssSources(newsletterId)
 
       const rssFeed = await parser.parseURL(feed.url)
 
@@ -1686,7 +1677,7 @@ export class RSSProcessor {
     const criteriaPrefix = section === 'primary' ? 'criteria_' : 'secondary_criteria_'
 
     const { data: criteriaConfig, error: configError } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('key, value')
       .eq('publication_id', newsletterId)
       .or(`key.eq.${enabledCountKey},key.eq.criteria_enabled_count,key.like.${criteriaPrefix}%_name,key.like.${criteriaPrefix}%_weight,key.like.criteria_%_name,key.like.criteria_%_weight`)
@@ -1846,7 +1837,7 @@ export class RSSProcessor {
 
       // Load deduplication settings
       const { data: settings } = await supabaseAdmin
-        .from('app_settings')
+        .from('publication_settings')
         .select('key, value')
         .eq('publication_id', newsletterId)
         .in('key', ['dedup_historical_lookback_days', 'dedup_strictness_threshold'])
@@ -2116,7 +2107,7 @@ export class RSSProcessor {
 
       // Get max_top_articles setting (defaults to 3)
       const { data: maxTopArticlesSetting } = await supabaseAdmin
-        .from('app_settings')
+        .from('publication_settings')
         .select('value')
         .eq('publication_id', newsletterId)
         .eq('key', 'max_top_articles')
@@ -2126,7 +2117,7 @@ export class RSSProcessor {
 
       // Get lookback hours setting (defaults to 72 hours)
       const { data: lookbackSetting } = await supabaseAdmin
-        .from('app_settings')
+        .from('publication_settings')
         .select('value')
         .eq('publication_id', newsletterId)
         .eq('key', 'primary_article_lookback_hours')
@@ -2228,7 +2219,7 @@ export class RSSProcessor {
 
       // Get max_secondary_articles setting (defaults to 3)
       const { data: maxSecondaryArticlesSetting } = await supabaseAdmin
-        .from('app_settings')
+        .from('publication_settings')
         .select('value')
         .eq('publication_id', newsletterId)
         .eq('key', 'max_secondary_articles')
@@ -2238,7 +2229,7 @@ export class RSSProcessor {
 
       // Get lookback hours setting (defaults to 36 hours for secondary)
       const { data: lookbackSetting } = await supabaseAdmin
-        .from('app_settings')
+        .from('publication_settings')
         .select('value')
         .eq('publication_id', newsletterId)
         .eq('key', 'secondary_article_lookback_hours')

@@ -9,6 +9,7 @@ import {
   generatePollSection,
   generateAdvertorialSection
 } from './newsletter-templates'
+import { getEmailSettings, getScheduleSettings } from './publication-settings'
 
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
 
@@ -44,27 +45,18 @@ export class MailerLiteService {
       const newsletterSlug = (dbissue as any)?.newsletters?.slug || 'accounting'
       const newsletterName = newsletterSlug.charAt(0).toUpperCase() + newsletterSlug.slice(1)
 
-      // Get sender and group settings from database
-      const { data: settings } = await supabaseAdmin
-        .from('app_settings')
-        .select('key, value')
-        .in('key', ['email_senderName', 'email_fromEmail', 'email_reviewGroupId', 'subject_line_emoji'])
-
-      const settingsMap = (settings || []).reduce((acc, setting) => {
-        acc[setting.key] = setting.value
-        return acc
-      }, {} as Record<string, string>)
-
-      const senderName = settingsMap['email_senderName'] || 'St. Cloud Scoop'
-      const fromEmail = settingsMap['email_fromEmail'] || 'scoop@stcscoop.com'
-      const reviewGroupId = settingsMap['email_reviewGroupId']
-      const subjectEmoji = settingsMap['subject_line_emoji'] || '🧮'
+      // Get sender and group settings from publication_settings (with fallback to app_settings)
+      const emailSettings = await getEmailSettings(issue.publication_id)
+      const senderName = emailSettings.senderName
+      const fromEmail = emailSettings.fromEmail
+      const reviewGroupId = emailSettings.reviewGroupId
+      const subjectEmoji = emailSettings.subjectLineEmoji || '🧮'
 
       if (!reviewGroupId) {
         throw new Error('Review Group ID not configured in database settings')
       }
 
-      console.log('Using database settings:', { senderName, fromEmail, reviewGroupId })
+      console.log('Using publication settings:', { senderName, fromEmail, reviewGroupId })
 
       const emailContent = await this.generateEmailHTML(issue, true)
 
@@ -120,7 +112,7 @@ export class MailerLiteService {
           const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
           const centralDate = new Date(nowCentral)
           const today = centralDate.toISOString().split('T')[0] // Today's date in YYYY-MM-DD
-          scheduleData = await this.getReviewScheduleData(today)
+          scheduleData = await this.getReviewScheduleData(today, issue.publication_id)
           console.log('Scheduling review issue for today with data:', scheduleData)
 
           const scheduleResponse = await mailerliteClient.post(`/campaigns/${issueId}/schedule`, scheduleData)
@@ -504,17 +496,14 @@ export class MailerLiteService {
   }
 
 
-  private async getReviewScheduleData(date: string): Promise<any> {
+  private async getReviewScheduleData(date: string, publicationId: string): Promise<any> {
     try {
-      // Get scheduled send time from database settings
-      const { data: setting } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'email_scheduledSendTime')
-        .single()
+      // Get scheduled send time from publication_settings (with fallback to app_settings)
+      const scheduleSettings = await getScheduleSettings(publicationId)
+      const scheduledTime = scheduleSettings.reviewSendTime
+      const timezoneId = scheduleSettings.timezoneId
 
-      const scheduledTime = setting?.value || '21:00' // Default to 9:00 PM if not found
-      console.log('Using scheduled send time from settings:', scheduledTime)
+      console.log('Using scheduled send time from publication settings:', scheduledTime)
 
       // Parse the time (format: "HH:MM")
       const [hours, minutes] = scheduledTime.split(':')
@@ -526,7 +515,7 @@ export class MailerLiteService {
           date: date, // YYYY-MM-DD format
           hours: hours, // HH format
           minutes: minutes, // MM format
-          timezone_id: 157 // Central Time zone ID (based on your Make.com example)
+          timezone_id: timezoneId // Publication-specific timezone
         }
       }
 
@@ -548,17 +537,14 @@ export class MailerLiteService {
     }
   }
 
-  private async getFinalScheduleData(date: string): Promise<any> {
+  private async getFinalScheduleData(date: string, publicationId: string): Promise<any> {
     try {
-      // Get final send time from database settings
-      const { data: setting } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'email_dailyScheduledSendTime')
-        .single()
+      // Get final send time from publication_settings (with fallback to app_settings)
+      const scheduleSettings = await getScheduleSettings(publicationId)
+      const finalTime = scheduleSettings.finalSendTime
+      const timezoneId = scheduleSettings.timezoneId
 
-      const finalTime = setting?.value || '04:55' // Default to 4:55 AM if not found
-      console.log('Using daily scheduled send time from settings:', finalTime)
+      console.log('Using daily scheduled send time from publication settings:', finalTime)
 
       // Parse the time (format: "HH:MM")
       const [hours, minutes] = finalTime.split(':')
@@ -570,7 +556,7 @@ export class MailerLiteService {
           date: date, // Newsletter date (YYYY-MM-DD format)
           hours: hours, // HH format
           minutes: minutes, // MM format
-          timezone_id: 157 // Central Time zone ID
+          timezone_id: timezoneId // Publication-specific timezone
         }
       }
 
@@ -606,27 +592,18 @@ export class MailerLiteService {
       const newsletterSlug = (dbissue as any)?.newsletters?.slug || 'accounting'
       const newsletterName = newsletterSlug.charAt(0).toUpperCase() + newsletterSlug.slice(1)
 
-      // Get sender settings
-      const { data: settings } = await supabaseAdmin
-        .from('app_settings')
-        .select('key, value')
-        .in('key', ['email_senderName', 'email_fromEmail', 'subject_line_emoji'])
-
-      const settingsMap = (settings || []).reduce((acc, setting) => {
-        acc[setting.key] = setting.value
-        return acc
-      }, {} as Record<string, string>)
-
-      const senderName = settingsMap['email_senderName'] || 'St. Cloud Scoop'
-      const fromEmail = settingsMap['email_fromEmail'] || 'scoop@stcscoop.com'
-      const subjectEmoji = settingsMap['subject_line_emoji'] || '🧮'
+      // Get sender settings from publication_settings (with fallback to app_settings)
+      const emailSettings = await getEmailSettings(issue.publication_id)
+      const senderName = emailSettings.senderName
+      const fromEmail = emailSettings.fromEmail
+      const subjectEmoji = emailSettings.subjectLineEmoji || '🧮'
 
       const emailContent = await this.generateEmailHTML(issue, false) // Not a review
 
       const subjectLine = issue.subject_line || `Newsletter - ${new Date(issue.date).toLocaleDateString()}`
 
       console.log('Creating final issue with subject line:', subjectLine)
-      console.log('Using sender settings:', { senderName, fromEmail })
+      console.log('Using publication settings:', { senderName, fromEmail })
 
       const issueData = {
         name: `${newsletterName} Newsletter: ${issue.date}`,
@@ -673,7 +650,7 @@ export class MailerLiteService {
           const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
           const centralDate = new Date(nowCentral)
           const today = centralDate.toISOString().split('T')[0] // Today's date in YYYY-MM-DD
-          const finalScheduleData = await this.getFinalScheduleData(today)
+          const finalScheduleData = await this.getFinalScheduleData(today, issue.publication_id)
           console.log('Scheduling final issue for today with data:', finalScheduleData)
 
           const scheduleResponse = await mailerliteClient.post(`/campaigns/${issueId}/schedule`, finalScheduleData)
@@ -707,7 +684,7 @@ export class MailerLiteService {
             })
 
             // Log to database for persistent tracking
-            const finalScheduleData = await this.getFinalScheduleData(issue.date)
+            const finalScheduleData = await this.getFinalScheduleData(issue.date, issue.publication_id)
             await this.logError('Failed to schedule final issue', {
               issueId: issue.id,
               mailerliteissueId: issueId,

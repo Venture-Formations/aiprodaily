@@ -13,7 +13,7 @@ interface ScheduleSettings {
 export class ScheduleChecker {
   public static async getScheduleSettings(newsletterId: string): Promise<ScheduleSettings> {
     const { data: settings } = await supabaseAdmin
-      .from('app_settings')
+      .from('publication_settings')
       .select('key, value')
       .eq('publication_id', newsletterId)
       .in('key', [
@@ -86,13 +86,15 @@ export class ScheduleChecker {
 
         // Update the last run date to today (for logging/tracking purposes only)
         await supabaseAdmin
-          .from('app_settings')
+          .from('publication_settings')
           .upsert({
             publication_id: newsletterId,
             key: lastRunKey,
             value: today,
             description: `Last run date for ${lastRunKey}`,
             updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'publication_id,key'
           })
 
         console.log(`${lastRunKey} running at ${currentTime} (last run tracking updated to ${today})`)

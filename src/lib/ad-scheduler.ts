@@ -1,10 +1,11 @@
 import { supabaseAdmin } from './supabase'
 import type { Advertisement } from '@/types/database'
+import { getAdSettings, updateNextAdPosition } from './publication-settings'
 
 interface ScheduleContext {
   issueDate: string // YYYY-MM-DD format
   issueId: string
-  newsletterId: string // UUID - needed for app_settings storage
+  newsletterId: string // UUID - needed for publication_settings storage
 }
 
 /**
@@ -24,20 +25,9 @@ export class AdScheduler {
     const { issueId, newsletterId } = context
 
     try {
-      // Get the current next_ad_position from app_settings (per newsletter)
-      const { data: settingsData, error: settingsError } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('publication_id', newsletterId)
-        .eq('key', 'next_ad_position')
-        .maybeSingle()
-
-      if (settingsError) {
-        console.error('[AdScheduler] Error fetching next_ad_position:', settingsError)
-        return null
-      }
-
-      const nextAdPosition = settingsData ? parseInt(settingsData.value) : 1
+      // Get the current next_ad_position from publication_settings (with fallback to app_settings)
+      const adSettings = await getAdSettings(newsletterId)
+      const nextAdPosition = adSettings.nextAdPosition
       console.log(`[AdScheduler] Current next_ad_position: ${nextAdPosition}`)
 
       // Get all active ads for this newsletter with display_order, sorted by display_order
@@ -181,24 +171,12 @@ export class AdScheduler {
         console.log(`[AdScheduler] Moving to next position: ${nextPosition}`)
       }
 
-      // Update next_ad_position in app_settings (upsert in case it doesn't exist)
-      // Store per publication_id due to app_settings table constraints
-      const { error: settingsError } = await supabaseAdmin
-        .from('app_settings')
-        .upsert({
-          key: 'next_ad_position',
-          publication_id: newsletterId,
-          value: nextPosition.toString(),
-          updated_at: new Date().toISOString(),
-          description: 'Next position in ad rotation sequence'
-        }, {
-          onConflict: 'publication_id,key',
-          ignoreDuplicates: false
-        })
+      // Update next_ad_position in publication_settings
+      const { success, error: settingsError } = await updateNextAdPosition(newsletterId, nextPosition)
 
-      if (settingsError) {
+      if (!success) {
         console.error('[AdScheduler] Failed to update next_ad_position:', settingsError)
-        throw settingsError
+        throw new Error(settingsError || 'Failed to update next_ad_position')
       }
 
       console.log(`[AdScheduler] Successfully recorded usage and updated next_ad_position to ${nextPosition}`)
