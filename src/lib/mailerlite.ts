@@ -471,7 +471,7 @@ export class MailerLiteService {
         }
         // Legacy name-based matching for other sections
         else if (section.name === 'Poll') {
-          const pollHtml = await generatePollSection(issue.id)
+          const pollHtml = await generatePollSection(issue)
           if (pollHtml) {
             sectionsHtml += pollHtml
           }

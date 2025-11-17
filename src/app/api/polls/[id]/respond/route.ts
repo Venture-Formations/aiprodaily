@@ -20,11 +20,34 @@ export async function GET(
       )
     }
 
+    // Get the poll to determine publication_id and validate option
+    const { data: poll, error: pollError } = await supabaseAdmin
+      .from('polls')
+      .select('id, publication_id, options')
+      .eq('id', id)
+      .single()
+
+    if (pollError || !poll) {
+      console.error('[Polls] Poll not found:', id)
+      return NextResponse.redirect(
+        new URL('/poll/error?message=Poll not found', request.url)
+      )
+    }
+
+    // Validate that the selected option exists in the poll
+    if (!poll.options.includes(option)) {
+      console.error('[Polls] Invalid option selected:', option)
+      return NextResponse.redirect(
+        new URL('/poll/error?message=Invalid option selected', request.url)
+      )
+    }
+
     // Record the poll response (upsert to handle duplicate responses)
     const { error: responseError } = await supabaseAdmin
       .from('poll_responses')
       .upsert({
         poll_id: id,
+        publication_id: poll.publication_id,
         subscriber_email: email,
         selected_option: option,
         issue_id: issueId || null
@@ -33,20 +56,21 @@ export async function GET(
       })
 
     if (responseError) {
-      console.error('Error recording poll response:', responseError)
+      console.error('[Polls] Error recording poll response:', responseError)
       return NextResponse.redirect(
         new URL('/poll/error?message=Failed to record response', request.url)
       )
     }
 
-    // Get count of unique polls this subscriber has responded to
+    // Get count of unique polls this subscriber has responded to (for this publication)
     const { data: uniquePolls, error: countError } = await supabaseAdmin
       .from('poll_responses')
       .select('poll_id')
       .eq('subscriber_email', email)
+      .eq('publication_id', poll.publication_id)
 
     if (countError) {
-      console.error('Error counting unique polls:', countError)
+      console.error('[Polls] Error counting unique polls:', countError)
     }
 
     const uniquePollCount = uniquePolls ? new Set(uniquePolls.map(r => r.poll_id)).size : 0
@@ -61,25 +85,24 @@ export async function GET(
       )
 
       if (syncResult.success) {
-        console.log(`Successfully synced poll count to MailerLite for ${email}`)
+        console.log(`[Polls] Synced poll count to MailerLite for ${email}: ${uniquePollCount} polls`)
       } else {
-        console.error(`Failed to sync to MailerLite:`, syncResult.error)
+        console.error(`[Polls] Failed to sync to MailerLite:`, syncResult.error)
         // Don't fail the whole request if MailerLite sync fails
       }
     } catch (mailerliteError) {
-      console.error('Error syncing to MailerLite:', mailerliteError)
+      console.error('[Polls] Error syncing to MailerLite:', mailerliteError)
       // Don't fail the whole request if MailerLite sync fails
     }
 
-    console.log(`Poll response recorded: ${email} responded to poll ${id} with option "${option}"`)
-    console.log(`Subscriber has responded to ${uniquePollCount} unique polls`)
+    console.log(`[Polls] Response recorded: ${email} voted "${option}" on poll ${id}`)
 
     // Redirect to thank you page
     return NextResponse.redirect(
       new URL('/poll/thank-you', request.url)
     )
   } catch (error) {
-    console.error('Error in GET /api/polls/[id]/respond:', error)
+    console.error('[Polls] Error in GET /api/polls/[id]/respond:', error)
     return NextResponse.redirect(
       new URL('/poll/error?message=An unexpected error occurred', request.url)
     )

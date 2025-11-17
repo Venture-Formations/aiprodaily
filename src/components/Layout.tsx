@@ -43,7 +43,7 @@ export default function Layout({ children }: LayoutProps) {
   useEffect(() => {
     if (pathname) {
       const match = pathname.match(/^\/dashboard\/([^\/]+)/)
-      if (match && match[1] !== 'campaigns' && match[1] !== 'analytics' && match[1] !== 'databases' && match[1] !== 'settings' && match[1] !== 'logs' && match[1] !== 'polls') {
+      if (match && match[1] !== 'campaigns' && match[1] !== 'analytics' && match[1] !== 'databases' && match[1] !== 'settings' && match[1] !== 'logs') {
         setNewsletterSlug(match[1])
       } else {
         setNewsletterSlug(null)

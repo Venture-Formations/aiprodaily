@@ -486,23 +486,24 @@ export async function generateMinnesotaGetawaysSection(issue: any): Promise<stri
 
 // ==================== POLL SECTION ====================
 
-export async function generatePollSection(issueId: string): Promise<string> {
+export async function generatePollSection(issue: { id: string; publication_id: string }): Promise<string> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.aiaccountingdaily.com'
 
   try {
     // Fetch colors from business settings
     const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
 
-    // Get active poll
+    // Get active poll for this publication
     const { data: pollData } = await supabaseAdmin
       .from('polls')
-      .select('*')
+      .select('id, publication_id, title, question, options, is_active')
+      .eq('publication_id', issue.publication_id)
       .eq('is_active', true)
       .limit(1)
       .single()
 
     if (!pollData) {
-      console.log('No active poll found, skipping poll section')
+      console.log(`[Polls] No active poll found for publication ${issue.publication_id}, skipping poll section`)
       return ''
     }
 
@@ -514,7 +515,7 @@ export async function generatePollSection(issueId: string): Promise<string> {
       return `
               <tr>
                 <td style="${paddingStyle}">
-                  <a href="${baseUrl}/api/polls/${pollData.id}/respond?option=${encodeURIComponent(option)}&amp;issueId=${issueId}&amp;email={$email}"
+                  <a href="${baseUrl}/api/polls/${pollData.id}/respond?option=${encodeURIComponent(option)}&amp;issue_id=${issue.id}&amp;email={$email}"
                      style="display:block; text-decoration:none; background:${primaryColor}; color:#ffffff; font-weight:bold;
                             font-size:16px; line-height:20px; padding:12px; border-radius:8px; text-align:center;">${option}</a>
                 </td>

@@ -8,16 +8,38 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+    const searchParams = request.nextUrl.searchParams
+    const publicationId = searchParams.get('publication_id')
+
+    if (!publicationId) {
+      return NextResponse.json(
+        { error: 'publication_id is required' },
+        { status: 400 }
+      )
+    }
+
+    // Verify poll belongs to this publication
+    const { data: poll, error: pollError } = await supabaseAdmin
+      .from('polls')
+      .select('id')
+      .eq('id', id)
+      .eq('publication_id', publicationId)
+      .single()
+
+    if (pollError || !poll) {
+      return NextResponse.json({ error: 'Poll not found' }, { status: 404 })
+    }
 
     // Get all responses for this poll
     const { data: responses, error } = await supabaseAdmin
       .from('poll_responses')
-      .select('*')
+      .select('id, poll_id, publication_id, issue_id, subscriber_email, selected_option, responded_at')
       .eq('poll_id', id)
+      .eq('publication_id', publicationId)
       .order('responded_at', { ascending: false })
 
     if (error) {
-      console.error('Error fetching poll responses:', error)
+      console.error('[Polls] Error fetching poll responses:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
@@ -41,7 +63,7 @@ export async function GET(
       }
     })
   } catch (error) {
-    console.error('Error in GET /api/polls/[id]/responses:', error)
+    console.error('[Polls] Error in GET /api/polls/[id]/responses:', error)
     return NextResponse.json(
       { error: 'Failed to fetch poll responses' },
       { status: 500 }
@@ -66,32 +88,49 @@ export async function POST(
       )
     }
 
+    // Get the poll to determine publication_id and validate option
+    const { data: poll, error: pollError } = await supabaseAdmin
+      .from('polls')
+      .select('id, publication_id, options')
+      .eq('id', id)
+      .single()
+
+    if (pollError || !poll) {
+      return NextResponse.json({ error: 'Poll not found' }, { status: 404 })
+    }
+
+    // Validate that the selected option exists in the poll
+    if (!poll.options.includes(selected_option)) {
+      return NextResponse.json(
+        { error: 'Invalid option selected' },
+        { status: 400 }
+      )
+    }
+
     // Use upsert to handle duplicate responses (update instead of error)
     const { data: response, error } = await supabaseAdmin
       .from('poll_responses')
       .upsert({
         poll_id: id,
+        publication_id: poll.publication_id,
         subscriber_email,
         selected_option,
         issue_id: issue_id || null
       }, {
         onConflict: 'poll_id,subscriber_email'
       })
-      .select()
+      .select('id, poll_id, publication_id, issue_id, subscriber_email, selected_option, responded_at')
       .single()
 
     if (error) {
-      console.error('Error recording poll response:', error)
+      console.error('[Polls] Error recording poll response:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // TODO: Sync to MailerLite - count unique polls this subscriber has responded to
-    // and update their "Poll Responses" field
-    // This will be implemented in the MailerLite sync task
-
+    console.log(`[Polls] Recorded response from ${subscriber_email} for poll ${id}`)
     return NextResponse.json({ response }, { status: 201 })
   } catch (error) {
-    console.error('Error in POST /api/polls/[id]/responses:', error)
+    console.error('[Polls] Error in POST /api/polls/[id]/responses:', error)
     return NextResponse.json(
       { error: 'Failed to record poll response' },
       { status: 500 }

@@ -469,6 +469,7 @@ export interface LinkClick {
 
 export interface Poll {
   id: string
+  publication_id: string
   title: string
   question: string
   options: string[]
@@ -480,6 +481,7 @@ export interface Poll {
 export interface PollResponse {
   id: string
   poll_id: string
+  publication_id: string
   issue_id: string | null
   subscriber_email: string
   selected_option: string
