@@ -1911,25 +1911,6 @@ export async function callWithStructuredPrompt(
   // Replace all placeholders in the entire config
   const processedRequest = replacePlaceholders(apiRequest)
 
-  // Log subject line API calls (full request)
-  const isSubjectLine = promptKey === 'ai_prompt_subject_line'
-  if (isSubjectLine) {
-    try {
-      const requestString = JSON.stringify(processedRequest, null, 2)
-      const lines = requestString.split('\n')
-      const first20Lines = lines.slice(0, 20).join('\n')
-      const remainingLines = lines.length - 20
-      console.log(`[Subject Line API Request] Provider: ${provider}, Prompt Key: ${promptKey}`)
-      console.log(`[Subject Line API Request] First 20 lines (${remainingLines > 0 ? `${remainingLines} more lines...` : 'complete'}):`)
-      console.log(first20Lines)
-      if (remainingLines > 0) {
-        console.log(`[Subject Line API Request] ... (${remainingLines} more lines)`)
-      }
-    } catch (logError) {
-      console.error('[Subject Line API Request] Failed to log request:', logError)
-    }
-  }
-
   // Add timeout
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 180000) // 180s (3min) for GPT-5
@@ -1940,17 +1921,6 @@ export async function callWithStructuredPrompt(
     if (provider === 'claude') {
       // Claude API - send exactly as-is (messages stays as messages)
       console.log(`[AI] Using Claude API for prompt (provider: ${provider})`)
-
-      // Log full Claude API call for subject line
-      if (isSubjectLine) {
-        const fullRequestString = JSON.stringify(processedRequest, null, 2)
-        console.log(`[Subject Line API Call] Full Claude API call:`)
-        console.log(`await anthropic.messages.create(`)
-        console.log(fullRequestString)
-        console.log(`, {`)
-        console.log(`  signal: controller.signal`)
-        console.log(`} as any)`)
-      }
 
       const response = await anthropic.messages.create(processedRequest, {
         signal: controller.signal
@@ -1971,17 +1941,6 @@ export async function callWithStructuredPrompt(
       if (processedRequest.messages) {
         processedRequest.input = processedRequest.messages
         delete processedRequest.messages
-      }
-
-      // Log full OpenAI API call for subject line
-      if (isSubjectLine) {
-        const fullRequestString = JSON.stringify(processedRequest, null, 2)
-        console.log(`[Subject Line API Call] Full OpenAI API call:`)
-        console.log(`await (openai as any).responses.create(`)
-        console.log(fullRequestString)
-        console.log(`, {`)
-        console.log(`  signal: controller.signal`)
-        console.log(`})`)
       }
 
       const response = await (openai as any).responses.create(processedRequest, {
