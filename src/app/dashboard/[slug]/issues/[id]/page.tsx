@@ -1541,7 +1541,8 @@ export default function issueDetailPage() {
     s.section_type === 'primary_articles' ||
     (!s.section_type && (s.name.toLowerCase().includes('top') ||
      s.name.toLowerCase().includes('primary') ||
-     s.name.toLowerCase().includes('main')))
+     s.name.toLowerCase().includes('main') ||
+     s.name.toLowerCase().includes('latest')))
   )
   const secondaryArticlesSection = newsletterSections.find(s =>
     s.section_type === 'secondary_articles' ||
