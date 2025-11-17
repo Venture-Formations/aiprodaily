@@ -49,22 +49,33 @@ export async function GET(request: NextRequest) {
     for (const appPrompt of appPrompts || []) {
       const pubPrompt = pubPromptsMap.get(appPrompt.key)
 
+      // Handle both string and object values from app_settings
+      const appValue = typeof appPrompt.value === 'object'
+        ? JSON.stringify(appPrompt.value)
+        : appPrompt.value
+      const pubValue = pubPrompt?.value
+
       const diag: any = {
         key: appPrompt.key,
-        app_value_length: appPrompt.value?.length || 0,
-        pub_value_length: pubPrompt?.value?.length || 0,
-        values_match: appPrompt.value === pubPrompt?.value
+        app_value_type: typeof appPrompt.value,
+        app_value_length: appValue?.length || 0,
+        pub_value_length: pubValue?.length || 0,
+        values_match: appValue === pubValue
       }
 
       // Check if app_settings value is valid JSON
-      try {
-        JSON.parse(appPrompt.value)
+      if (typeof appPrompt.value === 'object') {
         diag.app_is_valid_json = true
-      } catch (e) {
-        diag.app_is_valid_json = false
-        // Plain text prompts are OK
-        if (appPrompt.value?.startsWith('Y') || appPrompt.value?.startsWith('C')) {
-          diag.app_is_plain_text = true
+      } else {
+        try {
+          JSON.parse(appValue)
+          diag.app_is_valid_json = true
+        } catch (e) {
+          diag.app_is_valid_json = false
+          // Plain text prompts are OK
+          if (appValue?.startsWith('Y') || appValue?.startsWith('C')) {
+            diag.app_is_plain_text = true
+          }
         }
       }
 
@@ -73,9 +84,9 @@ export async function GET(request: NextRequest) {
         updates.push({
           id: pubPrompt.id,
           key: appPrompt.key,
-          newValue: appPrompt.value,
-          oldLength: pubPrompt.value?.length || 0,
-          newLength: appPrompt.value?.length || 0
+          newValue: appValue,
+          oldLength: pubValue?.length || 0,
+          newLength: appValue?.length || 0
         })
       }
 
