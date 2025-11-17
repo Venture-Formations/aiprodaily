@@ -199,49 +199,46 @@ async function generateNewsletterHtml(issue: any): Promise<string> {
     let sectionsHtml = ''
     if (sections && sections.length > 0) {
       for (const section of sections) {
-        // Check if this is a primary articles section (display_order 3)
-        if (section.display_order === 3 && activeArticles.length > 0) {
+        // Check section_type to determine what to render
+        if (section.section_type === 'primary_articles' && activeArticles.length > 0) {
           const primaryHtml = await generatePrimaryArticlesSection(activeArticles, issue.date, issue.id, section.name)
           sectionsHtml += primaryHtml
         }
-        // Check if this is a secondary articles section (display_order 5)
-        else if (section.display_order === 5) {
+        else if (section.section_type === 'secondary_articles') {
           const secondaryHtml = await generateSecondaryArticlesSection(issue, section.name)
           sectionsHtml += secondaryHtml
         }
-        // Use section ID for AI Applications (stable across name changes)
-        else if (section.id === SECTION_IDS.AI_APPLICATIONS) {
+        else if (section.section_type === 'ai_applications' || section.id === SECTION_IDS.AI_APPLICATIONS) {
           const aiAppsHtml = await generateAIAppsSection(issue)
           if (aiAppsHtml) {
             sectionsHtml += aiAppsHtml
           }
         }
-        // Use section ID for Prompt Ideas (stable across name changes)
-        else if (section.id === SECTION_IDS.PROMPT_IDEAS) {
+        else if (section.section_type === 'prompt_ideas' || section.id === SECTION_IDS.PROMPT_IDEAS) {
           const promptHtml = await generatePromptIdeasSection(issue)
           if (promptHtml) {
             sectionsHtml += promptHtml
           }
         }
-        // Legacy name-based matching for other sections
-        else if (section.name === 'Poll') {
+        else if (section.section_type === 'poll') {
           const pollHtml = await generatePollSection(issue)
           if (pollHtml) {
             sectionsHtml += pollHtml
           }
-        } else if (section.name === 'Breaking News') {
+        }
+        else if (section.section_type === 'breaking_news') {
           const breakingNewsHtml = await generateBreakingNewsSection(issue)
           if (breakingNewsHtml) {
             sectionsHtml += breakingNewsHtml
           }
-        } else if (section.name === 'Beyond the Feed') {
+        }
+        else if (section.section_type === 'beyond_the_feed') {
           const beyondFeedHtml = await generateBeyondTheFeedSection(issue)
           if (beyondFeedHtml) {
             sectionsHtml += beyondFeedHtml
           }
         }
-        // Use section ID for Advertisement (stable across name changes)
-        else if (section.id === SECTION_IDS.ADVERTISEMENT) {
+        else if (section.section_type === 'advertorial' || section.id === SECTION_IDS.ADVERTISEMENT) {
           const advertorialHtml = await generateAdvertorialSection(issue, false, section.name) // Don't record usage during preview, pass section name
           if (advertorialHtml) {
             sectionsHtml += advertorialHtml

@@ -82,6 +82,43 @@ async function logFinalArticlePositions(issue: any) {
 }
 
 /**
+ * Capture the active poll for this issue at send time
+ * Stores both the poll_id and a snapshot of the poll data
+ */
+async function capturePollForIssue(issueId: string, publicationId: string) {
+  console.log('[Polls] Capturing active poll for issue:', issueId)
+
+  // Get active poll for this publication
+  const { data: activePoll, error } = await supabaseAdmin
+    .from('polls')
+    .select('id, title, question, options')
+    .eq('publication_id', publicationId)
+    .eq('is_active', true)
+    .limit(1)
+    .single()
+
+  if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+    console.error('[Polls] Error fetching active poll:', error)
+    return { poll_id: null, poll_snapshot: null }
+  }
+
+  if (!activePoll) {
+    console.log('[Polls] No active poll found for this publication')
+    return { poll_id: null, poll_snapshot: null }
+  }
+
+  const pollSnapshot = {
+    id: activePoll.id,
+    title: activePoll.title,
+    question: activePoll.question,
+    options: activePoll.options
+  }
+
+  console.log(`[Polls] Captured poll: ${activePoll.title} (${activePoll.id})`)
+  return { poll_id: activePoll.id, poll_snapshot: pollSnapshot }
+}
+
+/**
  * Stage 2 Unassignment: Recycle posts that had articles generated but weren't selected
  * Runs AFTER final_position is set and issue is sent
  */
@@ -278,6 +315,9 @@ export async function POST(request: NextRequest) {
 
     const result = await mailerLiteService.createFinalissue(issue, mainGroupId)
 
+    // Capture the active poll for this issue
+    const { poll_id, poll_snapshot } = await capturePollForIssue(issue.id, newsletter.id)
+
     // Archive the newsletter for website display
     try {
       const archiveResult = await newsletterArchiver.archiveNewsletter({
@@ -298,13 +338,15 @@ export async function POST(request: NextRequest) {
       // Don't fail the send if archiving fails
     }
 
-    // Update issue status to sent and capture the previous status
+    // Update issue status to sent, capture the previous status, and record poll
     const { error: updateError } = await supabaseAdmin
       .from('publication_issues')
       .update({
         status: 'sent',
         status_before_send: issue.status, // Capture the status before sending
         final_sent_at: new Date().toISOString(),
+        poll_id: poll_id,
+        poll_snapshot: poll_snapshot,
         metrics: {
           ...issue.metrics,
           mailerlite_issue_id: result.issueId,
@@ -318,6 +360,9 @@ export async function POST(request: NextRequest) {
       // Don't fail the entire operation - the email was sent successfully
     } else {
       console.log('issue status updated to sent')
+      if (poll_id) {
+        console.log(`✓ Poll recorded: ${poll_snapshot?.title}`)
+      }
     }
 
     // 🔄 Stage 2 Unassignment - Free up unused article posts
@@ -334,6 +379,7 @@ export async function POST(request: NextRequest) {
       message: 'Final newsletter sent successfully',
       issueId: issue.id,
       mailerliteissueId: result.issueId,
+      pollId: poll_id,
       timestamp: new Date().toISOString()
     })
 
@@ -525,6 +571,9 @@ export async function GET(request: NextRequest) {
 
     const result = await mailerLiteService.createFinalissue(issue, mainGroupId)
 
+    // Capture the active poll for this issue
+    const { poll_id, poll_snapshot } = await capturePollForIssue(issue.id, newsletter.id)
+
     // Archive the newsletter for website display
     try {
       const archiveResult = await newsletterArchiver.archiveNewsletter({
@@ -545,13 +594,15 @@ export async function GET(request: NextRequest) {
       // Don't fail the send if archiving fails
     }
 
-    // Update issue status to sent and capture the previous status
+    // Update issue status to sent, capture the previous status, and record poll
     const { error: updateError } = await supabaseAdmin
       .from('publication_issues')
       .update({
         status: 'sent',
         status_before_send: issue.status, // Capture the status before sending
         final_sent_at: new Date().toISOString(),
+        poll_id: poll_id,
+        poll_snapshot: poll_snapshot,
         metrics: {
           ...issue.metrics,
           mailerlite_issue_id: result.issueId,
@@ -565,6 +616,9 @@ export async function GET(request: NextRequest) {
       // Don't fail the entire operation - the email was sent successfully
     } else {
       console.log('issue status updated to sent')
+      if (poll_id) {
+        console.log(`✓ Poll recorded: ${poll_snapshot?.title}`)
+      }
     }
 
     // 🔄 Stage 2 Unassignment - Free up unused article posts
@@ -581,6 +635,7 @@ export async function GET(request: NextRequest) {
       message: 'Final newsletter sent successfully',
       issueId: issue.id,
       mailerliteissueId: result.issueId,
+      pollId: poll_id,
       timestamp: new Date().toISOString()
     })
 

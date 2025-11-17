@@ -125,6 +125,13 @@ export interface PublicationIssue {
   workflow_state: string | null
   workflow_state_started_at: string | null
   workflow_error: string | null
+  poll_id: string | null
+  poll_snapshot: {
+    id: string
+    title: string
+    question: string
+    options: string[]
+  } | null
   created_at: string
   updated_at: string
 }

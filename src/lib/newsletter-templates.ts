@@ -8,6 +8,24 @@ import { normalizeEmailHtml } from './html-normalizer'
 
 // ==================== UTILITY FUNCTIONS ====================
 
+// Helper function to create a light background color from a hex color
+export function getLightBackground(hexColor: string): string {
+  // Remove # if present
+  const hex = hexColor.replace('#', '')
+
+  // Parse RGB values
+  const r = parseInt(hex.substring(0, 2), 16)
+  const g = parseInt(hex.substring(2, 4), 16)
+  const b = parseInt(hex.substring(4, 6), 16)
+
+  // Mix with white (90% white, 10% color) for a very light tint
+  const lightR = Math.round(r * 0.1 + 255 * 0.9)
+  const lightG = Math.round(g * 0.1 + 255 * 0.9)
+  const lightB = Math.round(b * 0.1 + 255 * 0.9)
+
+  return `rgb(${lightR}, ${lightG}, ${lightB})`
+}
+
 export function formatEventDate(dateStr: string): string {
   // Parse date as local date to avoid timezone offset issues
   const [year, month, day] = dateStr.split('-').map(Number)
@@ -507,6 +525,9 @@ export async function generatePollSection(issue: { id: string; publication_id: s
       return ''
     }
 
+    // Create a light background color from the primary color
+    const lightBackground = getLightBackground(primaryColor)
+
     // Generate button HTML for each option
     const optionsHtml = pollData.options.map((option: string, index: number) => {
       const isLast = index === pollData.options.length - 1
@@ -532,7 +553,7 @@ export async function generatePollSection(issue: { id: string; publication_id: s
           <td style="padding:5px;">
             <!-- Poll Box -->
             <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"
-                   style="width:100%; max-width:650px; margin:10px auto; background-color:#E8F0FE;
+                   style="width:100%; max-width:650px; margin:10px auto; background-color:${lightBackground};
                           border:2px solid ${primaryColor}; border-radius:10px; font-family:Arial, sans-serif; box-shadow:0 4px 12px rgba(0,0,0,.15);">
               <tr>
                 <td style="padding:14px; color:#1a1a1a; font-size:16px; line-height:1.5; text-align:center;">
