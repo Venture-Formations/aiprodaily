@@ -21,7 +21,7 @@ export interface Newsletter {
   updated_at: string
 }
 
-export interface NewsletterSetting {
+export interface PublicationSetting {
   id: string
   publication_id: string
   key: string
@@ -32,6 +32,9 @@ export interface NewsletterSetting {
   updated_at: string
   created_at: string
 }
+
+/** @deprecated Use PublicationSetting instead */
+export type NewsletterSetting = PublicationSetting
 
 // AI Professional Newsletter Features
 export type ToolType = 'Client' | 'Firm'
