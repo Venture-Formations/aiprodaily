@@ -295,11 +295,11 @@ async function fetchBusinessSettings(publicationId?: string): Promise<{
   if (publicationId) {
     const settings = await getPublicationBusinessSettings(publicationId)
     return {
-      primaryColor: settings.primaryColor,
-      secondaryColor: settings.secondaryColor,
-      headingFont: settings.headingFont,
-      bodyFont: settings.bodyFont,
-      websiteUrl: settings.websiteUrl,
+      primaryColor: settings.primary_color,
+      secondaryColor: settings.secondary_color,
+      headingFont: settings.heading_font,
+      bodyFont: settings.body_font,
+      websiteUrl: settings.website_url,
     }
   }
 

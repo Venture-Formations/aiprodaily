@@ -162,15 +162,15 @@ export async function getPublicationByDomain(
  * Get business/branding settings for a publication
  */
 export async function getBusinessSettings(publicationId: string): Promise<{
-  primaryColor: string
-  secondaryColor: string
-  headingFont: string
-  bodyFont: string
-  websiteUrl: string
-  logoUrl: string
-  headerImageUrl: string
-  newsletterName: string
-  businessName: string
+  primary_color: string
+  secondary_color: string
+  heading_font: string
+  body_font: string
+  website_url: string
+  logo_url: string
+  header_image_url: string
+  newsletter_name: string
+  business_name: string
 }> {
   const settings = await getPublicationSettings(publicationId, [
     'primary_color',
@@ -185,15 +185,15 @@ export async function getBusinessSettings(publicationId: string): Promise<{
   ])
 
   return {
-    primaryColor: settings.primary_color || '#1877F2',
-    secondaryColor: settings.secondary_color || '#10B981',
-    headingFont: settings.heading_font || 'Arial, sans-serif',
-    bodyFont: settings.body_font || 'Arial, sans-serif',
-    websiteUrl: settings.website_url || 'https://www.example.com',
-    logoUrl: settings.logo_url || '',
-    headerImageUrl: settings.header_image_url || '',
-    newsletterName: settings.newsletter_name || 'Newsletter',
-    businessName: settings.business_name || 'Business',
+    primary_color: settings.primary_color || '#1877F2',
+    secondary_color: settings.secondary_color || '#10B981',
+    heading_font: settings.heading_font || 'Arial, sans-serif',
+    body_font: settings.body_font || 'Arial, sans-serif',
+    website_url: settings.website_url || 'https://www.example.com',
+    logo_url: settings.logo_url || '',
+    header_image_url: settings.header_image_url || '',
+    newsletter_name: settings.newsletter_name || 'Newsletter',
+    business_name: settings.business_name || 'Business',
   }
 }
 
@@ -201,11 +201,11 @@ export async function getBusinessSettings(publicationId: string): Promise<{
  * Get email/MailerLite settings for a publication
  */
 export async function getEmailSettings(publicationId: string): Promise<{
-  senderName: string
-  fromEmail: string
-  reviewGroupId: string
-  subjectLineEmoji: string
-  mailerliteGroupId: string
+  sender_name: string
+  from_email: string
+  review_group_id: string
+  subject_line_emoji: string
+  mailerlite_group_id: string
 }> {
   const settings = await getPublicationSettings(publicationId, [
     'email_senderName',
@@ -216,11 +216,11 @@ export async function getEmailSettings(publicationId: string): Promise<{
   ])
 
   return {
-    senderName: settings.email_senderName || 'Newsletter',
-    fromEmail: settings.email_fromEmail || 'newsletter@example.com',
-    reviewGroupId: settings.email_reviewGroupId || '',
-    subjectLineEmoji: settings.subject_line_emoji || '',
-    mailerliteGroupId: settings.mailerlite_group_id || '',
+    sender_name: settings.email_senderName || 'Newsletter',
+    from_email: settings.email_fromEmail || 'newsletter@example.com',
+    review_group_id: settings.email_reviewGroupId || '',
+    subject_line_emoji: settings.subject_line_emoji || '',
+    mailerlite_group_id: settings.mailerlite_group_id || '',
   }
 }
 
@@ -228,13 +228,13 @@ export async function getEmailSettings(publicationId: string): Promise<{
  * Get article processing settings for a publication
  */
 export async function getArticleSettings(publicationId: string): Promise<{
-  primaryLookbackHours: number
-  secondaryLookbackHours: number
-  maxTopArticles: number
-  maxBottomArticles: number
-  maxSecondaryArticles: number
-  dedupHistoricalDays: number
-  dedupStrictnessThreshold: number
+  primary_lookback_hours: number
+  secondary_lookback_hours: number
+  max_top_articles: number
+  max_bottom_articles: number
+  max_secondary_articles: number
+  dedup_historical_days: number
+  dedup_strictness_threshold: number
 }> {
   const settings = await getPublicationSettings(publicationId, [
     'primary_article_lookback_hours',
@@ -247,13 +247,13 @@ export async function getArticleSettings(publicationId: string): Promise<{
   ])
 
   return {
-    primaryLookbackHours: parseInt(settings.primary_article_lookback_hours || '72', 10),
-    secondaryLookbackHours: parseInt(settings.secondary_article_lookback_hours || '168', 10),
-    maxTopArticles: parseInt(settings.max_top_articles || '3', 10),
-    maxBottomArticles: parseInt(settings.max_bottom_articles || '3', 10),
-    maxSecondaryArticles: parseInt(settings.max_secondary_articles || '3', 10),
-    dedupHistoricalDays: parseInt(settings.dedup_historical_lookback_days || '30', 10),
-    dedupStrictnessThreshold: parseFloat(settings.dedup_strictness_threshold || '0.85'),
+    primary_lookback_hours: parseInt(settings.primary_article_lookback_hours || '72', 10),
+    secondary_lookback_hours: parseInt(settings.secondary_article_lookback_hours || '168', 10),
+    max_top_articles: parseInt(settings.max_top_articles || '3', 10),
+    max_bottom_articles: parseInt(settings.max_bottom_articles || '3', 10),
+    max_secondary_articles: parseInt(settings.max_secondary_articles || '3', 10),
+    dedup_historical_days: parseInt(settings.dedup_historical_lookback_days || '30', 10),
+    dedup_strictness_threshold: parseFloat(settings.dedup_strictness_threshold || '0.85'),
   }
 }
 
@@ -273,9 +273,9 @@ export async function getAIPrompt(
  * Get Slack notification settings for a publication
  */
 export async function getSlackSettings(publicationId: string): Promise<{
-  webhookUrl: string
-  lowArticleCountEnabled: boolean
-  rssProcessingUpdatesEnabled: boolean
+  webhook_url: string
+  low_article_count_enabled: boolean
+  rss_processing_updates_enabled: boolean
 }> {
   const settings = await getPublicationSettings(publicationId, [
     'slack_webhook_url',
@@ -284,9 +284,9 @@ export async function getSlackSettings(publicationId: string): Promise<{
   ])
 
   return {
-    webhookUrl: settings.slack_webhook_url || '',
-    lowArticleCountEnabled: settings.slack_low_article_count_enabled === 'true',
-    rssProcessingUpdatesEnabled: settings.slack_rss_processing_updates_enabled === 'true',
+    webhook_url: settings.slack_webhook_url || '',
+    low_article_count_enabled: settings.slack_low_article_count_enabled === 'true',
+    rss_processing_updates_enabled: settings.slack_rss_processing_updates_enabled === 'true',
   }
 }
 
@@ -294,12 +294,12 @@ export async function getSlackSettings(publicationId: string): Promise<{
  * Get ad rotation settings for a publication
  */
 export async function getAdSettings(publicationId: string): Promise<{
-  nextAdPosition: number
+  next_ad_position: number
 }> {
   const settings = await getPublicationSettings(publicationId, ['next_ad_position'])
 
   return {
-    nextAdPosition: parseInt(settings.next_ad_position || '1', 10),
+    next_ad_position: parseInt(settings.next_ad_position || '1', 10),
   }
 }
 
@@ -331,8 +331,8 @@ export async function getExcludedRssSources(publicationId: string): Promise<stri
  * Get criteria settings for a publication
  */
 export async function getCriteriaSettings(publicationId: string): Promise<{
-  primaryCriteriaEnabledCount: number
-  secondaryCriteriaEnabledCount: number
+  primary_criteria_enabled_count: number
+  secondary_criteria_enabled_count: number
 }> {
   const settings = await getPublicationSettings(publicationId, [
     'primary_criteria_enabled_count',
@@ -340,8 +340,8 @@ export async function getCriteriaSettings(publicationId: string): Promise<{
   ])
 
   return {
-    primaryCriteriaEnabledCount: parseInt(settings.primary_criteria_enabled_count || '4', 10),
-    secondaryCriteriaEnabledCount: parseInt(settings.secondary_criteria_enabled_count || '4', 10),
+    primary_criteria_enabled_count: parseInt(settings.primary_criteria_enabled_count || '4', 10),
+    secondary_criteria_enabled_count: parseInt(settings.secondary_criteria_enabled_count || '4', 10),
   }
 }
 

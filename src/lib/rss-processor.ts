@@ -942,7 +942,7 @@ export class RSSProcessor {
 
     // Get lookback window from publication_settings
     const articleSettings = await getArticleSettings(newsletterId)
-    const lookbackHours = articleSettings.primaryLookbackHours
+    const lookbackHours = articleSettings.primary_lookback_hours
     const lookbackDate = new Date()
     lookbackDate.setHours(lookbackDate.getHours() - lookbackHours)
     const lookbackTimestamp = lookbackDate.toISOString()

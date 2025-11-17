@@ -27,7 +27,7 @@ export class AdScheduler {
     try {
       // Get the current next_ad_position from publication_settings (with fallback to app_settings)
       const adSettings = await getAdSettings(newsletterId)
-      const nextAdPosition = adSettings.nextAdPosition
+      const nextAdPosition = adSettings.next_ad_position
       console.log(`[AdScheduler] Current next_ad_position: ${nextAdPosition}`)
 
       // Get all active ads for this newsletter with display_order, sorted by display_order

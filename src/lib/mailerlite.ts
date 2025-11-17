@@ -47,10 +47,10 @@ export class MailerLiteService {
 
       // Get sender and group settings from publication_settings (with fallback to app_settings)
       const emailSettings = await getEmailSettings(issue.publication_id)
-      const senderName = emailSettings.senderName
-      const fromEmail = emailSettings.fromEmail
-      const reviewGroupId = emailSettings.reviewGroupId
-      const subjectEmoji = emailSettings.subjectLineEmoji || '🧮'
+      const senderName = emailSettings.sender_name
+      const fromEmail = emailSettings.from_email
+      const reviewGroupId = emailSettings.review_group_id
+      const subjectEmoji = emailSettings.subject_line_emoji || '🧮'
 
       if (!reviewGroupId) {
         throw new Error('Review Group ID not configured in database settings')
@@ -594,9 +594,9 @@ export class MailerLiteService {
 
       // Get sender settings from publication_settings (with fallback to app_settings)
       const emailSettings = await getEmailSettings(issue.publication_id)
-      const senderName = emailSettings.senderName
-      const fromEmail = emailSettings.fromEmail
-      const subjectEmoji = emailSettings.subjectLineEmoji || '🧮'
+      const senderName = emailSettings.sender_name
+      const fromEmail = emailSettings.from_email
+      const subjectEmoji = emailSettings.subject_line_emoji || '🧮'
 
       const emailContent = await this.generateEmailHTML(issue, false) // Not a review
 
