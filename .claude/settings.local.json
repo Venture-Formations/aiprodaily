@@ -74,7 +74,8 @@
       "Bash(cut:*)",
       "Bash(ping:*)",
       "Bash(npm uninstall:*)",
-      "Bash(del scriptsrenormalize-gusto-ad.ts)"
+      "Bash(del scriptsrenormalize-gusto-ad.ts)",
+      "WebFetch(domain:www.aiprodaily.com)"
     ],
     "deny": [],
     "ask": []
