@@ -46,9 +46,9 @@ export default async function WebsiteHome() {
   // Fetch newsletters with articles data for images (filtered by publication)
   const { data: newsletters } = await supabaseAdmin
     .from('archived_newsletters')
-    .select('id, issue_date, subject_line, send_date, metadata, articles')
+    .select('id, campaign_id, subject_line, send_date, metadata, articles')
     .eq('publication_id', publicationId)
-    .order('issue_date', { ascending: false })
+    .order('send_date', { ascending: false })
 
   return (
     <main className="min-h-screen">
