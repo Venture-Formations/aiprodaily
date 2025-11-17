@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     const { data: prompts, error } = await supabaseAdmin
       .from('publication_settings')
-      .select('key, value, description, ai_provider, expected_outputs')
+      .select('key, value, description')
       .eq('publication_id', newsletter.id)
       .like('key', 'ai_prompt_%')
       .order('key', { ascending: true })
@@ -79,8 +79,8 @@ export async function GET(request: NextRequest) {
         description: descParts.join(': ') || description,
         value: p.value,
         weight: weight,
-        ai_provider: p.ai_provider || 'openai',
-        expected_outputs: p.expected_outputs || null
+        ai_provider: 'openai',
+        expected_outputs: null
       }
     }) || []
 
