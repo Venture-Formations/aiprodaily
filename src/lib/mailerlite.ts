@@ -500,8 +500,8 @@ export class MailerLiteService {
     try {
       // Get scheduled send time from publication_settings (with fallback to app_settings)
       const scheduleSettings = await getScheduleSettings(publicationId)
-      const scheduledTime = scheduleSettings.reviewSendTime
-      const timezoneId = scheduleSettings.timezoneId
+      const scheduledTime = scheduleSettings.review_send_time
+      const timezoneId = scheduleSettings.timezone_id
 
       console.log('Using scheduled send time from publication settings:', scheduledTime)
 
@@ -541,8 +541,8 @@ export class MailerLiteService {
     try {
       // Get final send time from publication_settings (with fallback to app_settings)
       const scheduleSettings = await getScheduleSettings(publicationId)
-      const finalTime = scheduleSettings.finalSendTime
-      const timezoneId = scheduleSettings.timezoneId
+      const finalTime = scheduleSettings.final_send_time
+      const timezoneId = scheduleSettings.timezone_id
 
       console.log('Using daily scheduled send time from publication settings:', finalTime)
 

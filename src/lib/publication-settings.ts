@@ -349,9 +349,9 @@ export async function getCriteriaSettings(publicationId: string): Promise<{
  * Get email schedule settings for a publication
  */
 export async function getScheduleSettings(publicationId: string): Promise<{
-  reviewSendTime: string
-  finalSendTime: string
-  timezoneId: number
+  review_send_time: string
+  final_send_time: string
+  timezone_id: number
 }> {
   const settings = await getPublicationSettings(publicationId, [
     'email_scheduledSendTime',
@@ -360,9 +360,9 @@ export async function getScheduleSettings(publicationId: string): Promise<{
   ])
 
   return {
-    reviewSendTime: settings.email_scheduledSendTime || '21:00',
-    finalSendTime: settings.email_dailyScheduledSendTime || '04:55',
-    timezoneId: parseInt(settings.email_timezone_id || '157', 10), // 157 = Central Time
+    review_send_time: settings.email_scheduledSendTime || '21:00',
+    final_send_time: settings.email_dailyScheduledSendTime || '04:55',
+    timezone_id: parseInt(settings.email_timezone_id || '157', 10), // 157 = Central Time
   }
 }
 
