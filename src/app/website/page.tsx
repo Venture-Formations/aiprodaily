@@ -15,7 +15,19 @@ export default async function WebsiteHome() {
   const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'aiaccountingdaily.com'
 
   // Get publication ID from domain
-  const publicationId = await getPublicationByDomain(host) || 'accounting'
+  let publicationId = await getPublicationByDomain(host)
+
+  // Fallback: if domain lookup fails, try to get by slug or use first active publication
+  if (!publicationId) {
+    console.warn(`[Website] No publication found for domain: ${host}, falling back to first active`)
+    const { data: firstPub } = await supabaseAdmin
+      .from('publications')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+    publicationId = firstPub?.id || ''
+  }
 
   // Fetch settings from publication_settings
   const settings = await getPublicationSettings(publicationId, [
@@ -31,10 +43,11 @@ export default async function WebsiteHome() {
   const businessName = settings.business_name || 'AI Accounting Daily'
   const currentYear = new Date().getFullYear()
 
-  // Fetch newsletters with articles data for images
+  // Fetch newsletters with articles data for images (filtered by publication)
   const { data: newsletters } = await supabaseAdmin
     .from('archived_newsletters')
     .select('id, issue_date, subject_line, send_date, metadata, articles')
+    .eq('publication_id', publicationId)
     .order('issue_date', { ascending: false })
 
   return (
