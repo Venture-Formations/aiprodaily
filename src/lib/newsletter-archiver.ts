@@ -204,10 +204,10 @@ export class NewsletterArchiver {
       }
 
       // 5. Create archive record
-      const archiveData: Partial<ArchivedNewsletter> = {
-        issue_id: issueId,
+      // Note: Database uses campaign_id column (not issue_id)
+      const archiveData = {
+        campaign_id: issueId,  // Database column is still campaign_id
         publication_id: issue.publication_id,
-        issue_date: issueDate,
         subject_line: subjectLine,
         send_date: new Date().toISOString(),
         recipient_count: recipientCount,
@@ -294,7 +294,7 @@ export class NewsletterArchiver {
           ...updates,
           updated_at: new Date().toISOString()
         })
-        .eq('issue_id', issueId)
+        .eq('campaign_id', issueId)  // Database column is still campaign_id
 
       if (error) {
         console.error('Error updating archive:', error)
