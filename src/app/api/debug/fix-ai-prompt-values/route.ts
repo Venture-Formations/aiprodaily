@@ -80,7 +80,35 @@ export async function GET(request: NextRequest) {
           }
         } catch (e) {
           diag.parse_error = (e as Error).message
-          diag.issue = 'invalid_json'
+
+          // Check if it contains literal \n sequences (not actual newlines)
+          // This causes "Expected property name" errors
+          if (value.includes('\\n') || value.includes('\\t') || value.includes('\\"')) {
+            diag.issue = 'contains_escaped_chars'
+
+            // Try to fix by replacing escaped sequences with actual chars
+            const unescaped = value
+              .replace(/\\n/g, '\n')
+              .replace(/\\t/g, '\t')
+              .replace(/\\"/g, '"')
+              .replace(/\\\\/g, '\\')
+
+            try {
+              JSON.parse(unescaped)
+              diag.fixed_is_valid = true
+              updates.push({
+                id: prompt.id,
+                key: prompt.key,
+                oldValue: value.substring(0, 100) + '...',
+                newValue: unescaped
+              })
+            } catch (e2) {
+              diag.fixed_is_valid = false
+              diag.fix_error = (e2 as Error).message
+            }
+          } else {
+            diag.issue = 'invalid_json'
+          }
         }
       }
 
