@@ -1719,9 +1719,13 @@ export default function issueDetailPage() {
         const maxBottomSetting = data.settings.find((s: any) => s.key === 'max_bottom_articles')
         const maxSecondarySetting = data.settings.find((s: any) => s.key === 'max_secondary_articles')
 
-        setMaxTopArticles(maxTopSetting?.value ? parseInt(maxTopSetting.value) : 3)
-        setMaxBottomArticles(maxBottomSetting?.value ? parseInt(maxBottomSetting.value) : 3)
-        setMaxSecondaryArticles(maxSecondarySetting?.value ? parseInt(maxSecondarySetting.value) : 3)
+        const parsedMaxTop = maxTopSetting?.value ? parseInt(maxTopSetting.value, 10) : 3
+        const parsedMaxBottom = maxBottomSetting?.value ? parseInt(maxBottomSetting.value, 10) : 3
+        const parsedMaxSecondary = maxSecondarySetting?.value ? parseInt(maxSecondarySetting.value, 10) : 3
+
+        setMaxTopArticles(isNaN(parsedMaxTop) ? 3 : parsedMaxTop)
+        setMaxBottomArticles(isNaN(parsedMaxBottom) ? 3 : parsedMaxBottom)
+        setMaxSecondaryArticles(isNaN(parsedMaxSecondary) ? 3 : parsedMaxSecondary)
       }
     } catch (error) {
       console.error('Failed to fetch criteria config:', error)

@@ -299,7 +299,7 @@ function getArticleEmoji(headline: string, content: string): string {
 
 // ==================== HELPER: FETCH COLORS & FONTS ====================
 
-async function fetchBusinessSettings(publicationId?: string): Promise<{
+async function fetchBusinessSettings(publication_id?: string): Promise<{
   primaryColor: string;
   secondaryColor: string;
   headingFont: string;
@@ -307,8 +307,8 @@ async function fetchBusinessSettings(publicationId?: string): Promise<{
   websiteUrl: string;
 }> {
   // If publication_id is provided, use the new helper module (with fallback logging)
-  if (publicationId) {
-    const settings = await getPublicationBusinessSettings(publicationId)
+  if (publication_id) {
+    const settings = await getPublicationBusinessSettings(publication_id)
     return {
       primaryColor: settings.primary_color,
       secondaryColor: settings.secondary_color,
