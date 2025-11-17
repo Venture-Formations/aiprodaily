@@ -54,6 +54,15 @@ export async function GET(request: NextRequest) {
 
     const totalArticlesCount = (articlesCount?.length || 0) + (secondaryArticlesCount?.length || 0);
 
+    // Polls count
+    const { data: pollsCount, error: pollsError } = await supabase
+      .from('polls')
+      .select('id', { count: 'exact' });
+
+    if (pollsError) {
+      console.error('[API] Error fetching polls count:', pollsError.message);
+    }
+
     const databases = [
       {
         name: 'AI Applications',
@@ -78,6 +87,12 @@ export async function GET(request: NextRequest) {
         description: 'Current and past newsletter articles with scoring details',
         count: totalArticlesCount,
         href: '/dashboard/databases/articles'
+      },
+      {
+        name: 'Polls',
+        description: 'Newsletter polls for subscriber engagement',
+        count: pollsCount?.length || 0,
+        href: '/dashboard/polls'
       }
     ];
 
