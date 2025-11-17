@@ -601,11 +601,24 @@ export interface IssueEvent {
 /** @deprecated Use IssueEvent instead */
 export type issueEvent = IssueEvent
 
+export type SectionType =
+  | 'primary_articles'
+  | 'secondary_articles'
+  | 'welcome'
+  | 'ai_applications'
+  | 'prompt_ideas'
+  | 'advertorial'
+  | 'poll'
+  | 'breaking_news'
+  | 'beyond_the_feed'
+  | 'custom'
+
 export interface NewsletterSection {
   id: string
   name: string
   display_order: number
   is_active: boolean
+  section_type?: SectionType
   created_at: string
 }
 
