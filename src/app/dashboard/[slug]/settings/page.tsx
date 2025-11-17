@@ -5041,6 +5041,7 @@ function BusinessSettings() {
     subject_line_emoji: '🧮',
     primary_color: '#3B82F6',
     secondary_color: '#10B981',
+    tertiary_color: '#F59E0B',
     header_image_url: '',
     website_header_url: '',
     logo_url: '',
@@ -5330,6 +5331,28 @@ function BusinessSettings() {
                 onChange={(e) => setSettings({ ...settings, secondary_color: e.target.value })}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 placeholder="#10B981"
+              />
+            </div>
+          </div>
+
+          {/* Tertiary Color */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tertiary Color (Accents)
+            </label>
+            <div className="flex items-center space-x-2">
+              <input
+                type="color"
+                value={settings.tertiary_color}
+                onChange={(e) => setSettings({ ...settings, tertiary_color: e.target.value })}
+                className="h-10 w-20 border border-gray-300 rounded cursor-pointer"
+              />
+              <input
+                type="text"
+                value={settings.tertiary_color}
+                onChange={(e) => setSettings({ ...settings, tertiary_color: e.target.value })}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                placeholder="#F59E0B"
               />
             </div>
           </div>

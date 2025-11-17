@@ -25,12 +25,12 @@ export async function GET(request: NextRequest) {
       }, { status: 500 })
     }
 
-    // Get already archived campaign_ids
+    // Get already archived issue_ids
     const { data: archivedNewsletters } = await supabaseAdmin
       .from('archived_newsletters')
-      .select('campaign_id')
+      .select('issue_id')
 
-    const archivedIds = new Set(archivedNewsletters?.map(a => a.campaign_id) || [])
+    const archivedIds = new Set(archivedNewsletters?.map(a => a.issue_id) || [])
 
     // Find issues that haven't been archived
     const missingArchives = sentIssues?.filter(issue => !archivedIds.has(issue.id)) || []

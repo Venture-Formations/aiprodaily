@@ -174,6 +174,8 @@ export async function getPublicationByDomain(
 export async function getBusinessSettings(publicationId: string): Promise<{
   primary_color: string
   secondary_color: string
+  tertiary_color: string
+  quaternary_color: string
   heading_font: string
   body_font: string
   website_url: string
@@ -186,6 +188,8 @@ export async function getBusinessSettings(publicationId: string): Promise<{
   const settings = await getPublicationSettings(publicationId, [
     'primary_color',
     'secondary_color',
+    'tertiary_color',
+    'quaternary_color',
     'heading_font',
     'body_font',
     'website_url',
@@ -200,6 +204,8 @@ export async function getBusinessSettings(publicationId: string): Promise<{
   const result = {
     primary_color: settings.primary_color || '#1877F2',
     secondary_color: settings.secondary_color || '#10B981',
+    tertiary_color: settings.tertiary_color || '#F59E0B',
+    quaternary_color: settings.quaternary_color || '#8B5CF6',
     heading_font: settings.heading_font || 'Arial, sans-serif',
     body_font: settings.body_font || 'Arial, sans-serif',
     website_url: settings.website_url || 'https://www.example.com',

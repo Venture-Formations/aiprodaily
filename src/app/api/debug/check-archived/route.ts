@@ -5,8 +5,8 @@ export async function GET(request: NextRequest) {
   // Get all archived newsletters with their publication_id
   const { data: archived, error } = await supabaseAdmin
     .from('archived_newsletters')
-    .select('id, campaign_id, publication_id, subject_line, send_date')
-    .order('send_date', { ascending: false })
+    .select('id, issue_id, issue_date, publication_id, subject_line, send_date')
+    .order('issue_date', { ascending: false })
     .limit(30)
 
   // Get distinct publication_ids
@@ -18,7 +18,8 @@ export async function GET(request: NextRequest) {
     error: error?.message,
     newsletters: archived?.map(a => ({
       id: a.id,
-      campaign_id: a.campaign_id,
+      issue_id: a.issue_id,
+      issue_date: a.issue_date,
       publication_id: a.publication_id,
       send_date: a.send_date,
       subject_line: a.subject_line?.substring(0, 50)

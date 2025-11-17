@@ -302,6 +302,8 @@ function getArticleEmoji(headline: string, content: string): string {
 async function fetchBusinessSettings(publication_id?: string): Promise<{
   primaryColor: string;
   secondaryColor: string;
+  tertiaryColor: string;
+  quaternaryColor: string;
   headingFont: string;
   bodyFont: string;
   websiteUrl: string;
@@ -312,6 +314,8 @@ async function fetchBusinessSettings(publication_id?: string): Promise<{
     return {
       primaryColor: settings.primary_color,
       secondaryColor: settings.secondary_color,
+      tertiaryColor: settings.tertiary_color,
+      quaternaryColor: settings.quaternary_color,
       headingFont: settings.heading_font,
       bodyFont: settings.body_font,
       websiteUrl: settings.website_url,
@@ -324,7 +328,7 @@ async function fetchBusinessSettings(publication_id?: string): Promise<{
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
     .select('key, value')
-    .in('key', ['primary_color', 'secondary_color', 'heading_font', 'body_font', 'website_url'])
+    .in('key', ['primary_color', 'secondary_color', 'tertiary_color', 'quaternary_color', 'heading_font', 'body_font', 'website_url'])
 
   const settingsMap: Record<string, string> = {}
   settings?.forEach(setting => {
@@ -334,6 +338,8 @@ async function fetchBusinessSettings(publication_id?: string): Promise<{
   return {
     primaryColor: settingsMap.primary_color || '#1877F2',
     secondaryColor: settingsMap.secondary_color || '#10B981',
+    tertiaryColor: settingsMap.tertiary_color || '#F59E0B',
+    quaternaryColor: settingsMap.quaternary_color || '#8B5CF6',
     headingFont: settingsMap.heading_font || 'Arial, sans-serif',
     bodyFont: settingsMap.body_font || 'Arial, sans-serif',
     websiteUrl: settingsMap.website_url || 'https://www.aiaccountingdaily.com'

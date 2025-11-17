@@ -35,9 +35,9 @@ export default async function NewslettersPage() {
   // Fetch newsletters with articles data for images
   const { data: newsletters } = await supabaseAdmin
     .from('archived_newsletters')
-    .select('id, campaign_id, campaign_date, subject_line, send_date, metadata, articles')
+    .select('id, issue_id, issue_date, subject_line, send_date, metadata, articles')
     .eq('publication_id', publicationId)
-    .order('campaign_date', { ascending: false })
+    .order('issue_date', { ascending: false })
 
   return (
     <main className="min-h-screen bg-[#F5F5F7]">

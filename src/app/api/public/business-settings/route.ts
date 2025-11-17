@@ -29,6 +29,8 @@ export async function GET(request: NextRequest) {
       'business_name',
       'primary_color',
       'secondary_color',
+      'tertiary_color',
+      'quaternary_color',
       'header_image_url',
       'logo_url',
       'contact_email',
