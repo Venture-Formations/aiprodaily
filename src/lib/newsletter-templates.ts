@@ -5,6 +5,7 @@ import { supabaseAdmin } from './supabase'
 import { wrapTrackingUrl } from './url-tracking'
 import { AdScheduler } from './ad-scheduler'
 import { normalizeEmailHtml } from './html-normalizer'
+import { getBusinessSettings as getPublicationBusinessSettings } from './publication-settings'
 
 // ==================== UTILITY FUNCTIONS ====================
 
@@ -283,13 +284,28 @@ function getArticleEmoji(headline: string, content: string): string {
 
 // ==================== HELPER: FETCH COLORS & FONTS ====================
 
-async function fetchBusinessSettings(): Promise<{
+async function fetchBusinessSettings(publicationId?: string): Promise<{
   primaryColor: string;
   secondaryColor: string;
   headingFont: string;
   bodyFont: string;
   websiteUrl: string;
 }> {
+  // If publication_id is provided, use the new helper module (with fallback logging)
+  if (publicationId) {
+    const settings = await getPublicationBusinessSettings(publicationId)
+    return {
+      primaryColor: settings.primaryColor,
+      secondaryColor: settings.secondaryColor,
+      headingFont: settings.headingFont,
+      bodyFont: settings.bodyFont,
+      websiteUrl: settings.websiteUrl,
+    }
+  }
+
+  // Fallback to old behavior (logs warning so we know what to update)
+  console.warn('[SETTINGS] fetchBusinessSettings called without publication_id - update caller to pass publication_id')
+
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
     .select('key, value')
@@ -436,8 +452,8 @@ export async function generateSecondaryArticlesSection(issue: any, sectionName: 
     return ''
   }
 
-  // Fetch colors and fonts from business settings
-  const { primaryColor, secondaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
+  // Fetch colors and fonts from business settings (using publication_id if available)
+  const { primaryColor, secondaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue?.publication_id)
 
   const articlesHtml = secondaryArticles.map((article) => {
     const headline = article.headline || 'No headline'
@@ -508,8 +524,8 @@ export async function generateMinnesotaGetawaysSection(issue: any): Promise<stri
 
 export async function generatePollSection(issue: { id: string; publication_id: string }): Promise<string> {
   try {
-    // Fetch colors and website URL from business settings
-    const { primaryColor, headingFont, bodyFont, websiteUrl } = await fetchBusinessSettings()
+    // Fetch colors and website URL from business settings (using publication_id)
+    const { primaryColor, headingFont, bodyFont, websiteUrl } = await fetchBusinessSettings(issue.publication_id)
     const baseUrl = websiteUrl
 
     // Get active poll for this publication
@@ -600,8 +616,8 @@ export async function generateAdvertorialSection(issue: any, recordUsage: boolea
   try {
     console.log('Generating Advertorial section for issue:', issue?.id, 'recordUsage:', recordUsage)
 
-    // Fetch colors from business settings
-    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
+    // Fetch colors from business settings (using publication_id if available)
+    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue?.publication_id)
 
     // Check if ad already selected for this issue (get most recent if multiple)
     const { data: existingAd } = await supabaseAdmin
@@ -815,8 +831,8 @@ export async function generateBreakingNewsSection(issue: any): Promise<string> {
   try {
     console.log('Generating Breaking News section for issue:', issue?.id)
 
-    // Fetch colors from business settings
-    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
+    // Fetch colors from business settings (using publication_id if available)
+    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue?.publication_id)
 
     // Fetch selected Breaking News articles
     const { data: selections } = await supabaseAdmin
@@ -898,8 +914,8 @@ export async function generateBeyondTheFeedSection(issue: any): Promise<string> 
   try {
     console.log('Generating Beyond the Feed section for issue:', issue?.id)
 
-    // Fetch colors from business settings
-    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
+    // Fetch colors from business settings (using publication_id if available)
+    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue?.publication_id)
 
     // Fetch selected Beyond the Feed articles
     const { data: selections } = await supabaseAdmin
@@ -1014,8 +1030,8 @@ export async function generateAIAppsSection(issue: any): Promise<string> {
     // Import AppSelector
     const { AppSelector } = await import('./app-selector')
 
-    // Fetch colors and fonts from business settings
-    const { primaryColor, secondaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
+    // Fetch colors and fonts from business settings (using publication_id if available)
+    const { primaryColor, secondaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue?.publication_id)
 
     // Get the selected apps for this issue
     const apps = await AppSelector.getAppsForissue(issue.id)
@@ -1080,8 +1096,8 @@ export async function generatePromptIdeasSection(issue: any): Promise<string> {
     // Import PromptSelector
     const { PromptSelector } = await import('./prompt-selector')
 
-    // Fetch colors from business settings
-    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings()
+    // Fetch colors from business settings (using publication_id if available)
+    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue?.publication_id)
 
     // Get the selected prompt for this issue
     const prompt = await PromptSelector.getPromptForissue(issue.id)
