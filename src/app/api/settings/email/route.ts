@@ -42,12 +42,17 @@ export async function GET(request: NextRequest) {
     // Convert rows to object
     const savedSettings: Record<string, string> = {}
     settingsRows?.forEach(row => {
+      // Strip extra quotes if value was JSON stringified (e.g., '"20:30"' -> '20:30')
+      let cleanValue = row.value
+      if (cleanValue && cleanValue.startsWith('"') && cleanValue.endsWith('"') && cleanValue.length > 2) {
+        cleanValue = cleanValue.slice(1, -1)
+      }
       if (row.key.startsWith('email_')) {
         const settingKey = row.key.replace('email_', '')
-        savedSettings[settingKey] = row.value
+        savedSettings[settingKey] = cleanValue
       } else {
         // Keep max_top_articles, max_bottom_articles, and lookback hours as-is
-        savedSettings[row.key] = row.value
+        savedSettings[row.key] = cleanValue
       }
     })
 
