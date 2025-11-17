@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     .limit(30)
 
   // Get distinct publication_ids
-  const publicationIds = [...new Set(archived?.map(a => a.publication_id) || [])]
+  const publicationIds = Array.from(new Set(archived?.map(a => a.publication_id) || []))
 
   return NextResponse.json({
     totalNewsletters: archived?.length || 0,
