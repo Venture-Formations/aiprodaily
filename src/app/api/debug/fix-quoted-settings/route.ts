@@ -39,13 +39,33 @@ async function handleFixQuotedSettings() {
           setting.value.startsWith('"') &&
           setting.value.endsWith('"') &&
           setting.value.length > 2) {
-        const newValue = setting.value.slice(1, -1)
-        updates.push({
-          id: setting.id,
-          key: setting.key,
-          oldValue: setting.value,
-          newValue
-        })
+        let newValue: string
+
+        // Try to parse as JSON first (handles escaped JSON strings)
+        try {
+          const parsed = JSON.parse(setting.value)
+          // If the parsed value is a string, use it directly
+          // If it's an object, stringify it back without extra quotes
+          if (typeof parsed === 'string') {
+            newValue = parsed
+          } else {
+            // This shouldn't happen, but handle it anyway
+            newValue = JSON.stringify(parsed)
+          }
+        } catch (e) {
+          // If JSON.parse fails, fall back to simple quote stripping
+          newValue = setting.value.slice(1, -1)
+        }
+
+        // Only update if the value actually changed
+        if (newValue !== setting.value) {
+          updates.push({
+            id: setting.id,
+            key: setting.key,
+            oldValue: setting.value,
+            newValue
+          })
+        }
       }
     }
 
