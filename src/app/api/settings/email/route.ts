@@ -69,7 +69,10 @@ export async function GET(request: NextRequest) {
       primary_article_lookback_hours: '72',  // 72 hours for primary RSS
       secondary_article_lookback_hours: '36',  // 36 hours for secondary RSS
       dedup_historical_lookback_days: '3',  // 3 days of historical checking
-      dedup_strictness_threshold: '0.80'  // 80% similarity threshold
+      dedup_strictness_threshold: '0.80',  // 80% similarity threshold
+      max_top_articles: '3',  // Max articles for primary section
+      max_bottom_articles: '3',  // Max articles for bottom section
+      max_secondary_articles: '3'  // Max articles for secondary section
     }
 
     const finalSettings = {
