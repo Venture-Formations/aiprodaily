@@ -3,7 +3,16 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
+// Allow both GET and POST for convenience
+export async function GET(request: NextRequest) {
+  return handleFixQuotedSettings()
+}
+
 export async function POST(request: NextRequest) {
+  return handleFixQuotedSettings()
+}
+
+async function handleFixQuotedSettings() {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
@@ -80,3 +89,4 @@ export async function POST(request: NextRequest) {
     }, { status: 500 })
   }
 }
+
