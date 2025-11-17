@@ -538,23 +538,41 @@ export async function generateMinnesotaGetawaysSection(issue: any): Promise<stri
 
 // ==================== POLL SECTION ====================
 
-export async function generatePollSection(issue: { id: string; publication_id: string }): Promise<string> {
+export async function generatePollSection(issue: { id: string; publication_id: string; status?: string; poll_id?: string | null }): Promise<string> {
   try {
     // Fetch colors and website URL from business settings (using publication_id)
     const { primaryColor, headingFont, bodyFont, websiteUrl } = await fetchBusinessSettings(issue.publication_id)
     const baseUrl = websiteUrl
 
-    // Get active poll for this publication
-    const { data: pollData } = await supabaseAdmin
-      .from('polls')
-      .select('id, publication_id, title, question, options, is_active')
-      .eq('publication_id', issue.publication_id)
-      .eq('is_active', true)
-      .limit(1)
-      .single()
+    let pollData = null
+
+    // For sent issues, use the poll that was sent with it (if any)
+    if (issue.status === 'sent') {
+      if (!issue.poll_id) {
+        console.log(`[Polls] Sent issue ${issue.id} has no poll_id, skipping poll section`)
+        return ''
+      }
+      // Fetch the specific poll that was sent with this issue
+      const { data } = await supabaseAdmin
+        .from('polls')
+        .select('id, publication_id, title, question, options, is_active')
+        .eq('id', issue.poll_id)
+        .single()
+      pollData = data
+    } else {
+      // For draft/review issues, get the current active poll
+      const { data } = await supabaseAdmin
+        .from('polls')
+        .select('id, publication_id, title, question, options, is_active')
+        .eq('publication_id', issue.publication_id)
+        .eq('is_active', true)
+        .limit(1)
+        .single()
+      pollData = data
+    }
 
     if (!pollData) {
-      console.log(`[Polls] No active poll found for publication ${issue.publication_id}, skipping poll section`)
+      console.log(`[Polls] No poll found for issue ${issue.id}, skipping poll section`)
       return ''
     }
 
