@@ -1536,8 +1536,17 @@ export default function issueDetailPage() {
   const [loadingSections, setLoadingSections] = useState(false)
 
   // Section IDs for Top and Secondary Articles (to filter from dynamic sections)
-  const primaryArticlesSection = newsletterSections.find(s => s.display_order === 3)
-  const secondaryArticlesSection = newsletterSections.find(s => s.display_order === 5)
+  // Match by name patterns to avoid hardcoded display_order issues
+  const primaryArticlesSection = newsletterSections.find(s =>
+    s.name.toLowerCase().includes('top') ||
+    s.name.toLowerCase().includes('primary') ||
+    s.name.toLowerCase().includes('main')
+  )
+  const secondaryArticlesSection = newsletterSections.find(s =>
+    s.name.toLowerCase().includes('secondary') ||
+    s.name.toLowerCase().includes('updates') ||
+    s.name.toLowerCase().includes('more stories')
+  )
 
   // Criteria and article limits state
   const [criteriaConfig, setCriteriaConfig] = useState<Array<{name: string, weight: number}>>([])
