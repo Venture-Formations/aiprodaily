@@ -11,6 +11,7 @@ import {
   pointerWithin,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent
@@ -1586,6 +1587,12 @@ export default function issueDetailPage() {
     useSensor(PointerSensor, {
       activationConstraint: {
         delay: 250, // 250ms delay before drag starts (better for mobile)
+        tolerance: 5, // Allow 5px of movement before drag starts
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250, // 250ms press delay before drag starts on touch devices
         tolerance: 5, // Allow 5px of movement before drag starts
       },
     }),
