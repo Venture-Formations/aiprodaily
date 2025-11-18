@@ -507,9 +507,17 @@ export class Deduplicator {
 
     console.log(`[DEDUP] AI Semantic (${batchType}): Analyzing ${currentPostCount} current + ${historicalPosts.length} historical = ${postSummaries.length} total posts`)
 
-    const result = await AI_CALL.topicDeduper(postSummaries, newsletterId, 1000, 0.3)
+    let result
+    try {
+      result = await AI_CALL.topicDeduper(postSummaries, newsletterId, 1000, 0.3)
+      console.log(`[DEDUP] AI Semantic (${batchType}): Received result with ${result?.groups?.length || 0} groups`)
+    } catch (error) {
+      console.error(`[DEDUP] AI Semantic (${batchType}): Error calling AI:`, error)
+      return []
+    }
 
     if (!result || typeof result !== 'object' || !Array.isArray(result.groups)) {
+      console.error(`[DEDUP] AI Semantic (${batchType}): Invalid result format:`, result)
       return []
     }
 
@@ -517,9 +525,12 @@ export class Deduplicator {
     const groups: DuplicateGroup[] = []
     const currentPostIds = new Set(posts.map(p => p.id))
 
+    console.log(`[DEDUP] AI Semantic (${batchType}): Processing ${result.groups.length} groups...`)
+
     for (const group of result.groups) {
       try {
         if (!group || typeof group !== 'object' || !Array.isArray(group.duplicate_indices)) {
+          console.log(`[DEDUP] AI Semantic (${batchType}): Skipping invalid group structure`)
           continue
         }
 
@@ -528,7 +539,7 @@ export class Deduplicator {
           : null
 
         if (primaryIdx === null || primaryIdx < 0 || primaryIdx >= combinedPosts.length) {
-          console.error(`[DEDUP] Invalid primary_article_index: ${primaryIdx}`)
+          console.error(`[DEDUP] AI Semantic (${batchType}): Invalid primary_article_index ${primaryIdx} (combinedPosts.length=${combinedPosts.length})`)
           continue
         }
 
@@ -541,8 +552,11 @@ export class Deduplicator {
           .map((idx: number) => combinedPosts[idx].id)
           .filter((id: string) => currentPostIds.has(id)) // Only current posts
 
+        console.log(`[DEDUP] AI Semantic (${batchType}): Group "${group.topic_signature?.substring(0, 40)}..." - Primary idx ${primaryIdx} (historical: ${isPrimaryHistorical}), ${group.duplicate_indices.length} duplicates -> ${duplicatePostIds.length} current posts`)
+
         if (duplicatePostIds.length === 0) {
           // No current posts are duplicates in this group
+          console.log(`[DEDUP] AI Semantic (${batchType}): Skipping group - no current posts in duplicates`)
           continue
         }
 
@@ -557,6 +571,7 @@ export class Deduplicator {
             similarity_score: 0.8,
             explanation: `AI detected semantic similarity to previously published article: ${group.similarity_explanation || ''}`
           })
+          console.log(`[DEDUP] AI Semantic (${batchType}): Added historical match group with ${duplicatePostIds.length} duplicates`)
         } else {
           // Primary is current - mark as duplicate group within current issue
           groups.push({
@@ -567,12 +582,14 @@ export class Deduplicator {
             similarity_score: 0.8,
             explanation: group.similarity_explanation || ''
           })
+          console.log(`[DEDUP] AI Semantic (${batchType}): Added current match group with ${duplicatePostIds.length} duplicates`)
         }
       } catch (error) {
-        console.error(`[DEDUP] Error mapping semantic duplicate group:`, error)
+        console.error(`[DEDUP] AI Semantic (${batchType}): Error mapping group:`, error)
       }
     }
 
+    console.log(`[DEDUP] AI Semantic (${batchType}): Returning ${groups.length} groups`)
     return groups
   }
 
