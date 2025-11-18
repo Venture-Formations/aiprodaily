@@ -569,16 +569,20 @@ export class Deduplicator {
 
         // Create duplicate group
         if (isPrimaryHistorical) {
-          // Primary is historical - mark current posts as duplicates of historical content
+          // Primary is historical - mark ALL current posts as duplicates
+          // Use first current duplicate as primary, rest as duplicates
+          const newPrimaryId = duplicatePostIds[0]
+          const remainingDuplicates = duplicatePostIds.slice(1) // Exclude the new primary
+
           groups.push({
             topic_signature: `Historical AI match: "${primaryPost.title.substring(0, 60)}..."`,
-            primary_post_id: duplicatePostIds[0], // Use first current duplicate as primary
-            duplicate_post_ids: duplicatePostIds,
+            primary_post_id: newPrimaryId,
+            duplicate_post_ids: remainingDuplicates,
             detection_method: 'ai_semantic',
             similarity_score: 0.8,
             explanation: `AI detected semantic similarity to previously published article: ${group.similarity_explanation || ''}`
           })
-          console.log(`[DEDUP] AI Semantic (${batchType}): Added historical match group with ${duplicatePostIds.length} duplicates`)
+          console.log(`[DEDUP] AI Semantic (${batchType}): Added historical match group - primary: ${newPrimaryId}, ${remainingDuplicates.length} duplicates`)
         } else {
           // Primary is current - mark as duplicate group within current issue
           groups.push({
