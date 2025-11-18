@@ -438,10 +438,19 @@ export class Deduplicator {
         return []
       }
 
-      // Combine current posts + historical posts for AI analysis
+      // IMPORTANT: Limit historical posts for AI to prevent timeout
+      // Stage 0-2 check ALL historical, but AI is slow - limit to most recent 15
+      const MAX_HISTORICAL_FOR_AI = 15
+      const recentHistorical = historicalPosts.slice(0, MAX_HISTORICAL_FOR_AI)
+
+      if (historicalPosts.length > MAX_HISTORICAL_FOR_AI) {
+        console.log(`[DEDUP] AI Semantic: Limiting historical posts from ${historicalPosts.length} to ${MAX_HISTORICAL_FOR_AI} to prevent timeout`)
+      }
+
+      // Combine current posts + limited historical posts for AI analysis
       // Structure: [current posts..., historical posts...]
       const currentPostCount = posts.length
-      const combinedPosts = [...posts, ...historicalPosts]
+      const combinedPosts = [...posts, ...recentHistorical]
 
       // Create ID mapping for later lookup
       const postIdMap = new Map<number, string>() // index -> post_id
