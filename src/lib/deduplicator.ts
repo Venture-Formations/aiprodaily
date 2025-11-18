@@ -510,6 +510,13 @@ export class Deduplicator {
     let result
     try {
       result = await AI_CALL.topicDeduper(postSummaries, newsletterId, 1000, 0.3)
+
+      // Handle raw JSON string response
+      if (result && typeof result === 'object' && 'raw' in result && typeof result.raw === 'string') {
+        console.log(`[DEDUP] AI Semantic (${batchType}): Parsing raw JSON response`)
+        result = JSON.parse(result.raw)
+      }
+
       console.log(`[DEDUP] AI Semantic (${batchType}): Received result with ${result?.groups?.length || 0} groups`)
     } catch (error) {
       console.error(`[DEDUP] AI Semantic (${batchType}): Error calling AI:`, error)
