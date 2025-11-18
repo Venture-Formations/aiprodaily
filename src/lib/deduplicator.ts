@@ -9,14 +9,15 @@ import { supabaseAdmin } from './supabase'
  * Stage 0: Historical article check (against sent newsletters)
  * Stage 1: Exact content hash matching (deterministic)
  * Stage 2: Title similarity matching using Jaccard (deterministic)
- * Stage 3: AI semantic analysis (contextual)
+ * Stage 3: AI semantic analysis within sections (primary vs primary, secondary vs secondary)
+ * Stage 4: AI cross-section semantic analysis (remaining primary vs remaining secondary)
  */
 
 export interface DuplicateGroup {
   topic_signature: string
   primary_post_id: string  // Post ID instead of index
   duplicate_post_ids: string[]  // Post IDs instead of indices
-  detection_method: 'historical_match' | 'content_hash' | 'title_similarity' | 'ai_semantic'
+  detection_method: 'historical_match' | 'content_hash' | 'title_similarity' | 'ai_semantic' | 'ai_cross_section'
   similarity_score: number
   explanation?: string
 }
@@ -31,6 +32,7 @@ export interface DeduplicationResult {
     exact_duplicates: number
     title_duplicates: number
     semantic_duplicates: number
+    cross_section_duplicates: number
   }
 }
 
@@ -67,7 +69,7 @@ export class Deduplicator {
   }
 
   /**
-   * Main orchestrator - runs all 4 stages (0-3)
+   * Main orchestrator - runs all 5 stages (0-4)
    */
   async detectAllDuplicates(posts: RssPost[], issueId: string): Promise<DeduplicationResult> {
     if (posts.length === 0) {
@@ -80,7 +82,8 @@ export class Deduplicator {
           historical_duplicates: 0,
           exact_duplicates: 0,
           title_duplicates: 0,
-          semantic_duplicates: 0
+          semantic_duplicates: 0,
+          cross_section_duplicates: 0
         }
       }
     }
@@ -123,7 +126,8 @@ export class Deduplicator {
           historical_duplicates: historicalGroups.reduce((sum, g) => sum + getDuplicateCount(g), 0),
           exact_duplicates: 0,
           title_duplicates: 0,
-          semantic_duplicates: 0
+          semantic_duplicates: 0,
+          cross_section_duplicates: 0
         }
       }
     }
@@ -178,6 +182,26 @@ export class Deduplicator {
       }
     }
 
+    // Stage 4: AI cross-section semantic analysis (remaining primary vs remaining secondary)
+    const remainingAfterSemantic = posts.filter(post => !markedAsDuplicate.has(post.id))
+
+    if (remainingAfterSemantic.length >= 2) {
+      const crossSectionGroups = await this.detectCrossSectionDuplicates(
+        remainingAfterSemantic,
+        issueId
+      )
+
+      if (Array.isArray(crossSectionGroups)) {
+        for (const group of crossSectionGroups) {
+          if (!group || !Array.isArray(group.duplicate_post_ids)) {
+            continue
+          }
+          allGroups.push(group)
+          group.duplicate_post_ids.forEach(id => markedAsDuplicate.add(id))
+        }
+      }
+    }
+
     const totalDuplicates = markedAsDuplicate.size
 
     const getDuplicateCount = (g: DuplicateGroup): number => {
@@ -197,6 +221,9 @@ export class Deduplicator {
           .reduce((sum, g) => sum + getDuplicateCount(g), 0),
         semantic_duplicates: allGroups
           .filter(g => g.detection_method === 'ai_semantic')
+          .reduce((sum, g) => sum + getDuplicateCount(g), 0),
+        cross_section_duplicates: allGroups
+          .filter(g => g.detection_method === 'ai_cross_section')
           .reduce((sum, g) => sum + getDuplicateCount(g), 0)
       }
     }
@@ -602,6 +629,146 @@ export class Deduplicator {
 
     console.log(`[DEDUP] AI Semantic (${batchType}): Returning ${groups.length} groups`)
     return groups
+  }
+
+  /**
+   * Stage 4: AI cross-section semantic analysis
+   * Compares remaining primary posts vs remaining secondary posts
+   * No historical comparison - just the current posts that survived Stages 0-3
+   */
+  private async detectCrossSectionDuplicates(
+    posts: RssPost[],
+    issueId: string
+  ): Promise<DuplicateGroup[]> {
+    try {
+      if (!posts || posts.length < 2) {
+        return []
+      }
+
+      // Fetch feeds to determine which posts are primary vs secondary
+      const feedIds = Array.from(new Set(posts.map(p => p.feed_id).filter(Boolean)))
+      const { data: feeds } = await supabaseAdmin
+        .from('rss_feeds')
+        .select('id, use_for_primary_section, use_for_secondary_section')
+        .in('id', feedIds)
+
+      const feedMap = new Map(feeds?.map(f => [f.id, f]) || [])
+
+      // Split posts by section
+      const primaryPosts = posts.filter(p => {
+        const feed = feedMap.get(p.feed_id)
+        return feed?.use_for_primary_section
+      })
+
+      const secondaryPosts = posts.filter(p => {
+        const feed = feedMap.get(p.feed_id)
+        return feed?.use_for_secondary_section
+      })
+
+      console.log(`[DEDUP] Cross-Section: ${primaryPosts.length} primary, ${secondaryPosts.length} secondary remaining posts`)
+
+      // Only run if we have posts from BOTH sections
+      if (primaryPosts.length === 0 || secondaryPosts.length === 0) {
+        console.log(`[DEDUP] Cross-Section: Skipping - need posts from both sections`)
+        return []
+      }
+
+      // Combine all remaining posts for cross-section comparison
+      const allPosts = [...primaryPosts, ...secondaryPosts]
+
+      // Prepare post summaries with FULL article text
+      const postSummaries = allPosts.map(post => ({
+        title: post.title,
+        description: post.description || '',
+        full_article_text: post.full_article_text || post.content || ''
+      }))
+
+      console.log(`[DEDUP] Cross-Section: Running AI on ${allPosts.length} posts (${primaryPosts.length} primary + ${secondaryPosts.length} secondary)`)
+
+      // Get publication_id for AI call
+      const newsletterId = await this.getNewsletterIdFromissue(issueId)
+
+      // Run AI deduplication
+      let result
+      try {
+        result = await AI_CALL.topicDeduper(postSummaries, newsletterId, 1000, 0.3)
+
+        // Handle raw JSON string response
+        if (result && typeof result === 'object' && 'raw' in result && typeof result.raw === 'string') {
+          console.log(`[DEDUP] Cross-Section: Parsing raw JSON response`)
+          result = JSON.parse(result.raw)
+        }
+
+        console.log(`[DEDUP] Cross-Section: Received result with ${result?.groups?.length || 0} groups`)
+      } catch (error) {
+        console.error(`[DEDUP] Cross-Section: Error calling AI:`, error)
+        return []
+      }
+
+      if (!result || typeof result !== 'object' || !Array.isArray(result.groups)) {
+        console.error(`[DEDUP] Cross-Section: Invalid result format:`, result)
+        return []
+      }
+
+      // Process AI results - convert indices to post IDs
+      const groups: DuplicateGroup[] = []
+
+      console.log(`[DEDUP] Cross-Section: Processing ${result.groups.length} groups...`)
+
+      for (const group of result.groups) {
+        try {
+          if (!group || typeof group !== 'object' || !Array.isArray(group.duplicate_indices)) {
+            console.log(`[DEDUP] Cross-Section: Skipping invalid group structure`)
+            continue
+          }
+
+          const primaryIdx = typeof group.primary_article_index === 'number'
+            ? group.primary_article_index
+            : null
+
+          if (primaryIdx === null || primaryIdx < 0 || primaryIdx >= allPosts.length) {
+            console.error(`[DEDUP] Cross-Section: Invalid primary_article_index ${primaryIdx} (allPosts.length=${allPosts.length})`)
+            continue
+          }
+
+          const primaryPost = allPosts[primaryIdx]
+
+          // Get all duplicate post IDs
+          const duplicatePostIds = group.duplicate_indices
+            .filter((idx: number) => typeof idx === 'number' && idx >= 0 && idx < allPosts.length)
+            .map((idx: number) => allPosts[idx].id)
+            .filter((id: string) => id !== primaryPost.id) // Exclude primary from duplicates
+
+          console.log(`[DEDUP] Cross-Section: Group "${group.topic_signature?.substring(0, 40)}..." - Primary idx ${primaryIdx}, ${duplicatePostIds.length} duplicates`)
+
+          if (duplicatePostIds.length === 0) {
+            console.log(`[DEDUP] Cross-Section: Skipping group - no duplicates besides primary`)
+            continue
+          }
+
+          // Create duplicate group with cross-section detection method
+          groups.push({
+            topic_signature: group.topic_signature || 'Cross-section duplicate',
+            primary_post_id: primaryPost.id,
+            duplicate_post_ids: duplicatePostIds,
+            detection_method: 'ai_cross_section',
+            similarity_score: 0.8,
+            explanation: group.similarity_explanation || 'Similar story detected across primary and secondary sections'
+          })
+
+          console.log(`[DEDUP] Cross-Section: Added group - primary: ${primaryPost.id}, ${duplicatePostIds.length} duplicates`)
+        } catch (error) {
+          console.error(`[DEDUP] Cross-Section: Error mapping group:`, error)
+        }
+      }
+
+      console.log(`[DEDUP] Cross-Section: Returning ${groups.length} groups`)
+      return groups
+
+    } catch (error) {
+      console.error('[DEDUP] Cross-Section error:', error)
+      return []
+    }
   }
 
   /**
