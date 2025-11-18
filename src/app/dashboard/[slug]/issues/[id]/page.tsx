@@ -1368,6 +1368,7 @@ function SortableArticle({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+    touchAction: 'none',
   }
 
   return (
@@ -1400,10 +1401,11 @@ function SortableArticle({
               <div
                 {...attributes}
                 {...listeners}
-                className="flex-shrink-0 cursor-move mt-1 p-1 text-gray-400 hover:text-gray-600"
+                style={{ touchAction: 'none' }}
+                className="flex-shrink-0 cursor-move p-2 text-gray-400 hover:text-gray-600 min-w-[44px] min-h-[44px] flex items-center justify-center"
                 title="Drag to reorder"
               >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M7 2a2 2 0 00-2 2v12a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2H7zM6 6h8v2H6V6zm0 4h8v2H6v-2zm0 4h8v2H6v-2z"/>
                 </svg>
               </div>
