@@ -427,6 +427,7 @@ export class Deduplicator {
 
   /**
    * Stage 3: AI semantic analysis with full article text (current vs current AND current vs historical)
+   * Split into TWO calls: primary section posts and secondary section posts
    */
   private async detectSemanticDuplicates(
     posts: RssPost[],
@@ -447,100 +448,140 @@ export class Deduplicator {
         console.log(`[DEDUP] AI Semantic: Limiting historical posts from ${historicalPosts.length} to ${MAX_HISTORICAL_FOR_AI} to prevent timeout`)
       }
 
-      // Combine current posts + limited historical posts for AI analysis
-      // Structure: [current posts..., historical posts...]
-      const currentPostCount = posts.length
-      const combinedPosts = [...posts, ...recentHistorical]
+      // Fetch feeds for all current posts to determine primary vs secondary
+      const feedIds = Array.from(new Set(posts.map(p => p.feed_id).filter(Boolean)))
+      const { data: feeds } = await supabaseAdmin
+        .from('rss_feeds')
+        .select('id, use_for_primary_section, use_for_secondary_section')
+        .in('id', feedIds)
 
-      // Create ID mapping for later lookup
-      const postIdMap = new Map<number, string>() // index -> post_id
-      combinedPosts.forEach((post, idx) => {
-        postIdMap.set(idx, post.id)
+      const feedMap = new Map(feeds?.map(f => [f.id, f]) || [])
+
+      // Split posts by feed type
+      const primaryPosts = posts.filter(p => {
+        const feed = feedMap.get(p.feed_id)
+        return feed?.use_for_primary_section
       })
 
-      // Prepare post summaries with FULL article text
-      const postSummaries = combinedPosts.map(post => ({
-        title: post.title,
-        description: post.description || '',
-        full_article_text: post.full_article_text || post.content || ''
-      }))
+      const secondaryPosts = posts.filter(p => {
+        const feed = feedMap.get(p.feed_id)
+        return feed?.use_for_secondary_section
+      })
 
-      console.log(`[DEDUP] AI Semantic: Analyzing ${currentPostCount} current + ${historicalPosts.length} historical = ${postSummaries.length} total posts`)
+      console.log(`[DEDUP] AI Semantic: Split ${posts.length} posts -> ${primaryPosts.length} primary, ${secondaryPosts.length} secondary`)
 
-      // Get publication_id for AI call
+      // Get publication_id for AI calls
       const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
-      const result = await AI_CALL.topicDeduper(postSummaries, newsletterId, 1000, 0.3)
+      // Run AI deduplication for primary posts
+      const primaryGroups = primaryPosts.length > 0
+        ? await this.runSemanticDeduplicationBatch(primaryPosts, recentHistorical, newsletterId, 'primary')
+        : []
 
-      if (!result || typeof result !== 'object' || !Array.isArray(result.groups)) {
-        return []
-      }
+      // Run AI deduplication for secondary posts
+      const secondaryGroups = secondaryPosts.length > 0
+        ? await this.runSemanticDeduplicationBatch(secondaryPosts, recentHistorical, newsletterId, 'secondary')
+        : []
 
-      // Process AI results - convert indices to post IDs
-      const groups: DuplicateGroup[] = []
-      const currentPostIds = new Set(posts.map(p => p.id))
+      // Merge results
+      return [...primaryGroups, ...secondaryGroups]
 
-      for (const group of result.groups) {
-        try {
-          if (!group || typeof group !== 'object' || !Array.isArray(group.duplicate_indices)) {
-            continue
-          }
-
-          const primaryIdx = typeof group.primary_article_index === 'number'
-            ? group.primary_article_index
-            : null
-
-          if (primaryIdx === null || primaryIdx < 0 || primaryIdx >= combinedPosts.length) {
-            console.error(`[DEDUP] Invalid primary_article_index: ${primaryIdx}`)
-            continue
-          }
-
-          const primaryPost = combinedPosts[primaryIdx]
-          const isPrimaryHistorical = !currentPostIds.has(primaryPost.id)
-
-          // Get all duplicate post IDs (only current posts should be marked)
-          const duplicatePostIds = group.duplicate_indices
-            .filter((idx: number) => typeof idx === 'number' && idx >= 0 && idx < combinedPosts.length)
-            .map((idx: number) => combinedPosts[idx].id)
-            .filter((id: string) => currentPostIds.has(id)) // Only current posts
-
-          if (duplicatePostIds.length === 0) {
-            // No current posts are duplicates in this group
-            continue
-          }
-
-          // Create duplicate group
-          if (isPrimaryHistorical) {
-            // Primary is historical - mark current posts as duplicates of historical content
-            groups.push({
-              topic_signature: `Historical AI match: "${primaryPost.title.substring(0, 60)}..."`,
-              primary_post_id: duplicatePostIds[0], // Use first current duplicate as primary
-              duplicate_post_ids: duplicatePostIds,
-              detection_method: 'ai_semantic',
-              similarity_score: 0.8,
-              explanation: `AI detected semantic similarity to previously published article: ${group.similarity_explanation || ''}`
-            })
-          } else {
-            // Primary is current - mark as duplicate group within current issue
-            groups.push({
-              topic_signature: group.topic_signature || 'unknown',
-              primary_post_id: primaryPost.id,
-              duplicate_post_ids: duplicatePostIds,
-              detection_method: 'ai_semantic',
-              similarity_score: 0.8,
-              explanation: group.similarity_explanation || ''
-            })
-          }
-        } catch (error) {
-          console.error(`[DEDUP] Error mapping semantic duplicate group:`, error)
-        }
-      }
-
-      return groups
-
-    } catch {
+    } catch (error) {
+      console.error('[DEDUP] AI Semantic error:', error)
       return []
     }
+  }
+
+  /**
+   * Helper: Run AI deduplication for a batch of posts
+   */
+  private async runSemanticDeduplicationBatch(
+    posts: RssPost[],
+    historicalPosts: RssPost[],
+    newsletterId: string,
+    batchType: 'primary' | 'secondary'
+  ): Promise<DuplicateGroup[]> {
+    // Combine current posts + limited historical posts for AI analysis
+    // Structure: [current posts..., historical posts...]
+    const currentPostCount = posts.length
+    const combinedPosts = [...posts, ...historicalPosts]
+
+    // Prepare post summaries with FULL article text
+    const postSummaries = combinedPosts.map(post => ({
+      title: post.title,
+      description: post.description || '',
+      full_article_text: post.full_article_text || post.content || ''
+    }))
+
+    console.log(`[DEDUP] AI Semantic (${batchType}): Analyzing ${currentPostCount} current + ${historicalPosts.length} historical = ${postSummaries.length} total posts`)
+
+    const result = await AI_CALL.topicDeduper(postSummaries, newsletterId, 1000, 0.3)
+
+    if (!result || typeof result !== 'object' || !Array.isArray(result.groups)) {
+      return []
+    }
+
+    // Process AI results - convert indices to post IDs
+    const groups: DuplicateGroup[] = []
+    const currentPostIds = new Set(posts.map(p => p.id))
+
+    for (const group of result.groups) {
+      try {
+        if (!group || typeof group !== 'object' || !Array.isArray(group.duplicate_indices)) {
+          continue
+        }
+
+        const primaryIdx = typeof group.primary_article_index === 'number'
+          ? group.primary_article_index
+          : null
+
+        if (primaryIdx === null || primaryIdx < 0 || primaryIdx >= combinedPosts.length) {
+          console.error(`[DEDUP] Invalid primary_article_index: ${primaryIdx}`)
+          continue
+        }
+
+        const primaryPost = combinedPosts[primaryIdx]
+        const isPrimaryHistorical = !currentPostIds.has(primaryPost.id)
+
+        // Get all duplicate post IDs (only current posts should be marked)
+        const duplicatePostIds = group.duplicate_indices
+          .filter((idx: number) => typeof idx === 'number' && idx >= 0 && idx < combinedPosts.length)
+          .map((idx: number) => combinedPosts[idx].id)
+          .filter((id: string) => currentPostIds.has(id)) // Only current posts
+
+        if (duplicatePostIds.length === 0) {
+          // No current posts are duplicates in this group
+          continue
+        }
+
+        // Create duplicate group
+        if (isPrimaryHistorical) {
+          // Primary is historical - mark current posts as duplicates of historical content
+          groups.push({
+            topic_signature: `Historical AI match: "${primaryPost.title.substring(0, 60)}..."`,
+            primary_post_id: duplicatePostIds[0], // Use first current duplicate as primary
+            duplicate_post_ids: duplicatePostIds,
+            detection_method: 'ai_semantic',
+            similarity_score: 0.8,
+            explanation: `AI detected semantic similarity to previously published article: ${group.similarity_explanation || ''}`
+          })
+        } else {
+          // Primary is current - mark as duplicate group within current issue
+          groups.push({
+            topic_signature: group.topic_signature || 'unknown',
+            primary_post_id: primaryPost.id,
+            duplicate_post_ids: duplicatePostIds,
+            detection_method: 'ai_semantic',
+            similarity_score: 0.8,
+            explanation: group.similarity_explanation || ''
+          })
+        }
+      } catch (error) {
+        console.error(`[DEDUP] Error mapping semantic duplicate group:`, error)
+      }
+    }
+
+    return groups
   }
 
   /**
