@@ -1867,20 +1867,19 @@ export class RSSProcessor {
       let storedDuplicates = 0
 
       for (const group of result.groups) {
-        const primaryPost = allPosts[group.primary_post_index]
-        if (!primaryPost) {
-          console.error(`[Dedup] Primary post not found at index ${group.primary_post_index}`)
+        if (!group.primary_post_id || !Array.isArray(group.duplicate_post_ids)) {
+          console.error(`[Dedup] Invalid group structure:`, group)
           continue
         }
 
-        console.log(`[Dedup] Storing group: "${group.topic_signature?.substring(0, 50)}..." - Primary: ${primaryPost.id}`)
+        console.log(`[Dedup] Storing group: "${group.topic_signature?.substring(0, 50)}..." - Primary: ${group.primary_post_id}`)
 
         // Create duplicate group
         const { data: duplicateGroup, error: groupError } = await supabaseAdmin
           .from('duplicate_groups')
           .insert([{
             issue_id: issueId,
-            primary_post_id: primaryPost.id,
+            primary_post_id: group.primary_post_id,
             topic_signature: group.topic_signature
           }])
           .select('id')
@@ -1894,23 +1893,12 @@ export class RSSProcessor {
         storedGroups++
 
         if (duplicateGroup) {
+          console.log(`[Dedup] Marking ${group.duplicate_post_ids.length} posts as duplicates`)
+
           // Add duplicate posts to group with metadata
-          if (!Array.isArray(group.duplicate_indices)) {
-            console.error(`[Dedup] Invalid duplicate_indices for group ${duplicateGroup.id}`)
-            continue
-          }
-
-          console.log(`[Dedup] Marking ${group.duplicate_indices.length} posts as duplicates`)
-
-          for (const dupIndex of group.duplicate_indices) {
-            const dupPost = allPosts[dupIndex]
-            if (!dupPost) {
-              console.error(`[Dedup] Duplicate post not found at index ${dupIndex}`)
-              continue
-            }
-
-            if (dupPost.id === primaryPost.id) {
-              console.log(`[Dedup] Skipping primary post ${dupPost.id} from duplicate list`)
+          for (const postId of group.duplicate_post_ids) {
+            if (postId === group.primary_post_id) {
+              console.log(`[Dedup] Skipping primary post ${postId} from duplicate list`)
               continue
             }
 
@@ -1918,16 +1906,16 @@ export class RSSProcessor {
               .from('duplicate_posts')
               .insert([{
                 group_id: duplicateGroup.id,
-                post_id: dupPost.id,
+                post_id: postId,
                 similarity_score: group.similarity_score,
                 detection_method: group.detection_method,
                 actual_similarity_score: group.similarity_score
               }])
 
             if (dupError) {
-              console.error(`[Dedup] Failed to mark post ${dupPost.id} as duplicate:`, dupError.message)
+              console.error(`[Dedup] Failed to mark post ${postId} as duplicate:`, dupError.message)
             } else {
-              console.log(`[Dedup] Marked post ${dupPost.id} as duplicate`)
+              console.log(`[Dedup] Marked post ${postId} as duplicate`)
               storedDuplicates++
             }
           }

@@ -5,6 +5,10 @@ import { Deduplicator } from '@/lib/deduplicator'
 export const maxDuration = 600
 
 /**
+ * @deprecated This file uses the old index-based DuplicateGroup interface.
+ * It has not been updated to use the new post ID-based interface.
+ * Use with caution or update to match the new deduplicator.ts interface.
+ *
  * Reset deduplication for a issue and re-run with current prompt
  *
  * Usage: GET /api/debug/reset-deduplication?issueId=XXX&dry_run=true
