@@ -125,7 +125,7 @@ export default async function NewsletterPage({ params }: PageProps) {
           {/* Render sections in database order */}
           {sections && sections.map((section: any) => {
             // Welcome Section
-            if (section.name === 'Welcome' && welcome && (welcome.intro || welcome.tagline || welcome.summary)) {
+            if (section.section_type === 'welcome' && welcome && (welcome.intro || welcome.tagline || welcome.summary)) {
               return (
                 <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
                   <h2 className="text-2xl font-bold mb-6 inline-block px-3 py-1.5 rounded-md text-white" style={{ backgroundColor: primaryColor }}>{section.name}</h2>
@@ -148,8 +148,8 @@ export default async function NewsletterPage({ params }: PageProps) {
               )
             }
 
-            // Primary Articles Section (display_order 3)
-            if (section.display_order === 3 && articles.length > 0) {
+            // Primary Articles Section
+            if (section.section_type === 'primary_articles' && articles.length > 0) {
               return (
                 <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
                   <h2 className="text-2xl font-bold mb-6 inline-block px-3 py-1.5 rounded-md text-white" style={{ backgroundColor: primaryColor }}>{section.name}</h2>
@@ -191,8 +191,8 @@ export default async function NewsletterPage({ params }: PageProps) {
               )
             }
 
-            // Secondary Articles Section (display_order 5)
-            if (section.display_order === 5 && secondaryArticles.length > 0) {
+            // Secondary Articles Section
+            if (section.section_type === 'secondary_articles' && secondaryArticles.length > 0) {
               return (
                 <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
                   <h2 className="text-2xl font-bold mb-6 inline-block px-3 py-1.5 rounded-md text-white" style={{ backgroundColor: primaryColor }}>{section.name}</h2>
@@ -284,7 +284,7 @@ export default async function NewsletterPage({ params }: PageProps) {
             }
 
             // Poll Section
-            if (section.name === 'Poll' && poll) {
+            if (section.section_type === 'poll' && poll) {
               return (
                 <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
                   <h2 className="text-2xl font-bold mb-6 inline-block px-3 py-1.5 rounded-md text-white" style={{ backgroundColor: primaryColor }}>{section.name}</h2>
@@ -297,7 +297,7 @@ export default async function NewsletterPage({ params }: PageProps) {
             }
 
             // Advertorial Section
-            if (section.name === 'Advertorial' && advertorial) {
+            if (section.section_type === 'advertorial' && advertorial) {
               return (
                 <div key={section.id} className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
                   <h2 className="text-2xl font-bold mb-6 inline-block px-3 py-1.5 rounded-md text-white" style={{ backgroundColor: primaryColor }}>{section.name}</h2>
