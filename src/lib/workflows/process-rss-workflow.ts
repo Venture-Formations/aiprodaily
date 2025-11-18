@@ -7,16 +7,17 @@ import { AdScheduler } from '@/lib/ad-scheduler'
  * Each step gets its own 800-second timeout
  *
  * NEW STRUCTURE:
- * Step 1:  Setup + Deduplication
- * Step 2:  Generate 6 primary titles (fast)
- * Step 3:  Generate 3 primary bodies (batch 1)
- * Step 4:  Generate 3 primary bodies (batch 2)
- * Step 5:  Fact-check all 6 primary articles
- * Step 6:  Generate 6 secondary titles (fast)
- * Step 7:  Generate 3 secondary bodies (batch 1)
- * Step 8:  Generate 3 secondary bodies (batch 2)
- * Step 9:  Fact-check all 6 secondary articles
- * Step 10: Finalize
+ * Step 1:  Setup (create issue, assign posts)
+ * Step 2:  Deduplication (separate step with 180s timeout)
+ * Step 3:  Generate 6 primary titles (fast)
+ * Step 4:  Generate 3 primary bodies (batch 1)
+ * Step 5:  Generate 3 primary bodies (batch 2)
+ * Step 6:  Fact-check all 6 primary articles
+ * Step 7:  Generate 6 secondary titles (fast)
+ * Step 8:  Generate 3 secondary bodies (batch 1)
+ * Step 9:  Generate 3 secondary bodies (batch 2)
+ * Step 10: Fact-check all 6 secondary articles
+ * Step 11: Finalize
  */
 export async function processRSSWorkflow(input: {
   trigger: 'cron' | 'manual'
@@ -28,32 +29,35 @@ export async function processRSSWorkflow(input: {
 
   console.log(`[Workflow] Starting for newsletter: ${input.publication_id}`)
 
-  // STEP 1: Setup - Create issue, assign posts, deduplicate
+  // STEP 1: Setup - Create issue, assign posts
   issueId = await setupissue(input.publication_id)
 
+  // STEP 2: Deduplication (separate step with longer timeout)
+  await deduplicateissue(issueId)
+
   // PRIMARY SECTION
-  // STEP 2: Generate all 6 primary titles (fast, batched)
+  // STEP 3: Generate all 6 primary titles (fast, batched)
   await generatePrimaryTitles(issueId)
 
-  // STEP 3-4: Generate primary bodies in 2 batches (3 articles each)
+  // STEP 4-5: Generate primary bodies in 2 batches (3 articles each)
   await generatePrimaryBodiesBatch1(issueId)
   await generatePrimaryBodiesBatch2(issueId)
 
-  // STEP 5: Fact-check all primary articles
+  // STEP 6: Fact-check all primary articles
   await factCheckPrimary(issueId)
 
   // SECONDARY SECTION
-  // STEP 6: Generate all 6 secondary titles (fast, batched)
+  // STEP 7: Generate all 6 secondary titles (fast, batched)
   await generateSecondaryTitles(issueId)
 
-  // STEP 7-8: Generate secondary bodies in 2 batches (3 articles each)
+  // STEP 8-9: Generate secondary bodies in 2 batches (3 articles each)
   await generateSecondaryBodiesBatch1(issueId)
   await generateSecondaryBodiesBatch2(issueId)
 
-  // STEP 9: Fact-check all secondary articles
+  // STEP 10: Fact-check all secondary articles
   await factCheckSecondary(issueId)
 
-  // STEP 10: Finalize
+  // STEP 11: Finalize
   await finalizeIssue(issueId)
 
   console.log('=== WORKFLOW COMPLETE ===')
@@ -70,7 +74,7 @@ async function setupissue(newsletterId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 1/10] Setting up issue...')
+      console.log('[Workflow Step 1/11] Setting up issue...')
 
       const processor = new RSSProcessor()
 
@@ -85,7 +89,7 @@ async function setupissue(newsletterId: string) {
         throw new Error(`Newsletter not found: ${newsletterId}`)
       }
 
-      console.log(`[Workflow Step 1/10] Using newsletter: ${newsletter.name} (${newsletter.id})`)
+      console.log(`[Workflow Step 1/11] Using newsletter: ${newsletter.name} (${newsletter.id})`)
 
       // Calculate issue date (Central Time + 12 hours)
       const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
@@ -109,7 +113,7 @@ async function setupissue(newsletterId: string) {
       }
 
       const id = newissue.id
-      console.log(`[Workflow Step 1/10] issue created: ${id} for ${issueDate}`)
+      console.log(`[Workflow Step 1/11] issue created: ${id} for ${issueDate}`)
 
       // Select AI apps and prompts
       try {
@@ -119,7 +123,7 @@ async function setupissue(newsletterId: string) {
         await AppSelector.selectAppsForissue(id, newsletter.id)
         await PromptSelector.selectPromptForissue(id)
       } catch (error) {
-        console.log('[Workflow Step 1/10] AI selection failed (non-critical)')
+        console.log('[Workflow Step 1/11] AI selection failed (non-critical)')
       }
 
       // Assign top 12 posts per section
@@ -200,27 +204,54 @@ async function setupissue(newsletterId: string) {
           .in('id', topSecondary.map(p => p.id))
       }
 
-      console.log(`[Workflow Step 1/10] Assigned ${topPrimary.length} primary, ${topSecondary.length} secondary posts`)
-
-      // Deduplicate
-      const dedupeResult = await processor.handleDuplicatesForissue(id)
-      console.log(`[Workflow Step 1/10] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicate posts found`)
-      console.log('[Workflow Step 1/10] ✓ Setup complete')
+      console.log(`[Workflow Step 1/11] Assigned ${topPrimary.length} primary, ${topSecondary.length} secondary posts`)
+      console.log('[Workflow Step 1/11] ✓ Setup complete')
 
       return id
 
     } catch (error) {
       retryCount++
       if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 1/10] Failed after ${maxRetries} retries`)
+        console.error(`[Workflow Step 1/11] Failed after ${maxRetries} retries`)
         throw error
       }
-      console.log(`[Workflow Step 1/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      console.log(`[Workflow Step 1/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
 
   throw new Error('Unexpected: Retry loop exited without return')
+}
+
+// STEP 2: Deduplication (separate step with 180s timeout)
+async function deduplicateissue(issueId: string) {
+  "use step"
+
+  let retryCount = 0
+  const maxRetries = 2
+
+  while (retryCount <= maxRetries) {
+    try {
+      console.log('[Workflow Step 2/11] Running deduplication...')
+
+      const processor = new RSSProcessor()
+      const dedupeResult = await processor.handleDuplicatesForissue(issueId)
+
+      console.log(`[Workflow Step 2/11] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicate posts found`)
+      console.log('[Workflow Step 2/11] ✓ Deduplication complete')
+
+      return
+
+    } catch (error) {
+      retryCount++
+      if (retryCount > maxRetries) {
+        console.error(`[Workflow Step 2/11] Failed after ${maxRetries} retries`)
+        throw error
+      }
+      console.log(`[Workflow Step 2/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+  }
 }
 
 // PRIMARY SECTION
@@ -232,7 +263,7 @@ async function generatePrimaryTitles(issueId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 2/10] Generating 6 primary titles...')
+      console.log('[Workflow Step 3/11] Generating 6 primary titles...')
       const processor = new RSSProcessor()
       await processor.generateTitlesOnly(issueId, 'primary', 6)
 
@@ -242,16 +273,16 @@ async function generatePrimaryTitles(issueId: string) {
         .eq('issue_id', issueId)
         .not('headline', 'is', null)
 
-      console.log(`[Workflow Step 2/10] ✓ Generated ${articles?.length || 0} primary titles`)
+      console.log(`[Workflow Step 3/11] ✓ Generated ${articles?.length || 0} primary titles`)
       return
 
     } catch (error) {
       retryCount++
       if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 2/10] Failed after ${maxRetries} retries`)
+        console.error(`[Workflow Step 3/11] Failed after ${maxRetries} retries`)
         throw error
       }
-      console.log(`[Workflow Step 2/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      console.log(`[Workflow Step 3/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
@@ -265,7 +296,7 @@ async function generatePrimaryBodiesBatch1(issueId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 3/10] Generating 3 primary bodies (batch 1)...')
+      console.log('[Workflow Step 4/11] Generating 3 primary bodies (batch 1)...')
       const processor = new RSSProcessor()
       await processor.generateBodiesOnly(issueId, 'primary', 0, 3)
 
@@ -275,16 +306,16 @@ async function generatePrimaryBodiesBatch1(issueId: string) {
         .eq('issue_id', issueId)
         .not('content', 'is', null)
 
-      console.log(`[Workflow Step 3/10] ✓ Total bodies generated: ${articles?.length || 0}`)
+      console.log(`[Workflow Step 4/11] ✓ Total bodies generated: ${articles?.length || 0}`)
       return
 
     } catch (error) {
       retryCount++
       if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 3/10] Failed after ${maxRetries} retries`)
+        console.error(`[Workflow Step 4/11] Failed after ${maxRetries} retries`)
         throw error
       }
-      console.log(`[Workflow Step 3/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      console.log(`[Workflow Step 4/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
@@ -298,7 +329,7 @@ async function generatePrimaryBodiesBatch2(issueId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 4/10] Generating 3 more primary bodies (batch 2)...')
+      console.log('[Workflow Step 5/11] Generating 3 more primary bodies (batch 2)...')
       const processor = new RSSProcessor()
       await processor.generateBodiesOnly(issueId, 'primary', 3, 3)
 
@@ -308,16 +339,16 @@ async function generatePrimaryBodiesBatch2(issueId: string) {
         .eq('issue_id', issueId)
         .not('content', 'is', null)
 
-      console.log(`[Workflow Step 4/10] ✓ Total primary bodies: ${articles?.length || 0}`)
+      console.log(`[Workflow Step 5/11] ✓ Total primary bodies: ${articles?.length || 0}`)
       return
 
     } catch (error) {
       retryCount++
       if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 4/10] Failed after ${maxRetries} retries`)
+        console.error(`[Workflow Step 5/11] Failed after ${maxRetries} retries`)
         throw error
       }
-      console.log(`[Workflow Step 4/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      console.log(`[Workflow Step 5/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
@@ -331,7 +362,7 @@ async function factCheckPrimary(issueId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 5/10] Fact-checking all primary articles...')
+      console.log('[Workflow Step 6/11] Fact-checking all primary articles...')
       const processor = new RSSProcessor()
       await processor.factCheckArticles(issueId, 'primary')
 
@@ -342,16 +373,16 @@ async function factCheckPrimary(issueId: string) {
         .not('fact_check_score', 'is', null)
 
       const avgScore = (articles?.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) || 0) / (articles?.length || 1)
-      console.log(`[Workflow Step 5/10] ✓ Fact-checked ${articles?.length || 0} articles (avg score: ${avgScore.toFixed(1)}/10)`)
+      console.log(`[Workflow Step 6/11] ✓ Fact-checked ${articles?.length || 0} articles (avg score: ${avgScore.toFixed(1)}/10)`)
       return
 
     } catch (error) {
       retryCount++
       if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 5/10] Failed after ${maxRetries} retries`)
+        console.error(`[Workflow Step 6/11] Failed after ${maxRetries} retries`)
         throw error
       }
-      console.log(`[Workflow Step 5/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      console.log(`[Workflow Step 6/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
@@ -366,7 +397,7 @@ async function generateSecondaryTitles(issueId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 6/10] Generating 6 secondary titles...')
+      console.log('[Workflow Step 7/11] Generating 6 secondary titles...')
       const processor = new RSSProcessor()
       await processor.generateTitlesOnly(issueId, 'secondary', 6)
 
@@ -376,16 +407,16 @@ async function generateSecondaryTitles(issueId: string) {
         .eq('issue_id', issueId)
         .not('headline', 'is', null)
 
-      console.log(`[Workflow Step 6/10] ✓ Generated ${articles?.length || 0} secondary titles`)
+      console.log(`[Workflow Step 7/11] ✓ Generated ${articles?.length || 0} secondary titles`)
       return
 
     } catch (error) {
       retryCount++
       if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 6/10] Failed after ${maxRetries} retries`)
+        console.error(`[Workflow Step 7/11] Failed after ${maxRetries} retries`)
         throw error
       }
-      console.log(`[Workflow Step 6/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      console.log(`[Workflow Step 7/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
@@ -399,7 +430,7 @@ async function generateSecondaryBodiesBatch1(issueId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 7/10] Generating 3 secondary bodies (batch 1)...')
+      console.log('[Workflow Step 8/11] Generating 3 secondary bodies (batch 1)...')
       const processor = new RSSProcessor()
       await processor.generateBodiesOnly(issueId, 'secondary', 0, 3)
 
@@ -409,16 +440,16 @@ async function generateSecondaryBodiesBatch1(issueId: string) {
         .eq('issue_id', issueId)
         .not('content', 'is', null)
 
-      console.log(`[Workflow Step 7/10] ✓ Total bodies generated: ${articles?.length || 0}`)
+      console.log(`[Workflow Step 8/11] ✓ Total bodies generated: ${articles?.length || 0}`)
       return
 
     } catch (error) {
       retryCount++
       if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 7/10] Failed after ${maxRetries} retries`)
+        console.error(`[Workflow Step 8/11] Failed after ${maxRetries} retries`)
         throw error
       }
-      console.log(`[Workflow Step 7/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      console.log(`[Workflow Step 8/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
@@ -432,7 +463,7 @@ async function generateSecondaryBodiesBatch2(issueId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 8/10] Generating 3 more secondary bodies (batch 2)...')
+      console.log('[Workflow Step 9/11] Generating 3 more secondary bodies (batch 2)...')
       const processor = new RSSProcessor()
       await processor.generateBodiesOnly(issueId, 'secondary', 3, 3)
 
@@ -442,16 +473,16 @@ async function generateSecondaryBodiesBatch2(issueId: string) {
         .eq('issue_id', issueId)
         .not('content', 'is', null)
 
-      console.log(`[Workflow Step 8/10] ✓ Total secondary bodies: ${articles?.length || 0}`)
+      console.log(`[Workflow Step 9/11] ✓ Total secondary bodies: ${articles?.length || 0}`)
       return
 
     } catch (error) {
       retryCount++
       if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 8/10] Failed after ${maxRetries} retries`)
+        console.error(`[Workflow Step 9/11] Failed after ${maxRetries} retries`)
         throw error
       }
-      console.log(`[Workflow Step 8/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      console.log(`[Workflow Step 9/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
@@ -465,7 +496,7 @@ async function factCheckSecondary(issueId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 9/10] Fact-checking all secondary articles...')
+      console.log('[Workflow Step 10/11] Fact-checking all secondary articles...')
       const processor = new RSSProcessor()
       await processor.factCheckArticles(issueId, 'secondary')
 
@@ -476,16 +507,16 @@ async function factCheckSecondary(issueId: string) {
         .not('fact_check_score', 'is', null)
 
       const avgScore = (articles?.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) || 0) / (articles?.length || 1)
-      console.log(`[Workflow Step 9/10] ✓ Fact-checked ${articles?.length || 0} articles (avg score: ${avgScore.toFixed(1)}/10)`)
+      console.log(`[Workflow Step 10/11] ✓ Fact-checked ${articles?.length || 0} articles (avg score: ${avgScore.toFixed(1)}/10)`)
       return
 
     } catch (error) {
       retryCount++
       if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 9/10] Failed after ${maxRetries} retries`)
+        console.error(`[Workflow Step 10/11] Failed after ${maxRetries} retries`)
         throw error
       }
-      console.log(`[Workflow Step 9/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      console.log(`[Workflow Step 10/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
@@ -500,7 +531,7 @@ async function finalizeIssue(issueId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 10/10] Finalizing issue...')
+      console.log('[Workflow Step 11/11] Finalizing issue...')
       const processor = new RSSProcessor()
 
       // Auto-select top 3 per section
@@ -566,16 +597,16 @@ async function finalizeIssue(issueId: string) {
                   used_at: new Date().toISOString()
                 })
 
-              console.log(`[Workflow Step 10/10] Selected ad: ${selectedAd.title}`)
+              console.log(`[Workflow Step 11/11] Selected ad: ${selectedAd.title}`)
             } else {
-              console.log('[Workflow Step 10/10] Ad already assigned')
+              console.log('[Workflow Step 11/11] Ad already assigned')
             }
           } else {
-            console.log('[Workflow Step 10/10] No active ads available')
+            console.log('[Workflow Step 11/11] No active ads available')
           }
         }
       } catch (adError) {
-        console.log('[Workflow Step 10/10] Ad selection failed (non-critical):', adError)
+        console.log('[Workflow Step 11/11] Ad selection failed (non-critical):', adError)
         // Don't fail the entire step if ad selection fails
       }
 
@@ -587,16 +618,16 @@ async function finalizeIssue(issueId: string) {
 
       // Stage 1 unassignment
       const unassignResult = await processor.unassignUnusedPosts(issueId)
-      console.log(`[Workflow Step 10/10] ✓ Finalized. Unassigned ${unassignResult.unassigned} unused posts`)
+      console.log(`[Workflow Step 11/11] ✓ Finalized. Unassigned ${unassignResult.unassigned} unused posts`)
       return
 
     } catch (error) {
       retryCount++
       if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 10/10] Failed after ${maxRetries} retries`)
+        console.error(`[Workflow Step 11/11] Failed after ${maxRetries} retries`)
         throw error
       }
-      console.log(`[Workflow Step 10/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      console.log(`[Workflow Step 11/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }

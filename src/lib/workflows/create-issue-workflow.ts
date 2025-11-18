@@ -3,18 +3,19 @@ import { RSSProcessor } from '@/lib/rss-processor'
 
 /**
  * Create issue Workflow - Article Generation Steps
- * Runs after issue setup (AI selection, post assignment, deduplication)
+ * Runs after issue setup (AI selection, post assignment)
  *
  * Steps:
- * 1. Generate 6 primary titles
- * 2. Generate 3 primary bodies (batch 1)
- * 3. Generate 3 primary bodies (batch 2)
- * 4. Fact-check primary articles
- * 5. Generate 6 secondary titles
- * 6. Generate 3 secondary bodies (batch 1)
- * 7. Generate 3 secondary bodies (batch 2)
- * 8. Fact-check secondary articles
- * 9. Finalize (select top 3, generate welcome, set draft)
+ * 1. Deduplication (with extended timeout)
+ * 2. Generate 6 primary titles
+ * 3. Generate 3 primary bodies (batch 1)
+ * 4. Generate 3 primary bodies (batch 2)
+ * 5. Fact-check primary articles
+ * 6. Generate 6 secondary titles
+ * 7. Generate 3 secondary bodies (batch 1)
+ * 8. Generate 3 secondary bodies (batch 2)
+ * 9. Fact-check secondary articles
+ * 10. Finalize (select top 3, generate welcome, set draft)
  */
 export async function createIssueWorkflow(input: {
   issue_id: string
@@ -25,6 +26,9 @@ export async function createIssueWorkflow(input: {
   const { issue_id } = input
 
   console.log(`[Create issue Workflow] Starting for issue: ${issue_id}`)
+
+  // STEP 1: Deduplication
+  await deduplicateissue(issue_id)
 
   // PRIMARY SECTION
   await generatePrimaryTitles(issue_id)
@@ -44,6 +48,37 @@ export async function createIssueWorkflow(input: {
   console.log('[Create issue Workflow] ✓ Complete')
 
   return { issue_id, success: true }
+}
+
+// Step 1: Deduplication (with extended timeout for AI semantic analysis)
+async function deduplicateissue(issueId: string) {
+  "use step"
+
+  let retryCount = 0
+  const maxRetries = 2
+
+  while (retryCount <= maxRetries) {
+    try {
+      console.log('[Workflow Step 1/10] Running deduplication...')
+
+      const processor = new RSSProcessor()
+      const dedupeResult = await processor.handleDuplicatesForissue(issueId)
+
+      console.log(`[Workflow Step 1/10] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicate posts found`)
+      console.log('[Workflow Step 1/10] ✓ Deduplication complete')
+
+      return
+
+    } catch (error) {
+      retryCount++
+      if (retryCount > maxRetries) {
+        console.error(`[Workflow Step 1/10] Failed after ${maxRetries} retries`)
+        throw error
+      }
+      console.log(`[Workflow Step 1/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+  }
 }
 
 // Step 1: Generate Primary Titles

@@ -194,11 +194,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Create issue] Assigned ${topPrimary.length} primary, ${topSecondary.length} secondary posts`)
 
-    // Step 6: Deduplicate
-    const dedupeResult = await processor.handleDuplicatesForissue(issueId)
-    console.log(`[Create issue] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicates`)
-
-    // Step 7: Start the article generation workflow
+    // Step 6: Start the article generation workflow (deduplication now happens in workflow Step 2)
     console.log('[Create issue] Starting article generation workflow...')
     try {
       await start(createIssueWorkflow, [{
