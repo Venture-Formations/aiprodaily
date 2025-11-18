@@ -88,9 +88,12 @@ export class Deduplicator {
     const allGroups: DuplicateGroup[] = []
     const markedAsDuplicate = new Set<string>()  // Now tracking post IDs
 
-    // Fetch historical posts FIRST - they will be used in all stages
-    const historicalPosts = await this.fetchHistoricalPosts(issueId)
-    console.log(`[DEDUP] Fetched ${historicalPosts.length} historical posts for comparison`)
+    // Fetch ALL historical posts for Stages 0-2 (hash + title checks)
+    // Stage 3 (AI semantic) will fetch section-specific historical posts
+    const primaryHistorical = await this.fetchHistoricalPosts(issueId, 'primary')
+    const secondaryHistorical = await this.fetchHistoricalPosts(issueId, 'secondary')
+    const historicalPosts = [...primaryHistorical, ...secondaryHistorical]
+    console.log(`[DEDUP] Fetched ${historicalPosts.length} historical posts (${primaryHistorical.length} primary, ${secondaryHistorical.length} secondary)`)
 
     // Stage 0: Historical duplicates (hash-based)
     const historicalGroups = await this.detectHistoricalDuplicates(posts, historicalPosts)
@@ -201,8 +204,9 @@ export class Deduplicator {
 
   /**
    * Fetch historical posts from recently sent newsletters
+   * @param section - 'primary' or 'secondary' to fetch section-specific articles
    */
-  private async fetchHistoricalPosts(issueId: string): Promise<RssPost[]> {
+  private async fetchHistoricalPosts(issueId: string, section: 'primary' | 'secondary'): Promise<RssPost[]> {
     try {
       const cutoffDate = new Date()
       cutoffDate.setDate(cutoffDate.getDate() - this.config.historicalLookbackDays)
@@ -221,31 +225,22 @@ export class Deduplicator {
 
       const issueIds = recentCampaigns.map(c => c.id)
 
-      // Get all articles from those campaigns
+      // Get ONLY articles from the specified section
+      const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
       const { data: historicalArticles, error: articlesError } = await supabaseAdmin
-        .from('articles')
-        .select('id, post_id, headline')
-        .in('issue_id', issueIds)
-        .eq('is_active', true)
-        .eq('skipped', false)
-
-      const { data: historicalSecondaryArticles } = await supabaseAdmin
-        .from('secondary_articles')
+        .from(tableName)
         .select('id, post_id, headline')
         .in('issue_id', issueIds)
         .eq('is_active', true)
         .eq('skipped', false)
 
       if (articlesError) {
-        console.error('[DEDUP] Error fetching historical articles:', articlesError)
+        console.error(`[DEDUP] Error fetching historical ${section} articles:`, articlesError)
         return []
       }
 
       // Get the RSS posts for historical articles
-      const historicalPostIds = [
-        ...(historicalArticles?.map(a => a.post_id).filter(Boolean) || []),
-        ...(historicalSecondaryArticles?.map(a => a.post_id).filter(Boolean) || [])
-      ]
+      const historicalPostIds = historicalArticles?.map(a => a.post_id).filter(Boolean) || []
 
       if (historicalPostIds.length === 0) {
         return []
@@ -257,13 +252,13 @@ export class Deduplicator {
         .in('id', historicalPostIds)
 
       if (postsError) {
-        console.error('[DEDUP] Error fetching historical posts:', postsError)
+        console.error(`[DEDUP] Error fetching historical ${section} posts:`, postsError)
         return []
       }
 
       return historicalPosts || []
     } catch (error) {
-      console.error('[DEDUP] Error in fetchHistoricalPosts:', error)
+      console.error(`[DEDUP] Error in fetchHistoricalPosts (${section}):`, error)
       return []
     }
   }
@@ -427,7 +422,7 @@ export class Deduplicator {
 
   /**
    * Stage 3: AI semantic analysis with full article text (current vs current AND current vs historical)
-   * Split into TWO calls: primary section posts and secondary section posts
+   * Split into TWO calls: primary section posts vs primary historical, secondary vs secondary historical
    */
   private async detectSemanticDuplicates(
     posts: RssPost[],
@@ -437,15 +432,6 @@ export class Deduplicator {
     try {
       if (!posts || posts.length === 0) {
         return []
-      }
-
-      // IMPORTANT: Limit historical posts for AI to prevent timeout
-      // Stage 0-2 check ALL historical, but AI is slow - limit to most recent 15
-      const MAX_HISTORICAL_FOR_AI = 15
-      const recentHistorical = historicalPosts.slice(0, MAX_HISTORICAL_FOR_AI)
-
-      if (historicalPosts.length > MAX_HISTORICAL_FOR_AI) {
-        console.log(`[DEDUP] AI Semantic: Limiting historical posts from ${historicalPosts.length} to ${MAX_HISTORICAL_FOR_AI} to prevent timeout`)
       }
 
       // Fetch feeds for all current posts to determine primary vs secondary
@@ -470,17 +456,23 @@ export class Deduplicator {
 
       console.log(`[DEDUP] AI Semantic: Split ${posts.length} posts -> ${primaryPosts.length} primary, ${secondaryPosts.length} secondary`)
 
+      // Fetch section-specific historical posts
+      const primaryHistorical = await this.fetchHistoricalPosts(issueId, 'primary')
+      const secondaryHistorical = await this.fetchHistoricalPosts(issueId, 'secondary')
+
+      console.log(`[DEDUP] AI Semantic: Fetched ${primaryHistorical.length} primary historical, ${secondaryHistorical.length} secondary historical`)
+
       // Get publication_id for AI calls
       const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
-      // Run AI deduplication for primary posts
+      // Run AI deduplication for primary posts against primary historical
       const primaryGroups = primaryPosts.length > 0
-        ? await this.runSemanticDeduplicationBatch(primaryPosts, recentHistorical, newsletterId, 'primary')
+        ? await this.runSemanticDeduplicationBatch(primaryPosts, primaryHistorical, newsletterId, 'primary')
         : []
 
-      // Run AI deduplication for secondary posts
+      // Run AI deduplication for secondary posts against secondary historical
       const secondaryGroups = secondaryPosts.length > 0
-        ? await this.runSemanticDeduplicationBatch(secondaryPosts, recentHistorical, newsletterId, 'secondary')
+        ? await this.runSemanticDeduplicationBatch(secondaryPosts, secondaryHistorical, newsletterId, 'secondary')
         : []
 
       // Merge results
