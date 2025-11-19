@@ -211,54 +211,70 @@ export async function generateNewsletterHeader(formattedDate: string, issueDate?
 
   return `<html style="margin:0;padding:0;background-color:#f7f7f7;">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-@media (min-width:621px){
-  /* Increase padding on desktop */
-  .email-wrapper {
-    padding-left:10px !important;
-    padding-right:10px !important;
-  }
-}
-</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    @media (min-width:621px){
+      .email-wrapper {
+        padding-left:10px !important;
+        padding-right:10px !important;
+      }
+    }
+
+    @media only screen and (max-width:620px){
+      .email-wrapper {
+        padding-left:10px !important;
+        padding-right:10px !important;
+      }
+    }
+  </style>
+
 </head>
-<body style='margin:0!important;padding:0!important;background-color:#f7f7f7;width:100%!important;min-width:100%!important;'>
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#f7f7f7" style="background-color:#f7f7f7;margin:0;padding:0;">
-  <tr>
-    <td align="center" style="padding:0;">
-     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
-       <tr>
-         <td style="font-weight:bold;font-family:Arial,sans-serif;padding:5px 0;">
-           <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-             <tr>
-               <!-- spacer cell -->
-               <td width="10">&nbsp;</td>
-               <!-- content cell -->
-               <td align="right">
-                 <a href="{$url}" style="color:#000;text-decoration:underline;">View Online</a>&nbsp;|&nbsp;
-                 <a href="${signUpUrl}" style="color:#000;text-decoration:underline;">Sign Up</a>&nbsp;|&nbsp;
-                 <a href="{$forward}" style="color:#000;text-decoration:underline;">Share</a>
-               </td>
-             </tr>
-           </table>
-         </td>
-       </tr>
-     </table>
-     <div style='width:100%;max-width:750px;margin:0 auto;padding:0px;'>
-       <table width='100%' cellpadding='0' cellspacing='0' style='font-family:Arial,sans-serif;'>
-         <tr>
-           <td align='center' style='padding:0; background:${primaryColor}; border-radius: 10px;'>
-             <img alt='${newsletterName}' src='${headerImageUrl}' style='display:block;width:100%;max-width:500px;height:auto;margin:0 auto;'/>
-           </td>
-         </tr>
-       </table>
-       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
-         <tr>
-           <td align="center" style="padding:5px 0;font-family:Arial,sans-serif;font-weight:bold;font-size:16px;color:#1C293D;text-align:center;">${formattedDate}
+
+<body style="margin:0!important;padding:0!important;background-color:#f7f7f7;width:100%!important;min-width:100%!important;">
+
+  <div class="email-wrapper" style="width:100%;margin:0 auto;padding:10px;background-color:#f7f7f7;box-sizing:border-box;">
+
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
+      <tr>
+        <td style="font-weight:bold;font-family:Arial,sans-serif;padding:5px 0;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+            <tr>
+              <td width="10">&nbsp;</td>
+              <td align="right">
+                <a href="{$url}" style="color:#000;text-decoration:underline;">View Online</a>&nbsp;|&nbsp;
+                <a href="${signUpUrl}" style="color:#000;text-decoration:underline;">Sign Up</a>&nbsp;|&nbsp;
+                <a href="{$forward}" style="color:#000;text-decoration:underline;">Share</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <div style="width:100%;max-width:750px;margin:0 auto;padding:0;">
+
+      <!-- HEADER BANNER -->
+      <table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif;">
+        <tr>
+          <td align="center" style="padding:0;background:${primaryColor};border-radius:10px;">
+            <img alt="${newsletterName}" src="${headerImageUrl}" style="display:block;width:100%;max-width:500px;height:auto;margin:0 auto;" />
           </td>
-         </tr>
-       </table>
-     </div>
+        </tr>
+      </table>
+
+      <!-- DATE BELOW HEADER -->
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
+        <tr>
+          <td align="center" style="padding:5px 0;font-family:Arial,sans-serif;font-weight:bold;font-size:16px;color:#1C293D;text-align:center;">
+            ${formattedDate}
+          </td>
+        </tr>
+      </table>
+
+    </div>
+
+  </div>
 <br>`
 }
 
