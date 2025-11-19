@@ -31,7 +31,7 @@ export default async function SubscribePage() {
           </div>
 
           {/* Headline */}
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 leading-tight">
             Master AI Tools, Prompts & News
             <br />
             in Just 3 Mins a Day
