@@ -85,7 +85,7 @@ export function SubscribeForm() {
         // Track Purchase event in Facebook Pixel for optimization
         if (window.fbq) {
           window.fbq('track', 'Purchase', {
-            value: 8.00,
+            value: 7.00,
             currency: 'USD'
           })
         }
