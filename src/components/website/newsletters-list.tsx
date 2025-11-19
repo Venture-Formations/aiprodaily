@@ -124,7 +124,7 @@ export function NewslettersList({ newsletters, imageOverride }: NewslettersListP
                   <div className="px-4 pt-4 pb-4 flex-1 flex flex-col">
                     <div className="flex items-center gap-2 text-xs text-[#1D1D1F]/60 mb-1.5">
                       <Calendar className="w-3.5 h-3.5" />
-                      <span>{formatDate(newsletter.send_date)}</span>
+                      <span>{formatDate(newsletter.issue_date)}</span>
                     </div>
 
                     <h3 className="text-base font-bold text-[#1D1D1F] mb-2 group-hover:text-[#a855f7] transition-colors leading-tight flex-1">
