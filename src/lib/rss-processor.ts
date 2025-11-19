@@ -575,136 +575,171 @@ export class RSSProcessor {
    * Ingest posts from a single feed
    */
   private async ingestFeedPosts(feed: any, newsletterId: string): Promise<{ fetched: number; scored: number }> {
-    const rssFeed = await parser.parseURL(feed.url)
+    try {
+      const rssFeed = await parser.parseURL(feed.url)
 
-    // Filter posts from last 6 hours (safety margin)
-    const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000)
+      // Filter posts from last 6 hours (safety margin)
+      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000)
 
-    const recentPosts = rssFeed.items.filter(item => {
-      if (!item.pubDate) return true // Include if no date
-      const pubDate = new Date(item.pubDate)
-      return pubDate >= sixHoursAgo
-    })
+      const recentPosts = rssFeed.items.filter(item => {
+        if (!item.pubDate) return true // Include if no date
+        const pubDate = new Date(item.pubDate)
+        return pubDate >= sixHoursAgo
+      })
 
-    const newPosts: any[] = []
+      const newPosts: any[] = []
 
-    // Check which posts are actually new
-    for (const item of recentPosts) {
-      const externalId = item.guid || item.link || ''
+      // Check which posts are actually new
+      for (const item of recentPosts) {
+        const externalId = item.guid || item.link || ''
 
-      // Check if already exists (any issue or no issue)
-      const { data: existing } = await supabaseAdmin
-        .from('rss_posts')
-        .select('id')
-        .eq('external_id', externalId)
-        .maybeSingle()
+        // Check if already exists (any issue or no issue)
+        const { data: existing } = await supabaseAdmin
+          .from('rss_posts')
+          .select('id')
+          .eq('external_id', externalId)
+          .maybeSingle()
 
-      if (existing) continue
+        if (existing) continue
 
-      // Get excluded sources from publication_settings
-      const excludedSources = await getExcludedRssSources(newsletterId)
+        // Get excluded sources from publication_settings
+        const excludedSources = await getExcludedRssSources(newsletterId)
 
-      const author = item.creator || (item as any)['dc:creator'] || null
-      const blockImages = excludedSources.includes(author)
+        const author = item.creator || (item as any)['dc:creator'] || null
+        const blockImages = excludedSources.includes(author)
 
-      // Extract image URL
-      let imageUrl = this.extractImageUrl(item)
+        // Extract image URL
+        let imageUrl = this.extractImageUrl(item)
 
-      // Re-host Facebook images
-      if (!blockImages && imageUrl && imageUrl.includes('fbcdn.net')) {
+        // Re-host Facebook images
+        if (!blockImages && imageUrl && imageUrl.includes('fbcdn.net')) {
+          try {
+            const githubUrl = await this.githubStorage.uploadImage(imageUrl, item.title || 'Untitled')
+            if (githubUrl) imageUrl = githubUrl
+          } catch (error) {
+            // Silent failure
+          }
+        }
+
+        if (blockImages) imageUrl = null
+
+        // Insert new post (issueId = null)
+        const { data: newPost, error: insertError } = await supabaseAdmin
+          .from('rss_posts')
+          .insert([{
+            feed_id: feed.id,
+            issue_id: null, // ← Not assigned to issue yet
+            external_id: externalId,
+            title: item.title || '',
+            description: item.contentSnippet || item.content || '',
+            content: item.content || '',
+            author,
+            publication_date: item.pubDate,
+            source_url: item.link,
+            image_url: imageUrl,
+          }])
+          .select('id, source_url')
+          .single()
+
+        if (insertError || !newPost) continue
+
+        newPosts.push(newPost)
+      }
+
+      // Extract full text for new posts (parallel, batch of 10)
+      if (newPosts.length > 0) {
+        const urls = newPosts
+          .filter(p => p.source_url)
+          .map(p => p.source_url)
+
         try {
-          const githubUrl = await this.githubStorage.uploadImage(imageUrl, item.title || 'Untitled')
-          if (githubUrl) imageUrl = githubUrl
+          const extractionResults = await this.articleExtractor.extractBatch(urls, 10)
+
+          // Update posts with full text
+          for (const post of newPosts) {
+            if (!post.source_url) continue
+
+            const result = extractionResults.get(post.source_url)
+            if (result?.success && result.fullText) {
+              await supabaseAdmin
+                .from('rss_posts')
+                .update({ full_article_text: result.fullText })
+                .eq('id', post.id)
+            }
+          }
         } catch (error) {
-          // Silent failure
+          console.error('[Ingest] Extraction failed:', error instanceof Error ? error.message : 'Unknown')
         }
       }
 
-      if (blockImages) imageUrl = null
+      // Score new posts (batch of 5)
+      let scoredCount = 0
 
-      // Insert new post (issueId = null)
-      const { data: newPost, error: insertError } = await supabaseAdmin
-        .from('rss_posts')
-        .insert([{
-          feed_id: feed.id,
-          issue_id: null, // ← Not assigned to issue yet
-          external_id: externalId,
-          title: item.title || '',
-          description: item.contentSnippet || item.content || '',
-          content: item.content || '',
-          author,
-          publication_date: item.pubDate,
-          source_url: item.link,
-          image_url: imageUrl,
-        }])
-        .select('id, source_url')
+      if (newPosts.length > 0) {
+        // Get full post data for scoring
+        const { data: fullPosts } = await supabaseAdmin
+          .from('rss_posts')
+          .select('*')
+          .in('id', newPosts.map(p => p.id))
+
+        if (fullPosts && fullPosts.length > 0) {
+          // Score in batches of 5
+          const BATCH_SIZE = 5
+          const BATCH_DELAY = 2000
+
+          for (let i = 0; i < fullPosts.length; i += BATCH_SIZE) {
+            const batch = fullPosts.slice(i, i + BATCH_SIZE)
+
+            // Process batch in parallel
+            const results = await Promise.allSettled(
+              batch.map(post => this.scoreAndStorePost(post, newsletterId))
+            )
+
+            scoredCount += results.filter(r => r.status === 'fulfilled').length
+
+            // Delay between batches
+            if (i + BATCH_SIZE < fullPosts.length) {
+              await new Promise(resolve => setTimeout(resolve, BATCH_DELAY))
+            }
+          }
+        }
+      }
+
+      // Update feed last processed time on success
+      await supabaseAdmin
+        .from('rss_feeds')
+        .update({
+          last_processed: new Date().toISOString(),
+          processing_errors: 0,
+          last_error: null
+        })
+        .eq('id', feed.id)
+
+      return { fetched: newPosts.length, scored: scoredCount }
+
+    } catch (error) {
+      // Update feed error tracking
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+
+      // Get current error count
+      const { data: feedData } = await supabaseAdmin
+        .from('rss_feeds')
+        .select('processing_errors')
+        .eq('id', feed.id)
         .single()
 
-      if (insertError || !newPost) continue
+      const currentErrors = feedData?.processing_errors || 0
 
-      newPosts.push(newPost)
+      await supabaseAdmin
+        .from('rss_feeds')
+        .update({
+          processing_errors: currentErrors + 1,
+          last_error: errorMessage
+        })
+        .eq('id', feed.id)
+
+      throw error
     }
-
-    // Extract full text for new posts (parallel, batch of 10)
-    if (newPosts.length > 0) {
-      const urls = newPosts
-        .filter(p => p.source_url)
-        .map(p => p.source_url)
-
-      try {
-        const extractionResults = await this.articleExtractor.extractBatch(urls, 10)
-
-        // Update posts with full text
-        for (const post of newPosts) {
-          if (!post.source_url) continue
-
-          const result = extractionResults.get(post.source_url)
-          if (result?.success && result.fullText) {
-            await supabaseAdmin
-              .from('rss_posts')
-              .update({ full_article_text: result.fullText })
-              .eq('id', post.id)
-          }
-        }
-      } catch (error) {
-        console.error('[Ingest] Extraction failed:', error instanceof Error ? error.message : 'Unknown')
-      }
-    }
-
-    // Score new posts (batch of 5)
-    let scoredCount = 0
-
-    if (newPosts.length > 0) {
-      // Get full post data for scoring
-      const { data: fullPosts } = await supabaseAdmin
-        .from('rss_posts')
-        .select('*')
-        .in('id', newPosts.map(p => p.id))
-
-      if (fullPosts && fullPosts.length > 0) {
-        // Score in batches of 5
-        const BATCH_SIZE = 5
-        const BATCH_DELAY = 2000
-
-        for (let i = 0; i < fullPosts.length; i += BATCH_SIZE) {
-          const batch = fullPosts.slice(i, i + BATCH_SIZE)
-
-          // Process batch in parallel
-          const results = await Promise.allSettled(
-            batch.map(post => this.scoreAndStorePost(post, newsletterId))
-          )
-
-          scoredCount += results.filter(r => r.status === 'fulfilled').length
-
-          // Delay between batches
-          if (i + BATCH_SIZE < fullPosts.length) {
-            await new Promise(resolve => setTimeout(resolve, BATCH_DELAY))
-          }
-        }
-      }
-    }
-
-    return { fetched: newPosts.length, scored: scoredCount }
   }
 
   /**
