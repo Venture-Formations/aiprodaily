@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { Octokit } from '@octokit/rest'
 
 /**
  * Upload advertisement image to GitHub
@@ -58,35 +59,43 @@ export async function POST(request: NextRequest) {
     const filename = `ad-${timestamp}.jpg`
     const path = `advertisements/${filename}`
 
-    // Upload to GitHub
+    // Upload to GitHub using Octokit
     const githubToken = process.env.GITHUB_TOKEN
-    const githubOwner = process.env.GITHUB_OWNER || 'VFDavid'
-    const githubRepo = process.env.GITHUB_REPO || 'st-cloud-scoop-images'
+    const githubOwner = process.env.GITHUB_OWNER || 'Venture-Formations'
+    const githubRepo = process.env.GITHUB_REPO || 'aiprodaily'
 
-    const githubUrl = `https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${path}`
-
-    const githubResponse = await fetch(githubUrl, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${githubToken}`,
-        'Accept': 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        message: `Add advertisement image: ${filename}`,
-        content: base64Content,
-        branch: 'main'
-      })
-    })
-
-    if (!githubResponse.ok) {
-      const error = await githubResponse.text()
-      console.error('GitHub upload failed:', error)
-      throw new Error(`GitHub upload failed: ${githubResponse.statusText}`)
+    if (!githubToken) {
+      throw new Error('GitHub token not configured')
     }
 
-    const githubData = await githubResponse.json()
-    const imageUrl = githubData.content.download_url
+    const octokit = new Octokit({
+      auth: githubToken,
+    })
+
+    // Parse repo path if it contains owner (e.g., "Venture-Formations/aiprodaily")
+    let owner = githubOwner
+    let repo = githubRepo
+
+    if (githubRepo.includes('/')) {
+      const parts = githubRepo.split('/')
+      owner = parts[0]
+      repo = parts[1]
+    }
+
+    const uploadResponse = await octokit.repos.createOrUpdateFileContents({
+      owner,
+      repo,
+      path,
+      message: `Add advertisement image: ${filename}`,
+      content: base64Content,
+    })
+
+    if (!uploadResponse.data.content?.download_url) {
+      console.error('GitHub upload failed: No download URL returned')
+      throw new Error('GitHub upload failed: No download URL')
+    }
+
+    const imageUrl = uploadResponse.data.content.download_url
 
     return NextResponse.json({ url: imageUrl })
 
