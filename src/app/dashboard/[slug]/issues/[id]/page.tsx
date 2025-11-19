@@ -323,6 +323,11 @@ function AIAppsSection({ issue }: { issue: any }) {
                         ⭐ Featured
                       </span>
                     )}
+                    {app.is_affiliate && (
+                      <span className="ml-2 text-sm text-green-600 font-normal bg-green-50 px-2 py-0.5 rounded">
+                        Affiliate
+                      </span>
+                    )}
                   </h4>
                   {app.tagline && (
                     <p className="text-sm text-gray-600 italic mt-1">

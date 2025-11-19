@@ -1108,10 +1108,10 @@ export async function generateAIAppsSection(issue: any): Promise<string> {
         ? wrapTrackingUrl(appUrl, 'AI Apps', issue.date, issue.mailerlite_issue_id)
         : '#'
 
-      // Format: number. emoji Title - Description
+      // Format: number. emoji Title Description
       return `
       <div style='padding: 12px 0; border-bottom: 1px solid #e0e0e0; font-size: 16px; line-height: 24px; font-family: ${bodyFont};'>
-        <strong>${index + 1}.</strong> ${emoji} <a href='${trackedUrl}' style='color: ${secondaryColor}; text-decoration: underline; font-weight: bold;'>${app.app_name}</a> - ${app.description || 'AI-powered application'}
+        <strong>${index + 1}.</strong> ${emoji} <a href='${trackedUrl}' style='color: ${secondaryColor}; text-decoration: underline; font-weight: bold;'>${app.app_name}</a> ${app.description || 'AI-powered application'}
       </div>`
     }).join('')
 
