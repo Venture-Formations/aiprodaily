@@ -31,12 +31,21 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     }
   }
 
+  // Parse date as local date to avoid timezone offset issues
+  const [year, month, day] = newsletter.issue_date.split('-').map(Number)
+  const formattedDate = new Date(year, month - 1, day).toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
+
   return {
     title: `${newsletter.subject_line} - AI Accounting Daily`,
-    description: `AI Accounting Daily newsletter from ${new Date(newsletter.issue_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`,
+    description: `AI Accounting Daily newsletter from ${formattedDate}`,
     openGraph: {
       title: newsletter.subject_line,
-      description: `AI Accounting Daily newsletter from ${new Date(newsletter.issue_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`,
+      description: `AI Accounting Daily newsletter from ${formattedDate}`,
       type: 'article',
       publishedTime: newsletter.send_date,
     }
@@ -80,7 +89,9 @@ export default async function NewsletterPage({ params }: PageProps) {
   const primaryColor = settings.primary_color || '#1877F2'
   const currentYear = new Date().getFullYear()
 
-  const formattedDate = new Date(newsletter.issue_date).toLocaleDateString('en-US', {
+  // Parse date as local date to avoid timezone offset issues
+  const [year, month, day] = newsletter.issue_date.split('-').map(Number)
+  const formattedDate = new Date(year, month - 1, day).toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
