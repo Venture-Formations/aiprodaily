@@ -26,7 +26,7 @@ export default async function SubscribePage() {
             <img
               src={logoUrl}
               alt="AI Accounting Daily"
-              className="h-32 w-auto object-contain"
+              className="h-48 w-auto object-contain"
             />
           </div>
 
