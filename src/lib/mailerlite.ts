@@ -9,7 +9,7 @@ import {
   generatePollSection,
   generateAdvertorialSection
 } from './newsletter-templates'
-import { getEmailSettings, getScheduleSettings } from './publication-settings'
+import { getEmailSettings, getScheduleSettings, getPublicationSetting } from './publication-settings'
 
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
 
@@ -579,9 +579,52 @@ export class MailerLiteService {
     }
   }
 
-  async createFinalissue(issue: issueWithEvents, mainGroupId: string) {
+  private async getSecondaryScheduleData(date: string, publicationId: string): Promise<any> {
     try {
-      console.log(`Creating final issue for ${issue.date}`)
+      // Get secondary send time from publication_settings
+      const secondaryTime = await getPublicationSetting(publicationId, 'email_secondaryScheduledSendTime')
+      const timezoneIdStr = await getPublicationSetting(publicationId, 'email_timezone_id')
+      const timezoneId = timezoneIdStr ? parseInt(timezoneIdStr, 10) : 157 // Default to Central Time
+
+      const finalTime = secondaryTime || '04:55' // Default if not set
+
+      console.log('Using secondary scheduled send time from publication settings:', finalTime)
+
+      // Parse the time (format: "HH:MM")
+      const [hours, minutes] = finalTime.split(':')
+
+      // MailerLite scheduling format for secondary issue
+      const scheduleData = {
+        delivery: 'scheduled',
+        schedule: {
+          date: date, // Newsletter date (YYYY-MM-DD format)
+          hours: hours, // HH format
+          minutes: minutes, // MM format
+          timezone_id: timezoneId // Publication-specific timezone
+        }
+      }
+
+      console.log('Secondary issue schedule data:', JSON.stringify(scheduleData, null, 2))
+      return scheduleData
+
+    } catch (error) {
+      console.error('Error getting secondary schedule data, using default:', error)
+      // Fallback to 4:55 AM CT on the newsletter date
+      return {
+        delivery: 'scheduled',
+        schedule: {
+          date: date,
+          hours: '04',
+          minutes: '55',
+          timezone_id: 157
+        }
+      }
+    }
+  }
+
+  async createFinalissue(issue: issueWithEvents, mainGroupId: string, isSecondary: boolean = false) {
+    try {
+      console.log(`Creating ${isSecondary ? 'secondary' : 'final'} issue for ${issue.date}`)
 
       // Get newsletter slug for issue naming
       const { data: dbissue } = await supabaseAdmin
@@ -603,11 +646,15 @@ export class MailerLiteService {
 
       const subjectLine = issue.subject_line || `Newsletter - ${new Date(issue.date).toLocaleDateString()}`
 
-      console.log('Creating final issue with subject line:', subjectLine)
+      console.log(`Creating ${isSecondary ? 'secondary' : 'final'} issue with subject line:`, subjectLine)
       console.log('Using publication settings:', { senderName, fromEmail })
 
+      const campaignName = isSecondary
+        ? `${newsletterName} Newsletter (Secondary): ${issue.date}`
+        : `${newsletterName} Newsletter: ${issue.date}`
+
       const issueData = {
-        name: `${newsletterName} Newsletter: ${issue.date}`,
+        name: campaignName,
         type: 'regular',
         emails: [{
           subject: `${subjectEmoji} ${subjectLine}`,
@@ -651,8 +698,10 @@ export class MailerLiteService {
           const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
           const centralDate = new Date(nowCentral)
           const today = centralDate.toISOString().split('T')[0] // Today's date in YYYY-MM-DD
-          const finalScheduleData = await this.getFinalScheduleData(today, issue.publication_id)
-          console.log('Scheduling final issue for today with data:', finalScheduleData)
+          const finalScheduleData = isSecondary
+            ? await this.getSecondaryScheduleData(today, issue.publication_id)
+            : await this.getFinalScheduleData(today, issue.publication_id)
+          console.log(`Scheduling ${isSecondary ? 'secondary' : 'final'} issue for today with data:`, finalScheduleData)
 
           const scheduleResponse = await mailerliteClient.post(`/campaigns/${issueId}/schedule`, finalScheduleData)
 

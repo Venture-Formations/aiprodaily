@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       .from('publication_settings')
       .select('key, value')
       .eq('publication_id', newsletter.id)
-      .or('key.like.email_%,key.like.criteria_%,key.like.secondary_criteria_%,key.like.primary_criteria_%,key.eq.max_top_articles,key.eq.max_bottom_articles,key.eq.max_secondary_articles,key.eq.primary_article_lookback_hours,key.eq.secondary_article_lookback_hours,key.eq.dedup_historical_lookback_days,key.eq.dedup_strictness_threshold,key.eq.next_ad_position')
+      .or('key.like.email_%,key.like.criteria_%,key.like.secondary_criteria_%,key.like.primary_criteria_%,key.eq.max_top_articles,key.eq.max_bottom_articles,key.eq.max_secondary_articles,key.eq.primary_article_lookback_hours,key.eq.secondary_article_lookback_hours,key.eq.dedup_historical_lookback_days,key.eq.dedup_strictness_threshold,key.eq.next_ad_position,key.eq.secondary_send_days')
 
     if (error) {
       console.error('BACKEND GET: Database error:', error)
@@ -40,14 +40,22 @@ export async function GET(request: NextRequest) {
     console.log('BACKEND GET: Email settings keys found:', settingsRows?.filter(r => r.key.startsWith('email_')).map(r => r.key) || [])
 
     // Convert rows to object
-    const savedSettings: Record<string, string> = {}
+    const savedSettings: Record<string, any> = {}
     settingsRows?.forEach(row => {
       // Strip extra quotes if value was JSON stringified (e.g., '"20:30"' -> '20:30')
       let cleanValue = row.value
       if (cleanValue && cleanValue.startsWith('"') && cleanValue.endsWith('"') && cleanValue.length > 2) {
         cleanValue = cleanValue.slice(1, -1)
       }
-      if (row.key.startsWith('email_')) {
+
+      // Handle JSON fields
+      if (row.key === 'secondary_send_days') {
+        try {
+          savedSettings.secondarySendDays = JSON.parse(row.value)
+        } catch {
+          savedSettings.secondarySendDays = [1, 2, 3, 4, 5] // Default to Mon-Fri
+        }
+      } else if (row.key.startsWith('email_')) {
         const settingKey = row.key.replace('email_', '')
         savedSettings[settingKey] = cleanValue
       } else {
@@ -62,6 +70,7 @@ export async function GET(request: NextRequest) {
     const defaultSettings = {
       reviewGroupId: process.env.MAILERLITE_REVIEW_GROUP_ID || '',
       mainGroupId: process.env.MAILERLITE_MAIN_GROUP_ID || '',
+      secondaryGroupId: '',
       fromEmail: 'scoop@stcscoop.com',
       senderName: 'St. Cloud Scoop',
       reviewScheduleEnabled: 'true',
@@ -71,6 +80,10 @@ export async function GET(request: NextRequest) {
       dailyScheduleEnabled: 'false',
       dailyissueCreationTime: '04:30',  // 4:30 AM CT
       dailyScheduledSendTime: '04:55',  // 4:55 AM CT
+      secondaryScheduleEnabled: 'false',
+      secondaryissueCreationTime: '04:30',  // 4:30 AM CT
+      secondaryScheduledSendTime: '04:55',  // 4:55 AM CT
+      secondarySendDays: [1, 2, 3, 4, 5],  // Mon-Fri by default
       primary_article_lookback_hours: '72',  // 72 hours for primary RSS
       secondary_article_lookback_hours: '36',  // 36 hours for secondary RSS
       dedup_historical_lookback_days: '3',  // 3 days of historical checking
@@ -281,14 +294,17 @@ export async function POST(request: NextRequest) {
     // Check if this is a schedule time update request
     const scheduleFields = ['rssProcessingTime', 'issueCreationTime', 'scheduledSendTime',
                            'dailyissueCreationTime', 'dailyScheduledSendTime',
-                           'reviewScheduleEnabled', 'dailyScheduleEnabled']
+                           'secondaryissueCreationTime', 'secondaryScheduledSendTime',
+                           'reviewScheduleEnabled', 'dailyScheduleEnabled', 'secondaryScheduleEnabled',
+                           'secondarySendDays']
     const isScheduleUpdate = scheduleFields.some(field => settings[field] !== undefined) &&
                             !settings.fromEmail && !settings.senderName
 
     if (isScheduleUpdate) {
       // Validate time formats (HH:MM)
       const timeFields = ['rssProcessingTime', 'issueCreationTime', 'scheduledSendTime',
-                         'dailyissueCreationTime', 'dailyScheduledSendTime']
+                         'dailyissueCreationTime', 'dailyScheduledSendTime',
+                         'secondaryissueCreationTime', 'secondaryScheduledSendTime']
       for (const field of timeFields) {
         if (settings[field] && !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(settings[field])) {
           return NextResponse.json({
@@ -314,11 +330,23 @@ export async function POST(request: NextRequest) {
       if (settings.dailyScheduledSendTime !== undefined) {
         settingsToSave.push({ key: 'email_dailyScheduledSendTime', value: settings.dailyScheduledSendTime })
       }
+      if (settings.secondaryissueCreationTime !== undefined) {
+        settingsToSave.push({ key: 'email_secondaryissueCreationTime', value: settings.secondaryissueCreationTime })
+      }
+      if (settings.secondaryScheduledSendTime !== undefined) {
+        settingsToSave.push({ key: 'email_secondaryScheduledSendTime', value: settings.secondaryScheduledSendTime })
+      }
       if (settings.reviewScheduleEnabled !== undefined) {
         settingsToSave.push({ key: 'email_reviewScheduleEnabled', value: settings.reviewScheduleEnabled ? 'true' : 'false' })
       }
       if (settings.dailyScheduleEnabled !== undefined) {
         settingsToSave.push({ key: 'email_dailyScheduleEnabled', value: settings.dailyScheduleEnabled ? 'true' : 'false' })
+      }
+      if (settings.secondaryScheduleEnabled !== undefined) {
+        settingsToSave.push({ key: 'email_secondaryScheduleEnabled', value: settings.secondaryScheduleEnabled ? 'true' : 'false' })
+      }
+      if (settings.secondarySendDays !== undefined) {
+        settingsToSave.push({ key: 'secondary_send_days', value: JSON.stringify(settings.secondarySendDays) })
       }
 
       // Upsert schedule settings
@@ -367,6 +395,7 @@ export async function POST(request: NextRequest) {
     const settingsToSave = [
       { key: 'email_reviewGroupId', value: settings.reviewGroupId || '' },
       { key: 'email_mainGroupId', value: settings.mainGroupId || '' },
+      { key: 'email_secondaryGroupId', value: settings.secondaryGroupId || '' },
       { key: 'email_fromEmail', value: settings.fromEmail },
       { key: 'email_senderName', value: settings.senderName },
       { key: 'email_reviewScheduleEnabled', value: settings.reviewScheduleEnabled ? 'true' : 'false' },
@@ -375,7 +404,11 @@ export async function POST(request: NextRequest) {
       { key: 'email_scheduledSendTime', value: settings.scheduledSendTime },
       { key: 'email_dailyScheduleEnabled', value: settings.dailyScheduleEnabled ? 'true' : 'false' },
       { key: 'email_dailyissueCreationTime', value: settings.dailyissueCreationTime },
-      { key: 'email_dailyScheduledSendTime', value: settings.dailyScheduledSendTime }
+      { key: 'email_dailyScheduledSendTime', value: settings.dailyScheduledSendTime },
+      { key: 'email_secondaryScheduleEnabled', value: settings.secondaryScheduleEnabled ? 'true' : 'false' },
+      { key: 'email_secondaryissueCreationTime', value: settings.secondaryissueCreationTime },
+      { key: 'email_secondaryScheduledSendTime', value: settings.secondaryScheduledSendTime },
+      { key: 'secondary_send_days', value: JSON.stringify(settings.secondarySendDays || [1, 2, 3, 4, 5]) }
     ]
 
     // Upsert each setting

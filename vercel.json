@@ -25,6 +25,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/send-secondary",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/import-metrics",
       "schedule": "0 6 * * *"
     },
@@ -73,6 +77,9 @@
       "maxDuration": 300
     },
     "app/api/cron/send-final/route.ts": {
+      "maxDuration": 600
+    },
+    "app/api/cron/send-secondary/route.ts": {
       "maxDuration": 600
     },
     "app/api/cron/import-metrics/route.ts": {

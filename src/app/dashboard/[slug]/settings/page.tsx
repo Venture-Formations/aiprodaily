@@ -1132,6 +1132,7 @@ function EmailSettings() {
     // MailerLite Settings
     reviewGroupId: '',
     mainGroupId: '',
+    secondaryGroupId: '',
     fromEmail: 'scoop@stcscoop.com',
     senderName: 'St. Cloud Scoop',
 
@@ -1144,7 +1145,13 @@ function EmailSettings() {
     // Daily Newsletter Settings (Central Time)
     dailyScheduleEnabled: false,
     dailyissueCreationTime: '04:30',  // 4:30 AM
-    dailyScheduledSendTime: '04:55'  // 4:55 AM
+    dailyScheduledSendTime: '04:55',  // 4:55 AM
+
+    // Secondary Newsletter Settings (Central Time)
+    secondaryScheduleEnabled: false,
+    secondaryissueCreationTime: '04:30',  // 4:30 AM
+    secondaryScheduledSendTime: '04:55',  // 4:55 AM
+    secondarySendDays: [1, 2, 3, 4, 5]  // Mon-Fri by default
   })
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
@@ -1234,7 +1241,7 @@ function EmailSettings() {
     }
   }
 
-  const handleChange = (field: string, value: string | boolean) => {
+  const handleChange = (field: string, value: string | boolean | number[]) => {
     setSettings(prev => ({ ...prev, [field]: value }))
   }
 
@@ -1433,6 +1440,19 @@ function EmailSettings() {
               value={settings.mainGroupId}
               onChange={(e) => handleChange('mainGroupId', e.target.value)}
               placeholder="Group ID for main newsletter"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Secondary Group ID
+            </label>
+            <input
+              type="text"
+              value={settings.secondaryGroupId}
+              onChange={(e) => handleChange('secondaryGroupId', e.target.value)}
+              placeholder="Group ID for secondary sends"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
             />
           </div>
@@ -1965,6 +1985,259 @@ function EmailSettings() {
           <div className="text-sm text-green-800 space-y-1">
             <div>1. <strong>{settings.dailyissueCreationTime}</strong> - Create final campaign with any changes made to issue during review</div>
             <div>2. <strong>{settings.dailyScheduledSendTime}</strong> - Send final issue to main subscriber group</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Automated Secondary Publication Schedule */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Automated Secondary Publication Schedule</h3>
+          <div className="flex items-center">
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings.secondaryScheduleEnabled}
+                onChange={(e) => handleChange('secondaryScheduleEnabled', e.target.checked)}
+                className="sr-only"
+              />
+              <div className={`relative w-11 h-6 rounded-full transition-colors ${
+                settings.secondaryScheduleEnabled ? 'bg-brand-primary' : 'bg-gray-300'
+              }`}>
+                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                  settings.secondaryScheduleEnabled ? 'translate-x-5' : 'translate-x-0'
+                }`}></div>
+              </div>
+              <span className="ml-3 text-sm font-medium text-gray-700">
+                {settings.secondaryScheduleEnabled ? 'Enabled' : 'Disabled'}
+              </span>
+            </label>
+          </div>
+        </div>
+        <p className="text-sm text-gray-600 mb-4">
+          Configure secondary newsletter delivery to a different subscriber group on selected days (Central Time Zone).
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Campaign Creation Time
+            </label>
+            <div className="flex space-x-2 items-center">
+              <select
+                value={(() => {
+                  const hour24 = parseInt(settings.secondaryissueCreationTime.split(':')[0])
+                  return hour24 === 0 ? '12' : hour24 > 12 ? (hour24 - 12).toString() : hour24.toString()
+                })()}
+                onChange={(e) => {
+                  const minutes = settings.secondaryissueCreationTime.split(':')[1] || '00'
+                  const hour12 = parseInt(e.target.value)
+                  const currentHour24 = parseInt(settings.secondaryissueCreationTime.split(':')[0])
+                  const isAM = currentHour24 < 12
+                  let hour24
+                  if (hour12 === 12) {
+                    hour24 = isAM ? 0 : 12
+                  } else {
+                    hour24 = isAM ? hour12 : hour12 + 12
+                  }
+                  handleChange('secondaryissueCreationTime', `${hour24.toString().padStart(2, '0')}:${minutes}`)
+                }}
+                disabled={!settings.secondaryScheduleEnabled}
+                className="w-20 px-2 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary disabled:bg-gray-100 appearance-none bg-white"
+                style={{backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e\")", backgroundPosition: "right 0.5rem center", backgroundRepeat: "no-repeat", backgroundSize: "1.5em 1.5em"}}
+              >
+                {Array.from({ length: 12 }, (_, i) => {
+                  const hour = i + 1
+                  return (
+                    <option key={hour} value={hour.toString()}>
+                      {hour}
+                    </option>
+                  )
+                })}
+              </select>
+              <span>:</span>
+              <select
+                value={settings.secondaryissueCreationTime.split(':')[1] || '00'}
+                onChange={(e) => {
+                  const hour24 = parseInt(settings.secondaryissueCreationTime.split(':')[0])
+                  handleChange('secondaryissueCreationTime', `${hour24.toString().padStart(2, '0')}:${e.target.value}`)
+                }}
+                disabled={!settings.secondaryScheduleEnabled}
+                className="w-20 px-2 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary disabled:bg-gray-100 appearance-none bg-white"
+                style={{backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e\")", backgroundPosition: "right 0.5rem center", backgroundRepeat: "no-repeat", backgroundSize: "1.5em 1.5em"}}
+              >
+                <option value="00">00</option>
+                <option value="05">05</option>
+                <option value="10">10</option>
+                <option value="15">15</option>
+                <option value="20">20</option>
+                <option value="25">25</option>
+                <option value="30">30</option>
+                <option value="35">35</option>
+                <option value="40">40</option>
+                <option value="45">45</option>
+                <option value="50">50</option>
+                <option value="55">55</option>
+              </select>
+              <select
+                value={parseInt(settings.secondaryissueCreationTime.split(':')[0]) < 12 ? 'AM' : 'PM'}
+                onChange={(e) => {
+                  const minutes = settings.secondaryissueCreationTime.split(':')[1] || '00'
+                  const currentHour24 = parseInt(settings.secondaryissueCreationTime.split(':')[0])
+                  const currentHour12 = currentHour24 === 0 ? 12 : currentHour24 > 12 ? currentHour24 - 12 : currentHour24
+                  let newHour24
+                  if (e.target.value === 'AM') {
+                    newHour24 = currentHour12 === 12 ? 0 : currentHour12
+                  } else {
+                    newHour24 = currentHour12 === 12 ? 12 : currentHour12 + 12
+                  }
+                  handleChange('secondaryissueCreationTime', `${newHour24.toString().padStart(2, '0')}:${minutes}`)
+                }}
+                disabled={!settings.secondaryScheduleEnabled}
+                className="w-20 px-2 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary disabled:bg-gray-100 appearance-none bg-white"
+                style={{backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e\")", backgroundPosition: "right 0.5rem center", backgroundRepeat: "no-repeat", backgroundSize: "1.5em 1.5em"}}
+              >
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Secondary campaign creation with existing issue content</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Scheduled Send Time
+            </label>
+            <div className="flex space-x-2 items-center">
+              <select
+                value={(() => {
+                  const hour24 = parseInt(settings.secondaryScheduledSendTime.split(':')[0])
+                  return hour24 === 0 ? '12' : hour24 > 12 ? (hour24 - 12).toString() : hour24.toString()
+                })()}
+                onChange={(e) => {
+                  const minutes = settings.secondaryScheduledSendTime.split(':')[1] || '00'
+                  const hour12 = parseInt(e.target.value)
+                  const currentHour24 = parseInt(settings.secondaryScheduledSendTime.split(':')[0])
+                  const isAM = currentHour24 < 12
+                  let hour24
+                  if (hour12 === 12) {
+                    hour24 = isAM ? 0 : 12
+                  } else {
+                    hour24 = isAM ? hour12 : hour12 + 12
+                  }
+                  handleChange('secondaryScheduledSendTime', `${hour24.toString().padStart(2, '0')}:${minutes}`)
+                }}
+                disabled={!settings.secondaryScheduleEnabled}
+                className="w-16 px-2 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary disabled:bg-gray-100 appearance-none bg-white"
+                style={{backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e\")", backgroundPosition: "right 0.5rem center", backgroundRepeat: "no-repeat", backgroundSize: "1.5em 1.5em"}}
+              >
+                {Array.from({ length: 12 }, (_, i) => {
+                  const hour = i + 1
+                  return (
+                    <option key={hour} value={hour.toString()}>
+                      {hour}
+                    </option>
+                  )
+                })}
+              </select>
+              <span>:</span>
+              <select
+                value={settings.secondaryScheduledSendTime.split(':')[1] || '00'}
+                onChange={(e) => {
+                  const hour24 = parseInt(settings.secondaryScheduledSendTime.split(':')[0])
+                  handleChange('secondaryScheduledSendTime', `${hour24.toString().padStart(2, '0')}:${e.target.value}`)
+                }}
+                disabled={!settings.secondaryScheduleEnabled}
+                className="w-16 px-2 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary disabled:bg-gray-100 appearance-none bg-white"
+                style={{backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e\")", backgroundPosition: "right 0.5rem center", backgroundRepeat: "no-repeat", backgroundSize: "1.5em 1.5em"}}
+              >
+                <option value="00">00</option>
+                <option value="05">05</option>
+                <option value="10">10</option>
+                <option value="15">15</option>
+                <option value="20">20</option>
+                <option value="25">25</option>
+                <option value="30">30</option>
+                <option value="35">35</option>
+                <option value="40">40</option>
+                <option value="45">45</option>
+                <option value="50">50</option>
+                <option value="55">55</option>
+              </select>
+              <select
+                value={parseInt(settings.secondaryScheduledSendTime.split(':')[0]) < 12 ? 'AM' : 'PM'}
+                onChange={(e) => {
+                  const minutes = settings.secondaryScheduledSendTime.split(':')[1] || '00'
+                  const currentHour24 = parseInt(settings.secondaryScheduledSendTime.split(':')[0])
+                  const currentHour12 = currentHour24 === 0 ? 12 : currentHour24 > 12 ? currentHour24 - 12 : currentHour24
+                  let newHour24
+                  if (e.target.value === 'AM') {
+                    newHour24 = currentHour12 === 12 ? 0 : currentHour12
+                  } else {
+                    newHour24 = currentHour12 === 12 ? 12 : currentHour12 + 12
+                  }
+                  handleChange('secondaryScheduledSendTime', `${newHour24.toString().padStart(2, '0')}:${minutes}`)
+                }}
+                disabled={!settings.secondaryScheduleEnabled}
+                className="w-20 px-2 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary disabled:bg-gray-100 appearance-none bg-white"
+                style={{backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e\")", backgroundPosition: "right 0.5rem center", backgroundRepeat: "no-repeat", backgroundSize: "1.5em 1.5em"}}
+              >
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Delivery to secondary subscriber group (5-minute increments)</p>
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Send Days
+          </label>
+          <div className="grid grid-cols-7 gap-2">
+            {[
+              { day: 0, label: 'Sun' },
+              { day: 1, label: 'Mon' },
+              { day: 2, label: 'Tue' },
+              { day: 3, label: 'Wed' },
+              { day: 4, label: 'Thu' },
+              { day: 5, label: 'Fri' },
+              { day: 6, label: 'Sat' }
+            ].map(({ day, label }) => (
+              <label
+                key={day}
+                className={`flex items-center justify-center p-3 border rounded-md cursor-pointer transition-colors ${
+                  settings.secondarySendDays.includes(day)
+                    ? 'bg-brand-primary border-brand-primary text-white'
+                    : 'bg-white border-gray-300 text-gray-700 hover:border-brand-primary'
+                } ${!settings.secondaryScheduleEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={settings.secondarySendDays.includes(day)}
+                  onChange={(e) => {
+                    const days = settings.secondarySendDays
+                    if (e.target.checked) {
+                      handleChange('secondarySendDays', [...days, day].sort())
+                    } else {
+                      handleChange('secondarySendDays', days.filter(d => d !== day))
+                    }
+                  }}
+                  disabled={!settings.secondaryScheduleEnabled}
+                  className="sr-only"
+                />
+                <span className="text-sm font-medium">{label}</span>
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-2">Select the days when the secondary newsletter should be sent</p>
+        </div>
+
+        <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+          <h4 className="font-medium text-purple-900 mb-2">Secondary Publication Workflow</h4>
+          <div className="text-sm text-purple-800 space-y-1">
+            <div>1. <strong>{settings.secondaryissueCreationTime}</strong> - Create campaign using existing issue content</div>
+            <div>2. <strong>{settings.secondaryScheduledSendTime}</strong> - Send to secondary subscriber group (on selected days only)</div>
           </div>
         </div>
       </div>
