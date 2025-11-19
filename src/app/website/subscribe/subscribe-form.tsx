@@ -82,12 +82,9 @@ export function SubscribeForm() {
       const data = await response.json()
 
       if (response.ok) {
-        // Track Purchase event in Facebook Pixel for optimization
+        // Track Lead event in Facebook Pixel
         if (window.fbq) {
-          window.fbq('track', 'Purchase', {
-            value: 7.00,
-            currency: 'USD'
-          })
+          window.fbq('track', 'Lead')
         }
 
         // Redirect to personalization form with email parameter
