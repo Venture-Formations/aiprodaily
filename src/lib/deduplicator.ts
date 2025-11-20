@@ -589,8 +589,23 @@ export class Deduplicator {
         console.log(`[DEDUP] AI Semantic (${batchType}): Group "${group.topic_signature?.substring(0, 40)}..." - Primary idx ${primaryIdx} (historical: ${isPrimaryHistorical}), ${group.duplicate_indices.length} duplicates -> ${duplicatePostIds.length} current posts`)
 
         if (duplicatePostIds.length === 0) {
-          // No current posts are duplicates in this group
-          console.log(`[DEDUP] AI Semantic (${batchType}): Skipping group - no current posts in duplicates`)
+          // Check if primary is current and matches historical posts
+          if (!isPrimaryHistorical) {
+            // Primary is current but all its duplicates are historical
+            // This is a historical match - mark the current primary as duplicate
+            groups.push({
+              topic_signature: `Historical AI match: "${primaryPost.title.substring(0, 60)}..."`,
+              primary_post_id: primaryPost.id,
+              duplicate_post_ids: [primaryPost.id],  // Mark the primary itself as duplicate
+              detection_method: 'ai_semantic',
+              similarity_score: 0.8,
+              explanation: `AI detected semantic similarity to previously published article: ${group.similarity_explanation || ''}`
+            })
+            console.log(`[DEDUP] AI Semantic (${batchType}): Added historical match group - current primary ${primaryPost.id} matches historical posts`)
+          } else {
+            // Primary is historical, duplicates are historical - nothing to mark
+            console.log(`[DEDUP] AI Semantic (${batchType}): Skipping group - no current posts in duplicates`)
+          }
           continue
         }
 
