@@ -621,30 +621,42 @@ export class Deduplicator {
             const primaryPost = combinedPosts[primaryIdx]
             const isPrimaryHistorical = !currentPostIds.has(primaryPost.id)
 
+            // Check if ANY duplicate is historical
+            const hasHistoricalDuplicates = group.duplicate_indices.some((idx: number) => {
+              if (typeof idx !== 'number' || idx < 0 || idx >= combinedPosts.length) return false
+              const post = combinedPosts[idx]
+              return !currentPostIds.has(post.id) // Is historical?
+            })
+
             // Get all duplicate post IDs (only current posts should be marked)
             const duplicatePostIds = group.duplicate_indices
               .filter((idx: number) => typeof idx === 'number' && idx >= 0 && idx < combinedPosts.length)
               .map((idx: number) => combinedPosts[idx].id)
               .filter((id: string) => currentPostIds.has(id)) // Only current posts
 
-            console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Group "${group.topic_signature?.substring(0, 40)}..." - Primary idx ${primaryIdx} (historical: ${isPrimaryHistorical}), ${group.duplicate_indices.length} duplicates -> ${duplicatePostIds.length} current posts`)
+            console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Group "${group.topic_signature?.substring(0, 40)}..." - Primary idx ${primaryIdx} (historical: ${isPrimaryHistorical}), ${group.duplicate_indices.length} duplicates -> ${duplicatePostIds.length} current (hasHistorical: ${hasHistoricalDuplicates})`)
+
+            // If primary is current AND any duplicates are historical, mark primary as duplicate
+            if (!isPrimaryHistorical && hasHistoricalDuplicates) {
+              // Current primary matches historical posts (and possibly other current posts)
+              // Mark ALL current posts (including primary) as duplicates
+              const allCurrentPostsToMark = [primaryPost.id, ...duplicatePostIds]
+
+              groups.push({
+                topic_signature: `Historical AI match: "${primaryPost.title.substring(0, 60)}..."`,
+                primary_post_id: primaryPost.id,
+                duplicate_post_ids: allCurrentPostsToMark,  // Mark primary + all current duplicates
+                detection_method: 'ai_semantic',
+                similarity_score: 0.8,
+                explanation: `AI detected semantic similarity to previously published article: ${group.similarity_explanation || ''}`
+              })
+              console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Added historical match group - current primary ${primaryPost.id} + ${duplicatePostIds.length} current duplicates ALL marked (matched historical)`)
+              continue
+            }
 
             if (duplicatePostIds.length === 0) {
-              // Check if primary is current and matches historical posts
-              if (!isPrimaryHistorical) {
-                // Primary is current but all its duplicates are historical
-                // This is a historical match - mark the current primary as duplicate
-                groups.push({
-                  topic_signature: `Historical AI match: "${primaryPost.title.substring(0, 60)}..."`,
-                  primary_post_id: primaryPost.id,
-                  duplicate_post_ids: [primaryPost.id],  // Mark the primary itself as duplicate
-                  detection_method: 'ai_semantic',
-                  similarity_score: 0.8,
-                  explanation: `AI detected semantic similarity to previously published article: ${group.similarity_explanation || ''}`
-                })
-                console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Added historical match group - current primary ${primaryPost.id} matches historical posts`)
-              } else {
-                // Primary is historical, duplicates are historical - nothing to mark
+              // No current duplicates - skip if primary is also historical
+              if (isPrimaryHistorical) {
                 console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Skipping group - no current posts in duplicates`)
               }
               continue
@@ -666,7 +678,8 @@ export class Deduplicator {
               })
               console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Added historical match group - primary: ${newPrimaryId}, ${duplicatePostIds.length} duplicates`)
             } else {
-              // Primary is current - mark as duplicate group within current issue
+              // Primary is current, duplicates are current, NO historical matches
+              // This is a within-issue duplicate - keep primary, mark duplicates
               groups.push({
                 topic_signature: group.topic_signature || 'unknown',
                 primary_post_id: primaryPost.id,
@@ -675,7 +688,7 @@ export class Deduplicator {
                 similarity_score: 0.8,
                 explanation: group.similarity_explanation || ''
               })
-              console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Added current match group with ${duplicatePostIds.length} duplicates`)
+              console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Added current match group - keep primary ${primaryPost.id}, mark ${duplicatePostIds.length} duplicates`)
             }
           } catch (groupError) {
             console.error(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Error mapping group:`, groupError)
