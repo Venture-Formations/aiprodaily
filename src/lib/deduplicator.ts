@@ -513,6 +513,7 @@ export class Deduplicator {
 
   /**
    * Helper: Run AI deduplication for a batch of posts
+   * Splits current posts into smaller batches to avoid timeouts
    */
   private async runSemanticDeduplicationBatch(
     posts: RssPost[],
@@ -520,10 +521,51 @@ export class Deduplicator {
     newsletterId: string,
     batchType: 'primary' | 'secondary'
   ): Promise<DuplicateGroup[]> {
-    // Combine current posts + limited historical posts for AI analysis
-    // Structure: [current posts..., historical posts...]
-    const currentPostCount = posts.length
-    const combinedPosts = [...posts, ...historicalPosts]
+    const BATCH_SIZE = 5 // Process 5 current posts at a time (adjustable)
+    const allGroups: DuplicateGroup[] = []
+
+    // Split current posts into batches
+    const batches: RssPost[][] = []
+    for (let i = 0; i < posts.length; i += BATCH_SIZE) {
+      batches.push(posts.slice(i, i + BATCH_SIZE))
+    }
+
+    console.log(`[DEDUP] AI Semantic (${batchType}): Split ${posts.length} current posts into ${batches.length} batches of ${BATCH_SIZE}`)
+
+    // Process each batch
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const currentBatch = batches[batchIndex]
+      console.log(`[DEDUP] AI Semantic (${batchType}): Processing batch ${batchIndex + 1}/${batches.length} (${currentBatch.length} current + ${historicalPosts.length} historical)`)
+
+      const batchGroups = await this.processSingleBatch(
+        currentBatch,
+        historicalPosts,
+        newsletterId,
+        batchType,
+        batchIndex + 1,
+        batches.length
+      )
+
+      allGroups.push(...batchGroups)
+    }
+
+    console.log(`[DEDUP] AI Semantic (${batchType}): Completed all batches, found ${allGroups.length} total groups`)
+    return allGroups
+  }
+
+  /**
+   * Process a single batch with retry logic
+   */
+  private async processSingleBatch(
+    currentPosts: RssPost[],
+    historicalPosts: RssPost[],
+    newsletterId: string,
+    batchType: 'primary' | 'secondary',
+    batchNum: number,
+    totalBatches: number
+  ): Promise<DuplicateGroup[]> {
+    // Combine current posts + historical posts for AI analysis
+    const combinedPosts = [...currentPosts, ...historicalPosts]
 
     // Prepare post summaries with FULL article text
     const postSummaries = combinedPosts.map(post => ({
@@ -532,117 +574,131 @@ export class Deduplicator {
       full_article_text: post.full_article_text || post.content || ''
     }))
 
-    console.log(`[DEDUP] AI Semantic (${batchType}): Analyzing ${currentPostCount} current + ${historicalPosts.length} historical = ${postSummaries.length} total posts`)
+    const MAX_RETRIES = 3
+    const RETRY_DELAY = 2000 // 2 seconds
 
-    let result
-    try {
-      result = await AI_CALL.topicDeduper(postSummaries, newsletterId, 1000, 0.3)
-
-      // Handle raw JSON string response
-      if (result && typeof result === 'object' && 'raw' in result && typeof result.raw === 'string') {
-        console.log(`[DEDUP] AI Semantic (${batchType}): Parsing raw JSON response`)
-        result = JSON.parse(result.raw)
-      }
-
-      console.log(`[DEDUP] AI Semantic (${batchType}): Received result with ${result?.groups?.length || 0} groups`)
-    } catch (error) {
-      console.error(`[DEDUP] AI Semantic (${batchType}): Error calling AI:`, error)
-      return []
-    }
-
-    if (!result || typeof result !== 'object' || !Array.isArray(result.groups)) {
-      console.error(`[DEDUP] AI Semantic (${batchType}): Invalid result format:`, result)
-      return []
-    }
-
-    // Process AI results - convert indices to post IDs
-    const groups: DuplicateGroup[] = []
-    const currentPostIds = new Set(posts.map(p => p.id))
-
-    console.log(`[DEDUP] AI Semantic (${batchType}): Processing ${result.groups.length} groups...`)
-
-    for (const group of result.groups) {
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        if (!group || typeof group !== 'object' || !Array.isArray(group.duplicate_indices)) {
-          console.log(`[DEDUP] AI Semantic (${batchType}): Skipping invalid group structure`)
-          continue
+        console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Attempt ${attempt}/${MAX_RETRIES}`)
+
+        let result = await AI_CALL.topicDeduper(postSummaries, newsletterId, 1000, 0.3)
+
+        // Handle raw JSON string response
+        if (result && typeof result === 'object' && 'raw' in result && typeof result.raw === 'string') {
+          console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Parsing raw JSON response`)
+          result = JSON.parse(result.raw)
         }
 
-        const primaryIdx = typeof group.primary_article_index === 'number'
-          ? group.primary_article_index
-          : null
+        console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Received result with ${result?.groups?.length || 0} groups`)
 
-        if (primaryIdx === null || primaryIdx < 0 || primaryIdx >= combinedPosts.length) {
-          console.error(`[DEDUP] AI Semantic (${batchType}): Invalid primary_article_index ${primaryIdx} (combinedPosts.length=${combinedPosts.length})`)
-          continue
+        if (!result || typeof result !== 'object' || !Array.isArray(result.groups)) {
+          console.error(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Invalid result format`)
+          throw new Error('Invalid result format from AI')
         }
 
-        const primaryPost = combinedPosts[primaryIdx]
-        const isPrimaryHistorical = !currentPostIds.has(primaryPost.id)
+        // SUCCESS - Process AI results
+        const groups: DuplicateGroup[] = []
+        const currentPostIds = new Set(currentPosts.map(p => p.id))
 
-        // Get all duplicate post IDs (only current posts should be marked)
-        const duplicatePostIds = group.duplicate_indices
-          .filter((idx: number) => typeof idx === 'number' && idx >= 0 && idx < combinedPosts.length)
-          .map((idx: number) => combinedPosts[idx].id)
-          .filter((id: string) => currentPostIds.has(id)) // Only current posts
+        console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Processing ${result.groups.length} groups...`)
 
-        console.log(`[DEDUP] AI Semantic (${batchType}): Group "${group.topic_signature?.substring(0, 40)}..." - Primary idx ${primaryIdx} (historical: ${isPrimaryHistorical}), ${group.duplicate_indices.length} duplicates -> ${duplicatePostIds.length} current posts`)
+        for (const group of result.groups) {
+          try {
+            if (!group || typeof group !== 'object' || !Array.isArray(group.duplicate_indices)) {
+              console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Skipping invalid group structure`)
+              continue
+            }
 
-        if (duplicatePostIds.length === 0) {
-          // Check if primary is current and matches historical posts
-          if (!isPrimaryHistorical) {
-            // Primary is current but all its duplicates are historical
-            // This is a historical match - mark the current primary as duplicate
-            groups.push({
-              topic_signature: `Historical AI match: "${primaryPost.title.substring(0, 60)}..."`,
-              primary_post_id: primaryPost.id,
-              duplicate_post_ids: [primaryPost.id],  // Mark the primary itself as duplicate
-              detection_method: 'ai_semantic',
-              similarity_score: 0.8,
-              explanation: `AI detected semantic similarity to previously published article: ${group.similarity_explanation || ''}`
-            })
-            console.log(`[DEDUP] AI Semantic (${batchType}): Added historical match group - current primary ${primaryPost.id} matches historical posts`)
-          } else {
-            // Primary is historical, duplicates are historical - nothing to mark
-            console.log(`[DEDUP] AI Semantic (${batchType}): Skipping group - no current posts in duplicates`)
+            const primaryIdx = typeof group.primary_article_index === 'number'
+              ? group.primary_article_index
+              : null
+
+            if (primaryIdx === null || primaryIdx < 0 || primaryIdx >= combinedPosts.length) {
+              console.error(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Invalid primary_article_index ${primaryIdx} (combinedPosts.length=${combinedPosts.length})`)
+              continue
+            }
+
+            const primaryPost = combinedPosts[primaryIdx]
+            const isPrimaryHistorical = !currentPostIds.has(primaryPost.id)
+
+            // Get all duplicate post IDs (only current posts should be marked)
+            const duplicatePostIds = group.duplicate_indices
+              .filter((idx: number) => typeof idx === 'number' && idx >= 0 && idx < combinedPosts.length)
+              .map((idx: number) => combinedPosts[idx].id)
+              .filter((id: string) => currentPostIds.has(id)) // Only current posts
+
+            console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Group "${group.topic_signature?.substring(0, 40)}..." - Primary idx ${primaryIdx} (historical: ${isPrimaryHistorical}), ${group.duplicate_indices.length} duplicates -> ${duplicatePostIds.length} current posts`)
+
+            if (duplicatePostIds.length === 0) {
+              // Check if primary is current and matches historical posts
+              if (!isPrimaryHistorical) {
+                // Primary is current but all its duplicates are historical
+                // This is a historical match - mark the current primary as duplicate
+                groups.push({
+                  topic_signature: `Historical AI match: "${primaryPost.title.substring(0, 60)}..."`,
+                  primary_post_id: primaryPost.id,
+                  duplicate_post_ids: [primaryPost.id],  // Mark the primary itself as duplicate
+                  detection_method: 'ai_semantic',
+                  similarity_score: 0.8,
+                  explanation: `AI detected semantic similarity to previously published article: ${group.similarity_explanation || ''}`
+                })
+                console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Added historical match group - current primary ${primaryPost.id} matches historical posts`)
+              } else {
+                // Primary is historical, duplicates are historical - nothing to mark
+                console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Skipping group - no current posts in duplicates`)
+              }
+              continue
+            }
+
+            // Create duplicate group
+            if (isPrimaryHistorical) {
+              // Primary is historical - mark ALL current posts as duplicates
+              // Use first current duplicate as primary, include ALL in duplicate_post_ids (same pattern as Stages 0 & 2)
+              const newPrimaryId = duplicatePostIds[0]
+
+              groups.push({
+                topic_signature: `Historical AI match: "${primaryPost.title.substring(0, 60)}..."`,
+                primary_post_id: newPrimaryId,
+                duplicate_post_ids: duplicatePostIds,  // Include ALL current posts, including the primary
+                detection_method: 'ai_semantic',
+                similarity_score: 0.8,
+                explanation: `AI detected semantic similarity to previously published article: ${group.similarity_explanation || ''}`
+              })
+              console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Added historical match group - primary: ${newPrimaryId}, ${duplicatePostIds.length} duplicates`)
+            } else {
+              // Primary is current - mark as duplicate group within current issue
+              groups.push({
+                topic_signature: group.topic_signature || 'unknown',
+                primary_post_id: primaryPost.id,
+                duplicate_post_ids: duplicatePostIds,
+                detection_method: 'ai_semantic',
+                similarity_score: 0.8,
+                explanation: group.similarity_explanation || ''
+              })
+              console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Added current match group with ${duplicatePostIds.length} duplicates`)
+            }
+          } catch (groupError) {
+            console.error(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Error mapping group:`, groupError)
           }
-          continue
         }
 
-        // Create duplicate group
-        if (isPrimaryHistorical) {
-          // Primary is historical - mark ALL current posts as duplicates
-          // Use first current duplicate as primary, include ALL in duplicate_post_ids (same pattern as Stages 0 & 2)
-          const newPrimaryId = duplicatePostIds[0]
+        console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Returning ${groups.length} groups`)
+        return groups
 
-          groups.push({
-            topic_signature: `Historical AI match: "${primaryPost.title.substring(0, 60)}..."`,
-            primary_post_id: newPrimaryId,
-            duplicate_post_ids: duplicatePostIds,  // Include ALL current posts, including the primary
-            detection_method: 'ai_semantic',
-            similarity_score: 0.8,
-            explanation: `AI detected semantic similarity to previously published article: ${group.similarity_explanation || ''}`
-          })
-          console.log(`[DEDUP] AI Semantic (${batchType}): Added historical match group - primary: ${newPrimaryId}, ${duplicatePostIds.length} duplicates`)
-        } else {
-          // Primary is current - mark as duplicate group within current issue
-          groups.push({
-            topic_signature: group.topic_signature || 'unknown',
-            primary_post_id: primaryPost.id,
-            duplicate_post_ids: duplicatePostIds,
-            detection_method: 'ai_semantic',
-            similarity_score: 0.8,
-            explanation: group.similarity_explanation || ''
-          })
-          console.log(`[DEDUP] AI Semantic (${batchType}): Added current match group with ${duplicatePostIds.length} duplicates`)
-        }
       } catch (error) {
-        console.error(`[DEDUP] AI Semantic (${batchType}): Error mapping group:`, error)
+        console.error(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Attempt ${attempt} failed:`, error)
+
+        if (attempt < MAX_RETRIES) {
+          console.log(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: Retrying in ${RETRY_DELAY}ms...`)
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+        } else {
+          console.error(`[DEDUP] AI Semantic (${batchType}) Batch ${batchNum}/${totalBatches}: All ${MAX_RETRIES} attempts failed`)
+          return []
+        }
       }
     }
 
-    console.log(`[DEDUP] AI Semantic (${batchType}): Returning ${groups.length} groups`)
-    return groups
+    return []
   }
 
   /**
