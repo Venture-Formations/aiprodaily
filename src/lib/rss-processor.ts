@@ -1930,9 +1930,16 @@ export class RSSProcessor {
         if (duplicateGroup) {
           console.log(`[Dedup] Marking ${group.duplicate_post_ids.length} posts as duplicates`)
 
+          // For historical matches, if duplicate_post_ids only contains the primary_post_id,
+          // we still need to mark it as a duplicate (it matched a historical article)
+          const isHistoricalMatch = group.detection_method === 'historical_match' ||
+                                   (group.detection_method === 'title_similarity' &&
+                                    group.explanation?.includes('previously published'))
+
           // Add duplicate posts to group with metadata
           for (const postId of group.duplicate_post_ids) {
-            if (postId === group.primary_post_id) {
+            // Skip primary post UNLESS it's a historical match with only itself
+            if (postId === group.primary_post_id && !isHistoricalMatch) {
               console.log(`[Dedup] Skipping primary post ${postId} from duplicate list`)
               continue
             }
@@ -1950,7 +1957,7 @@ export class RSSProcessor {
             if (dupError) {
               console.error(`[Dedup] Failed to mark post ${postId} as duplicate:`, dupError.message)
             } else {
-              console.log(`[Dedup] Marked post ${postId} as duplicate`)
+              console.log(`[Dedup] Marked post ${postId} as duplicate (${group.detection_method})`)
               storedDuplicates++
             }
           }

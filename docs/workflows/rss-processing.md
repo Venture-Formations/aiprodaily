@@ -28,7 +28,7 @@ Ingest feeds → Score posts → Launch workflow → Assign & dedupe → Generat
 
 | Step | Purpose | Key Functions | Notes |
 |------|---------|---------------|-------|
-| 1 | Setup campaign, select AI apps/prompts, assign top 12 posts per section, dedupe staging data | `workflow.setupCampaign`, `RSSProcessor.assignTopPostsToCampaign`, `RSSProcessor.handleDuplicatesForCampaign` | Must complete within 800s; posts come from pre-scored pool (`campaign_id = NULL`). |
+| 1 | Setup campaign, select AI apps/prompts, assign top 12 posts per section, dedupe staging data | `workflow.setupCampaign`, `RSSProcessor.assignTopPostsToCampaign`, `RSSProcessor.handleDuplicatesForCampaign` | Must complete within 800s; posts come from pre-scored pool (`campaign_id = NULL`). See @docs/fixes/DEDUP_HISTORICAL_STORAGE_BUG.md for historical match storage fix. |
 | 2 | Generate six primary titles | `RSSProcessor.generateTitlesOnly` (primary) | Fast batch; relies on `ai_prompt_primary_article_title`. |
 | 3 | Generate three primary bodies (batch 1) | `RSSProcessor.generateArticlesForSection` | Uses deduped, top-ranked posts. |
 | 4 | Generate three primary bodies (batch 2) | same as step 3 | Ensure batching delay (2s) to respect rate limits. |

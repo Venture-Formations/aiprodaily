@@ -4,6 +4,8 @@
 **Type:** Feature Enhancement + Bug Fix
 **Status:** ✅ Complete
 
+**Related:** See [DEDUP_HISTORICAL_STORAGE_BUG.md](./DEDUP_HISTORICAL_STORAGE_BUG.md) for critical storage bug fix (2025-01-20)
+
 ## Overview
 
 Enhanced the deduplication system to compare posts against section-specific historical articles (primary vs primary, secondary vs secondary) and fixed critical bugs in AI semantic processing.
