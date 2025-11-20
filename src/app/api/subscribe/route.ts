@@ -80,8 +80,8 @@ export async function POST(request: NextRequest) {
 
     // Add Facebook Pixel data as custom fields (only if data exists)
     // Note: You'll need to create these custom fields in MailerLite first
-    if (fbData.fbp) subscriberData.fields.fb_pixel_fbp = fbData.fbp
-    if (fbData.fbc) subscriberData.fields.fb_pixel_fbc = fbData.fbc
+    if (fbData.fbp) subscriberData.fields.fbp = fbData.fbp
+    if (fbData.fbc) subscriberData.fields.fbc = fbData.fbc
     if (fbData.timestamp) subscriberData.fields.fb_pixel_timestamp = fbData.timestamp
     if (fbData.user_agent) subscriberData.fields.fb_pixel_user_agent = fbData.user_agent
     if (fbData.ip) subscriberData.fields.fb_pixel_ip = fbData.ip
