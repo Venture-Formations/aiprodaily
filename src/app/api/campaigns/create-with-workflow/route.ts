@@ -204,6 +204,71 @@ export async function POST(request: NextRequest) {
       console.log('[Create issue] Workflow started successfully')
     } catch (error) {
       console.error('[Create issue] Failed to start workflow:', error)
+
+      // CRITICAL ERROR: Alert about workflow failure
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      const errorStack = error instanceof Error ? error.stack : ''
+
+      console.error('[CRITICAL] Workflow Start Failure:', {
+        issue_id: issueId,
+        error: errorMessage,
+        stack: errorStack,
+        timestamp: new Date().toISOString(),
+        deployment_url: process.env.VERCEL_URL || 'unknown'
+      })
+
+      // Send Slack notification if webhook is configured
+      if (process.env.SLACK_WEBHOOK_URL) {
+        try {
+          await fetch(process.env.SLACK_WEBHOOK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: `🚨 CRITICAL: Workflow Start Failure`,
+              blocks: [
+                {
+                  type: 'header',
+                  text: {
+                    type: 'plain_text',
+                    text: '🚨 Workflow Start Failure'
+                  }
+                },
+                {
+                  type: 'section',
+                  fields: [
+                    {
+                      type: 'mrkdwn',
+                      text: `*Issue ID:*\n${issueId}`
+                    },
+                    {
+                      type: 'mrkdwn',
+                      text: `*Error:*\n${errorMessage}`
+                    },
+                    {
+                      type: 'mrkdwn',
+                      text: `*Time:*\n${new Date().toISOString()}`
+                    },
+                    {
+                      type: 'mrkdwn',
+                      text: `*Deployment:*\n${process.env.VERCEL_URL || 'unknown'}`
+                    }
+                  ]
+                },
+                {
+                  type: 'section',
+                  text: {
+                    type: 'mrkdwn',
+                    text: `*Action Required:*\nManually trigger workflow or use reprocess endpoint`
+                  }
+                }
+              ]
+            })
+          })
+        } catch (slackError) {
+          console.error('[Create issue] Failed to send Slack notification:', slackError)
+        }
+      }
+
       // Don't fail the whole request - workflow will be retried or run manually
     }
 
