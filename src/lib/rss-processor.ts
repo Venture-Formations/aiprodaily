@@ -1934,7 +1934,10 @@ export class RSSProcessor {
           // we still need to mark it as a duplicate (it matched a historical article)
           const isHistoricalMatch = group.detection_method === 'historical_match' ||
                                    (group.detection_method === 'title_similarity' &&
-                                    group.explanation?.includes('previously published'))
+                                    group.explanation?.includes('previously published')) ||
+                                   (group.detection_method === 'ai_semantic' &&
+                                    group.explanation?.includes('previously published')) ||
+                                   group.topic_signature?.startsWith('Historical AI match:')
 
           // Add duplicate posts to group with metadata
           for (const postId of group.duplicate_post_ids) {
