@@ -95,11 +95,11 @@ export async function POST(request: NextRequest) {
         console.log(`[Create issue] Selected ad: ${selectedAd.title} (ID: ${selectedAd.id})`)
 
         try {
-          // Use AdScheduler.recordAdUsage which handles everything properly
-          await AdScheduler.recordAdUsage(issueId, selectedAd.id, date, newsletterUuid)
-          console.log('[Create issue] Advertisement recorded successfully')
+          // Assign ad to issue (usage will be recorded at send-final)
+          await AdScheduler.assignAdToIssue(issueId, selectedAd.id, date)
+          console.log('[Create issue] Advertisement assigned (usage will be recorded at send-final)')
         } catch (recordError) {
-          console.error('[Create issue] Failed to record advertisement usage:', recordError)
+          console.error('[Create issue] Failed to assign advertisement:', recordError)
           // Log full error details
           console.error('[Create issue] Error details:', JSON.stringify(recordError, null, 2))
         }

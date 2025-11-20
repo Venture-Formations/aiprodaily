@@ -316,6 +316,24 @@ export async function POST(request: NextRequest) {
 
     const result = await mailerLiteService.createFinalissue(issue, mainGroupId)
 
+    // Record advertisement usage and advance rotation
+    try {
+      const { data: adAssignment } = await supabaseAdmin
+        .from('issue_advertisements')
+        .select('advertisement_id')
+        .eq('issue_id', issue.id)
+        .maybeSingle()
+
+      if (adAssignment) {
+        const { AdScheduler } = await import('@/lib/ad-scheduler')
+        await AdScheduler.recordAdUsage(issue.id, adAssignment.advertisement_id, issue.date, newsletter.id)
+        console.log('[Send Final] ✓ Advertisement usage recorded and rotation advanced')
+      }
+    } catch (adError) {
+      console.error('[Send Final] Failed to record ad usage (non-critical):', adError)
+      // Don't fail the send if ad tracking fails
+    }
+
     // Capture the active poll for this issue
     const { poll_id, poll_snapshot } = await capturePollForIssue(issue.id, newsletter.id)
 
@@ -572,6 +590,24 @@ export async function GET(request: NextRequest) {
     await logFinalArticlePositions(issue)
 
     const result = await mailerLiteService.createFinalissue(issue, mainGroupId)
+
+    // Record advertisement usage and advance rotation
+    try {
+      const { data: adAssignment } = await supabaseAdmin
+        .from('issue_advertisements')
+        .select('advertisement_id')
+        .eq('issue_id', issue.id)
+        .maybeSingle()
+
+      if (adAssignment) {
+        const { AdScheduler } = await import('@/lib/ad-scheduler')
+        await AdScheduler.recordAdUsage(issue.id, adAssignment.advertisement_id, issue.date, newsletter.id)
+        console.log('[Send Final] ✓ Advertisement usage recorded and rotation advanced')
+      }
+    } catch (adError) {
+      console.error('[Send Final] Failed to record ad usage (non-critical):', adError)
+      // Don't fail the send if ad tracking fails
+    }
 
     // Capture the active poll for this issue
     const { poll_id, poll_snapshot } = await capturePollForIssue(issue.id, newsletter.id)

@@ -67,6 +67,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const result = await mailerLiteService.createFinalissue(issue, mainGroupId)
 
+    // Record advertisement usage and advance rotation
+    try {
+      const { data: adAssignment } = await supabaseAdmin
+        .from('issue_advertisements')
+        .select('advertisement_id')
+        .eq('issue_id', id)
+        .maybeSingle()
+
+      if (adAssignment) {
+        const { AdScheduler } = await import('@/lib/ad-scheduler')
+        await AdScheduler.recordAdUsage(id, adAssignment.advertisement_id, issue.date, issue.publication_id)
+        console.log('[Send Final] ✓ Advertisement usage recorded and rotation advanced')
+      }
+    } catch (adError) {
+      console.error('[Send Final] Failed to record ad usage (non-critical):', adError)
+      // Don't fail the send if ad tracking fails
+    }
+
     // Archive the newsletter for website display
     try {
       const archiveResult = await newsletterArchiver.archiveNewsletter({

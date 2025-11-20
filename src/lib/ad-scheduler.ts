@@ -77,7 +77,54 @@ export class AdScheduler {
   }
 
   /**
-   * Record that an ad was used in a issue and increment next_ad_position
+   * Assign an ad to an issue WITHOUT recording usage or advancing position
+   * This is called during issue creation - actual usage is recorded at send-final
+   */
+  static async assignAdToIssue(
+    issueId: string,
+    adId: string,
+    issueDate: string
+  ): Promise<void> {
+    try {
+      console.log(`[AdScheduler] Assigning ad ${adId} to issue ${issueId} (no usage tracking yet)`)
+
+      // Check if ad already assigned to this issue
+      const { data: existingAssignment } = await supabaseAdmin
+        .from('issue_advertisements')
+        .select('id')
+        .eq('issue_id', issueId)
+        .maybeSingle()
+
+      if (existingAssignment) {
+        console.log('[AdScheduler] Ad already assigned to this issue')
+        return
+      }
+
+      // Insert into issue_advertisements (WITHOUT setting used_at)
+      const { error: insertError } = await supabaseAdmin
+        .from('issue_advertisements')
+        .insert({
+          issue_id: issueId,
+          advertisement_id: adId,
+          issue_date: issueDate
+          // Note: used_at is NOT set here - it will be set at send-final
+        })
+
+      if (insertError) {
+        console.error('[AdScheduler] Failed to assign ad:', insertError)
+        throw insertError
+      }
+
+      console.log(`[AdScheduler] ✓ Ad assigned (usage will be recorded at send-final)`)
+    } catch (error) {
+      console.error('[AdScheduler] Error in assignAdToIssue:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Record that an ad was actually sent in a newsletter and increment usage tracking
+   * This is called at send-final time, not during issue creation
    */
   static async recordAdUsage(
     issueId: string,
@@ -100,7 +147,7 @@ export class AdScheduler {
 
       console.log(`[AdScheduler] Recording usage for ad at position ${usedAd.display_order}`)
 
-      // Check if ad already assigned to this issue
+      // Update or insert the assignment record with used_at timestamp
       const { data: existingAssignment } = await supabaseAdmin
         .from('issue_advertisements')
         .select('id')
@@ -108,23 +155,35 @@ export class AdScheduler {
         .maybeSingle()
 
       if (existingAssignment) {
-        console.log('[AdScheduler] Ad already assigned to this issue, skipping insert')
-        return
-      }
+        // Update existing assignment with used_at timestamp
+        console.log('[AdScheduler] Updating existing assignment with used_at timestamp')
+        const { error: updateError } = await supabaseAdmin
+          .from('issue_advertisements')
+          .update({
+            used_at: new Date().toISOString()
+          })
+          .eq('id', existingAssignment.id)
 
-      // Insert into issue_advertisements
-      const { error: insertError } = await supabaseAdmin
-        .from('issue_advertisements')
-        .insert({
-          issue_id: issueId,
-          advertisement_id: adId,
-          issue_date: issueDate,
-          used_at: new Date().toISOString()
-        })
+        if (updateError) {
+          console.error('[AdScheduler] Failed to update assignment timestamp:', updateError)
+          throw updateError
+        }
+      } else {
+        // No existing assignment - create one (shouldn't happen if assignAdToIssue was called)
+        console.log('[AdScheduler] No existing assignment found, creating new one')
+        const { error: insertError } = await supabaseAdmin
+          .from('issue_advertisements')
+          .insert({
+            issue_id: issueId,
+            advertisement_id: adId,
+            issue_date: issueDate,
+            used_at: new Date().toISOString()
+          })
 
-      if (insertError) {
-        console.error('[AdScheduler] Failed to record usage:', insertError)
-        throw insertError
+        if (insertError) {
+          console.error('[AdScheduler] Failed to record usage:', insertError)
+          throw insertError
+        }
       }
 
       // Update the ad: increment times_used and set last_used_date
