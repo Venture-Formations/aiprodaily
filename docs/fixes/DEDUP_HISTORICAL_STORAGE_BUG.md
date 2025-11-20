@@ -2,8 +2,12 @@
 
 **Date:** 2025-01-20
 **Type:** Critical Bug Fix
-**Status:** ✅ Fixed
+**Status:** ✅ Fixed (2 commits)
 **Severity:** HIGH - Posts were slipping through to newsletters
+
+**Updates:**
+- Initial fix: Storage logic (`rss-processor.ts`) - Commit `00483ef`
+- Stage 3 fix: AI semantic pattern (`deduplicator.ts`) - Commit `ac2ecb0`
 
 ## Overview
 
@@ -125,25 +129,32 @@ for (const postId of group.duplicate_post_ids) {
 
 | Stage | Method | Issue Status | Notes |
 |-------|--------|--------------|-------|
-| Stage 0 | `historical_match` | ✅ FIXED | Hash-based historical comparison |
-| Stage 2 | `title_similarity` (historical) | ✅ FIXED | Jaccard similarity vs historical |
-| Stage 3 | `ai_semantic` (historical) | ✅ Already correct | Uses `slice(1)` pattern (line 602) |
+| Stage 0 | `historical_match` | ✅ FIXED (storage) | Hash-based historical comparison |
+| Stage 2 | `title_similarity` (historical) | ✅ FIXED (storage) | Jaccard similarity vs historical |
+| Stage 3 | `ai_semantic` (historical) | ✅ FIXED (both) | Required BOTH storage AND pattern fix |
 
-**Note:** Stage 3 (AI semantic) was already handling this correctly with:
+**Stage 3 Second Bug Discovered:**
+Stage 3 had an additional bug found during production testing:
 ```typescript
-const remainingDuplicates = duplicatePostIds.slice(1) // Exclude the new primary
+// OLD (broken):
+const remainingDuplicates = duplicatePostIds.slice(1) // If only 1 post, becomes [] ❌
+
+// NEW (fixed):
+duplicate_post_ids: duplicatePostIds  // Include ALL current posts ✅
 ```
+
+When only 1 current post matched a historical article, `slice(1)` created an empty array, resulting in groups with 0 duplicates.
 
 ## Files Changed
 
-| File | Change | Impact |
-|------|--------|--------|
-| `src/lib/rss-processor.ts` | Lines 1933-1945 | Storage logic now handles historical matches |
+| File | Change | Commit | Impact |
+|------|--------|--------|--------|
+| `src/lib/rss-processor.ts` | Lines 1933-1945 | `00483ef` | Storage logic now handles historical matches |
+| `src/lib/deduplicator.ts` | Line 606-607 | `ac2ecb0` | Stage 3 now uses consistent pattern (include ALL in duplicate_post_ids) |
 
 **No changes needed to:**
-- `src/lib/deduplicator.ts` - Detection logic is correct
 - Database schema - No migration needed
-- Other deduplication stages - Already working correctly
+- Stages 0, 1, 2, 4 - Already working correctly
 
 ## Testing
 
