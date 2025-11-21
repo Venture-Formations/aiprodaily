@@ -1,0 +1,270 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { supabaseAdmin } from '@/lib/supabase'
+
+/**
+ * Ads Analytics Endpoint
+ * Provides effectiveness metrics for advertisements in newsletters
+ *
+ * Query Parameters:
+ * - publication_id: Required - Filter by publication
+ * - ad_id: Optional - Specific ad ID (if not provided, shows all ads or 'all')
+ * - start_date: Optional - Start date (YYYY-MM-DD format)
+ * - end_date: Optional - End date (YYYY-MM-DD format)
+ * - days: Optional - Number of days to look back (default: 30, ignored if start_date provided)
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const publicationId = searchParams.get('publication_id')
+    const adIdFilter = searchParams.get('ad_id')
+    const startDateParam = searchParams.get('start_date')
+    const endDateParam = searchParams.get('end_date')
+    const days = parseInt(searchParams.get('days') || '30')
+
+    if (!publicationId) {
+      return NextResponse.json(
+        { error: 'publication_id is required' },
+        { status: 400 }
+      )
+    }
+
+    // Calculate date range using local timezone (NO UTC - per CLAUDE.md)
+    let startDateStr: string
+    let endDateStr: string
+
+    if (startDateParam && endDateParam) {
+      startDateStr = startDateParam
+      endDateStr = endDateParam
+    } else {
+      const endDate = new Date()
+      const startDate = new Date()
+      startDate.setDate(startDate.getDate() - days)
+
+      startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`
+      endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
+    }
+
+    console.log(`[Ads Analytics] Fetching for publication ${publicationId}, date range: ${startDateStr} to ${endDateStr}`)
+
+    // Fetch advertisements for this publication
+    let adsQuery = supabaseAdmin
+      .from('advertisements')
+      .select('id, title, button_url, status, times_used, times_paid, last_used_date, frequency')
+      .eq('publication_id', publicationId)
+      .in('status', ['active', 'completed'])
+      .order('title', { ascending: true })
+
+    if (adIdFilter && adIdFilter !== 'all') {
+      adsQuery = adsQuery.eq('id', adIdFilter)
+    }
+
+    const { data: ads, error: adsError } = await adsQuery
+
+    if (adsError) {
+      console.error('[Ads Analytics] Error fetching ads:', adsError)
+      return NextResponse.json({ error: adsError.message }, { status: 500 })
+    }
+
+    if (!ads || ads.length === 0) {
+      return NextResponse.json({
+        ads: [],
+        message: 'No advertisements found'
+      })
+    }
+
+    // Fetch all issue_advertisements in date range to count actual usage
+    const { data: issueAds, error: issueAdsError } = await supabaseAdmin
+      .from('issue_advertisements')
+      .select(`
+        id,
+        issue_id,
+        advertisement_id,
+        used_at,
+        newsletter_campaigns!inner(id, date, publication_id, status)
+      `)
+      .in('advertisement_id', ads.map(ad => ad.id))
+
+    if (issueAdsError) {
+      console.error('[Ads Analytics] Error fetching issue advertisements:', issueAdsError)
+      return NextResponse.json({ error: issueAdsError.message }, { status: 500 })
+    }
+
+    // Filter issue_ads by date range and publication
+    const filteredIssueAds = (issueAds || []).filter((issueAd: any) => {
+      const campaign = Array.isArray(issueAd.newsletter_campaigns)
+        ? issueAd.newsletter_campaigns[0]
+        : issueAd.newsletter_campaigns
+      if (!campaign || campaign.publication_id !== publicationId) return false
+      if (campaign.status !== 'sent') return false
+
+      const issueDate = campaign.date
+      return issueDate >= startDateStr && issueDate <= endDateStr
+    })
+
+    // Fetch link clicks for Advertorial section in date range
+    const { data: linkClicks, error: clicksError } = await supabaseAdmin
+      .from('link_clicks')
+      .select('id, link_url, subscriber_email, issue_date, issue_id, clicked_at')
+      .eq('link_section', 'Advertorial')
+      .gte('issue_date', startDateStr)
+      .lte('issue_date', endDateStr)
+
+    if (clicksError) {
+      console.error('[Ads Analytics] Error fetching link clicks:', clicksError)
+      return NextResponse.json({ error: clicksError.message }, { status: 500 })
+    }
+
+    // Fetch issues in date range for recipient counts (for CTR calculation)
+    const { data: issues, error: issuesError } = await supabaseAdmin
+      .from('newsletter_campaigns')
+      .select('id, date, metrics')
+      .eq('publication_id', publicationId)
+      .gte('date', startDateStr)
+      .lte('date', endDateStr)
+      .eq('status', 'sent')
+
+    if (issuesError) {
+      console.error('[Ads Analytics] Error fetching issues:', issuesError)
+    }
+
+    // Build analytics for each ad
+    const adAnalytics = ads.map(ad => {
+      // Count issues where this ad was used
+      const adIssues = filteredIssueAds.filter((ia: any) => ia.advertisement_id === ad.id)
+      const timesUsedInRange = adIssues.length
+
+      // Get unique issue IDs and dates
+      const issueIds = new Set(adIssues.map((ia: any) => ia.issue_id))
+      const issueDates = Array.from(new Set(adIssues.map((ia: any) => {
+        const campaign = Array.isArray(ia.newsletter_campaigns) ? ia.newsletter_campaigns[0] : ia.newsletter_campaigns
+        return campaign.date
+      }))).sort()
+
+      // Match clicks to this ad by URL or by issue
+      // Since multiple ads might share similar URLs, we'll match by issue_id where the ad was used
+      const adClicks = (linkClicks || []).filter(click => {
+        // First try to match by issue - this is the most accurate method
+        if (click.issue_id && issueIds.has(click.issue_id)) {
+          return true
+        }
+
+        // Fallback: match by URL if button_url is available
+        if (ad.button_url) {
+          try {
+            const clickUrl = new URL(click.link_url)
+            const destUrl = clickUrl.searchParams.get('url')
+
+            if (destUrl) {
+              const normalizedDestUrl = destUrl.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
+              const normalizedAdUrl = ad.button_url.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
+              return normalizedDestUrl === normalizedAdUrl || normalizedDestUrl.includes(normalizedAdUrl)
+            }
+          } catch (e) {
+            return click.link_url.toLowerCase().includes(ad.button_url.toLowerCase())
+          }
+        }
+
+        return false
+      })
+
+      const totalClicks = adClicks.length
+      const uniqueClickers = new Set(adClicks.map(click => click.subscriber_email)).size
+
+      // Calculate CTR (unique clickers / total recipients who saw this ad)
+      let clickThroughRate: number | null = null
+      let totalRecipients = 0
+
+      if (timesUsedInRange > 0 && issues) {
+        // Sum up recipients from issues where this ad appeared
+        issues.forEach(issue => {
+          if (issueIds.has(issue.id) && issue.metrics?.sent_count) {
+            totalRecipients += issue.metrics.sent_count
+          }
+        })
+
+        if (totalRecipients > 0) {
+          clickThroughRate = Math.round((uniqueClickers / totalRecipients) * 10000) / 100 // 2 decimal places
+        }
+      }
+
+      // Get clicks per issue for detailed breakdown
+      const clicksByIssue: Record<string, any> = {}
+      adClicks.forEach(click => {
+        if (click.issue_id && issueIds.has(click.issue_id)) {
+          if (!clicksByIssue[click.issue_id]) {
+            const issueData = adIssues.find((ia: any) => ia.issue_id === click.issue_id)
+            const campaign = issueData ? (Array.isArray(issueData.newsletter_campaigns) ? issueData.newsletter_campaigns[0] : issueData.newsletter_campaigns) : null
+            clicksByIssue[click.issue_id] = {
+              issue_id: click.issue_id,
+              issue_date: campaign?.date || click.issue_date,
+              clicks: [],
+              total_clicks: 0,
+              unique_clickers: new Set()
+            }
+          }
+
+          clicksByIssue[click.issue_id].clicks.push(click)
+          clicksByIssue[click.issue_id].total_clicks++
+          clicksByIssue[click.issue_id].unique_clickers.add(click.subscriber_email)
+        }
+      })
+
+      // Convert unique clickers set to count
+      const issueBreakdown = Object.values(clicksByIssue).map((issueData: any) => ({
+        issue_id: issueData.issue_id,
+        issue_date: issueData.issue_date,
+        total_clicks: issueData.total_clicks,
+        unique_clickers: issueData.unique_clickers.size
+      })).sort((a, b) => (b.issue_date || '').localeCompare(a.issue_date || ''))
+
+      return {
+        ad_id: ad.id,
+        ad_title: ad.title,
+        button_url: ad.button_url,
+        status: ad.status,
+        frequency: ad.frequency,
+        lifetime_times_used: ad.times_used,
+        times_paid: ad.times_paid,
+        last_used_date: ad.last_used_date,
+        metrics: {
+          times_used_in_range: timesUsedInRange,
+          issue_dates: issueDates,
+          unique_clickers: uniqueClickers,
+          total_clicks: totalClicks,
+          click_through_rate: clickThroughRate,
+          total_recipients: totalRecipients > 0 ? totalRecipients : null,
+          by_issue: issueBreakdown
+        }
+      }
+    })
+
+    // Sort by unique clickers descending
+    adAnalytics.sort((a, b) => b.metrics.unique_clickers - a.metrics.unique_clickers)
+
+    console.log(`[Ads Analytics] Returned analytics for ${adAnalytics.length} ad(s)`)
+
+    return NextResponse.json({
+      success: true,
+      date_range: {
+        start: startDateStr,
+        end: endDateStr
+      },
+      ads: adAnalytics
+    })
+
+  } catch (error) {
+    console.error('[Ads Analytics] Error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    )
+  }
+}
