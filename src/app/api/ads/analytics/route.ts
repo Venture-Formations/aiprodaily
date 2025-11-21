@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
       endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
     }
 
-    console.log(`[Ads Analytics] Fetching for publication ${publicationId}, date range: ${startDateStr} to ${endDateStr}`)
+    console.log(`[Ads Analytics] Fetching for newsletter_slug=${newsletterSlug}, publication ${publicationId}, date range: ${startDateStr} to ${endDateStr}`)
 
     // Fetch advertisements for this publication
     let adsQuery = supabaseAdmin
@@ -126,6 +126,8 @@ export async function GET(request: NextRequest) {
 
     const campaignMap = new Map((campaigns || []).map(c => [c.id, c]))
 
+    console.log(`[Ads Analytics] Found ${ads.length} ads, ${issueAds?.length || 0} issue_ads, ${campaigns?.length || 0} campaigns in range`)
+
     // Filter issue_ads by campaigns in date range
     const filteredIssueAds = (issueAds || []).filter((issueAd: any) => {
       return campaignMap.has(issueAd.issue_id)
@@ -133,6 +135,8 @@ export async function GET(request: NextRequest) {
       ...issueAd,
       campaign: campaignMap.get(issueAd.issue_id)
     }))
+
+    console.log(`[Ads Analytics] Filtered to ${filteredIssueAds.length} issue_ads in date range`)
 
     // Fetch link clicks for Advertorial section in date range
     const { data: linkClicks, error: clicksError } = await supabaseAdmin
@@ -146,6 +150,8 @@ export async function GET(request: NextRequest) {
       console.error('[Ads Analytics] Error fetching link clicks:', clicksError)
       return NextResponse.json({ error: clicksError.message }, { status: 500 })
     }
+
+    console.log(`[Ads Analytics] Found ${linkClicks?.length || 0} link clicks with section='Advertorial'`)
 
     // Fetch issues in date range for recipient counts (for CTR calculation)
     const { data: issues, error: issuesError } = await supabaseAdmin
@@ -172,6 +178,10 @@ export async function GET(request: NextRequest) {
 
       // Match clicks to this ad by URL or by issue
       // Since multiple ads might share similar URLs, we'll match by issue_id where the ad was used
+      if (adIssues.length > 0) {
+        console.log(`[Ads Analytics] Ad "${ad.title}": ${adIssues.length} issues, dates: ${issueDates.join(', ')}`)
+      }
+
       const adClicks = (linkClicks || []).filter(click => {
         // First try to match by issue - this is the most accurate method
         if (click.issue_id && issueIds.has(click.issue_id)) {
