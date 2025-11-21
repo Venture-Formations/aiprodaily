@@ -6,7 +6,7 @@ import { MailerLiteService } from '@/lib/mailerlite'
 
 interface RouteParams {
   params: Promise<{
-    issue: string
+    campaign: string
   }>
 }
 
@@ -17,13 +17,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { issue } = await params
+    const { campaign: issueId } = await params
 
     // Fetch issue metrics
     const { data: metrics, error } = await supabaseAdmin
       .from('email_metrics')
       .select('*')
-      .eq('issue_id', issue)
+      .eq('issue_id', issueId)
       .single()
 
     if (error) {
@@ -48,17 +48,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { issue } = await params
+    const { campaign: issueId } = await params
 
-    console.log(`[Analytics Refresh] Starting manual refresh for issue ${issue}`)
+    console.log(`[Analytics Refresh] Starting manual refresh for issue ${issueId}`)
 
     // Import fresh metrics from MailerLite
     const mailerLiteService = new MailerLiteService()
-    const metrics = await mailerLiteService.importissueMetrics(issue)
+    const metrics = await mailerLiteService.importissueMetrics(issueId)
 
     // Check if metrics is a skip indicator
     const isSkipped = metrics && typeof metrics === 'object' && 'skipped' in metrics
-    console.log(`[Analytics Refresh] Completed for issue ${issue}:`, {
+    console.log(`[Analytics Refresh] Completed for issue ${issueId}:`, {
       skipped: isSkipped,
       reason: isSkipped ? (metrics as any).reason : null
     })
