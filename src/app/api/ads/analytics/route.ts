@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
     const issueIds = Array.from(new Set((issueAds || []).map((ia: any) => ia.issue_id)))
 
     const { data: campaigns, error: campaignsError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .select('id, date, publication_id, status')
       .in('id', issueIds)
       .eq('publication_id', publicationId)
@@ -139,12 +139,14 @@ export async function GET(request: NextRequest) {
     console.log(`[Ads Analytics] Filtered to ${filteredIssueAds.length} issue_ads in date range`)
 
     // Fetch link clicks for Advertorial section in date range
+    // Using a high limit to avoid pagination issues
     const { data: linkClicks, error: clicksError } = await supabaseAdmin
       .from('link_clicks')
       .select('id, link_url, subscriber_email, issue_date, issue_id, clicked_at')
       .eq('link_section', 'Advertorial')
       .gte('issue_date', startDateStr)
       .lte('issue_date', endDateStr)
+      .limit(10000)
 
     if (clicksError) {
       console.error('[Ads Analytics] Error fetching link clicks:', clicksError)
@@ -155,7 +157,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch issues in date range for recipient counts (for CTR calculation)
     const { data: issues, error: issuesError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .select('id, date, metrics')
       .eq('publication_id', publicationId)
       .gte('date', startDateStr)

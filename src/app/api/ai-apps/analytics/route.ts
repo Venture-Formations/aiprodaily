@@ -147,17 +147,21 @@ export async function GET(request: NextRequest) {
     }))
 
     // Fetch link clicks for AI Apps section in date range
+    // Using a high limit to avoid pagination issues
     const { data: linkClicks, error: clicksError } = await supabaseAdmin
       .from('link_clicks')
-      .select('id, link_url, subscriber_email, issue_date, clicked_at')
+      .select('id, link_url, subscriber_email, issue_date, issue_id, clicked_at')
       .eq('link_section', 'AI Apps')
       .gte('issue_date', startDateStr)
       .lte('issue_date', endDateStr)
+      .limit(10000)
 
     if (clicksError) {
       console.error('[AI Apps Analytics] Error fetching link clicks:', clicksError)
       return NextResponse.json({ error: clicksError.message }, { status: 500 })
     }
+
+    console.log(`[AI Apps Analytics] Found ${linkClicks?.length || 0} link clicks with section='AI Apps'`)
 
     // Fetch issues in date range for recipient counts (for CTR calculation)
     const { data: issues, error: issuesError } = await supabaseAdmin
@@ -182,29 +186,61 @@ export async function GET(request: NextRequest) {
       const issueIds = new Set(appIssues.map((sel: any) => sel.issue_id))
       const issueDates = Array.from(new Set(appIssues.map((sel: any) => sel.campaign?.date).filter(Boolean))).sort()
 
-      // Match clicks to this app by URL
-      // The link_url in link_clicks should contain or match the app_url
+      // Match clicks to this app by issue (most accurate) or URL
       const appClicks = (linkClicks || []).filter(click => {
-        // Extract the destination URL from the tracking URL
-        try {
-          const clickUrl = new URL(click.link_url)
-          const destUrl = clickUrl.searchParams.get('url')
+        // First try to match by issue - this is the most accurate method
+        if (click.issue_id && issueIds.has(click.issue_id)) {
+          // If this click is from an issue where this app appeared, we need to verify it's for this specific app
+          // by checking the URL
+          try {
+            const clickUrl = new URL(click.link_url)
+            const destUrl = clickUrl.searchParams.get('url')
 
-          // Check if destination URL matches app URL (handle with/without trailing slashes and protocols)
-          if (destUrl && app.app_url) {
-            const normalizedDestUrl = destUrl.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
-            const normalizedAppUrl = app.app_url.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
-            return normalizedDestUrl === normalizedAppUrl || normalizedDestUrl.includes(normalizedAppUrl)
+            if (destUrl && app.app_url) {
+              const normalizedDestUrl = destUrl.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
+              const normalizedAppUrl = app.app_url.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
+              return normalizedDestUrl === normalizedAppUrl || normalizedDestUrl.includes(normalizedAppUrl)
+            }
+          } catch (e) {
+            // If URL parsing fails, try simple string matching
+            if (app.app_url && click.link_url.toLowerCase().includes(app.app_url.toLowerCase())) {
+              return true
+            }
           }
-        } catch (e) {
-          // If URL parsing fails, try simple string matching
-          return click.link_url.toLowerCase().includes(app.app_url.toLowerCase())
         }
+
+        // Fallback: match by URL even if not from a tracked issue
+        if (app.app_url) {
+          try {
+            const clickUrl = new URL(click.link_url)
+            const destUrl = clickUrl.searchParams.get('url')
+
+            if (destUrl) {
+              const normalizedDestUrl = destUrl.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
+              const normalizedAppUrl = app.app_url.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
+              return normalizedDestUrl === normalizedAppUrl || normalizedDestUrl.includes(normalizedAppUrl)
+            }
+          } catch (e) {
+            return click.link_url.toLowerCase().includes(app.app_url.toLowerCase())
+          }
+        }
+
         return false
       })
 
       const totalClicks = appClicks.length
       const uniqueClickers = new Set(appClicks.map(click => click.subscriber_email)).size
+
+      // Debug logging for first few apps
+      if (apps.indexOf(app) < 3 && issuesUsedIn > 0) {
+        console.log(`[AI Apps Analytics] App "${app.app_name}": ${issuesUsedIn} issues, ${totalClicks} clicks, ${uniqueClickers} unique`)
+        if (linkClicks && linkClicks.length > 0 && totalClicks === 0) {
+          // Sample a few link clicks to see what URLs we're working with
+          const sampleClicks = linkClicks.slice(0, 3)
+          console.log(`[AI Apps Analytics] App URL: ${app.app_url}`)
+          console.log(`[AI Apps Analytics] Sample click URLs:`, sampleClicks.map(c => c.link_url))
+        }
+      }
 
       // Calculate CTR (unique clickers / total recipients who saw this app)
       let clickThroughRate: number | null = null
