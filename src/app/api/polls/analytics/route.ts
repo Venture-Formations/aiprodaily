@@ -122,9 +122,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch issues in date range to calculate response rates
-    const { data: issues, error: issuesError } = await supabaseAdmin
+    const { data: issuesRaw, error: issuesError } = await supabaseAdmin
       .from('publication_issues')
-      .select('id, date, poll_id, email_metrics')
+      .select(`
+        id,
+        date,
+        poll_id,
+        email_metrics(*)
+      `)
       .eq('publication_id', publicationId)
       .gte('date', startDateStr)
       .lte('date', endDateStr)
@@ -134,6 +139,14 @@ export async function GET(request: NextRequest) {
     if (issuesError) {
       console.error('[Poll Analytics] Error fetching issues:', issuesError)
     }
+
+    // Transform email_metrics from array to single object (Supabase returns it as array)
+    const issues = (issuesRaw || []).map((issue: any) => ({
+      ...issue,
+      email_metrics: Array.isArray(issue.email_metrics) && issue.email_metrics.length > 0
+        ? issue.email_metrics[0]
+        : null
+    }))
 
     // Build analytics for each poll
     const pollAnalytics = polls.map(poll => {

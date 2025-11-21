@@ -174,9 +174,13 @@ export async function GET(request: NextRequest) {
     console.log(`[Ads Analytics] Found ${linkClicks?.length || 0} link clicks with section='Advertorial'`)
 
     // Fetch issues in date range for recipient counts (for CTR calculation)
-    const { data: issues, error: issuesError } = await supabaseAdmin
+    const { data: issuesRaw, error: issuesError } = await supabaseAdmin
       .from('publication_issues')
-      .select('id, date, email_metrics')
+      .select(`
+        id,
+        date,
+        email_metrics(*)
+      `)
       .eq('publication_id', publicationId)
       .gte('date', startDateStr)
       .lte('date', endDateStr)
@@ -185,6 +189,14 @@ export async function GET(request: NextRequest) {
     if (issuesError) {
       console.error('[Ads Analytics] Error fetching issues:', issuesError)
     }
+
+    // Transform email_metrics from array to single object (Supabase returns it as array)
+    const issues = (issuesRaw || []).map((issue: any) => ({
+      ...issue,
+      email_metrics: Array.isArray(issue.email_metrics) && issue.email_metrics.length > 0
+        ? issue.email_metrics[0]
+        : null
+    }))
 
     console.log(`[Ads Analytics] Found ${issues?.length || 0} issues for CTR calculation`)
     if (issues && issues.length > 0) {
