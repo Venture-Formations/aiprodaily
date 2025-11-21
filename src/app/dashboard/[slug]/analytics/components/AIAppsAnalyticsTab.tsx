@@ -185,6 +185,51 @@ export default function AIAppsAnalyticsTab({ slug }: Props) {
         </div>
       )}
 
+      {/* Unique Clicks by Category Bar Graph */}
+      {apps.length > 0 && (
+        <div className="bg-white shadow rounded-lg p-6 mb-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Unique Clicks by Category</h3>
+          <div className="space-y-3">
+            {(() => {
+              // Group apps by category and sum unique clickers
+              const categoryData: Record<string, number> = {}
+              apps.forEach(app => {
+                const category = app.category || 'Uncategorized'
+                if (!categoryData[category]) {
+                  categoryData[category] = 0
+                }
+                categoryData[category] += app.metrics.unique_clickers
+              })
+
+              // Convert to array and sort by unique clickers descending
+              const sortedCategories = Object.entries(categoryData)
+                .sort(([, a], [, b]) => b - a)
+
+              // Find max value for percentage calculation
+              const maxClicks = Math.max(...sortedCategories.map(([, clicks]) => clicks))
+
+              return sortedCategories.map(([category, clicks]) => {
+                const percentage = maxClicks > 0 ? (clicks / maxClicks) * 100 : 0
+                return (
+                  <div key={category}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="font-medium text-gray-700">{category}</span>
+                      <span className="text-gray-600">{clicks.toLocaleString()} unique clicks</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div
+                        className="bg-brand-primary rounded-full h-3 transition-all"
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })
+            })()}
+          </div>
+        </div>
+      )}
+
       {/* Apps Table */}
       {apps.length === 0 ? (
         <div className="bg-white shadow rounded-lg p-12 text-center text-gray-500">
