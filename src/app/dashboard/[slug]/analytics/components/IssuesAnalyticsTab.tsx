@@ -101,11 +101,21 @@ export default function IssuesAnalyticsTab({ slug }: Props) {
       const response = await fetch(`/api/analytics/${issueId}`, {
         method: 'POST'
       })
+      const data = await response.json()
+
       if (response.ok) {
-        fetchAnalytics() // Refresh the data
+        if (data.metrics?.skipped) {
+          alert(`Skipped: ${data.metrics.reason || 'No metrics available yet'}`)
+        } else {
+          alert('Metrics refreshed successfully!')
+          fetchAnalytics() // Refresh the data
+        }
+      } else {
+        alert(`Failed to refresh: ${data.message || data.error || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Failed to refresh metrics:', error)
+      alert('Failed to refresh metrics. Check console for details.')
     }
   }
 

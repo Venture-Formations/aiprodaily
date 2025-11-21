@@ -49,9 +49,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { issue } = await params
 
+    console.log(`[Analytics Refresh] Starting manual refresh for issue ${issue}`)
+
     // Import fresh metrics from MailerLite
     const mailerLiteService = new MailerLiteService()
     const metrics = await mailerLiteService.importissueMetrics(issue)
+
+    console.log(`[Analytics Refresh] Completed for issue ${issue}:`, {
+      skipped: metrics?.skipped || false,
+      reason: metrics?.reason || null
+    })
 
     return NextResponse.json({
       success: true,
@@ -60,7 +67,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     })
 
   } catch (error) {
-    console.error('Failed to import metrics:', error)
+    console.error('[Analytics Refresh] Failed to import metrics:', error)
     return NextResponse.json({
       error: 'Failed to import metrics',
       message: error instanceof Error ? error.message : 'Unknown error'
