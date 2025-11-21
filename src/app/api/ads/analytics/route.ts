@@ -138,20 +138,38 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Ads Analytics] Filtered to ${filteredIssueAds.length} issue_ads in date range`)
 
-    // Fetch link clicks for Advertorial section in date range
-    // Using a high limit to avoid pagination issues
-    const { data: linkClicks, error: clicksError } = await supabaseAdmin
-      .from('link_clicks')
-      .select('id, link_url, subscriber_email, issue_date, issue_id, clicked_at')
-      .eq('link_section', 'Advertorial')
-      .gte('issue_date', startDateStr)
-      .lte('issue_date', endDateStr)
-      .limit(10000)
+    // Fetch ALL link clicks for Advertorial section in date range
+    // Fetch in batches to avoid pagination limits
+    let allLinkClicks: any[] = []
+    let hasMore = true
+    let offset = 0
+    const batchSize = 1000
 
-    if (clicksError) {
-      console.error('[Ads Analytics] Error fetching link clicks:', clicksError)
-      return NextResponse.json({ error: clicksError.message }, { status: 500 })
+    while (hasMore) {
+      const { data: linkClicksBatch, error: clicksError } = await supabaseAdmin
+        .from('link_clicks')
+        .select('id, link_url, subscriber_email, issue_date, issue_id, clicked_at')
+        .eq('link_section', 'Advertorial')
+        .gte('issue_date', startDateStr)
+        .lte('issue_date', endDateStr)
+        .range(offset, offset + batchSize - 1)
+        .order('clicked_at', { ascending: false })
+
+      if (clicksError) {
+        console.error('[Ads Analytics] Error fetching link clicks:', clicksError)
+        return NextResponse.json({ error: clicksError.message }, { status: 500 })
+      }
+
+      if (!linkClicksBatch || linkClicksBatch.length === 0) {
+        hasMore = false
+      } else {
+        allLinkClicks = allLinkClicks.concat(linkClicksBatch)
+        offset += batchSize
+        hasMore = linkClicksBatch.length === batchSize
+      }
     }
+
+    const linkClicks = allLinkClicks
 
     console.log(`[Ads Analytics] Found ${linkClicks?.length || 0} link clicks with section='Advertorial'`)
 
@@ -191,19 +209,23 @@ export async function GET(request: NextRequest) {
         }
 
         // Fallback: match by URL if button_url is available
-        if (ad.button_url) {
-          try {
-            const clickUrl = new URL(click.link_url)
-            const destUrl = clickUrl.searchParams.get('url')
-
-            if (destUrl) {
-              const normalizedDestUrl = destUrl.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
-              const normalizedAdUrl = ad.button_url.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
-              return normalizedDestUrl === normalizedAdUrl || normalizedDestUrl.includes(normalizedAdUrl)
-            }
-          } catch (e) {
-            return click.link_url.toLowerCase().includes(ad.button_url.toLowerCase())
+        if (ad.button_url && click.link_url) {
+          // Normalize both URLs by removing protocol, www, and trailing slashes
+          const normalizeUrl = (url: string) => {
+            return url.toLowerCase()
+              .replace(/^https?:\/\//, '')
+              .replace(/^www\./, '')
+              .replace(/\/$/, '')
+              .trim()
           }
+
+          const normalizedClickUrl = normalizeUrl(click.link_url)
+          const normalizedAdUrl = normalizeUrl(ad.button_url)
+
+          // Check if URLs match exactly or if one contains the other
+          return normalizedClickUrl === normalizedAdUrl ||
+                 normalizedClickUrl.includes(normalizedAdUrl) ||
+                 normalizedAdUrl.includes(normalizedClickUrl)
         }
 
         return false

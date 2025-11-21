@@ -146,20 +146,38 @@ export async function GET(request: NextRequest) {
       campaign: campaignMap.get(selection.issue_id)
     }))
 
-    // Fetch link clicks for AI Apps section in date range
-    // Using a high limit to avoid pagination issues
-    const { data: linkClicks, error: clicksError } = await supabaseAdmin
-      .from('link_clicks')
-      .select('id, link_url, subscriber_email, issue_date, issue_id, clicked_at')
-      .eq('link_section', 'AI Apps')
-      .gte('issue_date', startDateStr)
-      .lte('issue_date', endDateStr)
-      .limit(10000)
+    // Fetch ALL link clicks for AI Apps section in date range
+    // Fetch in batches to avoid pagination limits
+    let allLinkClicks: any[] = []
+    let hasMore = true
+    let offset = 0
+    const batchSize = 1000
 
-    if (clicksError) {
-      console.error('[AI Apps Analytics] Error fetching link clicks:', clicksError)
-      return NextResponse.json({ error: clicksError.message }, { status: 500 })
+    while (hasMore) {
+      const { data: linkClicksBatch, error: clicksError } = await supabaseAdmin
+        .from('link_clicks')
+        .select('id, link_url, subscriber_email, issue_date, issue_id, clicked_at')
+        .eq('link_section', 'AI Apps')
+        .gte('issue_date', startDateStr)
+        .lte('issue_date', endDateStr)
+        .range(offset, offset + batchSize - 1)
+        .order('clicked_at', { ascending: false })
+
+      if (clicksError) {
+        console.error('[AI Apps Analytics] Error fetching link clicks:', clicksError)
+        return NextResponse.json({ error: clicksError.message }, { status: 500 })
+      }
+
+      if (!linkClicksBatch || linkClicksBatch.length === 0) {
+        hasMore = false
+      } else {
+        allLinkClicks = allLinkClicks.concat(linkClicksBatch)
+        offset += batchSize
+        hasMore = linkClicksBatch.length === batchSize
+      }
     }
+
+    const linkClicks = allLinkClicks
 
     console.log(`[AI Apps Analytics] Found ${linkClicks?.length || 0} link clicks with section='AI Apps'`)
 
@@ -186,46 +204,28 @@ export async function GET(request: NextRequest) {
       const issueIds = new Set(appIssues.map((sel: any) => sel.issue_id))
       const issueDates = Array.from(new Set(appIssues.map((sel: any) => sel.campaign?.date).filter(Boolean))).sort()
 
-      // Match clicks to this app by issue (most accurate) or URL
+      // Match clicks to this app by URL
+      // The link_url is the direct destination URL (e.g., https://www.skillful.ly/)
+      // The app_url might be stored with or without protocol (e.g., "affinda.com" or "https://affinda.com")
       const appClicks = (linkClicks || []).filter(click => {
-        // First try to match by issue - this is the most accurate method
-        if (click.issue_id && issueIds.has(click.issue_id)) {
-          // If this click is from an issue where this app appeared, we need to verify it's for this specific app
-          // by checking the URL
-          try {
-            const clickUrl = new URL(click.link_url)
-            const destUrl = clickUrl.searchParams.get('url')
+        if (!app.app_url || !click.link_url) return false
 
-            if (destUrl && app.app_url) {
-              const normalizedDestUrl = destUrl.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
-              const normalizedAppUrl = app.app_url.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
-              return normalizedDestUrl === normalizedAppUrl || normalizedDestUrl.includes(normalizedAppUrl)
-            }
-          } catch (e) {
-            // If URL parsing fails, try simple string matching
-            if (app.app_url && click.link_url.toLowerCase().includes(app.app_url.toLowerCase())) {
-              return true
-            }
-          }
+        // Normalize both URLs by removing protocol, www, and trailing slashes
+        const normalizeUrl = (url: string) => {
+          return url.toLowerCase()
+            .replace(/^https?:\/\//, '')
+            .replace(/^www\./, '')
+            .replace(/\/$/, '')
+            .trim()
         }
 
-        // Fallback: match by URL even if not from a tracked issue
-        if (app.app_url) {
-          try {
-            const clickUrl = new URL(click.link_url)
-            const destUrl = clickUrl.searchParams.get('url')
+        const normalizedClickUrl = normalizeUrl(click.link_url)
+        const normalizedAppUrl = normalizeUrl(app.app_url)
 
-            if (destUrl) {
-              const normalizedDestUrl = destUrl.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
-              const normalizedAppUrl = app.app_url.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
-              return normalizedDestUrl === normalizedAppUrl || normalizedDestUrl.includes(normalizedAppUrl)
-            }
-          } catch (e) {
-            return click.link_url.toLowerCase().includes(app.app_url.toLowerCase())
-          }
-        }
-
-        return false
+        // Check if URLs match exactly or if one contains the other
+        return normalizedClickUrl === normalizedAppUrl ||
+               normalizedClickUrl.includes(normalizedAppUrl) ||
+               normalizedAppUrl.includes(normalizedClickUrl)
       })
 
       const totalClicks = appClicks.length
