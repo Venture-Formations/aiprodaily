@@ -24,19 +24,36 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const publicationId = searchParams.get('publication_id')
+    const newsletterSlug = searchParams.get('newsletter_slug')
     const pollId = searchParams.get('poll_id')
     const issueId = searchParams.get('issue_id')
     const startDateParam = searchParams.get('start_date')
     const endDateParam = searchParams.get('end_date')
     const days = parseInt(searchParams.get('days') || '30')
 
-    if (!publicationId) {
+    if (!newsletterSlug) {
       return NextResponse.json(
-        { error: 'publication_id is required' },
+        { error: 'newsletter_slug is required' },
         { status: 400 }
       )
     }
+
+    // Get publication_id from slug (REQUIRED for multi-tenant isolation)
+    const { data: newsletter, error: newsletterError } = await supabaseAdmin
+      .from('publications')
+      .select('id')
+      .eq('slug', newsletterSlug)
+      .single()
+
+    if (newsletterError || !newsletter) {
+      console.error('[Poll Analytics] Newsletter not found:', newsletterSlug)
+      return NextResponse.json(
+        { error: 'Newsletter not found' },
+        { status: 404 }
+      )
+    }
+
+    const publicationId = newsletter.id
 
     // Calculate date range using local timezone (NO UTC - per CLAUDE.md)
     let startDateStr: string

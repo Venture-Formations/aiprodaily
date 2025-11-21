@@ -22,7 +22,7 @@ export default function AdsAnalyticsTab({ slug }: Props) {
   const fetchAdAnalytics = async () => {
     try {
       setLoading(true)
-      let url = `/api/ads/analytics?publication_id=${slug}`
+      let url = `/api/ads/analytics?newsletter_slug=${slug}`
 
       if (selectedAdId !== 'all') {
         url += `&ad_id=${selectedAdId}`

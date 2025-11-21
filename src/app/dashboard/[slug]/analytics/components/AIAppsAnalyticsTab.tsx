@@ -24,7 +24,7 @@ export default function AIAppsAnalyticsTab({ slug }: Props) {
   const fetchAIAppAnalytics = async () => {
     try {
       setLoading(true)
-      let url = `/api/ai-apps/analytics?publication_id=${slug}`
+      let url = `/api/ai-apps/analytics?newsletter_slug=${slug}`
 
       if (affiliateFilter !== 'all') {
         url += `&affiliate=${affiliateFilter}`

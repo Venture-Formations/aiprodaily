@@ -22,7 +22,7 @@ export default function PollsAnalyticsTab({ slug }: Props) {
   const fetchPollAnalytics = async () => {
     try {
       setLoading(true)
-      let url = `/api/polls/analytics?publication_id=${slug}`
+      let url = `/api/polls/analytics?newsletter_slug=${slug}`
 
       if (selectedPollId !== 'all') {
         url += `&poll_id=${selectedPollId}`
