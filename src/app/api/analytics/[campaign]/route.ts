@@ -55,9 +55,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const mailerLiteService = new MailerLiteService()
     const metrics = await mailerLiteService.importissueMetrics(issue)
 
+    // Check if metrics is a skip indicator
+    const isSkipped = metrics && typeof metrics === 'object' && 'skipped' in metrics
     console.log(`[Analytics Refresh] Completed for issue ${issue}:`, {
-      skipped: metrics?.skipped || false,
-      reason: metrics?.reason || null
+      skipped: isSkipped,
+      reason: isSkipped ? (metrics as any).reason : null
     })
 
     return NextResponse.json({
