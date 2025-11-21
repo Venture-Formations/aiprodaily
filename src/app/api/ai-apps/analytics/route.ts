@@ -194,6 +194,15 @@ export async function GET(request: NextRequest) {
       console.error('[AI Apps Analytics] Error fetching issues:', issuesError)
     }
 
+    console.log(`[AI Apps Analytics] Found ${issues?.length || 0} issues for CTR calculation`)
+    if (issues && issues.length > 0) {
+      console.log('[AI Apps Analytics] Sample issue for CTR:', {
+        id: issues[0].id,
+        date: issues[0].date,
+        email_metrics: issues[0].email_metrics
+      })
+    }
+
     // Build analytics for each app
     const appAnalytics = apps.map(app => {
       // Count issues where this app was included
@@ -256,6 +265,18 @@ export async function GET(request: NextRequest) {
 
         if (totalRecipients > 0) {
           clickThroughRate = Math.round((uniqueClickers / totalRecipients) * 10000) / 100 // 2 decimal places
+        }
+
+        // Debug logging for first app
+        if (apps.indexOf(app) === 0) {
+          console.log(`[AI Apps Analytics] CTR Debug for "${app.app_name}":`, {
+            issuesUsedIn,
+            issueIdsCount: issueIds.size,
+            totalIssuesAvailable: issues.length,
+            totalRecipients,
+            uniqueClickers,
+            clickThroughRate
+          })
         }
       }
 
