@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
     const issueIds = Array.from(new Set((issueSelections || []).map((sel: any) => sel.issue_id)))
 
     const { data: campaigns, error: campaignsError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .select('id, date, publication_id, status')
       .in('id', issueIds)
       .eq('publication_id', publicationId)
@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch issues in date range for recipient counts (for CTR calculation)
     const { data: issues, error: issuesError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .select('id, date, metrics')
       .eq('publication_id', publicationId)
       .gte('date', startDateStr)

@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch issues in date range to calculate response rates
     const { data: issues, error: issuesError } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('publication_issues')
       .select('id, date, poll_id, metrics')
       .eq('publication_id', publicationId)
       .gte('date', startDateStr)
