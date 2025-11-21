@@ -176,7 +176,7 @@ export async function GET(request: NextRequest) {
     // Fetch issues in date range for recipient counts (for CTR calculation)
     const { data: issues, error: issuesError } = await supabaseAdmin
       .from('publication_issues')
-      .select('id, date, metrics')
+      .select('id, date, email_metrics')
       .eq('publication_id', publicationId)
       .gte('date', startDateStr)
       .lte('date', endDateStr)
@@ -241,8 +241,8 @@ export async function GET(request: NextRequest) {
       if (timesUsedInRange > 0 && issues) {
         // Sum up recipients from issues where this ad appeared
         issues.forEach(issue => {
-          if (issueIds.has(issue.id) && issue.metrics?.sent_count) {
-            totalRecipients += issue.metrics.sent_count
+          if (issueIds.has(issue.id) && issue.email_metrics?.sent_count) {
+            totalRecipients += issue.email_metrics.sent_count
           }
         })
 

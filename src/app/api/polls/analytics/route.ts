@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
     // Fetch issues in date range to calculate response rates
     const { data: issues, error: issuesError } = await supabaseAdmin
       .from('publication_issues')
-      .select('id, date, poll_id, metrics')
+      .select('id, date, poll_id, email_metrics')
       .eq('publication_id', publicationId)
       .gte('date', startDateStr)
       .lte('date', endDateStr)
@@ -170,8 +170,8 @@ export async function GET(request: NextRequest) {
 
       if (pollIssues.length > 0) {
         pollIssues.forEach(issue => {
-          if (issue.metrics?.sent_count) {
-            totalRecipients += issue.metrics.sent_count
+          if (issue.email_metrics?.sent_count) {
+            totalRecipients += issue.email_metrics.sent_count
           }
         })
 
