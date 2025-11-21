@@ -30,14 +30,17 @@ async function executeMetricsImport() {
     }
   }
 
+  console.log(`[Metrics Import] Processing ${issues.length} issues from last 30 days`)
+
   const mailerLiteService = new MailerLiteService()
   let successCount = 0
   let errorCount = 0
   let skippedCount = 0
   const errors: string[] = []
-  
+
   for (const issue of issues) {
     try {
+      console.log(`[Metrics Import] Processing issue ${issue.id} (sent at: ${issue.final_sent_at})`)
       const result = await mailerLiteService.importissueMetrics(issue.id)
       
       // Check if result indicates a skip

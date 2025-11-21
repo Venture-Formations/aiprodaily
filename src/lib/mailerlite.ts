@@ -294,12 +294,24 @@ export class MailerLiteService {
       if (response.status === 200) {
         const data = response.data.data
         let stats = data
-        
+
         if (data.stats) {
           stats = data.stats
         } else if (data.statistics) {
           stats = data.statistics
         }
+
+        // Log the stats structure for debugging
+        console.log(`[MailerLite] Stats for campaign ${mailerliteCampaignId}:`, {
+          has_stats: !!data.stats,
+          has_statistics: !!data.statistics,
+          sent: stats.sent || 0,
+          delivered: stats.delivered || stats.delivered_count || 0,
+          opened_count: stats.opened?.count || stats.opens_count || stats.opened || 0,
+          clicked_count: stats.clicked?.count || stats.clicks_count || stats.clicked || 0,
+          open_rate: stats.opened?.rate || stats.open_rate || 0,
+          click_rate: stats.clicked?.rate || stats.click_rate || 0
+        })
 
         // Helper function to extract numeric value from rate fields
         // MailerLite returns rates as objects with { float: number, string: string }
@@ -345,6 +357,8 @@ export class MailerLiteService {
         if (updateError) {
           throw new Error(`Failed to update metrics: ${updateError.message}`)
         }
+
+        console.log(`[MailerLite] Updated metrics for issue ${issueId}:`, metricsUpdate)
 
         return metricsUpdate
       }
