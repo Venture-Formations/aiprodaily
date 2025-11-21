@@ -158,42 +158,6 @@ export class MailerLiteService {
           // Don't fail the whole process if scheduling fails - issue is still created
         }
 
-        // Store MailerLite issue ID in email_metrics table
-        // Check if metrics record exists first
-        const { data: existingMetrics } = await supabaseAdmin
-          .from('email_metrics')
-          .select('id')
-          .eq('issue_id', issue.id)
-          .single()
-
-        if (existingMetrics) {
-          // Update existing record
-          const { error: updateError } = await supabaseAdmin
-            .from('email_metrics')
-            .update({ mailerlite_issue_id: issueId })
-            .eq('id', existingMetrics.id)
-
-          if (updateError) {
-            console.error('Failed to update MailerLite issue ID:', updateError)
-          } else {
-            console.log(`Updated MailerLite issue ID ${issueId} in email_metrics`)
-          }
-        } else {
-          // Insert new record
-          const { error: insertError } = await supabaseAdmin
-            .from('email_metrics')
-            .insert({
-              issue_id: issue.id,
-              mailerlite_issue_id: issueId
-            })
-
-          if (insertError) {
-            console.error('Failed to insert MailerLite issue ID:', insertError)
-          } else {
-            console.log(`Stored MailerLite issue ID ${issueId} in email_metrics`)
-          }
-        }
-
         // Update issue with review sent timestamp
         await supabaseAdmin
           .from('publication_issues')
@@ -761,39 +725,41 @@ export class MailerLiteService {
           // Don't fail the whole process if scheduling fails - issue is still created
         }
 
-        // Store MailerLite issue ID in email_metrics table
-        // Check if metrics record exists first
-        const { data: existingMetrics } = await supabaseAdmin
-          .from('email_metrics')
-          .select('id')
-          .eq('issue_id', issue.id)
-          .single()
-
-        if (existingMetrics) {
-          // Update existing record
-          const { error: updateError } = await supabaseAdmin
+        // Store MailerLite issue ID in email_metrics table ONLY for primary final send (not secondary)
+        if (!isSecondary) {
+          // Check if metrics record exists first
+          const { data: existingMetrics } = await supabaseAdmin
             .from('email_metrics')
-            .update({ mailerlite_issue_id: issueId })
-            .eq('id', existingMetrics.id)
+            .select('id')
+            .eq('issue_id', issue.id)
+            .single()
 
-          if (updateError) {
-            console.error('Failed to update MailerLite issue ID:', updateError)
-          } else {
-            console.log(`Updated MailerLite issue ID ${issueId} in email_metrics`)
-          }
-        } else {
-          // Insert new record
-          const { error: insertError } = await supabaseAdmin
-            .from('email_metrics')
-            .insert({
-              issue_id: issue.id,
-              mailerlite_issue_id: issueId
-            })
+          if (existingMetrics) {
+            // Update existing record
+            const { error: updateError } = await supabaseAdmin
+              .from('email_metrics')
+              .update({ mailerlite_issue_id: issueId })
+              .eq('id', existingMetrics.id)
 
-          if (insertError) {
-            console.error('Failed to insert MailerLite issue ID:', insertError)
+            if (updateError) {
+              console.error('Failed to update MailerLite issue ID:', updateError)
+            } else {
+              console.log(`Updated MailerLite issue ID ${issueId} in email_metrics`)
+            }
           } else {
-            console.log(`Stored MailerLite issue ID ${issueId} in email_metrics`)
+            // Insert new record
+            const { error: insertError } = await supabaseAdmin
+              .from('email_metrics')
+              .insert({
+                issue_id: issue.id,
+                mailerlite_issue_id: issueId
+              })
+
+            if (insertError) {
+              console.error('Failed to insert MailerLite issue ID:', insertError)
+            } else {
+              console.log(`Stored MailerLite issue ID ${issueId} in email_metrics`)
+            }
           }
         }
 
