@@ -97,16 +97,10 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Fetch all issue_advertisements in date range to count actual usage
+    // Fetch all issue_advertisements for these ads
     const { data: issueAds, error: issueAdsError } = await supabaseAdmin
       .from('issue_advertisements')
-      .select(`
-        id,
-        issue_id,
-        advertisement_id,
-        used_at,
-        newsletter_campaigns!inner(id, date, publication_id, status)
-      `)
+      .select('id, issue_id, advertisement_id, used_at')
       .in('advertisement_id', ads.map(ad => ad.id))
 
     if (issueAdsError) {
@@ -114,17 +108,31 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: issueAdsError.message }, { status: 500 })
     }
 
-    // Filter issue_ads by date range and publication
-    const filteredIssueAds = (issueAds || []).filter((issueAd: any) => {
-      const campaign = Array.isArray(issueAd.newsletter_campaigns)
-        ? issueAd.newsletter_campaigns[0]
-        : issueAd.newsletter_campaigns
-      if (!campaign || campaign.publication_id !== publicationId) return false
-      if (campaign.status !== 'sent') return false
+    // Fetch campaigns for these issues
+    const issueIds = Array.from(new Set((issueAds || []).map((ia: any) => ia.issue_id)))
 
-      const issueDate = campaign.date
-      return issueDate >= startDateStr && issueDate <= endDateStr
-    })
+    const { data: campaigns, error: campaignsError } = await supabaseAdmin
+      .from('newsletter_campaigns')
+      .select('id, date, publication_id, status')
+      .in('id', issueIds)
+      .eq('publication_id', publicationId)
+      .eq('status', 'sent')
+      .gte('date', startDateStr)
+      .lte('date', endDateStr)
+
+    if (campaignsError) {
+      console.error('[Ads Analytics] Error fetching campaigns:', campaignsError)
+    }
+
+    const campaignMap = new Map((campaigns || []).map(c => [c.id, c]))
+
+    // Filter issue_ads by campaigns in date range
+    const filteredIssueAds = (issueAds || []).filter((issueAd: any) => {
+      return campaignMap.has(issueAd.issue_id)
+    }).map((issueAd: any) => ({
+      ...issueAd,
+      campaign: campaignMap.get(issueAd.issue_id)
+    }))
 
     // Fetch link clicks for Advertorial section in date range
     const { data: linkClicks, error: clicksError } = await supabaseAdmin
@@ -160,10 +168,7 @@ export async function GET(request: NextRequest) {
 
       // Get unique issue IDs and dates
       const issueIds = new Set(adIssues.map((ia: any) => ia.issue_id))
-      const issueDates = Array.from(new Set(adIssues.map((ia: any) => {
-        const campaign = Array.isArray(ia.newsletter_campaigns) ? ia.newsletter_campaigns[0] : ia.newsletter_campaigns
-        return campaign.date
-      }))).sort()
+      const issueDates = Array.from(new Set(adIssues.map((ia: any) => ia.campaign?.date).filter(Boolean))).sort()
 
       // Match clicks to this ad by URL or by issue
       // Since multiple ads might share similar URLs, we'll match by issue_id where the ad was used
@@ -218,10 +223,9 @@ export async function GET(request: NextRequest) {
         if (click.issue_id && issueIds.has(click.issue_id)) {
           if (!clicksByIssue[click.issue_id]) {
             const issueData = adIssues.find((ia: any) => ia.issue_id === click.issue_id)
-            const campaign = issueData ? (Array.isArray(issueData.newsletter_campaigns) ? issueData.newsletter_campaigns[0] : issueData.newsletter_campaigns) : null
             clicksByIssue[click.issue_id] = {
               issue_id: click.issue_id,
-              issue_date: campaign?.date || click.issue_date,
+              issue_date: issueData?.campaign?.date || click.issue_date,
               clicks: [],
               total_clicks: 0,
               unique_clickers: new Set()

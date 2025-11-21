@@ -109,15 +109,10 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Fetch all issue_ai_app_selections in date range to count usage
+    // Fetch all issue_ai_app_selections for these apps
     const { data: issueSelections, error: selectionsError } = await supabaseAdmin
       .from('issue_ai_app_selections')
-      .select(`
-        id,
-        issue_id,
-        app_id,
-        newsletter_campaigns!inner(id, date, publication_id, status)
-      `)
+      .select('id, issue_id, app_id')
       .in('app_id', apps.map(app => app.id))
 
     if (selectionsError) {
@@ -125,15 +120,31 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: selectionsError.message }, { status: 500 })
     }
 
-    // Filter selections by date range and publication
-    const filteredSelections = (issueSelections || []).filter((selection: any) => {
-      const campaign = selection.newsletter_campaigns
-      if (!campaign || campaign.publication_id !== publicationId) return false
-      if (campaign.status !== 'sent') return false
+    // Fetch campaigns for these issues
+    const issueIds = Array.from(new Set((issueSelections || []).map((sel: any) => sel.issue_id)))
 
-      const issueDate = campaign.date
-      return issueDate >= startDateStr && issueDate <= endDateStr
-    })
+    const { data: campaigns, error: campaignsError } = await supabaseAdmin
+      .from('newsletter_campaigns')
+      .select('id, date, publication_id, status')
+      .in('id', issueIds)
+      .eq('publication_id', publicationId)
+      .eq('status', 'sent')
+      .gte('date', startDateStr)
+      .lte('date', endDateStr)
+
+    if (campaignsError) {
+      console.error('[AI Apps Analytics] Error fetching campaigns:', campaignsError)
+    }
+
+    const campaignMap = new Map((campaigns || []).map(c => [c.id, c]))
+
+    // Filter selections by campaigns in date range
+    const filteredSelections = (issueSelections || []).filter((selection: any) => {
+      return campaignMap.has(selection.issue_id)
+    }).map((selection: any) => ({
+      ...selection,
+      campaign: campaignMap.get(selection.issue_id)
+    }))
 
     // Fetch link clicks for AI Apps section in date range
     const { data: linkClicks, error: clicksError } = await supabaseAdmin
@@ -169,10 +180,7 @@ export async function GET(request: NextRequest) {
 
       // Get unique issue IDs and dates
       const issueIds = new Set(appIssues.map((sel: any) => sel.issue_id))
-      const issueDates = Array.from(new Set(appIssues.map((sel: any) => {
-        const campaign = Array.isArray(sel.newsletter_campaigns) ? sel.newsletter_campaigns[0] : sel.newsletter_campaigns
-        return campaign.date
-      }))).sort()
+      const issueDates = Array.from(new Set(appIssues.map((sel: any) => sel.campaign?.date).filter(Boolean))).sort()
 
       // Match clicks to this app by URL
       // The link_url in link_clicks should contain or match the app_url
