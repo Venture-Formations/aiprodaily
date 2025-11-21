@@ -35,25 +35,6 @@ export async function GET(request: NextRequest) {
       console.error('[API] Error fetching Ads count:', adsError.message);
     }
 
-    // Articles count (both primary and secondary)
-    const { data: articlesCount, error: articlesError } = await supabase
-      .from('articles')
-      .select('id', { count: 'exact' });
-
-    if (articlesError) {
-      console.error('[API] Error fetching articles count:', articlesError.message);
-    }
-
-    const { data: secondaryArticlesCount, error: secondaryArticlesError } = await supabase
-      .from('secondary_articles')
-      .select('id', { count: 'exact' });
-
-    if (secondaryArticlesError) {
-      console.error('[API] Error fetching secondary articles count:', secondaryArticlesError.message);
-    }
-
-    const totalArticlesCount = (articlesCount?.length || 0) + (secondaryArticlesCount?.length || 0);
-
     // Polls count
     const { data: pollsCount, error: pollsError } = await supabase
       .from('polls')
@@ -81,12 +62,6 @@ export async function GET(request: NextRequest) {
         description: 'Newsletter advertisement submissions',
         count: adsCount?.length || 0,
         href: '/dashboard/databases/ads'
-      },
-      {
-        name: 'Articles',
-        description: 'Current and past newsletter articles with scoring details',
-        count: totalArticlesCount,
-        href: '/dashboard/databases/articles'
       },
       {
         name: 'Polls',
