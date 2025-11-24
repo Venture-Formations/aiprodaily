@@ -274,6 +274,8 @@ export async function generateNewsletterHeader(formattedDate: string, issueDate?
 
     </div>
 
+  </div>
+
 <br>`
 }
 
@@ -1338,7 +1340,9 @@ ${socialMediaSection}
     </td>
   </tr>
 </table>
-</div>
+    </td>
+  </tr>
+</table>
 </body>
 </html>`
 }
