@@ -16,7 +16,20 @@ import { RSSProcessor } from '@/lib/rss-processor'
  * 8. Generate 3 secondary bodies (batch 2)
  * 9. Fact-check secondary articles
  * 10. Finalize (select top 3, generate welcome, set draft)
+ *
+ * Note: Each step includes OIDC error handling and idempotency checks
+ * to gracefully handle Vercel workflow token refresh failures
  */
+
+/**
+ * Helper to detect if an error is an OIDC token error
+ */
+function isOidcError(error: any): boolean {
+  const errorMsg = error?.message || String(error)
+  return errorMsg.includes('VercelOidcTokenError') ||
+         errorMsg.includes('Failed to refresh OIDC token') ||
+         errorMsg.includes('Unable to find root directory')
+}
 export async function createIssueWorkflow(input: {
   issue_id: string
   publication_id: string
@@ -85,51 +98,130 @@ async function deduplicateissue(issueId: string) {
 async function generatePrimaryTitles(issueId: string) {
   "use step"
 
-  console.log('[Workflow Step 2/10] Generating 6 primary titles...')
-  const processor = new RSSProcessor()
-  await processor.generateTitlesOnly(issueId, 'primary', 6)
+  let workCompleted = false
 
-  const { data: articles } = await supabaseAdmin
-    .from('articles')
-    .select('id, headline')
-    .eq('issue_id', issueId)
-    .not('headline', 'is', null)
+  try {
+    // Idempotency check: skip if already done
+    const { data: existing } = await supabaseAdmin
+      .from('articles')
+      .select('id')
+      .eq('issue_id', issueId)
+      .not('headline', 'is', null)
 
-  console.log(`[Workflow Step 2/10] ✓ Generated ${articles?.length || 0} primary titles`)
+    if (existing && existing.length >= 6) {
+      console.log(`[Workflow Step 2/10] ✓ Already have ${existing.length} primary titles (skip)`)
+      return
+    }
+
+    console.log('[Workflow Step 2/10] Generating 6 primary titles...')
+    const processor = new RSSProcessor()
+    await processor.generateTitlesOnly(issueId, 'primary', 6)
+
+    // Mark work as complete before querying results
+    workCompleted = true
+
+    const { data: articles } = await supabaseAdmin
+      .from('articles')
+      .select('id, headline')
+      .eq('issue_id', issueId)
+      .not('headline', 'is', null)
+
+    console.log(`[Workflow Step 2/10] ✓ Generated ${articles?.length || 0} primary titles`)
+  } catch (error: any) {
+    // If OIDC error but work completed, log and continue
+    if (workCompleted && isOidcError(error)) {
+      console.log('[Workflow Step 2/10] ⚠️ OIDC token error after completion - continuing')
+      return
+    }
+    // Otherwise, this is a real error - rethrow
+    throw error
+  }
 }
 
 // Step 2: Generate Primary Bodies Batch 1
 async function generatePrimaryBodiesBatch1(issueId: string) {
   "use step"
 
-  console.log('[Workflow Step 3/10] Generating 3 primary bodies (batch 1)...')
-  const processor = new RSSProcessor()
-  await processor.generateBodiesOnly(issueId, 'primary', 0, 3)
+  let workCompleted = false
 
-  const { data: articles } = await supabaseAdmin
-    .from('articles')
-    .select('id, content')
-    .eq('issue_id', issueId)
-    .not('content', 'is', null)
+  try {
+    // Idempotency check: count existing bodies for first 3 articles
+    const { data: existing, count } = await supabaseAdmin
+      .from('articles')
+      .select('id, content', { count: 'exact' })
+      .eq('issue_id', issueId)
+      .not('content', 'is', null)
+      .range(0, 2) // First 3 articles (0-indexed)
 
-  console.log(`[Workflow Step 3/10] ✓ Total bodies generated: ${articles?.length || 0}`)
+    if (count && count >= 3) {
+      console.log('[Workflow Step 3/10] ✓ First 3 primary bodies already generated (skip)')
+      return
+    }
+
+    console.log('[Workflow Step 3/10] Generating 3 primary bodies (batch 1)...')
+    const processor = new RSSProcessor()
+    await processor.generateBodiesOnly(issueId, 'primary', 0, 3)
+
+    // Mark work as complete
+    workCompleted = true
+
+    const { data: articles } = await supabaseAdmin
+      .from('articles')
+      .select('id, content')
+      .eq('issue_id', issueId)
+      .not('content', 'is', null)
+
+    console.log(`[Workflow Step 3/10] ✓ Total bodies generated: ${articles?.length || 0}`)
+  } catch (error: any) {
+    // If OIDC error but work completed, log and continue
+    if (workCompleted && isOidcError(error)) {
+      console.log('[Workflow Step 3/10] ⚠️ OIDC token error after completion - continuing')
+      return
+    }
+    throw error
+  }
 }
 
 // Step 3: Generate Primary Bodies Batch 2
 async function generatePrimaryBodiesBatch2(issueId: string) {
   "use step"
 
-  console.log('[Workflow Step 4/10] Generating 3 more primary bodies (batch 2)...')
-  const processor = new RSSProcessor()
-  await processor.generateBodiesOnly(issueId, 'primary', 3, 3)
+  let workCompleted = false
 
-  const { data: articles } = await supabaseAdmin
-    .from('articles')
-    .select('id, content')
-    .eq('issue_id', issueId)
-    .not('content', 'is', null)
+  try {
+    // Idempotency check: count total bodies
+    const { count } = await supabaseAdmin
+      .from('articles')
+      .select('id', { count: 'exact' })
+      .eq('issue_id', issueId)
+      .not('content', 'is', null)
 
-  console.log(`[Workflow Step 4/10] ✓ Total primary bodies: ${articles?.length || 0}`)
+    if (count && count >= 6) {
+      console.log('[Workflow Step 4/10] ✓ All 6 primary bodies already generated (skip)')
+      return
+    }
+
+    console.log('[Workflow Step 4/10] Generating 3 more primary bodies (batch 2)...')
+    const processor = new RSSProcessor()
+    await processor.generateBodiesOnly(issueId, 'primary', 3, 3)
+
+    // Mark work as complete
+    workCompleted = true
+
+    const { data: articles } = await supabaseAdmin
+      .from('articles')
+      .select('id, content')
+      .eq('issue_id', issueId)
+      .not('content', 'is', null)
+
+    console.log(`[Workflow Step 4/10] ✓ Total primary bodies: ${articles?.length || 0}`)
+  } catch (error: any) {
+    if (workCompleted && isOidcError(error)) {
+      console.log('[Workflow Step 4/10] ⚠️ OIDC token error after completion - continuing')
+      return
+    }
+    throw error
+  }
 }
 
 // Step 4: Fact-check Primary Articles
@@ -154,51 +246,127 @@ async function factCheckPrimary(issueId: string) {
 async function generateSecondaryTitles(issueId: string) {
   "use step"
 
-  console.log('[Workflow Step 6/10] Generating 6 secondary titles...')
-  const processor = new RSSProcessor()
-  await processor.generateTitlesOnly(issueId, 'secondary', 6)
+  let workCompleted = false
 
-  const { data: articles } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('id, headline')
-    .eq('issue_id', issueId)
-    .not('headline', 'is', null)
+  try {
+    // Idempotency check: skip if already done
+    const { data: existing } = await supabaseAdmin
+      .from('secondary_articles')
+      .select('id')
+      .eq('issue_id', issueId)
+      .not('headline', 'is', null)
 
-  console.log(`[Workflow Step 6/10] ✓ Generated ${articles?.length || 0} secondary titles`)
+    if (existing && existing.length >= 6) {
+      console.log(`[Workflow Step 6/10] ✓ Already have ${existing.length} secondary titles (skip)`)
+      return
+    }
+
+    console.log('[Workflow Step 6/10] Generating 6 secondary titles...')
+    const processor = new RSSProcessor()
+    await processor.generateTitlesOnly(issueId, 'secondary', 6)
+
+    // Mark work as complete
+    workCompleted = true
+
+    const { data: articles } = await supabaseAdmin
+      .from('secondary_articles')
+      .select('id, headline')
+      .eq('issue_id', issueId)
+      .not('headline', 'is', null)
+
+    console.log(`[Workflow Step 6/10] ✓ Generated ${articles?.length || 0} secondary titles`)
+  } catch (error: any) {
+    if (workCompleted && isOidcError(error)) {
+      console.log('[Workflow Step 6/10] ⚠️ OIDC token error after completion - continuing')
+      return
+    }
+    throw error
+  }
 }
 
 // Step 6: Generate Secondary Bodies Batch 1
 async function generateSecondaryBodiesBatch1(issueId: string) {
   "use step"
 
-  console.log('[Workflow Step 7/10] Generating 3 secondary bodies (batch 1)...')
-  const processor = new RSSProcessor()
-  await processor.generateBodiesOnly(issueId, 'secondary', 0, 3)
+  let workCompleted = false
 
-  const { data: articles } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('id, content')
-    .eq('issue_id', issueId)
-    .not('content', 'is', null)
+  try {
+    // Idempotency check: count existing secondary bodies for first 3 articles
+    const { count } = await supabaseAdmin
+      .from('secondary_articles')
+      .select('id', { count: 'exact' })
+      .eq('issue_id', issueId)
+      .not('content', 'is', null)
+      .range(0, 2) // First 3 articles
 
-  console.log(`[Workflow Step 7/10] ✓ Total bodies generated: ${articles?.length || 0}`)
+    if (count && count >= 3) {
+      console.log('[Workflow Step 7/10] ✓ First 3 secondary bodies already generated (skip)')
+      return
+    }
+
+    console.log('[Workflow Step 7/10] Generating 3 secondary bodies (batch 1)...')
+    const processor = new RSSProcessor()
+    await processor.generateBodiesOnly(issueId, 'secondary', 0, 3)
+
+    // Mark work as complete
+    workCompleted = true
+
+    const { data: articles } = await supabaseAdmin
+      .from('secondary_articles')
+      .select('id, content')
+      .eq('issue_id', issueId)
+      .not('content', 'is', null)
+
+    console.log(`[Workflow Step 7/10] ✓ Total bodies generated: ${articles?.length || 0}`)
+  } catch (error: any) {
+    if (workCompleted && isOidcError(error)) {
+      console.log('[Workflow Step 7/10] ⚠️ OIDC token error after completion - continuing')
+      return
+    }
+    throw error
+  }
 }
 
 // Step 7: Generate Secondary Bodies Batch 2
 async function generateSecondaryBodiesBatch2(issueId: string) {
   "use step"
 
-  console.log('[Workflow Step 8/10] Generating 3 more secondary bodies (batch 2)...')
-  const processor = new RSSProcessor()
-  await processor.generateBodiesOnly(issueId, 'secondary', 3, 3)
+  let workCompleted = false
 
-  const { data: articles } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('id, content')
-    .eq('issue_id', issueId)
-    .not('content', 'is', null)
+  try {
+    // Idempotency check: count total secondary bodies
+    const { count } = await supabaseAdmin
+      .from('secondary_articles')
+      .select('id', { count: 'exact' })
+      .eq('issue_id', issueId)
+      .not('content', 'is', null)
 
-  console.log(`[Workflow Step 8/10] ✓ Total secondary bodies: ${articles?.length || 0}`)
+    if (count && count >= 6) {
+      console.log('[Workflow Step 8/10] ✓ All 6 secondary bodies already generated (skip)')
+      return
+    }
+
+    console.log('[Workflow Step 8/10] Generating 3 more secondary bodies (batch 2)...')
+    const processor = new RSSProcessor()
+    await processor.generateBodiesOnly(issueId, 'secondary', 3, 3)
+
+    // Mark work as complete
+    workCompleted = true
+
+    const { data: articles } = await supabaseAdmin
+      .from('secondary_articles')
+      .select('id, content')
+      .eq('issue_id', issueId)
+      .not('content', 'is', null)
+
+    console.log(`[Workflow Step 8/10] ✓ Total secondary bodies: ${articles?.length || 0}`)
+  } catch (error: any) {
+    if (workCompleted && isOidcError(error)) {
+      console.log('[Workflow Step 8/10] ⚠️ OIDC token error after completion - continuing')
+      return
+    }
+    throw error
+  }
 }
 
 // Step 8: Fact-check Secondary Articles

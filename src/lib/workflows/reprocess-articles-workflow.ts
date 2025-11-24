@@ -16,7 +16,19 @@ import { RSSProcessor } from '@/lib/rss-processor'
  * 8. Generate 3 secondary bodies (batch 2)
  * 9. Fact-check all articles
  * 10. Finalize (select top 3 each, regenerate welcome, set draft)
+ *
+ * Note: Includes OIDC error handling and idempotency checks
  */
+
+/**
+ * Helper to detect if an error is an OIDC token error
+ */
+function isOidcError(error: any): boolean {
+  const errorMsg = error?.message || String(error)
+  return errorMsg.includes('VercelOidcTokenError') ||
+         errorMsg.includes('Failed to refresh OIDC token') ||
+         errorMsg.includes('Unable to find root directory')
+}
 export async function reprocessArticlesWorkflow(input: {
   issue_id: string
   publication_id: string
@@ -206,17 +218,42 @@ async function selectAndDedupe(issueId: string, newsletterId: string) {
 async function generatePrimaryTitles(issueId: string) {
   "use step"
 
-  console.log('[Reprocess Step 3/10] Generating 6 primary titles...')
-  const processor = new RSSProcessor()
-  await processor.generateTitlesOnly(issueId, 'primary', 6)
+  let workCompleted = false
 
-  const { data: articles } = await supabaseAdmin
-    .from('articles')
-    .select('id, headline')
-    .eq('issue_id', issueId)
-    .not('headline', 'is', null)
+  try {
+    // Idempotency check: skip if already done
+    const { data: existing } = await supabaseAdmin
+      .from('articles')
+      .select('id')
+      .eq('issue_id', issueId)
+      .not('headline', 'is', null)
 
-  console.log(`[Reprocess Step 3/10] ✓ Generated ${articles?.length || 0} primary titles`)
+    if (existing && existing.length >= 6) {
+      console.log(`[Reprocess Step 3/10] ✓ Already have ${existing.length} primary titles (skip)`)
+      return
+    }
+
+    console.log('[Reprocess Step 3/10] Generating 6 primary titles...')
+    const processor = new RSSProcessor()
+    await processor.generateTitlesOnly(issueId, 'primary', 6)
+
+    // Mark work as complete
+    workCompleted = true
+
+    const { data: articles } = await supabaseAdmin
+      .from('articles')
+      .select('id, headline')
+      .eq('issue_id', issueId)
+      .not('headline', 'is', null)
+
+    console.log(`[Reprocess Step 3/10] ✓ Generated ${articles?.length || 0} primary titles`)
+  } catch (error: any) {
+    if (workCompleted && isOidcError(error)) {
+      console.log('[Reprocess Step 3/10] ⚠️ OIDC token error after completion - continuing')
+      return
+    }
+    throw error
+  }
 }
 
 async function generatePrimaryBodiesBatch1(issueId: string) {

@@ -43,6 +43,50 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Workflow Trigger] Checking schedules for ${newsletters.length} newsletters`)
 
+    // RECOVERY: Check for campaigns stuck in 'processing' due to OIDC errors
+    const { data: stuckCampaigns } = await supabaseAdmin
+      .from('newsletter_campaigns')
+      .select('id, publication_id, status, created_at')
+      .eq('status', 'processing')
+      .lt('created_at', new Date(Date.now() - 30 * 60 * 1000).toISOString()) // Older than 30 mins
+
+    if (stuckCampaigns && stuckCampaigns.length > 0) {
+      console.log(`[Workflow Trigger] Found ${stuckCampaigns.length} stuck campaigns - checking for OIDC recovery`)
+
+      for (const campaign of stuckCampaigns) {
+        // Check if articles were actually generated despite OIDC error
+        const { count: articleCount } = await supabaseAdmin
+          .from('articles')
+          .select('id', { count: 'exact' })
+          .eq('campaign_id', campaign.id)
+          .not('content', 'is', null)
+          .not('headline', 'is', null)
+
+        // If sufficient articles exist, the work completed but OIDC failed - manually finalize
+        if (articleCount && articleCount >= 3) {
+          console.log(`[Workflow Trigger] Campaign ${campaign.id} has ${articleCount} articles - attempting recovery`)
+
+          // Check if welcome section exists (indicates finalize step ran)
+          const { data: campaignData } = await supabaseAdmin
+            .from('newsletter_campaigns')
+            .select('welcome_section')
+            .eq('id', campaign.id)
+            .single()
+
+          if (campaignData?.welcome_section) {
+            // Finalize step completed, just update status
+            console.log(`[Workflow Trigger] Campaign ${campaign.id} is complete - updating to draft`)
+            await supabaseAdmin
+              .from('newsletter_campaigns')
+              .update({ status: 'draft' })
+              .eq('id', campaign.id)
+          } else {
+            console.log(`[Workflow Trigger] Campaign ${campaign.id} incomplete - leaving as processing for retry`)
+          }
+        }
+      }
+    }
+
     // Check each newsletter's schedule and start workflows as needed
     const startedWorkflows: string[] = []
 
