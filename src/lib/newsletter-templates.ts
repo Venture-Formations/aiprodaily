@@ -231,7 +231,7 @@ export async function generateNewsletterHeader(formattedDate: string, issueDate?
 
 </head>
 
-<body style="margin:0!important;padding:0!important;background-color:#f7f7f7;width:100%!important;min-width:100%!important;">
+<body style="margin:0!important;padding:0!important;background-color:#f7f7f7;">
 
   <div class="email-wrapper" style="width:100%;margin:0 auto;padding:10px;background-color:#f7f7f7;box-sizing:border-box;">
 
@@ -1337,9 +1337,6 @@ ${socialMediaSection}
         <a href="{$unsubscribe}" style='text-decoration: underline;'>Unsubscribe</a>
       </p>
       <p style="margin: 5px;text-align: center;">©${currentYear} ${businessName}, all rights reserved</p>
-    </td>
-  </tr>
-</table>
     </td>
   </tr>
 </table>
