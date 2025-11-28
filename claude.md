@@ -46,12 +46,12 @@ This project uses a **single branch** workflow:
 ## 5. Task Router
 | You are working on… | Open these references | Checklist |
 |---------------------|-----------------------|-----------|
-| RSS ingestion or campaign workflow | docs/workflows/rss-processing.md, docs/workflows/RSS_INGESTION_IMPLEMENTATION.md, docs/workflows/MULTI_CRITERIA_SCORING_GUIDE.md | Verify step runtime, scoring prompts, dedupe logic. |
-| AI prompts / content generation | docs/ai/prompt-system.md, docs/examples/AI_PROMPT_SYSTEM_GUIDE.md, docs/examples/OPENAI_RESPONSES_API_GUIDE.md | Ensure prompt keys exist per tenant, JSON schema matches parser, provider settings valid. |
-| AI apps selection / rotation | docs/guides/AI_APPS_IMPLEMENTATION_GUIDE.md, docs/guides/AFFILIATE_APPS_IMPLEMENTATION.md | Check cooldown settings, rotation logic, affiliate vs non-affiliate handling. |
-| Database/schema updates | docs/architecture/system-overview.md, docs/migrations/MULTI_TENANT_MIGRATION_GUIDE.md, docs/migrations/DATABASE_SETUP_GUIDE.md | Maintain `publication_id` filters, update migrations + status docs. |
-| Advertorials / ads | docs/guides/IMPLEMENTATION_COMPLETE_HYBRID_RSS.md, docs/guides/SECONDARY_ARTICLES_IMPLEMENTATION_GUIDE.md | Confirm Stage 1/2 unassignment behaviors and ad rotation settings. |
-| Campaign dashboard or admin UI | docs/feature-summary.md, docs/guides/FEATURE_WELCOME_SECTION.md | Keep React server components aligned with workflow data. |
+| RSS ingestion or workflow | docs/workflows/rss-processing.md, docs/workflows/MULTI_CRITERIA_SCORING_GUIDE.md | Verify step runtime, scoring prompts, dedupe logic. |
+| AI prompts / content generation | docs/ai/prompt-system.md, docs/examples/OPENAI_RESPONSES_API_GUIDE.md | Ensure prompt keys exist per tenant, JSON schema matches parser, provider settings valid. |
+| AI apps selection / rotation | Section 9 (below), `src/lib/app-selector.ts` | Check cooldown settings, rotation logic, affiliate vs non-affiliate handling. |
+| Database/schema updates | docs/architecture/system-overview.md, db/migrations/ | Maintain `publication_id` filters, update migrations. |
+| Advertorials / ads | docs/feature-summary.md (Ads section), `src/lib/newsletter-templates.ts` | Confirm Stage 1/2 unassignment behaviors and ad rotation settings. |
+| Campaign dashboard or admin UI | docs/feature-summary.md | Keep React server components aligned with workflow data. |
 | Cron / automation | docs/operations/cron-jobs.md, docs/vercel-api.md | Check schedule, secrets, and failure recovery steps. |
 | Quick task recipes | docs/recipes/quick-actions.md | Follow step-by-step provisioning or debug checklists. |
 | Troubleshooting production issues | docs/troubleshooting/common-issues.md, docs/status/CLEANUP_RECOMMENDATIONS.md | Use symptom-driven guides before modifying code; review outstanding cleanup items. |
@@ -61,13 +61,13 @@ This project uses a **single branch** workflow:
 | Domain | Primary Docs | Key Code Entry Points |
 |--------|--------------|-----------------------|
 | Campaign workflow | docs/workflows/rss-processing.md | `src/lib/workflows/process-rss-workflow.ts`, `/api/workflows/process-rss` |
-| RSS ingestion & scoring | docs/workflows/RSS_INGESTION_IMPLEMENTATION.md, docs/workflows/MULTI_CRITERIA_SCORING_GUIDE.md | `/api/cron/ingest-rss`, `src/lib/rss-processor.ts` |
-| AI prompts & scoring | docs/ai/prompt-system.md | `src/lib/openai.ts`, `publication_settings` table (fallback: `app_settings`) |
-| AI apps selection | docs/guides/AI_APPS_IMPLEMENTATION_GUIDE.md | `src/lib/app-selector.ts`, `ai_applications` table |
-| Advertorials & ads | docs/guides/IMPLEMENTATION_COMPLETE_HYBRID_RSS.md | `src/lib/newsletter-templates.ts`, `/api/cron/send-final` |
+| RSS ingestion & scoring | docs/workflows/MULTI_CRITERIA_SCORING_GUIDE.md | `/api/cron/ingest-rss`, `src/lib/rss-processor.ts` |
+| AI prompts & scoring | docs/ai/prompt-system.md | `src/lib/openai.ts`, `publication_settings` table |
+| AI apps selection | Section 9 (below) | `src/lib/app-selector.ts`, `ai_applications` table |
+| Advertorials & ads | docs/feature-summary.md | `src/lib/newsletter-templates.ts`, `/api/cron/send-final` |
 | Dashboard UI | docs/feature-summary.md | `src/app/dashboard/[slug]/` |
-| Marketing site | docs/guides/FEATURE_PUBLIC_NEWSLETTER_ARCHIVE.md | `src/app/website/`, `apps/marketing/` |
-| Migrations | docs/migrations/MULTI_TENANT_MIGRATION_GUIDE.md | `db/migrations/` |
+| Marketing site | docs/feature-summary.md | `src/app/website/`, `apps/marketing/` |
+| Migrations | db/migrations/ | `db/migrations/*.sql` |
 
 ## 7. File Structure
 See [docs/structure.md](docs/structure.md) for the complete file tree.
@@ -127,7 +127,7 @@ The AI apps system selects apps for each newsletter issue with rotation logic:
 ## 12. Automation & Ops
 - Cron schedules, secrets, recovery: docs/operations/cron-jobs.md
 - Vercel deployment & API notes: docs/vercel-api.md
-- Deployment/test checklists: docs/checklists/DEPLOYMENT_TASKS.md, docs/checklists/TESTING_CHECKLIST.md
+- Testing checklist: docs/checklists/TESTING_CHECKLIST.md
 - Monitoring expectations: `[Workflow]`, `[CRON]`, Slack alerts from monitor cron.
 
 ### Active Cron Jobs (from `vercel.json`)
