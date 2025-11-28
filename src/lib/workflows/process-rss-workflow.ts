@@ -120,10 +120,18 @@ async function setupissue(newsletterId: string) {
         const { AppSelector } = await import('@/lib/app-selector')
         const { PromptSelector } = await import('@/lib/prompt-selector')
 
-        await AppSelector.selectAppsForissue(id, newsletter.id)
+        console.log('[Workflow Step 1/11] Selecting AI apps...')
+        const selectedApps = await AppSelector.selectAppsForissue(id, newsletter.id)
+        console.log(`[Workflow Step 1/11] Selected ${selectedApps.length} AI apps`)
+
+        console.log('[Workflow Step 1/11] Selecting prompt...')
         await PromptSelector.selectPromptForissue(id)
+        console.log('[Workflow Step 1/11] Prompt selected')
       } catch (error) {
-        console.log('[Workflow Step 1/11] AI selection failed (non-critical)')
+        console.error('[Workflow Step 1/11] AI selection failed:', error)
+        console.error('[Workflow Step 1/11] Error details:', error instanceof Error ? error.message : String(error))
+        console.error('[Workflow Step 1/11] Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+        // Continue workflow even if AI selection fails (non-critical)
       }
 
       // Assign top 12 posts per section

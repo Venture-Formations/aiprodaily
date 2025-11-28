@@ -6035,7 +6035,7 @@ function AIAppsSettings() {
           Days before the same affiliate app can appear again. Default: 7 days
         </p>
         <p className="text-sm text-gray-400 mt-1">
-          Non-affiliate apps cycle through all before repeating (no cooldown)
+          Non-affiliate apps cycle through all apps in their category before repeating (no cooldown or 7-issue exclusion)
         </p>
       </div>
 
@@ -6070,8 +6070,8 @@ function AIAppsSettings() {
           <li>• Categories with count &gt; 0 are "must-have" (always included)</li>
           <li>• Categories with count = 0 are "fillers" (used to reach total apps)</li>
           <li>• <strong>Affiliate apps have 3x higher selection priority</strong> (more likely to appear)</li>
-          <li>• Affiliate apps cannot repeat within cooldown period (configurable above)</li>
-          <li>• Non-affiliate apps rotate: each app is used before cycling through again</li>
+          <li>• <strong>Affiliate apps</strong>: Subject to cooldown period only (configurable above, default: 7 days)</li>
+          <li>• <strong>Non-affiliate apps</strong>: Cycle through all apps in category before repeating (no cooldown)</li>
           <li>• Within each category, unused apps are prioritized</li>
           <li>• If a category runs out of apps, other categories can provide more to reach the total</li>
         </ul>
