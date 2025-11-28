@@ -1,5 +1,9 @@
 # Zod Validation: Before & After Comparison
 
+_Last updated: 2025-11-28_
+
+> **Note:** This is reference documentation showing validation patterns.
+
 ## Example 1: Invalid UUID
 
 ### ❌ Without Zod (Current)
@@ -7,7 +11,7 @@
 // Request
 POST /api/articles/manual
 {
-  "campaign_id": "invalid-uuid",
+  "issue_id": "invalid-uuid",
   "title": "Test Article",
   "content": "Some content"
 }

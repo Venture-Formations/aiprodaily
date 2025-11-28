@@ -1,5 +1,10 @@
 # St. Cloud Scoop Cleanup Recommendations
 
+_Last updated: 2025-11-28_
+_Status: In Progress - ~40 references remain in source code_
+
+> **Note:** See [docs/reference/ST_CLOUD_SCOOP_REFERENCES.md](../reference/ST_CLOUD_SCOOP_REFERENCES.md) for the full list of remaining references.
+
 This document provides actionable recommendations for each reference category, organized by priority and impact.
 
 ---
