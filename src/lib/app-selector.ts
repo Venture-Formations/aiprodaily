@@ -195,7 +195,7 @@ export class AppSelector {
         .from('issue_ai_app_selections')
         .select('app_id')
         .order('created_at', { ascending: false })
-        .limit(allApps.length * 2) // Look back at last 2 full cycles
+        .limit(Math.max(allApps.length * 3, 50)) // Look back at least 3 full cycles or 50 selections
 
       const usedNonAffiliateAppIds = new Set<string>()
       // Filter to only non-affiliate apps by checking against allApps
@@ -264,14 +264,12 @@ export class AppSelector {
       }
 
       // 3. If still need more, grab any unused apps
-      // For affiliates: cooldown check happens in selectRandomApp
+      // For affiliates: cooldown check happens below
       // For non-affiliates: allow all (they cycle through)
       while (selectedApps.length < totalApps && selectedApps.length < allApps.length) {
         const availableApps = allApps
           .filter(app => {
             if (selectedAppIds.has(app.id)) return false
-            // Non-affiliates: allow all (they cycle through)
-            // Affiliates: cooldown check happens in selectRandomApp
             return true
           })
           .sort((a, b) => {
@@ -284,9 +282,32 @@ export class AppSelector {
             return new Date(a.last_used_date).getTime() - new Date(b.last_used_date).getTime()
           })
         
-        // Take from the least recently used apps
-        const leastRecentlyUsed = availableApps.slice(0, Math.min(3, availableApps.length))
-        const selectedApp = this.selectRandomApp(leastRecentlyUsed, affiliateCooldownDays)
+        if (availableApps.length === 0) break
+        
+        // Find first eligible app (not an affiliate in cooldown)
+        // This fixes a bug where slicing to top 3 could miss eligible non-affiliates
+        let selectedApp: AIApplication | null = null
+        
+        for (const candidate of availableApps) {
+          // Non-affiliates are always eligible (no cooldown)
+          if (!candidate.is_affiliate) {
+            selectedApp = candidate
+            break
+          }
+          // Affiliates: check cooldown
+          if (!this.isInCooldown(candidate, affiliateCooldownDays)) {
+            selectedApp = candidate
+            break
+          }
+        }
+        
+        // If no app found (all affiliates in cooldown), try any non-affiliate
+        if (!selectedApp) {
+          const nonAffiliates = availableApps.filter(app => !app.is_affiliate)
+          if (nonAffiliates.length > 0) {
+            selectedApp = nonAffiliates[Math.floor(Math.random() * nonAffiliates.length)]
+          }
+        }
 
         if (selectedApp) {
           selectedApps.push(selectedApp)
@@ -296,7 +317,7 @@ export class AppSelector {
             usedNonAffiliateAppIds.add(selectedApp.id)
           }
         } else {
-          break // No more apps available
+          break // Truly no more apps available
         }
       }
 
