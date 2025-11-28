@@ -64,14 +64,14 @@ export async function POST(request: NextRequest) {
             .single()
 
           if (!existingAssignment) {
-            // Store the selected ad (without recording usage yet)
+            // Store the selected ad (usage will be recorded at send-final via AdScheduler.recordAdUsage)
             await supabaseAdmin
               .from('issue_advertisements')
               .insert({
                 issue_id: issue_id,
                 advertisement_id: selectedAd.id,
-                issue_date: issueData.date,
-                used_at: new Date().toISOString()
+                issue_date: issueData.date
+                // Note: used_at is NOT set here - it will be set at send-final time
               })
 
             console.log(`[Finalize] Selected ad: ${selectedAd.title} (ID: ${selectedAd.id})`)

@@ -926,7 +926,7 @@ export interface IssueAdvertisement {
   issue_id: string  // UUID stored as string in TypeScript
   advertisement_id: string  // UUID stored as string in TypeScript
   issue_date: string
-  used_at: string
+  used_at: string | null  // NULL until newsletter is sent, set by AdScheduler.recordAdUsage()
   created_at: string
   advertisement?: Advertisement
 }

@@ -668,23 +668,25 @@ export async function generateDiningDealsSection(issue: any): Promise<string> {
 
 // ==================== ADVERTORIAL ====================
 
-export async function generateAdvertorialSection(issue: any, recordUsage: boolean = false, sectionName: string = 'Advertorial'): Promise<string> {
+export async function generateAdvertorialSection(issue: any, _recordUsage: boolean = false, sectionName: string = 'Advertorial'): Promise<string> {
+  // Note: _recordUsage parameter is deprecated - ad usage is now tracked exclusively 
+  // by AdScheduler.recordAdUsage() in send-final/route.ts to prevent double-counting
   try {
-    console.log('Generating Advertorial section for issue:', issue?.id, 'recordUsage:', recordUsage)
+    console.log('Generating Advertorial section for issue:', issue?.id)
 
     // Fetch colors from business settings (using publication_id if available)
     const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue?.publication_id)
 
-    // Check if ad already selected for this issue (get most recent if multiple)
+    // Check if ad already selected for this issue
     const { data: existingAd } = await supabaseAdmin
       .from('issue_advertisements')
       .select('*, advertisement:advertisements(*)')
       .eq('issue_id', issue.id)
-      .order('used_at', { ascending: false })
+      .order('created_at', { ascending: false }) // Use created_at since used_at is NULL until send-final
       .limit(1)
       .maybeSingle()
 
-    let selectedAd = existingAd?.advertisement
+    const selectedAd = existingAd?.advertisement
 
     // If no ad selected, return empty (RSS processing should have selected one)
     if (!selectedAd) {
@@ -693,67 +695,6 @@ export async function generateAdvertorialSection(issue: any, recordUsage: boolea
     }
 
     console.log(`Using selected ad: ${selectedAd.title}`)
-
-    // Record usage if this is the final send (not a preview)
-    if (recordUsage) {
-      try {
-        // Increment times_used, update last_used_date, and update next_ad_position
-        const { data: currentAd } = await supabaseAdmin
-          .from('advertisements')
-          .select('times_used, display_order')
-          .eq('id', selectedAd.id)
-          .single()
-
-        if (currentAd) {
-          // Update the ad stats
-          await supabaseAdmin
-            .from('advertisements')
-            .update({
-              times_used: (currentAd.times_used || 0) + 1,
-              last_used_date: issue.date,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', selectedAd.id)
-
-          // Update next_ad_position
-          const { data: activeAds } = await supabaseAdmin
-            .from('advertisements')
-            .select('display_order')
-            .eq('status', 'active')
-            .not('display_order', 'is', null)
-            .order('display_order', { ascending: true })
-
-          if (activeAds && activeAds.length > 0) {
-            const currentPosition = currentAd.display_order || 1
-            let nextPosition = currentPosition + 1
-            const maxPosition = Math.max(...activeAds.map(ad => ad.display_order || 0))
-
-            if (nextPosition > maxPosition) {
-              nextPosition = 1
-            }
-
-            await supabaseAdmin
-              .from('app_settings')
-              .update({
-                value: nextPosition.toString(),
-                updated_at: new Date().toISOString()
-              })
-              .eq('key', 'next_ad_position')
-
-            console.log(`Recorded ad usage: ${selectedAd.title}, next position: ${nextPosition}`)
-          }
-        }
-      } catch (usageError) {
-        console.error('Error recording ad usage:', usageError)
-        // Don't fail the entire email generation if usage recording fails
-      }
-    }
-
-    // If no ad available, return empty section
-    if (!selectedAd) {
-      console.log('No advertisement available for this issue')
-      return ''
-    }
 
     // Generate HTML for the ad
     const buttonUrl = selectedAd.button_url || '#'

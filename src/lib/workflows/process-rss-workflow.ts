@@ -595,14 +595,14 @@ async function finalizeIssue(issueId: string) {
               .maybeSingle()
 
             if (!existingAssignment) {
-              // Store the selected ad
+              // Store the selected ad (usage will be recorded at send-final via AdScheduler.recordAdUsage)
               await supabaseAdmin
                 .from('issue_advertisements')
                 .insert({
                   issue_id: issueId,
                   advertisement_id: selectedAd.id,
-                  issue_date: issueData.date,
-                  used_at: new Date().toISOString()
+                  issue_date: issueData.date
+                  // Note: used_at is NOT set here - it will be set at send-final time
                 })
 
               console.log(`[Workflow Step 11/11] Selected ad: ${selectedAd.title}`)

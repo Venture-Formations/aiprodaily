@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
       .from('issue_advertisements')
       .select('*, advertisement:advertisements(*)')
       .eq('issue_id', issueId)
-      .order('used_at', { ascending: false })
+      .order('created_at', { ascending: false }) // Use created_at since used_at is NULL until send-final
       .limit(1)
       .maybeSingle()
 
