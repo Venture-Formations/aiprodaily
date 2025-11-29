@@ -1,6 +1,6 @@
 # Backend Patterns & Templates
 
-_Last updated: 2025-11-11_
+_Last updated: 2025-11-28_
 
 ## When to use this
 - You are creating a new API route, server action, or cron handler
@@ -24,17 +24,17 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    if (!body.campaignId || !body.newsletterId) {
-      return NextResponse.json({ error: 'Missing campaignId/newsletterId' }, { status: 400 })
+    if (!body.issueId || !body.publicationId) {
+      return NextResponse.json({ error: 'Missing issueId/publicationId' }, { status: 400 })
     }
 
-    const { campaignId, newsletterId } = body
+    const { issueId, publicationId } = body
 
     const { data, error } = await supabaseAdmin
-      .from('newsletter_campaigns')
+      .from('issues')
       .select('id')
-      .eq('id', campaignId)
-      .eq('newsletter_id', newsletterId)
+      .eq('id', issueId)
+      .eq('publication_id', publicationId)
       .maybeSingle()
 
     if (error) {
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!data) {
-      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Issue not found' }, { status: 404 })
     }
 
     // Domain logic here
@@ -65,10 +65,10 @@ export async function POST(request: NextRequest) {
 ## Database Query Pattern
 ```typescript
 const { data, error } = await supabaseAdmin
-  .from('articles')
+  .from('issue_articles')
   .select('id, headline, fact_check_score')
-  .eq('newsletter_id', newsletterId)
-  .eq('campaign_id', campaignId)
+  .eq('publication_id', publicationId)
+  .eq('issue_id', issueId)
   .order('rank', { ascending: true })
 
 if (error) {
@@ -77,7 +77,7 @@ if (error) {
 }
 
 if (!data || data.length === 0) {
-  console.log('[DB] No articles found for campaign', campaignId)
+  console.log('[DB] No articles found for issue', issueId)
   return []
 }
 
@@ -86,7 +86,7 @@ return data
 
 ### Guardrails
 - Select only required columns (avoid `*`).
-- Always include `newsletter_id` in filters for multi-tenant safety.
+- Always include `publication_id` in filters for multi-tenant safety.
 - Handle empty results gracefully (log + fallback).
 
 ## Batching Long Operations
@@ -103,7 +103,7 @@ for (const batch of chunkArray(items, BATCH_SIZE)) {
 
 async function processItemSafely(item: Item) {
   try {
-    await callAIWithPrompt('ai_prompt_primary_article_body', newsletterId, item)
+    await callAIWithPrompt('ai_prompt_primary_article_body', publicationId, item)
   } catch (error) {
     console.error('[AI] Item failed', item.id, error)
   }

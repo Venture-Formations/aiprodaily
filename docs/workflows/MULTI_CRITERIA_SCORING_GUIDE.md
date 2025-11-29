@@ -1,8 +1,11 @@
 # Multi-Criteria Scoring System Guide
 
+_Last updated: 2025-11-28_
+
 **Version:** 2.0
-**Last Updated:** 2025-01-07
-**Audience:** Newsletter operators transitioning from combined to separated criteria
+**Audience:** Newsletter operators using multi-criteria post scoring
+
+> **Note:** For prompt configuration, see Settings → AI Prompts in the dashboard.
 
 ---
 
@@ -59,7 +62,7 @@ The **Multi-Criteria Scoring System** evaluates RSS posts using **1 to 5 customi
 │                  SCORING PROCESS (Step 3)                   │
 │                                                              │
 │  For each enabled criterion (1-5):                          │
-│    1. Load AI prompt from app_settings                      │
+│    1. Load AI prompt from publication_settings              │
 │    2. Call OpenAI with post content + criterion prompt      │
 │    3. Receive: { score: 0-10, reason: "explanation" }       │
 │    4. Store in post_ratings table                           │

@@ -1,7 +1,12 @@
 # Database Setup Guide
 ## AI Professional Newsletter Platform
 
-**Last Updated:** 2025-10-14
+_Last updated: 2025-11-28_
+
+**Original Date:** 2025-10-14
+**Status:** Initial Setup Complete ✅ (Historical Reference)
+
+> **Note:** This guide documents the initial database setup. Schema has evolved since then - see `db/migrations/` for current migrations.
 
 ---
 

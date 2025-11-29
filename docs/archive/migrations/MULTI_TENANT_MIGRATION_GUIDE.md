@@ -1,8 +1,11 @@
 # Multi-Tenant Newsletter Platform Migration Guide
 
-**Created:** 2025-10-13
-**Target Architecture:** Subdomain-based multi-tenant system with single admin account
-**Current Project:** St. Cloud Scoop (remains independent)
+_Last updated: 2025-11-28_
+
+**Original Date:** 2025-10-13
+**Status:** Migration Complete ✅ (Historical Reference)
+
+> **Note:** This guide documents the completed multi-tenant migration. The platform is now live with `publications` and `publication_settings` tables. For current architecture, see [docs/architecture/system-overview.md](../architecture/system-overview.md).
 
 ---
 

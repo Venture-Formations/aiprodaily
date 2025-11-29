@@ -1,8 +1,10 @@
 # AI Prompt System - Complete Implementation Guide
 
+_Last updated: 2025-11-28_
+
 **Purpose**: Document the editable AI prompt system from AI Pros Newsletter for replication in other projects.
 
-**Last Updated**: 2025-01-24
+> **Note:** This is reference documentation. For current implementation details, see [docs/ai/prompt-system.md](../ai/prompt-system.md).
 
 ---
 
@@ -41,22 +43,25 @@
 
 ## Database Schema
 
-### Table: `app_settings`
+### Table: `publication_settings`
+
+> **Note:** Primary storage is `publication_settings` with fallback to `app_settings` for backwards compatibility.
 
 ```sql
-CREATE TABLE app_settings (
+CREATE TABLE publication_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  key TEXT UNIQUE NOT NULL,
+  key TEXT NOT NULL,
   value JSONB NOT NULL,
   description TEXT,
-  newsletter_id TEXT,
+  publication_id UUID REFERENCES publications(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(key, publication_id)
 );
 
 -- Index for faster lookups
-CREATE INDEX idx_app_settings_key ON app_settings(key);
-CREATE INDEX idx_app_settings_newsletter_id ON app_settings(newsletter_id);
+CREATE INDEX idx_publication_settings_key ON publication_settings(key);
+CREATE INDEX idx_publication_settings_publication_id ON publication_settings(publication_id);
 ```
 
 ### Key Naming Convention

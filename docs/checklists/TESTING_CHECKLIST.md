@@ -1,8 +1,11 @@
-# Testing Checklist - Accounting AI Newsletter Dashboard
+# Testing Checklist - AI Pros Newsletter Dashboard
 
-**Server Running:** ✅ http://localhost:3001
-**Date:** 2025-10-13
-**Build Status:** Clean compilation, no errors
+_Last updated: 2025-11-28_
+
+**Original Date:** 2025-10-13
+**Status:** Reference Checklist
+
+> **Note:** This is a testing reference. Update URLs to match your environment.
 
 ---
 

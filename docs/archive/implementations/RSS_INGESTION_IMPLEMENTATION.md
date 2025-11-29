@@ -1,8 +1,11 @@
 # RSS Ingestion System Implementation Guide
 
-**Created:** 2025-01-03
-**Estimated Time:** 2-3 hours (implementation + testing)
-**Risk Level:** Medium (changes core RSS processing)
+_Last updated: 2025-11-28_
+
+**Original Implementation:** 2025-01-03
+**Status:** Implementation Complete ✅
+
+> **Note:** This guide documents the hybrid RSS processing implementation. The system is now live and running.
 
 ---
 
@@ -34,14 +37,14 @@
 
 ## Step 1: Database Changes
 
-### 1.1 Make `campaign_id` Nullable
+### 1.1 Make `issue_id` Nullable
 
 **Run in Supabase SQL Editor:**
 
 ```sql
--- Make campaign_id nullable in rss_posts
+-- Make issue_id nullable in rss_posts
 ALTER TABLE rss_posts
-ALTER COLUMN campaign_id DROP NOT NULL;
+ALTER COLUMN issue_id DROP NOT NULL;
 
 -- Verify
 SELECT column_name, is_nullable

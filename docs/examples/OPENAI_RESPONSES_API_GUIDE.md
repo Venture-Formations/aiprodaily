@@ -1,7 +1,10 @@
 # OpenAI Responses API Migration Guide
 
-**Last Updated:** 2025-01-22
-**Status:** Active - All code migrated to Responses API
+_Last updated: 2025-11-28_
+
+**Status:** Reference Documentation
+
+> **Note:** This guide documents API patterns. For current AI implementation, see [docs/ai/prompt-system.md](../ai/prompt-system.md).
 
 ---
 
