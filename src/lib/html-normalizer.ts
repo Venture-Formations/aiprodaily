@@ -81,20 +81,22 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
     return `<table cellpadding="0" cellspacing="0" style="margin:8px 0;">${tableRows}</table>`
   })
 
-  // Convert manual bullets (• text<br>) to table format
+  // Convert manual bullets (• or → followed by text<br>) to table format
   processed = processed.replace(/<p>([\s\S]*?)<\/p>/gi, (match, content) => {
-    // Check if this paragraph contains manual bullets
-    if (/•/.test(content)) {
+    // Check if this paragraph contains manual bullets (• or →)
+    if (/[•→]/.test(content)) {
       const lines = content.split(/<br\s*\/?>/gi)
-      const hasManualBullets = lines.some((line: string) => /^\s*•\s+/.test(line.replace(/<[^>]+>/g, '')))
+      const hasManualBullets = lines.some((line: string) => /^\s*[•→]\s+/.test(line.replace(/<[^>]+>/g, '')))
 
       if (hasManualBullets) {
         const tableRows = lines
           .filter((line: string) => line.trim())
           .map((line: string) => {
             const cleanLine = line.replace(/<[^>]+>/g, '').trim()
-            const bulletMatch = cleanLine.match(/^\s*•\s+(.+)/)
+            // Match both • and → as bullet characters
+            const bulletMatch = cleanLine.match(/^\s*[•→]\s+(.+)/)
             if (bulletMatch) {
+              // Always render as • in the output for consistent styling
               return `<tr><td valign="top" style="padding-right:8px;">•</td><td>${bulletMatch[1]}</td></tr>`
             }
             return null
