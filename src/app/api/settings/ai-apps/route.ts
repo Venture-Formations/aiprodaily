@@ -3,6 +3,13 @@ import { getServerSession } from 'next-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authOptions } from '@/lib/auth'
 
+// Valid setting keys for AI apps
+const VALID_SETTING_KEYS = [
+  'ai_apps_per_newsletter',
+  'ai_apps_max_per_category',
+  'affiliate_cooldown_days'
+]
+
 /**
  * GET /api/settings/ai-apps - Get AI app settings
  */
@@ -29,10 +36,10 @@ export async function GET(request: NextRequest) {
       .from('publication_settings')
       .select('key, value, description')
       .eq('publication_id', newsletter.id)
-      .or('key.like.ai_apps_%,key.eq.affiliate_cooldown_days')
+      .in('key', VALID_SETTING_KEYS)
       .order('key')
 
-    // Convert to object for easier access
+    // Convert to flat object for easier editing
     const settingsMap: Record<string, any> = {}
     settings?.forEach(s => {
       settingsMap[s.key] = {
@@ -84,14 +91,14 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    // Update each setting
+    // Update each valid setting
     for (const [key, value] of Object.entries(settings)) {
-      // Only update ai_apps_ settings and affiliate_cooldown_days
-      if (!key.startsWith('ai_apps_') && key !== 'affiliate_cooldown_days') {
-        continue // Skip non-AI-app settings
+      // Only update valid AI app settings
+      if (!VALID_SETTING_KEYS.includes(key)) {
+        continue // Skip invalid settings
       }
 
-      await supabaseAdmin
+      const { error } = await supabaseAdmin
         .from('publication_settings')
         .upsert({
           key,
@@ -101,6 +108,11 @@ export async function PATCH(request: NextRequest) {
         }, {
           onConflict: 'publication_id,key'
         })
+
+      if (error) {
+        console.error(`Failed to update setting ${key}:`, error)
+        throw error
+      }
     }
 
     return NextResponse.json({ success: true })

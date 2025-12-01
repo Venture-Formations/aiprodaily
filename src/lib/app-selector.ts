@@ -1,10 +1,5 @@
 import { supabaseAdmin } from './supabase'
-import type { AIApplication, AIAppCategory } from '@/types/database'
-
-interface CategoryCount {
-  category: AIAppCategory
-  count: number
-}
+import type { AIApplication } from '@/types/database'
 
 export class AppSelector {
   /**
@@ -12,7 +7,7 @@ export class AppSelector {
    */
   private static async getAppSettings(newsletterId: string): Promise<{
     totalApps: number
-    categoryCounts: CategoryCount[]
+    maxPerCategory: number
     affiliateCooldownDays: number
   }> {
     try {
@@ -20,83 +15,29 @@ export class AppSelector {
         .from('publication_settings')
         .select('key, value')
         .eq('publication_id', newsletterId)
-        .or('key.like.ai_apps_%,key.eq.affiliate_cooldown_days')
+        .in('key', ['ai_apps_per_newsletter', 'ai_apps_max_per_category', 'affiliate_cooldown_days'])
 
       const settingsMap = new Map(settings?.map(s => [s.key, parseInt(s.value || '0')]) || [])
 
-      const totalApps = settingsMap.get('ai_apps_per_newsletter') || 6
-      const affiliateCooldownDays = settingsMap.get('affiliate_cooldown_days') || 7
-
-      const categoryCounts: CategoryCount[] = [
-        { category: 'Payroll', count: settingsMap.get('ai_apps_payroll_count') || 0 },
-        { category: 'HR', count: settingsMap.get('ai_apps_hr_count') || 0 },
-        { category: 'Accounting System', count: settingsMap.get('ai_apps_accounting_count') || 0 },
-        { category: 'Finance', count: settingsMap.get('ai_apps_finance_count') || 0 },
-        { category: 'Productivity', count: settingsMap.get('ai_apps_productivity_count') || 0 },
-        { category: 'Client Management', count: settingsMap.get('ai_apps_client_mgmt_count') || 0 },
-        { category: 'Banking', count: settingsMap.get('ai_apps_banking_count') || 0 },
-      ]
-
-      return { totalApps, categoryCounts, affiliateCooldownDays }
+      return {
+        totalApps: settingsMap.get('ai_apps_per_newsletter') || 6,
+        maxPerCategory: settingsMap.get('ai_apps_max_per_category') || 3,
+        affiliateCooldownDays: settingsMap.get('affiliate_cooldown_days') || 7
+      }
     } catch (error) {
       console.error('Error fetching app settings:', error)
       // Return defaults
       return {
         totalApps: 6,
-        affiliateCooldownDays: 7,
-        categoryCounts: [
-          { category: 'Payroll', count: 2 },
-          { category: 'HR', count: 1 },
-          { category: 'Accounting System', count: 2 },
-          { category: 'Finance', count: 0 },
-          { category: 'Productivity', count: 0 },
-          { category: 'Client Management', count: 0 },
-          { category: 'Banking', count: 1 },
-        ]
+        maxPerCategory: 3,
+        affiliateCooldownDays: 7
       }
     }
   }
 
   /**
-   * Get unused apps for a specific category
-   * - Affiliate apps: Excluded if in cooldown period (checked in selectRandomApp)
-   * - Non-affiliate apps: Excluded only if ALL non-affiliates in category have been used (then cycle through)
-   */
-  private static async getUnusedAppsForCategory(
-    category: AIAppCategory,
-    allApps: AIApplication[],
-    usedNonAffiliateAppIds: Set<string>
-  ): Promise<AIApplication[]> {
-    const categoryApps = allApps.filter(app => app.category === category)
-    const nonAffiliateApps = categoryApps.filter(app => !app.is_affiliate)
-
-    // For non-affiliate apps: Only exclude if ALL non-affiliates in category have been used
-    // This allows non-affiliates to cycle through all before repeating
-    const unusedNonAffiliateApps = nonAffiliateApps.filter(app => !usedNonAffiliateAppIds.has(app.id))
-    
-    // If all non-affiliates have been used, reset and allow cycling through all non-affiliates
-    if (unusedNonAffiliateApps.length === 0 && nonAffiliateApps.length > 0) {
-      console.log(`All ${category} non-affiliate apps have been used, cycling through again`)
-      // Return all apps (affiliates + all non-affiliates) to allow cycling
-      return categoryApps
-    }
-
-    // For affiliates: Include all (cooldown check happens in selectRandomApp)
-    // For non-affiliates: Only include unused ones
-    const affiliateApps = categoryApps.filter(app => app.is_affiliate)
-    const unusedApps = [...affiliateApps, ...unusedNonAffiliateApps]
-
-    // If somehow all apps are excluded, return all category apps
-    if (unusedApps.length === 0 && categoryApps.length > 0) {
-      console.log(`All ${category} apps excluded, returning all category apps`)
-      return categoryApps
-    }
-
-    return unusedApps
-  }
-
-  /**
    * Check if an affiliate app is within cooldown period
+   * Cooldown is based on last_used_date which is set during send-final
    */
   private static isInCooldown(app: AIApplication, cooldownDays: number): boolean {
     if (!app.is_affiliate || !app.last_used_date) {
@@ -111,43 +52,36 @@ export class AppSelector {
   }
 
   /**
-   * Select random app from array with affiliate priority weighting
-   * Affiliates have 3x higher chance of being selected
+   * Count how many apps from each category are already selected
    */
-  private static selectRandomApp(
-    apps: AIApplication[],
-    cooldownDays: number = 0
-  ): AIApplication | null {
-    if (apps.length === 0) return null
-
-    // Filter out affiliates in cooldown if cooldownDays is specified
-    const eligibleApps = cooldownDays > 0
-      ? apps.filter(app => !this.isInCooldown(app, cooldownDays))
-      : apps
-
-    if (eligibleApps.length === 0) {
-      // If all are in cooldown, fall back to non-affiliates only
-      const nonAffiliates = apps.filter(app => !app.is_affiliate)
-      if (nonAffiliates.length === 0) return null
-      return nonAffiliates[Math.floor(Math.random() * nonAffiliates.length)]
+  private static getCategoryCounts(selectedApps: AIApplication[]): Map<string, number> {
+    const counts = new Map<string, number>()
+    for (const app of selectedApps) {
+      const category = app.category || 'Unknown'
+      const current = counts.get(category) || 0
+      counts.set(category, current + 1)
     }
-
-    // Create weighted selection: affiliates appear 3x in the pool
-    const weightedPool: AIApplication[] = []
-    for (const app of eligibleApps) {
-      if (app.is_affiliate) {
-        weightedPool.push(app, app, app) // Add 3 times for 3x weight
-      } else {
-        weightedPool.push(app) // Add once
-      }
-    }
-
-    return weightedPool[Math.floor(Math.random() * weightedPool.length)]
+    return counts
   }
 
   /**
-   * Select apps for a issue based on category counts and rotation
-   * Ensures variety by tracking which apps have been used across all campaigns
+   * Check if adding an app would exceed the category maximum
+   */
+  private static wouldExceedCategoryMax(
+    app: AIApplication,
+    selectedApps: AIApplication[],
+    maxPerCategory: number
+  ): boolean {
+    const categoryCounts = this.getCategoryCounts(selectedApps)
+    const category = app.category || 'Unknown'
+    const currentCount = categoryCounts.get(category) || 0
+    return currentCount >= maxPerCategory
+  }
+
+  /**
+   * Select apps for a issue based on new logic:
+   * 1. Affiliates first (random, respecting cooldown and category max)
+   * 2. Non-affiliates to fill remaining (global rotation, respecting category max)
    */
   static async selectAppsForissue(issueId: string, newsletterId: string): Promise<AIApplication[]> {
     try {
@@ -163,8 +97,8 @@ export class AppSelector {
       }
 
       // Get selection settings
-      const { totalApps, categoryCounts, affiliateCooldownDays } = await this.getAppSettings(newsletterId)
-      console.log(`[AppSelector] Settings: totalApps=${totalApps}, categories=${categoryCounts.length}, cooldown=${affiliateCooldownDays} days`)
+      const { totalApps, maxPerCategory, affiliateCooldownDays } = await this.getAppSettings(newsletterId)
+      console.log(`[AppSelector] Settings: totalApps=${totalApps}, maxPerCategory=${maxPerCategory}, cooldown=${affiliateCooldownDays} days`)
 
       // Get all active apps for this newsletter
       const { data: allApps, error: appsError } = await supabaseAdmin
@@ -185,143 +119,109 @@ export class AppSelector {
 
       console.log(`[AppSelector] Found ${allApps.length} active apps for newsletter ${newsletterId}`)
 
-      // Separate tracking for affiliate vs non-affiliate apps
-      // Affiliates: Subject to cooldown period only (from "Affiliate App Cooldown (Days)" setting)
-      // Non-affiliates: Cycle through all before repeating (not subject to cooldown or issue exclusion)
-      
-      // For non-affiliates: Track all non-affiliate apps that have been used (for cycling)
-      // This allows non-affiliates to cycle through all before repeating
-      const { data: allRecentSelections } = await supabaseAdmin
+      // Separate affiliate and non-affiliate apps
+      const affiliateApps = allApps.filter(app => app.is_affiliate)
+      const nonAffiliateApps = allApps.filter(app => !app.is_affiliate)
+
+      console.log(`[AppSelector] ${affiliateApps.length} affiliate apps, ${nonAffiliateApps.length} non-affiliate apps`)
+
+      // Track used non-affiliate app IDs for global rotation
+      // Get all non-affiliate app IDs that have been used
+      const { data: usedNonAffiliateSelections } = await supabaseAdmin
         .from('issue_ai_app_selections')
         .select('app_id')
         .order('created_at', { ascending: false })
-        .limit(Math.max(allApps.length * 3, 50)) // Look back at least 3 full cycles or 50 selections
 
+      // Build set of used non-affiliate app IDs
       const usedNonAffiliateAppIds = new Set<string>()
-      // Filter to only non-affiliate apps by checking against allApps
-      allRecentSelections?.forEach(selection => {
-        const app = allApps.find(a => a.id === selection.app_id)
-        if (app && !app.is_affiliate) {
+      usedNonAffiliateSelections?.forEach(selection => {
+        const app = nonAffiliateApps.find(a => a.id === selection.app_id)
+        if (app) {
           usedNonAffiliateAppIds.add(selection.app_id)
         }
       })
-      console.log(`[AppSelector] Found ${usedNonAffiliateAppIds.size} non-affiliate apps in recent selections`)
-      console.log(`[AppSelector] Affiliate cooldown period: ${affiliateCooldownDays} days`)
 
-      // Select apps by category
+      // Check if all non-affiliates have been used - if so, reset the cycle
+      const allNonAffiliatesUsed = nonAffiliateApps.every(app => usedNonAffiliateAppIds.has(app.id))
+      if (allNonAffiliatesUsed && nonAffiliateApps.length > 0) {
+        console.log('[AppSelector] All non-affiliate apps used, resetting rotation cycle')
+        usedNonAffiliateAppIds.clear()
+      }
+
+      console.log(`[AppSelector] ${usedNonAffiliateAppIds.size} non-affiliate apps in rotation history`)
+
       const selectedApps: AIApplication[] = []
       const selectedAppIds = new Set<string>()
 
-      // 1. Select required apps for each category
-      for (const { category, count } of categoryCounts) {
-        if (count === 0) continue // Skip filler categories for now
+      // PHASE 1: Select affiliate apps first (random, respecting cooldown and category max)
+      const availableAffiliates = affiliateApps.filter(app => !this.isInCooldown(app, affiliateCooldownDays))
+      console.log(`[AppSelector] ${availableAffiliates.length} affiliates available (not in cooldown)`)
 
-        const unusedApps = await this.getUnusedAppsForCategory(category, allApps, usedNonAffiliateAppIds)
+      // Shuffle available affiliates for random selection
+      const shuffledAffiliates = [...availableAffiliates].sort(() => Math.random() - 0.5)
 
-        for (let i = 0; i < count; i++) {
-          const availableApps = unusedApps.filter(app => !selectedAppIds.has(app.id))
-          const selectedApp = this.selectRandomApp(availableApps, affiliateCooldownDays)
+      for (const app of shuffledAffiliates) {
+        if (selectedApps.length >= totalApps) break
 
-          if (selectedApp) {
-            selectedApps.push(selectedApp)
-            selectedAppIds.add(selectedApp.id)
-            // Mark non-affiliates as used for cycling
-            if (!selectedApp.is_affiliate) {
-              usedNonAffiliateAppIds.add(selectedApp.id)
-            }
-          }
+        // Check category maximum
+        if (this.wouldExceedCategoryMax(app, selectedApps, maxPerCategory)) {
+          console.log(`[AppSelector] Skipping affiliate ${app.app_name} - would exceed ${maxPerCategory} max for ${app.category}`)
+          continue
         }
+
+        selectedApps.push(app)
+        selectedAppIds.add(app.id)
+        console.log(`[AppSelector] Selected affiliate: ${app.app_name} (${app.category})`)
       }
 
-      // 2. Fill remaining slots with filler categories (count = 0)
-      const fillerCategories = categoryCounts
-        .filter(cc => cc.count === 0)
-        .map(cc => cc.category)
+      console.log(`[AppSelector] Selected ${selectedApps.length} affiliates, need ${totalApps - selectedApps.length} more`)
 
-      while (selectedApps.length < totalApps && fillerCategories.length > 0) {
-        const previousLength = selectedApps.length
+      // PHASE 2: Fill remaining slots with non-affiliate apps (global rotation, respecting category max)
+      if (selectedApps.length < totalApps) {
+        // Get unused non-affiliates first
+        const unusedNonAffiliates = nonAffiliateApps.filter(app =>
+          !usedNonAffiliateAppIds.has(app.id) && !selectedAppIds.has(app.id)
+        )
 
-        for (const category of fillerCategories) {
+        // Shuffle for random selection
+        const shuffledUnused = [...unusedNonAffiliates].sort(() => Math.random() - 0.5)
+
+        for (const app of shuffledUnused) {
           if (selectedApps.length >= totalApps) break
 
-          const unusedApps = await this.getUnusedAppsForCategory(category, allApps, usedNonAffiliateAppIds)
-          const availableApps = unusedApps.filter(app => !selectedAppIds.has(app.id))
-          const selectedApp = this.selectRandomApp(availableApps, affiliateCooldownDays)
+          // Check category maximum
+          if (this.wouldExceedCategoryMax(app, selectedApps, maxPerCategory)) {
+            console.log(`[AppSelector] Skipping non-affiliate ${app.app_name} - would exceed ${maxPerCategory} max for ${app.category}`)
+            continue
+          }
 
-          if (selectedApp) {
-            selectedApps.push(selectedApp)
-            selectedAppIds.add(selectedApp.id)
-            // Mark non-affiliates as used for cycling
-            if (!selectedApp.is_affiliate) {
-              usedNonAffiliateAppIds.add(selectedApp.id)
-            }
-          }
-        }
-
-        // Safety breaks
-        if (selectedApps.length === allApps.length) break // Selected all available apps
-        if (selectedApps.length === previousLength) break // No progress made, can't fill more slots
-      }
-
-      // 3. If still need more, grab any unused apps
-      // For affiliates: cooldown check happens below
-      // For non-affiliates: allow all (they cycle through)
-      while (selectedApps.length < totalApps && selectedApps.length < allApps.length) {
-        const availableApps = allApps
-          .filter(app => {
-            if (selectedAppIds.has(app.id)) return false
-            return true
-          })
-          .sort((a, b) => {
-            // Prefer apps that haven't been used recently
-            // Apps without last_used_date come first (never used)
-            if (!a.last_used_date && !b.last_used_date) return 0
-            if (!a.last_used_date) return -1
-            if (!b.last_used_date) return 1
-            // Otherwise, oldest last_used_date comes first
-            return new Date(a.last_used_date).getTime() - new Date(b.last_used_date).getTime()
-          })
-        
-        if (availableApps.length === 0) break
-        
-        // Find first eligible app (not an affiliate in cooldown)
-        // This fixes a bug where slicing to top 3 could miss eligible non-affiliates
-        let selectedApp: AIApplication | null = null
-        
-        for (const candidate of availableApps) {
-          // Non-affiliates are always eligible (no cooldown)
-          if (!candidate.is_affiliate) {
-            selectedApp = candidate
-            break
-          }
-          // Affiliates: check cooldown
-          if (!this.isInCooldown(candidate, affiliateCooldownDays)) {
-            selectedApp = candidate
-            break
-          }
-        }
-        
-        // If no app found (all affiliates in cooldown), try any non-affiliate
-        if (!selectedApp) {
-          const nonAffiliates = availableApps.filter(app => !app.is_affiliate)
-          if (nonAffiliates.length > 0) {
-            selectedApp = nonAffiliates[Math.floor(Math.random() * nonAffiliates.length)]
-          }
-        }
-
-        if (selectedApp) {
-          selectedApps.push(selectedApp)
-          selectedAppIds.add(selectedApp.id)
-          // Mark non-affiliates as used for cycling
-          if (!selectedApp.is_affiliate) {
-            usedNonAffiliateAppIds.add(selectedApp.id)
-          }
-        } else {
-          break // Truly no more apps available
+          selectedApps.push(app)
+          selectedAppIds.add(app.id)
+          console.log(`[AppSelector] Selected non-affiliate: ${app.app_name} (${app.category})`)
         }
       }
 
-      // 4. Record selections in database
+      // PHASE 3: If still need more and all unused are exhausted, use any remaining non-affiliates
+      // This handles edge case where category limits prevent selecting all unused apps
+      if (selectedApps.length < totalApps) {
+        const remainingNonAffiliates = nonAffiliateApps.filter(app => !selectedAppIds.has(app.id))
+        const shuffledRemaining = [...remainingNonAffiliates].sort(() => Math.random() - 0.5)
+
+        for (const app of shuffledRemaining) {
+          if (selectedApps.length >= totalApps) break
+
+          // Check category maximum
+          if (this.wouldExceedCategoryMax(app, selectedApps, maxPerCategory)) {
+            continue
+          }
+
+          selectedApps.push(app)
+          selectedAppIds.add(app.id)
+          console.log(`[AppSelector] Selected (fallback): ${app.app_name} (${app.category})`)
+        }
+      }
+
+      // Record selections in database (but DON'T update last_used_date - that happens in send-final)
       if (selectedApps.length > 0) {
         const selections = selectedApps.map((app, index) => ({
           issue_id: issueId,
@@ -339,24 +239,17 @@ export class AppSelector {
           throw new Error(`Failed to insert app selections: ${insertError.message}`)
         }
 
-        // Update last_used_date and times_used
-        const now = new Date().toISOString()
-        for (const app of selectedApps) {
-          const { error: updateError } = await supabaseAdmin
-            .from('ai_applications')
-            .update({
-              last_used_date: now,
-              times_used: (app.times_used || 0) + 1
-            })
-            .eq('id', app.id)
+        console.log(`[AppSelector] Selected ${selectedApps.length} apps for issue: ${issueId}`)
 
-          if (updateError) {
-            console.error(`Error updating app ${app.id}:`, updateError)
-            // Don't throw - this is less critical than the insert
-          }
-        }
+        // Log category breakdown
+        const categoryCounts = this.getCategoryCounts(selectedApps)
+        const categoryBreakdown = Array.from(categoryCounts.entries())
+          .map(([cat, count]) => `${cat}: ${count}`)
+          .join(', ')
+        console.log(`[AppSelector] Category breakdown: ${categoryBreakdown}`)
 
-        console.log(`Selected ${selectedApps.length} apps for issue:`, issueId)
+        const affiliateCount = selectedApps.filter(a => a.is_affiliate).length
+        console.log(`[AppSelector] Affiliates: ${affiliateCount}, Non-affiliates: ${selectedApps.length - affiliateCount}`)
       } else {
         console.warn(`No apps selected for issue ${issueId} - check app settings and active apps`)
       }
@@ -384,6 +277,57 @@ export class AppSelector {
     } catch (error) {
       console.error('Error getting apps for issue:', error)
       return []
+    }
+  }
+
+  /**
+   * Update last_used_date for apps in an issue (called from send-final)
+   * This starts the cooldown timer for affiliate apps
+   */
+  static async recordAppUsageOnSend(issueId: string): Promise<void> {
+    try {
+      // Get apps selected for this issue
+      const { data: selections } = await supabaseAdmin
+        .from('issue_ai_app_selections')
+        .select('app_id')
+        .eq('issue_id', issueId)
+
+      if (!selections || selections.length === 0) {
+        console.log('[AppSelector] No apps to update for issue:', issueId)
+        return
+      }
+
+      const appIds = selections.map(s => s.app_id)
+      const now = new Date().toISOString()
+
+      // Update last_used_date and times_used for all selected apps
+      for (const appId of appIds) {
+        // First get current times_used
+        const { data: app } = await supabaseAdmin
+          .from('ai_applications')
+          .select('times_used')
+          .eq('id', appId)
+          .single()
+
+        // Then update with incremented value
+        const { error: updateError } = await supabaseAdmin
+          .from('ai_applications')
+          .update({
+            last_used_date: now,
+            times_used: (app?.times_used || 0) + 1
+          })
+          .eq('id', appId)
+
+        if (updateError) {
+          console.error(`[AppSelector] Error updating app ${appId}:`, updateError)
+        }
+      }
+
+      console.log(`[AppSelector] Updated last_used_date for ${appIds.length} apps (cooldown started)`)
+
+    } catch (error) {
+      console.error('[AppSelector] Error recording app usage:', error)
+      // Don't throw - this is non-critical
     }
   }
 }

@@ -334,6 +334,16 @@ export async function POST(request: NextRequest) {
       // Don't fail the send if ad tracking fails
     }
 
+    // Record AI app usage (starts cooldown timer for affiliates)
+    try {
+      const { AppSelector } = await import('@/lib/app-selector')
+      await AppSelector.recordAppUsageOnSend(issue.id)
+      console.log('[Send Final] ✓ AI app usage recorded (cooldown started)')
+    } catch (appError) {
+      console.error('[Send Final] Failed to record AI app usage (non-critical):', appError)
+      // Don't fail the send if app tracking fails
+    }
+
     // Capture the active poll for this issue
     const { poll_id, poll_snapshot } = await capturePollForIssue(issue.id, newsletter.id)
 
@@ -607,6 +617,16 @@ export async function GET(request: NextRequest) {
     } catch (adError) {
       console.error('[Send Final] Failed to record ad usage (non-critical):', adError)
       // Don't fail the send if ad tracking fails
+    }
+
+    // Record AI app usage (starts cooldown timer for affiliates)
+    try {
+      const { AppSelector } = await import('@/lib/app-selector')
+      await AppSelector.recordAppUsageOnSend(issue.id)
+      console.log('[Send Final] ✓ AI app usage recorded (cooldown started)')
+    } catch (appError) {
+      console.error('[Send Final] Failed to record AI app usage (non-critical):', appError)
+      // Don't fail the send if app tracking fails
     }
 
     // Capture the active poll for this issue

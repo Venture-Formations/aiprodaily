@@ -5958,14 +5958,14 @@ function AIAppsSettings() {
       })
 
       if (response.ok) {
-        setMessage('✓ Settings saved successfully')
+        setMessage('Settings saved successfully')
         setTimeout(() => setMessage(''), 3000)
       } else {
-        setMessage('✗ Failed to save settings')
+        setMessage('Failed to save settings')
       }
     } catch (error) {
       console.error('Failed to save settings:', error)
-      setMessage('✗ Error saving settings')
+      setMessage('Error saving settings')
     } finally {
       setSaving(false)
     }
@@ -5979,101 +5979,81 @@ function AIAppsSettings() {
     return <div className="text-gray-600">Loading...</div>
   }
 
-  const categories = [
-    { key: 'ai_apps_payroll_count', label: 'Payroll', color: 'bg-blue-100 text-blue-800' },
-    { key: 'ai_apps_hr_count', label: 'HR', color: 'bg-green-100 text-green-800' },
-    { key: 'ai_apps_accounting_count', label: 'Accounting System', color: 'bg-purple-100 text-purple-800' },
-    { key: 'ai_apps_finance_count', label: 'Finance', color: 'bg-orange-100 text-orange-800' },
-    { key: 'ai_apps_productivity_count', label: 'Productivity', color: 'bg-pink-100 text-pink-800' },
-    { key: 'ai_apps_client_mgmt_count', label: 'Client Management', color: 'bg-indigo-100 text-indigo-800' },
-    { key: 'ai_apps_banking_count', label: 'Banking', color: 'bg-yellow-100 text-yellow-800' }
-  ]
-
   return (
     <div className="bg-white shadow rounded-lg p-6">
       <h2 className="text-xl font-bold text-gray-900 mb-4">AI Applications Selection Settings</h2>
 
       <p className="text-gray-600 mb-6">
-        Configure how many apps from each category are selected for each newsletter issue.
-        Set count to 0 for "filler" categories (used to fill remaining slots).
+        Configure how AI applications are selected for each newsletter issue.
+        Affiliate apps take priority, followed by non-affiliate apps with rotation.
       </p>
 
       {message && (
-        <div className={`mb-4 p-3 rounded-lg ${message.startsWith('✓') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+        <div className={`mb-4 p-3 rounded-lg ${message.includes('success') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
           {message}
         </div>
       )}
 
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Total Apps Per Newsletter
-        </label>
-        <input
-          type="number"
-          min="1"
-          max="20"
-          value={settings.ai_apps_per_newsletter || 6}
-          onChange={(e) => handleChange('ai_apps_per_newsletter', parseInt(e.target.value) || 6)}
-          className="w-32 border border-gray-300 rounded px-3 py-2"
-        />
-        <p className="text-sm text-gray-500 mt-1">Default: 6 apps</p>
+      <div className="space-y-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Total Apps Per Newsletter
+          </label>
+          <input
+            type="number"
+            min="1"
+            max="20"
+            value={settings.ai_apps_per_newsletter || 6}
+            onChange={(e) => handleChange('ai_apps_per_newsletter', parseInt(e.target.value) || 6)}
+            className="w-32 border border-gray-300 rounded px-3 py-2"
+          />
+          <p className="text-sm text-gray-500 mt-1">
+            Total number of AI apps to include in each newsletter. Default: 6
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Maximum per Category
+          </label>
+          <input
+            type="number"
+            min="1"
+            max="10"
+            value={settings.ai_apps_max_per_category || 3}
+            onChange={(e) => handleChange('ai_apps_max_per_category', parseInt(e.target.value) || 3)}
+            className="w-32 border border-gray-300 rounded px-3 py-2"
+          />
+          <p className="text-sm text-gray-500 mt-1">
+            Maximum number of apps from any single category per issue. Default: 3
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Affiliate App Cooldown (Days)
+          </label>
+          <input
+            type="number"
+            min="1"
+            max="90"
+            value={settings.affiliate_cooldown_days || 7}
+            onChange={(e) => handleChange('affiliate_cooldown_days', parseInt(e.target.value) || 7)}
+            className="w-32 border border-gray-300 rounded px-3 py-2"
+          />
+          <p className="text-sm text-gray-500 mt-1">
+            Days after a newsletter is sent before an affiliate app can appear again. Default: 7 days
+          </p>
+        </div>
       </div>
 
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Affiliate App Cooldown (Days)
-        </label>
-        <input
-          type="number"
-          min="1"
-          max="90"
-          value={settings.affiliate_cooldown_days || 7}
-          onChange={(e) => handleChange('affiliate_cooldown_days', parseInt(e.target.value) || 7)}
-          className="w-32 border border-gray-300 rounded px-3 py-2"
-        />
-        <p className="text-sm text-gray-500 mt-1">
-          Days before the same affiliate app can appear again. Default: 7 days
-        </p>
-        <p className="text-sm text-gray-400 mt-1">
-          Non-affiliate apps cycle through all apps in their category before repeating (no cooldown or 7-issue exclusion)
-        </p>
-      </div>
-
-      <div className="space-y-4 mb-6">
-        <h3 className="text-lg font-semibold text-gray-900">Category Counts</h3>
-        {categories.map(({ key, label, color }) => (
-          <div key={key} className="flex items-center justify-between">
-            <div className="flex items-center">
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${color} mr-3`}>
-                {label}
-              </span>
-              <p className="text-sm text-gray-600">
-                {settings[key] === 0 ? 'Filler category' : `${settings[key]} per newsletter`}
-              </p>
-            </div>
-            <input
-              type="number"
-              min="0"
-              max="10"
-              value={settings[key] || 0}
-              onChange={(e) => handleChange(key, parseInt(e.target.value) || 0)}
-              className="w-20 border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-        ))}
-      </div>
-
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <h4 className="font-semibold text-blue-900 mb-2">How it works:</h4>
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 my-6">
+        <h4 className="font-semibold text-blue-900 mb-2">How Selection Works:</h4>
         <ul className="text-sm text-blue-800 space-y-1">
-          <li>• Apps are selected automatically when creating a new issue</li>
-          <li>• Categories with count &gt; 0 are "must-have" (always included)</li>
-          <li>• Categories with count = 0 are "fillers" (used to reach total apps)</li>
-          <li>• <strong>Affiliate apps have 3x higher selection priority</strong> (more likely to appear)</li>
-          <li>• <strong>Affiliate apps</strong>: Subject to cooldown period only (configurable above, default: 7 days)</li>
-          <li>• <strong>Non-affiliate apps</strong>: Cycle through all apps in category before repeating (no cooldown)</li>
-          <li>• Within each category, unused apps are prioritized</li>
-          <li>• If a category runs out of apps, other categories can provide more to reach the total</li>
+          <li><strong>1. Affiliate apps first:</strong> All available affiliate apps (not in cooldown) are selected randomly until the total is met or no more affiliates are available</li>
+          <li><strong>2. Non-affiliate apps second:</strong> If slots remain, non-affiliate apps are selected using global rotation (all must be used before any repeats)</li>
+          <li><strong>3. Category maximum enforced:</strong> No single category can exceed the maximum per issue (applies to both affiliates and non-affiliates combined)</li>
+          <li><strong>4. Cooldown starts on send:</strong> The affiliate cooldown timer begins when the newsletter is actually sent, not when selected</li>
         </ul>
       </div>
 

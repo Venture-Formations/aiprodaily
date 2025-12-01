@@ -6,7 +6,17 @@
       "Bash(git commit:*)",
       "Bash(git push)",
       "Bash(npm run type-check:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "mcp__vercel__getDeployments",
+      "mcp__vercel__getDeploymentEvents",
+      "Bash(curl:*)",
+      "Bash(npm view:*)",
+      "Bash(nul)",
+      "Bash(npm show:*)",
+      "Bash(npm install:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(npm run:*)"
     ],
     "deny": [],
     "ask": []

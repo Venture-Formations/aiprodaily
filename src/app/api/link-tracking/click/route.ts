@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
+ * Ensures URL has a protocol, prepending https:// if missing
+ */
+function normalizeUrl(url: string): string {
+  if (!url) return url
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url
+  }
+  return `https://${url}`
+}
+
+/**
  * Link Click Tracking Endpoint
  * Tracks newsletter link clicks with comprehensive metadata
  *
@@ -30,7 +41,7 @@ export async function GET(request: NextRequest) {
       console.error('Link tracking missing parameters:', { url, section, date, email })
       // Still redirect to destination even if tracking fails
       if (url) {
-        return NextResponse.redirect(url)
+        return NextResponse.redirect(normalizeUrl(url))
       }
       return NextResponse.json(
         { error: 'Missing required parameters: url, section, date, email' },
@@ -42,14 +53,14 @@ export async function GET(request: NextRequest) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       console.error('Invalid email format:', email)
-      return NextResponse.redirect(url)
+      return NextResponse.redirect(normalizeUrl(url))
     }
 
     // Validate date format (YYYY-MM-DD)
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/
     if (!dateRegex.test(date)) {
       console.error('Invalid date format:', date)
-      return NextResponse.redirect(url)
+      return NextResponse.redirect(normalizeUrl(url))
     }
 
     // Extract request metadata
@@ -88,20 +99,20 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('Error tracking link click:', error)
       // Still redirect even if tracking fails
-      return NextResponse.redirect(url)
+      return NextResponse.redirect(normalizeUrl(url))
     }
 
     console.log('Link click tracked successfully:', data.id)
 
     // Redirect to destination URL
-    return NextResponse.redirect(url)
+    return NextResponse.redirect(normalizeUrl(url))
 
   } catch (error) {
     console.error('Link tracking error:', error)
     // Try to redirect to URL if available
     const url = new URL(request.url).searchParams.get('url')
     if (url) {
-      return NextResponse.redirect(url)
+      return NextResponse.redirect(normalizeUrl(url))
     }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },
