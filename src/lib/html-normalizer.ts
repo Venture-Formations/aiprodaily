@@ -94,10 +94,10 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
           .map((line: string) => {
             const cleanLine = line.replace(/<[^>]+>/g, '').trim()
             // Match both • and → as bullet characters
-            const bulletMatch = cleanLine.match(/^\s*[•→]\s+(.+)/)
+            const bulletMatch = cleanLine.match(/^\s*([•→])\s+(.+)/)
             if (bulletMatch) {
-              // Always render as • in the output for consistent styling
-              return `<tr><td valign="top" style="padding-right:8px;">•</td><td>${bulletMatch[1]}</td></tr>`
+              // Preserve the original bullet character (• or →)
+              return `<tr><td valign="top" style="padding-right:8px;">${bulletMatch[1]}</td><td>${bulletMatch[2]}</td></tr>`
             }
             return null
           })
