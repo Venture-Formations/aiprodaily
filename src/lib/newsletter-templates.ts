@@ -668,8 +668,120 @@ export async function generateDiningDealsSection(issue: any): Promise<string> {
 
 // ==================== ADVERTORIAL ====================
 
+// Shared interface for ad data used in advertorial rendering
+export interface AdvertorialAdData {
+  title: string
+  body: string
+  button_url: string
+  image_url?: string
+}
+
+// Shared interface for advertorial styling options
+export interface AdvertorialStyleOptions {
+  primaryColor: string
+  headingFont: string
+  bodyFont: string
+  sectionName?: string
+  linkUrl?: string // URL to use for links (can be tracked or untracked)
+}
+
+/**
+ * Generate the HTML for an advertorial card.
+ * This is the shared function used by both generateAdvertorialSection and the ad preview API.
+ * Any changes to the advertorial styling should be made here.
+ */
+export function generateAdvertorialHtml(
+  ad: AdvertorialAdData,
+  options: AdvertorialStyleOptions
+): string {
+  const { primaryColor, headingFont, bodyFont, sectionName = 'Advertorial', linkUrl } = options
+  const buttonUrl = linkUrl || ad.button_url || '#'
+
+  // Generate clickable image HTML if valid URL exists
+  const imageHtml = ad.image_url
+    ? `<tr><td style='padding: 0 12px; text-align: center;'><a href='${buttonUrl}'><img src='${ad.image_url}' alt='${ad.title}' style='max-width: 100%; max-height: 500px; border-radius: 4px; display: block; margin: 0 auto;'></a></td></tr>`
+    : ''
+
+  // Process ad body: normalize HTML for email compatibility, then make the last sentence a hyperlink
+  let processedBody = normalizeEmailHtml(ad.body || '')
+  if (buttonUrl !== '#' && processedBody) {
+    // Strip HTML to get plain text
+    const plainText = processedBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+
+    // Find all sentence-ending punctuation marks (., !, ?)
+    // But exclude periods that are part of domains (.com, .ai, .io, etc.) or abbreviations
+    const sentenceEndPattern = /[.!?](?=\s+[A-Z]|$)/g
+    const matches = Array.from(plainText.matchAll(sentenceEndPattern))
+
+    if (matches.length > 0) {
+      // Get the position of the last sentence-ending punctuation
+      const lastMatch = matches[matches.length - 1] as RegExpMatchArray
+      const lastPeriodIndex = lastMatch.index!
+
+      // Find the second-to-last sentence-ending punctuation
+      let startIndex = 0
+      if (matches.length > 1) {
+        const secondLastMatch = matches[matches.length - 2] as RegExpMatchArray
+        startIndex = secondLastMatch.index! + 1
+      }
+
+      // Extract the last complete sentence (from after previous punctuation to end, including the final punctuation)
+      const lastSentence = plainText.substring(startIndex, lastPeriodIndex + 1).trim()
+
+      if (lastSentence.length > 5) {
+        // Escape special regex characters
+        const escapedSentence = lastSentence.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+        // Replace in the original HTML
+        // Look for the sentence text, accounting for HTML tags that might be in between
+        const parts = escapedSentence.split(/\s+/)
+        const flexiblePattern = parts.join('\\s*(?:<[^>]*>\\s*)*')
+        const sentenceRegex = new RegExp(flexiblePattern, 'i')
+
+        processedBody = processedBody.replace(
+          sentenceRegex,
+          `<a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>$&</a>`
+        )
+      }
+    } else {
+      // No sentence-ending punctuation found - wrap the entire text
+      const trimmedText = plainText.trim()
+      if (trimmedText.length > 5) {
+        const escapedText = trimmedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const parts = escapedText.split(/\s+/)
+        const flexiblePattern = parts.join('\\s*(?:<[^>]*>\\s*)*')
+        const textRegex = new RegExp(flexiblePattern, 'i')
+
+        processedBody = processedBody.replace(
+          textRegex,
+          `<a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>$&</a>`
+        )
+      }
+    }
+  }
+
+  return `
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
+  <tr>
+    <td style="padding:0 10px;">
+      <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 10px; background: #fff; font-family: ${bodyFont}; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15); margin-top: 10px; overflow: hidden;'>
+        <tr>
+          <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">${sectionName}</h2>
+          </td>
+        </tr>
+        <tr><td style='padding: 10px 10px 4px; font-size: 20px; font-weight: bold; text-align: left;'>${ad.title}</td></tr>
+        ${imageHtml}
+        <tr><td style='padding: 0 10px 10px; font-family: ${bodyFont}; font-size: 16px; line-height: 24px; color: #333;'>${processedBody}</td></tr>
+      </table>
+    </td>
+  </tr>
+</table>
+<br>`
+}
+
 export async function generateAdvertorialSection(issue: any, _recordUsage: boolean = false, sectionName: string = 'Advertorial'): Promise<string> {
-  // Note: _recordUsage parameter is deprecated - ad usage is now tracked exclusively 
+  // Note: _recordUsage parameter is deprecated - ad usage is now tracked exclusively
   // by AdScheduler.recordAdUsage() in send-final/route.ts to prevent double-counting
   try {
     console.log('Generating Advertorial section for issue:', issue?.id)
@@ -696,100 +808,28 @@ export async function generateAdvertorialSection(issue: any, _recordUsage: boole
 
     console.log(`Using selected ad: ${selectedAd.title}`)
 
-    // Generate HTML for the ad
+    // Generate tracked URL for links
     const buttonUrl = selectedAd.button_url || '#'
-    const buttonText = selectedAd.button_text || 'Learn More'
-
     const trackedUrl = buttonUrl !== '#'
       ? wrapTrackingUrl(buttonUrl, 'Advertorial', issue.date, issue.mailerlite_issue_id)
       : '#'
 
-    const imageUrl = selectedAd.image_url || ''
-
-    // Generate clickable image HTML if valid URL exists
-    const imageHtml = imageUrl
-      ? `<tr><td style='padding: 0 12px; text-align: center;'><a href='${trackedUrl}'><img src='${imageUrl}' alt='${selectedAd.title}' style='max-width: 100%; max-height: 500px; border-radius: 4px; display: block; margin: 0 auto;'></a></td></tr>`
-      : ''
-
-    // Process ad body: normalize HTML for email compatibility, then make the last sentence a hyperlink
-    let processedBody = normalizeEmailHtml(selectedAd.body || '')
-    if (buttonUrl !== '#' && processedBody) {
-      // Strip HTML to get plain text
-      const plainText = processedBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-
-      // Find all sentence-ending punctuation marks (., !, ?)
-      // But exclude periods that are part of domains (.com, .ai, .io, etc.) or abbreviations
-      const sentenceEndPattern = /[.!?](?=\s+[A-Z]|$)/g
-      const matches = Array.from(plainText.matchAll(sentenceEndPattern))
-
-      if (matches.length > 0) {
-        // Get the position of the last sentence-ending punctuation
-        const lastMatch = matches[matches.length - 1] as RegExpMatchArray
-        const lastPeriodIndex = lastMatch.index!
-
-        // Find the second-to-last sentence-ending punctuation
-        let startIndex = 0
-        if (matches.length > 1) {
-          const secondLastMatch = matches[matches.length - 2] as RegExpMatchArray
-          startIndex = secondLastMatch.index! + 1
-        }
-
-        // Extract the last complete sentence (from after previous punctuation to end, including the final punctuation)
-        const lastSentence = plainText.substring(startIndex, lastPeriodIndex + 1).trim()
-
-        if (lastSentence.length > 5) {
-          // Escape special regex characters
-          const escapedSentence = lastSentence.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
-          // Replace in the original HTML
-          // Look for the sentence text, accounting for HTML tags that might be in between
-          const parts = escapedSentence.split(/\s+/)
-          const flexiblePattern = parts.join('\\s*(?:<[^>]*>\\s*)*')
-          const sentenceRegex = new RegExp(flexiblePattern, 'i')
-
-          processedBody = processedBody.replace(
-            sentenceRegex,
-            `<a href='${trackedUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>$&</a>`
-          )
-        }
-      } else {
-        // No sentence-ending punctuation found - wrap the entire text
-        const trimmedText = plainText.trim()
-        if (trimmedText.length > 5) {
-          const escapedText = trimmedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-          const parts = escapedText.split(/\s+/)
-          const flexiblePattern = parts.join('\\s*(?:<[^>]*>\\s*)*')
-          const textRegex = new RegExp(flexiblePattern, 'i')
-
-          processedBody = processedBody.replace(
-            textRegex,
-            `<a href='${trackedUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>$&</a>`
-          )
-        }
+    // Use the shared advertorial HTML generator
+    return generateAdvertorialHtml(
+      {
+        title: selectedAd.title,
+        body: selectedAd.body || '',
+        button_url: selectedAd.button_url || '#',
+        image_url: selectedAd.image_url
+      },
+      {
+        primaryColor,
+        headingFont,
+        bodyFont,
+        sectionName,
+        linkUrl: trackedUrl
       }
-    }
-
-    // Note: HTML normalization now happens when saving the ad to the database
-    // (see src/lib/html-normalizer.ts and /api/ads endpoints)
-
-    return `
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
-  <tr>
-    <td style="padding:0 10px;">
-      <table width='100%' cellpadding='0' cellspacing='0' style='border: 1px solid #ddd; border-radius: 10px; background: #fff; font-family: ${bodyFont}; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15); margin-top: 10px; overflow: hidden;'>
-        <tr>
-          <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">${sectionName}</h2>
-          </td>
-        </tr>
-        <tr><td style='padding: 10px 10px 4px; font-size: 20px; font-weight: bold; text-align: left;'>${selectedAd.title}</td></tr>
-        ${imageHtml}
-        <tr><td style='padding: 0 10px 10px; font-family: ${bodyFont}; font-size: 16px; line-height: 24px; color: #333;'>${processedBody}</td></tr>
-      </table>
-    </td>
-  </tr>
-</table>
-<br>`
+    )
   } catch (error) {
     console.error('Error generating Advertorial section:', error)
     return ''
