@@ -146,10 +146,12 @@ async function generatePrimaryBodiesBatch1(issueId: string) {
 
   try {
     // Idempotency check: count existing bodies for first 3 articles
+    // Note: Must check for non-empty content, not just non-null (empty string '' is used as placeholder)
     const { data: existing, count } = await supabaseAdmin
       .from('articles')
       .select('id, content', { count: 'exact' })
       .eq('issue_id', issueId)
+      .neq('content', '')
       .not('content', 'is', null)
       .range(0, 2) // First 3 articles (0-indexed)
 
@@ -190,10 +192,12 @@ async function generatePrimaryBodiesBatch2(issueId: string) {
 
   try {
     // Idempotency check: count total bodies
+    // Note: Must check for non-empty content, not just non-null (empty string '' is used as placeholder)
     const { count } = await supabaseAdmin
       .from('articles')
       .select('id', { count: 'exact' })
       .eq('issue_id', issueId)
+      .neq('content', '')
       .not('content', 'is', null)
 
     if (count && count >= 6) {
@@ -292,10 +296,12 @@ async function generateSecondaryBodiesBatch1(issueId: string) {
 
   try {
     // Idempotency check: count existing secondary bodies for first 3 articles
+    // Note: Must check for non-empty content, not just non-null (empty string '' is used as placeholder)
     const { count } = await supabaseAdmin
       .from('secondary_articles')
       .select('id', { count: 'exact' })
       .eq('issue_id', issueId)
+      .neq('content', '')
       .not('content', 'is', null)
       .range(0, 2) // First 3 articles
 
@@ -335,10 +341,12 @@ async function generateSecondaryBodiesBatch2(issueId: string) {
 
   try {
     // Idempotency check: count total secondary bodies
+    // Note: Must check for non-empty content, not just non-null (empty string '' is used as placeholder)
     const { count } = await supabaseAdmin
       .from('secondary_articles')
       .select('id', { count: 'exact' })
       .eq('issue_id', issueId)
+      .neq('content', '')
       .not('content', 'is', null)
 
     if (count && count >= 6) {
