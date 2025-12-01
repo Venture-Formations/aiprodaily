@@ -1,5 +1,8 @@
 # Feature: Public Newsletter Archive (AI Accounting Daily Website)
 
+_Last updated: 2025-11-28_
+_Status: Implementation Complete ✅_
+
 ## What This Feature Does
 Creates a public-facing newsletter archive at `/newsletters` where visitors can browse and read past newsletter editions, matching the AI Accounting Daily website design and branding. This provides SEO benefits and allows potential subscribers to see sample content before signing up.
 

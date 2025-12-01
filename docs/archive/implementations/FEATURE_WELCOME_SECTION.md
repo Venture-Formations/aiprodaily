@@ -1,5 +1,8 @@
 # Welcome Section Implementation Plan
 
+_Last updated: 2025-11-28_
+_Status: Implementation Complete ✅_
+
 ## Overview
 Add a dynamic Welcome section to the newsletter that:
 - Appears first in the email (after header, before primary articles)
@@ -37,15 +40,15 @@ Today, we're taking a look at an AI assistant trained on journals that doctors w
 
 ### 1. Database Schema Changes
 
-**Add `welcome_section` column to `newsletter_campaigns` table:**
+**Add `welcome_section` column to `issues` table:**
 
 ```sql
 -- Migration: db/migrations/add_welcome_section.sql
 
-ALTER TABLE newsletter_campaigns
+ALTER TABLE issues
 ADD COLUMN IF NOT EXISTS welcome_section TEXT;
 
-COMMENT ON COLUMN newsletter_campaigns.welcome_section IS 'AI-generated welcome text that summarizes the newsletter contents';
+COMMENT ON COLUMN issues.welcome_section IS 'AI-generated welcome text that summarizes the newsletter contents';
 ```
 
 **Rationale:** Store the generated welcome text directly in the campaign record for easy access and modification during review.
