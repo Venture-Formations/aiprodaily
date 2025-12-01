@@ -13,6 +13,9 @@ Sentry.init({
   // Disable performance monitoring to save quota (focus on errors only)
   tracesSampleRate: 0,
 
+  // Disable Sentry telemetry
+  telemetry: false,
+
   // Setting this option to true will print useful information to the console while you're setting up Sentry.
   debug: false,
 
