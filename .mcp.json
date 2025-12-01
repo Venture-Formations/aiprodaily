@@ -7,6 +7,18 @@
         "POSTGRES_URL": "${env:DATABASE_URL}"
       }
     },
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp"
+    },
+    "context7": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@upstash/context7-mcp@latest"]
+    },
+    "coderabbit": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "coderabbit-cli-mcp"]
+    },
     "vercel": {
       "command": "cmd",
       "args": ["/c", "npx", "-y", "vercel-mcp", "VERCEL_API_KEY=b2rRlFmL9kPxMPl6ZA7pgGDX"]

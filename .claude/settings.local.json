@@ -16,7 +16,16 @@
       "Bash(npm install:*)",
       "Bash(git pull:*)",
       "Bash(git stash:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "WebSearch",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:supabase.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(dir \"C:\\Users\\dpenn\\Documents\\AI_Pros_Newsletter\\agent-os\")",
+      "WebFetch(domain:docs.coderabbit.ai)",
+      "Bash(sh)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
@@ -24,7 +33,10 @@
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "vercel",
-    "memory"
+    "memory",
+    "supabase",
+    "context7",
+    "coderabbit"
   ],
   "hooks": {
     "UserPromptSubmit": [
