@@ -30,97 +30,6 @@ export class GitHubImageStorage {
     return this.enabled
   }
 
-  async uploadWeatherImage(imageUrl: string, forecastDate: string): Promise<string | null> {
-    if (!this.enabled || !this.octokit) {
-      // GitHub storage not enabled
-      return null
-    }
-
-    try {
-      // Downloading weather image silently
-
-      // Download image with timeout
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
-
-      const response = await fetch(imageUrl, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'AI-Pro-Daily/1.0',
-          'Accept': 'image/*',
-          'Cache-Control': 'no-cache'
-        }
-      })
-
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        return null
-      }
-
-      // Check content type
-      const contentType = response.headers.get('content-type')
-      if (!contentType || !contentType.startsWith('image/')) {
-        return null
-      }
-
-      // Get image data
-      const arrayBuffer = await response.arrayBuffer()
-      const buffer = Buffer.from(arrayBuffer)
-
-      // Check file size (limit to 5MB)
-      if (buffer.length > 5 * 1024 * 1024) {
-        return null
-      }
-
-      // Generate filename for weather image: weather-YYYY-MM-DD.png
-      const fileName = `weather-${forecastDate}.png`
-      const filePath = `weather-images/${fileName}`
-
-      // Check if weather image already exists for this date
-      try {
-        const { data: existingFile } = await this.octokit.repos.getContent({
-          owner: this.owner,
-          repo: this.repo,
-          path: filePath,
-        })
-
-        if (existingFile && 'download_url' in existingFile && existingFile.download_url) {
-          return existingFile.download_url
-        }
-      } catch (error: any) {
-        // File doesn't exist, which is fine - we'll create it
-        if (error.status !== 404) {
-          // Error checking file
-          return null
-        }
-      }
-
-      // Convert buffer to base64 for GitHub API
-      const content = buffer.toString('base64')
-
-      // Upload to GitHub
-      const uploadResponse = await this.octokit.repos.createOrUpdateFileContents({
-        owner: this.owner,
-        repo: this.repo,
-        path: filePath,
-        message: `Add weather forecast image for ${forecastDate}`,
-        content: content,
-      })
-
-      if (uploadResponse.data.content?.download_url) {
-        return uploadResponse.data.content.download_url
-      } else {
-        // No download URL
-        return null
-      }
-
-    } catch (error) {
-      // Silently fail - weather image upload errors are expected
-      return null
-    }
-  }
-
   async uploadImage(imageUrl: string, articleTitle: string): Promise<string | null> {
     if (!this.enabled || !this.octokit) {
       // GitHub storage not enabled
@@ -174,7 +83,7 @@ export class GitHubImageStorage {
       const imageHash = crypto.createHash('md5').update(imageUrl).digest('hex')
       const fileExtension = this.getImageExtension(imageUrl)
       const fileName = `${imageHash}${fileExtension}`
-      const filePath = `newsletter-images/${fileName}`
+      const filePath = `public/images/newsletter/${fileName}`
 
       // Check if image already exists in repository
       try {
@@ -247,7 +156,7 @@ export class GitHubImageStorage {
       const { data } = await this.octokit.repos.getContent({
         owner: this.owner,
         repo: this.repo,
-        path: 'newsletter-images',
+        path: 'public/images/newsletter',
       })
 
       if (Array.isArray(data)) {
@@ -261,88 +170,6 @@ export class GitHubImageStorage {
     } catch (error) {
       console.error('Error listing GitHub images:', error)
       return []
-    }
-  }
-
-  async listWeatherImages(): Promise<string[]> {
-    if (!this.enabled || !this.octokit) {
-      return []
-    }
-
-    try {
-      const { data } = await this.octokit.repos.getContent({
-        owner: this.owner,
-        repo: this.repo,
-        path: 'weather-images',
-      })
-
-      if (Array.isArray(data)) {
-        return data
-          .filter(file => file.type === 'file' && file.name?.startsWith('weather-'))
-          .map(file => file.download_url)
-          .filter((url): url is string => url !== null)
-      }
-
-      return []
-    } catch (error) {
-      console.error('Error listing weather images:', error)
-      return []
-    }
-  }
-
-  async cleanupOldWeatherImages(daysToKeep: number = 30): Promise<number> {
-    if (!this.enabled || !this.octokit) {
-      return 0
-    }
-
-    try {
-      console.log(`Cleaning up weather images older than ${daysToKeep} days...`)
-
-      const { data } = await this.octokit.repos.getContent({
-        owner: this.owner,
-        repo: this.repo,
-        path: 'weather-images',
-      })
-
-      if (!Array.isArray(data)) {
-        return 0
-      }
-
-      const cutoffDate = new Date()
-      cutoffDate.setDate(cutoffDate.getDate() - daysToKeep)
-      const cutoffDateStr = cutoffDate.toISOString().split('T')[0]
-
-      let deletedCount = 0
-
-      for (const file of data) {
-        if (file.type === 'file' && file.name?.startsWith('weather-')) {
-          // Extract date from filename: weather-YYYY-MM-DD.png
-          const dateMatch = file.name.match(/weather-(\d{4}-\d{2}-\d{2})\.png$/)
-          if (dateMatch) {
-            const fileDate = dateMatch[1]
-            if (fileDate < cutoffDateStr) {
-              console.log(`Deleting old weather image: ${file.name}`)
-
-              await this.octokit.repos.deleteFile({
-                owner: this.owner,
-                repo: this.repo,
-                path: file.path,
-                message: `Cleanup old weather image: ${file.name}`,
-                sha: file.sha
-              })
-
-              deletedCount++
-            }
-          }
-        }
-      }
-
-      console.log(`Cleaned up ${deletedCount} old weather images`)
-      return deletedCount
-
-    } catch (error) {
-      console.error('Error cleaning up old weather images:', error)
-      return 0
     }
   }
 
@@ -365,7 +192,7 @@ export class GitHubImageStorage {
         return null
       }
 
-      const filePath = `newsletter-images/${fileName}`
+      const filePath = `public/images/newsletter/${fileName}`
 
       // Check if file already exists in repository
       try {
@@ -437,7 +264,7 @@ export class GitHubImageStorage {
       }
 
       const fileName = `${imageId}.jpg`
-      const filePath = `images/library/${variant}/${fileName}`
+      const filePath = `public/images/library/${variant}/${fileName}`
 
       // Check if variant already exists
       try {
@@ -489,7 +316,7 @@ export class GitHubImageStorage {
    * Get CDN URL for an image variant (uses jsDelivr CDN)
    */
   getCdnUrl(imageId: string, variant: string = '1200x675'): string {
-    return `https://cdn.jsdelivr.net/gh/${this.owner}/${this.repo}@main/images/library/${variant}/${imageId}.jpg`
+    return `https://cdn.jsdelivr.net/gh/${this.owner}/${this.repo}@main/public/images/library/${variant}/${imageId}.jpg`
   }
 
   /**
@@ -504,7 +331,7 @@ export class GitHubImageStorage {
       const { data } = await this.octokit.repos.getContent({
         owner: this.owner,
         repo: this.repo,
-        path: `images/library/${variant}`,
+        path: `public/images/library/${variant}`,
       })
 
       if (Array.isArray(data)) {
@@ -534,7 +361,7 @@ export class GitHubImageStorage {
 
     try {
       const fileName = `${imageId}.jpg`
-      const filePath = `images/library/${variant}/${fileName}`
+      const filePath = `public/images/library/${variant}/${fileName}`
 
       // Get file info first to get the SHA
       const { data: fileInfo } = await this.octokit.repos.getContent({

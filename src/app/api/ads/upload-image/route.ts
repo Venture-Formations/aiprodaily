@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     // Generate unique filename
     const timestamp = Date.now()
     const filename = `ad-${timestamp}.jpg`
-    const path = `advertisements/${filename}`
+    const path = `public/images/advertisements/${filename}`
 
     // Upload to GitHub using Octokit
     const githubToken = process.env.GITHUB_TOKEN

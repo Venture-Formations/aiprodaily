@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now()
     const extension = file.name.split('.').pop()
     const filename = `business-${type}-${timestamp}.${extension}`
-    const githubPath = `business/${filename}`
+    const githubPath = `public/images/business/${filename}`
 
     console.log('🏷️ [Upload] Generated filename:', filename)
 
