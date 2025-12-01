@@ -29,7 +29,14 @@
       "mcp__coderabbit__run_review",
       "mcp__supabase__get_logs",
       "mcp__supabase__execute_sql",
-      "Bash(wsl:*)"
+      "Bash(wsl:*)",
+      "Bash(npx @sentry/wizard@latest -i nextjs --saas --org venture-formations --project javascript-nextjs)",
+      "mcp__vercel__getDeployment",
+      "Bash(npx tsx:*)",
+      "Bash(node:*)",
+      "Bash(git restore:*)",
+      "mcp__vercel__cancelDeployment",
+      "Bash(npm uninstall:*)"
     ],
     "deny": [],
     "ask": []
