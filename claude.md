@@ -43,6 +43,17 @@ This project uses a **single branch** workflow:
 - Push directly to `master` for all changes
 - Vercel automatically deploys on every push
 
+### Pre-Deployment Code Review (REQUIRED)
+**Before every `git push`, you MUST run a code review:**
+1. Run `mcp__coderabbit__run_review` to check for issues
+2. If CodeRabbit CLI is not available, perform a manual review checking:
+   - TypeScript errors (`npx tsc --noEmit`)
+   - Security issues (no exposed secrets, proper input validation)
+   - Multi-tenant isolation (`publication_id` filters on all queries)
+   - Error handling (try/catch, proper error responses)
+   - Code quality (no unused variables, clear naming)
+3. Only push after review passes or issues are addressed
+
 ## 5. Task Router
 | You are working on… | Open these references | Checklist |
 |---------------------|-----------------------|-----------|
