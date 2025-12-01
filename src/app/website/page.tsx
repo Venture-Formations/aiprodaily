@@ -57,7 +57,7 @@ export default async function WebsiteHome() {
       {/* Newsletters Content */}
       <NewslettersList
         newsletters={newsletters || []}
-        imageOverride="https://github.com/Venture-Formations/aiprodaily/raw/refs/heads/master/apps/marketing/public/ai_accounting_daily_cover_image.jpg"
+        imageOverride="https://github.com/Venture-Formations/aiprodaily/raw/refs/heads/master/public/images/accounting_website/ai_accounting_daily_cover_image.jpg"
       />
       <Footer logoUrl={logoUrl} newsletterName={newsletterName} businessName={businessName} currentYear={currentYear} />
     </main>
