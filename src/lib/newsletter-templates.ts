@@ -705,28 +705,41 @@ export function generateAdvertorialHtml(
   // Process ad body: normalize HTML for email compatibility, then make the last sentence a hyperlink
   let processedBody = normalizeEmailHtml(ad.body || '')
   if (buttonUrl !== '#' && processedBody) {
-    // Check for arrow CTA pattern on the last line (e.g., "→ Try Fiskl")
-    // The arrow stays bold, only the text after it becomes a link
-    // Pattern handles: <p><strong>→ Try Fiskl</strong></p> or plain "→ Try Fiskl"
-    const arrowCtaPattern = /(<(?:strong|b)[^>]*>)?(→\s*)([^<\n]+?)(<\/(?:strong|b)>)?(\s*<\/p>)?(\s*)$/i
-    const arrowMatch = processedBody.match(arrowCtaPattern)
+    // Check for arrow CTA in table format (created by normalizeEmailHtml)
+    // Pattern: <table...><tr><td...>→</td><td>CTA Text</td></tr></table> at the end
+    const tableArrowCtaPattern = /(<table[^>]*>)\s*<tr>\s*<td[^>]*>→<\/td>\s*<td>([^<]+)<\/td>\s*<\/tr>\s*<\/table>\s*$/i
+    const tableArrowMatch = processedBody.match(tableArrowCtaPattern)
 
-    if (arrowMatch) {
-      // Found arrow CTA pattern - make arrow bold, text after arrow is the link
-      const openingTag = arrowMatch[1] || '' // "<strong>" or "<b>" if present
-      const arrow = arrowMatch[2] // "→ "
-      const ctaText = arrowMatch[3].trim() // "Try Fiskl"
-      const closingStrongTag = arrowMatch[4] || '' // "</strong>" or "</b>" if present
-      const closingPTag = arrowMatch[5] || '' // "</p>" if present
-      const trailingSpace = arrowMatch[6] || ''
+    if (tableArrowMatch) {
+      // Found table-based arrow CTA - make arrow bold, text becomes a link
+      const ctaText = tableArrowMatch[2].trim()
 
-      // If already wrapped in strong/b, replace the whole thing
-      // Arrow stays bold, CTA text becomes a bold link
       processedBody = processedBody.replace(
-        arrowCtaPattern,
-        `${openingTag}${arrow}${closingStrongTag || '</strong>'}<a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${ctaText}</a>${closingPTag}${trailingSpace}`
+        tableArrowCtaPattern,
+        `<p><strong>→ </strong><a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${ctaText}</a></p>`
       )
     } else {
+      // Check for arrow CTA pattern in paragraph format (e.g., "→ Try Fiskl")
+      // Pattern handles: <p><strong>→ Try Fiskl</strong></p> or plain "→ Try Fiskl"
+      const arrowCtaPattern = /(<(?:strong|b)[^>]*>)?(→\s*)([^<\n]+?)(<\/(?:strong|b)>)?(\s*<\/p>)?(\s*)$/i
+      const arrowMatch = processedBody.match(arrowCtaPattern)
+
+      if (arrowMatch) {
+        // Found arrow CTA pattern - make arrow bold, text after arrow is the link
+        const openingTag = arrowMatch[1] || '' // "<strong>" or "<b>" if present
+        const arrow = arrowMatch[2] // "→ "
+        const ctaText = arrowMatch[3].trim() // "Try Fiskl"
+        const closingStrongTag = arrowMatch[4] || '' // "</strong>" or "</b>" if present
+        const closingPTag = arrowMatch[5] || '' // "</p>" if present
+        const trailingSpace = arrowMatch[6] || ''
+
+        // If already wrapped in strong/b, replace the whole thing
+        // Arrow stays bold, CTA text becomes a bold link
+        processedBody = processedBody.replace(
+          arrowCtaPattern,
+          `${openingTag}${arrow}${closingStrongTag || '</strong>'}<a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${ctaText}</a>${closingPTag}${trailingSpace}`
+        )
+      } else {
       // No arrow CTA - use existing last-sentence logic
       // Strip HTML to get plain text
       const plainText = processedBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
@@ -781,6 +794,7 @@ export function generateAdvertorialHtml(
         )
       }
     }
+      }
     }
   }
 
