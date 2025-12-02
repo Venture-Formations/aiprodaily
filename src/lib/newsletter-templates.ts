@@ -707,19 +707,24 @@ export function generateAdvertorialHtml(
   if (buttonUrl !== '#' && processedBody) {
     // Check for arrow CTA pattern on the last line (e.g., "→ Try Fiskl")
     // The arrow stays bold, only the text after it becomes a link
-    const arrowCtaPattern = /(→\s*)([^<\n]+)(\s*<\/(?:p|div|strong|b)>)?(\s*)$/i
+    // Pattern handles: <p><strong>→ Try Fiskl</strong></p> or plain "→ Try Fiskl"
+    const arrowCtaPattern = /(<(?:strong|b)[^>]*>)?(→\s*)([^<\n]+?)(<\/(?:strong|b)>)?(\s*<\/p>)?(\s*)$/i
     const arrowMatch = processedBody.match(arrowCtaPattern)
 
     if (arrowMatch) {
       // Found arrow CTA pattern - make arrow bold, text after arrow is the link
-      const arrow = arrowMatch[1] // "→ "
-      const ctaText = arrowMatch[2].trim() // "Try Fiskl"
-      const closingTag = arrowMatch[3] || '' // "</p>" or "</div>" etc
-      const trailingSpace = arrowMatch[4] || ''
+      const openingTag = arrowMatch[1] || '' // "<strong>" or "<b>" if present
+      const arrow = arrowMatch[2] // "→ "
+      const ctaText = arrowMatch[3].trim() // "Try Fiskl"
+      const closingStrongTag = arrowMatch[4] || '' // "</strong>" or "</b>" if present
+      const closingPTag = arrowMatch[5] || '' // "</p>" if present
+      const trailingSpace = arrowMatch[6] || ''
 
+      // If already wrapped in strong/b, replace the whole thing
+      // Arrow stays bold, CTA text becomes a bold link
       processedBody = processedBody.replace(
         arrowCtaPattern,
-        `<strong>${arrow}</strong><a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${ctaText}</a>${closingTag}${trailingSpace}`
+        `${openingTag}${arrow}${closingStrongTag || '</strong>'}<a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${ctaText}</a>${closingPTag}${trailingSpace}`
       )
     } else {
       // No arrow CTA - use existing last-sentence logic
