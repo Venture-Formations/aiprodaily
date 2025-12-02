@@ -705,13 +705,31 @@ export function generateAdvertorialHtml(
   // Process ad body: normalize HTML for email compatibility, then make the last sentence a hyperlink
   let processedBody = normalizeEmailHtml(ad.body || '')
   if (buttonUrl !== '#' && processedBody) {
-    // Strip HTML to get plain text
-    const plainText = processedBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+    // Check for arrow CTA pattern on the last line (e.g., "→ Try Fiskl")
+    // The arrow stays bold, only the text after it becomes a link
+    const arrowCtaPattern = /(→\s*)([^<\n]+)(\s*<\/(?:p|div|strong|b)>)?(\s*)$/i
+    const arrowMatch = processedBody.match(arrowCtaPattern)
 
-    // Find all sentence-ending punctuation marks (., !, ?)
-    // But exclude periods that are part of domains (.com, .ai, .io, etc.) or abbreviations
-    const sentenceEndPattern = /[.!?](?=\s+[A-Z]|$)/g
-    const matches = Array.from(plainText.matchAll(sentenceEndPattern))
+    if (arrowMatch) {
+      // Found arrow CTA pattern - make arrow bold, text after arrow is the link
+      const arrow = arrowMatch[1] // "→ "
+      const ctaText = arrowMatch[2].trim() // "Try Fiskl"
+      const closingTag = arrowMatch[3] || '' // "</p>" or "</div>" etc
+      const trailingSpace = arrowMatch[4] || ''
+
+      processedBody = processedBody.replace(
+        arrowCtaPattern,
+        `<strong>${arrow}</strong><a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${ctaText}</a>${closingTag}${trailingSpace}`
+      )
+    } else {
+      // No arrow CTA - use existing last-sentence logic
+      // Strip HTML to get plain text
+      const plainText = processedBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+
+      // Find all sentence-ending punctuation marks (., !, ?)
+      // But exclude periods that are part of domains (.com, .ai, .io, etc.) or abbreviations
+      const sentenceEndPattern = /[.!?](?=\s+[A-Z]|$)/g
+      const matches = Array.from(plainText.matchAll(sentenceEndPattern))
 
     if (matches.length > 0) {
       // Get the position of the last sentence-ending punctuation
@@ -757,6 +775,7 @@ export function generateAdvertorialHtml(
           `<a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>$&</a>`
         )
       }
+    }
     }
   }
 
