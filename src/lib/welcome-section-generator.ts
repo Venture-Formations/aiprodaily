@@ -39,34 +39,15 @@ export async function autoRegenerateWelcome(
       return { success: false, error: primaryError.message }
     }
 
-    // Fetch ALL active SECONDARY articles for this issue
-    const { data: secondaryArticles, error: secondaryError } = await supabaseAdmin
-      .from('secondary_articles')
-      .select('headline, content')
-      .eq('issue_id', issueId)
-      .eq('is_active', true)
-      .order('rank', { ascending: true })
-
-    if (secondaryError) {
-      console.error('[WELCOME] Error fetching secondary articles:', secondaryError)
-      return { success: false, error: secondaryError.message }
+    if (!primaryArticles || primaryArticles.length === 0) {
+      console.log('[WELCOME] No primary articles found, skipping welcome regeneration')
+      return { success: false, error: 'No primary articles found' }
     }
 
-    // Combine ALL articles (primary first, then secondary)
-    const allArticles = [
-      ...(primaryArticles || []),
-      ...(secondaryArticles || [])
-    ]
-
-    if (allArticles.length === 0) {
-      console.log('[WELCOME] No articles found, skipping welcome regeneration')
-      return { success: false, error: 'No articles found' }
-    }
-
-    console.log(`[WELCOME] Generating welcome from ${primaryArticles?.length || 0} primary and ${secondaryArticles?.length || 0} secondary articles`)
+    console.log(`[WELCOME] Generating welcome from ${primaryArticles.length} primary articles`)
 
     // Generate welcome text using AI_CALL (handles prompt + provider + call)
-    const result = await AI_CALL.welcomeSection(allArticles, newsletterId)
+    const result = await AI_CALL.welcomeSection(primaryArticles, newsletterId)
 
     // Extract intro, tagline, and summary from the result
     let welcomeIntro = ''
@@ -120,7 +101,7 @@ export async function autoRegenerateWelcome(
             issue_id: issueId,
             action: 'welcome_auto_regenerated',
             details: {
-              article_count: allArticles.length,
+              primary_article_count: primaryArticles.length,
               welcome_intro_length: welcomeIntro.length,
               welcome_tagline_length: welcomeTagline.length,
               welcome_summary_length: welcomeSummary.length

@@ -2598,7 +2598,7 @@ export class RSSProcessor {
       // Get publication_id from issue
       const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
-      // Fetch ALL active PRIMARY articles for this issue
+      // Fetch ALL active PRIMARY articles for this issue (welcome section only uses primary articles)
       const { data: primaryArticles, error: primaryError } = await supabaseAdmin
         .from('articles')
         .select('headline, content')
@@ -2610,32 +2610,14 @@ export class RSSProcessor {
         throw primaryError
       }
 
-      // Fetch ALL active SECONDARY articles for this issue
-      const { data: secondaryArticles, error: secondaryError } = await supabaseAdmin
-        .from('secondary_articles')
-        .select('headline, content')
-        .eq('issue_id', issueId)
-        .eq('is_active', true)
-        .order('rank', { ascending: true })
-
-      if (secondaryError) {
-        throw secondaryError
-      }
-
-      // Combine ALL articles (primary first, then secondary)
-      const allArticles = [
-        ...(primaryArticles || []),
-        ...(secondaryArticles || [])
-      ]
-
-      if (allArticles.length === 0) {
+      if (!primaryArticles || primaryArticles.length === 0) {
         return ''
       }
 
       // Generate welcome text using AI_CALL (uses callAIWithPrompt like other prompts)
       let result
       try {
-        result = await AI_CALL.welcomeSection(allArticles, newsletterId, 500, 0.8)
+        result = await AI_CALL.welcomeSection(primaryArticles, newsletterId, 500, 0.8)
       } catch (callError) {
         throw new Error(`AI call failed for welcome section: ${callError instanceof Error ? callError.message : 'Unknown error'}`)
       }

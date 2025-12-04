@@ -35,7 +35,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       )
     }
 
-    // Fetch ALL active PRIMARY articles for this issue
+    // Fetch ALL active PRIMARY articles for this issue (welcome section only uses primary articles)
     const { data: primaryArticles, error: primaryError } = await supabaseAdmin
       .from('articles')
       .select('headline, content')
@@ -48,39 +48,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       throw primaryError
     }
 
-    // Fetch ALL active SECONDARY articles for this issue
-    const { data: secondaryArticles, error: secondaryError } = await supabaseAdmin
-      .from('secondary_articles')
-      .select('headline, content')
-      .eq('issue_id', issueId)
-      .eq('is_active', true)
-      .order('rank', { ascending: true })
-
-    if (secondaryError) {
-      console.error('[API] Error fetching secondary articles:', secondaryError)
-      throw secondaryError
-    }
-
-    // Combine ALL articles (primary first, then secondary)
-    const allArticles = [
-      ...(primaryArticles || []),
-      ...(secondaryArticles || [])
-    ]
-
-    if (allArticles.length === 0) {
+    if (!primaryArticles || primaryArticles.length === 0) {
       return NextResponse.json(
         {
-          error: 'No articles found',
-          message: 'Cannot generate welcome section without articles'
+          error: 'No primary articles found',
+          message: 'Cannot generate welcome section without primary articles'
         },
         { status: 400 }
       )
     }
 
-    console.log(`[API] Generating welcome from ${primaryArticles?.length || 0} primary and ${secondaryArticles?.length || 0} secondary articles`)
+    console.log(`[API] Generating welcome from ${primaryArticles.length} primary articles`)
 
     // Generate welcome text using AI with the standardized AI_CALL interface
-    const result = await AI_CALL.welcomeSection(allArticles, issue.publication_id)
+    const result = await AI_CALL.welcomeSection(primaryArticles, issue.publication_id)
 
     console.log('[API] AI_CALL.welcomeSection result type:', typeof result)
 
@@ -136,7 +117,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             issue_id: issueId,
             action: 'welcome_regenerated',
             details: {
-              article_count: allArticles.length,
+              primary_article_count: primaryArticles.length,
               welcome_intro_length: welcomeIntro.length,
               welcome_tagline_length: welcomeTagline.length,
               welcome_summary_length: welcomeSummary.length
@@ -150,7 +131,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       welcome_intro: welcomeIntro,
       welcome_tagline: welcomeTagline,
       welcome_summary: welcomeSummary,
-      article_count: allArticles.length
+      primary_article_count: primaryArticles.length
     })
 
   } catch (error) {
