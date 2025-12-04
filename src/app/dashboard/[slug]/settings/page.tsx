@@ -2781,6 +2781,9 @@ function AIPromptsSettings() {
       if (rssPostId) {
         testUrl += `&rssPostId=${rssPostId}`
       }
+      if (newsletterSlug) {
+        testUrl += `&publicationId=${newsletterSlug}`
+      }
 
       // If currently editing this prompt, use the current content from the text box
       if (editingPrompt?.key === key && editingPrompt?.value) {

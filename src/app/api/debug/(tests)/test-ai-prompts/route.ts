@@ -172,6 +172,7 @@ export async function GET(request: NextRequest) {
     const rssPostId = searchParams.get('rssPostId')
     const customPromptContent = searchParams.get('promptContent') // Custom prompt content for testing
     const providerParam = searchParams.get('provider') as 'openai' | 'claude' | null // Override provider for testing
+    const publicationId = searchParams.get('publicationId') || searchParams.get('newsletterId') // For fetching real articles
 
     const results: Record<string, any> = {}
 
@@ -591,29 +592,65 @@ export async function GET(request: NextRequest) {
       try {
         const testPromptKey = promptKey || 'ai_prompt_welcome_section'
         const { promptJson: loadedPromptJson, provider: loadedProvider } = await loadPromptJSON(testPromptKey, customPromptContent, providerParam)
-        
-        const testArticles = [
-          {
-            headline: 'AI Tool Revolutionizes Tax Preparation for CPAs',
-            content: 'A new AI-powered tax software is helping accounting firms reduce preparation time by 60% while improving accuracy. The tool uses machine learning to identify deductions and flag potential issues before filing.'
-          },
-          {
-            headline: 'AICPA Issues New Guidelines on AI Use in Auditing',
-            content: 'The American Institute of CPAs released comprehensive guidelines for using artificial intelligence in audit procedures, emphasizing the need for human oversight and validation of AI-generated insights.'
-          },
-          {
-            headline: 'Cloud Accounting Platform Adds Real-Time Anomaly Detection',
-            content: 'QuickBooks announced a new feature that uses AI to detect unusual transactions in real-time, alerting accountants to potential fraud or errors before they become major issues.'
-          },
-          {
-            headline: 'Study Shows 78% of Accounting Firms Plan AI Adoption',
-            content: 'A recent survey reveals that the majority of accounting firms are planning to adopt AI tools within the next 18 months, primarily for automation of routine tasks and enhanced data analysis.'
-          },
-          {
-            headline: 'New IRS Ruling Addresses AI-Generated Tax Forms',
-            content: 'The Internal Revenue Service has issued guidance on the use of AI-generated tax documents, clarifying requirements for review and validation by licensed professionals.'
+
+        // Try to fetch real primary articles from the most recent sent issue
+        let testArticles: Array<{ headline: string; content: string }> = []
+        let articlesSource = 'fallback'
+        let issueDate: string | null = null
+
+        if (publicationId) {
+          // Find the most recent sent issue for this publication
+          const { data: recentIssue } = await supabaseAdmin
+            .from('publication_issues')
+            .select('id, date')
+            .eq('publication_id', publicationId)
+            .eq('status', 'sent')
+            .order('date', { ascending: false })
+            .limit(1)
+            .single()
+
+          if (recentIssue) {
+            // Fetch primary articles from that issue
+            const { data: articles } = await supabaseAdmin
+              .from('articles')
+              .select('headline, content')
+              .eq('issue_id', recentIssue.id)
+              .eq('is_active', true)
+              .order('rank', { ascending: true })
+
+            if (articles && articles.length > 0) {
+              testArticles = articles
+              articlesSource = 'database'
+              issueDate = recentIssue.date
+            }
           }
-        ]
+        }
+
+        // Fallback to sample articles if no real data available
+        if (testArticles.length === 0) {
+          testArticles = [
+            {
+              headline: 'AI Tool Revolutionizes Tax Preparation for CPAs',
+              content: 'A new AI-powered tax software is helping accounting firms reduce preparation time by 60% while improving accuracy. The tool uses machine learning to identify deductions and flag potential issues before filing.'
+            },
+            {
+              headline: 'AICPA Issues New Guidelines on AI Use in Auditing',
+              content: 'The American Institute of CPAs released comprehensive guidelines for using artificial intelligence in audit procedures, emphasizing the need for human oversight and validation of AI-generated insights.'
+            },
+            {
+              headline: 'Cloud Accounting Platform Adds Real-Time Anomaly Detection',
+              content: 'QuickBooks announced a new feature that uses AI to detect unusual transactions in real-time, alerting accountants to potential fraud or errors before they become major issues.'
+            },
+            {
+              headline: 'Study Shows 78% of Accounting Firms Plan AI Adoption',
+              content: 'A recent survey reveals that the majority of accounting firms are planning to adopt AI tools within the next 18 months, primarily for automation of routine tasks and enhanced data analysis.'
+            },
+            {
+              headline: 'New IRS Ruling Addresses AI-Generated Tax Forms',
+              content: 'The Internal Revenue Service has issued guidance on the use of AI-generated tax documents, clarifying requirements for review and validation by licensed professionals.'
+            }
+          ]
+        }
 
         const postData = {
           articles: JSON.stringify(testArticles, null, 2)
@@ -629,6 +666,8 @@ export async function GET(request: NextRequest) {
           prompt_key_used: testPromptKey,
           prompt_source: customPromptContent ? 'custom' : 'database',
           test_articles_count: testArticles.length,
+          articles_source: articlesSource,
+          issue_date: issueDate,
           ai_provider: loadedProvider
         }
       } catch (error) {
