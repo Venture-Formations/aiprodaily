@@ -224,19 +224,6 @@ export async function generateNewsletterHeader(formattedDate: string, issueDate?
       width: 100% !important;
       min-width: 100% !important;
     }
-    @media (min-width:621px){
-      .email-wrapper {
-        padding-left:10px !important;
-        padding-right:10px !important;
-      }
-    }
-
-    @media only screen and (max-width:620px){
-      .email-wrapper {
-        padding-left:10px !important;
-        padding-right:10px !important;
-      }
-    }
   </style>
 
 </head>
