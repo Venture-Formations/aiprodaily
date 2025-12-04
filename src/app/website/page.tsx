@@ -50,8 +50,25 @@ export default async function WebsiteHome() {
     .eq('publication_id', publicationId)
     .order('issue_date', { ascending: false })
 
+  // JSON-LD structured data for WebPage
+  const webPageSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "AI Accounting Daily - Newsletter Archive",
+    "description": "Daily insights, tools, and strategies to help accountants and finance professionals leverage AI for better outcomes.",
+    "publisher": {
+      "@type": "Organization",
+      "name": "AI Accounting Daily",
+      "url": "https://aiaccountingdaily.com"
+    }
+  }
+
   return (
     <main className="min-h-screen">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageSchema) }}
+      />
       <Header logoUrl={headerImageUrl} />
       <Hero />
       {/* Newsletters Content */}

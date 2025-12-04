@@ -4,6 +4,9 @@ import { SlackNotificationService } from '@/lib/slack'
 
 // Stripe webhook event types we handle
 const CHECKOUT_SESSION_COMPLETED = 'checkout.session.completed'
+const CUSTOMER_SUBSCRIPTION_DELETED = 'customer.subscription.deleted'
+const CUSTOMER_SUBSCRIPTION_UPDATED = 'customer.subscription.updated'
+const INVOICE_PAYMENT_FAILED = 'invoice.payment_failed'
 
 /**
  * Stripe Webhook Handler
@@ -101,6 +104,18 @@ export async function POST(request: NextRequest) {
         await handleCheckoutSessionCompleted(event.data.object)
         break
 
+      case CUSTOMER_SUBSCRIPTION_DELETED:
+        await handleSubscriptionDeleted(event.data.object)
+        break
+
+      case CUSTOMER_SUBSCRIPTION_UPDATED:
+        await handleSubscriptionUpdated(event.data.object)
+        break
+
+      case INVOICE_PAYMENT_FAILED:
+        await handlePaymentFailed(event.data.object)
+        break
+
       default:
         console.log(`[Webhook] Unhandled event type: ${event.type}`)
     }
@@ -121,11 +136,19 @@ export async function POST(request: NextRequest) {
 
 /**
  * Handle successful checkout session completion
- * This is where we insert the events into the database after payment is confirmed
+ * Handles both event submissions and tools directory subscriptions
  */
 async function handleCheckoutSessionCompleted(session: any) {
   const sessionId = session.id
+  const subscriptionId = session.subscription
+  const customerId = session.customer
   console.log(`[Webhook] Processing checkout session: ${sessionId}`)
+
+  // Check if this is a tools directory subscription (has metadata with tool_id)
+  if (session.metadata?.tool_id) {
+    await handleToolsDirectoryCheckout(session)
+    return
+  }
 
   // Retrieve the pending submission
   const { data: pendingSubmission, error: fetchError } = await supabaseAdmin
@@ -250,4 +273,196 @@ async function handleCheckoutSessionCompleted(session: any) {
   }
 
   console.log(`[Webhook] Successfully processed ${insertedEvents.length} events`)
+}
+
+/**
+ * Handle tools directory checkout session completion
+ * Called when a user pays for a sponsored listing
+ */
+async function handleToolsDirectoryCheckout(session: any) {
+  const toolId = session.metadata?.tool_id
+  const plan = session.metadata?.plan || 'monthly'
+  const subscriptionId = session.subscription
+  const customerId = session.customer
+
+  console.log(`[Webhook] Processing tools directory checkout for tool: ${toolId}`)
+
+  if (!toolId) {
+    console.error('[Webhook] Missing tool_id in session metadata')
+    throw new Error('Missing tool_id in session metadata')
+  }
+
+  // Update the tool with subscription info
+  const { error: updateError } = await supabaseAdmin
+    .from('tools_directory')
+    .update({
+      is_sponsored: true,
+      plan: plan,
+      stripe_subscription_id: subscriptionId,
+      stripe_customer_id: customerId,
+      stripe_payment_id: session.id,
+      sponsor_start_date: new Date().toISOString()
+    })
+    .eq('id', toolId)
+
+  if (updateError) {
+    console.error('[Webhook] Failed to update tool after payment:', updateError)
+    throw updateError
+  }
+
+  // Send Slack notification
+  const { data: tool } = await supabaseAdmin
+    .from('tools_directory')
+    .select('tool_name, submitter_email')
+    .eq('id', toolId)
+    .single()
+
+  if (tool) {
+    const slack = new SlackNotificationService()
+    const planLabel = plan === 'yearly' ? '$250/year' : '$30/month'
+    await slack.sendSimpleMessage(
+      `🛠️ New Sponsored Tool Listing!\n\n` +
+      `Tool: ${tool.tool_name}\n` +
+      `Plan: ${planLabel}\n` +
+      `Email: ${tool.submitter_email}\n` +
+      `Subscription ID: ${subscriptionId}`
+    )
+  }
+
+  console.log(`[Webhook] Successfully activated sponsored listing for tool: ${toolId}`)
+}
+
+/**
+ * Handle subscription cancellation or expiration
+ * This is called when:
+ * - Customer cancels their subscription
+ * - Subscription expires after failed payment retries
+ * - Subscription is deleted via Stripe dashboard
+ */
+async function handleSubscriptionDeleted(subscription: any) {
+  const subscriptionId = subscription.id
+  console.log(`[Webhook] Processing subscription deletion: ${subscriptionId}`)
+
+  // Find the tool with this subscription
+  const { data: tool, error: fetchError } = await supabaseAdmin
+    .from('tools_directory')
+    .select('id, tool_name, submitter_email')
+    .eq('stripe_subscription_id', subscriptionId)
+    .single()
+
+  if (fetchError || !tool) {
+    // No tool found - might be a different product subscription
+    console.log(`[Webhook] No tools directory entry found for subscription: ${subscriptionId}`)
+    return
+  }
+
+  // Remove sponsored status
+  const { error: updateError } = await supabaseAdmin
+    .from('tools_directory')
+    .update({
+      is_sponsored: false,
+      sponsor_end_date: new Date().toISOString()
+    })
+    .eq('id', tool.id)
+
+  if (updateError) {
+    console.error('[Webhook] Failed to remove sponsored status:', updateError)
+    throw updateError
+  }
+
+  // Send Slack notification
+  const slack = new SlackNotificationService()
+  await slack.sendSimpleMessage(
+    `⚠️ Sponsored Listing Ended\n\n` +
+    `Tool: ${tool.tool_name}\n` +
+    `Email: ${tool.submitter_email}\n` +
+    `Subscription: ${subscriptionId}\n\n` +
+    `The listing has been moved to free tier.`
+  )
+
+  console.log(`[Webhook] Removed sponsored status for tool: ${tool.tool_name}`)
+}
+
+/**
+ * Handle subscription updates
+ * This is called when:
+ * - Plan changes (upgrade/downgrade)
+ * - Subscription renews successfully
+ * - Payment method updates
+ */
+async function handleSubscriptionUpdated(subscription: any) {
+  const subscriptionId = subscription.id
+  const status = subscription.status
+  console.log(`[Webhook] Processing subscription update: ${subscriptionId}, status: ${status}`)
+
+  // Find the tool with this subscription
+  const { data: tool, error: fetchError } = await supabaseAdmin
+    .from('tools_directory')
+    .select('id, tool_name')
+    .eq('stripe_subscription_id', subscriptionId)
+    .single()
+
+  if (fetchError || !tool) {
+    // No tool found - might be a different product subscription
+    console.log(`[Webhook] No tools directory entry found for subscription: ${subscriptionId}`)
+    return
+  }
+
+  // Handle based on subscription status
+  if (status === 'active') {
+    // Subscription is active - ensure tool is sponsored
+    await supabaseAdmin
+      .from('tools_directory')
+      .update({ is_sponsored: true })
+      .eq('id', tool.id)
+    console.log(`[Webhook] Confirmed active subscription for tool: ${tool.tool_name}`)
+  } else if (status === 'past_due' || status === 'unpaid') {
+    // Payment issues - keep sponsored for now, Stripe will retry
+    console.log(`[Webhook] Subscription ${subscriptionId} has status: ${status}, awaiting payment`)
+  } else if (status === 'canceled' || status === 'incomplete_expired') {
+    // Subscription ended - remove sponsored status
+    await supabaseAdmin
+      .from('tools_directory')
+      .update({
+        is_sponsored: false,
+        sponsor_end_date: new Date().toISOString()
+      })
+      .eq('id', tool.id)
+    console.log(`[Webhook] Removed sponsored status for tool: ${tool.tool_name} (status: ${status})`)
+  }
+}
+
+/**
+ * Handle failed invoice payment
+ * Stripe will retry payments automatically, but we log this for visibility
+ */
+async function handlePaymentFailed(invoice: any) {
+  const subscriptionId = invoice.subscription
+  const customerEmail = invoice.customer_email
+  console.log(`[Webhook] Payment failed for subscription: ${subscriptionId}`)
+
+  if (!subscriptionId) {
+    console.log('[Webhook] No subscription ID in failed invoice, skipping')
+    return
+  }
+
+  // Find the tool with this subscription
+  const { data: tool } = await supabaseAdmin
+    .from('tools_directory')
+    .select('id, tool_name, submitter_email')
+    .eq('stripe_subscription_id', subscriptionId)
+    .single()
+
+  if (tool) {
+    // Send Slack notification about payment issue
+    const slack = new SlackNotificationService()
+    await slack.sendSimpleMessage(
+      `⚠️ Payment Failed - Sponsored Listing\n\n` +
+      `Tool: ${tool.tool_name}\n` +
+      `Email: ${tool.submitter_email || customerEmail}\n` +
+      `Subscription: ${subscriptionId}\n\n` +
+      `Stripe will retry the payment automatically.`
+    )
+    console.log(`[Webhook] Notified about payment failure for: ${tool.tool_name}`)
+  }
 }

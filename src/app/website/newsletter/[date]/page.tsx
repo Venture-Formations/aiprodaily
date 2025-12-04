@@ -112,8 +112,38 @@ export default async function NewsletterPage({ params }: PageProps) {
     PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b'
   }
 
+  // JSON-LD structured data for NewsArticle
+  const newsArticleSchema = {
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
+    "headline": newsletter.subject_line,
+    "datePublished": newsletter.send_date,
+    "dateModified": newsletter.send_date,
+    "author": {
+      "@type": "Organization",
+      "name": "AI Accounting Daily"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "AI Accounting Daily",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://aiaccountingdaily.com/logo.png"
+      }
+    },
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": `https://aiaccountingdaily.com/newsletter/${date}`
+    },
+    "description": `AI Accounting Daily newsletter from ${formattedDate}`
+  }
+
   return (
     <div className="min-h-screen bg-[#F5F5F7]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(newsArticleSchema) }}
+      />
       <Header logoUrl={headerImageUrl} />
 
       {/* Content */}

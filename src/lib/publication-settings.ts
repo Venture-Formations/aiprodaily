@@ -166,6 +166,25 @@ export async function getPublicationByDomain(
   return altData?.id || null
 }
 
+/**
+ * Get publication settings by domain (convenience function for public routes)
+ * Looks up the publication by domain, then fetches the requested settings
+ */
+export async function getPublicationSettingsByDomain(
+  domain: string,
+  keys: string[]
+): Promise<Record<string, string>> {
+  const publicationId = await getPublicationByDomain(domain)
+  
+  if (!publicationId) {
+    // Return empty object if no publication found
+    // Callers should use fallback defaults
+    return {}
+  }
+  
+  return getPublicationSettings(publicationId, keys)
+}
+
 // ==================== TYPED HELPER FUNCTIONS ====================
 
 /**

@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+
+// Check if this is a /tools route (for Clerk middleware)
+const isToolsRoute = createRouteMatcher(['/tools(.*)'])
 
 // Newsletter website domain mappings (for easy addition of new newsletters)
 // Format: domain -> newsletter slug
@@ -14,15 +18,10 @@ const NEWSLETTER_DOMAINS: Record<string, string> = {
 // Admin domains (dashboard access)
 const ADMIN_DOMAINS = ['aiprodaily.com', 'www.aiprodaily.com', 'aiprodaily.vercel.app']
 
-export async function middleware(request: NextRequest) {
+// Custom middleware logic for non-tools routes
+async function customMiddleware(request: NextRequest): Promise<NextResponse> {
   const hostname = request.headers.get('host') || ''
   const url = request.nextUrl
-
-  console.log('[Middleware] Request:', {
-    hostname,
-    pathname: url.pathname,
-    method: request.method
-  })
 
   // Detect staging environment - VERY strict, only for actual staging deployments
   // NEVER treat production domains as staging
@@ -97,18 +96,18 @@ export async function middleware(request: NextRequest) {
   })
 
   if (isAdminDomain) {
-    console.log('[Middleware] ✓ Admin domain matched:', hostname)
+    console.log('[Middleware] Admin domain matched:', hostname)
     // Admin domain - redirect root directly to signin (skip the root page component)
     if (url.pathname === '/') {
-      console.log('[Middleware] → Redirecting root to /auth/signin')
+      console.log('[Middleware] Redirecting root to /auth/signin')
       return NextResponse.redirect(new URL('/auth/signin', request.url))
     }
     // Allow normal dashboard/auth routing for other paths
-    console.log('[Middleware] → Passing through to Next.js routing')
+    console.log('[Middleware] Passing through to Next.js routing')
     return NextResponse.next()
   }
 
-  console.log('[Middleware] ✗ Not an admin domain, checking subdomain logic...')
+  console.log('[Middleware] Not an admin domain, checking subdomain logic...')
 
   // Skip subdomain logic for Vercel preview deployments
   const isVercelPreview = hostname.includes('.vercel.app') && !ADMIN_DOMAINS.includes(hostname)
@@ -214,9 +213,59 @@ export async function middleware(request: NextRequest) {
   }
 
   // Default: pass through to Next.js routing
-  console.log('[Middleware] → Default: passing through to Next.js routing')
+  console.log('[Middleware] Default: passing through to Next.js routing')
   return NextResponse.next()
 }
+
+// Routes that are hidden until launch (controlled by ENABLE_CUSTOMER_PORTAL env var)
+const isCustomerPortalRoute = createRouteMatcher(['/account(.*)', '/tools(.*)'])
+
+// Main middleware - uses clerkMiddleware for /tools routes, custom logic for others
+export default clerkMiddleware(async (auth, request) => {
+  const url = request.nextUrl
+
+  console.log('[Middleware] Request:', {
+    hostname: request.headers.get('host') || '',
+    pathname: url.pathname,
+    method: request.method
+  })
+
+  // Block customer portal and tools directory if not enabled
+  // Set ENABLE_CUSTOMER_PORTAL=true in Vercel env vars when ready to launch
+  if (isCustomerPortalRoute(request) && process.env.ENABLE_CUSTOMER_PORTAL !== 'true') {
+    const previewSecret = url.searchParams.get('preview')
+    const previewCookie = request.cookies.get('portal_preview')?.value
+    
+    // Allow access with secret query param OR valid preview cookie
+    if (previewSecret === process.env.PREVIEW_SECRET) {
+      // Set cookie so user can navigate without ?preview param
+      const response = NextResponse.next()
+      response.cookies.set('portal_preview', 'true', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 // 24 hours
+      })
+      return response
+    }
+    
+    if (previewCookie !== 'true') {
+      console.log('[Middleware] Customer portal not enabled, redirecting to home')
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+  }
+
+  // Handle /tools routes with Clerk
+  if (isToolsRoute(request)) {
+    // Don't use auth.protect() here - the submit page has SignedIn/SignedOut
+    // components that handle authentication state gracefully
+    // Let Clerk process the request to provide auth context
+    return NextResponse.next()
+  }
+
+  // For all other routes, use custom middleware logic
+  return customMiddleware(request)
+})
 
 export const config = {
   matcher: [

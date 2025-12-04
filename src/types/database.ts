@@ -891,7 +891,7 @@ export interface ImageSearchFilters {
 
 // Advertisement types
 export type AdFrequency = 'single' | 'weekly' | 'monthly'
-export type AdStatus = 'pending_payment' | 'pending_review' | 'approved' | 'active' | 'completed' | 'rejected'
+export type AdStatus = 'pending_payment' | 'pending_review' | 'in_progress' | 'awaiting_approval' | 'approved' | 'active' | 'completed' | 'rejected'
 
 export interface Advertisement {
   id: string
@@ -919,6 +919,11 @@ export interface Advertisement {
   rejection_reason: string | null
   created_at: string
   updated_at: string
+  // Customer portal fields
+  clerk_user_id: string | null  // Links ad to customer account
+  company_name: string | null   // Advertiser company/product name
+  ad_type: string | null        // 'main_sponsor', 'sidebar', 'footer', etc.
+  preview_image_url: string | null  // Admin-created preview for customer approval
 }
 
 export interface IssueAdvertisement {
@@ -942,4 +947,94 @@ export interface AdPricingTier {
   price_per_unit: number
   created_at: string
   updated_at: string
+}
+
+// ============================================
+// AI Tools Directory Types
+// ============================================
+
+export type DirectoryToolStatus = 'pending' | 'approved' | 'rejected' | 'edited'
+export type DirectoryPlan = 'free' | 'monthly' | 'yearly'
+
+export interface DirectoryCategory {
+  id: string
+  publication_id: string
+  name: string
+  description: string | null
+  slug: string
+  image_url: string | null
+  status: DirectoryToolStatus
+  display_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface DirectoryTool {
+  id: string
+  publication_id: string
+
+  // Core tool info
+  tool_name: string
+  tagline: string | null
+  description: string
+  website_url: string
+
+  // Images
+  logo_url: string | null
+  screenshot_url: string | null
+  tool_image_url: string | null
+  logo_image_url: string | null
+
+  // Submission info
+  clerk_user_id: string | null
+  submitter_email: string | null
+  submitter_name: string | null
+  submitter_image_url: string | null
+
+  // Status and moderation
+  status: DirectoryToolStatus
+  rejection_reason: string | null
+  approved_by: string | null
+  approved_at: string | null
+
+  // Sponsorship/Payment
+  is_sponsored: boolean
+  plan: DirectoryPlan
+  stripe_payment_id: string | null
+  stripe_subscription_id: string | null
+  stripe_customer_id: string | null
+  sponsor_start_date: string | null
+  sponsor_end_date: string | null
+
+  // Display settings
+  is_featured: boolean
+  display_order: number | null
+
+  // Analytics
+  view_count: number
+  click_count: number
+
+  // Legacy link
+  legacy_ai_app_id: string | null
+  is_affiliate: boolean
+
+  // Timestamps
+  created_at: string
+  updated_at: string
+}
+
+export interface DirectoryCategoryTool {
+  category_id: string
+  tool_id: string
+  created_at: string
+}
+
+// Extended types with relations
+export interface DirectoryToolWithCategories extends DirectoryTool {
+  categories: DirectoryCategory[]
+}
+
+export interface DirectoryCategoryWithTools extends DirectoryCategory {
+  tools: DirectoryTool[]
+  tool_count?: number
 }

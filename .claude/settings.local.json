@@ -36,7 +36,19 @@
       "Bash(node:*)",
       "Bash(git restore:*)",
       "mcp__vercel__cancelDeployment",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "mcp__supabase__list_tables",
+      "mcp__supabase__list_projects",
+      "mcp__supabase__apply_migration",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "Bash(taskkill:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(timeout /t:*)",
+      "Bash(pkill:*)",
+      "Bash(python:*)",
+      "WebFetch(domain:www.mailerlite.com)"
     ],
     "deny": [],
     "ask": []
@@ -47,7 +59,8 @@
     "memory",
     "supabase",
     "context7",
-    "coderabbit"
+    "coderabbit",
+    "mailerlite"
   ],
   "hooks": {
     "UserPromptSubmit": [

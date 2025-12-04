@@ -80,6 +80,7 @@ export default function Layout({ children }: LayoutProps) {
     const analyticsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/analytics` : '/dashboard/analytics'
     const databasesUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/databases` : '/dashboard/databases'
     const settingsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/settings` : '/dashboard/settings'
+    const toolsAdminUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/tools-admin` : '/dashboard/tools-admin'
 
     return (
       <div className="min-h-screen bg-gray-50">
@@ -108,6 +109,9 @@ export default function Layout({ children }: LayoutProps) {
                     </Link>
                     <Link href={settingsUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
                       Settings
+                    </Link>
+                    <Link href={toolsAdminUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
+                      Tools
                     </Link>
                   </nav>
                 )}
@@ -167,6 +171,7 @@ export default function Layout({ children }: LayoutProps) {
   const analyticsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/analytics` : '/dashboard/analytics'
   const databasesUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/databases` : '/dashboard/databases'
   const settingsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/settings` : '/dashboard/settings'
+  const toolsAdminUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/tools-admin` : '/dashboard/tools-admin'
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -195,6 +200,9 @@ export default function Layout({ children }: LayoutProps) {
                   </Link>
                   <Link href={settingsUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
                     Settings
+                  </Link>
+                  <Link href={toolsAdminUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
+                    Tools
                   </Link>
                 </nav>
               )}

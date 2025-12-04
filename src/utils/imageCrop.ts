@@ -28,21 +28,25 @@ export async function getCroppedImage(
   const scaleX = imgElement.naturalWidth / imgElement.width
   const scaleY = imgElement.naturalHeight / imgElement.height
 
-  // Set canvas dimensions to crop size
-  canvas.width = completedCrop.width
-  canvas.height = completedCrop.height
+  // Use the NATURAL dimensions for the output canvas (full resolution)
+  const naturalCropWidth = completedCrop.width * scaleX
+  const naturalCropHeight = completedCrop.height * scaleY
 
-  // Draw the cropped portion
+  // Set canvas dimensions to natural crop size for full resolution output
+  canvas.width = naturalCropWidth
+  canvas.height = naturalCropHeight
+
+  // Draw the cropped portion at full resolution
   ctx.drawImage(
     imgElement,
     completedCrop.x * scaleX,
     completedCrop.y * scaleY,
-    completedCrop.width * scaleX,
-    completedCrop.height * scaleY,
+    naturalCropWidth,
+    naturalCropHeight,
     0,
     0,
-    completedCrop.width,
-    completedCrop.height
+    naturalCropWidth,
+    naturalCropHeight
   )
 
   // Convert to blob

@@ -18,8 +18,44 @@ export default function WebsiteLayout({
 }>) {
   const pixelId = process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID || ''
 
+  // JSON-LD structured data for Organization
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "AI Accounting Daily",
+    "url": "https://aiaccountingdaily.com",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://aiaccountingdaily.com/logo.png"
+    },
+    "description": "Daily insights, tools, and strategies to help accountants and finance professionals leverage AI for better outcomes."
+  }
+
+  // JSON-LD structured data for WebSite
+  const websiteSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "AI Accounting Daily",
+    "url": "https://aiaccountingdaily.com",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://aiaccountingdaily.com/?search={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
+  }
+
   return (
     <>
+      {/* JSON-LD Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
+      />
+
       {/* Facebook Pixel */}
       {pixelId && (
         <>
