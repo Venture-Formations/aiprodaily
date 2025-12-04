@@ -232,24 +232,24 @@ export default clerkMiddleware(async (auth, request) => {
 
   // Block customer portal and tools directory if not enabled
   // Set ENABLE_CUSTOMER_PORTAL=true in Vercel env vars when ready to launch
+  let previewCookieResponse: NextResponse | null = null
+
   if (isCustomerPortalRoute(request) && process.env.ENABLE_CUSTOMER_PORTAL !== 'true') {
     const previewSecret = url.searchParams.get('preview')
     const previewCookie = request.cookies.get('portal_preview')?.value
-    
+
     // Allow access with secret query param OR valid preview cookie
     if (previewSecret === process.env.PREVIEW_SECRET) {
       // Set cookie so user can navigate without ?preview param
-      const response = NextResponse.next()
-      response.cookies.set('portal_preview', 'true', {
+      previewCookieResponse = NextResponse.next()
+      previewCookieResponse.cookies.set('portal_preview', 'true', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         maxAge: 60 * 60 * 24 // 24 hours
       })
-      return response
-    }
-    
-    if (previewCookie !== 'true') {
+      // Don't return yet - let subsequent logic run but use this response
+    } else if (previewCookie !== 'true') {
       console.log('[Middleware] Customer portal not enabled, redirecting to home')
       return NextResponse.redirect(new URL('/', request.url))
     }
@@ -260,7 +260,13 @@ export default clerkMiddleware(async (auth, request) => {
     // Don't use auth.protect() here - the submit page has SignedIn/SignedOut
     // components that handle authentication state gracefully
     // Let Clerk process the request to provide auth context
-    return NextResponse.next()
+    // Return preview cookie response if we need to set the cookie
+    return previewCookieResponse || NextResponse.next()
+  }
+
+  // If we have a preview cookie to set and we're on an /account route, return it
+  if (previewCookieResponse) {
+    return previewCookieResponse
   }
 
   // For all other routes, use custom middleware logic
