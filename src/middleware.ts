@@ -5,6 +5,9 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 // Check if this is a /tools route (for Clerk middleware)
 const isToolsRoute = createRouteMatcher(['/tools(.*)'])
 
+// Check if this is an /account route (for Clerk middleware)
+const isAccountRoute = createRouteMatcher(['/account(.*)'])
+
 // Newsletter website domain mappings (for easy addition of new newsletters)
 // Format: domain -> newsletter slug
 const NEWSLETTER_DOMAINS: Record<string, string> = {
@@ -255,18 +258,13 @@ export default clerkMiddleware(async (auth, request) => {
     }
   }
 
-  // Handle /tools routes with Clerk
-  if (isToolsRoute(request)) {
+  // Handle /tools and /account routes with Clerk (both need preview cookie support)
+  if (isToolsRoute(request) || isAccountRoute(request)) {
     // Don't use auth.protect() here - the submit page has SignedIn/SignedOut
     // components that handle authentication state gracefully
     // Let Clerk process the request to provide auth context
     // Return preview cookie response if we need to set the cookie
     return previewCookieResponse || NextResponse.next()
-  }
-
-  // If we have a preview cookie to set and we're on an /account route, return it
-  if (previewCookieResponse) {
-    return previewCookieResponse
   }
 
   // For all other routes, use custom middleware logic
