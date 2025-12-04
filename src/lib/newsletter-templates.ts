@@ -214,6 +214,16 @@ export async function generateNewsletterHeader(formattedDate: string, issueDate?
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background-color: #f7f7f7;
+      width: 100% !important;
+      min-width: 100% !important;
+    }
     @media (min-width:621px){
       .email-wrapper {
         padding-left:10px !important;
