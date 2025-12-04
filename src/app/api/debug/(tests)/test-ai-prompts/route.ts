@@ -599,11 +599,28 @@ export async function GET(request: NextRequest) {
         let issueDate: string | null = null
 
         if (publicationId) {
+          // Convert slug to UUID if needed
+          let publicationUuid = publicationId
+
+          // Check if it's a slug (not a UUID format)
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(publicationId)
+          if (!isUuid) {
+            const { data: publication } = await supabaseAdmin
+              .from('publications')
+              .select('id')
+              .eq('slug', publicationId)
+              .single()
+
+            if (publication) {
+              publicationUuid = publication.id
+            }
+          }
+
           // Find the most recent sent issue for this publication
           const { data: recentIssue } = await supabaseAdmin
             .from('publication_issues')
             .select('id, date')
-            .eq('publication_id', publicationId)
+            .eq('publication_id', publicationUuid)
             .eq('status', 'sent')
             .order('date', { ascending: false })
             .limit(1)
