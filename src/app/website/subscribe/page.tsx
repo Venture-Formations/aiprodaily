@@ -24,17 +24,17 @@ export default async function SubscribePage() {
   const newsletterName = settings.newsletter_name || 'AI Accounting Daily'
 
   return (
-    <main className="min-h-[100dvh] flex items-center justify-center bg-white px-4">
+    <main className="min-h-[100dvh] bg-white px-4">
       {/* Subscribe Section */}
-      <section className="py-6 sm:py-16">
+      <section className="pt-8 sm:pt-16 pb-6 sm:pb-16">
         <Container>
           <div className="mx-auto max-w-2xl text-center">
             {/* Logo */}
-            <div className="flex justify-center mb-4 sm:mb-8">
+            <div className="flex justify-center mb-6 sm:mb-8">
               <img
                 src={logoUrl}
                 alt={newsletterName}
-                className="h-20 sm:h-40 w-auto object-contain"
+                className="h-28 sm:h-44 w-auto object-contain"
               />
             </div>
 
