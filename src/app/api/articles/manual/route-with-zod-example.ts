@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof ZodError) {
       return NextResponse.json({
         error: 'Validation failed',
-        details: error.errors.map(e => ({
+        details: error.issues.map(e => ({
           field: e.path.join('.'),
           message: e.message
         }))
@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
     if (error instanceof ZodError) {
       return NextResponse.json({
         error: 'Validation failed',
-        details: error.errors.map(e => ({
+        details: error.issues.map(e => ({
           field: e.path.join('.'),
           message: e.message
         }))

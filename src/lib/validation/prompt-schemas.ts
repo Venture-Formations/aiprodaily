@@ -23,7 +23,7 @@ export const OpenAIPromptSchema = z.object({
     json_schema: z.object({
       name: z.string(),
       strict: z.boolean().optional(),
-      schema: z.record(z.any()) // JSON Schema object
+      schema: z.record(z.string(), z.any()) // JSON Schema object
     }).optional()
   }).optional(),
   messages: z.array(
@@ -80,8 +80,8 @@ export function validateOpenAIPrompt(jsonValue: any) {
     return OpenAIPromptSchema.parse(jsonValue)
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('[Validation] Invalid OpenAI prompt structure:', error.errors)
-      throw new Error(`Invalid prompt configuration: ${error.errors.map(e => e.message).join(', ')}`)
+      console.error('[Validation] Invalid OpenAI prompt structure:', error.issues)
+      throw new Error(`Invalid prompt configuration: ${error.issues.map(e => e.message).join(', ')}`)
     }
     throw error
   }
@@ -95,8 +95,8 @@ export function validateCriteriaConfig(config: any) {
     return CriteriaConfigSchema.parse(config)
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('[Validation] Invalid criteria config:', error.errors)
-      throw new Error(`Invalid criteria configuration: ${error.errors.map(e => e.message).join(', ')}`)
+      console.error('[Validation] Invalid criteria config:', error.issues)
+      throw new Error(`Invalid criteria configuration: ${error.issues.map(e => e.message).join(', ')}`)
     }
     throw error
   }
