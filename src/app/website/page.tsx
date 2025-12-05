@@ -1,6 +1,6 @@
-import { Header } from "@/components/website/header"
-import { Hero } from "@/components/website/hero"
-import { Footer } from "@/components/website/footer"
+import { Header } from "@/components/salient/Header"
+import { Hero } from "@/components/salient/Hero"
+import { Footer } from "@/components/salient/Footer"
 import { NewslettersList } from "@/components/website/newsletters-list"
 import { supabaseAdmin } from "@/lib/supabase"
 import { headers } from 'next/headers'

@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Card } from "@/components/website/ui/card"
-import { Button } from "@/components/website/ui/button"
 import { Calendar, ChevronLeft, ChevronRight, Mail } from "lucide-react"
 import Link from 'next/link'
+import { Container } from '@/components/salient/Container'
+import { Button } from '@/components/salient/Button'
 
 const NEWSLETTERS_PER_PAGE = 6
 
@@ -68,30 +68,46 @@ export function NewslettersList({ newsletters, imageOverride }: NewslettersListP
 
   if (newsletters.length === 0) {
     return (
-      <section id="newsletters" className="py-10 px-4 sm:px-6 lg:px-8">
-        <div className="container mx-auto max-w-6xl">
-          <div className="bg-white rounded-xl border border-border shadow-sm p-12 text-center">
-            <Mail className="mx-auto h-12 w-12 text-[#1D1D1F]/40 mb-4" />
-            <h3 className="text-xl font-semibold text-[#1D1D1F] mb-2">
+      <section id="newsletters" className="bg-blue-600 py-12 sm:py-16">
+        <Container>
+          <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
+            <Mail className="mx-auto h-12 w-12 text-slate-400 mb-4" />
+            <h3 className="text-xl font-semibold text-slate-900 mb-2">
               No Newsletters Archived Yet
             </h3>
-            <p className="text-[#1D1D1F]/60 mb-6">
+            <p className="text-slate-600 mb-6">
               Past newsletter editions will appear here once they are sent.
             </p>
-            <Link href="/website">
-              <Button className="bg-[#1c293d] hover:bg-[#1c293d]/90 text-white">
-                Go to Homepage
-              </Button>
-            </Link>
+            <Button href="/" color="blue">
+              Go to Homepage
+            </Button>
           </div>
-        </div>
+        </Container>
       </section>
     )
   }
 
   return (
-    <section id="newsletters" className="py-10 px-4 sm:px-6 lg:px-8">
-      <div className="container mx-auto max-w-6xl">
+    <section id="newsletters" className="relative overflow-hidden bg-blue-600 py-12 sm:py-16">
+      {/* Background image for purple/pink/teal clouding effect */}
+      <img
+        src="/images/background-call-to-action.jpg"
+        alt=""
+        className="absolute top-1/2 left-1/2 max-w-none -translate-x-1/2 -translate-y-1/2"
+        width={2347}
+        height={1244}
+      />
+      <Container className="relative">
+        {/* Section Header */}
+        <div className="mx-auto max-w-2xl text-center mb-12">
+          <h2 className="font-display text-3xl tracking-tight text-white sm:text-4xl">
+            Newsletter Archive
+          </h2>
+          <p className="mt-4 text-lg tracking-tight text-blue-100">
+            Browse our past issues and catch up on what you might have missed.
+          </p>
+        </div>
+
         {/* Newsletter Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {currentNewsletters.map((newsletter) => {
@@ -108,33 +124,35 @@ export function NewslettersList({ newsletters, imageOverride }: NewslettersListP
 
             return (
               <Link key={newsletter.id} href={`/newsletter/${dateForUrl}`}>
-                <Card className="group cursor-pointer hover:shadow-lg transition-shadow overflow-hidden p-0 bg-white border-border h-full flex flex-col">
+                <div className="group cursor-pointer bg-white rounded-2xl p-1 shadow-xl shadow-slate-900/10 hover:shadow-2xl hover:shadow-slate-900/20 transition-shadow h-full flex flex-col">
                   {/* Image */}
-                  <div className="relative w-full h-48 bg-gray-100 overflow-hidden">
-                    <img
-                      src={imageUrl || placeholderSvg}
-                      alt={firstArticle?.headline || newsletter.subject_line}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={(e) => {
-                        // Fallback to placeholder if image fails to load
-                        e.currentTarget.src = placeholderSvg
-                      }}
-                    />
+                  <div className="overflow-hidden rounded-xl">
+                    <div className="relative w-full h-48 bg-slate-100 overflow-hidden">
+                      <img
+                        src={imageUrl || placeholderSvg}
+                        alt={firstArticle?.headline || newsletter.subject_line}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        onError={(e) => {
+                          // Fallback to placeholder if image fails to load
+                          e.currentTarget.src = placeholderSvg
+                        }}
+                      />
+                    </div>
                   </div>
 
                   {/* Content */}
-                  <div className="px-4 pt-4 pb-4 flex-1 flex flex-col">
-                    <div className="flex items-center gap-2 text-xs text-[#1D1D1F]/60 mb-1.5">
+                  <div className="px-5 pt-5 pb-5 flex-1 flex flex-col">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
                       <Calendar className="w-3.5 h-3.5" />
                       <span>{formatDate(newsletter.issue_date)}</span>
                     </div>
 
-                    <h3 className="text-base font-bold text-[#1D1D1F] mb-2 group-hover:text-[#a855f7] transition-colors leading-tight flex-1">
+                    <h3 className="text-base font-semibold text-slate-900 mb-3 group-hover:text-blue-600 transition-colors leading-tight flex-1">
                       {newsletter.subject_line}
                     </h3>
 
                     {/* Content Stats */}
-                    <div className="flex items-center gap-3 text-xs text-[#1D1D1F]/70">
+                    <div className="flex items-center gap-3 text-xs text-slate-500">
                       {totalArticles > 0 && (
                         <span className="flex items-center gap-1">
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -161,7 +179,7 @@ export function NewslettersList({ newsletters, imageOverride }: NewslettersListP
                       )}
                     </div>
                   </div>
-                </Card>
+                </div>
               </Link>
             )
           })}
@@ -169,67 +187,57 @@ export function NewslettersList({ newsletters, imageOverride }: NewslettersListP
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 mt-10">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-sm text-[#1D1D1F]/40 hover:text-[#1D1D1F]/60 hover:bg-transparent"
+          <div className="flex items-center justify-center gap-2 mt-12">
+            <button
+              className="px-3 py-2 text-sm text-blue-100 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={currentPage === 1}
               onClick={() => setCurrentPage(1)}
             >
               First
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-sm text-[#1D1D1F]/40 hover:text-[#1D1D1F]/60 hover:bg-transparent"
+            </button>
+            <button
+              className="flex items-center px-3 py-2 text-sm text-blue-100 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={currentPage === 1}
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
             >
               <ChevronLeft className="w-4 h-4 mr-1" />
               Back
-            </Button>
+            </button>
 
             <div className="flex items-center gap-2">
               {getPageNumbers().map((page) => (
-                <Button
+                <button
                   key={page}
-                  variant={currentPage === page ? "default" : "ghost"}
-                  size="sm"
-                  className={`w-10 h-10 rounded-lg ${
+                  className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
                     currentPage === page
-                      ? "bg-[#1c293d] text-white hover:bg-[#1c293d]/90"
-                      : "text-[#1D1D1F] hover:bg-white/50"
+                      ? "bg-white text-blue-600"
+                      : "text-white hover:bg-white/10"
                   }`}
                   onClick={() => setCurrentPage(page)}
                 >
                   {page}
-                </Button>
+                </button>
               ))}
             </div>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-sm text-[#1D1D1F] hover:text-[#1D1D1F]/80 hover:bg-transparent"
+            <button
+              className="flex items-center px-3 py-2 text-sm text-white hover:text-white/80 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
             >
               Next
               <ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-sm text-[#1D1D1F] hover:text-[#1D1D1F]/80 hover:bg-transparent"
+            </button>
+            <button
+              className="px-3 py-2 text-sm text-white hover:text-white/80 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage(totalPages)}
             >
               Last
-            </Button>
+            </button>
           </div>
         )}
-      </div>
+      </Container>
     </section>
   )
 }

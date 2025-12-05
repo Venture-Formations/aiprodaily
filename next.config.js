@@ -12,6 +12,23 @@ const nextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return {
+      beforeFiles: [
+        // Marketing site rewrites for aiaccountingdaily.com
+        {
+          source: '/',
+          has: [{ type: 'host', value: 'aiaccountingdaily.com' }],
+          destination: '/website',
+        },
+        {
+          source: '/:path*',
+          has: [{ type: 'host', value: 'aiaccountingdaily.com' }],
+          destination: '/website/:path*',
+        },
+      ],
+    }
+  },
 }
 
 module.exports = withWorkflow(nextConfig)

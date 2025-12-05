@@ -48,7 +48,10 @@
       "Bash(timeout /t:*)",
       "Bash(pkill:*)",
       "Bash(python:*)",
-      "WebFetch(domain:www.mailerlite.com)"
+      "WebFetch(domain:www.mailerlite.com)",
+      "Bash(dir /s /b \"C:\\Users\\dpenn\\Downloads\\Tailwind*\")",
+      "Bash(dir \"C:\\Users\\dpenn\\Downloads\\Tailwind-20251205T144801Z-3-001\\Tailwind\" /s /b)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

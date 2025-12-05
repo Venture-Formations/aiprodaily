@@ -42,8 +42,8 @@ export function ContactForm() {
 
   if (submitted) {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-        <h2 className="text-2xl font-semibold text-green-800 mb-2">
+      <div className="bg-green-50 border border-green-200 rounded-2xl p-8 text-center shadow-xl">
+        <h2 className="font-display text-2xl font-semibold text-green-800 mb-2">
           Thank you for contacting us!
         </h2>
         <p className="text-green-700 mb-4">
@@ -51,7 +51,7 @@ export function ContactForm() {
         </p>
         <button
           onClick={() => setSubmitted(false)}
-          className="text-green-700 hover:text-green-800 font-medium underline"
+          className="text-blue-600 hover:text-blue-500 font-medium"
         >
           Send another message
         </button>
@@ -60,11 +60,11 @@ export function ContactForm() {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-8">
+    <div className="bg-white rounded-2xl shadow-xl p-8">
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Name */}
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-[#1D1D1F] mb-2">
+          <label htmlFor="name" className="block text-sm font-medium text-slate-900 mb-2">
             Name *
           </label>
           <input
@@ -73,14 +73,14 @@ export function ContactForm() {
             required
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#a855f7] focus:border-transparent"
+            className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-slate-900 placeholder:text-slate-400"
             placeholder="Your name"
           />
         </div>
 
         {/* Email */}
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-[#1D1D1F] mb-2">
+          <label htmlFor="email" className="block text-sm font-medium text-slate-900 mb-2">
             Email *
           </label>
           <input
@@ -89,14 +89,14 @@ export function ContactForm() {
             required
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#a855f7] focus:border-transparent"
+            className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-slate-900 placeholder:text-slate-400"
             placeholder="your@email.com"
           />
         </div>
 
         {/* Message */}
         <div>
-          <label htmlFor="message" className="block text-sm font-medium text-[#1D1D1F] mb-2">
+          <label htmlFor="message" className="block text-sm font-medium text-slate-900 mb-2">
             Questions/Comments *
           </label>
           <textarea
@@ -105,7 +105,7 @@ export function ContactForm() {
             rows={6}
             value={formData.message}
             onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#a855f7] focus:border-transparent resize-none"
+            className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent resize-none text-slate-900 placeholder:text-slate-400"
             placeholder="How can we help you?"
           />
         </div>
@@ -121,9 +121,9 @@ export function ContactForm() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-[#1c293d] hover:bg-[#1c293d]/90 disabled:opacity-50 text-white font-medium py-3 px-6 rounded-lg transition-colors"
+          className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold py-3 px-6 rounded-full transition-colors shadow-sm"
         >
-          {loading ? 'Sending...' : 'Submit'}
+          {loading ? 'Sending...' : 'Send Message'}
         </button>
       </form>
     </div>

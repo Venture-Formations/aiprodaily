@@ -1,7 +1,75 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
+@plugin '@tailwindcss/forms';
+
+@theme {
+  /* Typography scale - matching Salient */
+  --text-*: initial;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.5rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.75rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 2rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 2rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 2.5rem;
+  --text-4xl: 2.5rem;
+  --text-4xl--line-height: 3.5rem;
+  --text-5xl: 3rem;
+  --text-5xl--line-height: 3.5rem;
+  --text-6xl: 3.75rem;
+  --text-6xl--line-height: 1;
+  --text-7xl: 4.5rem;
+  --text-7xl--line-height: 1.1;
+  --text-8xl: 6rem;
+  --text-8xl--line-height: 1;
+  --text-9xl: 8rem;
+  --text-9xl--line-height: 1;
+
+  /* Custom radius */
+  --radius-4xl: 2rem;
+
+  /* Fonts - using CSS variables set by next/font */
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-lexend);
+
+  /* Custom container */
+  --container-2xl: 40rem;
+
+  /* Custom spacing */
+  --spacing-18: 4.5rem;
+  --spacing-88: 22rem;
+  --spacing-128: 32rem;
+
+  /* Brand colors */
+  --color-brand-primary: #1877F2;
+  --color-brand-secondary: #42B883;
+  --color-brand-accent: #FF6B6B;
+  --color-brand-light: #E3F2FD;
+  --color-brand-dark: #0D47A1;
+
+  /* Animation */
+  --animate-fade-in: fadeIn 0.2s ease-in-out;
+  --animate-slide-in: slideIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes slideIn {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(0); }
+}
+
+/* Theme CSS Variables for website */
 :root {
   --background: oklch(0.99 0 0);
   --foreground: oklch(0.2 0.02 255);

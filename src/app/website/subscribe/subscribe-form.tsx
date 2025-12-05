@@ -1,7 +1,5 @@
 'use client'
 
-import { Button } from "@/components/website/ui/button"
-import { Input } from "@/components/website/ui/input"
 import { useState } from "react"
 
 // Declare fbq for TypeScript
@@ -100,32 +98,35 @@ export function SubscribeForm() {
   }
 
   return (
-    <div className="max-w-xl mx-auto space-y-4">
-      <form onSubmit={handleSubmit} className="flex items-center gap-0 bg-white rounded-full border-2 border-[#1c293d] p-1.5 shadow-lg">
-        <Input
-          type="email"
-          placeholder="Enter Your Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={isSubmitting}
-          className="flex-1 h-12 px-6 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base placeholder:text-gray-400"
-        />
-        <Button
-          type="submit"
-          disabled={isSubmitting}
-          className="h-12 px-8 bg-[#1c293d] hover:bg-[#1c293d]/90 text-white font-semibold rounded-full text-base disabled:opacity-50"
-        >
-          {isSubmitting ? 'Subscribing...' : 'Subscribe'}
-        </Button>
+    <div className="space-y-4">
+      <form onSubmit={handleSubmit} className="flex justify-center">
+        <div className="relative w-full max-w-lg">
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={isSubmitting}
+            placeholder="Enter your email"
+            className="w-full rounded-full border-0 bg-white px-5 py-4 pr-36 text-slate-900 shadow-lg ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+          />
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50"
+          >
+            {isSubmitting ? 'Loading...' : 'Subscribe'}
+          </button>
+        </div>
       </form>
 
       {error && (
-        <p className="text-sm text-red-500 mt-2">{error}</p>
+        <p className="text-sm text-red-500">{error}</p>
       )}
 
       {!error && (
-        <p className="text-2xl font-bold text-gray-900 tracking-wide">
-          FREE FOREVER!
+        <p className="text-lg font-bold text-slate-600 tracking-wide">
+          FREE FOREVER
         </p>
       )}
     </div>
