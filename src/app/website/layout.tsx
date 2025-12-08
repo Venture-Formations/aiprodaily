@@ -56,15 +56,7 @@ export default function WebsiteLayout({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
       />
 
-      {/* SparkLoop Upscribe - autoshow disabled, triggered manually after personalization form */}
-      <Script
-        id="sparkloop-embed"
-        src="https://js.sparkloop.app/embed.js?publication_id=pub_6b958dc16ac6"
-        strategy="afterInteractive"
-        data-sparkloop=""
-        data-sparkloop-autoshow="false"
-      />
-
+      
       {/* Facebook Pixel */}
       {pixelId && (
         <>

@@ -91,10 +91,54 @@ export function PersonalizationForm() {
     }
   }
 
-  const triggerUpscribePopup = (subscriberEmail: string) => {
-    // Check if SparkLoop is available
-    if (typeof window !== 'undefined' && (window as any).SparkLoop) {
-      try {
+  const loadSparkLoopScript = (): Promise<void> => {
+    return new Promise((resolve) => {
+      // Check if already loaded
+      if ((window as any).SparkLoop) {
+        resolve()
+        return
+      }
+
+      // Check if script is already in DOM
+      if (document.getElementById('sparkloop-script')) {
+        // Wait for it to load
+        const checkLoaded = setInterval(() => {
+          if ((window as any).SparkLoop) {
+            clearInterval(checkLoaded)
+            resolve()
+          }
+        }, 100)
+        return
+      }
+
+      // Dynamically load SparkLoop script
+      const script = document.createElement('script')
+      script.id = 'sparkloop-script'
+      script.src = 'https://js.sparkloop.app/embed.js?publication_id=pub_6b958dc16ac6'
+      script.async = true
+      script.setAttribute('data-sparkloop', '')
+      script.setAttribute('data-sparkloop-autoshow', 'false')
+
+      script.onload = () => {
+        // Wait a moment for SparkLoop to initialize
+        setTimeout(() => resolve(), 500)
+      }
+
+      script.onerror = () => {
+        console.error('Failed to load SparkLoop script')
+        resolve() // Resolve anyway so we can redirect
+      }
+
+      document.body.appendChild(script)
+    })
+  }
+
+  const triggerUpscribePopup = async (subscriberEmail: string) => {
+    try {
+      // Load SparkLoop script dynamically
+      await loadSparkLoopScript()
+
+      if ((window as any).SparkLoop) {
         // SparkLoop Upscribe popup - pass the email for pre-filling
         (window as any).SparkLoop.Upscribe({
           email: subscriberEmail,
@@ -107,27 +151,13 @@ export function PersonalizationForm() {
             window.location.href = '/'
           }
         })
-      } catch (err) {
-        console.error('SparkLoop error:', err)
-        // Fallback: redirect to homepage
+      } else {
+        console.log('SparkLoop not available after loading, redirecting...')
         window.location.href = '/'
       }
-    } else {
-      // If SparkLoop not loaded yet, wait a bit and try again
-      console.log('SparkLoop not ready, waiting...')
-      setTimeout(() => {
-        if ((window as any).SparkLoop) {
-          (window as any).SparkLoop.Upscribe({
-            email: subscriberEmail,
-            onComplete: () => window.location.href = '/',
-            onClose: () => window.location.href = '/'
-          })
-        } else {
-          // If still not available, just redirect
-          console.log('SparkLoop unavailable, redirecting...')
-          window.location.href = '/'
-        }
-      }, 1500)
+    } catch (err) {
+      console.error('SparkLoop error:', err)
+      window.location.href = '/'
     }
   }
 
