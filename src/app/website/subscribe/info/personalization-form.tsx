@@ -80,7 +80,7 @@ export function PersonalizationForm() {
 
       if (response.ok) {
         // Load SparkLoop script - it auto-shows the popup
-        loadSparkLoopAndShowPopup()
+        loadSparkLoopAndShowPopup(email)
       } else {
         setError(data.error || 'Update failed. Please try again.')
         setIsSubmitting(false)
@@ -91,14 +91,26 @@ export function PersonalizationForm() {
     }
   }
 
-  const loadSparkLoopAndShowPopup = () => {
-    // SparkLoop auto-shows popup when script loads
-    // Only load it after form submission succeeds
+  const loadSparkLoopAndShowPopup = (subscriberEmail: string) => {
+    // SparkLoop auto-shows popup when script loads and detects a subscriber
     if (document.getElementById('sparkloop-script')) {
-      // Already loaded, redirect to home
       window.location.href = '/'
       return
     }
+
+    // Set up SparkLoop visitor data BEFORE loading script
+    // This tells SparkLoop who the subscriber is
+    (window as any).SL = (window as any).SL || {}
+    ;(window as any).SL.visitor = {
+      email: subscriberEmail
+    }
+
+    // Create a hidden form with email to trigger SparkLoop's form detection
+    const hiddenForm = document.createElement('form')
+    hiddenForm.id = 'sparkloop-trigger-form'
+    hiddenForm.style.display = 'none'
+    hiddenForm.innerHTML = `<input type="email" name="email" value="${subscriberEmail}" />`
+    document.body.appendChild(hiddenForm)
 
     const script = document.createElement('script')
     script.id = 'sparkloop-script'
@@ -106,22 +118,28 @@ export function PersonalizationForm() {
     script.async = true
     script.setAttribute('data-sparkloop', '')
 
-    // After popup is closed/completed, redirect to home
-    // SparkLoop doesn't have callbacks, so we'll check periodically
     script.onload = () => {
-      // Set up a listener for when user finishes with the popup
-      // Check every second if popup was closed (SparkLoop removes its elements)
+      // Trigger form submit event so SparkLoop detects it
+      setTimeout(() => {
+        const form = document.getElementById('sparkloop-trigger-form') as HTMLFormElement
+        if (form) {
+          // Dispatch submit event for SparkLoop to capture
+          form.dispatchEvent(new Event('submit', { bubbles: true }))
+        }
+      }, 500)
+
+      // Check periodically for popup close, then redirect
       let checkCount = 0
-      const maxChecks = 120 // 2 minutes max
+      const maxChecks = 120
 
       const checkPopupClosed = setInterval(() => {
         checkCount++
         const popupExists = document.querySelector('[data-sparkloop-upscribe]') ||
                            document.querySelector('.sparkloop-modal') ||
-                           document.querySelector('[class*="sparkloop"]')
+                           document.querySelector('[class*="sparkloop"]') ||
+                           document.querySelector('iframe[src*="sparkloop"]')
 
-        // After initial load, if popup disappears or max time reached, redirect
-        if (checkCount > 5 && !popupExists) {
+        if (checkCount > 10 && !popupExists) {
           clearInterval(checkPopupClosed)
           window.location.href = '/'
         }
