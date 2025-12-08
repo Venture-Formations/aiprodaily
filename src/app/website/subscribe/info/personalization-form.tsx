@@ -85,11 +85,8 @@ export function PersonalizationForm() {
 
       if (response.ok) {
         // SparkLoop will detect the form submission and show popup automatically
-        // After popup closes, redirect to home (SparkLoop handles this via its settings)
-        // If no popup appears within 5 seconds, redirect anyway
-        setTimeout(() => {
-          window.location.href = '/'
-        }, 5000)
+        // Wait for popup to close before redirecting
+        waitForSparkLoopPopupClose()
       } else {
         setError(data.error || 'Update failed. Please try again.')
         setIsSubmitting(false)
@@ -113,6 +110,41 @@ export function PersonalizationForm() {
       document.body.appendChild(script)
     }
   }, [])
+
+  const waitForSparkLoopPopupClose = () => {
+    // Wait for SparkLoop popup to appear, then wait for it to close
+    let popupDetected = false
+    let checkCount = 0
+    const maxWaitTime = 180 // 3 minutes max
+
+    const checkInterval = setInterval(() => {
+      checkCount++
+
+      // Look for SparkLoop popup elements
+      const popupExists = document.querySelector('[data-sparkloop-upscribe]') ||
+                         document.querySelector('.sparkloop-modal') ||
+                         document.querySelector('[class*="sparkloop"]') ||
+                         document.querySelector('iframe[src*="sparkloop"]') ||
+                         document.querySelector('[id*="sparkloop"]')
+
+      if (popupExists) {
+        popupDetected = true
+      }
+
+      // If popup was detected and is now gone, redirect
+      if (popupDetected && !popupExists) {
+        clearInterval(checkInterval)
+        window.location.href = '/'
+        return
+      }
+
+      // Timeout after max wait time
+      if (checkCount >= maxWaitTime) {
+        clearInterval(checkInterval)
+        window.location.href = '/'
+      }
+    }, 1000)
+  }
 
   return (
     <div className="space-y-6">
