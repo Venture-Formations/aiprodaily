@@ -79,8 +79,8 @@ export function PersonalizationForm() {
       const data = await response.json()
 
       if (response.ok) {
-        // Trigger SparkLoop/Upscribe popup
-        triggerUpscribePopup(email)
+        // Load SparkLoop script - it auto-shows the popup
+        loadSparkLoopAndShowPopup()
       } else {
         setError(data.error || 'Update failed. Please try again.')
         setIsSubmitting(false)
@@ -91,74 +91,49 @@ export function PersonalizationForm() {
     }
   }
 
-  const loadSparkLoopScript = (): Promise<void> => {
-    return new Promise((resolve) => {
-      // Check if already loaded
-      if ((window as any).SparkLoop) {
-        resolve()
-        return
-      }
-
-      // Check if script is already in DOM
-      if (document.getElementById('sparkloop-script')) {
-        // Wait for it to load
-        const checkLoaded = setInterval(() => {
-          if ((window as any).SparkLoop) {
-            clearInterval(checkLoaded)
-            resolve()
-          }
-        }, 100)
-        return
-      }
-
-      // Dynamically load SparkLoop script
-      const script = document.createElement('script')
-      script.id = 'sparkloop-script'
-      script.src = 'https://js.sparkloop.app/embed.js?publication_id=pub_6b958dc16ac6'
-      script.async = true
-      script.setAttribute('data-sparkloop', '')
-      script.setAttribute('data-sparkloop-autoshow', 'false')
-
-      script.onload = () => {
-        // Wait a moment for SparkLoop to initialize
-        setTimeout(() => resolve(), 500)
-      }
-
-      script.onerror = () => {
-        console.error('Failed to load SparkLoop script')
-        resolve() // Resolve anyway so we can redirect
-      }
-
-      document.body.appendChild(script)
-    })
-  }
-
-  const triggerUpscribePopup = async (subscriberEmail: string) => {
-    try {
-      // Load SparkLoop script dynamically
-      await loadSparkLoopScript()
-
-      if ((window as any).SparkLoop) {
-        // SparkLoop Upscribe popup - pass the email for pre-filling
-        (window as any).SparkLoop.Upscribe({
-          email: subscriberEmail,
-          onComplete: () => {
-            // Redirect to main website after completion
-            window.location.href = '/'
-          },
-          onClose: () => {
-            // Also redirect if user closes the popup
-            window.location.href = '/'
-          }
-        })
-      } else {
-        console.log('SparkLoop not available after loading, redirecting...')
-        window.location.href = '/'
-      }
-    } catch (err) {
-      console.error('SparkLoop error:', err)
+  const loadSparkLoopAndShowPopup = () => {
+    // SparkLoop auto-shows popup when script loads
+    // Only load it after form submission succeeds
+    if (document.getElementById('sparkloop-script')) {
+      // Already loaded, redirect to home
       window.location.href = '/'
+      return
     }
+
+    const script = document.createElement('script')
+    script.id = 'sparkloop-script'
+    script.src = 'https://js.sparkloop.app/embed.js?publication_id=pub_6b958dc16ac6'
+    script.async = true
+    script.setAttribute('data-sparkloop', '')
+
+    // After popup is closed/completed, redirect to home
+    // SparkLoop doesn't have callbacks, so we'll check periodically
+    script.onload = () => {
+      // Set up a listener for when user finishes with the popup
+      // Check every second if popup was closed (SparkLoop removes its elements)
+      let checkCount = 0
+      const maxChecks = 120 // 2 minutes max
+
+      const checkPopupClosed = setInterval(() => {
+        checkCount++
+        const popupExists = document.querySelector('[data-sparkloop-upscribe]') ||
+                           document.querySelector('.sparkloop-modal') ||
+                           document.querySelector('[class*="sparkloop"]')
+
+        // After initial load, if popup disappears or max time reached, redirect
+        if (checkCount > 5 && !popupExists) {
+          clearInterval(checkPopupClosed)
+          window.location.href = '/'
+        }
+
+        if (checkCount >= maxChecks) {
+          clearInterval(checkPopupClosed)
+          window.location.href = '/'
+        }
+      }, 1000)
+    }
+
+    document.body.appendChild(script)
   }
 
   return (

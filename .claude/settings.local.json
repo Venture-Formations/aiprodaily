@@ -54,7 +54,9 @@
       "Bash(dir:*)",
       "mcp__mailerlite__list_fields",
       "mcp__mailerlite__get_subscriber",
-      "mcp__mailerlite__update_subscriber"
+      "mcp__mailerlite__update_subscriber",
+      "WebFetch(domain:help.sparkloop.app)",
+      "WebFetch(domain:docs.sparkloop.app)"
     ],
     "deny": [],
     "ask": []
