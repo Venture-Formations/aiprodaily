@@ -61,8 +61,8 @@ export default async function AccountPage() {
     <div>
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-zinc-900">My Profile</h1>
-        <p className="text-zinc-600 mt-1">
+        <h1 className="text-2xl font-semibold text-slate-900">My Profile</h1>
+        <p className="text-slate-600 mt-1">
           Manage your AI tool listing in the directory
         </p>
       </div>

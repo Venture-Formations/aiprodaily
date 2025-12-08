@@ -158,13 +158,13 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-zinc-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
-          <h2 className="text-xl font-bold text-zinc-900">Edit Profile</h2>
+        <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+          <h2 className="text-xl font-bold text-slate-900">Edit Profile</h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-zinc-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
           >
-            <X className="w-5 h-5 text-zinc-500" />
+            <X className="w-5 h-5 text-slate-500" />
           </button>
         </div>
 
@@ -178,7 +178,7 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
 
           {/* Tool Name */}
           <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Tool Name *
             </label>
             <input
@@ -186,21 +186,21 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
               required
               value={formData.toolName}
               onChange={(e) => setFormData(prev => ({ ...prev, toolName: e.target.value }))}
-              className="w-full px-4 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-[blue-600] focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-200 bg-gray-50 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               disabled={isSubmitting}
             />
           </div>
 
           {/* Tagline */}
           <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Tagline
             </label>
             <input
               type="text"
               value={formData.tagline}
               onChange={(e) => setFormData(prev => ({ ...prev, tagline: e.target.value }))}
-              className="w-full px-4 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-[blue-600] focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-200 bg-gray-50 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="A short catchy phrase about your tool"
               disabled={isSubmitting}
             />
@@ -208,7 +208,7 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Description *
             </label>
             <textarea
@@ -216,14 +216,14 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
               rows={4}
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              className="w-full px-4 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-[blue-600] focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-200 bg-gray-50 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               disabled={isSubmitting}
             />
           </div>
 
           {/* Website URL */}
           <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Website URL *
             </label>
             <input
@@ -231,14 +231,14 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
               required
               value={formData.websiteUrl}
               onChange={(e) => setFormData(prev => ({ ...prev, websiteUrl: e.target.value }))}
-              className="w-full px-4 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-[blue-600] focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-200 bg-gray-50 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               disabled={isSubmitting}
             />
           </div>
 
           {/* Categories */}
           <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-2">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               Categories *
             </label>
             <div className="flex flex-wrap gap-2">
@@ -248,10 +248,10 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
                   type="button"
                   onClick={() => toggleCategory(category.id)}
                   disabled={isSubmitting}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                     selectedCategoryIds.includes(category.id)
-                      ? 'bg-[blue-600] text-white'
-                      : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
                   {category.name}
@@ -302,19 +302,19 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-zinc-200">
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-5 py-2.5 bg-zinc-100 text-zinc-700 rounded-lg font-medium hover:bg-zinc-200 transition-colors"
+              className="px-5 py-2.5 bg-slate-100 text-slate-700 rounded-full font-medium hover:bg-slate-200 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2.5 bg-[zinc-900] text-white rounded-lg font-medium hover:bg-[zinc-900]/90 transition-colors disabled:opacity-50"
+              className="px-5 py-2.5 bg-slate-900 text-white rounded-full font-medium hover:bg-slate-700 transition-colors disabled:opacity-50"
             >
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </button>
@@ -389,20 +389,20 @@ function ImageUploadField({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-zinc-700 mb-2">{label}</label>
+      <label className="block text-sm font-medium text-slate-700 mb-2">{label}</label>
 
       {displayUrl && !selectedImage && (
         <div className="flex items-center gap-3 mb-2">
           <img
             src={displayUrl}
             alt={label}
-            className="rounded-lg object-cover border border-zinc-200"
+            className="rounded-lg object-cover border border-slate-200"
             style={{ width: previewSize.width, height: previewSize.height }}
           />
           <button
             type="button"
             onClick={() => document.getElementById(`upload-${label}`)?.click()}
-            className="text-sm text-[blue-600] hover:underline"
+            className="text-sm text-blue-600 hover:underline"
             disabled={disabled}
           >
             Replace
@@ -412,10 +412,10 @@ function ImageUploadField({
 
       {!displayUrl && !selectedImage && (
         <label
-          className="cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-zinc-300 rounded-lg hover:border-[blue-600] transition-colors"
+          className="cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-lg hover:border-blue-600 transition-colors"
           style={{ width: previewSize.width, height: previewSize.height }}
         >
-          <span className="text-sm text-zinc-500">Upload</span>
+          <span className="text-sm text-slate-500">Upload</span>
           <input
             id={`upload-${label}`}
             type="file"
@@ -438,8 +438,8 @@ function ImageUploadField({
 
       {selectedImage && (
         <div className="space-y-3">
-          <div className="border rounded-lg p-3 bg-zinc-50">
-            <p className="text-xs text-zinc-600 mb-2">Crop to {aspectLabel}</p>
+          <div className="border rounded-lg p-3 bg-slate-50">
+            <p className="text-xs text-slate-600 mb-2">Crop to {aspectLabel}</p>
             <ReactCrop
               crop={crop}
               onChange={(c) => setCrop(c)}
@@ -460,7 +460,7 @@ function ImageUploadField({
               type="button"
               onClick={handleApplyCrop}
               disabled={!completedCrop}
-              className="px-3 py-1.5 bg-[blue-600] text-white rounded text-sm hover:bg-[blue-600]/90 disabled:opacity-50"
+              className="px-3 py-1.5 bg-blue-600 text-white rounded-full text-sm hover:bg-blue-500 disabled:opacity-50"
             >
               Apply
             </button>
@@ -471,7 +471,7 @@ function ImageUploadField({
                 setCrop(undefined)
                 setCompletedCrop(undefined)
               }}
-              className="px-3 py-1.5 bg-zinc-200 text-zinc-700 rounded text-sm hover:bg-zinc-300"
+              className="px-3 py-1.5 bg-slate-200 text-slate-700 rounded-full text-sm hover:bg-slate-300"
             >
               Cancel
             </button>

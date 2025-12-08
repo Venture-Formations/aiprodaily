@@ -56,19 +56,18 @@ export function AccountSidebar({ children, newsletterName, logoUrl }: AccountSid
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  // Show loading state while Clerk loads
   if (!isLoaded) {
     return (
-      <div className="min-h-screen bg-zinc-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-zinc-700"></div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     )
   }
 
   const SidebarContent = () => (
-    <nav className="flex h-full min-h-0 flex-col">
-      {/* Sidebar Header - Logo & Brand */}
-      <div className="flex flex-col border-b border-white/5 p-4">
+    <nav className="flex h-full flex-col">
+      {/* Logo & Brand */}
+      <div className="p-6 border-b border-slate-200">
         <Link href="/" className="flex items-center gap-3">
           {logoUrl ? (
             <img
@@ -77,104 +76,19 @@ export function AccountSidebar({ children, newsletterName, logoUrl }: AccountSid
               className="h-10 w-auto object-contain"
             />
           ) : (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-600">
               <span className="text-white font-bold text-lg">AI</span>
             </div>
           )}
           <div className="min-w-0">
-            <span className="block truncate text-sm font-semibold text-white">{newsletterName}</span>
-            <span className="block truncate text-xs text-zinc-400">Customer Portal</span>
+            <span className="block truncate text-sm font-semibold text-slate-900">{newsletterName}</span>
+            <span className="block truncate text-xs text-slate-500">Customer Portal</span>
           </div>
         </Link>
       </div>
 
-      {/* Sidebar Body - Navigation */}
-      <div className="flex flex-1 flex-col overflow-y-auto p-4">
-        {/* Main Navigation Section */}
-        <div className="flex flex-col gap-0.5">
-          {navigation.map((item) => {
-            const isActive = item.href === '/account'
-              ? pathname === '/account'
-              : pathname.startsWith(item.href)
-            const isParentOfActive = item.children?.some(child => pathname === child.href)
-
-            return (
-              <div key={item.name}>
-                <span className="relative">
-                  {isActive && !isParentOfActive && (
-                    <span className="absolute inset-y-2 -left-4 w-0.5 rounded-full bg-white" />
-                  )}
-                  <Link
-                    href={item.href}
-                    className={`flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'text-white'
-                        : 'text-zinc-400 hover:bg-white/5 hover:text-white'
-                    }`}
-                  >
-                    <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-white' : 'text-zinc-500'}`} />
-                    <span className="truncate">{item.name}</span>
-                    {item.children && (
-                      <ChevronDown className={`ml-auto h-4 w-4 transition-transform ${isActive ? 'rotate-180' : ''}`} />
-                    )}
-                  </Link>
-                </span>
-
-                {/* Sub-navigation */}
-                {item.children && isActive && (
-                  <div className="ml-4 mt-1 flex flex-col gap-0.5 border-l border-white/10 pl-3">
-                    {item.children.map((child) => {
-                      const isChildActive = pathname === child.href
-                      return (
-                        <span key={child.name} className="relative">
-                          {isChildActive && (
-                            <span className="absolute inset-y-2 -left-3 w-0.5 rounded-full bg-white" />
-                          )}
-                          <Link
-                            href={child.href}
-                            className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm transition-colors ${
-                              isChildActive
-                                ? 'text-white font-medium'
-                                : 'text-zinc-400 hover:bg-white/5 hover:text-white'
-                            }`}
-                          >
-                            <child.icon className={`h-4 w-4 shrink-0 ${isChildActive ? 'text-white' : 'text-zinc-500'}`} />
-                            <span className="truncate">{child.name}</span>
-                          </Link>
-                        </span>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Spacer */}
-        <div className="mt-8 flex-1" />
-
-        {/* Support Section */}
-        <div className="flex flex-col gap-0.5">
-          <Link
-            href="/contactus"
-            className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm font-medium text-zinc-400 hover:bg-white/5 hover:text-white transition-colors"
-          >
-            <HelpCircle className="h-5 w-5 shrink-0 text-zinc-500" />
-            <span className="truncate">Support</span>
-          </Link>
-          <Link
-            href="/tools"
-            className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm font-medium text-zinc-400 hover:bg-white/5 hover:text-white transition-colors"
-          >
-            <ExternalLink className="h-5 w-5 shrink-0 text-zinc-500" />
-            <span className="truncate">View Directory</span>
-          </Link>
-        </div>
-      </div>
-
-      {/* Sidebar Footer - User Account */}
-      <div className="flex flex-col border-t border-white/5 p-4">
+      {/* User Info */}
+      <div className="p-4 border-b border-slate-200">
         <div className="flex items-center gap-3">
           <UserButton
             afterSignOutUrl="/"
@@ -184,15 +98,89 @@ export function AccountSidebar({ children, newsletterName, logoUrl }: AccountSid
               }
             }}
           />
-          <span className="flex min-w-0 flex-col">
-            <span className="block truncate text-sm font-medium text-white">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-slate-900">
               {user?.fullName || 'User'}
-            </span>
-            <span className="block truncate text-xs text-zinc-400">
+            </p>
+            <p className="truncate text-xs text-slate-500">
               {user?.primaryEmailAddress?.emailAddress}
-            </span>
-          </span>
+            </p>
+          </div>
         </div>
+      </div>
+
+      {/* Navigation */}
+      <div className="flex-1 overflow-y-auto py-4">
+        <div className="px-4 mb-2">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Menu</p>
+        </div>
+        <div className="space-y-1 px-2">
+          {navigation.map((item) => {
+            const isActive = item.href === '/account'
+              ? pathname === '/account'
+              : pathname.startsWith(item.href)
+
+            return (
+              <div key={item.name}>
+                <Link
+                  href={item.href}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-blue-50 text-blue-600'
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                  }`}
+                >
+                  <item.icon className={`h-5 w-5 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
+                  <span>{item.name}</span>
+                  {item.children && (
+                    <ChevronDown className={`ml-auto h-4 w-4 transition-transform ${isActive ? 'rotate-180' : ''}`} />
+                  )}
+                </Link>
+
+                {/* Sub-navigation */}
+                {item.children && isActive && (
+                  <div className="ml-8 mt-1 space-y-1">
+                    {item.children.map((child) => {
+                      const isChildActive = pathname === child.href
+                      return (
+                        <Link
+                          key={child.name}
+                          href={child.href}
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                            isChildActive
+                              ? 'text-blue-600 font-medium'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                          }`}
+                        >
+                          <child.icon className={`h-4 w-4 ${isChildActive ? 'text-blue-600' : 'text-slate-400'}`} />
+                          <span>{child.name}</span>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Footer Links */}
+      <div className="p-4 border-t border-slate-200 space-y-1">
+        <Link
+          href="/contactus"
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+        >
+          <HelpCircle className="h-5 w-5 text-slate-400" />
+          <span>Support</span>
+        </Link>
+        <Link
+          href="/tools"
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+        >
+          <ExternalLink className="h-5 w-5 text-slate-400" />
+          <span>View Directory</span>
+        </Link>
       </div>
     </nav>
   )
@@ -200,59 +188,50 @@ export function AccountSidebar({ children, newsletterName, logoUrl }: AccountSid
   return (
     <>
       <SignedIn>
-        <div className="relative isolate flex min-h-screen w-full bg-white max-lg:flex-col lg:bg-zinc-100">
-          {/* Sidebar on desktop - fixed position */}
-          <div className="fixed inset-y-0 left-0 w-64 max-lg:hidden">
-            <div className="flex h-full flex-col bg-zinc-900">
-              <SidebarContent />
-            </div>
-          </div>
+        <div className="min-h-screen bg-slate-50 flex">
+          {/* Desktop Sidebar */}
+          <aside className="hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0 lg:border-r lg:border-slate-200 lg:bg-white">
+            <SidebarContent />
+          </aside>
 
-          {/* Mobile sidebar overlay */}
+          {/* Mobile sidebar */}
           {mobileMenuOpen && (
             <div className="fixed inset-0 z-50 lg:hidden">
-              {/* Backdrop */}
               <div
-                className="fixed inset-0 bg-black/30"
+                className="fixed inset-0 bg-slate-900/50"
                 onClick={() => setMobileMenuOpen(false)}
               />
-              {/* Sidebar panel */}
-              <div className="fixed inset-y-0 left-0 w-full max-w-80 p-2">
-                <div className="flex h-full flex-col rounded-lg bg-zinc-900 shadow-xl ring-1 ring-white/10">
-                  {/* Close button */}
-                  <div className="flex items-center justify-end px-4 pt-3">
-                    <button
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="rounded-lg p-2 text-zinc-400 hover:bg-white/5 hover:text-white"
-                    >
-                      <X className="h-5 w-5" />
-                    </button>
-                  </div>
-                  <SidebarContent />
+              <div className="fixed inset-y-0 left-0 w-full max-w-xs bg-white shadow-xl">
+                <div className="flex items-center justify-end p-4 border-b border-slate-200">
+                  <button
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="p-2 rounded-lg text-slate-500 hover:bg-slate-100"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
                 </div>
+                <SidebarContent />
               </div>
             </div>
           )}
 
           {/* Mobile header */}
-          <header className="flex items-center px-4 lg:hidden border-b border-zinc-200 bg-white">
-            <div className="py-2.5">
-              <button
-                onClick={() => setMobileMenuOpen(true)}
-                className="rounded-lg p-2.5 text-zinc-700 hover:bg-zinc-100"
-              >
-                <Menu className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="flex min-w-0 flex-1 items-center justify-between px-4">
-              <span className="text-sm font-semibold text-zinc-900">{newsletterName}</span>
+          <header className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center gap-4 px-4 py-3 bg-white border-b border-slate-200">
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="p-2 rounded-lg text-slate-600 hover:bg-slate-100"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <span className="text-sm font-semibold text-slate-900">{newsletterName}</span>
+            <div className="ml-auto">
               <UserButton afterSignOutUrl="/" />
             </div>
           </header>
 
           {/* Main Content */}
-          <main className="flex flex-1 flex-col pb-2 lg:min-w-0 lg:pt-2 lg:pr-2 lg:pl-64">
-            <div className="grow p-6 lg:rounded-lg lg:bg-white lg:p-10 lg:shadow-sm lg:ring-1 lg:ring-zinc-950/5">
+          <main className="flex-1 lg:pl-72">
+            <div className="py-8 px-4 sm:px-6 lg:px-8 lg:py-10 mt-14 lg:mt-0">
               <div className="mx-auto max-w-4xl">
                 {children}
               </div>

@@ -37,27 +37,27 @@ export default async function AdsOverviewPage() {
     <div>
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-zinc-900">My Ads</h1>
-        <p className="text-zinc-600 mt-1">
+        <h1 className="text-2xl font-bold text-slate-900">My Ads</h1>
+        <p className="text-slate-600 mt-1">
           Overview of your advertising options and campaigns
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-6">
         {/* Tool Profile Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden">
-          <div className="p-6 border-b border-zinc-100">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-6 border-b border-slate-100">
             <div className="flex items-center gap-3">
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
                 isSponsored
                   ? 'bg-gradient-to-r from-blue-600 to-cyan-500'
-                  : 'bg-zinc-100'
+                  : 'bg-slate-100'
               }`}>
-                <Star className={`w-6 h-6 ${isSponsored ? 'text-white fill-current' : 'text-zinc-400'}`} />
+                <Star className={`w-6 h-6 ${isSponsored ? 'text-white fill-current' : 'text-slate-400'}`} />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-zinc-900">Tool Profile</h2>
-                <p className="text-sm text-zinc-500">Sponsored listing in directory</p>
+                <h2 className="text-lg font-semibold text-slate-900">Tool Profile</h2>
+                <p className="text-sm text-slate-500">Sponsored listing in directory</p>
               </div>
             </div>
           </div>
@@ -65,7 +65,7 @@ export default async function AdsOverviewPage() {
           <div className="p-6">
             {!hasListing ? (
               <div className="text-center py-4">
-                <p className="text-zinc-500 mb-4">No tool listing yet</p>
+                <p className="text-slate-500 mb-4">No tool listing yet</p>
                 <Link
                   href="/tools/submit"
                   className="text-blue-600 font-medium hover:underline"
@@ -80,20 +80,20 @@ export default async function AdsOverviewPage() {
                     <Check className="w-4 h-4" />
                     Sponsored Active
                   </span>
-                  <span className="text-sm text-zinc-500">
+                  <span className="text-sm text-slate-500">
                     {tool.plan === 'yearly' ? 'Yearly' : 'Monthly'}
                   </span>
                 </div>
-                <p className="text-sm text-zinc-600 mb-4">
+                <p className="text-sm text-slate-600 mb-4">
                   Your listing "{tool.app_name}" is featured at the top of the directory.
                 </p>
               </div>
             ) : (
               <div>
-                <p className="text-sm text-zinc-600 mb-4">
+                <p className="text-sm text-slate-600 mb-4">
                   Upgrade "{tool.app_name}" to get priority placement and stand out.
                 </p>
-                <div className="flex items-center gap-4 text-sm text-zinc-500">
+                <div className="flex items-center gap-4 text-sm text-slate-500">
                   <span>From $30/mo</span>
                   <span>•</span>
                   <span>Cancel anytime</span>
@@ -102,7 +102,7 @@ export default async function AdsOverviewPage() {
             )}
           </div>
 
-          <div className="px-6 py-4 bg-zinc-50 border-t border-zinc-100">
+          <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
             <Link
               href="/account/ads/profile"
               className="flex items-center justify-between text-blue-600 font-medium hover:underline"
@@ -114,15 +114,15 @@ export default async function AdsOverviewPage() {
         </div>
 
         {/* Newsletter Ads Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden">
-          <div className="p-6 border-b border-zinc-100">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-6 border-b border-slate-100">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
                 <Newspaper className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-zinc-900">Newsletter Ads</h2>
-                <p className="text-sm text-zinc-500">Main Sponsor placements</p>
+                <h2 className="text-lg font-semibold text-slate-900">Newsletter Ads</h2>
+                <p className="text-sm text-slate-500">Main Sponsor placements</p>
               </div>
             </div>
           </div>
@@ -130,18 +130,18 @@ export default async function AdsOverviewPage() {
           <div className="p-6">
             {newsletterAdCount === 0 ? (
               <div className="text-center py-4">
-                <p className="text-zinc-500 mb-4">No newsletter ads yet</p>
-                <p className="text-sm text-zinc-400">
+                <p className="text-slate-500 mb-4">No newsletter ads yet</p>
+                <p className="text-sm text-slate-400">
                   Reach thousands of accounting professionals
                 </p>
               </div>
             ) : (
               <div className="space-y-3">
                 {newsletterAds?.map((ad) => (
-                  <div key={ad.id} className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg">
+                  <div key={ad.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <div>
-                      <p className="font-medium text-zinc-900 text-sm">{ad.company_name || ad.title}</p>
-                      <p className="text-xs text-zinc-500">
+                      <p className="font-medium text-slate-900 text-sm">{ad.company_name || ad.title}</p>
+                      <p className="text-xs text-slate-500">
                         {ad.preferred_start_date
                           ? new Date(ad.preferred_start_date).toLocaleDateString()
                           : 'Date TBD'}
@@ -154,7 +154,7 @@ export default async function AdsOverviewPage() {
             )}
           </div>
 
-          <div className="px-6 py-4 bg-zinc-50 border-t border-zinc-100">
+          <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
             <Link
               href="/account/ads/newsletter"
               className="flex items-center justify-between text-blue-600 font-medium hover:underline"
@@ -168,15 +168,15 @@ export default async function AdsOverviewPage() {
 
       {/* Quick Stats / Info */}
       <div className="mt-8 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl border border-blue-200 p-6">
-        <h3 className="font-semibold text-zinc-900 mb-4">Advertising Options</h3>
+        <h3 className="font-semibold text-slate-900 mb-4">Advertising Options</h3>
         <div className="grid grid-cols-2 gap-6">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
               <Star className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <p className="font-medium text-zinc-900">Sponsored Profile</p>
-              <p className="text-sm text-zinc-600">
+              <p className="font-medium text-slate-900">Sponsored Profile</p>
+              <p className="text-sm text-slate-600">
                 Monthly subscription. Your tool appears at the top of search results with a sponsored badge.
               </p>
             </div>
@@ -186,8 +186,8 @@ export default async function AdsOverviewPage() {
               <Newspaper className="w-5 h-5 text-cyan-600" />
             </div>
             <div>
-              <p className="font-medium text-zinc-900">Newsletter Main Sponsor</p>
-              <p className="text-sm text-zinc-600">
+              <p className="font-medium text-slate-900">Newsletter Main Sponsor</p>
+              <p className="text-sm text-slate-600">
                 One-time placement. Your ad appears prominently in a newsletter issue.
               </p>
             </div>

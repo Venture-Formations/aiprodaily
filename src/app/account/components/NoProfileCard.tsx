@@ -3,7 +3,7 @@ import { Plus, Sparkles } from 'lucide-react'
 
 export function NoProfileCard() {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 p-12 text-center">
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
       <div className="max-w-md mx-auto">
         {/* Icon */}
         <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-blue-50 flex items-center justify-center">
@@ -11,29 +11,29 @@ export function NoProfileCard() {
         </div>
 
         {/* Content */}
-        <h2 className="text-2xl font-bold text-zinc-900 mb-3">
+        <h2 className="text-2xl font-bold text-slate-900 mb-3">
           No Listing Yet
         </h2>
-        <p className="text-zinc-600 mb-8">
+        <p className="text-slate-600 mb-8">
           Submit your AI tool to the directory and get discovered by thousands of accounting professionals looking for solutions like yours.
         </p>
 
         {/* Benefits */}
         <div className="grid grid-cols-3 gap-4 mb-8 text-left">
-          <div className="p-4 bg-zinc-50 rounded-xl">
+          <div className="p-4 bg-slate-50 rounded-xl">
             <p className="text-2xl mb-1">🎯</p>
-            <p className="text-sm font-medium text-zinc-900">Targeted</p>
-            <p className="text-xs text-zinc-500">Reach accountants & finance pros</p>
+            <p className="text-sm font-medium text-slate-900">Targeted</p>
+            <p className="text-xs text-slate-500">Reach accountants & finance pros</p>
           </div>
-          <div className="p-4 bg-zinc-50 rounded-xl">
+          <div className="p-4 bg-slate-50 rounded-xl">
             <p className="text-2xl mb-1">📈</p>
-            <p className="text-sm font-medium text-zinc-900">Visibility</p>
-            <p className="text-xs text-zinc-500">Appear in search & categories</p>
+            <p className="text-sm font-medium text-slate-900">Visibility</p>
+            <p className="text-xs text-slate-500">Appear in search & categories</p>
           </div>
-          <div className="p-4 bg-zinc-50 rounded-xl">
+          <div className="p-4 bg-slate-50 rounded-xl">
             <p className="text-2xl mb-1">💰</p>
-            <p className="text-sm font-medium text-zinc-900">Free</p>
-            <p className="text-xs text-zinc-500">Basic listings are free</p>
+            <p className="text-sm font-medium text-slate-900">Free</p>
+            <p className="text-xs text-slate-500">Basic listings are free</p>
           </div>
         </div>
 
@@ -46,7 +46,7 @@ export function NoProfileCard() {
           Submit Your Tool
         </Link>
 
-        <p className="mt-4 text-sm text-zinc-500">
+        <p className="mt-4 text-sm text-slate-500">
           Free listings are reviewed within 1-2 business days
         </p>
       </div>

@@ -27,20 +27,20 @@ export default async function ToolProfileAdsPage() {
     <div>
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-zinc-900">Tool Profile Advertising</h1>
-        <p className="text-zinc-600 mt-1">
+        <h1 className="text-2xl font-bold text-slate-900">Tool Profile Advertising</h1>
+        <p className="text-slate-600 mt-1">
           Boost your tool's visibility with a Sponsored listing
         </p>
       </div>
 
       {!hasListing ? (
         // No listing yet
-        <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 p-12 text-center">
-          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-zinc-100 flex items-center justify-center">
-            <Star className="w-8 h-8 text-zinc-400" />
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
+          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-slate-100 flex items-center justify-center">
+            <Star className="w-8 h-8 text-slate-400" />
           </div>
-          <h2 className="text-xl font-bold text-zinc-900 mb-3">No Tool Listing Yet</h2>
-          <p className="text-zinc-600 mb-6 max-w-md mx-auto">
+          <h2 className="text-xl font-bold text-slate-900 mb-3">No Tool Listing Yet</h2>
+          <p className="text-slate-600 mb-6 max-w-md mx-auto">
             You need to submit a tool to the directory before you can upgrade to a Sponsored listing.
           </p>
           <Link
@@ -63,13 +63,13 @@ export default async function ToolProfileAdsPage() {
                     <Star className="w-7 h-7 text-white fill-current" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-zinc-900">{tool.app_name}</h2>
+                    <h2 className="text-xl font-bold text-slate-900">{tool.app_name}</h2>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-sm font-medium">
                         <Star className="w-4 h-4 fill-current" />
                         Sponsored
                       </span>
-                      <span className="text-sm text-zinc-500">
+                      <span className="text-sm text-slate-500">
                         {tool.plan === 'yearly' ? 'Yearly Plan' : 'Monthly Plan'}
                       </span>
                     </div>
@@ -77,34 +77,34 @@ export default async function ToolProfileAdsPage() {
                 </div>
                 <Link
                   href="/account/billing"
-                  className="px-4 py-2 bg-zinc-100 text-zinc-700 rounded-lg text-sm font-medium hover:bg-zinc-200 transition-colors"
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
                 >
                   Manage Subscription
                 </Link>
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-6 mt-6 pt-6 border-t border-zinc-100">
+              <div className="grid grid-cols-3 gap-6 mt-6 pt-6 border-t border-slate-100">
                 <div className="text-center">
-                  <div className="flex items-center justify-center gap-1.5 text-zinc-500 mb-1">
+                  <div className="flex items-center justify-center gap-1.5 text-slate-500 mb-1">
                     <Eye className="w-4 h-4" />
                     <span className="text-xs uppercase tracking-wide">Views</span>
                   </div>
-                  <p className="text-2xl font-bold text-zinc-900">
+                  <p className="text-2xl font-bold text-slate-900">
                     {tool.view_count?.toLocaleString() || '0'}
                   </p>
                 </div>
                 <div className="text-center">
-                  <div className="flex items-center justify-center gap-1.5 text-zinc-500 mb-1">
+                  <div className="flex items-center justify-center gap-1.5 text-slate-500 mb-1">
                     <TrendingUp className="w-4 h-4" />
                     <span className="text-xs uppercase tracking-wide">Clicks</span>
                   </div>
-                  <p className="text-2xl font-bold text-zinc-900">
+                  <p className="text-2xl font-bold text-slate-900">
                     {tool.click_count?.toLocaleString() || '0'}
                   </p>
                 </div>
                 <div className="text-center">
-                  <div className="flex items-center justify-center gap-1.5 text-zinc-500 mb-1">
+                  <div className="flex items-center justify-center gap-1.5 text-slate-500 mb-1">
                     <Zap className="w-4 h-4" />
                     <span className="text-xs uppercase tracking-wide">Position</span>
                   </div>
@@ -115,16 +115,16 @@ export default async function ToolProfileAdsPage() {
           </div>
 
           {/* Benefits Reminder */}
-          <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 p-6">
-            <h3 className="font-semibold text-zinc-900 mb-4">Your Sponsored Benefits</h3>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <h3 className="font-semibold text-slate-900 mb-4">Your Sponsored Benefits</h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex items-start gap-3">
                 <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
                   <Check className="w-4 h-4 text-emerald-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-zinc-900 text-sm">Priority Placement</p>
-                  <p className="text-xs text-zinc-500">Appear at the top of search results</p>
+                  <p className="font-medium text-slate-900 text-sm">Priority Placement</p>
+                  <p className="text-xs text-slate-500">Appear at the top of search results</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -132,8 +132,8 @@ export default async function ToolProfileAdsPage() {
                   <Check className="w-4 h-4 text-emerald-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-zinc-900 text-sm">Sponsored Badge</p>
-                  <p className="text-xs text-zinc-500">Stand out with a highlighted listing</p>
+                  <p className="font-medium text-slate-900 text-sm">Sponsored Badge</p>
+                  <p className="text-xs text-slate-500">Stand out with a highlighted listing</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -141,8 +141,8 @@ export default async function ToolProfileAdsPage() {
                   <Check className="w-4 h-4 text-emerald-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-zinc-900 text-sm">Enhanced Visibility</p>
-                  <p className="text-xs text-zinc-500">Blue border highlights your listing</p>
+                  <p className="font-medium text-slate-900 text-sm">Enhanced Visibility</p>
+                  <p className="text-xs text-slate-500">Blue border highlights your listing</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -150,8 +150,8 @@ export default async function ToolProfileAdsPage() {
                   <Check className="w-4 h-4 text-emerald-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-zinc-900 text-sm">Category Priority</p>
-                  <p className="text-xs text-zinc-500">Featured in category pages</p>
+                  <p className="font-medium text-slate-900 text-sm">Category Priority</p>
+                  <p className="text-xs text-slate-500">Featured in category pages</p>
                 </div>
               </div>
             </div>
@@ -161,20 +161,20 @@ export default async function ToolProfileAdsPage() {
         // Not sponsored - show upgrade options
         <div className="space-y-6">
           {/* Current Status */}
-          <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 p-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-zinc-100 flex items-center justify-center">
-                  <Star className="w-6 h-6 text-zinc-400" />
+                <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">
+                  <Star className="w-6 h-6 text-slate-400" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-zinc-900">{tool.app_name}</h2>
-                  <span className="text-sm text-zinc-500">Free Listing</span>
+                  <h2 className="text-lg font-bold text-slate-900">{tool.app_name}</h2>
+                  <span className="text-sm text-slate-500">Free Listing</span>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm text-zinc-500">Current Status</p>
-                <p className="font-medium text-zinc-900 capitalize">{tool.submission_status}</p>
+                <p className="text-sm text-slate-500">Current Status</p>
+                <p className="font-medium text-slate-900 capitalize">{tool.submission_status}</p>
               </div>
             </div>
           </div>
@@ -185,8 +185,8 @@ export default async function ToolProfileAdsPage() {
               <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 flex items-center justify-center">
                 <Star className="w-8 h-8 text-white fill-current" />
               </div>
-              <h2 className="text-2xl font-bold text-zinc-900 mb-2">Upgrade to Sponsored</h2>
-              <p className="text-zinc-600 max-w-lg mx-auto">
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Upgrade to Sponsored</h2>
+              <p className="text-slate-600 max-w-lg mx-auto">
                 Get more visibility and stand out from the crowd with a Sponsored listing
               </p>
             </div>
@@ -194,29 +194,29 @@ export default async function ToolProfileAdsPage() {
             {/* Pricing Cards */}
             <div className="grid grid-cols-2 gap-6 max-w-2xl mx-auto">
               {/* Monthly */}
-              <div className="bg-white rounded-xl border border-zinc-200 p-6">
-                <h3 className="font-semibold text-zinc-900 mb-1">Monthly</h3>
+              <div className="bg-white rounded-xl border border-slate-200 p-6">
+                <h3 className="font-semibold text-slate-900 mb-1">Monthly</h3>
                 <div className="mb-4">
-                  <span className="text-3xl font-bold text-zinc-900">$30</span>
-                  <span className="text-zinc-500">/month</span>
+                  <span className="text-3xl font-bold text-slate-900">$30</span>
+                  <span className="text-slate-500">/month</span>
                 </div>
                 <ul className="space-y-2 mb-6">
-                  <li className="flex items-center gap-2 text-sm text-zinc-600">
+                  <li className="flex items-center gap-2 text-sm text-slate-600">
                     <Check className="w-4 h-4 text-emerald-500" />
                     Priority placement
                   </li>
-                  <li className="flex items-center gap-2 text-sm text-zinc-600">
+                  <li className="flex items-center gap-2 text-sm text-slate-600">
                     <Check className="w-4 h-4 text-emerald-500" />
                     Sponsored badge
                   </li>
-                  <li className="flex items-center gap-2 text-sm text-zinc-600">
+                  <li className="flex items-center gap-2 text-sm text-slate-600">
                     <Check className="w-4 h-4 text-emerald-500" />
                     Cancel anytime
                   </li>
                 </ul>
                 <Link
                   href={`/account/ads/upgrade?plan=monthly&tool=${tool.id}`}
-                  className="block w-full py-2.5 bg-zinc-900 text-white text-center rounded-full font-medium hover:bg-zinc-700 transition-colors"
+                  className="block w-full py-2.5 bg-slate-900 text-white text-center rounded-full font-medium hover:bg-slate-700 transition-colors"
                 >
                   Choose Monthly
                 </Link>
@@ -229,21 +229,21 @@ export default async function ToolProfileAdsPage() {
                     Save 30%
                   </span>
                 </div>
-                <h3 className="font-semibold text-zinc-900 mb-1">Yearly</h3>
+                <h3 className="font-semibold text-slate-900 mb-1">Yearly</h3>
                 <div className="mb-4">
-                  <span className="text-3xl font-bold text-zinc-900">$250</span>
-                  <span className="text-zinc-500">/year</span>
+                  <span className="text-3xl font-bold text-slate-900">$250</span>
+                  <span className="text-slate-500">/year</span>
                 </div>
                 <ul className="space-y-2 mb-6">
-                  <li className="flex items-center gap-2 text-sm text-zinc-600">
+                  <li className="flex items-center gap-2 text-sm text-slate-600">
                     <Check className="w-4 h-4 text-emerald-500" />
                     All monthly benefits
                   </li>
-                  <li className="flex items-center gap-2 text-sm text-zinc-600">
+                  <li className="flex items-center gap-2 text-sm text-slate-600">
                     <Check className="w-4 h-4 text-emerald-500" />
                     2 months free
                   </li>
-                  <li className="flex items-center gap-2 text-sm text-zinc-600">
+                  <li className="flex items-center gap-2 text-sm text-slate-600">
                     <Check className="w-4 h-4 text-emerald-500" />
                     Locked-in pricing
                   </li>
@@ -259,16 +259,16 @@ export default async function ToolProfileAdsPage() {
           </div>
 
           {/* Benefits */}
-          <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 p-6">
-            <h3 className="font-semibold text-zinc-900 mb-4">What You Get with Sponsored</h3>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <h3 className="font-semibold text-slate-900 mb-4">What You Get with Sponsored</h3>
             <div className="grid grid-cols-2 gap-6">
               <div className="flex items-start gap-4">
                 <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
                   <TrendingUp className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-zinc-900">Priority Placement</p>
-                  <p className="text-sm text-zinc-500">Your tool appears at the top of search results and category pages</p>
+                  <p className="font-medium text-slate-900">Priority Placement</p>
+                  <p className="text-sm text-slate-500">Your tool appears at the top of search results and category pages</p>
                 </div>
               </div>
               <div className="flex items-start gap-4">
@@ -276,8 +276,8 @@ export default async function ToolProfileAdsPage() {
                   <Star className="w-5 h-5 text-cyan-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-zinc-900">Sponsored Badge</p>
-                  <p className="text-sm text-zinc-500">Stand out with a prominent "Sponsored" label on your listing</p>
+                  <p className="font-medium text-slate-900">Sponsored Badge</p>
+                  <p className="text-sm text-slate-500">Stand out with a prominent "Sponsored" label on your listing</p>
                 </div>
               </div>
               <div className="flex items-start gap-4">
@@ -285,8 +285,8 @@ export default async function ToolProfileAdsPage() {
                   <Eye className="w-5 h-5 text-teal-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-zinc-900">Enhanced Visibility</p>
-                  <p className="text-sm text-zinc-500">Blue highlighted border makes your listing pop</p>
+                  <p className="font-medium text-slate-900">Enhanced Visibility</p>
+                  <p className="text-sm text-slate-500">Blue highlighted border makes your listing pop</p>
                 </div>
               </div>
               <div className="flex items-start gap-4">
@@ -294,8 +294,8 @@ export default async function ToolProfileAdsPage() {
                   <Zap className="w-5 h-5 text-amber-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-zinc-900">More Clicks</p>
-                  <p className="text-sm text-zinc-500">Sponsored listings typically see 3-5x more engagement</p>
+                  <p className="font-medium text-slate-900">More Clicks</p>
+                  <p className="text-sm text-slate-500">Sponsored listings typically see 3-5x more engagement</p>
                 </div>
               </div>
             </div>

@@ -19,8 +19,8 @@ export default async function BillingPage() {
     <div>
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-zinc-900">Billing</h1>
-        <p className="text-zinc-600 mt-1">
+        <h1 className="text-2xl font-bold text-slate-900">Billing</h1>
+        <p className="text-slate-600 mt-1">
           Manage your subscriptions and payment methods
         </p>
       </div>
@@ -31,10 +31,10 @@ export default async function BillingPage() {
           <CreditCard className="w-8 h-8 text-blue-600" />
         </div>
 
-        <h2 className="text-xl font-bold text-zinc-900 mb-3">
+        <h2 className="text-xl font-bold text-slate-900 mb-3">
           Manage Your Billing
         </h2>
-        <p className="text-zinc-600 mb-8">
+        <p className="text-slate-600 mb-8">
           View invoices, update payment methods, and manage your subscriptions through our secure billing portal powered by Stripe.
         </p>
 
@@ -51,29 +51,29 @@ export default async function BillingPage() {
           <div className="grid grid-cols-3 gap-4 text-left">
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center flex-shrink-0">
-                <FileText className="w-4 h-4 text-zinc-600" />
+                <FileText className="w-4 h-4 text-slate-600" />
               </div>
               <div>
-                <p className="font-medium text-zinc-900 text-sm">Invoices</p>
-                <p className="text-xs text-zinc-500">View & download</p>
+                <p className="font-medium text-slate-900 text-sm">Invoices</p>
+                <p className="text-xs text-slate-500">View & download</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center flex-shrink-0">
-                <CreditCard className="w-4 h-4 text-zinc-600" />
+                <CreditCard className="w-4 h-4 text-slate-600" />
               </div>
               <div>
-                <p className="font-medium text-zinc-900 text-sm">Payment</p>
-                <p className="text-xs text-zinc-500">Update card info</p>
+                <p className="font-medium text-slate-900 text-sm">Payment</p>
+                <p className="text-xs text-slate-500">Update card info</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center flex-shrink-0">
-                <Shield className="w-4 h-4 text-zinc-600" />
+                <Shield className="w-4 h-4 text-slate-600" />
               </div>
               <div>
-                <p className="font-medium text-zinc-900 text-sm">Subscriptions</p>
-                <p className="text-xs text-zinc-500">Manage plans</p>
+                <p className="font-medium text-slate-900 text-sm">Subscriptions</p>
+                <p className="text-xs text-slate-500">Manage plans</p>
               </div>
             </div>
           </div>
