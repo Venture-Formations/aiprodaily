@@ -92,26 +92,13 @@ export function PersonalizationForm() {
   }
 
   const loadSparkLoopAndShowPopup = (subscriberEmail: string) => {
-    // SparkLoop auto-shows popup when script loads and detects a subscriber
+    // SparkLoop shows popup when it detects a form submission with email
     if (document.getElementById('sparkloop-script')) {
       window.location.href = '/'
       return
     }
 
-    // Set up SparkLoop visitor data BEFORE loading script
-    // This tells SparkLoop who the subscriber is
-    (window as any).SL = (window as any).SL || {}
-    ;(window as any).SL.visitor = {
-      email: subscriberEmail
-    }
-
-    // Create a hidden form with email to trigger SparkLoop's form detection
-    const hiddenForm = document.createElement('form')
-    hiddenForm.id = 'sparkloop-trigger-form'
-    hiddenForm.style.display = 'none'
-    hiddenForm.innerHTML = `<input type="email" name="email" value="${subscriberEmail}" />`
-    document.body.appendChild(hiddenForm)
-
+    // Load SparkLoop script first
     const script = document.createElement('script')
     script.id = 'sparkloop-script'
     script.src = 'https://js.sparkloop.app/embed.js?publication_id=pub_6b958dc16ac6'
@@ -119,14 +106,38 @@ export function PersonalizationForm() {
     script.setAttribute('data-sparkloop', '')
 
     script.onload = () => {
-      // Trigger form submit event so SparkLoop detects it
+      // Wait for SparkLoop to fully initialize
       setTimeout(() => {
-        const form = document.getElementById('sparkloop-trigger-form') as HTMLFormElement
-        if (form) {
-          // Dispatch submit event for SparkLoop to capture
-          form.dispatchEvent(new Event('submit', { bubbles: true }))
+        // Try to use SparkLoop's internal subscriber upsert
+        if ((window as any).SL && (window as any).SL.upsertSubscriber) {
+          (window as any).SL.upsertSubscriber({ email: subscriberEmail })
         }
-      }, 500)
+
+        // Also try triggering via their tracking
+        if ((window as any).SL && (window as any).SL.track) {
+          (window as any).SL.track('subscribe', { email: subscriberEmail })
+        }
+
+        // Create and submit a form that SparkLoop can intercept
+        const form = document.createElement('form')
+        form.id = 'sparkloop-email-form'
+        form.method = 'POST'
+        form.action = '#'
+        form.innerHTML = `
+          <input type="email" name="email" value="${subscriberEmail}" />
+          <input type="text" name="EMAIL" value="${subscriberEmail}" />
+          <button type="submit">Submit</button>
+        `
+        form.style.position = 'absolute'
+        form.style.left = '-9999px'
+        document.body.appendChild(form)
+
+        // Submit the form to trigger SparkLoop's detection
+        const submitBtn = form.querySelector('button')
+        if (submitBtn) {
+          submitBtn.click()
+        }
+      }, 1000)
 
       // Check periodically for popup close, then redirect
       let checkCount = 0
@@ -139,7 +150,7 @@ export function PersonalizationForm() {
                            document.querySelector('[class*="sparkloop"]') ||
                            document.querySelector('iframe[src*="sparkloop"]')
 
-        if (checkCount > 10 && !popupExists) {
+        if (checkCount > 15 && !popupExists) {
           clearInterval(checkPopupClosed)
           window.location.href = '/'
         }
