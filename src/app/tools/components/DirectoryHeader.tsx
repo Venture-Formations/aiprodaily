@@ -75,7 +75,6 @@ function MobileNavigation() {
       >
         <MobileNavLink href="/">Home</MobileNavLink>
         <MobileNavLink href="/tools">AI Tools</MobileNavLink>
-        <MobileNavLink href="/tools/submit">Submit Tool</MobileNavLink>
         <MobileNavLink href="/contactus">Contact</MobileNavLink>
         <hr className="m-2 border-slate-300/40" />
         <SignedOut>
@@ -114,7 +113,6 @@ export function DirectoryHeader({ logoUrl, newsletterName }: DirectoryHeaderProp
             <div className="hidden md:flex md:gap-x-6">
               <NavLink href="/">Home</NavLink>
               <NavLink href="/tools">AI Tools</NavLink>
-              <NavLink href="/tools/submit">Submit Tool</NavLink>
               <NavLink href="/contactus">Contact</NavLink>
             </div>
           </div>

@@ -1,6 +1,3 @@
-'use client'
-
-import { useState } from 'react'
 import Link from 'next/link'
 import { Container } from '@/components/salient/Container'
 
@@ -9,19 +6,6 @@ interface DirectoryHeroProps {
 }
 
 export function DirectoryHero({ toolCount }: DirectoryHeroProps) {
-  const [searchQuery, setSearchQuery] = useState('')
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (searchQuery.trim()) {
-      // Scroll to explore section with search applied
-      const exploreSection = document.getElementById('explore')
-      if (exploreSection) {
-        exploreSection.scrollIntoView({ behavior: 'smooth' })
-      }
-    }
-  }
-
   return (
     <section className="relative overflow-hidden">
       {/* Decorative gradient blur blotch */}
@@ -54,42 +38,22 @@ export function DirectoryHero({ toolCount }: DirectoryHeroProps) {
           accounting workflow, automate tedious tasks, and boost productivity.
         </p>
 
-        {/* Search Bar - Email input with button inside */}
-        <form onSubmit={handleSearch} className="mt-8 flex justify-center">
-          <div className="relative w-full max-w-lg">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search AI tools..."
-              className="w-full rounded-full border-0 bg-white px-5 py-4 pr-36 text-slate-900 shadow-lg ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
-            />
-            <Link
-              href="#explore"
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-            >
-              Explore
-            </Link>
-          </div>
-        </form>
-
-        {/* Quick links */}
-        <div className="mt-8 flex flex-wrap justify-center gap-4">
+        {/* CTA Buttons */}
+        <div className="mt-10 flex flex-col sm:flex-row justify-center gap-4">
           <Link
             href="#categories"
-            className="inline-flex items-center text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors"
+            className="group inline-flex items-center justify-center rounded-full bg-blue-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-all"
           >
-            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
             </svg>
             Browse by Category
           </Link>
-          <span className="text-slate-300">|</span>
           <Link
             href="/tools/submit"
-            className="inline-flex items-center text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors"
+            className="group inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-3.5 text-base font-semibold text-white shadow-lg hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 transition-all"
           >
-            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             Submit Your Tool
