@@ -6,6 +6,7 @@ import Image from 'next/image'
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop'
 import 'react-image-crop/dist/ReactCrop.css'
 import { getCroppedImage } from '@/utils/imageCrop'
+import Layout from '@/components/Layout'
 
 interface Tool {
   id: string
@@ -197,11 +198,12 @@ export default function ToolsAdminPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Tools Directory Admin</h1>
-        <p className="text-gray-600 mt-1">Review and manage tool submissions</p>
-      </div>
+    <Layout>
+      <div className="px-4 py-6 sm:px-0">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Tools Directory Admin</h1>
+          <p className="text-gray-600 mt-1">Review and manage tool submissions</p>
+        </div>
 
       {/* Filter Tabs */}
       <div className="flex gap-2 mb-6">
@@ -432,7 +434,8 @@ export default function ToolsAdminPage() {
           }}
         />
       )}
-    </div>
+      </div>
+    </Layout>
   )
 }
 
