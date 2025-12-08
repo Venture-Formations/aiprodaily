@@ -114,55 +114,80 @@ export function PersonalizationForm() {
   const waitForSparkLoopPopupClose = () => {
     // Wait for SparkLoop popup to appear, then wait for it to close
     let popupDetected = false
+    let initialBodyChildCount = document.body.children.length
     let checkCount = 0
     const maxWaitTime = 180 // 3 minutes max
 
     const checkInterval = setInterval(() => {
       checkCount++
 
-      // Look for SparkLoop popup elements - check multiple possible selectors
-      // SparkLoop typically uses iframes or modal divs
+      // SparkLoop adds elements to the body when showing popup
+      // Look specifically for popup/overlay elements, NOT forms
       const sparkloopIframe = document.querySelector('iframe[src*="sparkloop"]') ||
                               document.querySelector('iframe[src*="upscribe"]')
-      const sparkloopModal = document.querySelector('[class*="sparkloop"]') ||
-                            document.querySelector('[id*="sparkloop"]') ||
-                            document.querySelector('[data-sparkloop]') ||
-                            document.querySelector('[class*="sl-"]') ||
-                            document.querySelector('[id*="sl-"]')
 
-      // Also check for any overlay/modal that appeared after form submit
-      const anyModal = document.querySelector('[role="dialog"]') ||
-                      document.querySelector('.modal-overlay') ||
-                      document.querySelector('[class*="modal"]') ||
-                      document.querySelector('[class*="overlay"]')
+      // Look for fixed/absolute positioned overlays (popups typically use these)
+      const overlayElements = document.querySelectorAll('body > div')
+      let hasPopupOverlay = false
 
-      const popupExists = sparkloopIframe || sparkloopModal || anyModal
+      overlayElements.forEach((el) => {
+        const style = window.getComputedStyle(el)
+        const isOverlay = style.position === 'fixed' ||
+                         (style.position === 'absolute' && style.zIndex && parseInt(style.zIndex) > 1000)
+        if (isOverlay && !el.id?.includes('sparkloop-script')) {
+          hasPopupOverlay = true
+        }
+      })
 
-      // Debug logging (can remove later)
-      if (checkCount <= 3) {
+      // Check if body has more children than initially (SparkLoop injects popup)
+      const currentBodyChildCount = document.body.children.length
+      const hasNewElements = currentBodyChildCount > initialBodyChildCount
+
+      const popupExists = sparkloopIframe || hasPopupOverlay || hasNewElements
+
+      // Debug logging
+      if (checkCount <= 5 || checkCount % 10 === 0) {
         console.log('[SparkLoop] Checking for popup:', {
-          popupExists: !!popupExists,
+          popupExists,
           popupDetected,
-          checkCount
+          checkCount,
+          hasPopupOverlay,
+          hasNewElements,
+          bodyChildren: currentBodyChildCount,
+          initialChildren: initialBodyChildCount
         })
       }
 
-      if (popupExists) {
+      if (popupExists && !popupDetected) {
         popupDetected = true
+        // Update initial count now that popup is detected
+        console.log('[SparkLoop] Popup detected!')
       }
 
-      // If popup was detected and is now gone, redirect
-      if (popupDetected && !popupExists) {
-        console.log('[SparkLoop] Popup closed, redirecting...')
-        clearInterval(checkInterval)
-        window.location.href = '/'
-        return
+      // If popup was detected, check if the new elements are gone
+      if (popupDetected) {
+        // Give it a moment, then check if overlay is gone
+        if (!hasPopupOverlay && !sparkloopIframe) {
+          // Double-check after a short delay
+          setTimeout(() => {
+            const stillHasOverlay = Array.from(document.querySelectorAll('body > div')).some((el) => {
+              const style = window.getComputedStyle(el)
+              return style.position === 'fixed' ||
+                     (style.position === 'absolute' && style.zIndex && parseInt(style.zIndex) > 1000)
+            })
+
+            if (!stillHasOverlay) {
+              console.log('[SparkLoop] Popup closed, redirecting...')
+              clearInterval(checkInterval)
+              window.location.href = '/'
+            }
+          }, 500)
+        }
       }
 
-      // If no popup detected after 10 seconds, redirect anyway
-      // (popup might not have shown)
-      if (!popupDetected && checkCount >= 10) {
-        console.log('[SparkLoop] No popup detected after 10s, redirecting...')
+      // If no popup detected after 15 seconds, redirect anyway
+      if (!popupDetected && checkCount >= 15) {
+        console.log('[SparkLoop] No popup detected after 15s, redirecting...')
         clearInterval(checkInterval)
         window.location.href = '/'
         return
