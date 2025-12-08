@@ -60,10 +60,10 @@ export async function getApprovedTools(): Promise<DirectoryApp[]> {
     .select('*')
     .eq('publication_id', PUBLICATION_ID)
     .eq('is_active', true)
-    .order('is_paid_placement', { ascending: false })
-    .order('is_affiliate', { ascending: false })
-    .order('is_featured', { ascending: false })
-    .order('app_name', { ascending: true })
+    .order('is_paid_placement', { ascending: false })  // Sponsored first
+    .order('is_featured', { ascending: false })        // Then featured
+    .order('is_affiliate', { ascending: false })       // Then affiliates
+    .order('app_name', { ascending: true })            // Then alphabetically
 
   if (error) {
     console.error('[Directory] Error fetching AI applications:', error)
@@ -144,10 +144,10 @@ export async function getToolsByCategory(categorySlug: string): Promise<{
     .eq('publication_id', PUBLICATION_ID)
     .eq('is_active', true)
     .eq('category', category.name)
-    .order('is_paid_placement', { ascending: false })
-    .order('is_affiliate', { ascending: false })
-    .order('is_featured', { ascending: false })
-    .order('app_name', { ascending: true })
+    .order('is_paid_placement', { ascending: false })  // Sponsored first
+    .order('is_featured', { ascending: false })        // Then featured
+    .order('is_affiliate', { ascending: false })       // Then affiliates
+    .order('app_name', { ascending: true })            // Then alphabetically
 
   if (error) {
     console.error('[Directory] Error fetching category tools:', error)
@@ -170,9 +170,10 @@ export async function searchTools(query: string): Promise<DirectoryApp[]> {
     .eq('publication_id', PUBLICATION_ID)
     .eq('is_active', true)
     .or(`app_name.ilike.%${query}%,description.ilike.%${query}%`)
-    .order('is_paid_placement', { ascending: false })
-    .order('is_featured', { ascending: false })
-    .order('app_name', { ascending: true })
+    .order('is_paid_placement', { ascending: false })  // Sponsored first
+    .order('is_featured', { ascending: false })        // Then featured
+    .order('is_affiliate', { ascending: false })       // Then affiliates
+    .order('app_name', { ascending: true })            // Then alphabetically
     .limit(50)
 
   if (error) {
