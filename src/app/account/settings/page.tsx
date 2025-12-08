@@ -16,26 +16,26 @@ export default async function SettingsPage() {
     <div>
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
-        <p className="text-slate-600 mt-1">
+        <h1 className="text-2xl font-bold text-zinc-900">Settings</h1>
+        <p className="text-zinc-600 mt-1">
           Manage your account preferences
         </p>
       </div>
 
       <div className="space-y-6 max-w-2xl">
         {/* Profile Settings */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 p-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
               <User className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <h2 className="font-semibold text-slate-900">Profile</h2>
-              <p className="text-sm text-slate-500">Manage your personal information</p>
+              <h2 className="font-semibold text-zinc-900">Profile</h2>
+              <p className="text-sm text-zinc-500">Manage your personal information</p>
             </div>
           </div>
 
-          <div className="flex items-center justify-between py-4 border-t border-slate-100">
+          <div className="flex items-center justify-between py-4 border-t border-zinc-100">
             <div className="flex items-center gap-4">
               <UserButton
                 appearance={{
@@ -45,35 +45,35 @@ export default async function SettingsPage() {
                 }}
               />
               <div>
-                <p className="font-medium text-slate-900">{user.fullName || 'User'}</p>
-                <p className="text-sm text-slate-500">{user.primaryEmailAddress?.emailAddress}</p>
+                <p className="font-medium text-zinc-900">{user.fullName || 'User'}</p>
+                <p className="text-sm text-zinc-500">{user.primaryEmailAddress?.emailAddress}</p>
               </div>
             </div>
             <a
               href="https://accounts.clerk.dev/user"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-100 text-zinc-700 rounded-lg text-sm font-medium hover:bg-zinc-200 transition-colors"
             >
               Manage Account
               <ExternalLink className="w-4 h-4" />
             </a>
           </div>
 
-          <p className="text-xs text-slate-500 mt-4">
+          <p className="text-xs text-zinc-500 mt-4">
             Your account is managed through Clerk. Click "Manage Account" to update your password, email, or connected accounts.
           </p>
         </div>
 
         {/* Notification Settings */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 p-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-lg bg-cyan-100 flex items-center justify-center">
               <Bell className="w-5 h-5 text-cyan-600" />
             </div>
             <div>
-              <h2 className="font-semibold text-slate-900">Notifications</h2>
-              <p className="text-sm text-slate-500">Control what emails you receive</p>
+              <h2 className="font-semibold text-zinc-900">Notifications</h2>
+              <p className="text-sm text-zinc-500">Control what emails you receive</p>
             </div>
           </div>
 
@@ -97,19 +97,19 @@ export default async function SettingsPage() {
         </div>
 
         {/* Security */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 p-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
               <Shield className="w-5 h-5 text-emerald-600" />
             </div>
             <div>
-              <h2 className="font-semibold text-slate-900">Security</h2>
-              <p className="text-sm text-slate-500">Protect your account</p>
+              <h2 className="font-semibold text-zinc-900">Security</h2>
+              <p className="text-sm text-zinc-500">Protect your account</p>
             </div>
           </div>
 
-          <div className="p-4 bg-slate-50 rounded-xl">
-            <p className="text-sm text-slate-600">
+          <div className="p-4 bg-zinc-50 rounded-xl">
+            <p className="text-sm text-zinc-600">
               Security settings including password, two-factor authentication, and connected accounts are managed through your Clerk account.
             </p>
             <a
@@ -139,10 +139,10 @@ function NotificationToggle({
   defaultChecked: boolean
 }) {
   return (
-    <div className="flex items-center justify-between py-3 border-t border-slate-100 first:border-t-0 first:pt-0">
+    <div className="flex items-center justify-between py-3 border-t border-zinc-100 first:border-t-0 first:pt-0">
       <div>
-        <p className="font-medium text-slate-900 text-sm">{title}</p>
-        <p className="text-xs text-slate-500">{description}</p>
+        <p className="font-medium text-zinc-900 text-sm">{title}</p>
+        <p className="text-xs text-zinc-500">{description}</p>
       </div>
       <label className="relative inline-flex items-center cursor-pointer">
         <input
@@ -150,7 +150,7 @@ function NotificationToggle({
           defaultChecked={defaultChecked}
           className="sr-only peer"
         />
-        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-600/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+        <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-600/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
       </label>
     </div>
   )

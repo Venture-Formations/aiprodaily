@@ -72,7 +72,7 @@ export function ProfileCard({ tool }: ProfileCardProps) {
 
   return (
     <>
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden">
         {/* Header with gradient based on sponsored status */}
         <div className={`h-32 relative ${
           tool.is_sponsored
@@ -100,7 +100,7 @@ export function ProfileCard({ tool }: ProfileCardProps) {
           {/* Sponsored Badge */}
           {tool.is_sponsored && (
             <div className="absolute top-4 left-4">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-white text-slate-900">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-white text-zinc-900">
                 <Star className="w-4 h-4 fill-current text-amber-500" />
                 Sponsored
               </span>
@@ -131,15 +131,15 @@ export function ProfileCard({ tool }: ProfileCardProps) {
         <div className="pt-14 px-6 pb-6">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-slate-900">{tool.tool_name}</h2>
+              <h2 className="text-2xl font-bold text-zinc-900">{tool.tool_name}</h2>
               {tool.tagline && (
-                <p className="text-slate-600 mt-1">{tool.tagline}</p>
+                <p className="text-zinc-600 mt-1">{tool.tagline}</p>
               )}
             </div>
             <div className="flex gap-2">
               <button
                 onClick={() => setIsEditModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 transition-colors text-sm font-medium"
               >
                 <Edit className="w-4 h-4" />
                 Edit Profile
@@ -155,7 +155,7 @@ export function ProfileCard({ tool }: ProfileCardProps) {
                 href={tool.website_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-100 text-zinc-700 rounded-lg hover:bg-zinc-200 transition-colors text-sm font-medium"
               >
                 <ExternalLink className="w-4 h-4" />
                 Visit Site
@@ -184,7 +184,7 @@ export function ProfileCard({ tool }: ProfileCardProps) {
           )}
 
           {/* Description */}
-          <p className="mt-4 text-slate-700 leading-relaxed">
+          <p className="mt-4 text-zinc-700 leading-relaxed">
             {tool.description}
           </p>
 
@@ -193,7 +193,7 @@ export function ProfileCard({ tool }: ProfileCardProps) {
             {tool.categories.map((category) => (
               <span
                 key={category.id}
-                className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm"
+                className="px-3 py-1 bg-zinc-100 text-zinc-700 rounded-full text-sm"
               >
                 {category.name}
               </span>
@@ -201,31 +201,31 @@ export function ProfileCard({ tool }: ProfileCardProps) {
           </div>
 
           {/* Stats Row */}
-          <div className="mt-6 pt-6 border-t border-slate-100 grid grid-cols-3 gap-4">
+          <div className="mt-6 pt-6 border-t border-zinc-100 grid grid-cols-3 gap-4">
             <div className="text-center">
-              <div className="flex items-center justify-center gap-1.5 text-slate-500 mb-1">
+              <div className="flex items-center justify-center gap-1.5 text-zinc-500 mb-1">
                 <Eye className="w-4 h-4" />
                 <span className="text-xs uppercase tracking-wide">Views</span>
               </div>
-              <p className="text-2xl font-bold text-slate-900">
+              <p className="text-2xl font-bold text-zinc-900">
                 {tool.view_count?.toLocaleString() || '0'}
               </p>
             </div>
             <div className="text-center">
-              <div className="flex items-center justify-center gap-1.5 text-slate-500 mb-1">
+              <div className="flex items-center justify-center gap-1.5 text-zinc-500 mb-1">
                 <MousePointer className="w-4 h-4" />
                 <span className="text-xs uppercase tracking-wide">Clicks</span>
               </div>
-              <p className="text-2xl font-bold text-slate-900">
+              <p className="text-2xl font-bold text-zinc-900">
                 {tool.click_count?.toLocaleString() || '0'}
               </p>
             </div>
             <div className="text-center">
-              <div className="flex items-center justify-center gap-1.5 text-slate-500 mb-1">
+              <div className="flex items-center justify-center gap-1.5 text-zinc-500 mb-1">
                 <Star className="w-4 h-4" />
                 <span className="text-xs uppercase tracking-wide">Plan</span>
               </div>
-              <p className="text-2xl font-bold text-slate-900 capitalize">
+              <p className="text-2xl font-bold text-zinc-900 capitalize">
                 {tool.is_sponsored ? 'Sponsored' : 'Free'}
               </p>
             </div>
@@ -236,8 +236,8 @@ export function ProfileCard({ tool }: ProfileCardProps) {
             <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl border border-blue-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold text-slate-900">Upgrade to Sponsored</h3>
-                  <p className="text-sm text-slate-600 mt-1">
+                  <h3 className="font-semibold text-zinc-900">Upgrade to Sponsored</h3>
+                  <p className="text-sm text-zinc-600 mt-1">
                     Get a sponsored badge, appear at the top of search results, and stand out with a highlighted listing.
                   </p>
                 </div>
