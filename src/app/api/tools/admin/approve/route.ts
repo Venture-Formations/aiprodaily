@@ -10,6 +10,8 @@ export async function POST(request: NextRequest) {
                     host.includes('staging') ||
                     process.env.VERCEL_GIT_COMMIT_REF === 'staging'
 
+  let approverEmail: string | undefined
+
   if (!isStaging) {
     // Check admin authentication in production
     const session = await getServerSession(authOptions)
@@ -21,6 +23,10 @@ export async function POST(request: NextRequest) {
     if (!allowedEmails.includes(session.user.email)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+
+    approverEmail = session.user.email
+  } else {
+    approverEmail = 'staging-admin'
   }
 
   const { toolId } = await request.json()
@@ -29,7 +35,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Tool ID is required' }, { status: 400 })
   }
 
-  const result = await approveTool(toolId)
+  const result = await approveTool(toolId, approverEmail)
 
   if (result.error) {
     return NextResponse.json({ error: result.error }, { status: 500 })
