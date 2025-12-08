@@ -32,7 +32,7 @@ export function Hero() {
 
       if (response.ok) {
         // Redirect to personalization form with email parameter
-        window.location.href = `https://lunar-beneficial-spruce.heyflow.site/ai-accounting-daily-personalization-?email=${encodeURIComponent(email)}`
+        window.location.href = `/subscribe/info?email=${encodeURIComponent(email)}`
       } else {
         setError(data.error || 'Subscription failed. Please try again.')
         setIsSubmitting(false)
