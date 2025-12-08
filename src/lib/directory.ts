@@ -46,7 +46,7 @@ function transformApp(app: AIApplication): DirectoryApp {
     website_url: app.app_url,
     tool_image_url: app.screenshot_url,
     logo_image_url: app.logo_url,
-    is_sponsored: app.is_paid_placement || app.is_affiliate,
+    is_sponsored: app.is_paid_placement,
     categories: [{ id: category.id, name: category.name, slug: category.slug }]
   }
 }
