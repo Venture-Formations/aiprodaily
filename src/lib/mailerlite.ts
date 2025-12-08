@@ -415,7 +415,7 @@ export class MailerLiteService {
         // Check section_type to determine what to render
         if (section.section_type === 'primary_articles' && activeArticles.length > 0) {
           const { generatePrimaryArticlesSection } = await import('./newsletter-templates')
-          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, issue.date, issue.id, section.name, issue.publication_id)
+          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, issue.date, issue.id, section.name, issue.publication_id, issue.mailerlite_issue_id ?? undefined)
           sectionsHtml += primaryHtml
         }
         else if (section.section_type === 'secondary_articles') {

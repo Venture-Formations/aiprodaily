@@ -8,14 +8,16 @@
  * @param url - Destination URL
  * @param section - Newsletter section name
  * @param issueDate - issue date (YYYY-MM-DD)
- * @param issueId - Optional MailerLite issue ID
+ * @param mailerliteIssueId - Optional MailerLite campaign ID
+ * @param dbIssueId - Optional database issue ID (for MailerLite field updates)
  * @returns Tracking URL that redirects to destination
  */
 export function wrapTrackingUrl(
   url: string,
   section: string,
   issueDate: string,
-  issueId?: string
+  mailerliteIssueId?: string,
+  dbIssueId?: string
 ): string {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.aiaccountingdaily.com'
 
@@ -26,8 +28,13 @@ export function wrapTrackingUrl(
     email: '{$email}', // MailerLite variable
   })
 
-  if (issueId) {
-    params.append('issue_id', issueId)
+  if (mailerliteIssueId) {
+    params.append('mailerlite_id', mailerliteIssueId)
+  }
+
+  // Add database issue ID for MailerLite field updates
+  if (dbIssueId) {
+    params.append('issue_id', dbIssueId)
   }
 
   // Add MailerLite subscriber ID if available

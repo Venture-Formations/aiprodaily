@@ -135,6 +135,7 @@ export interface PublicationIssue {
     question: string
     options: string[]
   } | null
+  mailerlite_issue_id: string | null
   created_at: string
   updated_at: string
 }

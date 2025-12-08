@@ -5,6 +5,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/process-mailerlite-updates",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/create-campaign",
       "schedule": "*/5 * * * *"
     },
@@ -144,6 +148,9 @@
     },
     "app/api/workflows/create-campaign/route.ts": {
       "maxDuration": 800
+    },
+    "app/api/cron/process-mailerlite-updates/route.ts": {
+      "maxDuration": 120
     }
   }
 }

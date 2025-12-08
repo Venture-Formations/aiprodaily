@@ -13,6 +13,76 @@ function normalizeUrl(url: string): string {
 }
 
 /**
+ * Determines if the click should trigger a MailerLite field update
+ * Returns the field name to update, or null if no update needed
+ */
+function getMailerLiteFieldForSection(section: string): string | null {
+  const sectionLower = section.toLowerCase()
+
+  // Advertorial clicks -> clicked_ad field
+  if (sectionLower === 'advertorial' || sectionLower.includes('sponsor')) {
+    return 'clicked_ad'
+  }
+
+  // AI Apps clicks -> clicked_ai_app field
+  if (sectionLower === 'ai apps' || sectionLower === 'ai applications') {
+    return 'clicked_ai_app'
+  }
+
+  return null
+}
+
+/**
+ * Queues a MailerLite field update for async processing
+ */
+async function queueMailerLiteFieldUpdate(
+  email: string,
+  fieldName: string,
+  issueId: string | null,
+  linkClickId: string | null,
+  publicationId: string
+): Promise<void> {
+  try {
+    // Check if we already have a pending/completed update for this subscriber+field
+    // to avoid duplicate queue entries
+    const { data: existing } = await supabaseAdmin
+      .from('mailerlite_field_updates')
+      .select('id, status')
+      .eq('subscriber_email', email)
+      .eq('field_name', fieldName)
+      .in('status', ['pending', 'completed'])
+      .limit(1)
+      .maybeSingle()
+
+    if (existing) {
+      console.log(`[MailerLite Queue] Skipping duplicate: ${email} already has ${fieldName} update (${existing.status})`)
+      return
+    }
+
+    // Insert new queue entry
+    const { error } = await supabaseAdmin
+      .from('mailerlite_field_updates')
+      .insert({
+        subscriber_email: email,
+        field_name: fieldName,
+        field_value: true,
+        status: 'pending',
+        publication_id: publicationId,
+        issue_id: issueId,
+        link_click_id: linkClickId
+      })
+
+    if (error) {
+      console.error('[MailerLite Queue] Error queuing field update:', error)
+    } else {
+      console.log(`[MailerLite Queue] Queued ${fieldName}=true for ${email}`)
+    }
+  } catch (error) {
+    console.error('[MailerLite Queue] Exception queuing field update:', error)
+  }
+}
+
+/**
  * Link Click Tracking Endpoint
  * Tracks newsletter link clicks with comprehensive metadata
  *
@@ -103,6 +173,28 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('Link click tracked successfully:', data.id)
+
+    // Check if this click should queue a MailerLite field update
+    const mailerliteField = getMailerLiteFieldForSection(section)
+    if (mailerliteField && issueId) {
+      // Look up publication_id from the issue
+      const { data: issueData } = await supabaseAdmin
+        .from('publication_issues')
+        .select('publication_id')
+        .eq('id', issueId)
+        .single()
+
+      if (issueData?.publication_id) {
+        // Queue the field update asynchronously (don't await - fire and forget)
+        queueMailerLiteFieldUpdate(
+          email,
+          mailerliteField,
+          issueId,
+          data.id,
+          issueData.publication_id
+        ).catch(err => console.error('[MailerLite Queue] Background error:', err))
+      }
+    }
 
     // Redirect to destination URL
     return NextResponse.redirect(normalizeUrl(url))

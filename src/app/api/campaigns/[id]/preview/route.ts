@@ -203,7 +203,7 @@ async function generateNewsletterHtml(issue: any): Promise<string> {
       for (const section of sections) {
         // Check section_type to determine what to render
         if (section.section_type === 'primary_articles' && activeArticles.length > 0) {
-          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, issue.date, issue.id, section.name, issue.publication_id)
+          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, issue.date, issue.id, section.name, issue.publication_id, issue.mailerlite_issue_id)
           sectionsHtml += primaryHtml
         }
         else if (section.section_type === 'secondary_articles') {

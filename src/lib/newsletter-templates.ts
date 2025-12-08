@@ -414,7 +414,7 @@ export async function generateWelcomeSection(
 
 // ==================== PRIMARY ARTICLES SECTION ====================
 
-export async function generatePrimaryArticlesSection(articles: any[], issueDate: string, issueId: string | undefined, sectionName: string, publication_id?: string): Promise<string> {
+export async function generatePrimaryArticlesSection(articles: any[], issueDate: string, issueId: string | undefined, sectionName: string, publication_id?: string, mailerliteIssueId?: string): Promise<string> {
   if (!articles || articles.length === 0) {
     return ''
   }
@@ -428,8 +428,8 @@ export async function generatePrimaryArticlesSection(articles: any[], issueDate:
     const sourceUrl = article.rss_post?.source_url || '#'
     const emoji = getArticleEmoji(headline, content)
 
-    // Wrap URL with tracking
-    const trackedUrl = sourceUrl !== '#' ? wrapTrackingUrl(sourceUrl, sectionName, issueDate, issueId) : '#'
+    // Wrap URL with tracking (pass both mailerlite ID and database issue ID)
+    const trackedUrl = sourceUrl !== '#' ? wrapTrackingUrl(sourceUrl, sectionName, issueDate, mailerliteIssueId, issueId) : '#'
 
     return `
       <div style='padding: 16px 0; border-bottom: 1px solid #e0e0e0;'>
@@ -497,7 +497,7 @@ export async function generateSecondaryArticlesSection(issue: any, sectionName: 
     const emoji = getArticleEmoji(headline, content)
 
     // Wrap URL with tracking
-    const trackedUrl = sourceUrl !== '#' ? wrapTrackingUrl(sourceUrl, sectionName, issue.date, issue.mailerlite_issue_id) : '#'
+    const trackedUrl = sourceUrl !== '#' ? wrapTrackingUrl(sourceUrl, sectionName, issue.date, issue.mailerlite_issue_id, issue.id) : '#'
 
     return `
       <div style='padding: 16px 0; border-bottom: 1px solid #e0e0e0;'>
@@ -844,7 +844,7 @@ export async function generateAdvertorialSection(issue: any, _recordUsage: boole
     // Generate tracked URL for links
     const buttonUrl = selectedAd.button_url || '#'
     const trackedUrl = buttonUrl !== '#'
-      ? wrapTrackingUrl(buttonUrl, 'Advertorial', issue.date, issue.mailerlite_issue_id)
+      ? wrapTrackingUrl(buttonUrl, 'Advertorial', issue.date, issue.mailerlite_issue_id, issue.id)
       : '#'
 
     // Use the shared advertorial HTML generator
@@ -941,7 +941,7 @@ export async function generateBreakingNewsSection(issue: any): Promise<string> {
 
       // Wrap URL with tracking
       const trackedUrl = sourceUrl !== '#'
-        ? wrapTrackingUrl(sourceUrl, 'Breaking News', issue.date, issue.mailerlite_issue_id)
+        ? wrapTrackingUrl(sourceUrl, 'Breaking News', issue.date, issue.mailerlite_issue_id, issue.id)
         : '#'
 
       return `
@@ -1024,7 +1024,7 @@ export async function generateBeyondTheFeedSection(issue: any): Promise<string> 
 
       // Wrap URL with tracking
       const trackedUrl = sourceUrl !== '#'
-        ? wrapTrackingUrl(sourceUrl, 'Beyond the Feed', issue.date, issue.mailerlite_issue_id)
+        ? wrapTrackingUrl(sourceUrl, 'Beyond the Feed', issue.date, issue.mailerlite_issue_id, issue.id)
         : '#'
 
       return `
@@ -1120,7 +1120,7 @@ export async function generateAIAppsSection(issue: any): Promise<string> {
 
       // Wrap URL with tracking
       const trackedUrl = appUrl !== '#'
-        ? wrapTrackingUrl(appUrl, 'AI Apps', issue.date, issue.mailerlite_issue_id)
+        ? wrapTrackingUrl(appUrl, 'AI Apps', issue.date, issue.mailerlite_issue_id, issue.id)
         : '#'
 
       // Format: number. emoji Title Description
