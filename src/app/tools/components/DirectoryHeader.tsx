@@ -1,7 +1,95 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
+import {
+  Popover,
+  PopoverButton,
+  PopoverBackdrop,
+  PopoverPanel,
+} from '@headlessui/react'
+import clsx from 'clsx'
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs'
+
+import { Button } from '@/components/salient/Button'
+import { Container } from '@/components/salient/Container'
+import { NavLink } from '@/components/salient/NavLink'
+
+function MobileNavLink({
+  href,
+  children,
+}: {
+  href: string
+  children: React.ReactNode
+}) {
+  return (
+    <PopoverButton as={Link} href={href} className="block w-full p-2">
+      {children}
+    </PopoverButton>
+  )
+}
+
+function MobileNavIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-3.5 w-3.5 overflow-visible stroke-slate-700"
+      fill="none"
+      strokeWidth={2}
+      strokeLinecap="round"
+    >
+      <path
+        d="M0 1H14M0 7H14M0 13H14"
+        className={clsx(
+          'origin-center transition',
+          open && 'scale-90 opacity-0',
+        )}
+      />
+      <path
+        d="M2 2L12 12M12 2L2 12"
+        className={clsx(
+          'origin-center transition',
+          !open && 'scale-90 opacity-0',
+        )}
+      />
+    </svg>
+  )
+}
+
+function MobileNavigation() {
+  return (
+    <Popover>
+      <PopoverButton
+        className="relative z-10 flex h-8 w-8 items-center justify-center focus:not-data-focus:outline-hidden"
+        aria-label="Toggle Navigation"
+      >
+        {({ open }) => <MobileNavIcon open={open} />}
+      </PopoverButton>
+      <PopoverBackdrop
+        transition
+        className="fixed inset-0 bg-slate-300/50 duration-150 data-closed:opacity-0 data-enter:ease-out data-leave:ease-in"
+      />
+      <PopoverPanel
+        transition
+        className="absolute inset-x-0 top-full mt-4 flex origin-top flex-col rounded-2xl bg-white p-4 text-lg tracking-tight text-slate-900 shadow-xl ring-1 ring-slate-900/5 data-closed:scale-95 data-closed:opacity-0 data-enter:duration-150 data-enter:ease-out data-leave:duration-100 data-leave:ease-in"
+      >
+        <MobileNavLink href="/">Home</MobileNavLink>
+        <MobileNavLink href="/tools">AI Tools</MobileNavLink>
+        <MobileNavLink href="/tools/submit">Submit Tool</MobileNavLink>
+        <MobileNavLink href="/contactus">Contact</MobileNavLink>
+        <hr className="m-2 border-slate-300/40" />
+        <SignedOut>
+          <SignInButton mode="modal">
+            <button className="block w-full p-2 text-left">Sign In</button>
+          </SignInButton>
+        </SignedOut>
+        <SignedIn>
+          <MobileNavLink href="/account/ads">Sponsorship</MobileNavLink>
+        </SignedIn>
+      </PopoverPanel>
+    </Popover>
+  )
+}
 
 interface DirectoryHeaderProps {
   logoUrl: string
@@ -10,49 +98,37 @@ interface DirectoryHeaderProps {
 
 export function DirectoryHeader({ logoUrl, newsletterName }: DirectoryHeaderProps) {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="relative flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <img src={logoUrl} alt={newsletterName} className="h-10 object-contain" />
-          </Link>
-
-          {/* Navigation - Centered */}
-          <nav className="hidden md:flex items-center gap-8 absolute left-1/2 -translate-x-1/2">
-            <Link 
-              href="/" 
-              className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
-            >
-              Home
+    <header className="py-10 bg-slate-50">
+      <Container>
+        <nav className="relative z-50 flex justify-between">
+          <div className="flex items-center md:gap-x-12">
+            <Link href="/" aria-label="Home">
+              <Image
+                src={logoUrl}
+                alt={newsletterName}
+                width={140}
+                height={40}
+                className="h-10 w-auto"
+              />
             </Link>
-            <Link 
-              href="/tools" 
-              className="text-sm font-medium text-gray-900 transition-colors"
-            >
-              AI Tools
-            </Link>
-            <Link 
-              href="/contactus" 
-              className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
-            >
-              Contact Us
-            </Link>
-          </nav>
-
-          {/* Right side - Auth & CTA */}
-          <div className="flex items-center gap-3">
-            {/* User Profile / Sign In */}
+            <div className="hidden md:flex md:gap-x-6">
+              <NavLink href="/">Home</NavLink>
+              <NavLink href="/tools">AI Tools</NavLink>
+              <NavLink href="/tools/submit">Submit Tool</NavLink>
+              <NavLink href="/contactus">Contact</NavLink>
+            </div>
+          </div>
+          <div className="flex items-center gap-x-5 md:gap-x-8">
             <SignedOut>
               <SignInButton mode="modal">
-                <button className="hidden sm:inline-flex text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+                <button className="hidden md:block text-sm text-slate-700 hover:text-slate-900">
                   Sign In
                 </button>
               </SignInButton>
             </SignedOut>
-            
+
             <SignedIn>
-              <UserButton 
+              <UserButton
                 afterSignOutUrl="/tools"
                 appearance={{
                   elements: {
@@ -62,34 +138,30 @@ export function DirectoryHeader({ logoUrl, newsletterName }: DirectoryHeaderProp
               />
             </SignedIn>
 
-            {/* Sponsorship CTA */}
             <SignedOut>
               <SignInButton mode="modal" fallbackRedirectUrl="/account/ads">
-                <button className="hidden sm:inline-flex bg-[#1c293d] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#1c293d]/90 transition-colors">
-                  Sponsorship
-                </button>
+                <Button color="blue">
+                  <span>
+                    Sponsor <span className="hidden lg:inline">Listing</span>
+                  </span>
+                </Button>
               </SignInButton>
             </SignedOut>
-            
+
             <SignedIn>
-              <Link
-                href="/account/ads"
-                className="hidden sm:inline-flex bg-[#1c293d] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#1c293d]/90 transition-colors"
-              >
-                Sponsorship
-              </Link>
+              <Button href="/account/ads" color="blue">
+                <span>
+                  Sponsor <span className="hidden lg:inline">Listing</span>
+                </span>
+              </Button>
             </SignedIn>
-            
-            {/* Mobile menu button */}
-            <button className="md:hidden p-2 text-gray-600">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
+
+            <div className="-mr-1 md:hidden">
+              <MobileNavigation />
+            </div>
           </div>
-        </div>
-      </div>
+        </nav>
+      </Container>
     </header>
   )
 }
-

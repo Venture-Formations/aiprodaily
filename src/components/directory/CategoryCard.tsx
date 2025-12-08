@@ -1,8 +1,8 @@
 import Link from 'next/link'
-import type { DirectoryCategoryWithTools } from '@/types/database'
+import type { DirectoryCategory } from '@/lib/directory'
 
 interface CategoryCardProps {
-  category: DirectoryCategoryWithTools
+  category: DirectoryCategory
 }
 
 // Category icons mapping
@@ -21,12 +21,12 @@ export function CategoryCard({ category }: CategoryCardProps) {
 
   return (
     <Link href={`/tools/category/${category.slug}`}>
-      <div className="group p-6 bg-white rounded-xl border border-gray-200 hover:border-[#06b6d4] hover:shadow-lg transition-all duration-200">
+      <div className="group p-6 bg-white rounded-2xl shadow-sm ring-1 ring-slate-900/5 hover:shadow-lg hover:ring-blue-500/20 transition-all duration-200">
         <div className="flex items-center gap-4">
           {/* Icon */}
-          <div className="flex-shrink-0 w-12 h-12 bg-[#06b6d4]/10 rounded-lg flex items-center justify-center group-hover:bg-[#1c293d] transition-colors">
+          <div className="flex-shrink-0 w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center group-hover:bg-blue-600 transition-colors">
             <svg
-              className="w-6 h-6 text-[#06b6d4] group-hover:text-white transition-colors"
+              className="w-6 h-6 text-blue-600 group-hover:text-white transition-colors"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -37,17 +37,17 @@ export function CategoryCard({ category }: CategoryCardProps) {
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-semibold text-gray-900 group-hover:text-[#06b6d4] transition-colors">
+            <h3 className="text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
               {category.name}
             </h3>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-slate-500">
               {category.tool_count} {category.tool_count === 1 ? 'tool' : 'tools'}
             </p>
           </div>
 
           {/* Arrow */}
           <svg
-            className="w-5 h-5 text-gray-400 group-hover:text-[#06b6d4] group-hover:translate-x-1 transition-all"
+            className="w-5 h-5 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -57,7 +57,7 @@ export function CategoryCard({ category }: CategoryCardProps) {
         </div>
 
         {category.description && (
-          <p className="mt-3 text-sm text-gray-600 line-clamp-2">
+          <p className="mt-3 text-sm text-slate-600 line-clamp-2">
             {category.description}
           </p>
         )}

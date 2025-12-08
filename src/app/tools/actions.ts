@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase'
 import Stripe from 'stripe'
+import type { AIAppCategory } from '@/types/database'
 
 const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
 // Use SUPABASE_URL (server-side) instead of NEXT_PUBLIC_SUPABASE_URL
@@ -18,13 +19,12 @@ export interface AddToolData {
   email: string
   websiteUrl: string
   description: string
-  tagline?: string
-  categoryIds: string[]
+  category: AIAppCategory
   plan: 'free' | 'monthly' | 'yearly'
 }
 
 /**
- * Add a new tool submission
+ * Add a new tool submission - inserts into ai_applications
  */
 export async function addTool(
   data: AddToolData,
@@ -37,34 +37,43 @@ export async function addTool(
   try {
     // Check if tool already exists
     const { data: existingTool } = await supabaseAdmin
-      .from('tools_directory')
+      .from('ai_applications')
       .select('id')
       .eq('publication_id', PUBLICATION_ID)
-      .eq('website_url', data.websiteUrl)
+      .eq('app_url', data.websiteUrl)
       .single()
 
     if (existingTool) {
       return { error: 'A tool with this website URL already exists' }
     }
 
-    // Insert the tool
+    // Insert the tool into ai_applications
     const { data: tool, error: insertError } = await supabaseAdmin
-      .from('tools_directory')
+      .from('ai_applications')
       .insert({
         publication_id: PUBLICATION_ID,
-        tool_name: data.toolName,
-        tagline: data.tagline || null,
+        app_name: data.toolName,
         description: data.description,
-        website_url: data.websiteUrl,
-        tool_image_url: listingImageFileName ? `${SUPABASE_STORAGE_URL}${listingImageFileName}` : null,
-        logo_image_url: logoImageFileName ? `${SUPABASE_STORAGE_URL}${logoImageFileName}` : null,
+        category: data.category,
+        app_url: data.websiteUrl,
+        screenshot_url: listingImageFileName ? `${SUPABASE_STORAGE_URL}${listingImageFileName}` : null,
+        logo_url: logoImageFileName ? `${SUPABASE_STORAGE_URL}${logoImageFileName}` : null,
+        is_active: false, // Pending review
+        is_featured: false,
+        is_paid_placement: data.plan !== 'free',
+        is_affiliate: false,
+        tool_type: 'Client',
+        category_priority: 0,
+        times_used: 0,
+        // New submission fields
         clerk_user_id: clerkUserId,
         submitter_email: data.email,
         submitter_name: submitterName,
         submitter_image_url: submitterImageUrl,
-        status: 'pending',
+        submission_status: 'pending',
         plan: data.plan,
-        is_sponsored: data.plan !== 'free'
+        view_count: 0,
+        click_count: 0
       })
       .select('id')
       .single()
@@ -72,22 +81,6 @@ export async function addTool(
     if (insertError) {
       console.error('[Directory] Failed to insert tool:', insertError)
       return { error: insertError.message }
-    }
-
-    // Link categories
-    if (tool && data.categoryIds.length > 0) {
-      const categoryLinks = data.categoryIds.map(categoryId => ({
-        category_id: categoryId,
-        tool_id: tool.id
-      }))
-
-      const { error: linkError } = await supabaseAdmin
-        .from('directory_categories_tools')
-        .insert(categoryLinks)
-
-      if (linkError) {
-        console.error('[Directory] Failed to link categories:', linkError)
-      }
     }
 
     revalidatePath('/tools')
@@ -149,31 +142,39 @@ export async function createCheckoutSession(
 
 /**
  * Handle successful payment - update tool status
- * Note: The webhook handler also updates the tool, but this provides a fallback
- * in case the webhook is delayed or fails
  */
 export async function handlePaymentSuccess(toolId: string, plan: string) {
   // Check if already updated by webhook
   const { data: tool } = await supabaseAdmin
-    .from('tools_directory')
-    .select('is_sponsored, stripe_subscription_id')
+    .from('ai_applications')
+    .select('is_paid_placement, sponsor_start_date')
     .eq('id', toolId)
     .single()
 
   // If webhook already processed this, just revalidate
-  if (tool?.is_sponsored && tool?.stripe_subscription_id) {
+  if (tool?.is_paid_placement && tool?.sponsor_start_date) {
     console.log('[Directory] Tool already updated by webhook')
     revalidatePath('/tools')
     return { error: null }
   }
 
+  // Calculate sponsor end date based on plan
+  const sponsorStartDate = new Date()
+  const sponsorEndDate = new Date(sponsorStartDate)
+  if (plan === 'yearly') {
+    sponsorEndDate.setFullYear(sponsorEndDate.getFullYear() + 1)
+  } else {
+    sponsorEndDate.setMonth(sponsorEndDate.getMonth() + 1)
+  }
+
   // Fallback update if webhook hasn't processed yet
   const { error } = await supabaseAdmin
-    .from('tools_directory')
+    .from('ai_applications')
     .update({
-      is_sponsored: true,
-      plan: plan,
-      sponsor_start_date: new Date().toISOString()
+      is_paid_placement: true,
+      plan: plan as 'monthly' | 'yearly',
+      sponsor_start_date: sponsorStartDate.toISOString(),
+      sponsor_end_date: sponsorEndDate.toISOString()
     })
     .eq('id', toolId)
 
@@ -189,11 +190,13 @@ export async function handlePaymentSuccess(toolId: string, plan: string) {
 /**
  * Approve a tool (admin only)
  */
-export async function approveTool(toolId: string) {
+export async function approveTool(toolId: string, approvedBy?: string) {
   const { error } = await supabaseAdmin
-    .from('tools_directory')
+    .from('ai_applications')
     .update({
-      status: 'approved',
+      is_active: true,
+      submission_status: 'approved',
+      approved_by: approvedBy || null,
       approved_at: new Date().toISOString()
     })
     .eq('id', toolId)
@@ -204,18 +207,19 @@ export async function approveTool(toolId: string) {
   }
 
   revalidatePath('/tools')
-  revalidatePath('/tools/admin')
+  revalidatePath('/dashboard/accounting/tools-admin')
   return { error: null }
 }
 
 /**
- * Reject a tool (admin only)
+ * Reject a tool (admin only) - sets is_active to false
  */
 export async function rejectTool(toolId: string, reason: string) {
   const { error } = await supabaseAdmin
-    .from('tools_directory')
+    .from('ai_applications')
     .update({
-      status: 'rejected',
+      is_active: false,
+      submission_status: 'rejected',
       rejection_reason: reason
     })
     .eq('id', toolId)
@@ -225,7 +229,7 @@ export async function rejectTool(toolId: string, reason: string) {
     return { error: error.message }
   }
 
-  revalidatePath('/tools/admin')
+  revalidatePath('/dashboard/accounting/tools-admin')
   return { error: null }
 }
 
@@ -233,15 +237,8 @@ export async function rejectTool(toolId: string, reason: string) {
  * Delete a tool (admin only)
  */
 export async function deleteTool(toolId: string) {
-  // First delete category links
-  await supabaseAdmin
-    .from('directory_categories_tools')
-    .delete()
-    .eq('tool_id', toolId)
-
-  // Then delete the tool
   const { error } = await supabaseAdmin
-    .from('tools_directory')
+    .from('ai_applications')
     .delete()
     .eq('id', toolId)
 
@@ -251,7 +248,7 @@ export async function deleteTool(toolId: string) {
   }
 
   revalidatePath('/tools')
-  revalidatePath('/tools/admin')
+  revalidatePath('/dashboard/accounting/tools-admin')
   return { error: null }
 }
 
@@ -266,16 +263,15 @@ export async function updateTool(
 ) {
   const updateData: Record<string, any> = {}
 
-  if (data.toolName) updateData.tool_name = data.toolName
+  if (data.toolName) updateData.app_name = data.toolName
   if (data.description) updateData.description = data.description
-  if (data.tagline !== undefined) updateData.tagline = data.tagline
-  if (data.websiteUrl) updateData.website_url = data.websiteUrl
-  if (data.email) updateData.submitter_email = data.email
-  if (listingImageFileName) updateData.tool_image_url = `${SUPABASE_STORAGE_URL}${listingImageFileName}`
-  if (logoImageFileName) updateData.logo_image_url = `${SUPABASE_STORAGE_URL}${logoImageFileName}`
+  if (data.category) updateData.category = data.category
+  if (data.websiteUrl) updateData.app_url = data.websiteUrl
+  if (listingImageFileName) updateData.screenshot_url = `${SUPABASE_STORAGE_URL}${listingImageFileName}`
+  if (logoImageFileName) updateData.logo_url = `${SUPABASE_STORAGE_URL}${logoImageFileName}`
 
   const { error: updateError } = await supabaseAdmin
-    .from('tools_directory')
+    .from('ai_applications')
     .update(updateData)
     .eq('id', toolId)
 
@@ -284,29 +280,8 @@ export async function updateTool(
     return { error: updateError.message }
   }
 
-  // Update categories if provided
-  if (data.categoryIds) {
-    // Remove existing links
-    await supabaseAdmin
-      .from('directory_categories_tools')
-      .delete()
-      .eq('tool_id', toolId)
-
-    // Add new links
-    if (data.categoryIds.length > 0) {
-      const categoryLinks = data.categoryIds.map(categoryId => ({
-        category_id: categoryId,
-        tool_id: toolId
-      }))
-
-      await supabaseAdmin
-        .from('directory_categories_tools')
-        .insert(categoryLinks)
-    }
-  }
-
   revalidatePath('/tools')
-  revalidatePath('/tools/admin')
+  revalidatePath('/dashboard/accounting/tools-admin')
   return { error: null }
 }
 
@@ -315,7 +290,7 @@ export async function updateTool(
  */
 export async function toggleFeatured(toolId: string, isFeatured: boolean) {
   const { error } = await supabaseAdmin
-    .from('tools_directory')
+    .from('ai_applications')
     .update({ is_featured: isFeatured })
     .eq('id', toolId)
 

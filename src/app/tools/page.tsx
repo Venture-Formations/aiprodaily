@@ -2,6 +2,8 @@ import { DirectoryHero } from '@/components/directory/DirectoryHero'
 import { ToolsGrid } from '@/components/directory/ToolsGrid'
 import { CategoryCard } from '@/components/directory/CategoryCard'
 import { getApprovedTools, getApprovedCategories } from '@/lib/directory'
+import { Container } from '@/components/salient/Container'
+import { Button } from '@/components/salient/Button'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,11 +52,13 @@ export default async function ToolsDirectoryPage() {
       <DirectoryHero toolCount={tools.length} />
 
       {/* Categories Section */}
-      <section id="categories" className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section id="categories" className="py-16 bg-slate-50">
+        <Container>
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900">Browse by Category</h2>
-            <p className="mt-4 text-lg text-gray-600">
+            <h2 className="font-display text-3xl font-medium tracking-tight text-slate-900 sm:text-4xl">
+              Browse by Category
+            </h2>
+            <p className="mt-4 text-lg tracking-tight text-slate-700">
               Find the perfect AI tool for your specific needs
             </p>
           </div>
@@ -64,41 +68,45 @@ export default async function ToolsDirectoryPage() {
               <CategoryCard key={category.id} category={category} />
             ))}
           </div>
-        </div>
+        </Container>
       </section>
 
       {/* Tools Grid Section */}
       <section id="explore" className="py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <Container>
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900">All AI Tools</h2>
-            <p className="mt-4 text-lg text-gray-600">
+            <h2 className="font-display text-3xl font-medium tracking-tight text-slate-900 sm:text-4xl">
+              All AI Tools
+            </h2>
+            <p className="mt-4 text-lg tracking-tight text-slate-700">
               Explore our curated collection of AI tools for accounting professionals
             </p>
           </div>
 
           <ToolsGrid tools={tools} categories={categories} />
-        </div>
+        </Container>
       </section>
 
       {/* CTA Section */}
-      <section className="py-10 bg-[#1c293d] relative overflow-hidden">
-        {/* Gradient accent */}
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-gradient-to-br from-[#a855f7] via-[#06b6d4] to-[#14b8a6] rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-        </div>
-        <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
-          <h2 className="text-3xl font-bold text-white">Have an AI Tool to Share?</h2>
-          <p className="mt-4 text-xl text-white/70">
-            Submit your tool to reach thousands of accounting professionals looking for AI solutions.
-          </p>
-          <a
-            href="/tools/submit"
-            className="mt-8 inline-block bg-white text-[#1c293d] font-semibold px-8 py-3 rounded-lg hover:bg-white/90 transition-colors"
-          >
-            Submit Your Tool
-          </a>
-        </div>
+      <section className="py-16 bg-slate-900 relative overflow-hidden">
+        {/* Decorative gradient blur */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-gradient-to-r from-blue-600/20 to-cyan-500/20 rounded-full blur-3xl"></div>
+
+        <Container className="relative">
+          <div className="text-center">
+            <h2 className="font-display text-3xl font-medium tracking-tight text-white sm:text-4xl">
+              Have an AI Tool to Share?
+            </h2>
+            <p className="mt-4 text-lg tracking-tight text-slate-400 max-w-2xl mx-auto">
+              Submit your tool to reach thousands of accounting professionals looking for AI solutions.
+            </p>
+            <div className="mt-8">
+              <Button href="/tools/submit" color="white">
+                Submit Your Tool
+              </Button>
+            </div>
+          </div>
+        </Container>
       </section>
     </>
   )

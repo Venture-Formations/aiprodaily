@@ -2,10 +2,10 @@
 
 import { useState, useMemo } from 'react'
 import { ToolCard } from './ToolCard'
-import type { DirectoryToolWithCategories, DirectoryCategory } from '@/types/database'
+import type { DirectoryApp, DirectoryCategory } from '@/lib/directory'
 
 interface ToolsGridProps {
-  tools: DirectoryToolWithCategories[]
+  tools: DirectoryApp[]
   categories: DirectoryCategory[]
 }
 
@@ -21,8 +21,7 @@ export function ToolsGrid({ tools, categories }: ToolsGridProps) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(tool =>
         tool.tool_name.toLowerCase().includes(query) ||
-        tool.description.toLowerCase().includes(query) ||
-        tool.tagline?.toLowerCase().includes(query)
+        tool.description.toLowerCase().includes(query)
       )
     }
 
@@ -60,10 +59,10 @@ export function ToolsGrid({ tools, categories }: ToolsGridProps) {
           placeholder="Search AI tools..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#06b6d4] focus:border-transparent"
+          className="w-full px-4 py-3 pl-10 rounded-xl bg-white ring-1 ring-slate-900/10 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-shadow"
         />
         <svg
-          className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+          className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -85,8 +84,8 @@ export function ToolsGrid({ tools, categories }: ToolsGridProps) {
             onClick={() => toggleCategory(category.id)}
             className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
               selectedCategories.has(category.id)
-                ? 'bg-[#1c293d] text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
             }`}
           >
             {category.name}
@@ -103,7 +102,7 @@ export function ToolsGrid({ tools, categories }: ToolsGridProps) {
       </div>
 
       {/* Results Count */}
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-slate-500">
         Showing {filteredTools.length} of {tools.length} tools
       </p>
 
@@ -116,13 +115,13 @@ export function ToolsGrid({ tools, categories }: ToolsGridProps) {
         </div>
       ) : (
         <div className="text-center py-12">
-          <div className="text-gray-400 mb-4">
+          <div className="text-slate-400 mb-4">
             <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-1">No tools found</h3>
-          <p className="text-gray-500">Try adjusting your search or filter criteria</p>
+          <h3 className="text-lg font-medium text-slate-900 mb-1">No tools found</h3>
+          <p className="text-slate-500">Try adjusting your search or filter criteria</p>
         </div>
       )}
     </div>

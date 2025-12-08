@@ -7,7 +7,8 @@ import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-im
 import 'react-image-crop/dist/ReactCrop.css'
 import { addTool, createCheckoutSession } from '../actions'
 import { getCroppedImage } from '@/utils/imageCrop'
-import type { DirectoryCategory } from '@/types/database'
+import type { DirectoryCategory } from '@/lib/directory'
+import type { AIAppCategory } from '@/types/database'
 
 interface SubmitToolFormProps {
   categories: DirectoryCategory[]
@@ -121,7 +122,7 @@ function ImageUpload({
           <button
             type="button"
             onClick={onClear}
-            className="mt-2 text-sm text-[#06b6d4] hover:text-[#06b6d4]/80"
+            className="mt-2 text-sm text-blue-600 hover:text-blue-500"
           >
             Choose different image
           </button>
@@ -158,7 +159,7 @@ function ImageUpload({
                   type="button"
                   onClick={handleApplyCrop}
                   disabled={!completedCrop}
-                  className="px-4 py-2 bg-[#1c293d] text-white rounded-lg hover:bg-[#1c293d]/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Apply Crop
                 </button>
@@ -178,7 +179,7 @@ function ImageUpload({
           ) : (
             <div className="mt-1">
               <label
-                className="cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg hover:border-[#06b6d4] transition-colors"
+                className="cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 transition-colors"
                 style={{ width: previewSize.width, height: previewSize.height }}
               >
                 <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -213,9 +214,8 @@ export function SubmitToolForm({ categories }: SubmitToolFormProps) {
     toolName: '',
     email: user?.primaryEmailAddress?.emailAddress || '',
     websiteUrl: '',
-    tagline: '',
     description: '',
-    categoryIds: [] as string[],
+    category: 'Productivity' as AIAppCategory,
     plan: 'free' as 'free' | 'monthly' | 'yearly'
   })
 
@@ -235,15 +235,6 @@ export function SubmitToolForm({ categories }: SubmitToolFormProps) {
     setListingPreview(URL.createObjectURL(blob))
   }
 
-  const toggleCategory = (categoryId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      categoryIds: prev.categoryIds.includes(categoryId)
-        ? prev.categoryIds.filter(id => id !== categoryId)
-        : [...prev.categoryIds, categoryId]
-    }))
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -259,9 +250,6 @@ export function SubmitToolForm({ categories }: SubmitToolFormProps) {
       }
       if (!formData.description.trim()) {
         throw new Error('Description is required')
-      }
-      if (formData.categoryIds.length === 0) {
-        throw new Error('Please select at least one category')
       }
 
       // Upload logo image if provided
@@ -304,10 +292,10 @@ export function SubmitToolForm({ categories }: SubmitToolFormProps) {
       const result = await addTool(
         formData,
         user?.id || null,
-        listingFileName, // tool_image_url (16:9 listing image)
+        listingFileName, // screenshot_url (16:9 listing image)
         user?.fullName || 'Anonymous',
         user?.imageUrl || '',
-        logoFileName // logo_image_url (1:1 logo)
+        logoFileName // logo_url (1:1 logo)
       )
 
       if (result.error) {
@@ -350,7 +338,7 @@ export function SubmitToolForm({ categories }: SubmitToolFormProps) {
           id="toolName"
           value={formData.toolName}
           onChange={(e) => setFormData(prev => ({ ...prev, toolName: e.target.value }))}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#06b6d4] focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           placeholder="e.g., My AI Tool"
           disabled={isSubmitting}
         />
@@ -366,7 +354,7 @@ export function SubmitToolForm({ categories }: SubmitToolFormProps) {
           id="email"
           value={formData.email}
           onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#06b6d4] focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           placeholder="you@example.com"
           disabled={isSubmitting}
         />
@@ -382,24 +370,8 @@ export function SubmitToolForm({ categories }: SubmitToolFormProps) {
           id="websiteUrl"
           value={formData.websiteUrl}
           onChange={(e) => setFormData(prev => ({ ...prev, websiteUrl: e.target.value }))}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#06b6d4] focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           placeholder="https://yourwebsite.com"
-          disabled={isSubmitting}
-        />
-      </div>
-
-      {/* Tagline */}
-      <div>
-        <label htmlFor="tagline" className="block text-sm font-medium text-gray-700 mb-1">
-          Tagline
-        </label>
-        <input
-          type="text"
-          id="tagline"
-          value={formData.tagline}
-          onChange={(e) => setFormData(prev => ({ ...prev, tagline: e.target.value }))}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#06b6d4] focus:border-transparent"
-          placeholder="A short catchy phrase about your tool"
           disabled={isSubmitting}
         />
       </div>
@@ -407,41 +379,37 @@ export function SubmitToolForm({ categories }: SubmitToolFormProps) {
       {/* Description */}
       <div>
         <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-          Description *
+          Description * (max 200 characters)
         </label>
         <textarea
           id="description"
           value={formData.description}
           onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
           rows={4}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#06b6d4] focus:border-transparent"
+          maxLength={200}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           placeholder="Describe what your tool does and how it helps accountants..."
           disabled={isSubmitting}
         />
+        <p className="mt-1 text-sm text-gray-500">{formData.description.length}/200 characters</p>
       </div>
 
-      {/* Categories */}
+      {/* Category */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Categories * (select all that apply)
+        <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
+          Category *
         </label>
-        <div className="flex flex-wrap gap-2">
+        <select
+          id="category"
+          value={formData.category}
+          onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value as AIAppCategory }))}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          disabled={isSubmitting}
+        >
           {categories.map(category => (
-            <button
-              key={category.id}
-              type="button"
-              onClick={() => toggleCategory(category.id)}
-              disabled={isSubmitting}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                formData.categoryIds.includes(category.id)
-                  ? 'bg-[#1c293d] text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {category.name}
-            </button>
+            <option key={category.id} value={category.name}>{category.name}</option>
           ))}
-        </div>
+        </select>
       </div>
 
       {/* Image Uploads */}
@@ -493,7 +461,7 @@ export function SubmitToolForm({ categories }: SubmitToolFormProps) {
               disabled={isSubmitting}
               className={`p-4 rounded-lg border-2 text-center transition-all ${
                 formData.plan === plan
-                  ? 'border-[#06b6d4] bg-[#06b6d4]/10'
+                  ? 'border-blue-500 bg-blue-50'
                   : 'border-gray-200 hover:border-gray-300'
               }`}
             >
@@ -510,7 +478,7 @@ export function SubmitToolForm({ categories }: SubmitToolFormProps) {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full py-3 px-4 bg-[#1c293d] text-white font-semibold rounded-lg hover:bg-[#1c293d]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        className="w-full py-3 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {isSubmitting ? (
           <>

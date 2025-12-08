@@ -1,9 +1,9 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import type { DirectoryToolWithCategories } from '@/types/database'
+import type { DirectoryApp } from '@/lib/directory'
 
 interface ToolCardProps {
-  tool: DirectoryToolWithCategories
+  tool: DirectoryApp
 }
 
 // Generate a consistent color based on the tool name
@@ -33,11 +33,11 @@ export function ToolCard({ tool }: ToolCardProps) {
 
   return (
     <Link href={`/tools/${tool.id}`}>
-      <div className={`group flex items-center gap-4 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden p-4 ${
-        tool.is_featured ? 'border-2 border-[#06b6d4]' : 'border border-gray-100'
+      <div className={`group flex items-center gap-4 bg-white rounded-2xl shadow-sm ring-1 transition-all duration-200 overflow-hidden p-4 ${
+        tool.is_featured ? 'ring-2 ring-blue-500' : 'ring-slate-900/5 hover:shadow-lg hover:ring-blue-500/20'
       }`}>
         {/* Logo Image - Square */}
-        <div className="relative flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-lg overflow-hidden">
+        <div className="relative flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden">
           {logoUrl ? (
             <Image
               src={logoUrl}
@@ -58,7 +58,7 @@ export function ToolCard({ tool }: ToolCardProps) {
         {/* Content */}
         <div className="flex-grow min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-lg text-gray-900 group-hover:text-[#06b6d4] transition-colors truncate">
+            <h3 className="font-semibold text-lg text-slate-900 group-hover:text-blue-600 transition-colors truncate">
               {tool.tool_name}
             </h3>
             {tool.is_sponsored && (
@@ -68,27 +68,27 @@ export function ToolCard({ tool }: ToolCardProps) {
             )}
           </div>
 
-          <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+          <p className="text-sm text-slate-600 mt-1 line-clamp-2">
             {tool.description}
           </p>
 
           {/* Categories and Featured Badge */}
           <div className="flex flex-wrap items-center gap-1.5 mt-2">
-            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
             </svg>
             {tool.categories.slice(0, 3).map((category, catIndex) => (
-              <span key={category.id} className="text-sm text-gray-500">
+              <span key={category.id} className="text-sm text-slate-500">
                 {category.name}{catIndex < Math.min(tool.categories.length, 3) - 1 && ' · '}
               </span>
             ))}
             {tool.categories.length > 3 && (
-              <span className="text-sm text-gray-400">
+              <span className="text-sm text-slate-400">
                 +{tool.categories.length - 3} more
               </span>
             )}
             {tool.is_featured && !tool.is_sponsored && (
-              <span className="flex-shrink-0 bg-[#06b6d4] text-white text-xs font-semibold px-2 py-0.5 rounded-full ml-1">
+              <span className="flex-shrink-0 bg-blue-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full ml-1">
                 Featured
               </span>
             )}

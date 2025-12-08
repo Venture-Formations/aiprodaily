@@ -12,7 +12,6 @@ export default function AIApplicationsPage() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [addForm, setAddForm] = useState<Partial<AIApplication>>({
     app_name: '',
-    tagline: '',
     description: '',
     category: 'Payroll',
     app_url: '',
@@ -110,7 +109,6 @@ export default function AIApplicationsPage() {
         setShowAddForm(false)
         setAddForm({
           app_name: '',
-          tagline: '',
           description: '',
           category: 'Payroll',
           app_url: '',
@@ -162,14 +160,13 @@ export default function AIApplicationsPage() {
   }
 
   const downloadTemplate = () => {
-    const headers = ['Tool Name', 'Category', 'Tool Type', 'Link', 'Description', 'Tagline', 'Affiliate']
+    const headers = ['Tool Name', 'Category', 'Tool Type', 'Link', 'Description', 'Affiliate']
     const exampleRow = [
       'QuickBooks AI Assistant',
       'Accounting System',
       'Client',
       'https://example.com',
       'AI-powered accounting assistant that categorizes transactions automatically and provides intelligent insights for financial decisions.',
-      'Automate your bookkeeping with AI',
       'yes'
     ]
 
@@ -196,8 +193,7 @@ export default function AIApplicationsPage() {
       (filterAffiliate === 'non-affiliates' && !app.is_affiliate)
     const matchesSearch = searchQuery === '' ||
       app.app_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.tagline?.toLowerCase().includes(searchQuery.toLowerCase())
+      app.description?.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesCategory && matchesAffiliate && matchesSearch
   })
 
@@ -299,12 +295,6 @@ export default function AIApplicationsPage() {
                     </div>
 
                     <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div className="font-medium text-gray-900">Tagline</div>
-                      <div className="text-blue-600">Optional</div>
-                      <div className="text-gray-600">Short tagline (max 80 characters)</div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4 text-sm">
                       <div className="font-medium text-gray-900">Affiliate</div>
                       <div className="text-blue-600">Optional</div>
                       <div className="text-gray-600">Enter "yes", "true", or "1" for affiliate programs</div>
@@ -372,19 +362,6 @@ export default function AIApplicationsPage() {
                   onChange={(e) => setAddForm({ ...addForm, app_name: e.target.value })}
                   className="w-full border border-gray-300 rounded px-3 py-2"
                   placeholder="QuickBooks AI Assistant"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tagline
-                </label>
-                <input
-                  type="text"
-                  value={addForm.tagline || ''}
-                  onChange={(e) => setAddForm({ ...addForm, tagline: e.target.value })}
-                  className="w-full border border-gray-300 rounded px-3 py-2"
-                  placeholder="Automate your bookkeeping with AI"
-                  maxLength={80}
                 />
               </div>
               <div className="md:col-span-2">
@@ -533,7 +510,7 @@ export default function AIApplicationsPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by name, description, or tagline..."
+                placeholder="Search by name or description..."
                 className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -604,13 +581,6 @@ export default function AIApplicationsPage() {
                           onChange={(e) => setEditForm({ ...editForm, app_name: e.target.value })}
                           className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
                           placeholder="App Name"
-                        />
-                        <input
-                          type="text"
-                          value={editForm.tagline || ''}
-                          onChange={(e) => setEditForm({ ...editForm, tagline: e.target.value })}
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-xs mt-1"
-                          placeholder="Tagline"
                         />
                         <input
                           type="url"
@@ -708,9 +678,6 @@ export default function AIApplicationsPage() {
                           )}
                           <div>
                             <div className="text-sm font-medium text-gray-900">{app.app_name}</div>
-                            {app.tagline && (
-                              <div className="text-xs text-gray-500 italic">{app.tagline}</div>
-                            )}
                           </div>
                         </div>
                       </td>

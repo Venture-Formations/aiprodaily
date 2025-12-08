@@ -40,6 +40,9 @@ export type NewsletterSetting = PublicationSetting
 export type ToolType = 'Client' | 'Firm'
 export type AIAppCategory = 'Payroll' | 'HR' | 'Accounting System' | 'Finance' | 'Productivity' | 'Client Management' | 'Banking'
 
+export type AIAppSubmissionStatus = 'pending' | 'approved' | 'rejected' | 'edited'
+export type AIAppPlan = 'free' | 'monthly' | 'yearly'
+
 export interface AIApplication {
   id: string
   publication_id: string
@@ -62,6 +65,30 @@ export interface AIApplication {
   times_used: number
   created_at: string
   updated_at: string
+
+  // Submission info
+  clerk_user_id: string | null
+  submitter_email: string | null
+  submitter_name: string | null
+  submitter_image_url: string | null
+
+  // Status and moderation
+  submission_status: AIAppSubmissionStatus
+  rejection_reason: string | null
+  approved_by: string | null
+  approved_at: string | null
+
+  // Sponsorship/Payment
+  plan: AIAppPlan
+  stripe_payment_id: string | null
+  stripe_subscription_id: string | null
+  stripe_customer_id: string | null
+  sponsor_start_date: string | null
+  sponsor_end_date: string | null
+
+  // Analytics
+  view_count: number
+  click_count: number
 }
 
 export interface IssueAIAppSelection {

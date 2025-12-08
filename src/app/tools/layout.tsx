@@ -1,9 +1,12 @@
 import { ClerkProvider } from '@clerk/nextjs'
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import Image from 'next/image'
 import { headers } from 'next/headers'
 import { getPublicationSettingsByDomain } from '@/lib/publication-settings'
 import { DirectoryHeader } from './components/DirectoryHeader'
+import { Container } from '@/components/salient/Container'
+import { NavLink } from '@/components/salient/NavLink'
 
 export const metadata: Metadata = {
   title: 'AI Tools Directory | AI Accounting Daily',
@@ -18,62 +21,33 @@ interface DirectoryFooterProps {
 
 function DirectoryFooter({ logoUrl, newsletterName, businessName }: DirectoryFooterProps) {
   return (
-    <footer className="py-8 px-4 sm:px-6 lg:px-8 bg-[#1c293d] text-white">
-      <div className="container mx-auto max-w-6xl">
-        <div className="grid md:grid-cols-4 gap-6 mb-6">
-          {/* About */}
-          <div className="md:col-span-2">
-            <div className="flex items-center gap-2 mb-3">
-              <img src={logoUrl} alt={newsletterName} className="w-8 h-8 object-contain" />
-              <span className="font-bold text-base">{newsletterName}</span>
+    <footer className="bg-slate-50">
+      <Container>
+        <div className="py-16">
+          <Link href="/" className="mx-auto block w-fit">
+            <Image
+              src={logoUrl}
+              alt={newsletterName}
+              width={140}
+              height={40}
+              className="h-10 w-auto"
+            />
+          </Link>
+          <nav className="mt-10 text-sm" aria-label="quick links">
+            <div className="-my-1 flex justify-center gap-x-6">
+              <NavLink href="/">Home</NavLink>
+              <NavLink href="/tools">AI Tools</NavLink>
+              <NavLink href="/tools/submit">Submit Tool</NavLink>
+              <NavLink href="/contactus">Contact</NavLink>
             </div>
-            <p className="text-sm text-white/70 leading-relaxed max-w-sm">
-              Curated collection of AI tools for accounting professionals. 
-              Empowering finance teams with daily AI insights and strategies.
-            </p>
-          </div>
-
-          {/* Quick Links */}
-          <div>
-            <h3 className="text-sm font-semibold mb-3">Quick Links</h3>
-            <ul className="space-y-1.5 text-sm text-white/70">
-              <li>
-                <Link href="/" className="hover:text-white transition-colors">
-                  Home
-                </Link>
-              </li>
-              <li>
-                <Link href="/tools" className="hover:text-white transition-colors">
-                  Browse Tools
-                </Link>
-              </li>
-              <li>
-                <Link href="/tools/submit" className="hover:text-white transition-colors">
-                  Submit a Tool
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Newsletter */}
-          <div>
-            <h3 className="text-sm font-semibold mb-3">Stay Updated</h3>
-            <p className="text-sm text-white/70 mb-3">
-              Get daily AI insights delivered to your inbox.
-            </p>
-            <Link
-              href="/"
-              className="inline-block bg-white text-[#1c293d] px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/90 transition-colors"
-            >
-              Subscribe Free
-            </Link>
-          </div>
+          </nav>
         </div>
-
-        <div className="pt-6 border-t border-white/10 text-center text-white/60 text-xs">
-          <p>&copy; {new Date().getFullYear()} {businessName}. All rights reserved.</p>
+        <div className="flex flex-col items-center border-t border-slate-400/10 py-10">
+          <p className="text-sm text-slate-500">
+            Copyright &copy; {new Date().getFullYear()} {businessName}. All rights reserved.
+          </p>
         </div>
-      </div>
+      </Container>
     </footer>
   )
 }
@@ -87,11 +61,11 @@ export default async function ToolsLayout({
   const headersList = await headers()
   const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'aiaccountingdaily.com'
   const settings = await getPublicationSettingsByDomain(host, [
-    'newsletter_name', 
-    'logo_url', 
+    'newsletter_name',
+    'logo_url',
     'business_name'
   ])
-  
+
   const logoUrl = settings.logo_url || '/logo.png'
   const newsletterName = settings.newsletter_name || 'AI Accounting Daily'
   const businessName = settings.business_name || 'AI Accounting Daily'
@@ -132,16 +106,15 @@ export default async function ToolsLayout({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
       />
-      <div className="min-h-screen flex flex-col bg-gray-50">
+      <div className="min-h-screen flex flex-col">
         <DirectoryHeader logoUrl={logoUrl} newsletterName={newsletterName} />
-        {/* Add padding-top for fixed header */}
-        <main className="flex-1 pt-16">
+        <main className="flex-1">
           {children}
         </main>
-        <DirectoryFooter 
-          logoUrl={logoUrl} 
-          newsletterName={newsletterName} 
-          businessName={businessName} 
+        <DirectoryFooter
+          logoUrl={logoUrl}
+          newsletterName={newsletterName}
+          businessName={businessName}
         />
       </div>
     </ClerkProvider>

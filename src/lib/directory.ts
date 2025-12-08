@@ -1,100 +1,126 @@
 import { supabaseAdmin } from './supabase'
-import type {
-  DirectoryTool,
-  DirectoryCategory,
-  DirectoryToolWithCategories,
-  DirectoryCategoryWithTools
-} from '@/types/database'
+import type { AIApplication, AIAppCategory } from '@/types/database'
 
 const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf' // AI Accounting Daily
 
-/**
- * Get all approved tools with their categories
- */
-export async function getApprovedTools(): Promise<DirectoryToolWithCategories[]> {
-  const { data: tools, error } = await supabaseAdmin
-    .from('tools_directory')
-    .select(`
-      *,
-      directory_categories_tools!inner(
-        category:directory_categories(*)
-      )
-    `)
-    .eq('publication_id', PUBLICATION_ID)
-    .eq('status', 'approved')
-    .order('is_sponsored', { ascending: false })
-    .order('is_featured', { ascending: false })
-    .order('tool_name', { ascending: true })
+// Categories derived from AIAppCategory type
+const CATEGORIES: { id: string; name: AIAppCategory; slug: string; description: string }[] = [
+  { id: 'payroll', name: 'Payroll', slug: 'payroll', description: 'AI tools for payroll processing and management' },
+  { id: 'hr', name: 'HR', slug: 'hr', description: 'AI tools for human resources management' },
+  { id: 'accounting-system', name: 'Accounting System', slug: 'accounting-system', description: 'AI-powered accounting software and systems' },
+  { id: 'finance', name: 'Finance', slug: 'finance', description: 'AI tools for financial analysis and planning' },
+  { id: 'productivity', name: 'Productivity', slug: 'productivity', description: 'AI tools to boost productivity' },
+  { id: 'client-management', name: 'Client Management', slug: 'client-management', description: 'AI tools for managing client relationships' },
+  { id: 'banking', name: 'Banking', slug: 'banking', description: 'AI tools for banking and financial services' }
+]
 
-  if (error) {
-    console.error('[Directory] Error fetching approved tools:', error)
-    return []
-  }
+export interface DirectoryApp extends AIApplication {
+  // Alias fields for compatibility with existing UI
+  tool_name: string
+  website_url: string
+  tool_image_url: string | null
+  logo_image_url: string | null
+  is_sponsored: boolean
+  categories: { id: string; name: string; slug: string }[]
+}
 
-  // Transform the nested data structure
-  return (tools || []).map(tool => ({
-    ...tool,
-    categories: tool.directory_categories_tools?.map((ct: any) => ct.category).filter(Boolean) || []
-  }))
+export interface DirectoryCategory {
+  id: string
+  name: string
+  slug: string
+  description?: string
+  status?: string
+  tool_count?: number
 }
 
 /**
- * Get all approved categories with tool counts
+ * Transform AIApplication to DirectoryApp format for UI compatibility
  */
-export async function getApprovedCategories(): Promise<DirectoryCategoryWithTools[]> {
-  const { data: categories, error } = await supabaseAdmin
-    .from('directory_categories')
-    .select(`
-      *,
-      directory_categories_tools(
-        tool:tools_directory(*)
-      )
-    `)
+function transformApp(app: AIApplication): DirectoryApp {
+  const category = CATEGORIES.find(c => c.name === app.category) || CATEGORIES[4] // Default to Productivity
+
+  return {
+    ...app,
+    // Alias mappings for UI compatibility
+    tool_name: app.app_name,
+    website_url: app.app_url,
+    tool_image_url: app.screenshot_url,
+    logo_image_url: app.logo_url,
+    is_sponsored: app.is_paid_placement || app.is_affiliate,
+    categories: [{ id: category.id, name: category.name, slug: category.slug }]
+  }
+}
+
+/**
+ * Get all active AI applications
+ */
+export async function getApprovedTools(): Promise<DirectoryApp[]> {
+  const { data: apps, error } = await supabaseAdmin
+    .from('ai_applications')
+    .select('*')
     .eq('publication_id', PUBLICATION_ID)
-    .eq('status', 'approved')
-    .order('display_order', { ascending: true })
+    .eq('is_active', true)
+    .order('is_paid_placement', { ascending: false })
+    .order('is_affiliate', { ascending: false })
+    .order('is_featured', { ascending: false })
+    .order('app_name', { ascending: true })
+
+  if (error) {
+    console.error('[Directory] Error fetching AI applications:', error)
+    return []
+  }
+
+  return (apps || []).map(transformApp)
+}
+
+/**
+ * Get all categories with tool counts
+ */
+export async function getApprovedCategories(): Promise<DirectoryCategory[]> {
+  // Get counts per category
+  const { data: apps, error } = await supabaseAdmin
+    .from('ai_applications')
+    .select('category')
+    .eq('publication_id', PUBLICATION_ID)
+    .eq('is_active', true)
 
   if (error) {
     console.error('[Directory] Error fetching categories:', error)
-    return []
+    return CATEGORIES.map(c => ({ ...c, status: 'approved', tool_count: 0 }))
   }
 
-  // Transform and add tool counts
-  return (categories || []).map(category => ({
-    ...category,
-    tools: category.directory_categories_tools
-      ?.map((ct: any) => ct.tool)
-      .filter((tool: any) => tool?.status === 'approved') || [],
-    tool_count: category.directory_categories_tools
-      ?.filter((ct: any) => ct.tool?.status === 'approved').length || 0
+  // Count apps per category
+  const counts: Record<string, number> = {}
+  apps?.forEach(app => {
+    if (app.category) {
+      counts[app.category] = (counts[app.category] || 0) + 1
+    }
+  })
+
+  return CATEGORIES.map(c => ({
+    ...c,
+    status: 'approved',
+    tool_count: counts[c.name] || 0
   }))
 }
 
 /**
- * Get a single tool by ID with categories
+ * Get a single tool by ID
  */
-export async function getToolById(toolId: string): Promise<DirectoryToolWithCategories | null> {
-  const { data: tool, error } = await supabaseAdmin
-    .from('tools_directory')
-    .select(`
-      *,
-      directory_categories_tools(
-        category:directory_categories(*)
-      )
-    `)
+export async function getToolById(toolId: string): Promise<DirectoryApp | null> {
+  const { data: app, error } = await supabaseAdmin
+    .from('ai_applications')
+    .select('*')
     .eq('id', toolId)
     .eq('publication_id', PUBLICATION_ID)
     .single()
 
-  if (error || !tool) {
+  if (error || !app) {
     console.error('[Directory] Error fetching tool:', error)
     return null
   }
 
-  return {
-    ...tool,
-    categories: tool.directory_categories_tools?.map((ct: any) => ct.category).filter(Boolean) || []
-  }
+  return transformApp(app)
 }
 
 /**
@@ -102,66 +128,48 @@ export async function getToolById(toolId: string): Promise<DirectoryToolWithCate
  */
 export async function getToolsByCategory(categorySlug: string): Promise<{
   category: DirectoryCategory | null
-  tools: DirectoryToolWithCategories[]
+  tools: DirectoryApp[]
 }> {
-  // First get the category
-  const { data: category, error: catError } = await supabaseAdmin
-    .from('directory_categories')
-    .select('*')
-    .eq('publication_id', PUBLICATION_ID)
-    .eq('slug', categorySlug)
-    .eq('status', 'approved')
-    .single()
+  // Find the category
+  const category = CATEGORIES.find(c => c.slug === categorySlug)
 
-  if (catError || !category) {
+  if (!category) {
     return { category: null, tools: [] }
   }
 
   // Get tools in this category
-  const { data: categoryTools, error: toolsError } = await supabaseAdmin
-    .from('directory_categories_tools')
-    .select(`
-      tool:tools_directory(
-        *,
-        directory_categories_tools(
-          category:directory_categories(*)
-        )
-      )
-    `)
-    .eq('category_id', category.id)
+  const { data: apps, error } = await supabaseAdmin
+    .from('ai_applications')
+    .select('*')
+    .eq('publication_id', PUBLICATION_ID)
+    .eq('is_active', true)
+    .eq('category', category.name)
+    .order('is_paid_placement', { ascending: false })
+    .order('is_affiliate', { ascending: false })
+    .order('app_name', { ascending: true })
 
-  if (toolsError) {
-    console.error('[Directory] Error fetching category tools:', toolsError)
-    return { category, tools: [] }
+  if (error) {
+    console.error('[Directory] Error fetching category tools:', error)
+    return { category: { ...category, status: 'approved', tool_count: 0 }, tools: [] }
   }
 
-  const tools = (categoryTools || [])
-    .map((ct: any) => ct.tool)
-    .filter((tool: any) => tool?.status === 'approved')
-    .map((tool: any) => ({
-      ...tool,
-      categories: tool.directory_categories_tools?.map((ct: any) => ct.category).filter(Boolean) || []
-    }))
-
-  return { category, tools }
+  return {
+    category: { ...category, status: 'approved', tool_count: apps?.length || 0 },
+    tools: (apps || []).map(transformApp)
+  }
 }
 
 /**
  * Search tools by name or description
  */
-export async function searchTools(query: string): Promise<DirectoryToolWithCategories[]> {
-  const { data: tools, error } = await supabaseAdmin
-    .from('tools_directory')
-    .select(`
-      *,
-      directory_categories_tools(
-        category:directory_categories(*)
-      )
-    `)
+export async function searchTools(query: string): Promise<DirectoryApp[]> {
+  const { data: apps, error } = await supabaseAdmin
+    .from('ai_applications')
+    .select('*')
     .eq('publication_id', PUBLICATION_ID)
-    .eq('status', 'approved')
-    .or(`tool_name.ilike.%${query}%,description.ilike.%${query}%,tagline.ilike.%${query}%`)
-    .order('is_sponsored', { ascending: false })
+    .eq('is_active', true)
+    .or(`app_name.ilike.%${query}%,description.ilike.%${query}%`)
+    .order('is_paid_placement', { ascending: false })
     .limit(50)
 
   if (error) {
@@ -169,26 +177,18 @@ export async function searchTools(query: string): Promise<DirectoryToolWithCateg
     return []
   }
 
-  return (tools || []).map(tool => ({
-    ...tool,
-    categories: tool.directory_categories_tools?.map((ct: any) => ct.category).filter(Boolean) || []
-  }))
+  return (apps || []).map(transformApp)
 }
 
 /**
- * Get pending tools for admin review
+ * Get pending tools for admin review (tools with is_active = false)
  */
-export async function getPendingTools(): Promise<DirectoryToolWithCategories[]> {
-  const { data: tools, error } = await supabaseAdmin
-    .from('tools_directory')
-    .select(`
-      *,
-      directory_categories_tools(
-        category:directory_categories(*)
-      )
-    `)
+export async function getPendingTools(): Promise<DirectoryApp[]> {
+  const { data: apps, error } = await supabaseAdmin
+    .from('ai_applications')
+    .select('*')
     .eq('publication_id', PUBLICATION_ID)
-    .eq('status', 'pending')
+    .eq('is_active', false)
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -196,27 +196,24 @@ export async function getPendingTools(): Promise<DirectoryToolWithCategories[]> 
     return []
   }
 
-  return (tools || []).map(tool => ({
-    ...tool,
-    categories: tool.directory_categories_tools?.map((ct: any) => ct.category).filter(Boolean) || []
-  }))
+  return (apps || []).map(transformApp)
 }
 
 /**
- * Increment view count for a tool
+ * Increment view/usage count for a tool
  */
 export async function incrementToolViews(toolId: string): Promise<void> {
   try {
-    const { data: tool } = await supabaseAdmin
-      .from('tools_directory')
-      .select('view_count')
+    const { data: app } = await supabaseAdmin
+      .from('ai_applications')
+      .select('times_used')
       .eq('id', toolId)
       .single()
 
-    if (tool) {
+    if (app) {
       await supabaseAdmin
-        .from('tools_directory')
-        .update({ view_count: (tool.view_count || 0) + 1 })
+        .from('ai_applications')
+        .update({ times_used: (app.times_used || 0) + 1 })
         .eq('id', toolId)
     }
   } catch (error) {
@@ -225,19 +222,8 @@ export async function incrementToolViews(toolId: string): Promise<void> {
 }
 
 /**
- * Increment click count for a tool
+ * Increment click count for a tool (alias for incrementToolViews)
  */
 export async function incrementToolClicks(toolId: string): Promise<void> {
-  const { data: tool } = await supabaseAdmin
-    .from('tools_directory')
-    .select('click_count')
-    .eq('id', toolId)
-    .single()
-
-  if (tool) {
-    await supabaseAdmin
-      .from('tools_directory')
-      .update({ click_count: (tool.click_count || 0) + 1 })
-      .eq('id', toolId)
-  }
+  return incrementToolViews(toolId)
 }
