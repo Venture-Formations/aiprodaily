@@ -120,12 +120,32 @@ export function PersonalizationForm() {
     const checkInterval = setInterval(() => {
       checkCount++
 
-      // Look for SparkLoop popup elements
-      const popupExists = document.querySelector('[data-sparkloop-upscribe]') ||
-                         document.querySelector('.sparkloop-modal') ||
-                         document.querySelector('[class*="sparkloop"]') ||
-                         document.querySelector('iframe[src*="sparkloop"]') ||
-                         document.querySelector('[id*="sparkloop"]')
+      // Look for SparkLoop popup elements - check multiple possible selectors
+      // SparkLoop typically uses iframes or modal divs
+      const sparkloopIframe = document.querySelector('iframe[src*="sparkloop"]') ||
+                              document.querySelector('iframe[src*="upscribe"]')
+      const sparkloopModal = document.querySelector('[class*="sparkloop"]') ||
+                            document.querySelector('[id*="sparkloop"]') ||
+                            document.querySelector('[data-sparkloop]') ||
+                            document.querySelector('[class*="sl-"]') ||
+                            document.querySelector('[id*="sl-"]')
+
+      // Also check for any overlay/modal that appeared after form submit
+      const anyModal = document.querySelector('[role="dialog"]') ||
+                      document.querySelector('.modal-overlay') ||
+                      document.querySelector('[class*="modal"]') ||
+                      document.querySelector('[class*="overlay"]')
+
+      const popupExists = sparkloopIframe || sparkloopModal || anyModal
+
+      // Debug logging (can remove later)
+      if (checkCount <= 3) {
+        console.log('[SparkLoop] Checking for popup:', {
+          popupExists: !!popupExists,
+          popupDetected,
+          checkCount
+        })
+      }
 
       if (popupExists) {
         popupDetected = true
@@ -133,6 +153,16 @@ export function PersonalizationForm() {
 
       // If popup was detected and is now gone, redirect
       if (popupDetected && !popupExists) {
+        console.log('[SparkLoop] Popup closed, redirecting...')
+        clearInterval(checkInterval)
+        window.location.href = '/'
+        return
+      }
+
+      // If no popup detected after 10 seconds, redirect anyway
+      // (popup might not have shown)
+      if (!popupDetected && checkCount >= 10) {
+        console.log('[SparkLoop] No popup detected after 10s, redirecting...')
         clearInterval(checkInterval)
         window.location.href = '/'
         return
