@@ -52,7 +52,9 @@
       "Bash(dir /s /b \"C:\\Users\\dpenn\\Downloads\\Tailwind*\")",
       "Bash(dir \"C:\\Users\\dpenn\\Downloads\\Tailwind-20251205T144801Z-3-001\\Tailwind\" /s /b)",
       "Bash(dir:*)",
-      "mcp__mailerlite__list_fields"
+      "mcp__mailerlite__list_fields",
+      "mcp__mailerlite__get_subscriber",
+      "mcp__mailerlite__update_subscriber"
     ],
     "deny": [],
     "ask": []

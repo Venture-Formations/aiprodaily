@@ -12,10 +12,19 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { email, name, last_name, job_type, yearly_clients } = body
 
+    console.log(`[Personalize] Received request for ${email}`, { name, last_name, job_type, yearly_clients })
+
     if (!email || !email.includes('@')) {
       return NextResponse.json({
         error: 'Valid email address is required'
       }, { status: 400 })
+    }
+
+    if (!process.env.MAILERLITE_API_KEY) {
+      console.error('[Personalize] MAILERLITE_API_KEY not configured')
+      return NextResponse.json({
+        error: 'Service not configured'
+      }, { status: 500 })
     }
 
     // MailerLite API client
@@ -28,22 +37,6 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    console.log(`[Personalize] Updating subscriber ${email} with personalization data`)
-
-    // Search for subscriber by email
-    const searchResponse = await mailerliteClient.get('/subscribers', {
-      params: { 'filter[email]': email }
-    })
-
-    if (!searchResponse.data?.data || searchResponse.data.data.length === 0) {
-      console.error(`[Personalize] Subscriber ${email} not found`)
-      return NextResponse.json({
-        error: 'Subscriber not found. Please subscribe first.'
-      }, { status: 404 })
-    }
-
-    const subscriberId = searchResponse.data.data[0].id
-
     // Prepare fields to update
     const fields: Record<string, string> = {}
 
@@ -52,12 +45,15 @@ export async function POST(request: NextRequest) {
     if (job_type) fields.job_type = job_type
     if (yearly_clients) fields.yearly_clients = yearly_clients
 
-    // Update subscriber with personalization fields
-    await mailerliteClient.put(`/subscribers/${subscriberId}`, {
+    console.log(`[Personalize] Updating subscriber ${email} with fields:`, fields)
+
+    // Update subscriber directly by email - MailerLite accepts email as identifier
+    // Using PUT to /subscribers/{email} to update or create
+    const response = await mailerliteClient.put(`/subscribers/${encodeURIComponent(email)}`, {
       fields
     })
 
-    console.log(`[Personalize] Successfully updated subscriber ${email}`)
+    console.log(`[Personalize] Successfully updated subscriber ${email}`, response.status)
 
     return NextResponse.json({
       success: true,
@@ -65,13 +61,20 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error: any) {
-    console.error('[Personalize] Failed to update subscriber:', error)
+    console.error('[Personalize] Failed to update subscriber:', error.message)
 
     if (error.response) {
       console.error('[Personalize] MailerLite API error:', {
         status: error.response.status,
         data: error.response.data
       })
+
+      // If subscriber not found, return a more helpful error
+      if (error.response.status === 404) {
+        return NextResponse.json({
+          error: 'Subscriber not found. Please subscribe first.'
+        }, { status: 404 })
+      }
     }
 
     return NextResponse.json({
