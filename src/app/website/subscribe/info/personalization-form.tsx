@@ -21,8 +21,9 @@ const YEARLY_CLIENTS_OPTIONS = [
 
 export function PersonalizationForm() {
   const searchParams = useSearchParams()
-  const email = searchParams.get('email') || ''
+  const initialEmail = searchParams.get('email') || ''
 
+  const [email, setEmail] = useState(initialEmail)
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [jobType, setJobType] = useState('')
@@ -32,16 +33,16 @@ export function PersonalizationForm() {
 
   // Show error if no email provided
   useEffect(() => {
-    if (!email) {
+    if (!initialEmail) {
       setError('No email found. Please go back and subscribe first.')
     }
-  }, [email])
+  }, [initialEmail])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!email) {
-      setError('No email found. Please go back and subscribe first.')
+    if (!email || !email.includes('@')) {
+      setError('Please enter a valid email address')
       return
     }
 
@@ -64,11 +65,15 @@ export function PersonalizationForm() {
     setError('')
 
     try {
+      // If email was corrected, pass both old and new email
+      const emailChanged = email !== initialEmail && initialEmail !== ''
+
       const response = await fetch('/api/subscribe/personalize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
+          original_email: emailChanged ? initialEmail : undefined,
           name: firstName.trim(),
           last_name: lastName.trim(),
           job_type: jobType,
@@ -79,8 +84,12 @@ export function PersonalizationForm() {
       const data = await response.json()
 
       if (response.ok) {
-        // Load SparkLoop script - it auto-shows the popup
-        loadSparkLoopAndShowPopup(email)
+        // SparkLoop will detect the form submission and show popup automatically
+        // After popup closes, redirect to home (SparkLoop handles this via its settings)
+        // If no popup appears within 5 seconds, redirect anyway
+        setTimeout(() => {
+          window.location.href = '/'
+        }, 5000)
       } else {
         setError(data.error || 'Update failed. Please try again.')
         setIsSubmitting(false)
@@ -91,83 +100,46 @@ export function PersonalizationForm() {
     }
   }
 
-  const loadSparkLoopAndShowPopup = (subscriberEmail: string) => {
-    // SparkLoop shows popup when it detects a form submission with email
-    if (document.getElementById('sparkloop-script')) {
-      window.location.href = '/'
-      return
+  // SparkLoop will auto-detect the form submission since the form has an email field
+  // We just need to load the script on this page
+  useEffect(() => {
+    // Load SparkLoop script when page loads so it can track the form
+    if (typeof window !== 'undefined' && !document.getElementById('sparkloop-script')) {
+      const script = document.createElement('script')
+      script.id = 'sparkloop-script'
+      script.src = 'https://js.sparkloop.app/embed.js?publication_id=pub_6b958dc16ac6'
+      script.async = true
+      script.setAttribute('data-sparkloop', '')
+      document.body.appendChild(script)
     }
-
-    // Load SparkLoop script first
-    const script = document.createElement('script')
-    script.id = 'sparkloop-script'
-    script.src = 'https://js.sparkloop.app/embed.js?publication_id=pub_6b958dc16ac6'
-    script.async = true
-    script.setAttribute('data-sparkloop', '')
-
-    script.onload = () => {
-      // Wait for SparkLoop to fully initialize
-      setTimeout(() => {
-        // Try to use SparkLoop's internal subscriber upsert
-        if ((window as any).SL && (window as any).SL.upsertSubscriber) {
-          (window as any).SL.upsertSubscriber({ email: subscriberEmail })
-        }
-
-        // Also try triggering via their tracking
-        if ((window as any).SL && (window as any).SL.track) {
-          (window as any).SL.track('subscribe', { email: subscriberEmail })
-        }
-
-        // Create and submit a form that SparkLoop can intercept
-        const form = document.createElement('form')
-        form.id = 'sparkloop-email-form'
-        form.method = 'POST'
-        form.action = '#'
-        form.innerHTML = `
-          <input type="email" name="email" value="${subscriberEmail}" />
-          <input type="text" name="EMAIL" value="${subscriberEmail}" />
-          <button type="submit">Submit</button>
-        `
-        form.style.position = 'absolute'
-        form.style.left = '-9999px'
-        document.body.appendChild(form)
-
-        // Submit the form to trigger SparkLoop's detection
-        const submitBtn = form.querySelector('button')
-        if (submitBtn) {
-          submitBtn.click()
-        }
-      }, 1000)
-
-      // Check periodically for popup close, then redirect
-      let checkCount = 0
-      const maxChecks = 120
-
-      const checkPopupClosed = setInterval(() => {
-        checkCount++
-        const popupExists = document.querySelector('[data-sparkloop-upscribe]') ||
-                           document.querySelector('.sparkloop-modal') ||
-                           document.querySelector('[class*="sparkloop"]') ||
-                           document.querySelector('iframe[src*="sparkloop"]')
-
-        if (checkCount > 15 && !popupExists) {
-          clearInterval(checkPopupClosed)
-          window.location.href = '/'
-        }
-
-        if (checkCount >= maxChecks) {
-          clearInterval(checkPopupClosed)
-          window.location.href = '/'
-        }
-      }, 1000)
-    }
-
-    document.body.appendChild(script)
-  }
+  }, [])
 
   return (
     <div className="space-y-6">
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Email Field */}
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-slate-700 text-left mb-1">
+            Email <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={isSubmitting}
+            placeholder="you@example.com"
+            className="w-full rounded-lg border-0 bg-white px-4 py-3 text-slate-900 shadow-lg ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+          />
+          {email !== initialEmail && initialEmail && (
+            <p className="text-xs text-amber-600 mt-1 text-left">
+              Email will be updated from {initialEmail}
+            </p>
+          )}
+        </div>
+
         {/* Name Fields - Side by Side */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
@@ -257,12 +229,6 @@ export function PersonalizationForm() {
 
       {error && (
         <p className="text-sm text-red-500 text-center">{error}</p>
-      )}
-
-      {!error && email && (
-        <p className="text-sm text-slate-500">
-          Signing up as <span className="font-medium text-slate-700">{email}</span>
-        </p>
       )}
     </div>
   )

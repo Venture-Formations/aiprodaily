@@ -6,13 +6,20 @@ const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
 /**
  * Update subscriber personalization fields in MailerLite
  * Called after subscriber completes the personalization form
+ * Supports email correction if original_email is provided
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, name, last_name, job_type, yearly_clients } = body
+    const { email, original_email, name, last_name, job_type, yearly_clients } = body
 
-    console.log(`[Personalize] Received request for ${email}`, { name, last_name, job_type, yearly_clients })
+    console.log(`[Personalize] Received request for ${email}`, {
+      original_email,
+      name,
+      last_name,
+      job_type,
+      yearly_clients
+    })
 
     if (!email || !email.includes('@')) {
       return NextResponse.json({
@@ -45,15 +52,27 @@ export async function POST(request: NextRequest) {
     if (job_type) fields.job_type = job_type
     if (yearly_clients) fields.yearly_clients = yearly_clients
 
-    console.log(`[Personalize] Updating subscriber ${email} with fields:`, fields)
+    // If email was corrected, we need to update the original subscriber's email
+    if (original_email && original_email !== email) {
+      console.log(`[Personalize] Email corrected from ${original_email} to ${email}`)
 
-    // Update subscriber directly by email - MailerLite accepts email as identifier
-    // Using PUT to /subscribers/{email} to update or create
-    const response = await mailerliteClient.put(`/subscribers/${encodeURIComponent(email)}`, {
-      fields
-    })
+      // Update the original subscriber with new email and fields
+      const response = await mailerliteClient.put(`/subscribers/${encodeURIComponent(original_email)}`, {
+        email: email, // Update to new email
+        fields
+      })
 
-    console.log(`[Personalize] Successfully updated subscriber ${email}`, response.status)
+      console.log(`[Personalize] Successfully updated subscriber email from ${original_email} to ${email}`, response.status)
+    } else {
+      // No email change, just update fields
+      console.log(`[Personalize] Updating subscriber ${email} with fields:`, fields)
+
+      const response = await mailerliteClient.put(`/subscribers/${encodeURIComponent(email)}`, {
+        fields
+      })
+
+      console.log(`[Personalize] Successfully updated subscriber ${email}`, response.status)
+    }
 
     return NextResponse.json({
       success: true,
