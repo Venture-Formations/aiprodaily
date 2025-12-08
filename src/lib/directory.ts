@@ -146,6 +146,7 @@ export async function getToolsByCategory(categorySlug: string): Promise<{
     .eq('category', category.name)
     .order('is_paid_placement', { ascending: false })
     .order('is_affiliate', { ascending: false })
+    .order('is_featured', { ascending: false })
     .order('app_name', { ascending: true })
 
   if (error) {
@@ -170,6 +171,8 @@ export async function searchTools(query: string): Promise<DirectoryApp[]> {
     .eq('is_active', true)
     .or(`app_name.ilike.%${query}%,description.ilike.%${query}%`)
     .order('is_paid_placement', { ascending: false })
+    .order('is_featured', { ascending: false })
+    .order('app_name', { ascending: true })
     .limit(50)
 
   if (error) {
