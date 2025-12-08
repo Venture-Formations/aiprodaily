@@ -13,15 +13,10 @@ export default function PromptIdeasPage() {
   const [addForm, setAddForm] = useState<Partial<PromptIdea>>({
     title: '',
     prompt_text: '',
-    category: 'Tax Preparation',
     use_case: '',
-    suggested_model: 'ChatGPT',
-    difficulty_level: 'Intermediate',
     is_active: true,
     is_featured: false
   })
-  const [filterCategory, setFilterCategory] = useState<string>('all')
-  const [filterDifficulty, setFilterDifficulty] = useState<string>('all')
   const [expandedPromptId, setExpandedPromptId] = useState<string | null>(null)
   const [uploadingCSV, setUploadingCSV] = useState(false)
   const [uploadMessage, setUploadMessage] = useState('')
@@ -108,10 +103,7 @@ export default function PromptIdeasPage() {
         setAddForm({
           title: '',
           prompt_text: '',
-          category: 'Tax Preparation',
           use_case: '',
-          suggested_model: 'ChatGPT',
-          difficulty_level: 'Intermediate',
           is_active: true,
           is_featured: false
         })
@@ -151,14 +143,6 @@ export default function PromptIdeasPage() {
     }
   }
 
-  const filteredPrompts = prompts.filter(prompt =>
-    (filterCategory === 'all' || prompt.category === filterCategory) &&
-    (filterDifficulty === 'all' || prompt.difficulty_level === filterDifficulty)
-  )
-
-  const categories = ['Tax Preparation', 'Audit & Compliance', 'Financial Reporting', 'Client Communication', 'Document Analysis', 'Data Entry']
-  const difficultyLevels = ['Beginner', 'Intermediate', 'Advanced']
-  const models = ['ChatGPT', 'Claude', 'Gemini', 'Any']
 
   if (loading) {
     return (
@@ -242,35 +226,7 @@ export default function PromptIdeasPage() {
                   placeholder="You are an accounting expert. Help me reconcile my bank statements by..."
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Category
-                </label>
-                <select
-                  value={addForm.category || ''}
-                  onChange={(e) => setAddForm({ ...addForm, category: e.target.value })}
-                  className="w-full border border-gray-300 rounded px-3 py-2"
-                >
-                  {categories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Difficulty Level
-                </label>
-                <select
-                  value={addForm.difficulty_level || ''}
-                  onChange={(e) => setAddForm({ ...addForm, difficulty_level: e.target.value })}
-                  className="w-full border border-gray-300 rounded px-3 py-2"
-                >
-                  {difficultyLevels.map(level => (
-                    <option key={level} value={level}>{level}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Use Case (optional)
                 </label>
@@ -282,21 +238,7 @@ export default function PromptIdeasPage() {
                   placeholder="Monthly close process"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Suggested Model
-                </label>
-                <select
-                  value={addForm.suggested_model || ''}
-                  onChange={(e) => setAddForm({ ...addForm, suggested_model: e.target.value })}
-                  className="w-full border border-gray-300 rounded px-3 py-2"
-                >
-                  {models.map(model => (
-                    <option key={model} value={model}>{model}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-center space-x-4">
+              <div className="md:col-span-2 flex items-center space-x-4">
                 <label className="flex items-center">
                   <input
                     type="checkbox"
@@ -334,36 +276,10 @@ export default function PromptIdeasPage() {
           </div>
         )}
 
-        {/* Filters */}
-        <div className="mb-4 flex items-center space-x-4">
-          <div>
-            <label className="text-sm font-medium text-gray-700 mr-2">Category:</label>
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-1"
-            >
-              <option value="all">All Categories</option>
-              {categories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700 mr-2">Difficulty:</label>
-            <select
-              value={filterDifficulty}
-              onChange={(e) => setFilterDifficulty(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-1"
-            >
-              <option value="all">All Levels</option>
-              {difficultyLevels.map(level => (
-                <option key={level} value={level}>{level}</option>
-              ))}
-            </select>
-          </div>
+        {/* Prompts Count */}
+        <div className="mb-4">
           <span className="text-sm text-gray-600">
-            Showing {filteredPrompts.length} of {prompts.length} prompts
+            Showing {prompts.length} prompts
           </span>
         </div>
 
@@ -376,15 +292,6 @@ export default function PromptIdeasPage() {
                   Title
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Category
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Difficulty
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Model
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -393,7 +300,7 @@ export default function PromptIdeasPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredPrompts.map((prompt) => (
+              {prompts.map((prompt) => (
                 <tr key={prompt.id} className={!prompt.is_active ? 'bg-gray-50' : ''}>
                   {editingId === prompt.id ? (
                     <>
@@ -410,39 +317,6 @@ export default function PromptIdeasPage() {
                           className="w-full border border-gray-300 rounded px-2 py-1 text-xs mt-2 font-mono"
                           rows={4}
                         />
-                      </td>
-                      <td className="px-6 py-4">
-                        <select
-                          value={editForm.category || ''}
-                          onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                        >
-                          {categories.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-6 py-4">
-                        <select
-                          value={editForm.difficulty_level || ''}
-                          onChange={(e) => setEditForm({ ...editForm, difficulty_level: e.target.value })}
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                        >
-                          {difficultyLevels.map(level => (
-                            <option key={level} value={level}>{level}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-6 py-4">
-                        <select
-                          value={editForm.suggested_model || ''}
-                          onChange={(e) => setEditForm({ ...editForm, suggested_model: e.target.value })}
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                        >
-                          {models.map(model => (
-                            <option key={model} value={model}>{model}</option>
-                          ))}
-                        </select>
                       </td>
                       <td className="px-6 py-4">
                         <label className="flex items-center text-sm">
@@ -500,21 +374,6 @@ export default function PromptIdeasPage() {
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {prompt.category}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          prompt.difficulty_level === 'Beginner' ? 'bg-green-100 text-green-800' :
-                          prompt.difficulty_level === 'Intermediate' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {prompt.difficulty_level}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {prompt.suggested_model}
-                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {prompt.is_active ? (
                           <span className="text-green-600">✓ Active</span>
@@ -546,7 +405,7 @@ export default function PromptIdeasPage() {
             </tbody>
           </table>
 
-          {filteredPrompts.length === 0 && (
+          {prompts.length === 0 && (
             <div className="text-center py-12 text-gray-500">
               No prompt ideas found. Click "Add Prompt" to get started.
             </div>
@@ -554,7 +413,7 @@ export default function PromptIdeasPage() {
         </div>
 
         {/* Stats */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-blue-600">{prompts.length}</div>
             <div className="text-sm text-gray-600">Total Prompts</div>
@@ -570,12 +429,6 @@ export default function PromptIdeasPage() {
               {prompts.filter(p => p.is_featured).length}
             </div>
             <div className="text-sm text-gray-600">Featured</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-purple-600">
-              {new Set(prompts.map(p => p.category)).size}
-            </div>
-            <div className="text-sm text-gray-600">Categories</div>
           </div>
         </div>
       </div>
