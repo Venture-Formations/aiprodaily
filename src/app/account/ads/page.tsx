@@ -13,10 +13,10 @@ export default async function AdsOverviewPage() {
     redirect('/sign-in')
   }
 
-  // Fetch user's tool listing for sponsored status
+  // Fetch user's tool listing for sponsored status from ai_applications table
   const { data: tool } = await supabaseAdmin
-    .from('tools_directory')
-    .select('id, tool_name, is_sponsored, status, plan')
+    .from('ai_applications')
+    .select('id, app_name, is_paid_placement, submission_status, plan')
     .eq('clerk_user_id', user.id)
     .single()
 
@@ -30,34 +30,34 @@ export default async function AdsOverviewPage() {
     .limit(3)
 
   const hasListing = !!tool
-  const isSponsored = tool?.is_sponsored || false
+  const isSponsored = tool?.is_paid_placement || false
   const newsletterAdCount = newsletterAds?.length || 0
 
   return (
     <div>
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">My Ads</h1>
-        <p className="text-gray-600 mt-1">
+        <h1 className="text-2xl font-bold text-slate-900">My Ads</h1>
+        <p className="text-slate-600 mt-1">
           Overview of your advertising options and campaigns
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-6">
         {/* Tool Profile Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-6 border-b border-slate-100">
             <div className="flex items-center gap-3">
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                isSponsored 
-                  ? 'bg-gradient-to-r from-[#a855f7] via-[#06b6d4] to-[#14b8a6]' 
-                  : 'bg-gray-100'
+                isSponsored
+                  ? 'bg-gradient-to-r from-blue-600 to-cyan-500'
+                  : 'bg-slate-100'
               }`}>
-                <Star className={`w-6 h-6 ${isSponsored ? 'text-white fill-current' : 'text-gray-400'}`} />
+                <Star className={`w-6 h-6 ${isSponsored ? 'text-white fill-current' : 'text-slate-400'}`} />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Tool Profile</h2>
-                <p className="text-sm text-gray-500">Sponsored listing in directory</p>
+                <h2 className="text-lg font-semibold text-slate-900">Tool Profile</h2>
+                <p className="text-sm text-slate-500">Sponsored listing in directory</p>
               </div>
             </div>
           </div>
@@ -65,10 +65,10 @@ export default async function AdsOverviewPage() {
           <div className="p-6">
             {!hasListing ? (
               <div className="text-center py-4">
-                <p className="text-gray-500 mb-4">No tool listing yet</p>
+                <p className="text-slate-500 mb-4">No tool listing yet</p>
                 <Link
                   href="/tools/submit"
-                  className="text-[#06b6d4] font-medium hover:underline"
+                  className="text-blue-600 font-medium hover:underline"
                 >
                   Submit your tool first →
                 </Link>
@@ -76,24 +76,24 @@ export default async function AdsOverviewPage() {
             ) : isSponsored ? (
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-[#a855f7]/10 via-[#06b6d4]/10 to-[#14b8a6]/10 text-[#06b6d4] rounded-full text-sm font-medium">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full text-sm font-medium">
                     <Check className="w-4 h-4" />
                     Sponsored Active
                   </span>
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-slate-500">
                     {tool.plan === 'yearly' ? 'Yearly' : 'Monthly'}
                   </span>
                 </div>
-                <p className="text-sm text-gray-600 mb-4">
-                  Your listing "{tool.tool_name}" is featured at the top of the directory.
+                <p className="text-sm text-slate-600 mb-4">
+                  Your listing "{tool.app_name}" is featured at the top of the directory.
                 </p>
               </div>
             ) : (
               <div>
-                <p className="text-sm text-gray-600 mb-4">
-                  Upgrade "{tool.tool_name}" to get priority placement and stand out.
+                <p className="text-sm text-slate-600 mb-4">
+                  Upgrade "{tool.app_name}" to get priority placement and stand out.
                 </p>
-                <div className="flex items-center gap-4 text-sm text-gray-500">
+                <div className="flex items-center gap-4 text-sm text-slate-500">
                   <span>From $30/mo</span>
                   <span>•</span>
                   <span>Cancel anytime</span>
@@ -102,10 +102,10 @@ export default async function AdsOverviewPage() {
             )}
           </div>
 
-          <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+          <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
             <Link
               href="/account/ads/profile"
-              className="flex items-center justify-between text-[#06b6d4] font-medium hover:underline"
+              className="flex items-center justify-between text-blue-600 font-medium hover:underline"
             >
               <span>{isSponsored ? 'Manage Sponsorship' : 'Upgrade to Sponsored'}</span>
               <ArrowRight className="w-4 h-4" />
@@ -114,15 +114,15 @@ export default async function AdsOverviewPage() {
         </div>
 
         {/* Newsletter Ads Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-6 border-b border-slate-100">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-[#a855f7]/10 via-[#06b6d4]/10 to-[#14b8a6]/10 flex items-center justify-center">
-                <Newspaper className="w-6 h-6 text-[#06b6d4]" />
+              <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
+                <Newspaper className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Newsletter Ads</h2>
-                <p className="text-sm text-gray-500">Main Sponsor placements</p>
+                <h2 className="text-lg font-semibold text-slate-900">Newsletter Ads</h2>
+                <p className="text-sm text-slate-500">Main Sponsor placements</p>
               </div>
             </div>
           </div>
@@ -130,20 +130,20 @@ export default async function AdsOverviewPage() {
           <div className="p-6">
             {newsletterAdCount === 0 ? (
               <div className="text-center py-4">
-                <p className="text-gray-500 mb-4">No newsletter ads yet</p>
-                <p className="text-sm text-gray-400">
+                <p className="text-slate-500 mb-4">No newsletter ads yet</p>
+                <p className="text-sm text-slate-400">
                   Reach thousands of accounting professionals
                 </p>
               </div>
             ) : (
               <div className="space-y-3">
                 {newsletterAds?.map((ad) => (
-                  <div key={ad.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div key={ad.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <div>
-                      <p className="font-medium text-gray-900 text-sm">{ad.company_name || ad.title}</p>
-                      <p className="text-xs text-gray-500">
-                        {ad.preferred_start_date 
-                          ? new Date(ad.preferred_start_date).toLocaleDateString() 
+                      <p className="font-medium text-slate-900 text-sm">{ad.company_name || ad.title}</p>
+                      <p className="text-xs text-slate-500">
+                        {ad.preferred_start_date
+                          ? new Date(ad.preferred_start_date).toLocaleDateString()
                           : 'Date TBD'}
                       </p>
                     </div>
@@ -154,10 +154,10 @@ export default async function AdsOverviewPage() {
             )}
           </div>
 
-          <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+          <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
             <Link
               href="/account/ads/newsletter"
-              className="flex items-center justify-between text-[#06b6d4] font-medium hover:underline"
+              className="flex items-center justify-between text-blue-600 font-medium hover:underline"
             >
               <span>{newsletterAdCount > 0 ? 'View All Newsletter Ads' : 'Create Newsletter Ad'}</span>
               <ArrowRight className="w-4 h-4" />
@@ -167,27 +167,27 @@ export default async function AdsOverviewPage() {
       </div>
 
       {/* Quick Stats / Info */}
-      <div className="mt-8 bg-gradient-to-r from-[#a855f7]/5 via-[#06b6d4]/5 to-[#14b8a6]/5 rounded-2xl border border-[#06b6d4]/20 p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Advertising Options</h3>
+      <div className="mt-8 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl border border-blue-200 p-6">
+        <h3 className="font-semibold text-slate-900 mb-4">Advertising Options</h3>
         <div className="grid grid-cols-2 gap-6">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <Star className="w-5 h-5 text-[#a855f7]" />
+              <Star className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <p className="font-medium text-gray-900">Sponsored Profile</p>
-              <p className="text-sm text-gray-600">
+              <p className="font-medium text-slate-900">Sponsored Profile</p>
+              <p className="text-sm text-slate-600">
                 Monthly subscription. Your tool appears at the top of search results with a sponsored badge.
               </p>
             </div>
           </div>
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <Newspaper className="w-5 h-5 text-[#06b6d4]" />
+              <Newspaper className="w-5 h-5 text-cyan-600" />
             </div>
             <div>
-              <p className="font-medium text-gray-900">Newsletter Main Sponsor</p>
-              <p className="text-sm text-gray-600">
+              <p className="font-medium text-slate-900">Newsletter Main Sponsor</p>
+              <p className="text-sm text-slate-600">
                 One-time placement. Your ad appears prominently in a newsletter issue.
               </p>
             </div>

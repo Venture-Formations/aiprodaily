@@ -4,11 +4,28 @@ import { useState, useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop'
 import 'react-image-crop/dist/ReactCrop.css'
-import type { DirectoryTool, DirectoryCategory } from '@/types/database'
 import { getCroppedImage } from '@/utils/imageCrop'
 
+// Simplified type for edit modal - works with transformed ai_applications data
+interface ProfileTool {
+  id: string
+  tool_name: string
+  tagline: string | null
+  description: string | null
+  website_url: string
+  tool_image_url: string | null
+  logo_image_url: string | null
+  is_sponsored: boolean
+  status: string
+  rejection_reason: string | null
+  view_count: number
+  click_count: number
+  clerk_user_id: string | null
+  categories: { id: string; name: string; slug: string }[]
+}
+
 interface EditProfileModalProps {
-  tool: DirectoryTool & { categories: DirectoryCategory[] }
+  tool: ProfileTool
   isOpen: boolean
   onClose: () => void
 }
@@ -34,12 +51,12 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
   const [formData, setFormData] = useState({
     toolName: tool.tool_name,
     tagline: tool.tagline || '',
-    description: tool.description,
+    description: tool.description || '',
     websiteUrl: tool.website_url,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [categories, setCategories] = useState<DirectoryCategory[]>([])
+  const [categories, setCategories] = useState<{ id: string; name: string; slug: string }[]>([])
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(
     tool.categories.map(c => c.id)
   )
