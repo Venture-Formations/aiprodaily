@@ -81,106 +81,86 @@ export async function POST(request: NextRequest) {
 
     const newsletterUuid = newsletter.id
 
-    // Get recent issues for this newsletter
-    const { data: issues, error: issuesError } = await supabaseAdmin
-      .from('publication_issues')
-      .select('id')
-      .eq('publication_id', newsletterUuid)
-      .order('date', { ascending: false })
-      .limit(10) // Get last 10 issues
-
-    if (issuesError) {
-      console.error('[AI Test Multiple] Error fetching issues:', issuesError)
-      return NextResponse.json(
-        { error: 'Failed to fetch issues' },
-        { status: 500 }
-      )
-    }
-
-    if (!issues || issues.length === 0) {
-      console.log('[AI Test Multiple] No issues found')
-      return NextResponse.json(
-        { error: 'No issues found for this newsletter' },
-        { status: 404 }
-      )
-    }
-
-    const issueIds = issues.map(c => c.id)
-
     // Get section based on prompt type
     const section = getSection(prompt_type)
 
-    console.log('[AI Test Multiple] Fetching posts for section:', section)
+    console.log('[AI Test Multiple] Fetching posts from sent issues for section:', section)
 
-    // Get list of duplicate post IDs to exclude
-    const { data: duplicatePosts, error: duplicatesError } = await supabaseAdmin
-      .from('duplicate_posts')
-      .select('post_id')
+    // Calculate cutoff date (5 days ago)
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - 5)
+    const cutoffDateStr = cutoffDate.toISOString().split('T')[0]
 
-    if (duplicatesError) {
-      console.error('[AI Test Multiple] Error fetching duplicates:', duplicatesError)
-    }
+    // Determine which article table to query based on section
+    const articleTable = section === 'secondary' ? 'secondary_articles' : 'articles'
 
-    const duplicatePostIds = duplicatePosts?.map(d => d.post_id) || []
-    console.log('[AI Test Multiple] Excluding', duplicatePostIds.length, 'duplicate posts')
-
-    // Fetch posts from the appropriate section
-    let query = supabaseAdmin
-      .from('rss_posts')
-      .select('id, title, description, full_article_text, source_url, publication_date')
-      .in('issue_id', issueIds)
-      .not('full_article_text', 'is', null)  // Exclude posts without full text
-      .order('publication_date', { ascending: false })
+    // Fetch posts that were actually used in sent issues
+    const { data: usedPosts, error: usedPostsError } = await supabaseAdmin
+      .from(articleTable)
+      .select(`
+        post_id,
+        headline,
+        rss_posts!inner (
+          id,
+          title,
+          description,
+          full_article_text,
+          source_url,
+          publication_date
+        ),
+        publication_issues!inner (
+          id,
+          date,
+          status,
+          publication_id
+        )
+      `)
+      .eq('publication_issues.publication_id', newsletterUuid)
+      .eq('publication_issues.status', 'sent')
+      .gte('publication_issues.date', cutoffDateStr)
+      .eq('is_active', true)
+      .not('final_position', 'is', null)
+      .order('publication_issues(date)', { ascending: false })
       .limit(limit)
 
-    // Exclude duplicate posts
-    if (duplicatePostIds.length > 0) {
-      query = query.not('id', 'in', `(${duplicatePostIds.join(',')})`)
-    }
-
-    // Filter by section if not 'all'
-    if (section !== 'all') {
-      // Get feed IDs for the section - use proper boolean column names
-      const sectionField = section === 'primary' ? 'use_for_primary_section' : 'use_for_secondary_section'
-      const { data: feeds, error: feedsError } = await supabaseAdmin
-        .from('rss_feeds')
-        .select('id')
-        .eq('publication_id', newsletterUuid)
-        .eq(sectionField, true)
-        .eq('active', true)
-
-      if (feedsError) {
-        console.error('[AI Test Multiple] Error fetching feeds:', feedsError)
-        return NextResponse.json(
-          { error: 'Failed to fetch RSS feeds' },
-          { status: 500 }
-        )
-      }
-
-      if (!feeds || feeds.length === 0) {
-        return NextResponse.json(
-          { error: `No active ${section} feeds found` },
-          { status: 404 }
-        )
-      }
-
-      const feedIds = feeds.map(f => f.id)
-      query = query.in('feed_id', feedIds)
-    }
-
-    const { data: posts, error: postsError } = await query
-
-    if (postsError) {
-      console.error('[AI Test Multiple] Error fetching posts:', postsError)
+    if (usedPostsError) {
+      console.error('[AI Test Multiple] Error fetching posts from sent issues:', usedPostsError)
       return NextResponse.json(
-        { error: 'Failed to fetch RSS posts' },
+        { error: 'Failed to fetch posts from sent issues', details: usedPostsError.message },
         { status: 500 }
       )
     }
 
-    if (!posts || posts.length === 0) {
+    // Extract and deduplicate the RSS posts
+    const postsMap = new Map<string, {
+      id: string
+      title: string
+      description: string | null
+      full_article_text: string | null
+      source_url: string | null
+      publication_date: string | null
+    }>()
+
+    for (const article of usedPosts || []) {
+      const rssPost = article.rss_posts as unknown as {
+        id: string
+        title: string
+        description: string | null
+        full_article_text: string | null
+        source_url: string | null
+        publication_date: string | null
+      } | null
+
+      if (rssPost && !postsMap.has(rssPost.id)) {
+        postsMap.set(rssPost.id, rssPost)
+      }
+    }
+
+    const posts = Array.from(postsMap.values()).slice(0, limit)
+
+    if (posts.length === 0) {
       return NextResponse.json(
-        { error: 'No posts found for testing' },
+        { error: 'No posts found from sent issues in the last 5 days' },
         { status: 404 }
       )
     }
