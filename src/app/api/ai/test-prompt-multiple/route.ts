@@ -95,12 +95,14 @@ export async function POST(request: NextRequest) {
     const articleTable = section === 'secondary' ? 'secondary_articles' : 'articles'
 
     // Fetch posts that were actually used in sent issues
+    // Join articles -> rss_posts (via post_id) and articles -> publication_issues (via issue_id)
     const { data: usedPosts, error: usedPostsError } = await supabaseAdmin
       .from(articleTable)
       .select(`
         post_id,
+        issue_id,
         headline,
-        rss_posts!inner (
+        rss_posts (
           id,
           title,
           description,
@@ -108,20 +110,17 @@ export async function POST(request: NextRequest) {
           source_url,
           publication_date
         ),
-        publication_issues!inner (
+        publication_issues (
           id,
           date,
           status,
           publication_id
         )
       `)
-      .eq('publication_issues.publication_id', newsletterUuid)
-      .eq('publication_issues.status', 'sent')
-      .gte('publication_issues.date', cutoffDateStr)
       .eq('is_active', true)
       .not('final_position', 'is', null)
-      .order('publication_issues(date)', { ascending: false })
-      .limit(limit)
+      .not('post_id', 'is', null)
+      .limit(200)
 
     if (usedPostsError) {
       console.error('[AI Test Multiple] Error fetching posts from sent issues:', usedPostsError)
@@ -131,7 +130,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Extract and deduplicate the RSS posts
+    // Extract and deduplicate the RSS posts, filtering by publication_id, status, and date
     const postsMap = new Map<string, {
       id: string
       title: string
@@ -150,6 +149,17 @@ export async function POST(request: NextRequest) {
         source_url: string | null
         publication_date: string | null
       } | null
+      const issue = article.publication_issues as unknown as {
+        date: string
+        status: string
+        publication_id: string
+      } | null
+
+      // Filter: must match publication, be sent, and be within date range
+      if (!issue) continue
+      if (issue.publication_id !== newsletterUuid) continue
+      if (issue.status !== 'sent') continue
+      if (issue.date < cutoffDateStr) continue
 
       if (rssPost && !postsMap.has(rssPost.id)) {
         postsMap.set(rssPost.id, rssPost)
