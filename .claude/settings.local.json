@@ -58,7 +58,8 @@
       "WebFetch(domain:help.sparkloop.app)",
       "WebFetch(domain:docs.sparkloop.app)",
       "WebFetch(domain:js.sparkloop.app)",
-      "WebFetch(domain:script.sparkloop.app)"
+      "WebFetch(domain:script.sparkloop.app)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

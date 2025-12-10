@@ -15,6 +15,8 @@ interface RSSPost {
   full_article_text: string | null
   source_url: string | null
   publication_date: string | null
+  used_in_issue_date?: string
+  generated_headline?: string
 }
 
 interface TestResult {
@@ -92,6 +94,7 @@ export default function AIPromptTestingPage() {
   const [livePromptProviderMatches, setLivePromptProviderMatches] = useState(false)
   const [isModified, setIsModified] = useState(false)
 
+
   // Helper function to determine section from prompt type
   const getSection = (type: PromptType): 'primary' | 'secondary' | 'all' => {
     if (type === 'primary-title' || type === 'primary-body' || type === 'subject-line') return 'primary'
@@ -99,7 +102,7 @@ export default function AIPromptTestingPage() {
     return 'all' // For post-scorer, custom
   }
 
-  // Load recent RSS posts when authenticated or when prompt type changes
+  // Load posts from sent issues when authenticated or when prompt type changes
   useEffect(() => {
     if (status === 'authenticated') {
       loadRecentPosts()
@@ -124,14 +127,14 @@ export default function AIPromptTestingPage() {
     setLoadingPosts(true)
     try {
       const section = getSection(promptType)
-      console.log('[Frontend] Fetching posts for newsletter:', slug, 'section:', section)
-      const res = await fetch(`/api/rss/recent-posts?publication_id=${slug}&limit=50&section=${section}`)
+      console.log('[Frontend] Fetching posts from sent issues for newsletter:', slug, 'section:', section)
+      const res = await fetch(`/api/rss/recent-posts?publication_id=${slug}&limit=50&section=${section}&source=sent&days=5`)
       const data = await res.json()
 
       console.log('[Frontend] Response status:', res.status, 'data:', data)
 
       if (data.success) {
-        console.log('[Frontend] Successfully loaded', data.posts.length, 'posts')
+        console.log('[Frontend] Successfully loaded', data.posts.length, 'posts from sent issues')
         setRecentPosts(data.posts)
         if (data.posts.length > 0) {
           setSelectedPostId(data.posts[0].id)
@@ -516,17 +519,20 @@ export default function AIPromptTestingPage() {
             {/* RSS Post Selector */}
             {promptType !== 'custom' && (
               <div className="bg-white rounded-lg shadow p-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Sample RSS Post
                 </label>
+                <p className="text-xs text-gray-500 mb-3">
+                  Posts from sent newsletters (last 5 days)
+                </p>
                 {status === 'loading' ? (
                   <p className="text-gray-500 text-sm">Authenticating...</p>
                 ) : loadingPosts ? (
                   <p className="text-gray-500 text-sm">Loading posts...</p>
                 ) : recentPosts.length === 0 ? (
                   <div className="text-gray-500 text-sm bg-yellow-50 border border-yellow-200 rounded p-3">
-                    <p className="font-medium text-yellow-800">No recent posts found</p>
-                    <p className="text-xs mt-1">Make sure RSS feeds have been processed for this newsletter.</p>
+                    <p className="font-medium text-yellow-800">No posts found</p>
+                    <p className="text-xs mt-1">No newsletters have been sent in the last 5 days.</p>
                   </div>
                 ) : (
                   <>
@@ -538,13 +544,22 @@ export default function AIPromptTestingPage() {
                     >
                       {recentPosts.map(post => (
                         <option key={post.id} value={post.id}>
-                          {post.title.substring(0, 80)}...
+                          {post.used_in_issue_date
+                            ? `[${new Date(post.used_in_issue_date).toLocaleDateString()}] `
+                            : ''}
+                          {post.title.substring(0, 70)}...
                         </option>
                       ))}
                     </select>
                     {selectedPost && (
                       <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded border border-gray-200">
                         <p className="font-medium mb-1">{selectedPost.title}</p>
+                        {selectedPost.used_in_issue_date && (
+                          <p className="text-xs text-green-600 mb-1">
+                            Used in issue: {new Date(selectedPost.used_in_issue_date).toLocaleDateString()}
+                            {selectedPost.generated_headline && ` • Generated: "${selectedPost.generated_headline.substring(0, 40)}..."`}
+                          </p>
+                        )}
                         <p className="text-xs">{selectedPost.description?.substring(0, 150)}...</p>
                       </div>
                     )}

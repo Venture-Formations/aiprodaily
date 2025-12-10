@@ -18,8 +18,10 @@ export async function GET(request: NextRequest) {
     const newsletterId = searchParams.get('publication_id')
     const limit = parseInt(searchParams.get('limit') || '50')
     const section = searchParams.get('section') || 'all' // 'primary', 'secondary', or 'all'
+    const source = searchParams.get('source') || 'recent' // 'recent' or 'sent'
+    const days = parseInt(searchParams.get('days') || '5')
 
-    console.log('[API] Fetching posts for newsletter slug:', newsletterId, 'limit:', limit, 'section:', section)
+    console.log('[API] Fetching posts for newsletter slug:', newsletterId, 'limit:', limit, 'section:', section, 'source:', source)
 
     if (!newsletterId) {
       return NextResponse.json(
@@ -44,6 +46,101 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('[API] Found newsletter UUID:', newsletter.id)
+
+    // If source is 'sent', fetch posts that were actually used in sent issues
+    if (source === 'sent') {
+      const cutoffDate = new Date()
+      cutoffDate.setDate(cutoffDate.getDate() - days)
+      const cutoffDateStr = cutoffDate.toISOString().split('T')[0]
+
+      console.log('[API] Fetching posts from sent issues since:', cutoffDateStr)
+
+      // Determine which article table to query based on section
+      const articleTable = section === 'secondary' ? 'secondary_articles' : 'articles'
+
+      // Build query to get posts used in sent issues
+      const { data: usedPosts, error: usedPostsError } = await supabaseAdmin
+        .from(articleTable)
+        .select(`
+          post_id,
+          campaign_id,
+          headline,
+          final_position,
+          rss_posts!inner (
+            id,
+            title,
+            description,
+            full_article_text,
+            source_url,
+            publication_date
+          ),
+          publication_issues!inner (
+            id,
+            date,
+            status,
+            publication_id
+          )
+        `)
+        .eq('publication_issues.publication_id', newsletter.id)
+        .eq('publication_issues.status', 'sent')
+        .gte('publication_issues.date', cutoffDateStr)
+        .eq('is_active', true)
+        .not('final_position', 'is', null)
+        .order('publication_issues(date)', { ascending: false })
+        .limit(limit)
+
+      if (usedPostsError) {
+        console.error('[API] Error fetching posts from sent issues:', usedPostsError)
+        return NextResponse.json(
+          { error: 'Failed to fetch posts from sent issues', details: usedPostsError.message },
+          { status: 500 }
+        )
+      }
+
+      // Extract and deduplicate the RSS posts
+      const postsMap = new Map<string, {
+        id: string
+        title: string
+        description: string | null
+        full_article_text: string | null
+        source_url: string | null
+        publication_date: string | null
+        used_in_issue_date?: string
+        generated_headline?: string
+      }>()
+
+      for (const article of usedPosts || []) {
+        // Supabase with !inner returns single objects for 1:1 joins
+        const rssPost = article.rss_posts as unknown as {
+          id: string
+          title: string
+          description: string | null
+          full_article_text: string | null
+          source_url: string | null
+          publication_date: string | null
+        } | null
+        const issue = article.publication_issues as unknown as { date: string } | null
+
+        if (rssPost && !postsMap.has(rssPost.id)) {
+          postsMap.set(rssPost.id, {
+            ...rssPost,
+            used_in_issue_date: issue?.date,
+            generated_headline: article.headline
+          })
+        }
+      }
+
+      const posts = Array.from(postsMap.values())
+      console.log('[API] Found', posts.length, 'posts from sent issues')
+
+      return NextResponse.json({
+        success: true,
+        posts,
+        count: posts.length,
+        source: 'sent',
+        days
+      })
+    }
 
     // Get feeds for the specified section
     let feedIds: string[] | null = null
