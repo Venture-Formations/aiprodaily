@@ -28,7 +28,6 @@ const listingTypeConfig = {
 interface ProfileTool {
   id: string
   tool_name: string
-  tagline: string | null
   description: string | null
   website_url: string
   tool_image_url: string | null
@@ -158,9 +157,6 @@ export function ProfileCard({ tool }: ProfileCardProps) {
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-2xl font-bold text-slate-900">{tool.tool_name}</h2>
-              {tool.tagline && (
-                <p className="text-slate-600 mt-1">{tool.tagline}</p>
-              )}
             </div>
             <div className="flex gap-2">
               <button

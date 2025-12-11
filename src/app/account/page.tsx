@@ -4,15 +4,17 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { ProfileCard } from './components/ProfileCard'
 import { NoProfileCard } from './components/NoProfileCard'
 
-// Categories mapping for ai_applications
+// Categories mapping for ai_applications - matches directory.ts
 const CATEGORIES = [
+  { id: 'accounting-bookkeeping', name: 'Accounting & Bookkeeping', slug: 'accounting-bookkeeping' },
+  { id: 'tax-compliance', name: 'Tax & Compliance', slug: 'tax-compliance' },
   { id: 'payroll', name: 'Payroll', slug: 'payroll' },
-  { id: 'hr', name: 'HR', slug: 'hr' },
-  { id: 'accounting-system', name: 'Accounting System', slug: 'accounting-system' },
-  { id: 'finance', name: 'Finance', slug: 'finance' },
-  { id: 'productivity', name: 'Productivity', slug: 'productivity' },
+  { id: 'finance-analysis', name: 'Finance & Analysis', slug: 'finance-analysis' },
+  { id: 'expense-management', name: 'Expense Management', slug: 'expense-management' },
   { id: 'client-management', name: 'Client Management', slug: 'client-management' },
-  { id: 'banking', name: 'Banking', slug: 'banking' }
+  { id: 'productivity', name: 'Productivity', slug: 'productivity' },
+  { id: 'hr', name: 'HR', slug: 'hr' },
+  { id: 'banking-payments', name: 'Banking & Payments', slug: 'banking-payments' }
 ]
 
 export const dynamic = 'force-dynamic'
@@ -41,7 +43,6 @@ export default async function AccountPage() {
   const toolWithCategories = app ? {
     id: app.id,
     tool_name: app.app_name,
-    tagline: null, // ai_applications doesn't have tagline
     description: app.description,
     website_url: app.app_url,
     tool_image_url: app.screenshot_url,
@@ -56,7 +57,7 @@ export default async function AccountPage() {
     click_count: app.click_count || 0,
     clerk_user_id: app.clerk_user_id,
     categories: app.category
-      ? [CATEGORIES.find(c => c.name === app.category) || CATEGORIES[4]]
+      ? [CATEGORIES.find(c => c.name === app.category) || CATEGORIES[6]] // Default to Productivity
       : []
   } : null
 

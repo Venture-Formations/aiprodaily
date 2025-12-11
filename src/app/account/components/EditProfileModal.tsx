@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { X } from 'lucide-react'
+import { X, Lock } from 'lucide-react'
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop'
 import 'react-image-crop/dist/ReactCrop.css'
 import { getCroppedImage } from '@/utils/imageCrop'
@@ -10,18 +10,28 @@ import { getCroppedImage } from '@/utils/imageCrop'
 interface ProfileTool {
   id: string
   tool_name: string
-  tagline: string | null
   description: string | null
   website_url: string
   tool_image_url: string | null
   logo_image_url: string | null
   is_sponsored: boolean
+  is_featured?: boolean
+  listing_type?: 'free' | 'paid_placement' | 'featured'
   status: string
   rejection_reason: string | null
   view_count: number
   click_count: number
   clerk_user_id: string | null
   categories: { id: string; name: string; slug: string }[]
+}
+
+interface CategoryWithStatus {
+  id: string
+  name: string
+  slug: string
+  hasFeatured?: boolean
+  isDisabled?: boolean
+  disabledReason?: string | null
 }
 
 interface EditProfileModalProps {
@@ -50,15 +60,15 @@ function centerAspectCrop(
 export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProps) {
   const [formData, setFormData] = useState({
     toolName: tool.tool_name,
-    tagline: tool.tagline || '',
     description: tool.description || '',
     websiteUrl: tool.website_url,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [categories, setCategories] = useState<{ id: string; name: string; slug: string }[]>([])
-  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(
-    tool.categories.map(c => c.id)
+  const [categories, setCategories] = useState<CategoryWithStatus[]>([])
+  // Single category selection - use name to match ai_applications.category field
+  const [selectedCategory, setSelectedCategory] = useState<string>(
+    tool.categories[0]?.name || ''
   )
 
   // Image state
@@ -85,17 +95,20 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
     }
   }, [isOpen])
 
-  const toggleCategory = (categoryId: string) => {
-    setSelectedCategoryIds(prev =>
-      prev.includes(categoryId)
-        ? prev.filter(id => id !== categoryId)
-        : [...prev, categoryId]
-    )
+  const handleCategorySelect = (categoryName: string, isDisabled?: boolean) => {
+    if (isDisabled) return
+    setSelectedCategory(categoryName)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    if (!selectedCategory) {
+      setError('Please select a category')
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
@@ -132,7 +145,7 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
         body: JSON.stringify({
           toolId: tool.id,
           ...formData,
-          categoryIds: selectedCategoryIds,
+          category: selectedCategory,
           logoFileName: logoFileName || undefined,
           listingFileName: listingFileName || undefined,
         })
@@ -191,21 +204,6 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
             />
           </div>
 
-          {/* Tagline */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Tagline
-            </label>
-            <input
-              type="text"
-              value={formData.tagline}
-              onChange={(e) => setFormData(prev => ({ ...prev, tagline: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-200 bg-gray-50 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="A short catchy phrase about your tool"
-              disabled={isSubmitting}
-            />
-          </div>
-
           {/* Description */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -236,28 +234,46 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
             />
           </div>
 
-          {/* Categories */}
+          {/* Category - Single Select */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Categories *
+              Category *
             </label>
+            <p className="text-xs text-slate-500 mb-3">
+              Select one category that best fits your tool
+            </p>
             <div className="flex flex-wrap gap-2">
-              {categories.map(category => (
-                <button
-                  key={category.id}
-                  type="button"
-                  onClick={() => toggleCategory(category.id)}
-                  disabled={isSubmitting}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                    selectedCategoryIds.includes(category.id)
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  {category.name}
-                </button>
-              ))}
+              {categories.map(category => {
+                const isSelected = selectedCategory === category.name
+                const isDisabled = category.isDisabled
+
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    onClick={() => handleCategorySelect(category.name, isDisabled)}
+                    disabled={isSubmitting || isDisabled}
+                    title={category.disabledReason || undefined}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                      isDisabled
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                        : isSelected
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {isDisabled && <Lock className="w-3 h-3" />}
+                    {category.name}
+                  </button>
+                )
+              })}
             </div>
+            {categories.some(c => c.isDisabled) && (
+              <p className="text-xs text-slate-500 mt-2">
+                <Lock className="w-3 h-3 inline mr-1" />
+                Categories with a lock already have a featured tool and cannot be selected for featured listings.
+              </p>
+            )}
           </div>
 
           {/* Images */}
@@ -481,4 +497,3 @@ function ImageUploadField({
     </div>
   )
 }
-

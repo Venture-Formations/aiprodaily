@@ -2,31 +2,33 @@ import { NextRequest, NextResponse } from 'next/server'
 import { currentUser } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+
 export async function PUT(request: NextRequest) {
   try {
     const user = await currentUser()
-    
+
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const body = await request.json()
-    const { 
-      toolId, 
-      toolName, 
-      tagline, 
-      description, 
-      websiteUrl, 
-      categoryIds,
+    const {
+      toolId,
+      toolName,
+      description,
+      websiteUrl,
+      category,
       logoFileName,
-      listingFileName 
+      listingFileName
     } = body
 
-    // Verify the tool belongs to this user
+    // Verify the tool belongs to this user in ai_applications table
     const { data: existingTool, error: fetchError } = await supabaseAdmin
-      .from('tools_directory')
-      .select('id, clerk_user_id, status')
+      .from('ai_applications')
+      .select('id, clerk_user_id, submission_status, is_featured, listing_type, category')
       .eq('id', toolId)
+      .eq('publication_id', PUBLICATION_ID)
       .single()
 
     if (fetchError || !existingTool) {
@@ -37,61 +39,61 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    // Build update object
-    const updateData: Record<string, any> = {
-      tool_name: toolName,
-      tagline: tagline || null,
+    // If user is featured and trying to change category, verify the new category doesn't have a featured tool
+    const isFeatured = existingTool.is_featured || existingTool.listing_type === 'featured'
+    if (isFeatured && category && category !== existingTool.category) {
+      const { data: featuredInCategory } = await supabaseAdmin
+        .from('ai_applications')
+        .select('id')
+        .eq('publication_id', PUBLICATION_ID)
+        .eq('category', category)
+        .eq('is_featured', true)
+        .neq('id', toolId)
+        .single()
+
+      if (featuredInCategory) {
+        return NextResponse.json({
+          error: 'Cannot move to this category - it already has a featured tool'
+        }, { status: 400 })
+      }
+    }
+
+    // Build update object for ai_applications
+    const updateData: Record<string, unknown> = {
+      app_name: toolName,
       description,
-      website_url: websiteUrl,
+      app_url: websiteUrl,
       updated_at: new Date().toISOString(),
     }
 
+    // Update category if provided
+    if (category) {
+      updateData.category = category
+    }
+
     // If tool is already approved, mark as 'edited' for admin review
-    if (existingTool.status === 'approved') {
-      updateData.status = 'edited'
+    if (existingTool.submission_status === 'approved') {
+      updateData.submission_status = 'edited'
     }
 
     // Add image URLs if new images were uploaded
     if (logoFileName) {
-      updateData.logo_image_url = `https://raw.githubusercontent.com/${process.env.GITHUB_REPO}/master/public/images/tools/${logoFileName}`
+      updateData.logo_url = `https://raw.githubusercontent.com/${process.env.GITHUB_REPO}/master/public/images/tools/${logoFileName}`
     }
     if (listingFileName) {
-      updateData.tool_image_url = `https://raw.githubusercontent.com/${process.env.GITHUB_REPO}/master/public/images/tools/${listingFileName}`
+      updateData.screenshot_url = `https://raw.githubusercontent.com/${process.env.GITHUB_REPO}/master/public/images/tools/${listingFileName}`
     }
 
-    // Update tool
+    // Update tool in ai_applications
     const { error: updateError } = await supabaseAdmin
-      .from('tools_directory')
+      .from('ai_applications')
       .update(updateData)
       .eq('id', toolId)
+      .eq('publication_id', PUBLICATION_ID)
 
     if (updateError) {
       console.error('Failed to update tool:', updateError)
       return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 })
-    }
-
-    // Update categories if provided
-    if (categoryIds && categoryIds.length > 0) {
-      // Delete existing category associations
-      await supabaseAdmin
-        .from('directory_categories_tools')
-        .delete()
-        .eq('tool_id', toolId)
-
-      // Insert new category associations
-      const categoryInserts = categoryIds.map((categoryId: string) => ({
-        tool_id: toolId,
-        category_id: categoryId,
-      }))
-
-      const { error: categoryError } = await supabaseAdmin
-        .from('directory_categories_tools')
-        .insert(categoryInserts)
-
-      if (categoryError) {
-        console.error('Failed to update categories:', categoryError)
-        // Don't fail the whole request for category issues
-      }
     }
 
     return NextResponse.json({ success: true })
@@ -101,4 +103,3 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-
