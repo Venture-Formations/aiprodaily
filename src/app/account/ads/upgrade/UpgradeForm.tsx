@@ -5,16 +5,6 @@ import { useRouter } from 'next/navigation'
 import { Check, Star, Crown, Lock, ArrowLeft, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 
-// Pricing constants
-const PRICING = {
-  paid_placement_monthly: 30,
-  paid_placement_yearly: 300,
-  featured_monthly: 60,
-  featured_yearly: 600,
-}
-
-const YEARLY_DISCOUNT_MONTHS = 2
-
 interface UpgradeFormProps {
   tool: {
     id: string
@@ -26,13 +16,21 @@ interface UpgradeFormProps {
   initialListingType?: 'paid_placement' | 'featured'
   initialBillingPeriod?: 'monthly' | 'yearly'
   categoryHasFeatured: boolean
+  pricing: {
+    paidPlacementMonthly: number
+    paidPlacementYearly: number
+    featuredMonthly: number
+    featuredYearly: number
+    yearlyDiscountMonths: number
+  }
 }
 
 export function UpgradeForm({
   tool,
   initialListingType,
   initialBillingPeriod,
-  categoryHasFeatured
+  categoryHasFeatured,
+  pricing
 }: UpgradeFormProps) {
   const router = useRouter()
   const [selectedType, setSelectedType] = useState<'paid_placement' | 'featured'>(
@@ -80,11 +78,11 @@ export function UpgradeForm({
   // Can't select featured if category already has one (and it's not this tool)
   const featuredDisabled = categoryHasFeatured && tool.currentListingType !== 'featured'
 
-  // Calculate prices
-  const paidPlacementMonthly = PRICING.paid_placement_monthly
-  const paidPlacementYearly = PRICING.paid_placement_yearly
-  const featuredMonthly = PRICING.featured_monthly
-  const featuredYearly = PRICING.featured_yearly
+  // Use pricing from props
+  const paidPlacementMonthly = pricing.paidPlacementMonthly
+  const paidPlacementYearly = pricing.paidPlacementYearly
+  const featuredMonthly = pricing.featuredMonthly
+  const featuredYearly = pricing.featuredYearly
 
   const currentPrice = selectedType === 'featured'
     ? (selectedPeriod === 'yearly' ? featuredYearly : featuredMonthly)
@@ -258,7 +256,7 @@ export function UpgradeForm({
           >
             <div className="absolute -top-3 left-4">
               <span className="px-3 py-1 bg-green-500 text-white text-xs font-medium rounded-full">
-                Save {YEARLY_DISCOUNT_MONTHS} months
+                Save {pricing.yearlyDiscountMonths} months
               </span>
             </div>
             <h3 className="font-semibold text-slate-900 mb-1">Yearly</h3>
@@ -267,7 +265,7 @@ export function UpgradeForm({
               <span className="text-base font-normal text-slate-500">/year</span>
             </p>
             <p className="text-sm text-slate-500 mt-2">
-              Pay annually and get {YEARLY_DISCOUNT_MONTHS} months free
+              Pay annually and get {pricing.yearlyDiscountMonths} months free
             </p>
           </button>
         </div>

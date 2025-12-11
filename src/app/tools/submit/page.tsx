@@ -1,20 +1,16 @@
 import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs'
 import { SubmitToolForm } from './submit-form'
-import { getApprovedCategories, getCategoriesWithFeaturedTools } from '@/lib/directory'
+import { getApprovedCategories, getCategoriesWithFeaturedTools, getDirectoryPricing } from '@/lib/directory'
 import { Container } from '@/components/salient/Container'
 import { Button } from '@/components/salient/Button'
 
 export const dynamic = 'force-dynamic'
 
-// Pricing constants
-const PAID_PLACEMENT_MONTHLY = 30
-const FEATURED_MONTHLY = 60 // Double the paid placement price
-const YEARLY_DISCOUNT_MONTHS = 2 // 2 months free
-
 export default async function SubmitToolPage() {
-  const [categories, categoriesWithFeatured] = await Promise.all([
+  const [categories, categoriesWithFeatured, pricing] = await Promise.all([
     getApprovedCategories(),
-    getCategoriesWithFeaturedTools()
+    getCategoriesWithFeaturedTools(),
+    getDirectoryPricing()
   ])
 
   // Convert Set to array for client component
@@ -97,12 +93,12 @@ export default async function SubmitToolPage() {
                 <div className="text-center">
                   <h3 className="text-lg font-semibold text-slate-900">Paid Placement</h3>
                   <div className="mt-4">
-                    <span className="text-3xl font-bold text-slate-900">${PAID_PLACEMENT_MONTHLY}</span>
+                    <span className="text-3xl font-bold text-slate-900">${pricing.paidPlacementPrice}</span>
                     <span className="text-slate-500">/month</span>
                   </div>
                   <div className="text-sm text-slate-500 mt-1">
-                    or ${PAID_PLACEMENT_MONTHLY * (12 - YEARLY_DISCOUNT_MONTHS)}/year
-                    <span className="text-green-600 font-medium ml-1">(Save ${PAID_PLACEMENT_MONTHLY * YEARLY_DISCOUNT_MONTHS})</span>
+                    or ${pricing.paidPlacementYearlyPrice}/year
+                    <span className="text-green-600 font-medium ml-1">(Save ${pricing.paidPlacementPrice * pricing.yearlyDiscountMonths})</span>
                   </div>
                   <ul className="mt-6 space-y-3 text-sm text-slate-600 text-left">
                     <li className="flex items-center gap-2">
@@ -141,12 +137,12 @@ export default async function SubmitToolPage() {
                 <div className="text-center">
                   <h3 className="text-lg font-semibold text-slate-900">Featured Listing</h3>
                   <div className="mt-4">
-                    <span className="text-3xl font-bold text-slate-900">${FEATURED_MONTHLY}</span>
+                    <span className="text-3xl font-bold text-slate-900">${pricing.featuredPrice}</span>
                     <span className="text-slate-500">/month</span>
                   </div>
                   <div className="text-sm text-slate-500 mt-1">
-                    or ${FEATURED_MONTHLY * (12 - YEARLY_DISCOUNT_MONTHS)}/year
-                    <span className="text-green-600 font-medium ml-1">(Save ${FEATURED_MONTHLY * YEARLY_DISCOUNT_MONTHS})</span>
+                    or ${pricing.featuredYearlyPrice}/year
+                    <span className="text-green-600 font-medium ml-1">(Save ${pricing.featuredPrice * pricing.yearlyDiscountMonths})</span>
                   </div>
                   <ul className="mt-6 space-y-3 text-sm text-slate-600 text-left">
                     <li className="flex items-center gap-2">
@@ -187,9 +183,9 @@ export default async function SubmitToolPage() {
               categories={categories}
               featuredCategories={featuredCategories}
               pricing={{
-                paidPlacementMonthly: PAID_PLACEMENT_MONTHLY,
-                featuredMonthly: FEATURED_MONTHLY,
-                yearlyDiscountMonths: YEARLY_DISCOUNT_MONTHS
+                paidPlacementMonthly: pricing.paidPlacementPrice,
+                featuredMonthly: pricing.featuredPrice,
+                yearlyDiscountMonths: pricing.yearlyDiscountMonths
               }}
             />
           </div>

@@ -1,7 +1,7 @@
 import { currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
-import { getCategoriesWithFeaturedTools } from '@/lib/directory'
+import { getCategoriesWithFeaturedTools, getDirectoryPricing } from '@/lib/directory'
 import { UpgradeForm } from './UpgradeForm'
 
 const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
@@ -28,13 +28,19 @@ export default async function UpgradePage({ searchParams }: UpgradePageProps) {
   const listingType = params.listing_type as 'paid_placement' | 'featured' | undefined
   const billingPeriod = params.billing_period as 'monthly' | 'yearly' | undefined
 
-  // Fetch user's tool
-  const { data: tool, error } = await supabaseAdmin
-    .from('ai_applications')
-    .select('id, app_name, category, is_featured, is_paid_placement, listing_type, billing_period, submission_status')
-    .eq('clerk_user_id', user.id)
-    .eq('publication_id', PUBLICATION_ID)
-    .single()
+  // Fetch user's tool and pricing in parallel
+  const [toolResult, categoriesWithFeatured, pricing] = await Promise.all([
+    supabaseAdmin
+      .from('ai_applications')
+      .select('id, app_name, category, is_featured, is_paid_placement, listing_type, billing_period, submission_status')
+      .eq('clerk_user_id', user.id)
+      .eq('publication_id', PUBLICATION_ID)
+      .single(),
+    getCategoriesWithFeaturedTools(),
+    getDirectoryPricing()
+  ])
+
+  const { data: tool, error } = toolResult
 
   if (error || !tool) {
     redirect('/account')
@@ -45,8 +51,6 @@ export default async function UpgradePage({ searchParams }: UpgradePageProps) {
     redirect('/account')
   }
 
-  // Get categories with featured tools to check availability
-  const categoriesWithFeatured = await getCategoriesWithFeaturedTools()
   const categoryHasFeatured = tool.category ? categoriesWithFeatured.has(tool.category) && !tool.is_featured : false
 
   // Determine current listing type
@@ -74,6 +78,13 @@ export default async function UpgradePage({ searchParams }: UpgradePageProps) {
         initialListingType={listingType}
         initialBillingPeriod={billingPeriod}
         categoryHasFeatured={categoryHasFeatured}
+        pricing={{
+          paidPlacementMonthly: pricing.paidPlacementPrice,
+          paidPlacementYearly: pricing.paidPlacementYearlyPrice,
+          featuredMonthly: pricing.featuredPrice,
+          featuredYearly: pricing.featuredYearlyPrice,
+          yearlyDiscountMonths: pricing.yearlyDiscountMonths
+        }}
       />
     </div>
   )
