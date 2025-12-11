@@ -23,14 +23,16 @@ export default async function ToolDetailPage({ params }: ToolDetailPageProps) {
   const heroImageUrl = tool.tool_image_url || '/placeholder-tool.png'
   const logoUrl = tool.logo_image_url || null
 
-  // Get related tools from same categories
+  // Get related tools from same categories (randomly selected)
   const allTools = await getApprovedTools()
-  const relatedTools = allTools
-    .filter(t =>
-      t.id !== tool.id &&
-      t.categories.some(cat => tool.categories.some(tc => tc.id === cat.id))
-    )
-    .slice(0, 4)
+  const sameCategoryTools = allTools.filter(t =>
+    t.id !== tool.id &&
+    t.categories.some(cat => tool.categories.some(tc => tc.id === cat.id))
+  )
+
+  // Shuffle and take 4 random tools
+  const shuffled = sameCategoryTools.sort(() => Math.random() - 0.5)
+  const relatedTools = shuffled.slice(0, 4)
 
   // JSON-LD structured data for SoftwareApplication
   const softwareApplicationSchema = {
@@ -97,11 +99,6 @@ export default async function ToolDetailPage({ params }: ToolDetailPageProps) {
                   className="object-cover"
                   priority
                 />
-                {tool.is_sponsored && (
-                  <span className="absolute top-4 right-4 bg-orange-500 text-white text-sm font-semibold px-3 py-1 rounded-full">
-                    Sponsored
-                  </span>
-                )}
               </div>
 
               <div className="p-6 sm:p-8">

@@ -52,17 +52,17 @@ export default async function ToolsDirectoryPage() {
       <DirectoryHero toolCount={tools.length} />
 
       {/* Categories Section */}
-      <section id="categories" className="py-16 bg-slate-900 relative overflow-hidden">
+      <section id="categories" className="py-16 bg-slate-50 relative overflow-hidden">
         {/* Decorative gradient blur blotches */}
-        <div className="absolute top-0 left-1/4 w-[500px] h-[400px] bg-gradient-to-r from-blue-600/20 to-cyan-500/20 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 right-1/4 w-[400px] h-[300px] bg-gradient-to-r from-cyan-500/15 to-blue-600/15 rounded-full blur-3xl"></div>
+        <div className="absolute top-0 left-1/4 w-[500px] h-[400px] bg-gradient-to-r from-blue-100 to-cyan-100 rounded-full blur-3xl opacity-60"></div>
+        <div className="absolute bottom-0 right-1/4 w-[400px] h-[300px] bg-gradient-to-r from-cyan-100 to-blue-100 rounded-full blur-3xl opacity-60"></div>
 
         <Container className="relative">
           <div className="text-center mb-12">
-            <h2 className="font-display text-3xl font-medium tracking-tight text-white sm:text-4xl">
+            <h2 className="font-display text-3xl font-medium tracking-tight text-slate-900 sm:text-4xl">
               Browse AI Tools by Category
             </h2>
-            <p className="mt-4 text-lg tracking-tight text-slate-400">
+            <p className="mt-4 text-lg tracking-tight text-slate-700">
               Find the perfect AI tool for your specific needs
             </p>
           </div>
@@ -88,7 +88,7 @@ export default async function ToolsDirectoryPage() {
           </div>
 
           {/* Affiliate Disclosure */}
-          <p className="text-xs text-slate-400 mb-6">
+          <p className="text-xs text-slate-400 mb-6 text-center">
             Disclosure: Some products in this list include affiliate links or paid placements. We may earn a commission or receive compensation when you click our links or purchase through them.
           </p>
 
@@ -97,20 +97,20 @@ export default async function ToolsDirectoryPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 bg-slate-900 relative overflow-hidden">
+      <section className="py-16 bg-slate-50 relative overflow-hidden">
         {/* Decorative gradient blur */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-gradient-to-r from-blue-600/20 to-cyan-500/20 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-gradient-to-r from-blue-100 to-cyan-100 rounded-full blur-3xl opacity-60"></div>
 
         <Container className="relative">
           <div className="text-center">
-            <h2 className="font-display text-3xl font-medium tracking-tight text-white sm:text-4xl">
+            <h2 className="font-display text-3xl font-medium tracking-tight text-slate-900 sm:text-4xl">
               Have an AI Tool to Share?
             </h2>
-            <p className="mt-4 text-lg tracking-tight text-slate-400 max-w-2xl mx-auto">
+            <p className="mt-4 text-lg tracking-tight text-slate-700 max-w-2xl mx-auto">
               Submit your tool to reach thousands of accounting professionals looking for AI solutions.
             </p>
             <div className="mt-8">
-              <Button href="/tools/submit" color="white">
+              <Button href="/tools/submit" color="blue">
                 Submit Your Tool
               </Button>
             </div>
