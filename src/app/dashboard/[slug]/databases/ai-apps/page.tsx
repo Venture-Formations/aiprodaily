@@ -19,6 +19,7 @@ export default function AIApplicationsPage() {
     category_priority: 0,
     is_active: true,
     is_featured: false,
+    is_paid_placement: false,
     is_affiliate: false
   })
   const [filterCategory, setFilterCategory] = useState<string>('all')
@@ -115,7 +116,9 @@ export default function AIApplicationsPage() {
           tool_type: 'Client',
           category_priority: 0,
           is_active: true,
-          is_featured: false
+          is_featured: false,
+          is_paid_placement: false,
+          is_affiliate: false
         })
       }
     } catch (error) {
@@ -451,6 +454,15 @@ export default function AIApplicationsPage() {
                 <label className="flex items-center">
                   <input
                     type="checkbox"
+                    checked={addForm.is_paid_placement}
+                    onChange={(e) => setAddForm({ ...addForm, is_paid_placement: e.target.checked })}
+                    className="mr-2"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Paid Placement</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
                     checked={addForm.is_affiliate}
                     onChange={(e) => setAddForm({ ...addForm, is_affiliate: e.target.checked })}
                     className="mr-2"
@@ -477,7 +489,7 @@ export default function AIApplicationsPage() {
         )}
 
         {/* Database Summary Stats */}
-        <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="mb-6 grid grid-cols-2 md:grid-cols-6 gap-4">
           <div className="bg-white p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-blue-600">{apps.length}</div>
             <div className="text-sm text-gray-600">Total Applications</div>
@@ -493,6 +505,18 @@ export default function AIApplicationsPage() {
               {apps.filter(a => a.is_affiliate).length}
             </div>
             <div className="text-sm text-gray-600">Affiliates</div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <div className="text-2xl font-bold text-amber-600">
+              {apps.filter(a => a.is_featured).length}
+            </div>
+            <div className="text-sm text-gray-600">Featured</div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <div className="text-2xl font-bold text-cyan-600">
+              {apps.filter(a => a.is_paid_placement).length}
+            </div>
+            <div className="text-sm text-gray-600">Paid Placement</div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-purple-600">
@@ -642,6 +666,15 @@ export default function AIApplicationsPage() {
                         <label className="flex items-center text-sm mt-1">
                           <input
                             type="checkbox"
+                            checked={editForm.is_paid_placement}
+                            onChange={(e) => setEditForm({ ...editForm, is_paid_placement: e.target.checked })}
+                            className="mr-1"
+                          />
+                          Paid Placement
+                        </label>
+                        <label className="flex items-center text-sm mt-1">
+                          <input
+                            type="checkbox"
                             checked={editForm.is_affiliate}
                             onChange={(e) => setEditForm({ ...editForm, is_affiliate: e.target.checked })}
                             className="mr-1"
@@ -699,7 +732,10 @@ export default function AIApplicationsPage() {
                           <span className="text-gray-400">Inactive</span>
                         )}
                         {app.is_featured && (
-                          <span className="block text-yellow-600 text-xs">★ Featured</span>
+                          <span className="block text-amber-600 text-xs">★ Featured</span>
+                        )}
+                        {app.is_paid_placement && (
+                          <span className="block text-cyan-600 text-xs">⬆ Paid Placement</span>
                         )}
                         {app.is_affiliate && (
                           <span className="block text-blue-600 text-xs font-semibold">$ Affiliate</span>
