@@ -49,7 +49,7 @@ export default async function ToolsDirectoryPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionPageSchema) }}
       />
       {/* Hero Section */}
-      <DirectoryHero toolCount={tools.length} />
+      <DirectoryHero toolCount={tools.length} categoryCount={categories.length} />
 
       {/* Categories Section */}
       <section id="categories" className="py-16 bg-blue-600 relative overflow-hidden">

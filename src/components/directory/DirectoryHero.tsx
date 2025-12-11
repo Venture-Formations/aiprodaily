@@ -3,9 +3,10 @@ import { Container } from '@/components/salient/Container'
 
 interface DirectoryHeroProps {
   toolCount: number
+  categoryCount: number
 }
 
-export function DirectoryHero({ toolCount }: DirectoryHeroProps) {
+export function DirectoryHero({ toolCount, categoryCount }: DirectoryHeroProps) {
   return (
     <section className="relative overflow-hidden">
       {/* Decorative gradient blur blotch */}
@@ -62,7 +63,7 @@ export function DirectoryHero({ toolCount }: DirectoryHeroProps) {
             <div className="mt-1 text-sm text-slate-500">AI Tools</div>
           </div>
           <div className="text-center">
-            <div className="text-3xl font-bold text-slate-900">7</div>
+            <div className="text-3xl font-bold text-slate-900">{categoryCount}</div>
             <div className="mt-1 text-sm text-slate-500">Categories</div>
           </div>
           <div className="text-center">
