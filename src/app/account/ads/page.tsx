@@ -4,6 +4,8 @@ import { supabaseAdmin } from '@/lib/supabase'
 import Link from 'next/link'
 import { Star, Newspaper, ArrowRight, Check, Crown, Clock } from 'lucide-react'
 
+const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+
 export const dynamic = 'force-dynamic'
 
 export default async function AdsOverviewPage() {
@@ -18,6 +20,7 @@ export default async function AdsOverviewPage() {
     .from('ai_applications')
     .select('id, app_name, is_paid_placement, is_featured, listing_type, billing_period, submission_status')
     .eq('clerk_user_id', user.id)
+    .eq('publication_id', PUBLICATION_ID)
     .single()
 
   const hasListing = !!tool

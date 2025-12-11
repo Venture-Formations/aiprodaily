@@ -5,6 +5,8 @@ import { getCategoriesWithFeaturedTools } from '@/lib/directory'
 import Link from 'next/link'
 import { Star, Check, Zap, TrendingUp, Eye, ArrowRight, Crown } from 'lucide-react'
 
+const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+
 export const dynamic = 'force-dynamic'
 
 // Pricing constants
@@ -24,6 +26,7 @@ export default async function ToolProfileAdsPage() {
     .from('ai_applications')
     .select('id, app_name, category, is_paid_placement, is_featured, listing_type, billing_period, submission_status, plan, view_count, click_count')
     .eq('clerk_user_id', user.id)
+    .eq('publication_id', PUBLICATION_ID)
     .single()
 
   // Get categories with featured tools

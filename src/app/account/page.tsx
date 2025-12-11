@@ -4,6 +4,8 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { ProfileCard } from './components/ProfileCard'
 import { NoProfileCard } from './components/NoProfileCard'
 
+const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+
 // Categories mapping for ai_applications - matches directory.ts
 const CATEGORIES = [
   { id: 'accounting-bookkeeping', name: 'Accounting & Bookkeeping', slug: 'accounting-bookkeeping' },
@@ -31,6 +33,7 @@ export default async function AccountPage() {
     .from('ai_applications')
     .select('*')
     .eq('clerk_user_id', user.id)
+    .eq('publication_id', PUBLICATION_ID)
     .single()
 
   // Debug logging
