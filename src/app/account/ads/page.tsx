@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getDirectoryPricing } from '@/lib/directory'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Star, Newspaper, ArrowRight, Check, Crown, Clock } from 'lucide-react'
 
 const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
@@ -20,7 +21,7 @@ export default async function AdsOverviewPage() {
   const [toolResult, pricing] = await Promise.all([
     supabaseAdmin
       .from('ai_applications')
-      .select('id, app_name, is_paid_placement, is_featured, plan, submission_status, publication_id')
+      .select('id, app_name, logo_url, is_paid_placement, is_featured, plan, submission_status, publication_id')
       .eq('clerk_user_id', user.id)
       .eq('publication_id', PUBLICATION_ID)
       .single(),
@@ -56,19 +57,31 @@ export default async function AdsOverviewPage() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-6 border-b border-slate-100">
             <div className="flex items-center gap-3">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                isFeatured
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-500'
-                  : isPaidListing
-                    ? 'bg-gradient-to-r from-blue-600 to-cyan-500'
-                    : 'bg-slate-100'
-              }`}>
-                {isFeatured ? (
-                  <Crown className="w-6 h-6 text-white" />
-                ) : (
-                  <Star className={`w-6 h-6 ${isPaidListing ? 'text-white fill-current' : 'text-slate-400'}`} />
-                )}
-              </div>
+              {tool?.logo_url ? (
+                <div className="w-12 h-12 rounded-xl overflow-hidden bg-white border border-slate-200 flex items-center justify-center">
+                  <Image
+                    src={tool.logo_url}
+                    alt={tool.app_name}
+                    width={48}
+                    height={48}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              ) : (
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                  isFeatured
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                    : isPaidListing
+                      ? 'bg-gradient-to-r from-blue-600 to-cyan-500'
+                      : 'bg-slate-100'
+                }`}>
+                  {isFeatured ? (
+                    <Crown className="w-6 h-6 text-white" />
+                  ) : (
+                    <Star className={`w-6 h-6 ${isPaidListing ? 'text-white fill-current' : 'text-slate-400'}`} />
+                  )}
+                </div>
+              )}
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Tool Profile</h2>
                 <p className="text-sm text-slate-500">Premium listing in directory</p>

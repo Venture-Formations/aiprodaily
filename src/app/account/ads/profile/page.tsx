@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getCategoriesWithFeaturedTools, getDirectoryPricing } from '@/lib/directory'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Star, Check, Zap, TrendingUp, Eye, ArrowRight, Crown } from 'lucide-react'
 
 const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
@@ -20,7 +21,7 @@ export default async function ToolProfileAdsPage() {
   const [toolResult, pricing, categoriesWithFeatured] = await Promise.all([
     supabaseAdmin
       .from('ai_applications')
-      .select('id, app_name, category, is_paid_placement, is_featured, plan, submission_status, view_count, click_count, publication_id')
+      .select('id, app_name, logo_url, category, is_paid_placement, is_featured, plan, submission_status, view_count, click_count, publication_id')
       .eq('clerk_user_id', user.id)
       .eq('publication_id', PUBLICATION_ID)
       .single(),
@@ -82,9 +83,21 @@ export default async function ToolProfileAdsPage() {
             <div className="bg-white rounded-xl p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-center">
-                    <Crown className="w-7 h-7 text-white" />
-                  </div>
+                  {tool.logo_url ? (
+                    <div className="w-14 h-14 rounded-xl overflow-hidden bg-white border border-slate-200 flex items-center justify-center">
+                      <Image
+                        src={tool.logo_url}
+                        alt={tool.app_name}
+                        width={56}
+                        height={56}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-14 h-14 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-center">
+                      <Crown className="w-7 h-7 text-white" />
+                    </div>
+                  )}
                   <div>
                     <h2 className="text-xl font-bold text-slate-900">{tool.app_name}</h2>
                     <div className="flex items-center gap-2 mt-1">
@@ -185,9 +198,21 @@ export default async function ToolProfileAdsPage() {
             <div className="bg-white rounded-xl p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 flex items-center justify-center">
-                    <Star className="w-7 h-7 text-white fill-current" />
-                  </div>
+                  {tool.logo_url ? (
+                    <div className="w-14 h-14 rounded-xl overflow-hidden bg-white border border-slate-200 flex items-center justify-center">
+                      <Image
+                        src={tool.logo_url}
+                        alt={tool.app_name}
+                        width={56}
+                        height={56}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-14 h-14 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 flex items-center justify-center">
+                      <Star className="w-7 h-7 text-white fill-current" />
+                    </div>
+                  )}
                   <div>
                     <h2 className="text-xl font-bold text-slate-900">{tool.app_name}</h2>
                     <div className="flex items-center gap-2 mt-1">
@@ -370,9 +395,21 @@ export default async function ToolProfileAdsPage() {
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">
-                  <Star className="w-6 h-6 text-slate-400" />
-                </div>
+                {tool.logo_url ? (
+                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-white border border-slate-200 flex items-center justify-center">
+                    <Image
+                      src={tool.logo_url}
+                      alt={tool.app_name}
+                      width={48}
+                      height={48}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">
+                    <Star className="w-6 h-6 text-slate-400" />
+                  </div>
+                )}
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">{tool.app_name}</h2>
                   <span className="text-sm text-slate-500">Free Listing</span>
