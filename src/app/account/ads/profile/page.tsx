@@ -1,18 +1,13 @@
 import { currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
-import { getCategoriesWithFeaturedTools } from '@/lib/directory'
+import { getCategoriesWithFeaturedTools, getDirectoryPricing } from '@/lib/directory'
 import Link from 'next/link'
 import { Star, Check, Zap, TrendingUp, Eye, ArrowRight, Crown } from 'lucide-react'
 
 const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
 
 export const dynamic = 'force-dynamic'
-
-// Pricing constants
-const PAID_PLACEMENT_MONTHLY = 30
-const FEATURED_MONTHLY = 60
-const YEARLY_DISCOUNT_MONTHS = 2
 
 export default async function ToolProfileAdsPage() {
   const user = await currentUser()
@@ -21,22 +16,25 @@ export default async function ToolProfileAdsPage() {
     redirect('/sign-in')
   }
 
-  // Fetch user's tool listing from ai_applications table
-  const { data: tool, error } = await supabaseAdmin
-    .from('ai_applications')
-    .select('id, app_name, category, is_paid_placement, is_featured, plan, submission_status, view_count, click_count, publication_id')
-    .eq('clerk_user_id', user.id)
-    .eq('publication_id', PUBLICATION_ID)
-    .single()
+  // Fetch user's tool listing, pricing, and featured categories in parallel
+  const [toolResult, pricing, categoriesWithFeatured] = await Promise.all([
+    supabaseAdmin
+      .from('ai_applications')
+      .select('id, app_name, category, is_paid_placement, is_featured, plan, submission_status, view_count, click_count, publication_id')
+      .eq('clerk_user_id', user.id)
+      .eq('publication_id', PUBLICATION_ID)
+      .single(),
+    getDirectoryPricing(),
+    getCategoriesWithFeaturedTools()
+  ])
+
+  const { data: tool, error } = toolResult
 
   // Debug logging
   console.log('[Account/Ads/Profile] Clerk user ID:', user.id)
   console.log('[Account/Ads/Profile] Publication ID:', PUBLICATION_ID)
   console.log('[Account/Ads/Profile] Tool found:', tool)
   console.log('[Account/Ads/Profile] Error:', error)
-
-  // Get categories with featured tools
-  const categoriesWithFeatured = await getCategoriesWithFeaturedTools()
 
   const hasListing = !!tool
   const listingType = tool?.is_featured ? 'featured' : tool?.is_paid_placement ? 'paid_placement' : 'free'
@@ -263,7 +261,7 @@ export default async function ToolProfileAdsPage() {
                 <div className="bg-white rounded-xl border border-slate-200 p-6">
                   <h3 className="font-semibold text-slate-900 mb-1">Monthly</h3>
                   <div className="mb-4">
-                    <span className="text-3xl font-bold text-slate-900">${FEATURED_MONTHLY}</span>
+                    <span className="text-3xl font-bold text-slate-900">${pricing.featuredPrice}</span>
                     <span className="text-slate-500">/month</span>
                   </div>
                   <ul className="space-y-2 mb-6">
@@ -292,12 +290,12 @@ export default async function ToolProfileAdsPage() {
                 <div className="bg-white rounded-xl border-2 border-amber-500 p-6 relative">
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                     <span className="px-3 py-1 bg-amber-500 text-white text-xs font-medium rounded-full">
-                      Save ${FEATURED_MONTHLY * YEARLY_DISCOUNT_MONTHS}
+                      Save ${pricing.featuredPrice * pricing.yearlyDiscountMonths}
                     </span>
                   </div>
                   <h3 className="font-semibold text-slate-900 mb-1">Yearly</h3>
                   <div className="mb-4">
-                    <span className="text-3xl font-bold text-slate-900">${FEATURED_MONTHLY * (12 - YEARLY_DISCOUNT_MONTHS)}</span>
+                    <span className="text-3xl font-bold text-slate-900">${pricing.featuredYearlyPrice}</span>
                     <span className="text-slate-500">/year</span>
                   </div>
                   <ul className="space-y-2 mb-6">
@@ -307,7 +305,7 @@ export default async function ToolProfileAdsPage() {
                     </li>
                     <li className="flex items-center gap-2 text-sm text-slate-600">
                       <Check className="w-4 h-4 text-amber-500" />
-                      {YEARLY_DISCOUNT_MONTHS} months free
+                      {pricing.yearlyDiscountMonths} months free
                     </li>
                     <li className="flex items-center gap-2 text-sm text-slate-600">
                       <Check className="w-4 h-4 text-amber-500" />
@@ -446,11 +444,11 @@ export default async function ToolProfileAdsPage() {
                 </div>
                 <h3 className="font-semibold text-slate-900 mb-1">Paid Placement</h3>
                 <div className="mb-4">
-                  <span className="text-3xl font-bold text-slate-900">${PAID_PLACEMENT_MONTHLY}</span>
+                  <span className="text-3xl font-bold text-slate-900">${pricing.paidPlacementPrice}</span>
                   <span className="text-slate-500">/mo</span>
                 </div>
                 <p className="text-xs text-slate-500 mb-4">
-                  or ${PAID_PLACEMENT_MONTHLY * (12 - YEARLY_DISCOUNT_MONTHS)}/year
+                  or ${pricing.paidPlacementYearlyPrice}/year
                 </p>
                 <ul className="space-y-2 mb-6">
                   <li className="flex items-center gap-2 text-sm text-slate-600">
@@ -489,11 +487,11 @@ export default async function ToolProfileAdsPage() {
                 )}
                 <h3 className="font-semibold text-slate-900 mb-1">Featured</h3>
                 <div className="mb-4">
-                  <span className="text-3xl font-bold text-slate-900">${FEATURED_MONTHLY}</span>
+                  <span className="text-3xl font-bold text-slate-900">${pricing.featuredPrice}</span>
                   <span className="text-slate-500">/mo</span>
                 </div>
                 <p className="text-xs text-slate-500 mb-4">
-                  or ${FEATURED_MONTHLY * (12 - YEARLY_DISCOUNT_MONTHS)}/year
+                  or ${pricing.featuredYearlyPrice}/year
                 </p>
                 <ul className="space-y-2 mb-6">
                   <li className="flex items-center gap-2 text-sm text-slate-600">

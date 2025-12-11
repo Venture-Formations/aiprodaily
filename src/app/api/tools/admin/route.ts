@@ -35,12 +35,18 @@ export async function GET(request: NextRequest) {
   }
 
   const status = request.nextUrl.searchParams.get('status') || 'pending'
+  const submittedOnly = request.nextUrl.searchParams.get('submitted_only') !== 'false'
 
   // Query ai_applications table
   let query = supabaseAdmin
     .from('ai_applications')
     .select('*')
     .order('created_at', { ascending: false })
+
+  // By default, only show submitted tools (those with clerk_user_id set)
+  if (submittedOnly) {
+    query = query.not('clerk_user_id', 'is', null)
+  }
 
   // Map status filter - ai_applications uses submission_status
   if (status !== 'all') {

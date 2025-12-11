@@ -1,6 +1,7 @@
 import { currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getDirectoryPricing } from '@/lib/directory'
 import Link from 'next/link'
 import { Star, Newspaper, ArrowRight, Check, Crown, Clock } from 'lucide-react'
 
@@ -15,13 +16,18 @@ export default async function AdsOverviewPage() {
     redirect('/sign-in')
   }
 
-  // Fetch user's tool listing for listing type from ai_applications table
-  const { data: tool, error } = await supabaseAdmin
-    .from('ai_applications')
-    .select('id, app_name, is_paid_placement, is_featured, plan, submission_status, publication_id')
-    .eq('clerk_user_id', user.id)
-    .eq('publication_id', PUBLICATION_ID)
-    .single()
+  // Fetch user's tool listing and pricing in parallel
+  const [toolResult, pricing] = await Promise.all([
+    supabaseAdmin
+      .from('ai_applications')
+      .select('id, app_name, is_paid_placement, is_featured, plan, submission_status, publication_id')
+      .eq('clerk_user_id', user.id)
+      .eq('publication_id', PUBLICATION_ID)
+      .single(),
+    getDirectoryPricing()
+  ])
+
+  const { data: tool, error } = toolResult
 
   // Debug logging
   console.log('[Account/Ads] Clerk user ID:', user.id)
@@ -117,7 +123,7 @@ export default async function AdsOverviewPage() {
                   Upgrade &ldquo;{tool.app_name}&rdquo; to get priority placement and stand out.
                 </p>
                 <div className="flex items-center gap-4 text-sm text-slate-500">
-                  <span>From $30/mo</span>
+                  <span>From ${pricing.paidPlacementPrice}/mo</span>
                   <span>•</span>
                   <span>Cancel anytime</span>
                 </div>
@@ -190,7 +196,7 @@ export default async function AdsOverviewPage() {
             <div>
               <p className="font-medium text-slate-900">Paid Placement</p>
               <p className="text-sm text-slate-600">
-                $30/mo. Your tool appears on Page 1 of the directory.
+                ${pricing.paidPlacementPrice}/mo. Your tool appears on Page 1 of the directory.
               </p>
             </div>
           </div>
@@ -201,7 +207,7 @@ export default async function AdsOverviewPage() {
             <div>
               <p className="font-medium text-slate-900">Featured Listing</p>
               <p className="text-sm text-slate-600">
-                $60/mo. Get the #1 position in your category with premium styling.
+                ${pricing.featuredPrice}/mo. Get the #1 position in your category with premium styling.
               </p>
             </div>
           </div>

@@ -234,6 +234,77 @@ export async function incrementToolClicks(toolId: string): Promise<void> {
   return incrementToolViews(toolId)
 }
 
+// Default pricing values
+const DEFAULT_PRICING = {
+  paidPlacementPrice: 30,
+  featuredPrice: 60,
+  yearlyDiscountMonths: 2
+}
+
+export interface DirectoryPricing {
+  paidPlacementPrice: number
+  featuredPrice: number
+  yearlyDiscountMonths: number
+  // Computed values
+  paidPlacementYearlyPrice: number
+  featuredYearlyPrice: number
+}
+
+/**
+ * Get directory pricing from publication_settings
+ * Falls back to defaults if settings are not configured
+ */
+export async function getDirectoryPricing(): Promise<DirectoryPricing> {
+  try {
+    const { data: settings, error } = await supabaseAdmin
+      .from('publication_settings')
+      .select('key, value')
+      .eq('publication_id', PUBLICATION_ID)
+      .in('key', ['directory_paid_placement_price', 'directory_featured_price', 'directory_yearly_discount_months'])
+
+    if (error) {
+      console.error('[Directory] Error fetching pricing settings:', error)
+      return computePricing(DEFAULT_PRICING)
+    }
+
+    // Build settings map from database
+    const settingsMap: Record<string, string> = {}
+    settings?.forEach(s => {
+      if (s.value !== null) {
+        settingsMap[s.key] = s.value
+      }
+    })
+
+    const pricing = {
+      paidPlacementPrice: settingsMap.directory_paid_placement_price
+        ? parseFloat(settingsMap.directory_paid_placement_price)
+        : DEFAULT_PRICING.paidPlacementPrice,
+      featuredPrice: settingsMap.directory_featured_price
+        ? parseFloat(settingsMap.directory_featured_price)
+        : DEFAULT_PRICING.featuredPrice,
+      yearlyDiscountMonths: settingsMap.directory_yearly_discount_months
+        ? parseInt(settingsMap.directory_yearly_discount_months)
+        : DEFAULT_PRICING.yearlyDiscountMonths
+    }
+
+    return computePricing(pricing)
+  } catch (error) {
+    console.error('[Directory] Unexpected error fetching pricing:', error)
+    return computePricing(DEFAULT_PRICING)
+  }
+}
+
+/**
+ * Compute yearly prices based on monthly price and discount months
+ */
+function computePricing(base: { paidPlacementPrice: number; featuredPrice: number; yearlyDiscountMonths: number }): DirectoryPricing {
+  return {
+    ...base,
+    paidPlacementYearlyPrice: base.paidPlacementPrice * (12 - base.yearlyDiscountMonths),
+    featuredYearlyPrice: base.featuredPrice * (12 - base.yearlyDiscountMonths)
+  }
+}
+
 /**
  * Get categories that already have a featured tool
  * Returns a Set of category names that have featured tools
