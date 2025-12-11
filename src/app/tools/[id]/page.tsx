@@ -1,9 +1,10 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { getToolById, getApprovedTools } from '@/lib/directory'
+import { getToolById, getApprovedTools, incrementToolViews } from '@/lib/directory'
 import { Container } from '@/components/salient/Container'
 import { Button } from '@/components/salient/Button'
+import { ToolClickTracker } from './ToolClickTracker'
 
 interface ToolDetailPageProps {
   params: Promise<{ id: string }>
@@ -18,6 +19,9 @@ export default async function ToolDetailPage({ params }: ToolDetailPageProps) {
   if (!tool || !tool.is_active) {
     notFound()
   }
+
+  // Track page view (fire and forget, don't block render)
+  incrementToolViews(id).catch(() => {})
 
   // Use listing image (tool_image_url) for hero, logo_image_url for Quick Info
   const heroImageUrl = tool.tool_image_url || '/placeholder-tool.png'
@@ -133,17 +137,16 @@ export default async function ToolDetailPage({ params }: ToolDetailPageProps) {
 
                 {/* CTA */}
                 <div className="mt-8">
-                  <a
-                    href={tool.website_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <ToolClickTracker
+                    toolId={id}
+                    websiteUrl={tool.website_url}
                     className="group inline-flex items-center justify-center rounded-full py-3 px-6 text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 active:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                   >
                     Visit Website
                     <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
-                  </a>
+                  </ToolClickTracker>
                 </div>
               </div>
             </div>
@@ -174,14 +177,13 @@ export default async function ToolDetailPage({ params }: ToolDetailPageProps) {
                 <div>
                   <dt className="text-sm text-slate-500">Website</dt>
                   <dd>
-                    <a
-                      href={tool.website_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <ToolClickTracker
+                      toolId={id}
+                      websiteUrl={tool.website_url}
                       className="text-blue-600 hover:text-blue-500 text-sm break-all transition-colors"
                     >
                       {new URL(tool.website_url).hostname}
-                    </a>
+                    </ToolClickTracker>
                   </dd>
                 </div>
                 <div>

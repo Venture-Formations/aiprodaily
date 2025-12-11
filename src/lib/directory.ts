@@ -206,32 +206,47 @@ export async function getPendingTools(): Promise<DirectoryApp[]> {
 }
 
 /**
- * Increment view/usage count for a tool
+ * Increment view count for a tool (when profile page is viewed)
  */
 export async function incrementToolViews(toolId: string): Promise<void> {
   try {
     const { data: app } = await supabaseAdmin
       .from('ai_applications')
-      .select('times_used')
+      .select('view_count')
       .eq('id', toolId)
       .single()
 
     if (app) {
       await supabaseAdmin
         .from('ai_applications')
-        .update({ times_used: (app.times_used || 0) + 1 })
+        .update({ view_count: (app.view_count || 0) + 1 })
         .eq('id', toolId)
     }
   } catch (error) {
-    console.error('[Directory] Error incrementing views:', error)
+    console.error('[Directory] Error incrementing view_count:', error)
   }
 }
 
 /**
- * Increment click count for a tool (alias for incrementToolViews)
+ * Increment click count for a tool (when Visit Website is clicked)
  */
 export async function incrementToolClicks(toolId: string): Promise<void> {
-  return incrementToolViews(toolId)
+  try {
+    const { data: app } = await supabaseAdmin
+      .from('ai_applications')
+      .select('click_count')
+      .eq('id', toolId)
+      .single()
+
+    if (app) {
+      await supabaseAdmin
+        .from('ai_applications')
+        .update({ click_count: (app.click_count || 0) + 1 })
+        .eq('id', toolId)
+    }
+  } catch (error) {
+    console.error('[Directory] Error incrementing click_count:', error)
+  }
 }
 
 // Default pricing values
