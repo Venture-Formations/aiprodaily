@@ -18,9 +18,8 @@ export default async function AdsOverviewPage() {
   // Fetch user's tool listing for listing type from ai_applications table
   const { data: tool, error } = await supabaseAdmin
     .from('ai_applications')
-    .select('id, app_name, is_paid_placement, is_featured, listing_type, billing_period, submission_status')
+    .select('id, app_name, is_paid_placement, is_featured, listing_type, billing_period, submission_status, publication_id')
     .eq('clerk_user_id', user.id)
-    .eq('publication_id', PUBLICATION_ID)
     .single()
 
   // Debug logging
