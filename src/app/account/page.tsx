@@ -33,6 +33,7 @@ export default async function AccountPage() {
     .from('ai_applications')
     .select('*')
     .eq('clerk_user_id', user.id)
+    .eq('publication_id', PUBLICATION_ID)
     .single()
 
   // Debug logging

@@ -24,8 +24,9 @@ export default async function ToolProfileAdsPage() {
   // Fetch user's tool listing from ai_applications table
   const { data: tool, error } = await supabaseAdmin
     .from('ai_applications')
-    .select('id, app_name, category, is_paid_placement, is_featured, listing_type, billing_period, submission_status, plan, view_count, click_count, publication_id')
+    .select('id, app_name, category, is_paid_placement, is_featured, plan, submission_status, view_count, click_count, publication_id')
     .eq('clerk_user_id', user.id)
+    .eq('publication_id', PUBLICATION_ID)
     .single()
 
   // Debug logging
@@ -38,9 +39,10 @@ export default async function ToolProfileAdsPage() {
   const categoriesWithFeatured = await getCategoriesWithFeaturedTools()
 
   const hasListing = !!tool
-  const listingType = tool?.listing_type || (tool?.is_featured ? 'featured' : tool?.is_paid_placement ? 'paid_placement' : 'free')
+  const listingType = tool?.is_featured ? 'featured' : tool?.is_paid_placement ? 'paid_placement' : 'free'
   const isPaidListing = listingType !== 'free'
   const isFeatured = listingType === 'featured'
+  const billingPeriod = tool?.plan === 'yearly' ? 'Yearly' : tool?.plan === 'monthly' ? 'Monthly' : null
 
   // Check if user's category already has a featured tool (and it's not theirs)
   const categoryHasFeatured = tool?.category ? categoriesWithFeatured.has(tool.category) && !tool.is_featured : false
@@ -92,7 +94,7 @@ export default async function ToolProfileAdsPage() {
                         Featured
                       </span>
                       <span className="text-sm text-slate-500 capitalize">
-                        {tool.billing_period || tool.plan} Plan
+                        {billingPeriod || 'Free'} Plan
                       </span>
                     </div>
                   </div>
@@ -198,7 +200,7 @@ export default async function ToolProfileAdsPage() {
                         Paid Placement
                       </span>
                       <span className="text-sm text-slate-500 capitalize">
-                        {tool.billing_period || tool.plan} Plan
+                        {billingPeriod || 'Free'} Plan
                       </span>
                     </div>
                   </div>

@@ -18,8 +18,9 @@ export default async function AdsOverviewPage() {
   // Fetch user's tool listing for listing type from ai_applications table
   const { data: tool, error } = await supabaseAdmin
     .from('ai_applications')
-    .select('id, app_name, is_paid_placement, is_featured, listing_type, billing_period, submission_status, publication_id')
+    .select('id, app_name, is_paid_placement, is_featured, plan, submission_status, publication_id')
     .eq('clerk_user_id', user.id)
+    .eq('publication_id', PUBLICATION_ID)
     .single()
 
   // Debug logging
@@ -29,9 +30,10 @@ export default async function AdsOverviewPage() {
   console.log('[Account/Ads] Error:', error)
 
   const hasListing = !!tool
-  const listingType = tool?.listing_type || (tool?.is_featured ? 'featured' : tool?.is_paid_placement ? 'paid_placement' : 'free')
+  const listingType = tool?.is_featured ? 'featured' : tool?.is_paid_placement ? 'paid_placement' : 'free'
   const isPaidListing = listingType !== 'free'
   const isFeatured = listingType === 'featured'
+  const billingPeriod = tool?.plan === 'yearly' ? 'Yearly' : tool?.plan === 'monthly' ? 'Monthly' : null
 
   return (
     <div>
@@ -87,7 +89,7 @@ export default async function AdsOverviewPage() {
                     Featured
                   </span>
                   <span className="text-sm text-slate-500 capitalize">
-                    {tool.billing_period || 'Monthly'}
+                    {billingPeriod || 'Monthly'}
                   </span>
                 </div>
                 <p className="text-sm text-slate-600 mb-4">
@@ -102,7 +104,7 @@ export default async function AdsOverviewPage() {
                     Paid Placement
                   </span>
                   <span className="text-sm text-slate-500 capitalize">
-                    {tool.billing_period || 'Monthly'}
+                    {billingPeriod || 'Monthly'}
                   </span>
                 </div>
                 <p className="text-sm text-slate-600 mb-4">
