@@ -52,17 +52,22 @@ export default async function ToolsDirectoryPage() {
       <DirectoryHero toolCount={tools.length} />
 
       {/* Categories Section */}
-      <section id="categories" className="py-16 bg-slate-50 relative overflow-hidden">
-        {/* Decorative gradient blur blotches */}
-        <div className="absolute top-0 left-1/4 w-[500px] h-[400px] bg-gradient-to-r from-blue-100 to-cyan-100 rounded-full blur-3xl opacity-60"></div>
-        <div className="absolute bottom-0 right-1/4 w-[400px] h-[300px] bg-gradient-to-r from-cyan-100 to-blue-100 rounded-full blur-3xl opacity-60"></div>
+      <section id="categories" className="py-16 bg-blue-600 relative overflow-hidden">
+        {/* Background image for purple/pink/teal clouding effect */}
+        <img
+          src="/images/background-call-to-action.jpg"
+          alt=""
+          className="absolute top-1/2 left-1/2 max-w-none -translate-x-1/2 -translate-y-1/2"
+          width={2347}
+          height={1244}
+        />
 
         <Container className="relative">
           <div className="text-center mb-12">
-            <h2 className="font-display text-3xl font-medium tracking-tight text-slate-900 sm:text-4xl">
+            <h2 className="font-display text-3xl font-medium tracking-tight text-white sm:text-4xl">
               Browse AI Tools by Category
             </h2>
-            <p className="mt-4 text-lg tracking-tight text-slate-700">
+            <p className="mt-4 text-lg tracking-tight text-blue-100">
               Find the perfect AI tool for your specific needs
             </p>
           </div>
@@ -97,20 +102,26 @@ export default async function ToolsDirectoryPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 bg-slate-50 relative overflow-hidden">
-        {/* Decorative gradient blur */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-gradient-to-r from-blue-100 to-cyan-100 rounded-full blur-3xl opacity-60"></div>
+      <section className="py-16 bg-blue-600 relative overflow-hidden">
+        {/* Background image for purple/pink/teal clouding effect */}
+        <img
+          src="/images/background-call-to-action.jpg"
+          alt=""
+          className="absolute top-1/2 left-1/2 max-w-none -translate-x-1/2 -translate-y-1/2"
+          width={2347}
+          height={1244}
+        />
 
         <Container className="relative">
           <div className="text-center">
-            <h2 className="font-display text-3xl font-medium tracking-tight text-slate-900 sm:text-4xl">
+            <h2 className="font-display text-3xl font-medium tracking-tight text-white sm:text-4xl">
               Have an AI Tool to Share?
             </h2>
-            <p className="mt-4 text-lg tracking-tight text-slate-700 max-w-2xl mx-auto">
+            <p className="mt-4 text-lg tracking-tight text-blue-100 max-w-2xl mx-auto">
               Submit your tool to reach thousands of accounting professionals looking for AI solutions.
             </p>
             <div className="mt-8">
-              <Button href="/tools/submit" color="blue">
+              <Button href="/tools/submit" color="white">
                 Submit Your Tool
               </Button>
             </div>
