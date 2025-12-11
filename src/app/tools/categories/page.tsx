@@ -23,7 +23,7 @@ export default async function CategoriesPage() {
       <Container>
         <div className="text-center mb-12">
           <h1 className="font-display text-4xl font-medium tracking-tight text-slate-900 sm:text-5xl">
-            Browse by Category
+            Browse AI Tools by Category
           </h1>
           <p className="mt-4 text-lg tracking-tight text-slate-700">
             Find the perfect AI tool for your specific accounting needs
