@@ -106,7 +106,7 @@ export default async function ToolProfileAdsPage() {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-6 mt-6 pt-6 border-t border-slate-100">
+              <div className="grid grid-cols-2 gap-6 mt-6 pt-6 border-t border-slate-100">
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-1.5 text-slate-500 mb-1">
                     <Eye className="w-4 h-4" />
@@ -124,13 +124,6 @@ export default async function ToolProfileAdsPage() {
                   <p className="text-2xl font-bold text-slate-900">
                     {tool.click_count?.toLocaleString() || '0'}
                   </p>
-                </div>
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-1.5 text-slate-500 mb-1">
-                    <Zap className="w-4 h-4" />
-                    <span className="text-xs uppercase tracking-wide">Position</span>
-                  </div>
-                  <p className="text-2xl font-bold text-amber-600">#1</p>
                 </div>
               </div>
             </div>
@@ -212,7 +205,7 @@ export default async function ToolProfileAdsPage() {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-6 mt-6 pt-6 border-t border-slate-100">
+              <div className="grid grid-cols-2 gap-6 mt-6 pt-6 border-t border-slate-100">
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-1.5 text-slate-500 mb-1">
                     <Eye className="w-4 h-4" />
@@ -230,13 +223,6 @@ export default async function ToolProfileAdsPage() {
                   <p className="text-2xl font-bold text-slate-900">
                     {tool.click_count?.toLocaleString() || '0'}
                   </p>
-                </div>
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-1.5 text-slate-500 mb-1">
-                    <Zap className="w-4 h-4" />
-                    <span className="text-xs uppercase tracking-wide">Position</span>
-                  </div>
-                  <p className="text-2xl font-bold text-blue-600">Page 1</p>
                 </div>
               </div>
             </div>
@@ -337,7 +323,7 @@ export default async function ToolProfileAdsPage() {
           {/* Current Benefits */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
             <h3 className="font-semibold text-slate-900 mb-4">Your Paid Placement Benefits</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="flex items-start gap-3">
                 <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                   <Check className="w-4 h-4 text-blue-600" />
@@ -354,15 +340,6 @@ export default async function ToolProfileAdsPage() {
                 <div>
                   <p className="font-medium text-slate-900 text-sm">Priority Search</p>
                   <p className="text-xs text-slate-500">Higher in search results</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                  <Check className="w-4 h-4 text-blue-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-slate-900 text-sm">Enhanced Visibility</p>
-                  <p className="text-xs text-slate-500">Stand out from free listings</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
