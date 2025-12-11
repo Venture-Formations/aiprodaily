@@ -431,12 +431,15 @@ export async function generatePrimaryArticlesSection(articles: any[], issueDate:
     // Wrap URL with tracking (pass both mailerlite ID and database issue ID)
     const trackedUrl = sourceUrl !== '#' ? wrapTrackingUrl(sourceUrl, sectionName, issueDate, mailerliteIssueId, issueId) : '#'
 
+    // Convert newlines to <br> for proper HTML display (AI responses contain \n for paragraphs)
+    const formattedContent = content.replace(/\n/g, '<br>')
+
     return `
       <div style='padding: 16px 0; border-bottom: 1px solid #e0e0e0;'>
         <div style='font-size: 18px; font-weight: bold; margin-bottom: 8px; font-family: ${bodyFont};'>
           ${emoji} <a href='${trackedUrl}' style='color: ${secondaryColor}; text-decoration: underline;'>${headline}</a>
         </div>
-        <div style='font-size: 16px; line-height: 24px; color: #333; font-family: ${bodyFont};'>${content}</div>
+        <div style='font-size: 16px; line-height: 24px; color: #333; font-family: ${bodyFont};'>${formattedContent}</div>
       </div>`
   }).join('')
 
@@ -499,12 +502,15 @@ export async function generateSecondaryArticlesSection(issue: any, sectionName: 
     // Wrap URL with tracking
     const trackedUrl = sourceUrl !== '#' ? wrapTrackingUrl(sourceUrl, sectionName, issue.date, issue.mailerlite_issue_id, issue.id) : '#'
 
+    // Convert newlines to <br> for proper HTML display (AI responses contain \n for paragraphs)
+    const formattedContent = content.replace(/\n/g, '<br>')
+
     return `
       <div style='padding: 16px 0; border-bottom: 1px solid #e0e0e0;'>
         <div style='font-size: 18px; font-weight: bold; margin-bottom: 8px; font-family: ${bodyFont};'>
           ${emoji} <a href='${trackedUrl}' style='color: ${secondaryColor}; text-decoration: underline;'>${headline}</a>
         </div>
-        <div style='font-size: 16px; line-height: 24px; color: #333; font-family: ${bodyFont};'>${content}</div>
+        <div style='font-size: 16px; line-height: 24px; color: #333; font-family: ${bodyFont};'>${formattedContent}</div>
       </div>`
   }).join('')
 
