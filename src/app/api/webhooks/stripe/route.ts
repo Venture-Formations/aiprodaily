@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SlackNotificationService } from '@/lib/slack'
 
+const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+
 // Stripe webhook event types we handle
 const CHECKOUT_SESSION_COMPLETED = 'checkout.session.completed'
 const CUSTOMER_SUBSCRIPTION_DELETED = 'customer.subscription.deleted'
@@ -144,12 +146,156 @@ async function handleCheckoutSessionCompleted(session: any) {
   const customerId = session.customer
   console.log(`[Webhook] Processing checkout session: ${sessionId}`)
 
-  // Check if this is a tools directory subscription (has metadata with tool_id)
-  if (session.metadata?.tool_id) {
+  // Check if this is an ai_applications upgrade (has source: ai_applications in metadata)
+  if (session.metadata?.source === 'ai_applications' || session.metadata?.listing_type) {
+    await handleAIApplicationsCheckout(session)
+    return
+  }
+
+  // Check if this is a legacy tools directory subscription (has metadata with tool_id but no source)
+  if (session.metadata?.tool_id && !session.metadata?.listing_type) {
     await handleToolsDirectoryCheckout(session)
     return
   }
 
+  // Otherwise, handle as event submission
+  await handleEventSubmissionCheckout(session, sessionId)
+}
+
+/**
+ * Handle AI Applications checkout (new system)
+ * Updates ai_applications table with is_featured, listing_type, etc.
+ */
+async function handleAIApplicationsCheckout(session: any) {
+  const toolId = session.metadata?.tool_id
+  const listingType = session.metadata?.listing_type || 'paid_placement'
+  const billingPeriod = session.metadata?.billing_period || 'monthly'
+  const subscriptionId = session.subscription
+  const customerId = session.customer
+
+  console.log(`[Webhook] Processing AI applications checkout for tool: ${toolId}, type: ${listingType}`)
+
+  if (!toolId) {
+    console.error('[Webhook] Missing tool_id in session metadata')
+    throw new Error('Missing tool_id in session metadata')
+  }
+
+  // Calculate sponsor dates
+  const sponsorStartDate = new Date()
+  const sponsorEndDate = new Date(sponsorStartDate)
+  if (billingPeriod === 'yearly') {
+    sponsorEndDate.setFullYear(sponsorEndDate.getFullYear() + 1)
+  } else {
+    sponsorEndDate.setMonth(sponsorEndDate.getMonth() + 1)
+  }
+
+  // Update the tool with subscription info
+  const { error: updateError } = await supabaseAdmin
+    .from('ai_applications')
+    .update({
+      is_paid_placement: listingType === 'paid_placement',
+      is_featured: listingType === 'featured',
+      listing_type: listingType,
+      billing_period: billingPeriod,
+      stripe_subscription_id: subscriptionId,
+      stripe_customer_id: customerId,
+      stripe_payment_id: session.id,
+      sponsor_start_date: sponsorStartDate.toISOString(),
+      sponsor_end_date: sponsorEndDate.toISOString()
+    })
+    .eq('id', toolId)
+    .eq('publication_id', PUBLICATION_ID)
+
+  if (updateError) {
+    console.error('[Webhook] Failed to update ai_applications after payment:', updateError)
+    throw updateError
+  }
+
+  // Send Slack notification
+  const { data: tool } = await supabaseAdmin
+    .from('ai_applications')
+    .select('app_name, submitter_email, category')
+    .eq('id', toolId)
+    .single()
+
+  if (tool) {
+    const slack = new SlackNotificationService()
+    const listingLabel = listingType === 'featured' ? 'Featured' : 'Paid Placement'
+    const periodLabel = billingPeriod === 'yearly' ? 'yearly' : 'monthly'
+    await slack.sendSimpleMessage(
+      `🛠️ New ${listingLabel} Tool Listing!\n\n` +
+      `Tool: ${tool.app_name}\n` +
+      `Category: ${tool.category}\n` +
+      `Plan: ${listingLabel} (${periodLabel})\n` +
+      `Email: ${tool.submitter_email}\n` +
+      `Subscription ID: ${subscriptionId}`
+    )
+  }
+
+  console.log(`[Webhook] Successfully activated ${listingType} listing for tool: ${toolId}`)
+}
+
+/**
+ * Handle legacy tools directory checkout session completion
+ * Called when a user pays for a sponsored listing (old system)
+ */
+async function handleToolsDirectoryCheckout(session: any) {
+  const toolId = session.metadata?.tool_id
+  const plan = session.metadata?.plan || 'monthly'
+  const subscriptionId = session.subscription
+  const customerId = session.customer
+
+  console.log(`[Webhook] Processing legacy tools directory checkout for tool: ${toolId}`)
+
+  if (!toolId) {
+    console.error('[Webhook] Missing tool_id in session metadata')
+    throw new Error('Missing tool_id in session metadata')
+  }
+
+  // Update the tool with subscription info
+  const { error: updateError } = await supabaseAdmin
+    .from('tools_directory')
+    .update({
+      is_sponsored: true,
+      plan: plan,
+      stripe_subscription_id: subscriptionId,
+      stripe_customer_id: customerId,
+      stripe_payment_id: session.id,
+      sponsor_start_date: new Date().toISOString()
+    })
+    .eq('id', toolId)
+
+  if (updateError) {
+    console.error('[Webhook] Failed to update tool after payment:', updateError)
+    throw updateError
+  }
+
+  // Send Slack notification
+  const { data: tool } = await supabaseAdmin
+    .from('tools_directory')
+    .select('tool_name, submitter_email')
+    .eq('id', toolId)
+    .single()
+
+  if (tool) {
+    const slack = new SlackNotificationService()
+    const planLabel = plan === 'yearly' ? '$250/year' : '$30/month'
+    await slack.sendSimpleMessage(
+      `🛠️ New Sponsored Tool Listing (Legacy)!\n\n` +
+      `Tool: ${tool.tool_name}\n` +
+      `Plan: ${planLabel}\n` +
+      `Email: ${tool.submitter_email}\n` +
+      `Subscription ID: ${subscriptionId}`
+    )
+  }
+
+  console.log(`[Webhook] Successfully activated sponsored listing for tool: ${toolId}`)
+}
+
+/**
+ * Handle event submission checkout
+ */
+async function handleEventSubmissionCheckout(session: any, sessionId: string) {
   // Retrieve the pending submission
   const { data: pendingSubmission, error: fetchError } = await supabaseAdmin
     .from('pending_event_submissions')
@@ -182,7 +328,6 @@ async function handleCheckoutSessionCompleted(session: any) {
 
       if (deactivateError) {
         console.error('[Webhook] Error deactivating original event:', deactivateError)
-        // Don't throw - continue with creating the promoted event
       } else {
         console.log(`[Webhook] Successfully deactivated original event ${event.existing_event_id}`)
       }
@@ -191,7 +336,6 @@ async function handleCheckoutSessionCompleted(session: any) {
     // Fix malformed timestamps (remove extra :00 at the end)
     const fixTimestamp = (timestamp: string) => {
       if (!timestamp) return timestamp
-      // Fix format like "2025-10-08T15:15:00:00" to "2025-10-08T15:15:00"
       return timestamp.replace(/T(\d{2}:\d{2}:\d{2}):\d{2}$/, 'T$1')
     }
 
@@ -269,172 +413,162 @@ async function handleCheckoutSessionCompleted(session: any) {
 
   if (updateError) {
     console.error('[Webhook] Failed to mark submission as processed:', updateError)
-    // Don't throw - events are already inserted
   }
 
   console.log(`[Webhook] Successfully processed ${insertedEvents.length} events`)
 }
 
 /**
- * Handle tools directory checkout session completion
- * Called when a user pays for a sponsored listing
- */
-async function handleToolsDirectoryCheckout(session: any) {
-  const toolId = session.metadata?.tool_id
-  const plan = session.metadata?.plan || 'monthly'
-  const subscriptionId = session.subscription
-  const customerId = session.customer
-
-  console.log(`[Webhook] Processing tools directory checkout for tool: ${toolId}`)
-
-  if (!toolId) {
-    console.error('[Webhook] Missing tool_id in session metadata')
-    throw new Error('Missing tool_id in session metadata')
-  }
-
-  // Update the tool with subscription info
-  const { error: updateError } = await supabaseAdmin
-    .from('tools_directory')
-    .update({
-      is_sponsored: true,
-      plan: plan,
-      stripe_subscription_id: subscriptionId,
-      stripe_customer_id: customerId,
-      stripe_payment_id: session.id,
-      sponsor_start_date: new Date().toISOString()
-    })
-    .eq('id', toolId)
-
-  if (updateError) {
-    console.error('[Webhook] Failed to update tool after payment:', updateError)
-    throw updateError
-  }
-
-  // Send Slack notification
-  const { data: tool } = await supabaseAdmin
-    .from('tools_directory')
-    .select('tool_name, submitter_email')
-    .eq('id', toolId)
-    .single()
-
-  if (tool) {
-    const slack = new SlackNotificationService()
-    const planLabel = plan === 'yearly' ? '$250/year' : '$30/month'
-    await slack.sendSimpleMessage(
-      `🛠️ New Sponsored Tool Listing!\n\n` +
-      `Tool: ${tool.tool_name}\n` +
-      `Plan: ${planLabel}\n` +
-      `Email: ${tool.submitter_email}\n` +
-      `Subscription ID: ${subscriptionId}`
-    )
-  }
-
-  console.log(`[Webhook] Successfully activated sponsored listing for tool: ${toolId}`)
-}
-
-/**
  * Handle subscription cancellation or expiration
- * This is called when:
- * - Customer cancels their subscription
- * - Subscription expires after failed payment retries
- * - Subscription is deleted via Stripe dashboard
  */
 async function handleSubscriptionDeleted(subscription: any) {
   const subscriptionId = subscription.id
   console.log(`[Webhook] Processing subscription deletion: ${subscriptionId}`)
 
-  // Find the tool with this subscription
-  const { data: tool, error: fetchError } = await supabaseAdmin
+  // First, try to find in ai_applications (new system)
+  const { data: aiApp } = await supabaseAdmin
+    .from('ai_applications')
+    .select('id, app_name, submitter_email')
+    .eq('stripe_subscription_id', subscriptionId)
+    .single()
+
+  if (aiApp) {
+    // Remove featured/paid status
+    const { error: updateError } = await supabaseAdmin
+      .from('ai_applications')
+      .update({
+        is_featured: false,
+        is_paid_placement: false,
+        listing_type: 'free',
+        sponsor_end_date: new Date().toISOString()
+      })
+      .eq('id', aiApp.id)
+
+    if (updateError) {
+      console.error('[Webhook] Failed to remove paid status from ai_applications:', updateError)
+      throw updateError
+    }
+
+    const slack = new SlackNotificationService()
+    await slack.sendSimpleMessage(
+      `⚠️ Tool Listing Downgraded\n\n` +
+      `Tool: ${aiApp.app_name}\n` +
+      `Email: ${aiApp.submitter_email}\n` +
+      `Subscription: ${subscriptionId}\n\n` +
+      `The listing has been moved to free tier.`
+    )
+
+    console.log(`[Webhook] Removed paid status for ai_application: ${aiApp.app_name}`)
+    return
+  }
+
+  // Fallback: Try legacy tools_directory
+  const { data: tool } = await supabaseAdmin
     .from('tools_directory')
     .select('id, tool_name, submitter_email')
     .eq('stripe_subscription_id', subscriptionId)
     .single()
 
-  if (fetchError || !tool) {
-    // No tool found - might be a different product subscription
-    console.log(`[Webhook] No tools directory entry found for subscription: ${subscriptionId}`)
-    return
-  }
-
-  // Remove sponsored status
-  const { error: updateError } = await supabaseAdmin
-    .from('tools_directory')
-    .update({
-      is_sponsored: false,
-      sponsor_end_date: new Date().toISOString()
-    })
-    .eq('id', tool.id)
-
-  if (updateError) {
-    console.error('[Webhook] Failed to remove sponsored status:', updateError)
-    throw updateError
-  }
-
-  // Send Slack notification
-  const slack = new SlackNotificationService()
-  await slack.sendSimpleMessage(
-    `⚠️ Sponsored Listing Ended\n\n` +
-    `Tool: ${tool.tool_name}\n` +
-    `Email: ${tool.submitter_email}\n` +
-    `Subscription: ${subscriptionId}\n\n` +
-    `The listing has been moved to free tier.`
-  )
-
-  console.log(`[Webhook] Removed sponsored status for tool: ${tool.tool_name}`)
-}
-
-/**
- * Handle subscription updates
- * This is called when:
- * - Plan changes (upgrade/downgrade)
- * - Subscription renews successfully
- * - Payment method updates
- */
-async function handleSubscriptionUpdated(subscription: any) {
-  const subscriptionId = subscription.id
-  const status = subscription.status
-  console.log(`[Webhook] Processing subscription update: ${subscriptionId}, status: ${status}`)
-
-  // Find the tool with this subscription
-  const { data: tool, error: fetchError } = await supabaseAdmin
-    .from('tools_directory')
-    .select('id, tool_name')
-    .eq('stripe_subscription_id', subscriptionId)
-    .single()
-
-  if (fetchError || !tool) {
-    // No tool found - might be a different product subscription
-    console.log(`[Webhook] No tools directory entry found for subscription: ${subscriptionId}`)
-    return
-  }
-
-  // Handle based on subscription status
-  if (status === 'active') {
-    // Subscription is active - ensure tool is sponsored
-    await supabaseAdmin
-      .from('tools_directory')
-      .update({ is_sponsored: true })
-      .eq('id', tool.id)
-    console.log(`[Webhook] Confirmed active subscription for tool: ${tool.tool_name}`)
-  } else if (status === 'past_due' || status === 'unpaid') {
-    // Payment issues - keep sponsored for now, Stripe will retry
-    console.log(`[Webhook] Subscription ${subscriptionId} has status: ${status}, awaiting payment`)
-  } else if (status === 'canceled' || status === 'incomplete_expired') {
-    // Subscription ended - remove sponsored status
-    await supabaseAdmin
+  if (tool) {
+    const { error: updateError } = await supabaseAdmin
       .from('tools_directory')
       .update({
         is_sponsored: false,
         sponsor_end_date: new Date().toISOString()
       })
       .eq('id', tool.id)
-    console.log(`[Webhook] Removed sponsored status for tool: ${tool.tool_name} (status: ${status})`)
+
+    if (updateError) {
+      console.error('[Webhook] Failed to remove sponsored status:', updateError)
+      throw updateError
+    }
+
+    const slack = new SlackNotificationService()
+    await slack.sendSimpleMessage(
+      `⚠️ Sponsored Listing Ended (Legacy)\n\n` +
+      `Tool: ${tool.tool_name}\n` +
+      `Email: ${tool.submitter_email}\n` +
+      `Subscription: ${subscriptionId}\n\n` +
+      `The listing has been moved to free tier.`
+    )
+
+    console.log(`[Webhook] Removed sponsored status for tool: ${tool.tool_name}`)
+    return
   }
+
+  console.log(`[Webhook] No tool found for subscription: ${subscriptionId}`)
+}
+
+/**
+ * Handle subscription updates
+ */
+async function handleSubscriptionUpdated(subscription: any) {
+  const subscriptionId = subscription.id
+  const status = subscription.status
+  console.log(`[Webhook] Processing subscription update: ${subscriptionId}, status: ${status}`)
+
+  // First, try to find in ai_applications (new system)
+  const { data: aiApp } = await supabaseAdmin
+    .from('ai_applications')
+    .select('id, app_name, listing_type')
+    .eq('stripe_subscription_id', subscriptionId)
+    .single()
+
+  if (aiApp) {
+    if (status === 'active') {
+      // Ensure tool has correct paid status
+      console.log(`[Webhook] Confirmed active subscription for ai_application: ${aiApp.app_name}`)
+    } else if (status === 'past_due' || status === 'unpaid') {
+      console.log(`[Webhook] Subscription ${subscriptionId} has status: ${status}, awaiting payment`)
+    } else if (status === 'canceled' || status === 'incomplete_expired') {
+      await supabaseAdmin
+        .from('ai_applications')
+        .update({
+          is_featured: false,
+          is_paid_placement: false,
+          listing_type: 'free',
+          sponsor_end_date: new Date().toISOString()
+        })
+        .eq('id', aiApp.id)
+      console.log(`[Webhook] Removed paid status for ai_application: ${aiApp.app_name} (status: ${status})`)
+    }
+    return
+  }
+
+  // Fallback: Try legacy tools_directory
+  const { data: tool } = await supabaseAdmin
+    .from('tools_directory')
+    .select('id, tool_name')
+    .eq('stripe_subscription_id', subscriptionId)
+    .single()
+
+  if (tool) {
+    if (status === 'active') {
+      await supabaseAdmin
+        .from('tools_directory')
+        .update({ is_sponsored: true })
+        .eq('id', tool.id)
+      console.log(`[Webhook] Confirmed active subscription for tool: ${tool.tool_name}`)
+    } else if (status === 'past_due' || status === 'unpaid') {
+      console.log(`[Webhook] Subscription ${subscriptionId} has status: ${status}, awaiting payment`)
+    } else if (status === 'canceled' || status === 'incomplete_expired') {
+      await supabaseAdmin
+        .from('tools_directory')
+        .update({
+          is_sponsored: false,
+          sponsor_end_date: new Date().toISOString()
+        })
+        .eq('id', tool.id)
+      console.log(`[Webhook] Removed sponsored status for tool: ${tool.tool_name} (status: ${status})`)
+    }
+    return
+  }
+
+  console.log(`[Webhook] No tool found for subscription: ${subscriptionId}`)
 }
 
 /**
  * Handle failed invoice payment
- * Stripe will retry payments automatically, but we log this for visibility
  */
 async function handlePaymentFailed(invoice: any) {
   const subscriptionId = invoice.subscription
@@ -446,7 +580,27 @@ async function handlePaymentFailed(invoice: any) {
     return
   }
 
-  // Find the tool with this subscription
+  // First, try to find in ai_applications (new system)
+  const { data: aiApp } = await supabaseAdmin
+    .from('ai_applications')
+    .select('id, app_name, submitter_email')
+    .eq('stripe_subscription_id', subscriptionId)
+    .single()
+
+  if (aiApp) {
+    const slack = new SlackNotificationService()
+    await slack.sendSimpleMessage(
+      `⚠️ Payment Failed - Tool Listing\n\n` +
+      `Tool: ${aiApp.app_name}\n` +
+      `Email: ${aiApp.submitter_email || customerEmail}\n` +
+      `Subscription: ${subscriptionId}\n\n` +
+      `Stripe will retry the payment automatically.`
+    )
+    console.log(`[Webhook] Notified about payment failure for: ${aiApp.app_name}`)
+    return
+  }
+
+  // Fallback: Try legacy tools_directory
   const { data: tool } = await supabaseAdmin
     .from('tools_directory')
     .select('id, tool_name, submitter_email')
@@ -454,10 +608,9 @@ async function handlePaymentFailed(invoice: any) {
     .single()
 
   if (tool) {
-    // Send Slack notification about payment issue
     const slack = new SlackNotificationService()
     await slack.sendSimpleMessage(
-      `⚠️ Payment Failed - Sponsored Listing\n\n` +
+      `⚠️ Payment Failed - Sponsored Listing (Legacy)\n\n` +
       `Tool: ${tool.tool_name}\n` +
       `Email: ${tool.submitter_email || customerEmail}\n` +
       `Subscription: ${subscriptionId}\n\n` +
