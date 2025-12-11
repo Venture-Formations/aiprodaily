@@ -1932,6 +1932,13 @@ export async function callWithStructuredPrompt(
       const textContent = response.content.find((c: any) => c.type === 'text')
       content = textContent && 'text' in textContent ? textContent.text : ''
 
+      // Debug: Log raw Claude response to check for newlines
+      console.log(`[AI][Claude] Raw response length: ${content.length}`)
+      console.log(`[AI][Claude] Contains \\n: ${content.includes('\n')}`)
+      console.log(`[AI][Claude] Contains \\n\\n: ${content.includes('\n\n')}`)
+      console.log(`[AI][Claude] Contains literal backslash-n: ${content.includes('\\n')}`)
+      console.log(`[AI][Claude] First 500 chars: ${content.substring(0, 500)}`)
+
       if (!content) {
         throw new Error('No response from Claude')
       }
@@ -2060,13 +2067,24 @@ export async function callWithStructuredPrompt(
       }
 
       // Match test endpoint logic exactly - check both match and [0] exists
+      let parsed: any
       if (arrayMatch && Array.isArray(arrayMatch) && arrayMatch[0]) {
-        return JSON.parse(arrayMatch[0])
+        parsed = JSON.parse(arrayMatch[0])
       } else if (objectMatch && Array.isArray(objectMatch) && objectMatch[0]) {
-        return JSON.parse(objectMatch[0])
+        parsed = JSON.parse(objectMatch[0])
       } else {
-        return JSON.parse(cleanedContent.trim())
+        parsed = JSON.parse(cleanedContent.trim())
       }
+
+      // Debug: Log parsed content to check newlines preservation
+      if (parsed && parsed.content) {
+        console.log(`[AI][Parsed] Content length: ${parsed.content.length}`)
+        console.log(`[AI][Parsed] Contains \\n: ${parsed.content.includes('\n')}`)
+        console.log(`[AI][Parsed] Contains \\n\\n: ${parsed.content.includes('\n\n')}`)
+        console.log(`[AI][Parsed] First 300 chars: ${parsed.content.substring(0, 300)}`)
+      }
+
+      return parsed
     } catch (parseError) {
       // Return raw content wrapped in object
       return { raw: content }
