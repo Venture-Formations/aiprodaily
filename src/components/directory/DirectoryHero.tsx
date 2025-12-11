@@ -12,11 +12,6 @@ export function DirectoryHero({ toolCount }: DirectoryHeroProps) {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-gradient-to-r from-blue-100 via-slate-50 to-cyan-100 rounded-full blur-3xl opacity-60 -z-10"></div>
 
       <Container className="relative pt-10 pb-10 text-center lg:pt-16">
-        {/* Social proof badge */}
-        <div className="inline-flex items-center px-5 py-2.5 bg-slate-900 rounded-full mb-8 shadow-sm">
-          <span className="text-sm font-semibold text-white">{toolCount}+ AI tools for accounting professionals</span>
-        </div>
-
         <h1 className="mx-auto max-w-4xl font-display text-4xl font-medium tracking-tight text-slate-900 sm:text-6xl">
           Discover{' '}
           <span className="relative whitespace-nowrap">

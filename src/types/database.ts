@@ -38,7 +38,7 @@ export type NewsletterSetting = PublicationSetting
 
 // AI Professional Newsletter Features
 export type ToolType = 'Client' | 'Firm'
-export type AIAppCategory = 'Payroll' | 'HR' | 'Accounting System' | 'Finance' | 'Productivity' | 'Client Management' | 'Banking'
+export type AIAppCategory = 'Accounting & Bookkeeping' | 'Tax & Compliance' | 'Payroll' | 'Finance & Analysis' | 'Expense Management' | 'Client Management' | 'Productivity' | 'HR' | 'Banking & Payments'
 
 export type AIAppSubmissionStatus = 'pending' | 'approved' | 'rejected' | 'edited'
 export type AIAppPlan = 'free' | 'monthly' | 'yearly'

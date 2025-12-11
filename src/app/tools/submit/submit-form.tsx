@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop'
@@ -10,8 +10,18 @@ import { getCroppedImage } from '@/utils/imageCrop'
 import type { DirectoryCategory } from '@/lib/directory'
 import type { AIAppCategory } from '@/types/database'
 
+// Listing types
+type ListingType = 'free' | 'paid_placement' | 'featured'
+type BillingPeriod = 'monthly' | 'yearly'
+
 interface SubmitToolFormProps {
   categories: DirectoryCategory[]
+  featuredCategories: string[]
+  pricing: {
+    paidPlacementMonthly: number
+    featuredMonthly: number
+    yearlyDiscountMonths: number
+  }
 }
 
 function centerAspectCrop(
@@ -203,7 +213,7 @@ function ImageUpload({
   )
 }
 
-export function SubmitToolForm({ categories }: SubmitToolFormProps) {
+export function SubmitToolForm({ categories, featuredCategories, pricing }: SubmitToolFormProps) {
   const { user } = useUser()
   const router = useRouter()
 
@@ -215,9 +225,20 @@ export function SubmitToolForm({ categories }: SubmitToolFormProps) {
     email: user?.primaryEmailAddress?.emailAddress || '',
     websiteUrl: '',
     description: '',
-    category: 'Productivity' as AIAppCategory,
-    plan: 'free' as 'free' | 'monthly' | 'yearly'
+    category: 'Accounting & Bookkeeping' as AIAppCategory,
+    listingType: 'free' as ListingType,
+    billingPeriod: 'monthly' as BillingPeriod
   })
+
+  // Check if selected category already has a featured tool
+  const categoryHasFeatured = featuredCategories.includes(formData.category)
+
+  // If user selected featured but category now has one (e.g., after category change), reset to paid_placement
+  useEffect(() => {
+    if (formData.listingType === 'featured' && categoryHasFeatured) {
+      setFormData(prev => ({ ...prev, listingType: 'paid_placement' }))
+    }
+  }, [formData.category, categoryHasFeatured, formData.listingType])
 
   // Image state - separate for logo (1:1) and listing (16:9)
   const [logoBlob, setLogoBlob] = useState<Blob | null>(null)
@@ -233,6 +254,30 @@ export function SubmitToolForm({ categories }: SubmitToolFormProps) {
   const handleListingCropComplete = (blob: Blob) => {
     setListingBlob(blob)
     setListingPreview(URL.createObjectURL(blob))
+  }
+
+  // Calculate pricing
+  const getPrice = () => {
+    if (formData.listingType === 'free') return 0
+
+    const monthlyPrice = formData.listingType === 'featured'
+      ? pricing.featuredMonthly
+      : pricing.paidPlacementMonthly
+
+    if (formData.billingPeriod === 'yearly') {
+      return monthlyPrice * (12 - pricing.yearlyDiscountMonths)
+    }
+    return monthlyPrice
+  }
+
+  const getPriceLabel = () => {
+    if (formData.listingType === 'free') return 'Free'
+
+    const price = getPrice()
+    if (formData.billingPeriod === 'yearly') {
+      return `$${price}/year`
+    }
+    return `$${price}/month`
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -288,9 +333,24 @@ export function SubmitToolForm({ categories }: SubmitToolFormProps) {
         }
       }
 
+      // Convert listing type to plan format for backend
+      const plan = formData.listingType === 'free' ? 'free' :
+        formData.listingType === 'paid_placement' ?
+          (formData.billingPeriod === 'yearly' ? 'paid_placement_yearly' : 'paid_placement_monthly') :
+          (formData.billingPeriod === 'yearly' ? 'featured_yearly' : 'featured_monthly')
+
       // Submit tool with both image filenames
       const result = await addTool(
-        formData,
+        {
+          toolName: formData.toolName,
+          email: formData.email,
+          websiteUrl: formData.websiteUrl,
+          description: formData.description,
+          category: formData.category,
+          plan: plan as any, // Will be updated to support new plan types
+          listingType: formData.listingType,
+          billingPeriod: formData.billingPeriod
+        },
         user?.id || null,
         listingFileName, // screenshot_url (16:9 listing image)
         user?.fullName || 'Anonymous',
@@ -303,8 +363,12 @@ export function SubmitToolForm({ categories }: SubmitToolFormProps) {
       }
 
       // If paid plan, redirect to Stripe
-      if (formData.plan !== 'free' && result.tool) {
-        const checkoutUrl = await createCheckoutSession(result.tool.id, formData.plan)
+      if (formData.listingType !== 'free' && result.tool) {
+        const checkoutUrl = await createCheckoutSession(
+          result.tool.id,
+          formData.listingType,
+          formData.billingPeriod
+        )
         if (checkoutUrl) {
           window.location.href = checkoutUrl
           return
@@ -447,32 +511,120 @@ export function SubmitToolForm({ categories }: SubmitToolFormProps) {
         />
       </div>
 
-      {/* Plan Selection */}
+      {/* Listing Type Selection */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Listing Type
         </label>
         <div className="grid grid-cols-3 gap-4">
-          {(['free', 'monthly', 'yearly'] as const).map(plan => (
+          {/* Free */}
+          <button
+            type="button"
+            onClick={() => setFormData(prev => ({ ...prev, listingType: 'free' }))}
+            disabled={isSubmitting}
+            className={`p-4 rounded-lg border-2 text-center transition-all ${
+              formData.listingType === 'free'
+                ? 'border-green-500 bg-green-50'
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <div className="font-semibold text-gray-900">Free</div>
+            <div className="text-sm text-gray-500">$0</div>
+          </button>
+
+          {/* Paid Placement */}
+          <button
+            type="button"
+            onClick={() => setFormData(prev => ({ ...prev, listingType: 'paid_placement' }))}
+            disabled={isSubmitting}
+            className={`p-4 rounded-lg border-2 text-center transition-all ${
+              formData.listingType === 'paid_placement'
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <div className="font-semibold text-gray-900">Paid Placement</div>
+            <div className="text-sm text-gray-500">${pricing.paidPlacementMonthly}/mo</div>
+          </button>
+
+          {/* Featured */}
+          <button
+            type="button"
+            onClick={() => !categoryHasFeatured && setFormData(prev => ({ ...prev, listingType: 'featured' }))}
+            disabled={isSubmitting || categoryHasFeatured}
+            className={`p-4 rounded-lg border-2 text-center transition-all ${
+              categoryHasFeatured
+                ? 'border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed'
+                : formData.listingType === 'featured'
+                  ? 'border-amber-500 bg-amber-50'
+                  : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <div className={`font-semibold ${categoryHasFeatured ? 'text-gray-400' : 'text-gray-900'}`}>Featured</div>
+            <div className={`text-sm ${categoryHasFeatured ? 'text-gray-400' : 'text-gray-500'}`}>${pricing.featuredMonthly}/mo</div>
+            {categoryHasFeatured && (
+              <div className="text-xs text-amber-600 mt-1">Slot taken</div>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Billing Period Toggle - Only show for paid options */}
+      {formData.listingType !== 'free' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Billing Period
+          </label>
+          <div className="flex gap-4">
             <button
-              key={plan}
               type="button"
-              onClick={() => setFormData(prev => ({ ...prev, plan }))}
+              onClick={() => setFormData(prev => ({ ...prev, billingPeriod: 'monthly' }))}
               disabled={isSubmitting}
-              className={`p-4 rounded-lg border-2 text-center transition-all ${
-                formData.plan === plan
+              className={`flex-1 p-3 rounded-lg border-2 text-center transition-all ${
+                formData.billingPeriod === 'monthly'
                   ? 'border-blue-500 bg-blue-50'
                   : 'border-gray-200 hover:border-gray-300'
               }`}
             >
-              <div className="font-semibold text-gray-900 capitalize">{plan}</div>
+              <div className="font-semibold text-gray-900">Monthly</div>
               <div className="text-sm text-gray-500">
-                {plan === 'free' ? '$0' : plan === 'monthly' ? '$30/mo' : '$250/yr'}
+                ${formData.listingType === 'featured' ? pricing.featuredMonthly : pricing.paidPlacementMonthly}/month
               </div>
             </button>
-          ))}
+
+            <button
+              type="button"
+              onClick={() => setFormData(prev => ({ ...prev, billingPeriod: 'yearly' }))}
+              disabled={isSubmitting}
+              className={`flex-1 p-3 rounded-lg border-2 text-center transition-all ${
+                formData.billingPeriod === 'yearly'
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="font-semibold text-gray-900">Yearly</div>
+              <div className="text-sm text-gray-500">
+                ${(formData.listingType === 'featured' ? pricing.featuredMonthly : pricing.paidPlacementMonthly) * (12 - pricing.yearlyDiscountMonths)}/year
+              </div>
+              <div className="text-xs text-green-600 font-medium">
+                Save {pricing.yearlyDiscountMonths} months
+              </div>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Price Summary */}
+      {formData.listingType !== 'free' && (
+        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+          <div className="flex justify-between items-center">
+            <span className="text-gray-700">
+              {formData.listingType === 'featured' ? 'Featured Listing' : 'Paid Placement'} ({formData.billingPeriod})
+            </span>
+            <span className="text-lg font-semibold text-gray-900">{getPriceLabel()}</span>
+          </div>
+        </div>
+      )}
 
       {/* Submit Button */}
       <button
@@ -489,7 +641,7 @@ export function SubmitToolForm({ categories }: SubmitToolFormProps) {
             Submitting...
           </>
         ) : (
-          formData.plan === 'free' ? 'Submit Tool' : 'Continue to Payment'
+          formData.listingType === 'free' ? 'Submit Tool' : `Continue to Payment (${getPriceLabel()})`
         )}
       </button>
 

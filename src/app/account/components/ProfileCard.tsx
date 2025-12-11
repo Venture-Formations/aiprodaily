@@ -12,9 +12,17 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  XCircle
+  XCircle,
+  Crown
 } from 'lucide-react'
 import { EditProfileModal } from './EditProfileModal'
+
+// Listing type labels
+const listingTypeConfig = {
+  free: { label: 'Free', color: 'text-slate-600' },
+  paid_placement: { label: 'Paid Placement', color: 'text-blue-600' },
+  featured: { label: 'Featured', color: 'text-amber-600' }
+}
 
 // Simplified type for ProfileCard - works with transformed ai_applications data
 interface ProfileTool {
@@ -26,6 +34,9 @@ interface ProfileTool {
   tool_image_url: string | null
   logo_image_url: string | null
   is_sponsored: boolean
+  is_featured?: boolean
+  listing_type?: 'free' | 'paid_placement' | 'featured'
+  billing_period?: 'monthly' | 'yearly' | null
   status: string
   rejection_reason: string | null
   view_count: number
@@ -70,14 +81,21 @@ export function ProfileCard({ tool }: ProfileCardProps) {
   const status = statusConfig[tool.status as keyof typeof statusConfig] || statusConfig.pending
   const StatusIcon = status.icon
 
+  // Determine listing type
+  const listingType = tool.listing_type || (tool.is_featured ? 'featured' : tool.is_sponsored ? 'paid_placement' : 'free')
+  const isPaidListing = listingType !== 'free'
+  const listingConfig = listingTypeConfig[listingType] || listingTypeConfig.free
+
   return (
     <>
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        {/* Header with gradient based on sponsored status */}
+        {/* Header with gradient based on listing type */}
         <div className={`h-32 relative ${
-          tool.is_sponsored
-            ? 'bg-gradient-to-r from-blue-600 to-cyan-500'
-            : 'bg-gradient-to-r from-slate-800 to-slate-600'
+          listingType === 'featured'
+            ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+            : listingType === 'paid_placement'
+              ? 'bg-gradient-to-r from-blue-600 to-cyan-500'
+              : 'bg-gradient-to-r from-slate-800 to-slate-600'
         }`}>
           {/* Tool Image if available */}
           {tool.tool_image_url && (
@@ -88,7 +106,7 @@ export function ProfileCard({ tool }: ProfileCardProps) {
               className="object-cover opacity-30"
             />
           )}
-          
+
           {/* Status Badge */}
           <div className="absolute top-4 right-4">
             <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${status.color}`}>
@@ -97,12 +115,16 @@ export function ProfileCard({ tool }: ProfileCardProps) {
             </span>
           </div>
 
-          {/* Sponsored Badge */}
-          {tool.is_sponsored && (
+          {/* Listing Type Badge */}
+          {isPaidListing && (
             <div className="absolute top-4 left-4">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-white text-slate-900">
-                <Star className="w-4 h-4 fill-current text-amber-500" />
-                Sponsored
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-white text-slate-900`}>
+                {listingType === 'featured' ? (
+                  <Crown className="w-4 h-4 text-amber-500" />
+                ) : (
+                  <Star className="w-4 h-4 text-blue-500" />
+                )}
+                {listingConfig.label}
               </span>
             </div>
           )}
@@ -118,7 +140,11 @@ export function ProfileCard({ tool }: ProfileCardProps) {
                 className="rounded-xl border-4 border-white shadow-lg object-cover"
               />
             ) : (
-              <div className="w-20 h-20 rounded-xl border-4 border-white shadow-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center">
+              <div className={`w-20 h-20 rounded-xl border-4 border-white shadow-lg flex items-center justify-center ${
+                listingType === 'featured'
+                  ? 'bg-gradient-to-br from-amber-500 to-orange-500'
+                  : 'bg-gradient-to-br from-blue-600 to-cyan-500'
+              }`}>
                 <span className="text-white text-3xl font-bold">
                   {tool.tool_name.charAt(0).toUpperCase()}
                 </span>
@@ -166,11 +192,11 @@ export function ProfileCard({ tool }: ProfileCardProps) {
           {/* Status Message */}
           {tool.status !== 'approved' && (
             <div className={`mt-4 p-4 rounded-lg ${
-              tool.status === 'rejected' ? 'bg-red-50' : 
+              tool.status === 'rejected' ? 'bg-red-50' :
               tool.status === 'edited' ? 'bg-blue-50' : 'bg-amber-50'
             }`}>
               <p className={`text-sm ${
-                tool.status === 'rejected' ? 'text-red-700' : 
+                tool.status === 'rejected' ? 'text-red-700' :
                 tool.status === 'edited' ? 'text-blue-700' : 'text-amber-700'
               }`}>
                 {status.description}
@@ -225,20 +251,23 @@ export function ProfileCard({ tool }: ProfileCardProps) {
                 <Star className="w-4 h-4" />
                 <span className="text-xs uppercase tracking-wide">Plan</span>
               </div>
-              <p className="text-2xl font-bold text-slate-900 capitalize">
-                {tool.is_sponsored ? 'Sponsored' : 'Free'}
+              <p className={`text-2xl font-bold ${listingConfig.color}`}>
+                {listingConfig.label}
               </p>
+              {tool.billing_period && (
+                <p className="text-xs text-slate-500 capitalize">{tool.billing_period}</p>
+              )}
             </div>
           </div>
 
-          {/* Upgrade CTA for non-sponsored */}
-          {!tool.is_sponsored && tool.status === 'approved' && (
+          {/* Upgrade CTA for free listings */}
+          {listingType === 'free' && tool.status === 'approved' && (
             <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl border border-blue-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold text-slate-900">Upgrade to Sponsored</h3>
+                  <h3 className="font-semibold text-slate-900">Upgrade Your Listing</h3>
                   <p className="text-sm text-slate-600 mt-1">
-                    Get a sponsored badge, appear at the top of search results, and stand out with a highlighted listing.
+                    Get more visibility with Paid Placement or become the Featured tool in your category.
                   </p>
                 </div>
                 <Link
@@ -250,16 +279,35 @@ export function ProfileCard({ tool }: ProfileCardProps) {
               </div>
             </div>
           )}
+
+          {/* Upgrade to Featured CTA for paid placement listings */}
+          {listingType === 'paid_placement' && tool.status === 'approved' && (
+            <div className="mt-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-slate-900">Upgrade to Featured</h3>
+                  <p className="text-sm text-slate-600 mt-1">
+                    Get the #1 position in your category with a Featured listing.
+                  </p>
+                </div>
+                <Link
+                  href="/account/ads/profile"
+                  className="flex-shrink-0 px-5 py-2.5 bg-amber-500 text-white rounded-full font-medium hover:bg-amber-400 transition-colors"
+                >
+                  Upgrade to Featured
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Edit Modal */}
-      <EditProfileModal 
+      <EditProfileModal
         tool={tool}
-        isOpen={isEditModalOpen} 
-        onClose={() => setIsEditModalOpen(false)} 
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
       />
     </>
   )
 }
-

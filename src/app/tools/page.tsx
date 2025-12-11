@@ -52,13 +52,17 @@ export default async function ToolsDirectoryPage() {
       <DirectoryHero toolCount={tools.length} />
 
       {/* Categories Section */}
-      <section id="categories" className="py-16 bg-slate-50">
-        <Container>
+      <section id="categories" className="py-16 bg-slate-900 relative overflow-hidden">
+        {/* Decorative gradient blur blotches */}
+        <div className="absolute top-0 left-1/4 w-[500px] h-[400px] bg-gradient-to-r from-blue-600/20 to-cyan-500/20 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-1/4 w-[400px] h-[300px] bg-gradient-to-r from-cyan-500/15 to-blue-600/15 rounded-full blur-3xl"></div>
+
+        <Container className="relative">
           <div className="text-center mb-12">
-            <h2 className="font-display text-3xl font-medium tracking-tight text-slate-900 sm:text-4xl">
-              Browse by Category
+            <h2 className="font-display text-3xl font-medium tracking-tight text-white sm:text-4xl">
+              Browse AI Tools by Category
             </h2>
-            <p className="mt-4 text-lg tracking-tight text-slate-700">
+            <p className="mt-4 text-lg tracking-tight text-slate-400">
               Find the perfect AI tool for your specific needs
             </p>
           </div>
@@ -82,6 +86,11 @@ export default async function ToolsDirectoryPage() {
               Explore our curated collection of AI tools for accounting professionals
             </p>
           </div>
+
+          {/* Affiliate Disclosure */}
+          <p className="text-xs text-slate-400 mb-6">
+            Disclosure: Some products in this list include affiliate links or paid placements. We may earn a commission or receive compensation when you click our links or purchase through them.
+          </p>
 
           <ToolsGrid tools={tools} categories={categories} />
         </Container>

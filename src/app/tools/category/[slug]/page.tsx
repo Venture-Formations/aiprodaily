@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ToolCard } from '@/components/directory/ToolCard'
+import type { Metadata } from 'next'
+import { CategoryToolsGrid } from '@/components/directory/CategoryToolsGrid'
 import { getToolsByCategory, getApprovedCategories } from '@/lib/directory'
 import { Container } from '@/components/salient/Container'
 import { Button } from '@/components/salient/Button'
@@ -10,6 +11,28 @@ interface CategoryPageProps {
 }
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
+  const { slug } = await params
+  const { category, tools } = await getToolsByCategory(slug)
+
+  if (!category) {
+    return { title: 'Category Not Found' }
+  }
+
+  const toolCount = tools.length >= 10 ? 10 : tools.length
+  const pageTitle = `${toolCount} Best AI ${category.name} Tools for Accounting`
+
+  return {
+    title: pageTitle,
+    description: category.description || `Discover the best AI ${category.name.toLowerCase()} tools for accounting professionals. Browse our curated directory.`,
+    openGraph: {
+      title: pageTitle,
+      description: category.description || `Discover the best AI ${category.name.toLowerCase()} tools for accounting professionals.`,
+      url: `https://aiaccountingdaily.com/tools/category/${slug}`,
+    },
+  }
+}
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const { slug } = await params
@@ -22,12 +45,16 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   // Get all categories for sidebar
   const allCategories = await getApprovedCategories()
 
+  // Page title for display and SEO
+  const toolCount = tools.length >= 10 ? 10 : tools.length
+  const pageTitle = `${toolCount} Best AI ${category.name} Tools for Accounting`
+
   // JSON-LD structured data for CollectionPage
   const categoryPageSchema = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
-    "name": `${category.name} - AI Tools Directory`,
-    "description": category.description || `Discover AI tools for ${category.name.toLowerCase()}. Browse curated tools for accounting professionals.`,
+    "name": pageTitle,
+    "description": category.description || `Discover the best AI ${category.name.toLowerCase()} tools for accounting professionals. Browse our curated directory.`,
     "url": `https://aiaccountingdaily.com/tools/category/${slug}`,
     "publisher": {
       "@type": "Organization",
@@ -76,7 +103,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
             {/* Header */}
             <div className="mb-8">
               <h1 className="font-display text-3xl font-medium tracking-tight text-slate-900 sm:text-4xl">
-                {category.name}
+                {pageTitle}
               </h1>
               {category.description && (
                 <p className="mt-2 text-lg text-slate-700">{category.description}</p>
@@ -86,13 +113,14 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
               </p>
             </div>
 
+            {/* Affiliate Disclosure */}
+            <p className="text-xs text-slate-400 mb-6">
+              Disclosure: Some products in this list include affiliate links or paid placements. We may earn a commission or receive compensation when you click our links or purchase through them.
+            </p>
+
             {/* Tools List */}
             {tools.length > 0 ? (
-              <div className="flex flex-col gap-4">
-                {tools.map((tool) => (
-                  <ToolCard key={tool.id} tool={tool} />
-                ))}
-              </div>
+              <CategoryToolsGrid tools={tools} />
             ) : (
               <div className="text-center py-12 bg-white rounded-2xl ring-1 ring-slate-900/5">
                 <div className="text-slate-400 mb-4">

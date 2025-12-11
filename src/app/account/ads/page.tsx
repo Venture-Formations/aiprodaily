@@ -2,21 +2,21 @@ import { currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import Link from 'next/link'
-import { Star, Newspaper, ArrowRight, Check, Clock, Calendar } from 'lucide-react'
+import { Star, Newspaper, ArrowRight, Check, Crown } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdsOverviewPage() {
   const user = await currentUser()
-  
+
   if (!user) {
     redirect('/sign-in')
   }
 
-  // Fetch user's tool listing for sponsored status from ai_applications table
+  // Fetch user's tool listing for listing type from ai_applications table
   const { data: tool } = await supabaseAdmin
     .from('ai_applications')
-    .select('id, app_name, is_paid_placement, submission_status, plan')
+    .select('id, app_name, is_paid_placement, is_featured, listing_type, billing_period, submission_status')
     .eq('clerk_user_id', user.id)
     .single()
 
@@ -30,7 +30,9 @@ export default async function AdsOverviewPage() {
     .limit(3)
 
   const hasListing = !!tool
-  const isSponsored = tool?.is_paid_placement || false
+  const listingType = tool?.listing_type || (tool?.is_featured ? 'featured' : tool?.is_paid_placement ? 'paid_placement' : 'free')
+  const isPaidListing = listingType !== 'free'
+  const isFeatured = listingType === 'featured'
   const newsletterAdCount = newsletterAds?.length || 0
 
   return (
@@ -49,15 +51,21 @@ export default async function AdsOverviewPage() {
           <div className="p-6 border-b border-slate-100">
             <div className="flex items-center gap-3">
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                isSponsored
-                  ? 'bg-gradient-to-r from-blue-600 to-cyan-500'
-                  : 'bg-slate-100'
+                isFeatured
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                  : isPaidListing
+                    ? 'bg-gradient-to-r from-blue-600 to-cyan-500'
+                    : 'bg-slate-100'
               }`}>
-                <Star className={`w-6 h-6 ${isSponsored ? 'text-white fill-current' : 'text-slate-400'}`} />
+                {isFeatured ? (
+                  <Crown className="w-6 h-6 text-white" />
+                ) : (
+                  <Star className={`w-6 h-6 ${isPaidListing ? 'text-white fill-current' : 'text-slate-400'}`} />
+                )}
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Tool Profile</h2>
-                <p className="text-sm text-slate-500">Sponsored listing in directory</p>
+                <p className="text-sm text-slate-500">Premium listing in directory</p>
               </div>
             </div>
           </div>
@@ -73,25 +81,40 @@ export default async function AdsOverviewPage() {
                   Submit your tool first →
                 </Link>
               </div>
-            ) : isSponsored ? (
+            ) : isFeatured ? (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-600 rounded-full text-sm font-medium">
+                    <Crown className="w-4 h-4" />
+                    Featured
+                  </span>
+                  <span className="text-sm text-slate-500 capitalize">
+                    {tool.billing_period || 'Monthly'}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-600 mb-4">
+                  Your listing &ldquo;{tool.app_name}&rdquo; has the #1 position in its category.
+                </p>
+              </div>
+            ) : isPaidListing ? (
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full text-sm font-medium">
                     <Check className="w-4 h-4" />
-                    Sponsored Active
+                    Paid Placement
                   </span>
-                  <span className="text-sm text-slate-500">
-                    {tool.plan === 'yearly' ? 'Yearly' : 'Monthly'}
+                  <span className="text-sm text-slate-500 capitalize">
+                    {tool.billing_period || 'Monthly'}
                   </span>
                 </div>
                 <p className="text-sm text-slate-600 mb-4">
-                  Your listing "{tool.app_name}" is featured at the top of the directory.
+                  Your listing &ldquo;{tool.app_name}&rdquo; appears on Page 1 of the directory.
                 </p>
               </div>
             ) : (
               <div>
                 <p className="text-sm text-slate-600 mb-4">
-                  Upgrade "{tool.app_name}" to get priority placement and stand out.
+                  Upgrade &ldquo;{tool.app_name}&rdquo; to get priority placement and stand out.
                 </p>
                 <div className="flex items-center gap-4 text-sm text-slate-500">
                   <span>From $30/mo</span>
@@ -107,7 +130,7 @@ export default async function AdsOverviewPage() {
               href="/account/ads/profile"
               className="flex items-center justify-between text-blue-600 font-medium hover:underline"
             >
-              <span>{isSponsored ? 'Manage Sponsorship' : 'Upgrade to Sponsored'}</span>
+              <span>{isPaidListing ? 'Manage Listing' : 'Upgrade Listing'}</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -169,15 +192,26 @@ export default async function AdsOverviewPage() {
       {/* Quick Stats / Info */}
       <div className="mt-8 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl border border-blue-200 p-6">
         <h3 className="font-semibold text-slate-900 mb-4">Advertising Options</h3>
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-3 gap-6">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
               <Star className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <p className="font-medium text-slate-900">Sponsored Profile</p>
+              <p className="font-medium text-slate-900">Paid Placement</p>
               <p className="text-sm text-slate-600">
-                Monthly subscription. Your tool appears at the top of search results with a sponsored badge.
+                $30/mo. Your tool appears on Page 1 of the directory.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+              <Crown className="w-5 h-5 text-amber-500" />
+            </div>
+            <div>
+              <p className="font-medium text-slate-900">Featured Listing</p>
+              <p className="text-sm text-slate-600">
+                $60/mo. Get the #1 position in your category with premium styling.
               </p>
             </div>
           </div>
@@ -186,7 +220,7 @@ export default async function AdsOverviewPage() {
               <Newspaper className="w-5 h-5 text-cyan-600" />
             </div>
             <div>
-              <p className="font-medium text-slate-900">Newsletter Main Sponsor</p>
+              <p className="font-medium text-slate-900">Newsletter Sponsor</p>
               <p className="text-sm text-slate-600">
                 One-time placement. Your ad appears prominently in a newsletter issue.
               </p>

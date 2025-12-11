@@ -5,13 +5,15 @@ const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf' // AI Accounting D
 
 // Categories derived from AIAppCategory type
 const CATEGORIES: { id: string; name: AIAppCategory; slug: string; description: string }[] = [
-  { id: 'payroll', name: 'Payroll', slug: 'payroll', description: 'AI tools for payroll processing and management' },
-  { id: 'hr', name: 'HR', slug: 'hr', description: 'AI tools for human resources management' },
-  { id: 'accounting-system', name: 'Accounting System', slug: 'accounting-system', description: 'AI-powered accounting software and systems' },
-  { id: 'finance', name: 'Finance', slug: 'finance', description: 'AI tools for financial analysis and planning' },
-  { id: 'productivity', name: 'Productivity', slug: 'productivity', description: 'AI tools to boost productivity' },
-  { id: 'client-management', name: 'Client Management', slug: 'client-management', description: 'AI tools for managing client relationships' },
-  { id: 'banking', name: 'Banking', slug: 'banking', description: 'AI tools for banking and financial services' }
+  { id: 'accounting-bookkeeping', name: 'Accounting & Bookkeeping', slug: 'accounting-bookkeeping', description: 'Discover top AI accounting software and bookkeeping tools that automate journal entries, reconciliations, and financial reporting for accountants and firms.' },
+  { id: 'tax-compliance', name: 'Tax & Compliance', slug: 'tax-compliance', description: 'Find the best AI tax preparation and compliance tools to streamline filing, identify deductions, and stay current with regulations.' },
+  { id: 'payroll', name: 'Payroll', slug: 'payroll', description: 'Browse top AI payroll solutions that automate wage calculations, tax withholdings, direct deposits, and compliance reporting.' },
+  { id: 'finance-analysis', name: 'Finance & Analysis', slug: 'finance-analysis', description: 'Explore the best AI financial planning and analysis tools for forecasting, budgeting, cash flow management, and data-driven decisions.' },
+  { id: 'expense-management', name: 'Expense Management', slug: 'expense-management', description: 'Find top AI expense tracking tools that automate receipt capture, categorization, reimbursements, and spend analytics.' },
+  { id: 'client-management', name: 'Client Management', slug: 'client-management', description: 'Discover the best AI-powered CRM and client portal solutions for accounting firms to manage relationships and workflows.' },
+  { id: 'productivity', name: 'Productivity', slug: 'productivity', description: 'Browse top AI productivity tools that help accountants automate repetitive tasks, manage documents, and work smarter.' },
+  { id: 'hr', name: 'HR', slug: 'hr', description: 'Find the best AI human resources tools for recruiting, onboarding, employee management, and HR compliance.' },
+  { id: 'banking-payments', name: 'Banking & Payments', slug: 'banking-payments', description: 'Explore top AI banking integrations and payment tools for automated bank feeds, invoicing, and receivables management.' }
 ]
 
 export interface DirectoryApp extends AIApplication {
@@ -230,4 +232,31 @@ export async function incrementToolViews(toolId: string): Promise<void> {
  */
 export async function incrementToolClicks(toolId: string): Promise<void> {
   return incrementToolViews(toolId)
+}
+
+/**
+ * Get categories that already have a featured tool
+ * Returns a Set of category names that have featured tools
+ */
+export async function getCategoriesWithFeaturedTools(): Promise<Set<string>> {
+  const { data: featuredTools, error } = await supabaseAdmin
+    .from('ai_applications')
+    .select('category')
+    .eq('publication_id', PUBLICATION_ID)
+    .eq('is_active', true)
+    .eq('is_featured', true)
+
+  if (error) {
+    console.error('[Directory] Error fetching featured tools:', error)
+    return new Set()
+  }
+
+  const categoriesWithFeatured = new Set<string>()
+  featuredTools?.forEach(tool => {
+    if (tool.category) {
+      categoriesWithFeatured.add(tool.category)
+    }
+  })
+
+  return categoriesWithFeatured
 }

@@ -14,13 +14,27 @@ const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY)
   : null
 
+// Pricing constants (in cents for Stripe, display in dollars)
+const PRICING = {
+  paid_placement_monthly: 30,
+  paid_placement_yearly: 300, // 10 months (2 free)
+  featured_monthly: 60,
+  featured_yearly: 600, // 10 months (2 free)
+}
+
+// Listing types
+type ListingType = 'free' | 'paid_placement' | 'featured'
+type BillingPeriod = 'monthly' | 'yearly'
+
 export interface AddToolData {
   toolName: string
   email: string
   websiteUrl: string
   description: string
   category: AIAppCategory
-  plan: 'free' | 'monthly' | 'yearly'
+  plan: string // Legacy field, will be derived from listingType + billingPeriod
+  listingType?: ListingType
+  billingPeriod?: BillingPeriod
 }
 
 /**
@@ -47,6 +61,11 @@ export async function addTool(
       return { error: 'A tool with this website URL already exists' }
     }
 
+    // Determine listing type and featured status
+    const listingType = data.listingType || 'free'
+    const isFeatured = listingType === 'featured'
+    const isPaidPlacement = listingType === 'paid_placement'
+
     // Insert the tool into ai_applications
     const { data: tool, error: insertError } = await supabaseAdmin
       .from('ai_applications')
@@ -59,8 +78,8 @@ export async function addTool(
         screenshot_url: listingImageFileName ? `${SUPABASE_STORAGE_URL}${listingImageFileName}` : null,
         logo_url: logoImageFileName ? `${SUPABASE_STORAGE_URL}${logoImageFileName}` : null,
         is_active: false, // Pending review
-        is_featured: false,
-        is_paid_placement: data.plan !== 'free',
+        is_featured: isFeatured,
+        is_paid_placement: isPaidPlacement,
         is_affiliate: false,
         tool_type: 'Client',
         category_priority: 0,
@@ -72,6 +91,8 @@ export async function addTool(
         submitter_image_url: submitterImageUrl,
         submission_status: 'pending',
         plan: data.plan,
+        listing_type: listingType,
+        billing_period: data.billingPeriod || null,
         view_count: 0,
         click_count: 0
       })
@@ -92,44 +113,91 @@ export async function addTool(
 }
 
 /**
- * Create Stripe checkout session for sponsored listing
+ * Create Stripe checkout session for paid listing
  */
 export async function createCheckoutSession(
   toolId: string,
-  plan: 'monthly' | 'yearly'
+  listingType: ListingType,
+  billingPeriod: BillingPeriod
 ): Promise<string | null> {
   if (!stripe) {
     console.error('[Directory] Stripe not configured')
     return null
   }
 
-  const priceId = plan === 'monthly'
+  // Determine the correct price ID based on listing type and billing period
+  const priceKey = `${listingType}_${billingPeriod}` as keyof typeof PRICING
+  const amount = PRICING[priceKey]
+
+  if (!amount) {
+    console.error('[Directory] Invalid listing type or billing period')
+    return null
+  }
+
+  // Get the appropriate Stripe price ID from env vars
+  // Format: STRIPE_PRICE_PAID_PLACEMENT_MONTHLY, STRIPE_PRICE_FEATURED_YEARLY, etc.
+  const priceEnvKey = `STRIPE_PRICE_${listingType.toUpperCase()}_${billingPeriod.toUpperCase()}`
+  const priceId = process.env[priceEnvKey]
+
+  // If no specific price ID, try the legacy ones
+  const legacyPriceId = billingPeriod === 'monthly'
     ? process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY
     : process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY
 
-  if (!priceId) {
-    console.error('[Directory] Stripe price ID not configured')
-    return null
-  }
+  const finalPriceId = priceId || legacyPriceId
 
   try {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
+    // If we have a price ID (subscription), use that
+    if (finalPriceId) {
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price: finalPriceId,
+            quantity: 1
+          }
+        ],
+        mode: 'subscription',
+        metadata: {
+          tool_id: toolId,
+          listing_type: listingType,
+          billing_period: billingPeriod
+        },
+        success_url: `${baseUrl}/tools/success?tool_id=${toolId}&listing_type=${listingType}&billing_period=${billingPeriod}`,
+        cancel_url: `${baseUrl}/tools/submit`
+      })
+
+      return session.url
+    }
+
+    // Fallback: Create a one-time payment session with price_data
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
-          price: priceId,
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `${listingType === 'featured' ? 'Featured' : 'Paid Placement'} Listing (${billingPeriod})`,
+              description: `AI Tools Directory ${listingType === 'featured' ? 'Featured' : 'Paid Placement'} listing`
+            },
+            unit_amount: amount * 100, // Convert to cents
+            recurring: {
+              interval: billingPeriod === 'monthly' ? 'month' : 'year'
+            }
+          },
           quantity: 1
         }
       ],
       mode: 'subscription',
-      // Include tool_id and plan in metadata for webhook processing
       metadata: {
         tool_id: toolId,
-        plan: plan
+        listing_type: listingType,
+        billing_period: billingPeriod
       },
-      success_url: `${baseUrl}/tools/success?tool_id=${toolId}&plan=${plan}`,
+      success_url: `${baseUrl}/tools/success?tool_id=${toolId}&listing_type=${listingType}&billing_period=${billingPeriod}`,
       cancel_url: `${baseUrl}/tools/submit`
     })
 
@@ -143,25 +211,29 @@ export async function createCheckoutSession(
 /**
  * Handle successful payment - update tool status
  */
-export async function handlePaymentSuccess(toolId: string, plan: string) {
+export async function handlePaymentSuccess(
+  toolId: string,
+  listingType: string,
+  billingPeriod: string
+) {
   // Check if already updated by webhook
   const { data: tool } = await supabaseAdmin
     .from('ai_applications')
-    .select('is_paid_placement, sponsor_start_date')
+    .select('is_paid_placement, is_featured, sponsor_start_date')
     .eq('id', toolId)
     .single()
 
   // If webhook already processed this, just revalidate
-  if (tool?.is_paid_placement && tool?.sponsor_start_date) {
+  if (tool?.sponsor_start_date && (tool?.is_paid_placement || tool?.is_featured)) {
     console.log('[Directory] Tool already updated by webhook')
     revalidatePath('/tools')
     return { error: null }
   }
 
-  // Calculate sponsor end date based on plan
+  // Calculate sponsor end date based on billing period
   const sponsorStartDate = new Date()
   const sponsorEndDate = new Date(sponsorStartDate)
-  if (plan === 'yearly') {
+  if (billingPeriod === 'yearly') {
     sponsorEndDate.setFullYear(sponsorEndDate.getFullYear() + 1)
   } else {
     sponsorEndDate.setMonth(sponsorEndDate.getMonth() + 1)
@@ -171,8 +243,10 @@ export async function handlePaymentSuccess(toolId: string, plan: string) {
   const { error } = await supabaseAdmin
     .from('ai_applications')
     .update({
-      is_paid_placement: true,
-      plan: plan as 'monthly' | 'yearly',
+      is_paid_placement: listingType === 'paid_placement',
+      is_featured: listingType === 'featured',
+      listing_type: listingType,
+      billing_period: billingPeriod,
       sponsor_start_date: sponsorStartDate.toISOString(),
       sponsor_end_date: sponsorEndDate.toISOString()
     })

@@ -66,8 +66,8 @@ export async function POST(request: NextRequest) {
 
     // Validate categories
     const validCategories: AIAppCategory[] = [
-      'Payroll', 'HR', 'Accounting System', 'Finance',
-      'Productivity', 'Client Management', 'Banking'
+      'Accounting & Bookkeeping', 'Tax & Compliance', 'Payroll', 'Finance & Analysis',
+      'Expense Management', 'Client Management', 'Productivity', 'HR', 'Banking & Payments'
     ]
     const validToolTypes: ToolType[] = ['Client', 'Firm']
 

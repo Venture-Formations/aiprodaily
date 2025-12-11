@@ -7,16 +7,17 @@ interface ToolCardProps {
 }
 
 // Generate a consistent color based on the tool name
+// Colors based on Salient Tailwind template palette
 function getColorFromName(name: string): string {
   const colors = [
-    'bg-blue-500',
-    'bg-green-500',
-    'bg-purple-500',
-    'bg-orange-500',
-    'bg-pink-500',
-    'bg-teal-500',
-    'bg-indigo-500',
-    'bg-red-500',
+    'bg-blue-600',      // Primary blue
+    'bg-slate-700',     // Dark slate
+    'bg-blue-500',      // Lighter blue
+    'bg-slate-600',     // Medium slate
+    'bg-blue-800',      // Deep blue
+    'bg-slate-800',     // Darker slate
+    'bg-blue-700',      // Mid blue
+    'bg-slate-500',     // Light slate
   ]
   let hash = 0
   for (let i = 0; i < name.length; i++) {
@@ -33,7 +34,7 @@ export function ToolCard({ tool }: ToolCardProps) {
 
   return (
     <Link href={`/tools/${tool.id}`}>
-      <div className={`group flex items-center gap-4 bg-white rounded-2xl shadow-sm ring-1 transition-all duration-200 overflow-hidden p-4 ${
+      <div className={`group relative flex items-center gap-4 bg-white rounded-2xl shadow-sm ring-1 transition-all duration-200 overflow-hidden p-4 ${
         tool.is_featured ? 'ring-2 ring-blue-500' : 'ring-slate-900/5 hover:shadow-lg hover:ring-blue-500/20'
       }`}>
         {/* Logo Image - Square */}
@@ -61,11 +62,6 @@ export function ToolCard({ tool }: ToolCardProps) {
             <h3 className="font-semibold text-lg text-slate-900 group-hover:text-blue-600 transition-colors truncate">
               {tool.tool_name}
             </h3>
-            {tool.is_sponsored && (
-              <span className="flex-shrink-0 bg-orange-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
-                Sponsored
-              </span>
-            )}
           </div>
 
           <p className="text-sm text-slate-600 mt-1 line-clamp-2">
@@ -94,6 +90,13 @@ export function ToolCard({ tool }: ToolCardProps) {
             )}
           </div>
         </div>
+
+        {/* Paid Placement - Bottom Right Corner */}
+        {tool.is_sponsored && (
+          <span className="absolute bottom-3 right-3 text-sm text-slate-500">
+            Paid Placement
+          </span>
+        )}
       </div>
     </Link>
   )
