@@ -63,9 +63,12 @@ export default async function ToolsLayout({
   const settings = await getPublicationSettingsByDomain(host, [
     'newsletter_name',
     'logo_url',
+    'website_header_url',
     'business_name'
   ])
 
+  // Use website_header_url for header (same as /website pages), logo_url for footer
+  const headerLogoUrl = settings.website_header_url || settings.logo_url || '/logo.png'
   const logoUrl = settings.logo_url || '/logo.png'
   const newsletterName = settings.newsletter_name || 'AI Accounting Daily'
   const businessName = settings.business_name || 'AI Accounting Daily'
@@ -107,7 +110,7 @@ export default async function ToolsLayout({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
       />
       <div className="min-h-screen flex flex-col">
-        <DirectoryHeader logoUrl={logoUrl} newsletterName={newsletterName} />
+        <DirectoryHeader logoUrl={headerLogoUrl} newsletterName={newsletterName} />
         <main className="flex-1">
           {children}
         </main>
