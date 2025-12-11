@@ -408,6 +408,11 @@ export class RSSProcessor {
             return
           }
 
+          // Debug: Check if content has newlines before save
+          console.log(`[Bodies] Content has \\n: ${bodyResult.content.includes('\n')}`)
+          console.log(`[Bodies] Content has \\n\\n: ${bodyResult.content.includes('\n\n')}`)
+          console.log(`[Bodies] Content preview: ${bodyResult.content.substring(0, 200)}`)
+
           // Update article with body
           await supabaseAdmin
             .from(tableName)
