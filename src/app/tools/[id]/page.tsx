@@ -91,7 +91,7 @@ export default async function ToolDetailPage({ params }: ToolDetailPageProps) {
           <div className="lg:col-span-2 space-y-8">
             {/* Hero */}
             <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-900/5 overflow-hidden">
-              <div className="relative h-64 md:h-80 bg-slate-100">
+              <div className="relative aspect-video bg-slate-100">
                 <Image
                   src={heroImageUrl}
                   alt={tool.tool_name}
