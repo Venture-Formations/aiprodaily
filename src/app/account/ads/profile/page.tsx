@@ -22,12 +22,18 @@ export default async function ToolProfileAdsPage() {
   }
 
   // Fetch user's tool listing from ai_applications table
-  const { data: tool } = await supabaseAdmin
+  const { data: tool, error } = await supabaseAdmin
     .from('ai_applications')
     .select('id, app_name, category, is_paid_placement, is_featured, listing_type, billing_period, submission_status, plan, view_count, click_count')
     .eq('clerk_user_id', user.id)
     .eq('publication_id', PUBLICATION_ID)
     .single()
+
+  // Debug logging
+  console.log('[Account/Ads/Profile] Clerk user ID:', user.id)
+  console.log('[Account/Ads/Profile] Publication ID:', PUBLICATION_ID)
+  console.log('[Account/Ads/Profile] Tool found:', tool)
+  console.log('[Account/Ads/Profile] Error:', error)
 
   // Get categories with featured tools
   const categoriesWithFeatured = await getCategoriesWithFeaturedTools()

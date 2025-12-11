@@ -37,10 +37,10 @@ export default async function AccountPage() {
     .single()
 
   // Debug logging
-  if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned, which is fine
-    console.log('[Account] Clerk user ID:', user.id)
-    console.log('[Account] Query error:', error)
-  }
+  console.log('[Account] Clerk user ID:', user.id)
+  console.log('[Account] Publication ID:', PUBLICATION_ID)
+  console.log('[Account] App found:', app ? { id: app.id, app_name: app.app_name } : null)
+  console.log('[Account] Error:', error)
 
   // Transform ai_applications data to match DirectoryTool format for ProfileCard
   const toolWithCategories = app ? {

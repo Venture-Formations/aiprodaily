@@ -16,12 +16,18 @@ export default async function AdsOverviewPage() {
   }
 
   // Fetch user's tool listing for listing type from ai_applications table
-  const { data: tool } = await supabaseAdmin
+  const { data: tool, error } = await supabaseAdmin
     .from('ai_applications')
     .select('id, app_name, is_paid_placement, is_featured, listing_type, billing_period, submission_status')
     .eq('clerk_user_id', user.id)
     .eq('publication_id', PUBLICATION_ID)
     .single()
+
+  // Debug logging
+  console.log('[Account/Ads] Clerk user ID:', user.id)
+  console.log('[Account/Ads] Publication ID:', PUBLICATION_ID)
+  console.log('[Account/Ads] Tool found:', tool)
+  console.log('[Account/Ads] Error:', error)
 
   const hasListing = !!tool
   const listingType = tool?.listing_type || (tool?.is_featured ? 'featured' : tool?.is_paid_placement ? 'paid_placement' : 'free')
