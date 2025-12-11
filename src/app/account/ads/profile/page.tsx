@@ -40,6 +40,7 @@ export default async function ToolProfileAdsPage() {
   const listingType = tool?.is_featured ? 'featured' : tool?.is_paid_placement ? 'paid_placement' : 'free'
   const isPaidListing = listingType !== 'free'
   const isFeatured = listingType === 'featured'
+  // Only show billing period if it's monthly or yearly (not 'free' or null)
   const billingPeriod = tool?.plan === 'yearly' ? 'Yearly' : tool?.plan === 'monthly' ? 'Monthly' : null
 
   // Check if user's category already has a featured tool (and it's not theirs)
@@ -91,18 +92,22 @@ export default async function ToolProfileAdsPage() {
                         <Crown className="w-4 h-4" />
                         Featured
                       </span>
-                      <span className="text-sm text-slate-500 capitalize">
-                        {billingPeriod || 'Free'} Plan
-                      </span>
+                      {billingPeriod && (
+                        <span className="text-sm text-slate-500">
+                          {billingPeriod} Billing
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
-                <Link
-                  href="/account/billing"
-                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
-                >
-                  Manage Subscription
-                </Link>
+                {billingPeriod && (
+                  <Link
+                    href="/account/billing"
+                    className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
+                  >
+                    Manage Subscription
+                  </Link>
+                )}
               </div>
 
               {/* Stats */}
@@ -190,18 +195,22 @@ export default async function ToolProfileAdsPage() {
                         <Star className="w-4 h-4 fill-current" />
                         Paid Placement
                       </span>
-                      <span className="text-sm text-slate-500 capitalize">
-                        {billingPeriod || 'Free'} Plan
-                      </span>
+                      {billingPeriod && (
+                        <span className="text-sm text-slate-500">
+                          {billingPeriod} Billing
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
-                <Link
-                  href="/account/billing"
-                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
-                >
-                  Manage Subscription
-                </Link>
+                {billingPeriod && (
+                  <Link
+                    href="/account/billing"
+                    className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
+                  >
+                    Manage Subscription
+                  </Link>
+                )}
               </div>
 
               {/* Stats */}
