@@ -119,8 +119,11 @@ export default async function AdsOverviewPage() {
                     Free Listing
                   </span>
                 </div>
-                <p className="text-sm text-slate-600 mb-4">
-                  &ldquo;{tool.app_name}&rdquo; is listed in the directory. Upgrade to Featured for the #1 position in your category.
+                <p className="text-sm text-slate-600 mb-2">
+                  &ldquo;{tool.app_name}&rdquo; is listed in the directory.
+                </p>
+                <p className="text-sm font-bold text-slate-900">
+                  Upgrade to Featured for the #1 position in your category.
                 </p>
               </div>
             )}
