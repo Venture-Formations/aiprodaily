@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { supabaseAdmin } from '@/lib/supabase'
-import { MailerLiteService } from '@/lib/mailerlite'
+import { SendGridService } from '@/lib/sendgrid'
 import { newsletterArchiver } from '@/lib/newsletter-archiver'
 
 interface RouteParams {
@@ -54,18 +54,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }, { status: 400 })
     }
 
-    const mailerLiteService = new MailerLiteService()
+    const sendGridService = new SendGridService()
 
-    // Get main group ID from environment (for now - later can be from settings)
-    const mainGroupId = process.env.MAILERLITE_MAIN_GROUP_ID
+    const result = await sendGridService.createFinalCampaign(issue)
 
-    if (!mainGroupId) {
-      return NextResponse.json({
-        error: 'Main group ID not configured'
-      }, { status: 500 })
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to create SendGrid campaign')
     }
 
-    const result = await mailerLiteService.createFinalissue(issue, mainGroupId)
+    console.log('SendGrid campaign created:', result.campaignId)
 
     // Record advertisement usage and advance rotation
     try {
@@ -120,15 +117,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             user_id: user.id,
             issue_id: id,
             action: 'final_issue_sent',
-            details: { mailerlite_issue_id: result.issueId }
+            details: { sendgrid_campaign_id: result.campaignId }
           }])
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Final issue scheduled successfully',
-      mailerlite_issue_id: result.issueId
+      message: 'Final campaign scheduled successfully via SendGrid',
+      sendgrid_campaign_id: result.campaignId
     })
 
   } catch (error) {

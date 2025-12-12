@@ -1129,10 +1129,22 @@ function Notifications() {
 
 function EmailSettings() {
   const [settings, setSettings] = useState({
+    // Email Provider Toggle
+    emailProvider: 'mailerlite' as 'mailerlite' | 'sendgrid',
+
     // MailerLite Settings
-    reviewGroupId: '',
-    mainGroupId: '',
-    secondaryGroupId: '',
+    mailerliteReviewGroupId: '',
+    mailerliteMainGroupId: '',
+    mailerliteSecondaryGroupId: '',
+
+    // SendGrid Settings
+    sendgridReviewListId: '',
+    sendgridMainListId: '',
+    sendgridSecondaryListId: '',
+    sendgridSenderId: '',
+    sendgridUnsubscribeGroupId: '',
+
+    // Common Email Settings
     fromEmail: 'scoop@stcscoop.com',
     senderName: 'St. Cloud Scoop',
 
@@ -1413,50 +1425,61 @@ function EmailSettings() {
 
   return (
     <div className="space-y-6">
-      {/* MailerLite Configuration */}
+      {/* Email Provider Selection */}
       <div className="bg-white shadow rounded-lg p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">MailerLite Configuration</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Email Service Provider</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          Choose which email service provider to use for sending newsletters. Configure both providers below to enable easy switching.
+        </p>
+
+        <div className="flex items-center space-x-4">
+          <button
+            type="button"
+            onClick={() => handleChange('emailProvider', 'mailerlite')}
+            className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all ${
+              settings.emailProvider === 'mailerlite'
+                ? 'border-brand-primary bg-brand-primary/10 text-brand-primary font-medium'
+                : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+            }`}
+          >
+            <div className="flex items-center justify-center space-x-2">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+              </svg>
+              <span>MailerLite</span>
+            </div>
+            {settings.emailProvider === 'mailerlite' && (
+              <div className="text-xs mt-1 text-brand-primary">Active Provider</div>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleChange('emailProvider', 'sendgrid')}
+            className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all ${
+              settings.emailProvider === 'sendgrid'
+                ? 'border-brand-primary bg-brand-primary/10 text-brand-primary font-medium'
+                : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+            }`}
+          >
+            <div className="flex items-center justify-center space-x-2">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+              </svg>
+              <span>SendGrid</span>
+            </div>
+            {settings.emailProvider === 'sendgrid' && (
+              <div className="text-xs mt-1 text-brand-primary">Active Provider</div>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Common Email Settings */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Sender Settings</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Review Group ID
-            </label>
-            <input
-              type="text"
-              value={settings.reviewGroupId}
-              onChange={(e) => handleChange('reviewGroupId', e.target.value)}
-              placeholder="Group ID for review emails"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Main Group ID
-            </label>
-            <input
-              type="text"
-              value={settings.mainGroupId}
-              onChange={(e) => handleChange('mainGroupId', e.target.value)}
-              placeholder="Group ID for main newsletter"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Secondary Group ID
-            </label>
-            <input
-              type="text"
-              value={settings.secondaryGroupId}
-              onChange={(e) => handleChange('secondaryGroupId', e.target.value)}
-              placeholder="Group ID for secondary sends"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
-            />
-          </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               From Email
@@ -1477,6 +1500,138 @@ function EmailSettings() {
               type="text"
               value={settings.senderName}
               onChange={(e) => handleChange('senderName', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* MailerLite Configuration */}
+      <div className={`bg-white shadow rounded-lg p-6 ${settings.emailProvider !== 'mailerlite' ? 'opacity-60' : ''}`}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-gray-900">MailerLite Configuration</h3>
+          {settings.emailProvider === 'mailerlite' && (
+            <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+              Active
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Review Group ID
+            </label>
+            <input
+              type="text"
+              value={settings.mailerliteReviewGroupId}
+              onChange={(e) => handleChange('mailerliteReviewGroupId', e.target.value)}
+              placeholder="MailerLite group ID for review emails"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Main Group ID
+            </label>
+            <input
+              type="text"
+              value={settings.mailerliteMainGroupId}
+              onChange={(e) => handleChange('mailerliteMainGroupId', e.target.value)}
+              placeholder="MailerLite group ID for main newsletter"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Secondary Group ID
+            </label>
+            <input
+              type="text"
+              value={settings.mailerliteSecondaryGroupId}
+              onChange={(e) => handleChange('mailerliteSecondaryGroupId', e.target.value)}
+              placeholder="MailerLite group ID for secondary sends"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* SendGrid Configuration */}
+      <div className={`bg-white shadow rounded-lg p-6 ${settings.emailProvider !== 'sendgrid' ? 'opacity-60' : ''}`}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-gray-900">SendGrid Configuration</h3>
+          {settings.emailProvider === 'sendgrid' && (
+            <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+              Active
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Review List ID
+            </label>
+            <input
+              type="text"
+              value={settings.sendgridReviewListId}
+              onChange={(e) => handleChange('sendgridReviewListId', e.target.value)}
+              placeholder="SendGrid list ID for review emails"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Main List ID
+            </label>
+            <input
+              type="text"
+              value={settings.sendgridMainListId}
+              onChange={(e) => handleChange('sendgridMainListId', e.target.value)}
+              placeholder="SendGrid list ID for main newsletter"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Secondary List ID
+            </label>
+            <input
+              type="text"
+              value={settings.sendgridSecondaryListId}
+              onChange={(e) => handleChange('sendgridSecondaryListId', e.target.value)}
+              placeholder="SendGrid list ID for secondary sends"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Sender ID
+            </label>
+            <input
+              type="text"
+              value={settings.sendgridSenderId}
+              onChange={(e) => handleChange('sendgridSenderId', e.target.value)}
+              placeholder="SendGrid verified sender ID"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Unsubscribe Group ID
+            </label>
+            <input
+              type="text"
+              value={settings.sendgridUnsubscribeGroupId}
+              onChange={(e) => handleChange('sendgridUnsubscribeGroupId', e.target.value)}
+              placeholder="SendGrid unsubscribe group ID"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
             />
           </div>
@@ -1680,7 +1835,7 @@ function EmailSettings() {
                 <option value="PM">PM</option>
               </select>
             </div>
-            <p className="text-xs text-gray-500 mt-1">MailerLite campaign setup and review</p>
+            <p className="text-xs text-gray-500 mt-1">SendGrid campaign setup and review</p>
           </div>
 
           <div>
@@ -1774,7 +1929,7 @@ function EmailSettings() {
           <div className="text-sm text-blue-800 space-y-1">
             <div>1. <strong>{settings.rssProcessingTime}</strong> - Create tomorrow's issue, process RSS feeds, and generate AI subject line</div>
             <div>2. <strong>{settings.issueCreationTime}</strong> - Create review campaign and schedule for delivery</div>
-            <div>3. <strong>{settings.scheduledSendTime}</strong> - MailerLite sends review to review group only</div>
+            <div>3. <strong>{settings.scheduledSendTime}</strong> - SendGrid sends review to review list only</div>
           </div>
         </div>
       </div>
@@ -4522,11 +4677,11 @@ function SlackSettings() {
     {
       id: 'scheduledSendFailure',
       name: 'Scheduled Send Failures',
-      description: 'Alerts when scheduled sends fail to deliver to MailerLite',
+      description: 'Alerts when scheduled sends fail to deliver to SendGrid',
       examples: [
         'Scheduled Send Failed - issue abc123',
-        'Send triggered but no email delivered to MailerLite',
-        'MailerLite API authentication failed during scheduled send'
+        'Send triggered but no email delivered to SendGrid',
+        'SendGrid API authentication failed during scheduled send'
       ]
     },
     {
@@ -4542,11 +4697,11 @@ function SlackSettings() {
     {
       id: 'emailDeliveryUpdates',
       name: 'Email Delivery Success',
-      description: 'MailerLite issue delivery confirmations',
+      description: 'SendGrid campaign delivery confirmations',
       examples: [
         'Review issue sent successfully for issue abc123',
         'Final issue sent successfully for issue xyz789',
-        'MailerLite delivery confirmed'
+        'SendGrid delivery confirmed'
       ]
     },
     {
@@ -5333,8 +5488,8 @@ function BusinessSettings() {
     linkedin_url: '',
     instagram_enabled: false,
     instagram_url: '',
-    mailerlite_group_name: '',
-    mailerlite_group_id: ''
+    sendgrid_list_name: '',
+    sendgrid_list_id: ''
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -5527,37 +5682,37 @@ function BusinessSettings() {
             />
           </div>
 
-          {/* MailerLite Group Name */}
+          {/* SendGrid List Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              MailerLite Group Name
+              SendGrid List Name
             </label>
             <input
               type="text"
-              value={settings.mailerlite_group_name || ''}
-              onChange={(e) => setSettings({ ...settings, mailerlite_group_name: e.target.value })}
+              value={settings.sendgrid_list_name || ''}
+              onChange={(e) => setSettings({ ...settings, sendgrid_list_name: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g., AI Accounting Daily"
             />
             <p className="mt-1 text-sm text-gray-500">
-              Name of the MailerLite group for website subscribers
+              Name of the SendGrid list for website subscribers
             </p>
           </div>
 
-          {/* MailerLite Group ID */}
+          {/* SendGrid List ID */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              MailerLite Group ID
+              SendGrid List ID
             </label>
             <input
               type="text"
-              value={settings.mailerlite_group_id || ''}
-              onChange={(e) => setSettings({ ...settings, mailerlite_group_id: e.target.value })}
+              value={settings.sendgrid_list_id || ''}
+              onChange={(e) => setSettings({ ...settings, sendgrid_list_id: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              placeholder="e.g., 168177348986799878"
+              placeholder="e.g., abc123-def456-ghi789"
             />
             <p className="mt-1 text-sm text-gray-500">
-              The group ID from MailerLite to add new subscribers to
+              The list ID from SendGrid to add new subscribers to
             </p>
           </div>
         </div>

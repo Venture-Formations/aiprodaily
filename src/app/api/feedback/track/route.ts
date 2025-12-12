@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import axios from 'axios'
-
-const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
+import { SendGridService } from '@/lib/sendgrid'
 
 export async function GET(request: NextRequest) {
   try {
@@ -57,7 +55,7 @@ export async function GET(request: NextRequest) {
         issue_date: date,
         subscriber_email: email,
         section_choice: choice,
-        mailerlite_updated: false,
+        mailerlite_updated: false, // Legacy field name, still tracks sync status
         created_at: new Date().toISOString()
       }, {
         onConflict: 'issue_date,subscriber_email'
@@ -67,82 +65,37 @@ export async function GET(request: NextRequest) {
 
     if (dbError) {
       console.error('Database error storing feedback:', dbError)
-      // Continue anyway - we'll try to update MailerLite
+      // Continue anyway - we'll try to update SendGrid
     } else {
       console.log('Feedback stored successfully:', feedback?.id)
     }
 
-    // Update MailerLite subscriber custom field
-    let mailerLiteUpdated = false
+    // Update SendGrid subscriber custom field
+    let providerUpdated = false
     try {
-      console.log('Updating MailerLite subscriber custom field...')
-      const apiKey = process.env.MAILERLITE_API_KEY
+      console.log('Updating SendGrid subscriber custom field...')
+      const sendgrid = new SendGridService()
+      const updateResult = await sendgrid.updateContactFields(email, {
+        section_choice: choice
+      })
 
-      if (!apiKey) {
-        console.error('MAILERLITE_API_KEY not configured')
+      if (updateResult.success) {
+        console.log('SendGrid update successful for:', email)
+        providerUpdated = true
       } else {
-        // First, find the subscriber by email
-        const searchResponse = await axios.get(
-          `${MAILERLITE_API_BASE}/subscribers`,
-          {
-            headers: {
-              'Authorization': `Bearer ${apiKey}`,
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            params: {
-              filter: {
-                email: email
-              }
-            }
-          }
-        )
-
-        console.log('MailerLite search response:', {
-          found: searchResponse.data?.data?.length || 0,
-          email
-        })
-
-        if (searchResponse.data?.data && searchResponse.data.data.length > 0) {
-          const subscriber = searchResponse.data.data[0]
-          console.log('Found subscriber:', subscriber.id)
-
-          // Update the subscriber's custom field
-          const updateResponse = await axios.put(
-            `${MAILERLITE_API_BASE}/subscribers/${subscriber.id}`,
-            {
-              fields: {
-                section_choice: choice
-              }
-            },
-            {
-              headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-              }
-            }
-          )
-
-          console.log('MailerLite update successful:', updateResponse.data)
-          mailerLiteUpdated = true
-        } else {
-          console.warn('Subscriber not found in MailerLite:', email)
-        }
+        console.warn('SendGrid update failed:', updateResult.error)
       }
-    } catch (mlError: any) {
-      console.error('MailerLite API error:', {
-        message: mlError.message,
-        response: mlError.response?.data,
-        status: mlError.response?.status
+    } catch (sgError: any) {
+      console.error('SendGrid API error:', {
+        message: sgError.message
       })
     }
 
-    // Update the feedback record with MailerLite status
+    // Update the feedback record with sync status
     if (feedback?.id) {
       await supabaseAdmin
         .from('feedback_responses')
-        .update({ mailerlite_updated: mailerLiteUpdated })
+        .update({ mailerlite_updated: providerUpdated }) // Legacy field name
         .eq('id', feedback.id)
     }
 

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { SendGridService } from '@/lib/sendgrid'
 import { MailerLiteService } from '@/lib/mailerlite'
-import { getPublicationSetting } from '@/lib/publication-settings'
+import { getPublicationSetting, getEmailProviderSettings } from '@/lib/publication-settings'
 
 export const maxDuration = 600 // 10 minutes
 
@@ -81,17 +82,17 @@ export async function POST(request: NextRequest) {
 
     console.log(`[CRON] Today (${dayOfWeek}) is a configured send day, proceeding...`)
 
-    // Get secondary group ID
-    const secondaryGroupId = await getPublicationSetting(publicationId, 'email_secondaryGroupId')
-    if (!secondaryGroupId) {
-      console.error('[CRON] Secondary group ID not configured')
+    // Get secondary list ID (SendGrid)
+    const secondaryListId = await getPublicationSetting(publicationId, 'sendgrid_secondary_list_id')
+    if (!secondaryListId) {
+      console.error('[CRON] Secondary list ID not configured')
       return NextResponse.json({
         success: false,
-        error: 'Secondary group ID not configured in settings'
+        error: 'Secondary list ID not configured in settings (sendgrid_secondary_list_id)'
       }, { status: 400 })
     }
 
-    console.log('[CRON] Using secondary group ID:', secondaryGroupId)
+    console.log('[CRON] Using secondary list ID:', secondaryListId)
 
     // Get today's issue (can be in_review, changes_made, or sent)
     const localDate = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
@@ -159,12 +160,35 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Create and send the secondary campaign
-    const mailerLiteService = new MailerLiteService()
+    // Check which email provider to use
+    const providerSettings = await getEmailProviderSettings(publicationId)
+    console.log(`[CRON] Using email provider: ${providerSettings.provider}`)
 
-    // Modify the subject line to indicate this is a secondary send if needed
-    // The MailerLite service will add "(Secondary)" suffix to the campaign name
-    const result = await mailerLiteService.createFinalissue(issue, secondaryGroupId, true) // true = isSecondary
+    let result: { success: boolean; campaignId?: string; issueId?: string; error?: string }
+
+    if (providerSettings.provider === 'sendgrid') {
+      // Create and send the secondary campaign via SendGrid
+      const sendGridService = new SendGridService()
+      result = await sendGridService.createFinalCampaign(issue, true) // true = isSecondary
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create secondary SendGrid campaign')
+      }
+    } else {
+      // Create and send the secondary campaign via MailerLite
+      const mailerliteService = new MailerLiteService()
+      const mlResult = await mailerliteService.createFinalissue(issue, providerSettings.secondaryGroupId, true) // true = isSecondary
+
+      result = {
+        success: mlResult.success,
+        campaignId: mlResult.issueId,
+        error: mlResult.success ? undefined : 'Failed to create secondary MailerLite campaign'
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create secondary MailerLite campaign')
+      }
+    }
 
     // Update issue to record secondary send
     const { error: updateError } = await supabaseAdmin
@@ -173,7 +197,7 @@ export async function POST(request: NextRequest) {
         secondary_sent_at: new Date().toISOString(),
         metrics: {
           ...issue.metrics,
-          mailerlite_secondary_campaign_id: result.issueId,
+          [`${providerSettings.provider}_secondary_singlesend_id`]: result.campaignId,
           secondary_sent_timestamp: new Date().toISOString()
         }
       })
@@ -190,11 +214,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Secondary newsletter sent successfully',
+      message: 'Secondary newsletter sent successfully via SendGrid',
       issue_id: issue.id,
       issue_date: issue.date,
-      secondary_group_id: secondaryGroupId,
-      mailerlite_campaign_id: result.issueId,
+      secondary_list_id: secondaryListId,
+      sendgrid_campaign_id: result.campaignId,
       sent_at: new Date().toISOString()
     })
 
@@ -290,17 +314,17 @@ export async function GET(request: NextRequest) {
 
     console.log(`[CRON] Today (${dayOfWeek}) is a configured send day, proceeding...`)
 
-    // Get secondary group ID
-    const secondaryGroupId = await getPublicationSetting(publicationId, 'email_secondaryGroupId')
-    if (!secondaryGroupId) {
-      console.error('[CRON] Secondary group ID not configured')
+    // Get secondary list ID (SendGrid)
+    const secondaryListId = await getPublicationSetting(publicationId, 'sendgrid_secondary_list_id')
+    if (!secondaryListId) {
+      console.error('[CRON] Secondary list ID not configured')
       return NextResponse.json({
         success: false,
-        error: 'Secondary group ID not configured in settings'
+        error: 'Secondary list ID not configured in settings (sendgrid_secondary_list_id)'
       }, { status: 400 })
     }
 
-    console.log('[CRON] Using secondary group ID:', secondaryGroupId)
+    console.log('[CRON] Using secondary list ID:', secondaryListId)
 
     // Get today's issue (can be in_review, changes_made, or sent)
     const localDate = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
@@ -368,12 +392,35 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Create and send the secondary campaign
-    const mailerLiteService = new MailerLiteService()
+    // Check which email provider to use
+    const providerSettings = await getEmailProviderSettings(publicationId)
+    console.log(`[CRON] Using email provider: ${providerSettings.provider}`)
 
-    // Modify the subject line to indicate this is a secondary send if needed
-    // The MailerLite service will add "(Secondary)" suffix to the campaign name
-    const result = await mailerLiteService.createFinalissue(issue, secondaryGroupId, true) // true = isSecondary
+    let result: { success: boolean; campaignId?: string; issueId?: string; error?: string }
+
+    if (providerSettings.provider === 'sendgrid') {
+      // Create and send the secondary campaign via SendGrid
+      const sendGridService = new SendGridService()
+      result = await sendGridService.createFinalCampaign(issue, true) // true = isSecondary
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create secondary SendGrid campaign')
+      }
+    } else {
+      // Create and send the secondary campaign via MailerLite
+      const mailerliteService = new MailerLiteService()
+      const mlResult = await mailerliteService.createFinalissue(issue, providerSettings.secondaryGroupId, true) // true = isSecondary
+
+      result = {
+        success: mlResult.success,
+        campaignId: mlResult.issueId,
+        error: mlResult.success ? undefined : 'Failed to create secondary MailerLite campaign'
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create secondary MailerLite campaign')
+      }
+    }
 
     // Update issue to record secondary send
     const { error: updateError } = await supabaseAdmin
@@ -382,7 +429,7 @@ export async function GET(request: NextRequest) {
         secondary_sent_at: new Date().toISOString(),
         metrics: {
           ...issue.metrics,
-          mailerlite_secondary_campaign_id: result.issueId,
+          [`${providerSettings.provider}_secondary_singlesend_id`]: result.campaignId,
           secondary_sent_timestamp: new Date().toISOString()
         }
       })
@@ -399,11 +446,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Secondary newsletter sent successfully',
+      message: 'Secondary newsletter sent successfully via SendGrid',
       issue_id: issue.id,
       issue_date: issue.date,
-      secondary_group_id: secondaryGroupId,
-      mailerlite_campaign_id: result.issueId,
+      secondary_list_id: secondaryListId,
+      sendgrid_campaign_id: result.campaignId,
       sent_at: new Date().toISOString()
     })
 

@@ -365,7 +365,7 @@ export default function IssuesAnalyticsTab({ slug }: Props) {
                   <div className="text-2xl font-bold text-green-600 mb-1">
                     {feedbackAnalytics.syncSuccessRate.toFixed(1)}%
                   </div>
-                  <div className="text-sm text-gray-600">MailerLite Sync Rate</div>
+                  <div className="text-sm text-gray-600">Email Provider Sync Rate</div>
                 </div>
                 <div className="bg-purple-50 p-4 rounded-lg">
                   <div className="text-2xl font-bold text-purple-600 mb-1">

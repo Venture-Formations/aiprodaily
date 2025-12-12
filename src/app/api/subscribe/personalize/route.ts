@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import axios from 'axios'
-
-const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
+import { SendGridService } from '@/lib/sendgrid'
 
 /**
- * Update subscriber personalization fields in MailerLite
+ * Update subscriber personalization fields in SendGrid
  * Called after subscriber completes the personalization form
  * Supports email correction if original_email is provided
  */
@@ -27,51 +25,59 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    if (!process.env.MAILERLITE_API_KEY) {
-      console.error('[Personalize] MAILERLITE_API_KEY not configured')
-      return NextResponse.json({
-        error: 'Service not configured'
-      }, { status: 500 })
-    }
-
-    // MailerLite API client
-    const mailerliteClient = axios.create({
-      baseURL: MAILERLITE_API_BASE,
-      headers: {
-        'Authorization': `Bearer ${process.env.MAILERLITE_API_KEY}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-    })
+    const sendgrid = new SendGridService()
 
     // Prepare fields to update
-    const fields: Record<string, string> = {}
+    const fields: Record<string, any> = {}
 
-    if (name) fields.name = name
+    if (name) fields.first_name = name
     if (last_name) fields.last_name = last_name
     if (job_type) fields.job_type = job_type
     if (yearly_clients) fields.yearly_clients = yearly_clients
 
-    // If email was corrected, we need to update the original subscriber's email
+    // If email was corrected, we need to handle it differently
+    // SendGrid doesn't support changing email directly - would need to delete old and create new
     if (original_email && original_email !== email) {
-      console.log(`[Personalize] Email corrected from ${original_email} to ${email}`)
+      console.log(`[Personalize] Email correction requested from ${original_email} to ${email}`)
+      console.log(`[Personalize] Note: Email changes require manual intervention in SendGrid`)
 
-      // Update the original subscriber with new email and fields
-      const response = await mailerliteClient.put(`/subscribers/${encodeURIComponent(original_email)}`, {
-        email: email, // Update to new email
-        fields
-      })
+      // Update the new email with fields (subscriber should have been added with new email already)
+      const result = await sendgrid.updateContactFields(email, fields)
 
-      console.log(`[Personalize] Successfully updated subscriber email from ${original_email} to ${email}`, response.status)
+      if (!result.success) {
+        // Try upserting the contact
+        const upsertResult = await sendgrid.upsertContact(email, {
+          firstName: name,
+          lastName: last_name,
+          customFields: { job_type, yearly_clients }
+        })
+
+        if (!upsertResult.success) {
+          throw new Error(upsertResult.error || 'Failed to update subscriber')
+        }
+      }
+
+      console.log(`[Personalize] Successfully updated/created subscriber ${email}`)
     } else {
       // No email change, just update fields
       console.log(`[Personalize] Updating subscriber ${email} with fields:`, fields)
 
-      const response = await mailerliteClient.put(`/subscribers/${encodeURIComponent(email)}`, {
-        fields
-      })
+      const result = await sendgrid.updateContactFields(email, fields)
 
-      console.log(`[Personalize] Successfully updated subscriber ${email}`, response.status)
+      if (!result.success) {
+        // If update fails, try upserting
+        const upsertResult = await sendgrid.upsertContact(email, {
+          firstName: name,
+          lastName: last_name,
+          customFields: { job_type, yearly_clients }
+        })
+
+        if (!upsertResult.success) {
+          throw new Error(upsertResult.error || 'Failed to update subscriber')
+        }
+      }
+
+      console.log(`[Personalize] Successfully updated subscriber ${email}`)
     }
 
     return NextResponse.json({
@@ -82,23 +88,9 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('[Personalize] Failed to update subscriber:', error.message)
 
-    if (error.response) {
-      console.error('[Personalize] MailerLite API error:', {
-        status: error.response.status,
-        data: error.response.data
-      })
-
-      // If subscriber not found, return a more helpful error
-      if (error.response.status === 404) {
-        return NextResponse.json({
-          error: 'Subscriber not found. Please subscribe first.'
-        }, { status: 404 })
-      }
-    }
-
     return NextResponse.json({
       error: 'Failed to save personalization',
-      message: error.response?.data?.message || error.message || 'Unknown error'
+      message: error.message || 'Unknown error'
     }, { status: 500 })
   }
 }

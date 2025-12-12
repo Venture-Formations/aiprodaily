@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { SendGridService } from '@/lib/sendgrid'
 import { MailerLiteService } from '@/lib/mailerlite'
 import { ScheduleChecker } from '@/lib/schedule-checker'
+import { getEmailProviderSettings } from '@/lib/publication-settings'
 
 export async function POST(request: NextRequest) {
   try {
@@ -121,34 +123,47 @@ export async function POST(request: NextRequest) {
 
     console.log('Using subject line:', issue.subject_line)
 
-    // Create MailerLite review campaign
-    const mailerLiteService = new MailerLiteService()
-    const result = await mailerLiteService.createReviewissue(issue)
+    // Check which email provider to use
+    const providerSettings = await getEmailProviderSettings(newsletter.id)
+    console.log(`[Review Send] Using email provider: ${providerSettings.provider}`)
 
-    console.log('MailerLite issue created:', result.issueId)
+    let result: { success: boolean; campaignId?: string; issueId?: string; error?: string }
 
-    // Update issue status to in_review
-    const { error: updateError } = await supabaseAdmin
-      .from('publication_issues')
-      .update({
-        status: 'in_review',
-        review_sent_at: new Date().toISOString()
-      })
-      .eq('id', issue.id)
+    if (providerSettings.provider === 'sendgrid') {
+      // Create SendGrid review campaign
+      const sendGridService = new SendGridService()
+      result = await sendGridService.createReviewCampaign(issue)
 
-    if (updateError) {
-      console.error('Failed to update issue status:', updateError)
-      // Continue anyway since MailerLite issue was created
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create SendGrid campaign')
+      }
+      console.log('SendGrid campaign created:', result.campaignId)
+    } else {
+      // Create MailerLite review campaign
+      const mailerliteService = new MailerLiteService()
+      const mlResult = await mailerliteService.createReviewissue(issue)
+
+      result = {
+        success: mlResult.success,
+        campaignId: mlResult.issueId,
+        error: mlResult.success ? undefined : 'Failed to create MailerLite campaign'
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create MailerLite campaign')
+      }
+      console.log('MailerLite campaign created:', result.campaignId)
     }
 
+    // Note: Both services update issue status to in_review
     console.log('=== REVIEW SEND COMPLETED ===')
 
     return NextResponse.json({
       success: true,
-      message: 'Review issue sent to MailerLite successfully',
+      message: 'Review campaign sent to SendGrid successfully',
       issueId: issue.id,
       issueDate: issueDate,
-      mailerliteissueId: result.issueId,
+      sendgridCampaignId: result.campaignId,
       subjectLine: issue.subject_line,
       activeArticlesCount: activeArticles.length,
       timestamp: new Date().toISOString()
@@ -293,34 +308,47 @@ export async function GET(request: NextRequest) {
 
     console.log('Using subject line:', issue.subject_line)
 
-    // Create MailerLite review campaign
-    const mailerLiteService = new MailerLiteService()
-    const result = await mailerLiteService.createReviewissue(issue)
+    // Check which email provider to use
+    const providerSettings = await getEmailProviderSettings(newsletter.id)
+    console.log(`[Review Send] Using email provider: ${providerSettings.provider}`)
 
-    console.log('MailerLite issue created:', result.issueId)
+    let result: { success: boolean; campaignId?: string; issueId?: string; error?: string }
 
-    // Update issue status to in_review
-    const { error: updateError } = await supabaseAdmin
-      .from('publication_issues')
-      .update({
-        status: 'in_review',
-        review_sent_at: new Date().toISOString()
-      })
-      .eq('id', issue.id)
+    if (providerSettings.provider === 'sendgrid') {
+      // Create SendGrid review campaign
+      const sendGridService = new SendGridService()
+      result = await sendGridService.createReviewCampaign(issue)
 
-    if (updateError) {
-      console.error('Failed to update issue status:', updateError)
-      // Continue anyway since MailerLite issue was created
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create SendGrid campaign')
+      }
+      console.log('SendGrid campaign created:', result.campaignId)
+    } else {
+      // Create MailerLite review campaign
+      const mailerliteService = new MailerLiteService()
+      const mlResult = await mailerliteService.createReviewissue(issue)
+
+      result = {
+        success: mlResult.success,
+        campaignId: mlResult.issueId,
+        error: mlResult.success ? undefined : 'Failed to create MailerLite campaign'
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create MailerLite campaign')
+      }
+      console.log('MailerLite campaign created:', result.campaignId)
     }
 
+    // Note: Both services update issue status to in_review
     console.log('=== REVIEW SEND COMPLETED ===')
 
     return NextResponse.json({
       success: true,
-      message: 'Review issue sent to MailerLite successfully',
+      message: 'Review campaign sent to SendGrid successfully',
       issueId: issue.id,
       issueDate: issueDate,
-      mailerliteissueId: result.issueId,
+      sendgridCampaignId: result.campaignId,
       subjectLine: issue.subject_line,
       activeArticlesCount: activeArticles.length,
       timestamp: new Date().toISOString()

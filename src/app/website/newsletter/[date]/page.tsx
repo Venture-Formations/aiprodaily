@@ -14,7 +14,7 @@ interface PageProps {
   params: Promise<{ date: string }>
 }
 
-// Helper function to clean MailerLite merge tags for website display
+// Helper function to clean email merge tags for website display
 function cleanMergeTags(text: string): string {
   // Replace {$name|default:'Accounting Pro'} with "Accounting Pro"
   return text.replace(/\{\$name\|default:"([^"]+)"\}/g, '$1')

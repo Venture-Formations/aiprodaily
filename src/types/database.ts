@@ -449,7 +449,8 @@ export interface DuplicatePost {
 export interface EmailMetrics {
   id: string
   issue_id: string
-  mailerlite_issue_id: string | null
+  mailerlite_issue_id: string | null  // Legacy: MailerLite campaign ID (pre-migration)
+  sendgrid_singlesend_id: string | null  // New: SendGrid Single Send ID (post-migration)
   sent_count: number
   delivered_count: number
   opened_count: number

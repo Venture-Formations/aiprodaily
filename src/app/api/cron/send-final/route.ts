@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { SendGridService } from '@/lib/sendgrid'
 import { MailerLiteService } from '@/lib/mailerlite'
 import { ScheduleChecker } from '@/lib/schedule-checker'
 import { SlackNotificationService } from '@/lib/slack'
 import { newsletterArchiver } from '@/lib/newsletter-archiver'
+import { getEmailProviderSettings } from '@/lib/publication-settings'
 
 // Helper function to log article positions at final send
 async function logFinalArticlePositions(issue: any) {
@@ -292,29 +294,40 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Send the final issue
-    const mailerLiteService = new MailerLiteService()
-
-    // Get main group ID from settings
-    const { data: mainGroupSetting } = await supabaseAdmin
-      .from('publication_settings')
-      .select('value')
-      .eq('publication_id', newsletter.id)
-      .eq('key', 'email_mainGroupId')
-      .single()
-
-    const mainGroupId = mainGroupSetting?.value
-
-    if (!mainGroupId) {
-      throw new Error('Main group ID not configured in settings')
-    }
-
-    console.log('Using main group ID from settings:', mainGroupId)
-
     // Log article positions at final send
     await logFinalArticlePositions(issue)
 
-    const result = await mailerLiteService.createFinalissue(issue, mainGroupId)
+    // Check which email provider to use
+    const providerSettings = await getEmailProviderSettings(newsletter.id)
+    console.log(`[Send Final] Using email provider: ${providerSettings.provider}`)
+
+    let result: { success: boolean; campaignId?: string; issueId?: string; error?: string }
+
+    if (providerSettings.provider === 'sendgrid') {
+      // Send via SendGrid
+      const sendGridService = new SendGridService()
+      result = await sendGridService.createFinalCampaign(issue)
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create SendGrid campaign')
+      }
+      console.log('SendGrid campaign created:', result.campaignId)
+    } else {
+      // Send via MailerLite
+      const mailerliteService = new MailerLiteService()
+      const mlResult = await mailerliteService.createFinalissue(issue, providerSettings.mainGroupId, false)
+
+      result = {
+        success: mlResult.success,
+        campaignId: mlResult.issueId,
+        error: mlResult.success ? undefined : 'Failed to create MailerLite campaign'
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create MailerLite campaign')
+      }
+      console.log('MailerLite campaign created:', result.campaignId)
+    }
 
     // Record advertisement usage and advance rotation
     try {
@@ -378,7 +391,7 @@ export async function POST(request: NextRequest) {
         poll_snapshot: poll_snapshot,
         metrics: {
           ...issue.metrics,
-          mailerlite_issue_id: result.issueId,
+          sendgrid_campaign_id: result.campaignId,
           sent_timestamp: new Date().toISOString()
         }
       })
@@ -405,9 +418,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Final newsletter sent successfully',
+      message: 'Final newsletter sent successfully via SendGrid',
       issueId: issue.id,
-      mailerliteissueId: result.issueId,
+      sendgridCampaignId: result.campaignId,
       pollId: poll_id,
       timestamp: new Date().toISOString()
     })
@@ -577,29 +590,40 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Send the final issue
-    const mailerLiteService = new MailerLiteService()
-
-    // Get main group ID from settings
-    const { data: mainGroupSetting } = await supabaseAdmin
-      .from('publication_settings')
-      .select('value')
-      .eq('publication_id', newsletter.id)
-      .eq('key', 'email_mainGroupId')
-      .single()
-
-    const mainGroupId = mainGroupSetting?.value
-
-    if (!mainGroupId) {
-      throw new Error('Main group ID not configured in settings')
-    }
-
-    console.log('Using main group ID from settings:', mainGroupId)
-
     // Log article positions at final send
     await logFinalArticlePositions(issue)
 
-    const result = await mailerLiteService.createFinalissue(issue, mainGroupId)
+    // Check which email provider to use
+    const providerSettings = await getEmailProviderSettings(newsletter.id)
+    console.log(`[Send Final] Using email provider: ${providerSettings.provider}`)
+
+    let result: { success: boolean; campaignId?: string; issueId?: string; error?: string }
+
+    if (providerSettings.provider === 'sendgrid') {
+      // Send via SendGrid
+      const sendGridService = new SendGridService()
+      result = await sendGridService.createFinalCampaign(issue)
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create SendGrid campaign')
+      }
+      console.log('SendGrid campaign created:', result.campaignId)
+    } else {
+      // Send via MailerLite
+      const mailerliteService = new MailerLiteService()
+      const mlResult = await mailerliteService.createFinalissue(issue, providerSettings.mainGroupId, false)
+
+      result = {
+        success: mlResult.success,
+        campaignId: mlResult.issueId,
+        error: mlResult.success ? undefined : 'Failed to create MailerLite campaign'
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create MailerLite campaign')
+      }
+      console.log('MailerLite campaign created:', result.campaignId)
+    }
 
     // Record advertisement usage and advance rotation
     try {
@@ -663,7 +687,7 @@ export async function GET(request: NextRequest) {
         poll_snapshot: poll_snapshot,
         metrics: {
           ...issue.metrics,
-          mailerlite_issue_id: result.issueId,
+          sendgrid_campaign_id: result.campaignId,
           sent_timestamp: new Date().toISOString()
         }
       })
@@ -690,9 +714,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Final newsletter sent successfully',
+      message: 'Final newsletter sent successfully via SendGrid',
       issueId: issue.id,
-      mailerliteissueId: result.issueId,
+      sendgridCampaignId: result.campaignId,
       pollId: poll_id,
       timestamp: new Date().toISOString()
     })

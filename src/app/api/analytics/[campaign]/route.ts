@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
-import { MailerLiteService } from '@/lib/mailerlite'
+import { emailMetricsService } from '@/lib/email-metrics'
 
 interface RouteParams {
   params: Promise<{
@@ -52,9 +52,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     console.log(`[Analytics Refresh] Starting manual refresh for issue ${issueId}`)
 
-    // Import fresh metrics from MailerLite
-    const mailerLiteService = new MailerLiteService()
-    const metrics = await mailerLiteService.importissueMetrics(issueId)
+    // Import fresh metrics using hybrid service (SendGrid or MailerLite based on campaign type)
+    const metrics = await emailMetricsService.importMetrics(issueId)
 
     // Check if metrics is a skip indicator
     const isSkipped = metrics && typeof metrics === 'object' && 'skipped' in metrics

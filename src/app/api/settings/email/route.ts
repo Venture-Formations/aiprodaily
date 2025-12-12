@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       .from('publication_settings')
       .select('key, value')
       .eq('publication_id', newsletter.id)
-      .or('key.like.email_%,key.like.criteria_%,key.like.secondary_criteria_%,key.like.primary_criteria_%,key.eq.max_top_articles,key.eq.max_bottom_articles,key.eq.max_secondary_articles,key.eq.primary_article_lookback_hours,key.eq.secondary_article_lookback_hours,key.eq.dedup_historical_lookback_days,key.eq.dedup_strictness_threshold,key.eq.next_ad_position,key.eq.secondary_send_days')
+      .or('key.like.email_%,key.like.sendgrid_%,key.like.mailerlite_%,key.like.criteria_%,key.like.secondary_criteria_%,key.like.primary_criteria_%,key.eq.max_top_articles,key.eq.max_bottom_articles,key.eq.max_secondary_articles,key.eq.primary_article_lookback_hours,key.eq.secondary_article_lookback_hours,key.eq.dedup_historical_lookback_days,key.eq.dedup_strictness_threshold,key.eq.next_ad_position,key.eq.secondary_send_days')
 
     if (error) {
       console.error('BACKEND GET: Database error:', error)
@@ -55,6 +55,29 @@ export async function GET(request: NextRequest) {
         } catch {
           savedSettings.secondarySendDays = [1, 2, 3, 4, 5] // Default to Mon-Fri
         }
+      } else if (row.key === 'email_provider') {
+        // Email provider toggle (mailerlite or sendgrid)
+        savedSettings.emailProvider = cleanValue
+      } else if (row.key.startsWith('sendgrid_')) {
+        // Keep SendGrid settings with sendgrid_ prefix for clarity
+        const keyMap: Record<string, string> = {
+          'sendgrid_review_list_id': 'sendgridReviewListId',
+          'sendgrid_main_list_id': 'sendgridMainListId',
+          'sendgrid_secondary_list_id': 'sendgridSecondaryListId',
+          'sendgrid_sender_id': 'sendgridSenderId',
+          'sendgrid_unsubscribe_group_id': 'sendgridUnsubscribeGroupId'
+        }
+        const uiKey = keyMap[row.key] || row.key.replace('sendgrid_', 'sendgrid')
+        savedSettings[uiKey] = cleanValue
+      } else if (row.key.startsWith('mailerlite_')) {
+        // MailerLite settings
+        const keyMap: Record<string, string> = {
+          'mailerlite_review_group_id': 'mailerliteReviewGroupId',
+          'mailerlite_main_group_id': 'mailerliteMainGroupId',
+          'mailerlite_secondary_group_id': 'mailerliteSecondaryGroupId'
+        }
+        const uiKey = keyMap[row.key] || row.key.replace('mailerlite_', 'mailerlite')
+        savedSettings[uiKey] = cleanValue
       } else if (row.key.startsWith('email_')) {
         const settingKey = row.key.replace('email_', '')
         savedSettings[settingKey] = cleanValue
@@ -68,9 +91,22 @@ export async function GET(request: NextRequest) {
 
     // Return current settings or defaults
     const defaultSettings = {
-      reviewGroupId: process.env.MAILERLITE_REVIEW_GROUP_ID || '',
-      mainGroupId: process.env.MAILERLITE_MAIN_GROUP_ID || '',
-      secondaryGroupId: '',
+      // Email Provider Toggle
+      emailProvider: 'mailerlite',  // 'mailerlite' or 'sendgrid'
+
+      // MailerLite Settings
+      mailerliteReviewGroupId: '',
+      mailerliteMainGroupId: '',
+      mailerliteSecondaryGroupId: '',
+
+      // SendGrid Settings
+      sendgridReviewListId: '',
+      sendgridMainListId: '',
+      sendgridSecondaryListId: '',
+      sendgridSenderId: '',
+      sendgridUnsubscribeGroupId: '',
+
+      // Common Email Settings
       fromEmail: 'scoop@stcscoop.com',
       senderName: 'St. Cloud Scoop',
       reviewScheduleEnabled: 'true',
@@ -392,10 +428,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Save settings as individual key-value pairs
+    // Supports both MailerLite and SendGrid configurations
     const settingsToSave = [
-      { key: 'email_reviewGroupId', value: settings.reviewGroupId || '' },
-      { key: 'email_mainGroupId', value: settings.mainGroupId || '' },
-      { key: 'email_secondaryGroupId', value: settings.secondaryGroupId || '' },
+      // Email Provider Toggle
+      { key: 'email_provider', value: settings.emailProvider || 'mailerlite' },
+
+      // MailerLite Settings
+      { key: 'mailerlite_review_group_id', value: settings.mailerliteReviewGroupId || '' },
+      { key: 'mailerlite_main_group_id', value: settings.mailerliteMainGroupId || '' },
+      { key: 'mailerlite_secondary_group_id', value: settings.mailerliteSecondaryGroupId || '' },
+
+      // SendGrid Settings
+      { key: 'sendgrid_review_list_id', value: settings.sendgridReviewListId || '' },
+      { key: 'sendgrid_main_list_id', value: settings.sendgridMainListId || '' },
+      { key: 'sendgrid_secondary_list_id', value: settings.sendgridSecondaryListId || '' },
+      { key: 'sendgrid_sender_id', value: settings.sendgridSenderId || '' },
+      { key: 'sendgrid_unsubscribe_group_id', value: settings.sendgridUnsubscribeGroupId || '' },
+
+      // Common Email Settings
       { key: 'email_fromEmail', value: settings.fromEmail },
       { key: 'email_senderName', value: settings.senderName },
       { key: 'email_reviewScheduleEnabled', value: settings.reviewScheduleEnabled ? 'true' : 'false' },

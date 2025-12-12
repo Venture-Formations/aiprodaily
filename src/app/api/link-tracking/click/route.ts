@@ -13,10 +13,10 @@ function normalizeUrl(url: string): string {
 }
 
 /**
- * Determines if the click should trigger a MailerLite field update
+ * Determines if the click should trigger an email provider field update
  * Returns the field name to update, or null if no update needed
  */
-function getMailerLiteFieldForSection(section: string): string | null {
+function getFieldForSection(section: string): string | null {
   const sectionLower = section.toLowerCase()
 
   // Advertorial clicks -> clicked_ad field
@@ -33,9 +33,9 @@ function getMailerLiteFieldForSection(section: string): string | null {
 }
 
 /**
- * Queues a MailerLite field update for async processing
+ * Queues an email provider field update for async processing
  */
-async function queueMailerLiteFieldUpdate(
+async function queueFieldUpdate(
   email: string,
   fieldName: string,
   issueId: string | null,
@@ -46,7 +46,7 @@ async function queueMailerLiteFieldUpdate(
     // Check if we already have a pending/completed update for this subscriber+field
     // to avoid duplicate queue entries
     const { data: existing } = await supabaseAdmin
-      .from('mailerlite_field_updates')
+      .from('sendgrid_field_updates')
       .select('id, status')
       .eq('subscriber_email', email)
       .eq('field_name', fieldName)
@@ -55,13 +55,13 @@ async function queueMailerLiteFieldUpdate(
       .maybeSingle()
 
     if (existing) {
-      console.log(`[MailerLite Queue] Skipping duplicate: ${email} already has ${fieldName} update (${existing.status})`)
+      console.log(`[Field Update Queue] Skipping duplicate: ${email} already has ${fieldName} update (${existing.status})`)
       return
     }
 
     // Insert new queue entry
     const { error } = await supabaseAdmin
-      .from('mailerlite_field_updates')
+      .from('sendgrid_field_updates')
       .insert({
         subscriber_email: email,
         field_name: fieldName,
@@ -73,12 +73,12 @@ async function queueMailerLiteFieldUpdate(
       })
 
     if (error) {
-      console.error('[MailerLite Queue] Error queuing field update:', error)
+      console.error('[Field Update Queue] Error queuing field update:', error)
     } else {
-      console.log(`[MailerLite Queue] Queued ${fieldName}=true for ${email}`)
+      console.log(`[Field Update Queue] Queued ${fieldName}=true for ${email}`)
     }
   } catch (error) {
-    console.error('[MailerLite Queue] Exception queuing field update:', error)
+    console.error('[Field Update Queue] Exception queuing field update:', error)
   }
 }
 
@@ -90,9 +90,9 @@ async function queueMailerLiteFieldUpdate(
  * - url: Destination URL (required)
  * - section: Newsletter section (required)
  * - date: issue date (required)
- * - issue_id: MailerLite issue ID (optional)
- * - email: Subscriber email from MailerLite (required)
- * - subscriber_id: MailerLite subscriber ID (optional)
+ * - issue_id: Database issue ID (optional)
+ * - email: Subscriber email (required)
+ * - subscriber_id: Subscriber ID (optional)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -174,9 +174,9 @@ export async function GET(request: NextRequest) {
 
     console.log('Link click tracked successfully:', data.id)
 
-    // Check if this click should queue a MailerLite field update
-    const mailerliteField = getMailerLiteFieldForSection(section)
-    if (mailerliteField && issueId) {
+    // Check if this click should queue an email provider field update
+    const fieldToUpdate = getFieldForSection(section)
+    if (fieldToUpdate && issueId) {
       // Look up publication_id from the issue
       const { data: issueData } = await supabaseAdmin
         .from('publication_issues')
@@ -186,13 +186,13 @@ export async function GET(request: NextRequest) {
 
       if (issueData?.publication_id) {
         // Queue the field update asynchronously (don't await - fire and forget)
-        queueMailerLiteFieldUpdate(
+        queueFieldUpdate(
           email,
-          mailerliteField,
+          fieldToUpdate,
           issueId,
           data.id,
           issueData.publication_id
-        ).catch(err => console.error('[MailerLite Queue] Background error:', err))
+        ).catch(err => console.error('[Field Update Queue] Background error:', err))
       }
     }
 

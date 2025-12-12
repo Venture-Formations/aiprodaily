@@ -239,9 +239,8 @@ export async function generateNewsletterHeader(formattedDate: string, issueDate?
             <tr>
               <td width="10">&nbsp;</td>
               <td align="right">
-                <a href="{$url}" style="color:#000;text-decoration:underline;">View Online</a>&nbsp;|&nbsp;
-                <a href="${signUpUrl}" style="color:#000;text-decoration:underline;">Sign Up</a>&nbsp;|&nbsp;
-                <a href="{$forward}" style="color:#000;text-decoration:underline;">Share</a>
+                <a href="{{Weblink}}" style="color:#000;text-decoration:underline;">View Online</a>&nbsp;|&nbsp;
+                <a href="${signUpUrl}" style="color:#000;text-decoration:underline;">Sign Up</a>
               </td>
             </tr>
           </table>
@@ -1354,7 +1353,7 @@ ${socialMediaSection}
     <td style="font-family: Arial, sans-serif; font-size: 12px; color: #777; text-align: center; padding: 20px 10px; border-top: 1px solid #ccc; background-color: #ffffff;">
       <p style="margin: 0;text-align: center;">You're receiving this email because you subscribed to <strong>${newsletterName}</strong>.</p>
       <p style="margin: 5px 0 0;text-align: center;">
-        <a href="{$unsubscribe}" style='text-decoration: underline;'>Unsubscribe</a>
+        <a href="[Unsubscribe]" style='text-decoration: underline;'>Unsubscribe</a>
       </p>
       <p style="margin: 5px;text-align: center;">©${currentYear} ${businessName}, all rights reserved</p>
     </td>

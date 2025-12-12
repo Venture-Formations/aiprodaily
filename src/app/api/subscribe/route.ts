@@ -1,20 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
-import axios from 'axios'
 import { headers } from 'next/headers'
 import { getPublicationByDomain, getPublicationSetting } from '@/lib/publication-settings'
-
-const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
+import { SendGridService } from '@/lib/sendgrid'
 
 /**
- * Subscribe email to MailerLite and add to group
+ * Subscribe email to SendGrid and add to list
  * Used by website homepage subscribe form
  * Captures Facebook Pixel data for attribution tracking
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, facebook_pixel } = body
+    const { email, facebook_pixel, name } = body
 
     if (!email || !email.includes('@')) {
       return NextResponse.json({
@@ -29,11 +26,18 @@ export async function POST(request: NextRequest) {
     // Get publication ID from domain
     const publicationId = await getPublicationByDomain(host) || 'accounting'
 
-    // Get MailerLite Group ID from publication_settings
-    const groupId = await getPublicationSetting(publicationId, 'mailerlite_group_id')
-
-    if (!groupId) {
-      console.error('MailerLite Group ID not configured for publication:', publicationId)
+    // Get SendGrid List ID from publication_settings
+    // Falls back to MailerLite group ID for backwards compatibility
+    let listId = await getPublicationSetting(publicationId, 'sendgrid_signup_list_id')
+    if (!listId) {
+      listId = await getPublicationSetting(publicationId, 'sendgrid_main_list_id')
+    }
+    if (!listId) {
+      // Fallback check for MailerLite settings (to help with migration debugging)
+      const mlGroupId = await getPublicationSetting(publicationId, 'mailerlite_group_id')
+      if (mlGroupId) {
+        console.error('[Subscribe] Found MailerLite group ID but no SendGrid list ID. Migration incomplete.')
+      }
       return NextResponse.json({
         error: 'Subscription service not configured'
       }, { status: 500 })
@@ -45,120 +49,53 @@ export async function POST(request: NextRequest) {
                       request.headers.get('x-real-ip') ||
                       null
 
-    // Prepare Facebook Pixel data
-    const fbData = {
-      timestamp: facebook_pixel?.timestamp || new Date().toISOString(),
-      fbp: facebook_pixel?.fbp || null,
-      fbc: facebook_pixel?.fbc || null,
-      user_agent: userAgent,
-      ip: ipAddress,
-      event_source_url: facebook_pixel?.event_source_url || request.url
+    // Prepare custom fields data
+    const customFields: Record<string, any> = {}
+
+    // Add Facebook Pixel data as custom fields (if data exists)
+    if (facebook_pixel) {
+      if (facebook_pixel.fbp) customFields.fbp = facebook_pixel.fbp
+      if (facebook_pixel.fbc) customFields.fbc = facebook_pixel.fbc
+      if (facebook_pixel.timestamp) customFields.fb_pixel_timestamp = facebook_pixel.timestamp
+      if (facebook_pixel.event_source_url) customFields.fb_pixel_event_source_url = facebook_pixel.event_source_url
+    }
+    if (userAgent) customFields.fb_pixel_user_agent = userAgent
+    if (ipAddress) customFields.fb_pixel_ip = ipAddress
+
+    console.log(`[Subscribe] Adding ${email} to SendGrid list ${listId}`)
+    if (facebook_pixel) {
+      console.log('[Subscribe] Facebook Pixel data captured')
     }
 
-    // MailerLite API client
-    const mailerliteClient = axios.create({
-      baseURL: MAILERLITE_API_BASE,
-      headers: {
-        'Authorization': `Bearer ${process.env.MAILERLITE_API_KEY}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
+    // Use SendGrid service to upsert contact
+    const sendgridService = new SendGridService()
+    const result = await sendgridService.upsertContact(email, {
+      firstName: name || undefined,
+      customFields: Object.keys(customFields).length > 0 ? customFields : undefined,
+      listIds: [listId]
     })
 
-    console.log(`Subscribing ${email} to MailerLite group ${groupId}`)
-    if (facebook_pixel) {
-      console.log('Facebook Pixel data:', fbData)
-    }
-
-    // Prepare subscriber data with Facebook Pixel fields
-    const subscriberData: any = {
-      email: email,
-      groups: [groupId],
-      status: 'active',
-      fields: {}
-    }
-
-    // Add Facebook Pixel data as custom fields (only if data exists)
-    // Note: You'll need to create these custom fields in MailerLite first
-    if (fbData.fbp) subscriberData.fields.fbp = fbData.fbp
-    if (fbData.fbc) subscriberData.fields.fbc = fbData.fbc
-    if (fbData.timestamp) subscriberData.fields.fb_pixel_timestamp = fbData.timestamp
-    if (fbData.user_agent) subscriberData.fields.fb_pixel_user_agent = fbData.user_agent
-    if (fbData.ip) subscriberData.fields.fb_pixel_ip = fbData.ip
-    if (fbData.event_source_url) subscriberData.fields.fb_pixel_event_source_url = fbData.event_source_url
-
-    // Try to add/update subscriber and add to group in one request
-    try {
-      const response = await mailerliteClient.post('/subscribers', subscriberData)
-
-      console.log('MailerLite API response:', {
-        status: response.status,
-        data: response.data
-      })
-
+    if (!result.success) {
+      console.error('[Subscribe] SendGrid upsert failed:', result.error)
       return NextResponse.json({
-        success: true,
-        message: 'Successfully subscribed!'
-      })
-
-    } catch (apiError: any) {
-      // Check if subscriber already exists
-      if (apiError.response?.status === 422 || apiError.response?.data?.message?.includes('already exists')) {
-        console.log(`Subscriber ${email} already exists, adding to group and updating fields...`)
-
-        // Search for subscriber by email
-        const searchResponse = await mailerliteClient.get(`/subscribers`, {
-          params: { 'filter[email]': email }
-        })
-
-        if (searchResponse.data?.data && searchResponse.data.data.length > 0) {
-          const subscriberId = searchResponse.data.data[0].id
-
-          // Add subscriber to group
-          await mailerliteClient.post(`/subscribers/${subscriberId}/groups/${groupId}`)
-
-          // Update Facebook Pixel fields if provided
-          if (Object.keys(subscriberData.fields).length > 0) {
-            try {
-              await mailerliteClient.put(`/subscribers/${subscriberId}`, {
-                fields: subscriberData.fields
-              })
-              console.log('Updated Facebook Pixel fields for existing subscriber')
-            } catch (fieldError) {
-              console.error('Error updating Facebook Pixel fields:', fieldError)
-              // Don't fail the subscription if field update fails
-            }
-          }
-
-          console.log(`Added existing subscriber ${email} to group ${groupId}`)
-
-          return NextResponse.json({
-            success: true,
-            message: 'Successfully subscribed!'
-          })
-        } else {
-          throw new Error('Subscriber not found after creation error')
-        }
-      } else {
-        // Re-throw other errors
-        throw apiError
-      }
+        error: 'Subscription failed',
+        message: result.error || 'Unknown error'
+      }, { status: 500 })
     }
+
+    console.log(`[Subscribe] Successfully added ${email} to SendGrid list`)
+
+    return NextResponse.json({
+      success: true,
+      message: 'Successfully subscribed!'
+    })
 
   } catch (error: any) {
-    console.error('Subscription failed:', error)
-
-    // Log detailed error info
-    if (error.response) {
-      console.error('MailerLite API error:', {
-        status: error.response.status,
-        data: error.response.data
-      })
-    }
+    console.error('[Subscribe] Subscription failed:', error)
 
     return NextResponse.json({
       error: 'Subscription failed',
-      message: error.response?.data?.message || error.message || 'Unknown error'
+      message: error.message || 'Unknown error'
     }, { status: 500 })
   }
 }

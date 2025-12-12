@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { supabaseAdmin } from '@/lib/supabase'
-import { MailerLiteService } from '@/lib/mailerlite'
+import { SendGridService } from '@/lib/sendgrid'
 import { authOptions } from '@/lib/auth'
 
 interface RouteParams {
@@ -141,34 +141,28 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }, { status: 500 })
     }
 
-    // Now proceed with MailerLite service call
-    console.log('Creating MailerLite service...')
+    // Now proceed with SendGrid service call
+    console.log('Creating SendGrid service...')
     console.log('Environment check:', {
-      hasApiKey: !!process.env.MAILERLITE_API_KEY,
-      hasReviewGroupId: !!process.env.MAILERLITE_REVIEW_GROUP_ID,
-      apiKeyPrefix: process.env.MAILERLITE_API_KEY?.substring(0, 8) + '...',
-      reviewGroupId: process.env.MAILERLITE_REVIEW_GROUP_ID
+      hasApiKey: !!process.env.SENDGRID_API_KEY
     })
 
-    const mailerLiteService = new MailerLiteService()
-    console.log('Calling createReviewissue with issue subject_line:', issue.subject_line)
+    const sendGridService = new SendGridService()
+    console.log('Calling createReviewCampaign with issue subject_line:', issue.subject_line)
     console.log('Using forced subject line:', forcedSubjectLine)
 
     // Use forced subject line if provided, otherwise fall back to issue subject line
     const finalSubjectLine = forcedSubjectLine || issue.subject_line
-    console.log('Final subject line for MailerLite:', finalSubjectLine)
+    console.log('Final subject line for SendGrid:', finalSubjectLine)
 
-    const result = await mailerLiteService.createReviewissue(issue, finalSubjectLine)
-    console.log('MailerLite result:', result)
+    const result = await sendGridService.createReviewCampaign(issue, finalSubjectLine)
+    console.log('SendGrid result:', result)
 
-    // Update issue status to in_review and log review sent timestamp
-    await supabaseAdmin
-      .from('publication_issues')
-      .update({
-        status: 'in_review',
-        review_sent_at: new Date().toISOString()
-      })
-      .eq('id', id)
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to create SendGrid campaign')
+    }
+
+    // Note: SendGridService already updates issue status to in_review
 
     // Log user activity
     if (session.user?.email) {
@@ -185,15 +179,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             user_id: user.id,
             issue_id: id,
             action: 'review_issue_sent',
-            details: { mailerlite_issue_id: result.issueId }
+            details: { sendgrid_campaign_id: result.campaignId }
           }])
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Review issue sent successfully',
-      mailerlite_issue_id: result.issueId
+      message: 'Review campaign sent successfully via SendGrid',
+      sendgrid_campaign_id: result.campaignId
     })
 
   } catch (error) {

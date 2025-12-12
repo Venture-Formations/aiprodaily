@@ -22,6 +22,8 @@
     "@mozilla/readability": "^0.6.0",
     "@octokit/rest": "^22.0.0",
     "@radix-ui/react-slot": "^1.2.3",
+    "@sendgrid/client": "^8.1.6",
+    "@sendgrid/mail": "^8.1.6",
     "@supabase/supabase-js": "^2.39.7",
     "@tailwindcss/forms": "^0.5.7",
     "@tailwindcss/postcss": "^4.1.15",

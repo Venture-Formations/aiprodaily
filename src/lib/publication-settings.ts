@@ -239,7 +239,7 @@ export async function getBusinessSettings(publicationId: string): Promise<{
 }
 
 /**
- * Get email/MailerLite settings for a publication
+ * Get email/MailerLite settings for a publication (legacy function)
  */
 export async function getEmailSettings(publicationId: string): Promise<{
   sender_name: string
@@ -262,6 +262,54 @@ export async function getEmailSettings(publicationId: string): Promise<{
     review_group_id: settings.email_reviewGroupId || '',
     subject_line_emoji: settings.subject_line_emoji || '',
     mailerlite_group_id: settings.mailerlite_group_id || '',
+  }
+}
+
+/**
+ * Get the active email provider and its configuration
+ * Returns 'mailerlite' or 'sendgrid' along with the appropriate group/list IDs
+ */
+export async function getEmailProviderSettings(publicationId: string): Promise<{
+  provider: 'mailerlite' | 'sendgrid'
+  reviewGroupId: string
+  mainGroupId: string
+  secondaryGroupId: string
+  sendgridSenderId?: string
+  sendgridUnsubscribeGroupId?: string
+}> {
+  const settings = await getPublicationSettings(publicationId, [
+    'email_provider',
+    // MailerLite settings
+    'mailerlite_review_group_id',
+    'mailerlite_main_group_id',
+    'mailerlite_secondary_group_id',
+    // SendGrid settings
+    'sendgrid_review_list_id',
+    'sendgrid_main_list_id',
+    'sendgrid_secondary_list_id',
+    'sendgrid_sender_id',
+    'sendgrid_unsubscribe_group_id',
+  ])
+
+  const provider = (settings.email_provider || 'mailerlite') as 'mailerlite' | 'sendgrid'
+
+  if (provider === 'sendgrid') {
+    return {
+      provider: 'sendgrid',
+      reviewGroupId: settings.sendgrid_review_list_id || '',
+      mainGroupId: settings.sendgrid_main_list_id || '',
+      secondaryGroupId: settings.sendgrid_secondary_list_id || '',
+      sendgridSenderId: settings.sendgrid_sender_id || '',
+      sendgridUnsubscribeGroupId: settings.sendgrid_unsubscribe_group_id || '',
+    }
+  }
+
+  // Default to MailerLite
+  return {
+    provider: 'mailerlite',
+    reviewGroupId: settings.mailerlite_review_group_id || '',
+    mainGroupId: settings.mailerlite_main_group_id || '',
+    secondaryGroupId: settings.mailerlite_secondary_group_id || '',
   }
 }
 

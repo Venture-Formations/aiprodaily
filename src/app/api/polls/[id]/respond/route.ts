@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { MailerLiteService } from '@/lib/mailerlite'
+import { SendGridService } from '@/lib/sendgrid'
 
 // GET /api/polls/[id]/respond - Handle poll response from email link
 export async function GET(
@@ -75,24 +75,23 @@ export async function GET(
 
     const uniquePollCount = uniquePolls ? new Set(uniquePolls.map(r => r.poll_id)).size : 0
 
-    // Sync to MailerLite - update subscriber's "Poll Responses" field with uniquePollCount
+    // Sync to SendGrid - update subscriber's "poll_responses" custom field with uniquePollCount
     try {
-      const mailerlite = new MailerLiteService()
-      const syncResult = await mailerlite.updateSubscriberField(
+      const sendgrid = new SendGridService()
+      const syncResult = await sendgrid.updateContactFields(
         email,
-        'poll_responses',
-        uniquePollCount
+        { poll_responses: uniquePollCount }
       )
 
       if (syncResult.success) {
-        console.log(`[Polls] Synced poll count to MailerLite for ${email}: ${uniquePollCount} polls`)
+        console.log(`[Polls] Synced poll count to SendGrid for ${email}: ${uniquePollCount} polls`)
       } else {
-        console.error(`[Polls] Failed to sync to MailerLite:`, syncResult.error)
-        // Don't fail the whole request if MailerLite sync fails
+        console.error(`[Polls] Failed to sync to SendGrid:`, syncResult.error)
+        // Don't fail the whole request if SendGrid sync fails
       }
-    } catch (mailerliteError) {
-      console.error('[Polls] Error syncing to MailerLite:', mailerliteError)
-      // Don't fail the whole request if MailerLite sync fails
+    } catch (sendgridError) {
+      console.error('[Polls] Error syncing to SendGrid:', sendgridError)
+      // Don't fail the whole request if SendGrid sync fails
     }
 
     console.log(`[Polls] Response recorded: ${email} voted "${option}" on poll ${id}`)
