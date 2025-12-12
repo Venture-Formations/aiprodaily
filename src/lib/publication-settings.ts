@@ -279,10 +279,13 @@ export async function getEmailProviderSettings(publicationId: string): Promise<{
 }> {
   const settings = await getPublicationSettings(publicationId, [
     'email_provider',
-    // MailerLite settings
+    // MailerLite settings (new keys)
     'mailerlite_review_group_id',
     'mailerlite_main_group_id',
     'mailerlite_secondary_group_id',
+    // MailerLite legacy keys (fallback)
+    'mailerlite_group_id',
+    'email_reviewGroupId',
     // SendGrid settings
     'sendgrid_review_list_id',
     'sendgrid_main_list_id',
@@ -304,11 +307,11 @@ export async function getEmailProviderSettings(publicationId: string): Promise<{
     }
   }
 
-  // Default to MailerLite
+  // Default to MailerLite (with legacy key fallbacks)
   return {
     provider: 'mailerlite',
-    reviewGroupId: settings.mailerlite_review_group_id || '',
-    mainGroupId: settings.mailerlite_main_group_id || '',
+    reviewGroupId: settings.mailerlite_review_group_id || settings.email_reviewGroupId || '',
+    mainGroupId: settings.mailerlite_main_group_id || settings.mailerlite_group_id || '',
     secondaryGroupId: settings.mailerlite_secondary_group_id || '',
   }
 }

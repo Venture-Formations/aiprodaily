@@ -70,17 +70,27 @@ export async function GET(request: NextRequest) {
         const uiKey = keyMap[row.key] || row.key.replace('sendgrid_', 'sendgrid')
         savedSettings[uiKey] = cleanValue
       } else if (row.key.startsWith('mailerlite_')) {
-        // MailerLite settings
+        // MailerLite settings (including legacy key mapping)
         const keyMap: Record<string, string> = {
           'mailerlite_review_group_id': 'mailerliteReviewGroupId',
           'mailerlite_main_group_id': 'mailerliteMainGroupId',
-          'mailerlite_secondary_group_id': 'mailerliteSecondaryGroupId'
+          'mailerlite_secondary_group_id': 'mailerliteSecondaryGroupId',
+          // Legacy key - map to main group
+          'mailerlite_group_id': 'mailerliteMainGroupId'
         }
         const uiKey = keyMap[row.key] || row.key.replace('mailerlite_', 'mailerlite')
-        savedSettings[uiKey] = cleanValue
+        // Don't overwrite if we already have a value (prefer new key over legacy)
+        if (!savedSettings[uiKey]) {
+          savedSettings[uiKey] = cleanValue
+        }
       } else if (row.key.startsWith('email_')) {
         const settingKey = row.key.replace('email_', '')
         savedSettings[settingKey] = cleanValue
+
+        // Also map legacy email_reviewGroupId to mailerliteReviewGroupId
+        if (row.key === 'email_reviewGroupId' && !savedSettings.mailerliteReviewGroupId) {
+          savedSettings.mailerliteReviewGroupId = cleanValue
+        }
       } else {
         // Keep max_top_articles, max_bottom_articles, and lookback hours as-is
         savedSettings[row.key] = cleanValue
