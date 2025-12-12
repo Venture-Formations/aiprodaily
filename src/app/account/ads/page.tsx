@@ -183,17 +183,31 @@ export default async function AdsOverviewPage() {
         </div>
       </div>
 
-      {/* Newsletter Ads - Coming Soon */}
-      <div className="mt-8 bg-slate-50 rounded-2xl border border-slate-200 p-6">
-        <div className="flex items-start gap-4">
-          <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
-            <Newspaper className="w-5 h-5 text-slate-400" />
+      {/* Advertising Options */}
+      <div className="mt-8 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl border border-blue-200 p-6">
+        <h3 className="font-semibold text-slate-900 mb-4">Advertising Options</h3>
+        <div className="grid grid-cols-2 gap-6">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+              <Crown className="w-5 h-5 text-amber-500" />
+            </div>
+            <div>
+              <p className="font-medium text-slate-900">Featured Listing</p>
+              <p className="text-sm text-slate-600">
+                ${pricing.featuredPrice}/mo. Get the #1 position in your category with premium styling.
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="font-medium text-slate-900">Newsletter Sponsor <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full ml-2">Coming Soon</span></p>
-            <p className="text-sm text-slate-500 mt-1">
-              One-time placement. Your ad appears prominently in a newsletter issue.
-            </p>
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+              <Newspaper className="w-5 h-5 text-cyan-600" />
+            </div>
+            <div>
+              <p className="font-medium text-slate-900">Newsletter Sponsor <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full ml-2">Coming Soon</span></p>
+              <p className="text-sm text-slate-600">
+                One-time placement. Your ad appears prominently in a newsletter issue.
+              </p>
+            </div>
           </div>
         </div>
       </div>

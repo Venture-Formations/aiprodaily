@@ -2273,67 +2273,113 @@ export class RSSProcessor {
         .eq('key', 'secondary_article_lookback_hours')
         .single()
 
-      const lookbackHours = lookbackSetting ? parseInt(lookbackSetting.value) : 36
-      const lookbackDate = new Date()
-      lookbackDate.setHours(lookbackDate.getHours() - lookbackHours)
-      const lookbackTimestamp = lookbackDate.toISOString()
-
-      // Query ALL secondary articles from the lookback window that haven't been used in sent newsletters
-      const { data: availableArticles, error } = await supabaseAdmin
-        .from('secondary_articles')
-        .select(`
-          id,
-          issue_id,
-          fact_check_score,
-          created_at,
-          final_position,
-          rss_post:rss_posts(
-            post_rating:post_ratings(total_score)
-          )
-        `)
-        .gte('created_at', lookbackTimestamp)
-        .gte('fact_check_score', 15)
-        .is('final_position', null)  // Only articles NOT used in sent newsletters
+      const baseLookbackHours = lookbackSetting ? parseInt(lookbackSetting.value) : 36
 
       console.log(`[Secondary Selection] Target: ${finalArticleCount} articles`)
-      console.log(`[Secondary Selection] Lookback: ${lookbackHours} hours (since ${lookbackTimestamp})`)
 
-      if (error) {
-        console.error(`[Secondary Selection] Query error:`, error.message)
+      // Progressive fallback: try with decreasing score thresholds, then extend lookback
+      const fallbackStrategies = [
+        { scoreThreshold: 15, lookbackMultiplier: 1, description: 'strict criteria' },
+        { scoreThreshold: 10, lookbackMultiplier: 1, description: 'reduced score threshold (10)' },
+        { scoreThreshold: 5, lookbackMultiplier: 1, description: 'low score threshold (5)' },
+        { scoreThreshold: 15, lookbackMultiplier: 2, description: 'extended lookback (2x)' },
+        { scoreThreshold: 10, lookbackMultiplier: 2, description: 'extended lookback + reduced score' },
+        { scoreThreshold: 5, lookbackMultiplier: 2, description: 'extended lookback + low score' },
+        { scoreThreshold: 0, lookbackMultiplier: 3, description: 'maximum fallback (no score filter, 3x lookback)' }
+      ]
+
+      const selectedArticles: { id: string; current_issue_id: string; score: number; created_at: string }[] = []
+      const selectedIds = new Set<string>()
+
+      for (const strategy of fallbackStrategies) {
+        if (selectedArticles.length >= finalArticleCount) {
+          break // We have enough articles
+        }
+
+        const lookbackHours = baseLookbackHours * strategy.lookbackMultiplier
+        const lookbackDate = new Date()
+        lookbackDate.setHours(lookbackDate.getHours() - lookbackHours)
+        const lookbackTimestamp = lookbackDate.toISOString()
+
+        console.log(`[Secondary Selection] Trying ${strategy.description}: lookback ${lookbackHours}h, score >= ${strategy.scoreThreshold}`)
+
+        // Build query with current strategy
+        let query = supabaseAdmin
+          .from('secondary_articles')
+          .select(`
+            id,
+            issue_id,
+            fact_check_score,
+            created_at,
+            final_position,
+            rss_post:rss_posts(
+              post_rating:post_ratings(total_score)
+            )
+          `)
+          .gte('created_at', lookbackTimestamp)
+          .is('final_position', null)  // Only articles NOT used in sent newsletters
+
+        // Only add score filter if threshold > 0
+        if (strategy.scoreThreshold > 0) {
+          query = query.gte('fact_check_score', strategy.scoreThreshold)
+        }
+
+        const { data: availableArticles, error } = await query
+
+        if (error) {
+          console.error(`[Secondary Selection] Query error:`, error.message)
+          continue
+        }
+
+        if (!availableArticles || availableArticles.length === 0) {
+          console.log(`[Secondary Selection] No articles found with ${strategy.description}`)
+          continue
+        }
+
+        // Filter out already selected articles and sort by score
+        const newArticles = availableArticles
+          .filter((article: any) => !selectedIds.has(article.id))
+          .map((article: any) => ({
+            id: article.id,
+            current_issue_id: article.issue_id,
+            score: article.rss_post?.post_rating?.[0]?.total_score || 0,
+            created_at: article.created_at
+          }))
+          .sort((a, b) => b.score - a.score)
+
+        // Take only as many as we still need
+        const needed = finalArticleCount - selectedArticles.length
+        const toAdd = newArticles.slice(0, needed)
+
+        if (toAdd.length > 0) {
+          console.log(`[Secondary Selection] Found ${toAdd.length} additional articles with ${strategy.description}`)
+          toAdd.forEach((a) => {
+            selectedArticles.push(a)
+            selectedIds.add(a.id)
+          })
+        }
+      }
+
+      if (selectedArticles.length === 0) {
+        console.log(`[Secondary Selection] No articles found after all fallback attempts`)
         return
       }
 
-      if (!availableArticles || availableArticles.length === 0) {
-        console.log(`[Secondary Selection] No articles found matching criteria`)
-        return
-      }
+      // Sort final selection by score and log
+      selectedArticles.sort((a, b) => b.score - a.score)
 
-      console.log(`[Secondary Selection] Found ${availableArticles.length} articles meeting criteria (fact_check_score >= 15, not used in sent newsletters)`)
-
-      // Sort ALL available articles by rating (highest first) and take the top N
-      const sortedArticles = availableArticles
-        .map((article: any) => ({
-          id: article.id,
-          current_issue_id: article.issue_id,
-          score: article.rss_post?.post_rating?.[0]?.total_score || 0,
-          created_at: article.created_at
-        }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, finalArticleCount)
-
-      console.log(`[Secondary Selection] Selected ${sortedArticles.length} articles (sorted by score):`)
-      sortedArticles.forEach((a, idx) => {
+      console.log(`[Secondary Selection] Final selection: ${selectedArticles.length}/${finalArticleCount} articles (sorted by score):`)
+      selectedArticles.forEach((a, idx) => {
         console.log(`  ${idx + 1}. Article ${a.id} - Score: ${a.score}`)
       })
 
-      if (sortedArticles.length === 0) {
-        console.log(`[Secondary Selection] No articles to activate after sorting`)
-        return
+      if (selectedArticles.length < finalArticleCount) {
+        console.log(`[Secondary Selection] ⚠ Warning: Only ${selectedArticles.length} articles available, target was ${finalArticleCount}`)
       }
 
       // Update all selected articles to belong to current issue and activate them
-      for (let i = 0; i < sortedArticles.length; i++) {
-        const article = sortedArticles[i]
+      for (let i = 0; i < selectedArticles.length; i++) {
+        const article = selectedArticles[i]
 
         await supabaseAdmin
           .from('secondary_articles')
@@ -2345,11 +2391,11 @@ export class RSSProcessor {
           .eq('id', article.id)
       }
 
-      console.log(`[Secondary Selection] ✓ Activated ${sortedArticles.length} secondary articles for issue`)
+      console.log(`[Secondary Selection] ✓ Activated ${selectedArticles.length} secondary articles for issue`)
 
     } catch (error) {
-      const errorMsg = error instanceof Error 
-        ? error.message 
+      const errorMsg = error instanceof Error
+        ? error.message
         : typeof error === 'object' && error !== null
           ? JSON.stringify(error, null, 2)
           : String(error)
