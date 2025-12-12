@@ -80,7 +80,7 @@ export default async function AdsOverviewPage() {
               )}
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Tool Profile</h2>
-                <p className="text-sm text-slate-500">Premium listing in directory</p>
+                <p className="text-sm text-slate-500">Premium listing in AI Tools Directory</p>
               </div>
             </div>
           </div>
@@ -126,12 +126,12 @@ export default async function AdsOverviewPage() {
             )}
           </div>
 
-          <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
+          <div className={`px-6 py-4 border-t ${isFeatured ? 'bg-slate-50 border-slate-100' : 'bg-gradient-to-r from-amber-500 to-orange-500'}`}>
             <Link
               href="/account/ads/profile"
-              className="flex items-center justify-between text-blue-600 font-medium hover:underline"
+              className={`flex items-center justify-between font-medium ${isFeatured ? 'text-blue-600 hover:underline' : 'text-white'}`}
             >
-              <span>{isFeatured ? 'Manage Listing' : 'Upgrade Listing'}</span>
+              <span>{isFeatured ? 'Manage Listing' : 'Upgrade to Featured'}</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
