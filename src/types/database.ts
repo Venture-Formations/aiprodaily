@@ -1067,3 +1067,86 @@ export interface DirectoryCategoryWithTools extends DirectoryCategory {
   tools: DirectoryTool[]
   tool_count?: number
 }
+
+// ============================================
+// Sponsorship Packages & Entitlements Types
+// ============================================
+
+export interface SponsorshipPackage {
+  id: string
+  publication_id: string
+
+  // Package Info
+  name: string
+  description: string | null
+
+  // Included Benefits
+  newsletter_ad_spots: number
+  featured_listing_included: boolean
+  featured_listing_months: number
+
+  // Pricing
+  price_monthly: number | null
+  price_yearly: number | null
+
+  // Stripe Integration
+  stripe_product_id: string | null
+  stripe_price_id_monthly: string | null
+  stripe_price_id_yearly: string | null
+
+  // Display & Status
+  display_order: number
+  is_active: boolean
+  is_featured: boolean
+
+  // Metadata
+  created_at: string
+  updated_at: string
+}
+
+export type EntitlementType = 'newsletter_ad' | 'featured_listing'
+export type EntitlementStatus = 'active' | 'expired' | 'cancelled' | 'paused'
+
+export interface CustomerEntitlement {
+  id: string
+  publication_id: string
+  clerk_user_id: string
+
+  // Source of entitlement
+  package_id: string | null
+
+  // Entitlement Details
+  entitlement_type: EntitlementType
+  quantity_total: number
+  quantity_used: number
+
+  // Validity Period
+  valid_from: string
+  valid_until: string | null
+
+  // Stripe Integration
+  stripe_subscription_id: string | null
+  stripe_customer_id: string | null
+
+  // Status
+  status: EntitlementStatus
+
+  // Admin/Audit
+  notes: string | null
+  granted_by: string | null
+
+  // Metadata
+  created_at: string
+  updated_at: string
+
+  // Joined relations (optional)
+  package?: SponsorshipPackage
+}
+
+// Extended types with computed fields
+export interface CustomerEntitlementWithDetails extends CustomerEntitlement {
+  quantity_remaining: number
+  is_valid: boolean
+  customer_email?: string
+  customer_name?: string
+}

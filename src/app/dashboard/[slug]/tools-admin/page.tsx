@@ -8,7 +8,7 @@ import 'react-image-crop/dist/ReactCrop.css'
 import { getCroppedImage } from '@/utils/imageCrop'
 import Layout from '@/components/Layout'
 import Link from 'next/link'
-import { Settings } from 'lucide-react'
+import { Settings, Package, Users } from 'lucide-react'
 
 interface Tool {
   id: string
@@ -207,13 +207,29 @@ export default function ToolsAdminPage() {
             <h1 className="text-2xl font-bold text-gray-900">Tools Directory Admin</h1>
             <p className="text-gray-600 mt-1">Review and manage tool submissions</p>
           </div>
-          <Link
-            href="tools-admin/settings"
-            className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-          >
-            <Settings className="w-4 h-4 mr-2" />
-            Pricing Settings
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="tools-admin/packages"
+              className="inline-flex items-center px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
+            >
+              <Package className="w-4 h-4 mr-2" />
+              Packages
+            </Link>
+            <Link
+              href="tools-admin/entitlements"
+              className="inline-flex items-center px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+            >
+              <Users className="w-4 h-4 mr-2" />
+              Entitlements
+            </Link>
+            <Link
+              href="tools-admin/settings"
+              className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              Settings
+            </Link>
+          </div>
         </div>
 
       {/* Filter Tabs */}

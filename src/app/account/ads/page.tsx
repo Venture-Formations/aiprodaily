@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { getDirectoryPricing } from '@/lib/directory'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Star, Newspaper, ArrowRight, Check, Crown, Clock } from 'lucide-react'
+import { Star, Newspaper, ArrowRight, Crown, Clock } from 'lucide-react'
 
 const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
 
@@ -37,9 +37,7 @@ export default async function AdsOverviewPage() {
   console.log('[Account/Ads] Error:', error)
 
   const hasListing = !!tool
-  const listingType = tool?.is_featured ? 'featured' : tool?.is_paid_placement ? 'paid_placement' : 'free'
-  const isPaidListing = listingType !== 'free'
-  const isFeatured = listingType === 'featured'
+  const isFeatured = tool?.is_featured || false
   const billingPeriod = tool?.plan === 'yearly' ? 'Yearly' : tool?.plan === 'monthly' ? 'Monthly' : null
 
   return (
@@ -71,14 +69,12 @@ export default async function AdsOverviewPage() {
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
                   isFeatured
                     ? 'bg-gradient-to-r from-amber-500 to-orange-500'
-                    : isPaidListing
-                      ? 'bg-gradient-to-r from-blue-600 to-cyan-500'
-                      : 'bg-slate-100'
+                    : 'bg-slate-100'
                 }`}>
                   {isFeatured ? (
                     <Crown className="w-6 h-6 text-white" />
                   ) : (
-                    <Star className={`w-6 h-6 ${isPaidListing ? 'text-white fill-current' : 'text-slate-400'}`} />
+                    <Star className="w-6 h-6 text-slate-400" />
                   )}
                 </div>
               )}
@@ -115,31 +111,17 @@ export default async function AdsOverviewPage() {
                   Your listing &ldquo;{tool.app_name}&rdquo; has the #1 position in its category.
                 </p>
               </div>
-            ) : isPaidListing ? (
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full text-sm font-medium">
-                    <Check className="w-4 h-4" />
-                    Paid Placement
-                  </span>
-                  <span className="text-sm text-slate-500 capitalize">
-                    {billingPeriod || 'Monthly'}
-                  </span>
-                </div>
-                <p className="text-sm text-slate-600 mb-4">
-                  Your listing &ldquo;{tool.app_name}&rdquo; appears on Page 1 of the directory.
-                </p>
-              </div>
             ) : (
               <div>
-                <p className="text-sm text-slate-600 mb-4">
-                  Upgrade &ldquo;{tool.app_name}&rdquo; to get priority placement and stand out.
-                </p>
-                <div className="flex items-center gap-4 text-sm text-slate-500">
-                  <span>From ${pricing.paidPlacementPrice}/mo</span>
-                  <span>•</span>
-                  <span>Cancel anytime</span>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-full text-sm font-medium">
+                    <Star className="w-4 h-4" />
+                    Free Listing
+                  </span>
                 </div>
+                <p className="text-sm text-slate-600 mb-4">
+                  &ldquo;{tool.app_name}&rdquo; is listed in the directory. Upgrade to Featured for the #1 position in your category.
+                </p>
               </div>
             )}
           </div>
@@ -149,7 +131,7 @@ export default async function AdsOverviewPage() {
               href="/account/ads/profile"
               className="flex items-center justify-between text-blue-600 font-medium hover:underline"
             >
-              <span>{isPaidListing ? 'Manage Listing' : 'Upgrade Listing'}</span>
+              <span>{isFeatured ? 'Manage Listing' : 'Upgrade Listing'}</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -199,20 +181,9 @@ export default async function AdsOverviewPage() {
       </div>
 
       {/* Quick Stats / Info */}
-      <div className="mt-8 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl border border-blue-200 p-6">
+      <div className="mt-8 bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl border border-amber-200 p-6">
         <h3 className="font-semibold text-slate-900 mb-4">Advertising Options</h3>
-        <div className="grid grid-cols-3 gap-6">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <Star className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="font-medium text-slate-900">Paid Placement</p>
-              <p className="text-sm text-slate-600">
-                ${pricing.paidPlacementPrice}/mo. Your tool appears on Page 1 of the directory.
-              </p>
-            </div>
-          </div>
+        <div className="grid grid-cols-2 gap-6">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
               <Crown className="w-5 h-5 text-amber-500" />
@@ -220,7 +191,7 @@ export default async function AdsOverviewPage() {
             <div>
               <p className="font-medium text-slate-900">Featured Listing</p>
               <p className="text-sm text-slate-600">
-                ${pricing.featuredPrice}/mo. Get the #1 position in your category with premium styling.
+                ${pricing.featuredPrice}/mo. Get the #1 position in your category with premium styling. Only 1 featured listing per category.
               </p>
             </div>
           </div>
@@ -231,7 +202,7 @@ export default async function AdsOverviewPage() {
             <div>
               <p className="font-medium text-slate-900">Newsletter Sponsor</p>
               <p className="text-sm text-slate-600">
-                One-time placement. Your ad appears prominently in a newsletter issue.
+                One-time placement. Your ad appears prominently in a newsletter issue. Coming soon!
               </p>
             </div>
           </div>

@@ -35,7 +35,7 @@ const navigation = [
     href: '/account/ads',
     icon: Megaphone,
     children: [
-      { name: 'Tool Profile', href: '/account/ads/profile', icon: Star },
+      { name: 'Tool Directory', href: '/account/ads/profile', icon: Star },
       { name: 'Newsletter', href: '/account/ads/newsletter', icon: Newspaper }
     ]
   },

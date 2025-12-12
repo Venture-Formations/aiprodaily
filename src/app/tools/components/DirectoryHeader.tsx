@@ -78,12 +78,12 @@ function MobileNavigation() {
         <MobileNavLink href="/contactus">Contact</MobileNavLink>
         <hr className="m-2 border-slate-300/40" />
         <SignedOut>
-          <SignInButton mode="modal">
+          <SignInButton mode="modal" fallbackRedirectUrl="/account">
             <button className="block w-full p-2 text-left">Sign In</button>
           </SignInButton>
         </SignedOut>
         <SignedIn>
-          <MobileNavLink href="/account/ads">Sponsorship</MobileNavLink>
+          <MobileNavLink href="/account/ads">Manage Listing</MobileNavLink>
         </SignedIn>
       </PopoverPanel>
     </Popover>
@@ -118,7 +118,7 @@ export function DirectoryHeader({ logoUrl, newsletterName }: DirectoryHeaderProp
           </div>
           <div className="flex items-center gap-x-5 md:gap-x-8">
             <SignedOut>
-              <SignInButton mode="modal">
+              <SignInButton mode="modal" fallbackRedirectUrl="/account">
                 <button className="hidden md:block text-sm text-slate-700 hover:text-slate-900">
                   Sign In
                 </button>
@@ -136,20 +136,10 @@ export function DirectoryHeader({ logoUrl, newsletterName }: DirectoryHeaderProp
               />
             </SignedIn>
 
-            <SignedOut>
-              <SignInButton mode="modal" fallbackRedirectUrl="/account/ads">
-                <Button color="blue">
-                  <span>
-                    Sponsor <span className="hidden lg:inline">Listing</span>
-                  </span>
-                </Button>
-              </SignInButton>
-            </SignedOut>
-
             <SignedIn>
               <Button href="/account/ads" color="blue">
                 <span>
-                  Sponsor <span className="hidden lg:inline">Listing</span>
+                  Manage <span className="hidden lg:inline">Listing</span>
                 </span>
               </Button>
             </SignedIn>
