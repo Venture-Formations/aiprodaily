@@ -180,31 +180,46 @@ export default async function AdsOverviewPage() {
         </div>
       </div>
 
-      {/* Quick Stats / Info */}
-      <div className="mt-8 bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl border border-amber-200 p-6">
-        <h3 className="font-semibold text-slate-900 mb-4">Advertising Options</h3>
-        <div className="grid grid-cols-2 gap-6">
+      {/* Featured Listing Promo */}
+      <div className="mt-8 bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl border border-amber-200 overflow-hidden">
+        {/* Urgency Header */}
+        <div className="bg-amber-500 text-white text-center py-3 px-4">
+          <p className="font-bold">⚡ Only 1 Featured Listing Per Category — Limited Availability</p>
+        </div>
+
+        <div className="p-6">
           <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <Crown className="w-5 h-5 text-amber-500" />
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-center flex-shrink-0 shadow-md">
+              <Crown className="w-6 h-6 text-white" />
             </div>
-            <div>
-              <p className="font-medium text-slate-900">Featured Listing</p>
-              <p className="text-sm text-slate-600">
-                ${pricing.featuredPrice}/mo. Get the #1 position in your category with premium styling. Only 1 featured listing per category.
+            <div className="flex-1">
+              <p className="font-semibold text-slate-900 text-lg">Featured Listing — ${pricing.featuredPrice}/month</p>
+              <p className="text-slate-600 mt-1">
+                Claim the #1 position in your category. Featured tools get premium styling, a featured badge, and appear first in all category views. Once claimed, no other tool in that category can be featured.
               </p>
+              <Link
+                href="/account/ads/profile"
+                className="inline-flex items-center gap-2 mt-3 text-amber-600 font-medium hover:text-amber-700"
+              >
+                Check availability in your category
+                <ArrowRight className="w-4 h-4" />
+              </Link>
             </div>
           </div>
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <Newspaper className="w-5 h-5 text-cyan-600" />
-            </div>
-            <div>
-              <p className="font-medium text-slate-900">Newsletter Sponsor</p>
-              <p className="text-sm text-slate-600">
-                One-time placement. Your ad appears prominently in a newsletter issue. Coming soon!
-              </p>
-            </div>
+        </div>
+      </div>
+
+      {/* Newsletter Ads - Coming Soon */}
+      <div className="mt-4 bg-slate-50 rounded-2xl border border-slate-200 p-6">
+        <div className="flex items-start gap-4">
+          <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+            <Newspaper className="w-5 h-5 text-slate-400" />
+          </div>
+          <div>
+            <p className="font-medium text-slate-900">Newsletter Sponsor <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full ml-2">Coming Soon</span></p>
+            <p className="text-sm text-slate-500 mt-1">
+              One-time placement. Your ad appears prominently in a newsletter issue.
+            </p>
           </div>
         </div>
       </div>

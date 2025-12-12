@@ -231,29 +231,26 @@ function FeaturedUpgradeModal({
       <div className="absolute inset-0 bg-black/50" onClick={onContinueFree} />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 p-6">
-        {/* Featured badge */}
-        <div className="flex justify-center mb-4">
-          <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold px-4 py-1 rounded-full">
-            Featured Spot Available
-          </span>
+      <div className="relative bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 overflow-hidden">
+        {/* Urgency Banner */}
+        <div className="bg-amber-500 text-white text-center py-3 px-4">
+          <p className="font-bold text-lg">⚡ Only 1 Featured Listing Per Category</p>
         </div>
 
-        <h2 className="text-xl font-semibold text-gray-900 text-center mb-2">
-          Upgrade to Featured Listing?
-        </h2>
+        <div className="p-6">
+          <h2 className="text-xl font-semibold text-gray-900 text-center mb-2">
+            Claim the #1 Position in {categoryName}!
+          </h2>
 
-        <p className="text-gray-600 text-center mb-4">
-          The <span className="font-semibold text-gray-900">{categoryName}</span> category doesn&apos;t have a featured listing yet.
-        </p>
-
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-          <p className="text-sm text-amber-800 text-center">
-            <span className="font-semibold">Only 1 featured position per category.</span>
-            <br />
-            Claim the #1 spot before someone else does!
+          <p className="text-gray-600 text-center mb-4">
+            This category doesn&apos;t have a featured listing yet — <span className="font-semibold text-amber-600">the spot is yours for the taking!</span>
           </p>
-        </div>
+
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-lg p-4 mb-6">
+            <p className="text-amber-800 text-center font-medium">
+              Once claimed, no other tool in {categoryName} can be featured until you cancel.
+            </p>
+          </div>
 
         {/* Benefits */}
         <ul className="space-y-2 mb-6">
@@ -316,6 +313,7 @@ function FeaturedUpgradeModal({
           >
             Continue with Free Listing
           </button>
+        </div>
         </div>
       </div>
     </div>

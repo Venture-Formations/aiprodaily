@@ -225,13 +225,19 @@ export default async function ToolProfileAdsPage() {
           {/* Upgrade to Featured Option */}
           {!categoryHasFeatured ? (
             <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl border border-amber-200 p-8">
+              {/* Urgency Banner */}
+              <div className="bg-amber-500 text-white text-center py-3 px-4 rounded-xl mb-6 shadow-md">
+                <p className="font-bold text-lg">⚡ Only 1 Featured Listing Per Category</p>
+                <p className="text-amber-100 text-sm">This spot is currently available in your category!</p>
+              </div>
+
               <div className="text-center mb-8">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-center">
                   <Crown className="w-8 h-8 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-slate-900 mb-2">Upgrade to Featured</h2>
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">Claim the #1 Position</h2>
                 <p className="text-slate-600 max-w-lg mx-auto">
-                  Get the #1 position in your category. Only one featured listing per category.
+                  Be the featured tool in your category and get maximum visibility
                 </p>
               </div>
 
