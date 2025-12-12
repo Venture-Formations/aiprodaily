@@ -1200,7 +1200,8 @@ function EmailSettings() {
         const processedData = {
           ...emailSettings,
           reviewScheduleEnabled: emailSettings.reviewScheduleEnabled === 'true',
-          dailyScheduleEnabled: emailSettings.dailyScheduleEnabled === 'true'
+          dailyScheduleEnabled: emailSettings.dailyScheduleEnabled === 'true',
+          secondaryScheduleEnabled: emailSettings.secondaryScheduleEnabled === 'true'
         }
         console.log('FRONTEND: Processed settings with boolean conversion (max articles excluded):', processedData)
         setSettings(processedData)  // Don't merge with prev - use fresh data from API

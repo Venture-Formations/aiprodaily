@@ -180,37 +180,8 @@ export default async function AdsOverviewPage() {
         </div>
       </div>
 
-      {/* Featured Listing Promo */}
-      <div className="mt-8 bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl border border-amber-200 overflow-hidden">
-        {/* Urgency Header */}
-        <div className="bg-amber-500 text-white text-center py-3 px-4">
-          <p className="font-bold">⚡ Only 1 Featured Listing Per Category — Limited Availability</p>
-        </div>
-
-        <div className="p-6">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-center flex-shrink-0 shadow-md">
-              <Crown className="w-6 h-6 text-white" />
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-slate-900 text-lg">Featured Listing — ${pricing.featuredPrice}/month</p>
-              <p className="text-slate-600 mt-1">
-                Claim the #1 position in your category. Featured tools get premium styling, a featured badge, and appear first in all category views. Once claimed, no other tool in that category can be featured.
-              </p>
-              <Link
-                href="/account/ads/profile"
-                className="inline-flex items-center gap-2 mt-3 text-amber-600 font-medium hover:text-amber-700"
-              >
-                Check availability in your category
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Newsletter Ads - Coming Soon */}
-      <div className="mt-4 bg-slate-50 rounded-2xl border border-slate-200 p-6">
+      <div className="mt-8 bg-slate-50 rounded-2xl border border-slate-200 p-6">
         <div className="flex items-start gap-4">
           <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
             <Newspaper className="w-5 h-5 text-slate-400" />
