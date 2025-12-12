@@ -2277,15 +2277,12 @@ export class RSSProcessor {
 
       console.log(`[Secondary Selection] Target: ${finalArticleCount} articles`)
 
-      // Progressive fallback: try with decreasing score thresholds, then extend lookback
+      // Progressive fallback: try with decreasing score thresholds
       const fallbackStrategies = [
-        { scoreThreshold: 15, lookbackMultiplier: 1, description: 'strict criteria' },
-        { scoreThreshold: 10, lookbackMultiplier: 1, description: 'reduced score threshold (10)' },
-        { scoreThreshold: 5, lookbackMultiplier: 1, description: 'low score threshold (5)' },
-        { scoreThreshold: 15, lookbackMultiplier: 2, description: 'extended lookback (2x)' },
-        { scoreThreshold: 10, lookbackMultiplier: 2, description: 'extended lookback + reduced score' },
-        { scoreThreshold: 5, lookbackMultiplier: 2, description: 'extended lookback + low score' },
-        { scoreThreshold: 0, lookbackMultiplier: 3, description: 'maximum fallback (no score filter, 3x lookback)' }
+        { scoreThreshold: 15, lookbackMultiplier: 1, description: 'strict criteria (score >= 15)' },
+        { scoreThreshold: 10, lookbackMultiplier: 1, description: 'reduced score threshold (score >= 10)' },
+        { scoreThreshold: 5, lookbackMultiplier: 1, description: 'low score threshold (score >= 5)' },
+        { scoreThreshold: 0, lookbackMultiplier: 1, description: 'no score filter' }
       ]
 
       const selectedArticles: { id: string; current_issue_id: string; score: number; created_at: string }[] = []

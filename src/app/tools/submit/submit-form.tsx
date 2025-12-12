@@ -532,14 +532,21 @@ export function SubmitToolForm({ categories, featuredCategories, featuredMonthly
             Website URL *
           </label>
           <input
-            type="url"
+            type="text"
             id="websiteUrl"
             value={formData.websiteUrl}
             onChange={(e) => setFormData(prev => ({ ...prev, websiteUrl: e.target.value }))}
+            onBlur={(e) => {
+              const url = e.target.value.trim()
+              if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+                setFormData(prev => ({ ...prev, websiteUrl: `https://${url}` }))
+              }
+            }}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="https://yourwebsite.com"
+            placeholder="yourwebsite.com"
             disabled={isSubmitting}
           />
+          <p className="mt-1 text-sm text-gray-500">https:// will be added automatically if not included</p>
         </div>
 
         {/* Description */}
