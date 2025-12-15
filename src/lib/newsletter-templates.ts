@@ -727,27 +727,52 @@ export function generateAdvertorialHtml(
       )
     } else {
       // Check for arrow CTA pattern in paragraph format
-      // This handles BOTH:
-      // 1. Arrow at start: "→ Try Fiskl"
-      // 2. Arrow mid-line: "Some text → Try Fiskl" (only text AFTER arrow becomes link)
+      // Handle various structures:
+      // 1. Plain: "→ Try Fiskl"
+      // 2. Mid-line: "Some text → Try Fiskl"
+      // 3. Separate tags: "<strong>→ </strong><strong>Send it to Shoeboxed.</strong>"
 
-      // First, try to find arrow anywhere in the content (mid-line or at start)
-      // Pattern: anything before arrow (optional), arrow, then CTA text
-      const midLineArrowPattern = /([\s\S]*?)(→\s*)([^<\n→]+?)(\s*<\/p>|\s*<\/strong>|\s*$)/i
-      const midLineMatch = processedBody.match(midLineArrowPattern)
+      let arrowHandled = false
 
-      if (midLineMatch && midLineMatch[3].trim().length > 3) {
-        // Found arrow pattern - only the text AFTER the arrow becomes the link
-        const beforeArrow = midLineMatch[1] // Text before arrow (may include tags)
-        const arrow = midLineMatch[2] // "→ "
-        const ctaText = midLineMatch[3].trim() // "Send it to Shoeboxed"
-        const afterCta = midLineMatch[4] || '' // closing tags
+      // First, try to match arrow in separate strong tag followed by CTA in another strong tag
+      // Pattern: <strong>→ </strong><strong>CTA text</strong>
+      const separateTagsPattern = /([\s\S]*?<strong[^>]*>)(→\s*)(<\/strong>\s*<strong[^>]*>)([^<]+)(<\/strong>)/i
+      const separateTagsMatch = processedBody.match(separateTagsPattern)
+
+      if (separateTagsMatch && separateTagsMatch[4].trim().length > 3) {
+        const beforeArrow = separateTagsMatch[1]
+        const arrow = separateTagsMatch[2]
+        const betweenTags = separateTagsMatch[3]
+        const ctaText = separateTagsMatch[4].trim()
+        const closingTag = separateTagsMatch[5]
 
         processedBody = processedBody.replace(
-          midLineArrowPattern,
-          `${beforeArrow}<strong>${arrow}</strong><a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${ctaText}</a>${afterCta}`
+          separateTagsPattern,
+          `${beforeArrow}${arrow}${betweenTags}<a href='${buttonUrl}' style='color: #000; text-decoration: underline;'>${ctaText}</a>${closingTag}`
         )
-      } else {
+        arrowHandled = true
+      }
+
+      // If not handled, try simpler mid-line pattern
+      if (!arrowHandled) {
+        const midLineArrowPattern = /([\s\S]*?)(→\s*)([^<\n→]+?)(\s*<\/p>|\s*<\/strong>|\s*$)/i
+        const midLineMatch = processedBody.match(midLineArrowPattern)
+
+        if (midLineMatch && midLineMatch[3].trim().length > 3) {
+          const beforeArrow = midLineMatch[1]
+          const arrow = midLineMatch[2]
+          const ctaText = midLineMatch[3].trim()
+          const afterCta = midLineMatch[4] || ''
+
+          processedBody = processedBody.replace(
+            midLineArrowPattern,
+            `${beforeArrow}<strong>${arrow}</strong><a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${ctaText}</a>${afterCta}`
+          )
+          arrowHandled = true
+        }
+      }
+
+      if (!arrowHandled) {
       // No arrow CTA - use existing last-sentence logic
       // Strip HTML to get plain text
       const plainText = processedBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
