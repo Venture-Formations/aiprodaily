@@ -11,6 +11,9 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
   // Convert font-weight: 700 spans to <strong> tags before removing spans
   processed = processed.replace(/<span([^>]*?)font-weight:\s*700([^>]*?)>(.*?)<\/span>/gi, '<strong>$3</strong>')
 
+  // Convert font-style: italic spans to <em> tags before removing spans
+  processed = processed.replace(/<span([^>]*?)font-style:\s*italic([^>]*?)>(.*?)<\/span>/gi, '<em>$3</em>')
+
   // Strip the outer Google Docs wrapper span
   processed = processed.replace(/<span[^>]*docs-internal-guid[^>]*>([\s\S]*?)<\/span>\s*$/gi, '$1')
 
@@ -76,6 +79,8 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
   processed = processed.replace(/<br[^>]*>/gi, '<br>')
   processed = processed.replace(/<strong[^>]*>/gi, '<strong>')
   processed = processed.replace(/<b[^>]*>/gi, '<b>')
+  processed = processed.replace(/<em[^>]*>/gi, '<em>')
+  processed = processed.replace(/<i[^>]*>/gi, '<i>')
 
   // Handle links - keep href but remove other attributes
   processed = processed.replace(/<a\s+[^>]*href="([^"]*)"[^>]*>/gi, '<a href="$1">')
