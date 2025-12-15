@@ -9,10 +9,23 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
   let processed = html
 
   // Convert font-weight: 700 spans to <strong> tags before removing spans
-  processed = processed.replace(/<span([^>]*?)font-weight:\s*700([^>]*?)>(.*?)<\/span>/gi, '<strong>$3</strong>')
+  // BUT only if they don't contain block elements (p, div, br) - otherwise they're wrapper spans
+  processed = processed.replace(/<span([^>]*?)font-weight:\s*700([^>]*?)>(.*?)<\/span>/gi, (match, before, after, content) => {
+    // If content contains block elements, it's a wrapper - don't make it strong
+    if (/<(?:p|div|br|table|tr|td)[^>]*>/i.test(content)) {
+      return content // Just return the content without the span
+    }
+    return `<strong>${content}</strong>`
+  })
 
   // Convert font-style: italic spans to <em> tags before removing spans
-  processed = processed.replace(/<span([^>]*?)font-style:\s*italic([^>]*?)>(.*?)<\/span>/gi, '<em>$3</em>')
+  // Same logic - don't convert wrapper spans
+  processed = processed.replace(/<span([^>]*?)font-style:\s*italic([^>]*?)>(.*?)<\/span>/gi, (match, before, after, content) => {
+    if (/<(?:p|div|br|table|tr|td)[^>]*>/i.test(content)) {
+      return content
+    }
+    return `<em>${content}</em>`
+  })
 
   // Strip the outer Google Docs wrapper span
   processed = processed.replace(/<span[^>]*docs-internal-guid[^>]*>([\s\S]*?)<\/span>\s*$/gi, '$1')
@@ -75,7 +88,8 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
   })
 
   // Remove ALL attributes from tags (except href on links - list tags already processed above)
-  processed = processed.replace(/<p[^>]*>/gi, '<p>')
+  // Add inline margin:0 to paragraphs to prevent excessive spacing in emails
+  processed = processed.replace(/<p[^>]*>/gi, '<p style="margin:0 0 0.5em 0;">')
   processed = processed.replace(/<br[^>]*>/gi, '<br>')
   processed = processed.replace(/<strong[^>]*>/gi, '<strong>')
   processed = processed.replace(/<b[^>]*>/gi, '<b>')
