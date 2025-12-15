@@ -207,6 +207,9 @@ export interface RssFeed {
   updated_at: string
 }
 
+// Extraction status types for paywall/access detection
+export type ExtractionStatus = 'pending' | 'success' | 'paywall' | 'login_required' | 'blocked' | 'timeout' | 'failed'
+
 export interface RssPost {
   id: string
   feed_id: string
@@ -225,6 +228,9 @@ export interface RssPost {
   breaking_news_category: string | null
   ai_summary: string | null
   ai_title: string | null
+  // Extraction status tracking (paywall/access detection)
+  extraction_status: ExtractionStatus | null
+  extraction_error: string | null
   // Multi-criteria scoring system (expandable 1-5 criteria)
   criteria_1_score: number | null
   criteria_1_reason: string | null

@@ -706,17 +706,24 @@ export function generateAdvertorialHtml(
   let processedBody = normalizeEmailHtml(ad.body || '')
   if (buttonUrl !== '#' && processedBody) {
     // Check for arrow CTA in table format (created by normalizeEmailHtml)
-    // Pattern: <table...><tr><td...>→</td><td>CTA Text</td></tr></table> at the end
-    const tableArrowCtaPattern = /(<table[^>]*>)\s*<tr>\s*<td[^>]*>→<\/td>\s*<td>([^<]+)<\/td>\s*<\/tr>\s*<\/table>\s*$/i
-    const tableArrowMatch = processedBody.match(tableArrowCtaPattern)
+    // This handles both single-row tables AND multi-row tables with arrows
+    // We want to make the LAST arrow row's text into a clickable link
+    
+    // Pattern for the last row with an arrow in a table (handles bold arrows too)
+    // Made more flexible: doesn't require table to be at very end, allows for trailing whitespace/content
+    const tableArrowLastRowPattern = /(<table[^>]*>(?:[\s\S]*?<tr>[\s\S]*?<\/tr>)*?)(<tr>\s*<td[^>]*>\s*(?:<strong>)?\s*→\s*(?:<\/strong>)?\s*<\/td>\s*<td>)([^<]+)(<\/td>\s*<\/tr>\s*<\/table>)/i
+    const tableArrowMatch = processedBody.match(tableArrowLastRowPattern)
 
     if (tableArrowMatch) {
-      // Found table-based arrow CTA - make arrow bold, text becomes a link
-      const ctaText = tableArrowMatch[2].trim()
+      // Found table-based arrow CTA - keep the table structure but make the last row's text a link
+      const beforeLastRow = tableArrowMatch[1]
+      const lastRowStart = tableArrowMatch[2]
+      const ctaText = tableArrowMatch[3].trim()
+      const lastRowEnd = tableArrowMatch[4]
 
       processedBody = processedBody.replace(
-        tableArrowCtaPattern,
-        `<p><strong>→ </strong><a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${ctaText}</a></p>`
+        tableArrowLastRowPattern,
+        `${beforeLastRow}${lastRowStart}<a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${ctaText}</a>${lastRowEnd}`
       )
     } else {
       // Check for arrow CTA pattern in paragraph format (e.g., "→ Try Fiskl")

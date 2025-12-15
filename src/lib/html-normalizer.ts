@@ -1,10 +1,9 @@
 // HTML normalization utilities for email-safe formatting
-// Used when saving advertorial content to the database
+// Used for advertorial content to ensure consistent rendering in emails
 
 /**
  * Normalizes HTML content by stripping Google Docs formatting and creating clean, simple HTML
  * with proper bullet/numbered list formatting that handles multi-line wrapping.
- * This should be called when SAVING advertorial content to the database.
  */
 export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans-serif'): string {
   let processed = html
@@ -19,8 +18,21 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
   processed = processed.replace(/<div[^>]*>/gi, '<p>')
   processed = processed.replace(/<\/div>/gi, '</p>')
 
-  // Remove ALL other spans - keep just the text content
+  // Remove spans WITHOUT meaningful styles (preserve color, background-color)
+  // First, preserve spans with color or background styles by marking them temporarily
+  const preservedSpans: string[] = []
+  processed = processed.replace(/<span[^>]*style\s*=\s*["'][^"']*(?:color|background)[^"']*["'][^>]*>(.*?)<\/span>/gi, (match) => {
+    preservedSpans.push(match)
+    return `__PRESERVED_SPAN_${preservedSpans.length - 1}__`
+  })
+  
+  // Now remove all other spans (they don't have meaningful styles)
   processed = processed.replace(/<span[^>]*>(.*?)<\/span>/gi, '$1')
+  
+  // Restore preserved spans
+  preservedSpans.forEach((span, index) => {
+    processed = processed.replace(`__PRESERVED_SPAN_${index}__`, span)
+  })
 
   // IMPORTANT: Handle React Quill list formats BEFORE removing attributes
   // React Quill uses <ol><li data-list="bullet"> for bullet lists
@@ -96,8 +108,8 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
             // Match both • and → as bullet characters
             const bulletMatch = cleanLine.match(/^\s*([•→])\s+(.+)/)
             if (bulletMatch) {
-              // Preserve the original bullet character (• or →)
-              return `<tr><td valign="top" style="padding-right:8px;">${bulletMatch[1]}</td><td>${bulletMatch[2]}</td></tr>`
+              // Make the bullet/arrow bold for better visibility
+              return `<tr><td valign="top" style="padding-right:8px;"><strong>${bulletMatch[1]}</strong></td><td>${bulletMatch[2]}</td></tr>`
             }
             return null
           })
@@ -112,9 +124,9 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
     return match
   })
 
-  // Normalize whitespace (but preserve structure)
+  // Normalize whitespace - only collapse excessive whitespace (3+ spaces), preserve paragraph breaks
   processed = processed
-    .replace(/>\s+</g, '><') // Remove spaces between tags
+    .replace(/>\s{3,}</g, '> <')  // Only collapse 3+ spaces to single space
     .trim()
 
   return processed

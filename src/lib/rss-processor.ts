@@ -668,7 +668,20 @@ export class RSSProcessor {
             if (result?.success && result.fullText) {
               await supabaseAdmin
                 .from('rss_posts')
-                .update({ full_article_text: result.fullText })
+                .update({ 
+                  full_article_text: result.fullText,
+                  extraction_status: 'success',
+                  extraction_error: null
+                })
+                .eq('id', post.id)
+            } else if (result) {
+              // Store extraction failure status (paywall, login_required, blocked, etc.)
+              await supabaseAdmin
+                .from('rss_posts')
+                .update({
+                  extraction_status: result.status || 'failed',
+                  extraction_error: result.error?.substring(0, 500) || null
+                })
                 .eq('id', post.id)
             }
           }
@@ -3326,8 +3339,10 @@ export class RSSProcessor {
         return
       }
 
-      // Update database with extracted content
+      // Update database with extracted content and status
       let successCount = 0
+      let paywallCount = 0
+      let loginCount = 0
 
       for (const [url, result] of Array.from(extractionResults.entries())) {
         const postId = urlToPostMap.get(url)
@@ -3337,14 +3352,33 @@ export class RSSProcessor {
           const { error: updateError } = await supabaseAdmin
             .from('rss_posts')
             .update({
-              full_article_text: result.fullText
+              full_article_text: result.fullText,
+              extraction_status: 'success',
+              extraction_error: null
             })
             .eq('id', postId)
 
           if (!updateError) {
             successCount++
           }
+        } else {
+          // Store extraction failure with status
+          const status = result.status || 'failed'
+          if (status === 'paywall') paywallCount++
+          if (status === 'login_required') loginCount++
+
+          await supabaseAdmin
+            .from('rss_posts')
+            .update({
+              extraction_status: status,
+              extraction_error: result.error?.substring(0, 500) || null
+            })
+            .eq('id', postId)
         }
+      }
+
+      if (paywallCount > 0 || loginCount > 0) {
+        console.log(`[Extract] Access restrictions: ${paywallCount} paywall, ${loginCount} login required`)
       }
 
     } catch (error) {
@@ -3404,20 +3438,25 @@ export class RSSProcessor {
         return
       }
 
-      // Update database with extracted content
+      // Update database with extracted content and status
       let successCount = 0
       let failureCount = 0
+      let paywallCount = 0
+      let loginCount = 0
+      let blockedCount = 0
 
       for (const [url, result] of Array.from(extractionResults.entries())) {
         const postId = urlToPostMap.get(url)
         if (!postId) continue
 
         if (result.success && result.fullText) {
-          // Update post with full article text
+          // Update post with full article text and success status
           const { error: updateError } = await supabaseAdmin
             .from('rss_posts')
             .update({
-              full_article_text: result.fullText
+              full_article_text: result.fullText,
+              extraction_status: 'success',
+              extraction_error: null
             })
             .eq('id', postId)
 
@@ -3427,7 +3466,20 @@ export class RSSProcessor {
             failureCount++
           }
         } else {
+          // Store extraction failure with detailed status
+          const status = result.status || 'failed'
+          if (status === 'paywall') paywallCount++
+          if (status === 'login_required') loginCount++
+          if (status === 'blocked') blockedCount++
           failureCount++
+
+          await supabaseAdmin
+            .from('rss_posts')
+            .update({
+              extraction_status: status,
+              extraction_error: result.error?.substring(0, 500) || null
+            })
+            .eq('id', postId)
         }
       }
 
@@ -3436,7 +3488,10 @@ export class RSSProcessor {
         totalPosts: posts.length,
         alreadyExtracted: postsAlreadyExtracted,
         successfulExtractions: successCount,
-        failedExtractions: failureCount
+        failedExtractions: failureCount,
+        paywallDetected: paywallCount,
+        loginRequired: loginCount,
+        accessBlocked: blockedCount
       })
 
     } catch (error) {
