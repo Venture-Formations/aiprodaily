@@ -726,25 +726,26 @@ export function generateAdvertorialHtml(
         `${beforeLastRow}${lastRowStart}<a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${ctaText}</a>${lastRowEnd}`
       )
     } else {
-      // Check for arrow CTA pattern in paragraph format (e.g., "→ Try Fiskl")
-      // Pattern handles: <p><strong>→ Try Fiskl</strong></p> or plain "→ Try Fiskl"
-      const arrowCtaPattern = /(<(?:strong|b)[^>]*>)?(→\s*)([^<\n]+?)(<\/(?:strong|b)>)?(\s*<\/p>)?(\s*)$/i
-      const arrowMatch = processedBody.match(arrowCtaPattern)
+      // Check for arrow CTA pattern in paragraph format
+      // This handles BOTH:
+      // 1. Arrow at start: "→ Try Fiskl"
+      // 2. Arrow mid-line: "Some text → Try Fiskl" (only text AFTER arrow becomes link)
 
-      if (arrowMatch) {
-        // Found arrow CTA pattern - make arrow bold, text after arrow is the link
-        const openingTag = arrowMatch[1] || '' // "<strong>" or "<b>" if present
-        const arrow = arrowMatch[2] // "→ "
-        const ctaText = arrowMatch[3].trim() // "Try Fiskl"
-        const closingStrongTag = arrowMatch[4] || '' // "</strong>" or "</b>" if present
-        const closingPTag = arrowMatch[5] || '' // "</p>" if present
-        const trailingSpace = arrowMatch[6] || ''
+      // First, try to find arrow anywhere in the content (mid-line or at start)
+      // Pattern: anything before arrow (optional), arrow, then CTA text
+      const midLineArrowPattern = /([\s\S]*?)(→\s*)([^<\n→]+?)(\s*<\/p>|\s*<\/strong>|\s*$)/i
+      const midLineMatch = processedBody.match(midLineArrowPattern)
 
-        // If already wrapped in strong/b, replace the whole thing
-        // Arrow stays bold, CTA text becomes a bold link
+      if (midLineMatch && midLineMatch[3].trim().length > 3) {
+        // Found arrow pattern - only the text AFTER the arrow becomes the link
+        const beforeArrow = midLineMatch[1] // Text before arrow (may include tags)
+        const arrow = midLineMatch[2] // "→ "
+        const ctaText = midLineMatch[3].trim() // "Send it to Shoeboxed"
+        const afterCta = midLineMatch[4] || '' // closing tags
+
         processedBody = processedBody.replace(
-          arrowCtaPattern,
-          `${openingTag}${arrow}${closingStrongTag || '</strong>'}<a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${ctaText}</a>${closingPTag}${trailingSpace}`
+          midLineArrowPattern,
+          `${beforeArrow}<strong>${arrow}</strong><a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${ctaText}</a>${afterCta}`
         )
       } else {
       // No arrow CTA - use existing last-sentence logic
