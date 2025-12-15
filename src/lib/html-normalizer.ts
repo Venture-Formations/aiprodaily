@@ -92,7 +92,7 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
   processed = processed.replace(/<p[^>]*>/gi, '<p style="margin:0 0 0.5em 0;">')
   processed = processed.replace(/<br[^>]*>/gi, '<br>')
   processed = processed.replace(/<strong[^>]*>/gi, '<strong>')
-  processed = processed.replace(/<b[^>]*>/gi, '<b>')
+  processed = processed.replace(/<b(?!r)[^>]*>/gi, '<b>') // Negative lookahead to avoid matching <br>
   processed = processed.replace(/<em[^>]*>/gi, '<em>')
   processed = processed.replace(/<i[^>]*>/gi, '<i>')
 
