@@ -89,7 +89,7 @@ export function normalizeEmailHtml(html: string, bodyFont: string = 'Arial, sans
 
   // Remove ALL attributes from tags (except href on links - list tags already processed above)
   // Add inline margin:0 to paragraphs to prevent excessive spacing in emails
-  processed = processed.replace(/<p[^>]*>/gi, '<p style="margin:0 0 0.5em 0;">')
+  processed = processed.replace(/<p[^>]*>/gi, '<p style="margin:0;">')
   processed = processed.replace(/<br[^>]*>/gi, '<br>')
   processed = processed.replace(/<strong[^>]*>/gi, '<strong>')
   processed = processed.replace(/<b(?!r)[^>]*>/gi, '<b>') // Negative lookahead to avoid matching <br>
