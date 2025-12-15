@@ -46,6 +46,11 @@ interface Article {
   finalPosition: number | null
   createdAt: string
   issueDate: string
+  // Click metrics (for sent articles)
+  uniqueClickers: number | null
+  totalClicks: number | null
+  totalRecipients: number | null
+  ctr: number | null
 }
 
 interface Column {
@@ -65,9 +70,13 @@ export default function ArticlesTab({ slug }: { slug: string }) {
 
   // Filter states
   const [feedTypeFilter, setFeedTypeFilter] = useState<'all' | 'Primary' | 'Secondary'>('all')
+  const [positionFilter, setPositionFilter] = useState<'all' | 'all_sent' | number>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [minScore, setMinScore] = useState<number | ''>('')
   const [maxScore, setMaxScore] = useState<number | ''>('')
+
+  // Get unique positions for filter dropdown
+  const uniquePositions = Array.from(new Set(articles.filter(a => a.finalPosition !== null).map(a => a.finalPosition as number))).sort((a, b) => a - b)
 
   // Column visibility states
   const [columns, setColumns] = useState<Column[]>([
@@ -102,6 +111,10 @@ export default function ArticlesTab({ slug }: { slug: string }) {
     { key: 'content', label: 'Content', enabled: false, exportable: true },
     { key: 'factCheckScore', label: 'Fact Check Score', enabled: false, exportable: true },
     { key: 'wordCount', label: 'Word Count', enabled: true, exportable: true },
+    { key: 'uniqueClickers', label: 'Unique Clickers', enabled: true, exportable: true },
+    { key: 'totalClicks', label: 'Total Clicks', enabled: true, exportable: true },
+    { key: 'ctr', label: 'CTR %', enabled: true, exportable: true },
+    { key: 'totalRecipients', label: 'Recipients', enabled: false, exportable: true },
   ])
 
   useEffect(() => {
@@ -110,7 +123,7 @@ export default function ArticlesTab({ slug }: { slug: string }) {
 
   useEffect(() => {
     applyFilters()
-  }, [articles, feedTypeFilter, searchTerm, minScore, maxScore])
+  }, [articles, feedTypeFilter, positionFilter, searchTerm, minScore, maxScore])
 
   const fetchArticles = async () => {
     try {
@@ -134,6 +147,16 @@ export default function ArticlesTab({ slug }: { slug: string }) {
     if (feedTypeFilter !== 'all') {
       filtered = filtered.filter(a => a.feedType === feedTypeFilter)
     }
+
+    // Position filter
+    if (positionFilter === 'all_sent') {
+      // Show only articles that were sent (have a position)
+      filtered = filtered.filter(a => a.finalPosition !== null)
+    } else if (typeof positionFilter === 'number') {
+      // Show articles with specific position
+      filtered = filtered.filter(a => a.finalPosition === positionFilter)
+    }
+    // 'all' shows everything including unsent articles
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
@@ -167,6 +190,7 @@ export default function ArticlesTab({ slug }: { slug: string }) {
 
   const clearFilters = () => {
     setFeedTypeFilter('all')
+    setPositionFilter('all')
     setSearchTerm('')
     setMinScore('')
     setMaxScore('')
@@ -283,6 +307,14 @@ export default function ArticlesTab({ slug }: { slug: string }) {
         ) : 'N/A'
       case 'content':
         return truncateText(stripHtml(article.content), 60)
+      case 'uniqueClickers':
+      case 'totalClicks':
+      case 'totalRecipients':
+        const clickNum = article[columnKey as keyof Article] as number | null
+        return clickNum !== null ? clickNum.toLocaleString() : '-'
+      case 'ctr':
+        const ctrValue = article.ctr
+        return ctrValue !== null ? `${ctrValue.toFixed(2)}%` : '-'
       default:
         return truncateText(String(article[columnKey as keyof Article] || ''), 60)
     }
@@ -325,7 +357,7 @@ export default function ArticlesTab({ slug }: { slug: string }) {
 
       {/* Filters */}
       <div className="bg-white shadow rounded-lg p-4 mb-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Feed Type
@@ -338,6 +370,30 @@ export default function ArticlesTab({ slug }: { slug: string }) {
               <option value="all">All</option>
               <option value="Primary">Primary</option>
               <option value="Secondary">Secondary</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Position
+            </label>
+            <select
+              value={positionFilter}
+              onChange={(e) => {
+                const val = e.target.value
+                if (val === 'all' || val === 'all_sent') {
+                  setPositionFilter(val)
+                } else {
+                  setPositionFilter(parseInt(val))
+                }
+              }}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+            >
+              <option value="all">All Articles</option>
+              <option value="all_sent">All Sent</option>
+              {uniquePositions.map(pos => (
+                <option key={pos} value={pos}>Position {pos}</option>
+              ))}
             </select>
           </div>
 

@@ -63,11 +63,25 @@ export async function GET(request: NextRequest) {
     console.log('[API] Criteria settings found:', criteriaSettings?.length || 0);
     console.log('[API] Criteria config:', JSON.stringify(criteriaConfig, null, 2));
 
-    // First, get issues for this newsletter
-    const { data: issues } = await supabase
+    // First, get issues for this newsletter (with email_metrics for recipient counts)
+    const { data: issuesRaw } = await supabase
       .from('publication_issues')
-      .select('id, date, publication_id')
+      .select(`
+        id,
+        date,
+        publication_id,
+        status,
+        email_metrics(sent_count)
+      `)
       .eq('publication_id', newsletterId);
+
+    // Transform email_metrics from array to single object
+    const issues = (issuesRaw || []).map((issue: any) => ({
+      ...issue,
+      email_metrics: Array.isArray(issue.email_metrics) && issue.email_metrics.length > 0
+        ? issue.email_metrics[0]
+        : null
+    }));
 
     console.log('[API] Found issues:', issues?.length || 0);
 
@@ -226,6 +240,71 @@ export async function GET(request: NextRequest) {
     const feedMap = new Map(rssFeeds?.map(f => [f.id, f]) || []);
     console.log('[API] Feed map size:', feedMap.size, 'Keys:', Array.from(feedMap.keys()).slice(0, 5));
 
+    // Fetch link clicks for sent issues to calculate article metrics
+    // We'll match clicks to articles by source_url and issue_id
+    let linkClicks: any[] = [];
+    const sentIssueIds = issues.filter(i => i.status === 'sent').map(i => i.id);
+
+    if (sentIssueIds.length > 0) {
+      // Fetch in batches to avoid pagination limits
+      let allClicks: any[] = [];
+      let hasMore = true;
+      let offset = 0;
+      const batchSize = 1000;
+
+      while (hasMore) {
+        const { data: clicksBatch, error: clicksError } = await supabase
+          .from('link_clicks')
+          .select('id, link_url, subscriber_email, issue_id')
+          .in('issue_id', sentIssueIds)
+          .range(offset, offset + batchSize - 1);
+
+        if (clicksError) {
+          console.error('[API] Link clicks error:', clicksError.message);
+          break;
+        }
+
+        if (!clicksBatch || clicksBatch.length === 0) {
+          hasMore = false;
+        } else {
+          allClicks = allClicks.concat(clicksBatch);
+          offset += batchSize;
+          hasMore = clicksBatch.length === batchSize;
+        }
+      }
+
+      linkClicks = allClicks;
+      console.log('[API] Found link clicks:', linkClicks.length);
+    }
+
+    // Build a map of clicks by issue_id + normalized source_url for quick lookup
+    // Key format: "issue_id|normalized_url"
+    const normalizeUrl = (url: string): string => {
+      if (!url) return '';
+      return url.toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/^www\./, '')
+        .replace(/\/$/, '')
+        .trim();
+    };
+
+    // Group clicks by issue_id and link_url
+    const clicksMap = new Map<string, { totalClicks: number; uniqueClickers: Set<string> }>();
+    linkClicks.forEach(click => {
+      if (!click.issue_id || !click.link_url) return;
+      const key = `${click.issue_id}|${normalizeUrl(click.link_url)}`;
+      if (!clicksMap.has(key)) {
+        clicksMap.set(key, { totalClicks: 0, uniqueClickers: new Set() });
+      }
+      const entry = clicksMap.get(key)!;
+      entry.totalClicks++;
+      if (click.subscriber_email) {
+        entry.uniqueClickers.add(click.subscriber_email);
+      }
+    });
+
+    console.log('[API] Clicks map size:', clicksMap.size);
+
     // Transform and combine articles
     const transformArticle = (article: any, isPrimary: boolean) => {
       const post = postMap.get(article.post_id);
@@ -296,7 +375,39 @@ export async function GET(request: NextRequest) {
         wordCount: article.word_count || null,
         finalPosition: article.rank || null,
         createdAt: article.created_at || '',
-        issueDate: issue?.date || ''
+        issueDate: issue?.date || '',
+
+        // Click metrics (only for sent articles with position)
+        ...(() => {
+          // Only calculate metrics for articles with a position (actually sent)
+          if (!article.rank || !post?.source_url || !article.issue_id) {
+            return {
+              uniqueClickers: null,
+              totalClicks: null,
+              totalRecipients: null,
+              ctr: null
+            };
+          }
+
+          const clickKey = `${article.issue_id}|${normalizeUrl(post.source_url)}`;
+          const clickData = clicksMap.get(clickKey);
+          const uniqueClickers = clickData?.uniqueClickers.size || 0;
+          const totalClicks = clickData?.totalClicks || 0;
+          const totalRecipients = issue?.email_metrics?.sent_count || null;
+
+          // Calculate CTR (unique clickers / total recipients * 100)
+          let ctr: number | null = null;
+          if (totalRecipients && totalRecipients > 0) {
+            ctr = Math.round((uniqueClickers / totalRecipients) * 10000) / 100; // 2 decimal places
+          }
+
+          return {
+            uniqueClickers,
+            totalClicks,
+            totalRecipients,
+            ctr
+          };
+        })()
       };
     };
 
