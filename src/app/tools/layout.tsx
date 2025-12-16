@@ -1,55 +1,13 @@
 import { ClerkProvider } from '@clerk/nextjs'
 import type { Metadata } from 'next'
-import Link from 'next/link'
-import Image from 'next/image'
 import { headers } from 'next/headers'
 import { getPublicationSettingsByDomain } from '@/lib/publication-settings'
-import { DirectoryHeader } from './components/DirectoryHeader'
-import { Container } from '@/components/salient/Container'
-import { NavLink } from '@/components/salient/NavLink'
+import { Header } from '@/components/salient/Header'
+import { Footer } from '@/components/salient/Footer'
 
 export const metadata: Metadata = {
   title: 'AI Tools Directory | AI Accounting Daily',
   description: 'Discover the best AI tools for accounting professionals. Browse 200+ tools for finance, payroll, HR, productivity, and more.',
-}
-
-interface DirectoryFooterProps {
-  logoUrl: string
-  newsletterName: string
-  businessName: string
-}
-
-function DirectoryFooter({ logoUrl, newsletterName, businessName }: DirectoryFooterProps) {
-  return (
-    <footer className="bg-slate-50">
-      <Container>
-        <div className="py-16">
-          <Link href="/" className="mx-auto block w-fit">
-            <Image
-              src={logoUrl}
-              alt={newsletterName}
-              width={140}
-              height={40}
-              className="h-10 w-auto"
-            />
-          </Link>
-          <nav className="mt-10 text-sm" aria-label="quick links">
-            <div className="-my-1 flex justify-center gap-x-6">
-              <NavLink href="/">Home</NavLink>
-              <NavLink href="/news">News</NavLink>
-              <NavLink href="/tools">AI Tools</NavLink>
-              <NavLink href="/contactus">Contact</NavLink>
-            </div>
-          </nav>
-        </div>
-        <div className="flex flex-col items-center border-t border-slate-400/10 py-10">
-          <p className="text-sm text-slate-500">
-            Copyright &copy; {new Date().getFullYear()} {businessName}. All rights reserved.
-          </p>
-        </div>
-      </Container>
-    </footer>
-  )
 }
 
 export default async function ToolsLayout({
@@ -110,14 +68,15 @@ export default async function ToolsLayout({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
       />
       <div className="min-h-screen flex flex-col">
-        <DirectoryHeader logoUrl={headerLogoUrl} newsletterName={newsletterName} />
+        <Header logoUrl={headerLogoUrl} />
         <main className="flex-1">
           {children}
         </main>
-        <DirectoryFooter
+        <Footer
           logoUrl={logoUrl}
           newsletterName={newsletterName}
           businessName={businessName}
+          currentYear={new Date().getFullYear()}
         />
       </div>
     </ClerkProvider>
