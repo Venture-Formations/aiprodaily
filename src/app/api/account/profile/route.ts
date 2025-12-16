@@ -13,6 +13,8 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
+    console.log('[Profile API] Request body:', JSON.stringify(body, null, 2))
+
     const {
       toolId,
       toolName,
@@ -32,8 +34,11 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (fetchError || !existingTool) {
+      console.log('[Profile API] Tool not found. Error:', fetchError)
       return NextResponse.json({ error: 'Tool not found' }, { status: 404 })
     }
+
+    console.log('[Profile API] Found tool:', JSON.stringify(existingTool, null, 2))
 
     if (existingTool.clerk_user_id !== user.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
@@ -88,6 +93,8 @@ export async function PUT(request: NextRequest) {
     if (listingFileName) {
       updateData.screenshot_url = `https://raw.githubusercontent.com/${process.env.GITHUB_REPO}/master/public/images/tools/${listingFileName}`
     }
+
+    console.log('[Profile API] Update data:', JSON.stringify(updateData, null, 2))
 
     // Update tool in ai_applications
     const { error: updateError } = await supabaseAdmin
