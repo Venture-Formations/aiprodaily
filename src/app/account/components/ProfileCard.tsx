@@ -191,17 +191,28 @@ export function ProfileCard({ tool }: ProfileCardProps) {
               tool.status === 'rejected' ? 'bg-red-50' :
               tool.status === 'edited' ? 'bg-blue-50' : 'bg-amber-50'
             }`}>
-              <p className={`text-sm ${
+              <div className={`flex items-start justify-between gap-4 ${
                 tool.status === 'rejected' ? 'text-red-700' :
                 tool.status === 'edited' ? 'text-blue-700' : 'text-amber-700'
               }`}>
-                {status.description}
-                {tool.status === 'rejected' && tool.rejection_reason && (
-                  <span className="block mt-1 font-medium">
-                    Reason: {tool.rejection_reason}
-                  </span>
+                <div className="text-sm">
+                  {status.description}
+                  {tool.status === 'rejected' && tool.rejection_reason && (
+                    <span className="block mt-1 font-medium">
+                      Reason: {tool.rejection_reason}
+                    </span>
+                  )}
+                </div>
+                {tool.status === 'rejected' && (
+                  <button
+                    onClick={() => setIsEditModalOpen(true)}
+                    className="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors text-sm font-medium"
+                  >
+                    <Edit className="w-4 h-4" />
+                    Fix Listing
+                  </button>
                 )}
-              </p>
+              </div>
             </div>
           )}
 

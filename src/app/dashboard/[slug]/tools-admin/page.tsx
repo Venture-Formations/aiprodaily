@@ -367,15 +367,20 @@ export default function ToolsAdminPage() {
 
               {/* Actions */}
               <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100">
+                {/* Approve button for pending and rejected tools */}
+                {(tool.status === 'pending' || tool.status === 'rejected') && (
+                  <button
+                    onClick={() => handleApprove(tool.id)}
+                    disabled={actionLoading === tool.id}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                  >
+                    {actionLoading === tool.id ? 'Processing...' : 'Approve'}
+                  </button>
+                )}
+
+                {/* Reject button only for pending tools */}
                 {tool.status === 'pending' && (
                   <>
-                    <button
-                      onClick={() => handleApprove(tool.id)}
-                      disabled={actionLoading === tool.id}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
-                    >
-                      {actionLoading === tool.id ? 'Processing...' : 'Approve'}
-                    </button>
                     {rejectingId === tool.id ? (
                       <div className="flex items-center gap-2 flex-1">
                         <input

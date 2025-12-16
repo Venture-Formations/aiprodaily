@@ -15,3 +15,4 @@ CREATE INDEX IF NOT EXISTS idx_rss_posts_extraction_status ON rss_posts(extracti
 COMMENT ON COLUMN rss_posts.extraction_status IS 'Status of full article extraction: pending, success, paywall, login_required, blocked, timeout, failed';
 COMMENT ON COLUMN rss_posts.extraction_error IS 'Error message or reason for extraction failure';
 
+

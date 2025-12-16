@@ -72,8 +72,13 @@ export async function PUT(request: NextRequest) {
     }
 
     // If tool is already approved, mark as 'edited' for admin review
+    // If tool was rejected, set back to 'pending' for re-review
     if (existingTool.submission_status === 'approved') {
       updateData.submission_status = 'edited'
+    } else if (existingTool.submission_status === 'rejected') {
+      updateData.submission_status = 'pending'
+      updateData.rejection_reason = null // Clear the rejection reason
+      updateData.is_active = false // Ensure it stays inactive until approved
     }
 
     // Add image URLs if new images were uploaded

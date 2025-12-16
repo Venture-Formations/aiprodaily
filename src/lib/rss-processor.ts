@@ -2164,7 +2164,77 @@ export class RSSProcessor {
         .eq('key', 'max_top_articles')
         .single()
 
-      const finalArticleCount = maxTopArticlesSetting ? parseInt(maxTopArticlesSetting.value) : 3
+      let finalArticleCount = maxTopArticlesSetting ? parseInt(maxTopArticlesSetting.value) : 3
+      let manualArticlesUsed = 0
+
+      // Check for available manual articles for the primary section
+      const { data: manualArticles, error: manualError } = await supabaseAdmin
+        .from('manual_articles')
+        .select('*')
+        .eq('publication_id', newsletterId)
+        .eq('section_type', 'primary_articles')
+        .eq('status', 'published')
+        .is('used_in_issue_id', null)
+        .order('publish_date', { ascending: true })
+        .limit(finalArticleCount)
+
+      if (manualError) {
+        console.log(`[Primary Selection] Manual articles query error:`, manualError.message)
+      }
+
+      // Use manual articles if available - they replace RSS article slots
+      if (manualArticles && manualArticles.length > 0) {
+        console.log(`[Primary Selection] Found ${manualArticles.length} manual article(s) to use`)
+
+        for (const manual of manualArticles) {
+          manualArticlesUsed++
+          const rank = manualArticlesUsed
+
+          // Insert manual article into the articles table for this issue
+          const { error: insertError } = await supabaseAdmin
+            .from('articles')
+            .insert({
+              post_id: null, // Manual articles don't have RSS post
+              issue_id: issueId,
+              headline: manual.title,
+              content: manual.body,
+              rank: rank,
+              is_active: true,
+              skipped: false,
+              fact_check_score: 100, // Manual articles are pre-approved
+              word_count: manual.body.replace(/<[^>]+>/g, '').split(/\s+/).filter((w: string) => w.length > 0).length
+            })
+
+          if (insertError) {
+            console.error(`[Primary Selection] Failed to insert manual article ${manual.id}:`, insertError.message)
+            manualArticlesUsed--
+            continue
+          }
+
+          // Mark manual article as used
+          await supabaseAdmin
+            .from('manual_articles')
+            .update({
+              status: 'used',
+              used_in_issue_id: issueId,
+              used_at: new Date().toISOString()
+            })
+            .eq('id', manual.id)
+
+          console.log(`[Primary Selection] ✓ Used manual article: "${manual.title}" (rank ${rank})`)
+        }
+
+        // Reduce the count of RSS articles needed
+        finalArticleCount = finalArticleCount - manualArticlesUsed
+        console.log(`[Primary Selection] Need ${finalArticleCount} more RSS article(s) to fill remaining slots`)
+
+        if (finalArticleCount <= 0) {
+          console.log(`[Primary Selection] All slots filled by manual articles`)
+          // Generate subject line using the first manual article
+          await this.generateSubjectLineForissue(issueId)
+          return
+        }
+      }
 
       // Get lookback hours setting (defaults to 72 hours)
       const { data: lookbackSetting } = await supabaseAdmin
@@ -2234,6 +2304,7 @@ export class RSSProcessor {
       }
 
       // Update all selected articles to belong to current issue and activate them
+      // Rank starts after any manual articles that were already used
       for (let i = 0; i < sortedArticles.length; i++) {
         const article = sortedArticles[i]
 
@@ -2242,12 +2313,12 @@ export class RSSProcessor {
           .update({
             issue_id: issueId,
             is_active: true,
-            rank: i + 1  // Rank 1, 2, 3...
+            rank: i + 1 + manualArticlesUsed  // Rank continues after manual articles
           })
           .eq('id', article.id)
       }
 
-      console.log(`[Primary Selection] ✓ Activated ${sortedArticles.length} primary articles for issue`)
+      console.log(`[Primary Selection] ✓ Activated ${sortedArticles.length} RSS articles for issue (ranks ${manualArticlesUsed + 1}-${manualArticlesUsed + sortedArticles.length})`)
 
       // Generate subject line using the top-ranked article
       await this.generateSubjectLineForissue(issueId)
@@ -2276,7 +2347,75 @@ export class RSSProcessor {
         .eq('key', 'max_secondary_articles')
         .single()
 
-      const finalArticleCount = maxSecondaryArticlesSetting ? parseInt(maxSecondaryArticlesSetting.value) : 3
+      let finalArticleCount = maxSecondaryArticlesSetting ? parseInt(maxSecondaryArticlesSetting.value) : 3
+      let manualArticlesUsed = 0
+
+      // Check for available manual articles for the secondary section
+      const { data: manualArticles, error: manualError } = await supabaseAdmin
+        .from('manual_articles')
+        .select('*')
+        .eq('publication_id', newsletterId)
+        .eq('section_type', 'secondary_articles')
+        .eq('status', 'published')
+        .is('used_in_issue_id', null)
+        .order('publish_date', { ascending: true })
+        .limit(finalArticleCount)
+
+      if (manualError) {
+        console.log(`[Secondary Selection] Manual articles query error:`, manualError.message)
+      }
+
+      // Use manual articles if available - they replace RSS article slots
+      if (manualArticles && manualArticles.length > 0) {
+        console.log(`[Secondary Selection] Found ${manualArticles.length} manual article(s) to use`)
+
+        for (const manual of manualArticles) {
+          manualArticlesUsed++
+          const rank = manualArticlesUsed
+
+          // Insert manual article into the secondary_articles table for this issue
+          const { error: insertError } = await supabaseAdmin
+            .from('secondary_articles')
+            .insert({
+              post_id: null, // Manual articles don't have RSS post
+              issue_id: issueId,
+              headline: manual.title,
+              content: manual.body,
+              rank: rank,
+              is_active: true,
+              skipped: false,
+              fact_check_score: 100, // Manual articles are pre-approved
+              word_count: manual.body.replace(/<[^>]+>/g, '').split(/\s+/).filter((w: string) => w.length > 0).length
+            })
+
+          if (insertError) {
+            console.error(`[Secondary Selection] Failed to insert manual article ${manual.id}:`, insertError.message)
+            manualArticlesUsed--
+            continue
+          }
+
+          // Mark manual article as used
+          await supabaseAdmin
+            .from('manual_articles')
+            .update({
+              status: 'used',
+              used_in_issue_id: issueId,
+              used_at: new Date().toISOString()
+            })
+            .eq('id', manual.id)
+
+          console.log(`[Secondary Selection] ✓ Used manual article: "${manual.title}" (rank ${rank})`)
+        }
+
+        // Reduce the count of RSS articles needed
+        finalArticleCount = finalArticleCount - manualArticlesUsed
+        console.log(`[Secondary Selection] Need ${finalArticleCount} more RSS article(s) to fill remaining slots`)
+
+        if (finalArticleCount <= 0) {
+          console.log(`[Secondary Selection] All slots filled by manual articles`)
+          return
+        }
+      }
 
       // Get lookback hours setting (defaults to 36 hours for secondary)
       const { data: lookbackSetting } = await supabaseAdmin
@@ -2288,7 +2427,7 @@ export class RSSProcessor {
 
       const baseLookbackHours = lookbackSetting ? parseInt(lookbackSetting.value) : 36
 
-      console.log(`[Secondary Selection] Target: ${finalArticleCount} articles`)
+      console.log(`[Secondary Selection] Target: ${finalArticleCount} RSS articles (after ${manualArticlesUsed} manual)`)
 
       // Progressive fallback: try with decreasing score thresholds
       const fallbackStrategies = [
@@ -2388,6 +2527,7 @@ export class RSSProcessor {
       }
 
       // Update all selected articles to belong to current issue and activate them
+      // Rank starts after any manual articles that were already used
       for (let i = 0; i < selectedArticles.length; i++) {
         const article = selectedArticles[i]
 
@@ -2396,12 +2536,12 @@ export class RSSProcessor {
           .update({
             issue_id: issueId,
             is_active: true,
-            rank: i + 1  // Rank 1, 2, 3...
+            rank: i + 1 + manualArticlesUsed  // Rank continues after manual articles
           })
           .eq('id', article.id)
       }
 
-      console.log(`[Secondary Selection] ✓ Activated ${selectedArticles.length} secondary articles for issue`)
+      console.log(`[Secondary Selection] ✓ Activated ${selectedArticles.length} RSS secondary articles for issue (ranks ${manualArticlesUsed + 1}-${manualArticlesUsed + selectedArticles.length})`)
 
     } catch (error) {
       const errorMsg = error instanceof Error
