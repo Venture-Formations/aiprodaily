@@ -543,6 +543,13 @@ export default function ManualArticlesPage() {
                         )}
                         {article.status === 'published' && (
                           <>
+                            <Link
+                              href={`/news/${article.slug}`}
+                              target="_blank"
+                              className="text-green-600 hover:text-green-900"
+                            >
+                              View
+                            </Link>
                             <button
                               onClick={() => openEditModal(article)}
                               className="text-blue-600 hover:text-blue-900"
