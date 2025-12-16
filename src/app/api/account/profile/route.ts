@@ -21,8 +21,8 @@ export async function PUT(request: NextRequest) {
       description,
       websiteUrl,
       category,
-      logoFileName,
-      listingFileName
+      logoUrl,
+      listingUrl
     } = body
 
     // Verify the tool belongs to this user in ai_applications table
@@ -86,12 +86,12 @@ export async function PUT(request: NextRequest) {
       updateData.is_active = false // Ensure it stays inactive until approved
     }
 
-    // Add image URLs if new images were uploaded
-    if (logoFileName) {
-      updateData.logo_url = `https://raw.githubusercontent.com/${process.env.GITHUB_REPO}/master/public/images/tools/${logoFileName}`
+    // Add image URLs if new images were uploaded (already Supabase Storage URLs)
+    if (logoUrl) {
+      updateData.logo_url = logoUrl
     }
-    if (listingFileName) {
-      updateData.screenshot_url = `https://raw.githubusercontent.com/${process.env.GITHUB_REPO}/master/public/images/tools/${listingFileName}`
+    if (listingUrl) {
+      updateData.screenshot_url = listingUrl
     }
 
     console.log('[Profile API] Update data:', JSON.stringify(updateData, null, 2))

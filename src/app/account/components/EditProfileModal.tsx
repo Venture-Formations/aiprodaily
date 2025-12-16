@@ -111,12 +111,12 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
     setIsSubmitting(true)
 
     try {
-      // Upload images if changed
-      let logoFileName = ''
-      let listingFileName = ''
+      // Upload images if changed - capture the Supabase Storage URLs
+      let logoUrl = ''
+      let listingUrl = ''
 
       if (logoBlob) {
-        logoFileName = `${tool.clerk_user_id}/logo-${Date.now()}.jpg`
+        const logoFileName = `${tool.clerk_user_id}/logo-${Date.now()}.jpg`
         const formDataUpload = new FormData()
         formDataUpload.append('file', logoBlob, 'logo.jpg')
         const uploadRes = await fetch(`/api/tools/upload-image?fileName=${encodeURIComponent(logoFileName)}`, {
@@ -124,10 +124,12 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
           body: formDataUpload
         })
         if (!uploadRes.ok) throw new Error('Failed to upload logo')
+        const uploadData = await uploadRes.json()
+        logoUrl = uploadData.url
       }
 
       if (listingBlob) {
-        listingFileName = `${tool.clerk_user_id}/listing-${Date.now()}.jpg`
+        const listingFileName = `${tool.clerk_user_id}/listing-${Date.now()}.jpg`
         const formDataUpload = new FormData()
         formDataUpload.append('file', listingBlob, 'listing.jpg')
         const uploadRes = await fetch(`/api/tools/upload-image?fileName=${encodeURIComponent(listingFileName)}`, {
@@ -135,6 +137,8 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
           body: formDataUpload
         })
         if (!uploadRes.ok) throw new Error('Failed to upload listing image')
+        const uploadData = await uploadRes.json()
+        listingUrl = uploadData.url
       }
 
       // Update profile
@@ -145,8 +149,8 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
           toolId: tool.id,
           ...formData,
           category: selectedCategory,
-          logoFileName: logoFileName || undefined,
-          listingFileName: listingFileName || undefined,
+          logoUrl: logoUrl || undefined,
+          listingUrl: listingUrl || undefined,
         })
       })
 
