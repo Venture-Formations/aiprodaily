@@ -5,7 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 async function getActivePublication() {
   const { data: publication } = await supabaseAdmin
     .from('publications')
-    .select('id')
+    .select('id, website_domain')
     .eq('is_active', true)
     .limit(1)
     .single()
@@ -52,7 +52,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ articles })
+    return NextResponse.json({
+      articles,
+      website_domain: activeNewsletter.website_domain
+    })
   } catch (error: any) {
     console.error('[API] Manual articles GET error:', error.message)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

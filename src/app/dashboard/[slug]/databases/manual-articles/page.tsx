@@ -31,6 +31,7 @@ export default function ManualArticlesPage() {
   const [activeTab, setActiveTab] = useState<'draft' | 'published' | 'used'>('draft')
   const [articles, setArticles] = useState<NewsArticle[]>([])
   const [categories, setCategories] = useState<ArticleCategory[]>([])
+  const [websiteDomain, setWebsiteDomain] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingArticle, setEditingArticle] = useState<NewsArticle | null>(null)
@@ -70,6 +71,9 @@ export default function ManualArticlesPage() {
       if (response.ok) {
         const data = await response.json()
         setArticles(data.articles || [])
+        if (data.website_domain) {
+          setWebsiteDomain(data.website_domain)
+        }
       }
     } catch (error) {
       console.error('Failed to fetch articles:', error)
@@ -494,7 +498,7 @@ export default function ManualArticlesPage() {
                             {article.title}
                           </div>
                           <div className="text-xs text-gray-500">
-                            /news/{article.slug}
+                            {websiteDomain ? `${websiteDomain}/news/${article.slug}` : `/news/${article.slug}`}
                           </div>
                         </div>
                       </div>
@@ -543,13 +547,14 @@ export default function ManualArticlesPage() {
                         )}
                         {article.status === 'published' && (
                           <>
-                            <Link
-                              href={`/news/${article.slug}`}
+                            <a
+                              href={websiteDomain ? `https://${websiteDomain}/news/${article.slug}` : `/news/${article.slug}`}
                               target="_blank"
+                              rel="noopener noreferrer"
                               className="text-green-600 hover:text-green-900"
                             >
                               View
-                            </Link>
+                            </a>
                             <button
                               onClick={() => openEditModal(article)}
                               className="text-blue-600 hover:text-blue-900"
@@ -571,13 +576,14 @@ export default function ManualArticlesPage() {
                           </>
                         )}
                         {article.status === 'used' && (
-                          <Link
-                            href={`/news/${article.slug}`}
+                          <a
+                            href={websiteDomain ? `https://${websiteDomain}/news/${article.slug}` : `/news/${article.slug}`}
                             target="_blank"
+                            rel="noopener noreferrer"
                             className="text-blue-600 hover:text-blue-900"
                           >
                             View
-                          </Link>
+                          </a>
                         )}
                       </div>
                     </td>
