@@ -65,17 +65,41 @@ export async function GET(request: NextRequest) {
 
     // First, get issues for this newsletter (with email_metrics for recipient counts)
     // Include mailerlite_issue_id to handle both old (pre-12/08) and new click tracking formats
-    const { data: issuesRaw } = await supabase
-      .from('publication_issues')
-      .select(`
-        id,
-        date,
-        publication_id,
-        status,
-        mailerlite_issue_id,
-        email_metrics(sent_count)
-      `)
-      .eq('publication_id', newsletterId);
+    // Use pagination to handle more than 1000 issues (Supabase default limit)
+    let allIssuesRaw: any[] = [];
+    let issuesOffset = 0;
+    const issuesBatchSize = 1000;
+    let hasMoreIssues = true;
+
+    while (hasMoreIssues) {
+      const { data: issuesBatch, error: issuesError } = await supabase
+        .from('publication_issues')
+        .select(`
+          id,
+          date,
+          publication_id,
+          status,
+          mailerlite_issue_id,
+          email_metrics(sent_count)
+        `)
+        .eq('publication_id', newsletterId)
+        .range(issuesOffset, issuesOffset + issuesBatchSize - 1);
+
+      if (issuesError) {
+        console.error('[API] Issues fetch error:', issuesError.message);
+        break;
+      }
+
+      if (!issuesBatch || issuesBatch.length === 0) {
+        hasMoreIssues = false;
+      } else {
+        allIssuesRaw = allIssuesRaw.concat(issuesBatch);
+        issuesOffset += issuesBatchSize;
+        hasMoreIssues = issuesBatch.length === issuesBatchSize;
+      }
+    }
+
+    const issuesRaw = allIssuesRaw;
 
     // Transform email_metrics from array to single object
     const issues = (issuesRaw || []).map((issue: any) => ({
