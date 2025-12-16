@@ -19,7 +19,9 @@ const CATEGORIES = [
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('[Categories] API called')
     const user = await currentUser()
+    console.log('[Categories] User:', user?.id || 'not logged in')
 
     // Get categories that have featured tools
     const { data: featuredTools, error: featuredError } = await supabaseAdmin
@@ -50,6 +52,7 @@ export async function GET(request: NextRequest) {
         .from('ai_applications')
         .select('listing_type, is_featured, is_paid_placement, category')
         .eq('clerk_user_id', user.id)
+        .eq('publication_id', PUBLICATION_ID)
         .single()
 
       if (userTool) {
@@ -83,6 +86,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ categories: categoriesWithStatus })
   } catch (err) {
     console.error('[Categories] Error:', err)
-    return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 })
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+    return NextResponse.json({ error: 'Failed to fetch categories', details: errorMessage }, { status: 500 })
   }
 }
