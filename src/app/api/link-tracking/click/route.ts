@@ -34,6 +34,7 @@ function getFieldForSection(section: string): string | null {
 
 /**
  * Queues an email provider field update for async processing
+ * Includes retry logic for transient network failures
  */
 async function queueFieldUpdate(
   email: string,
@@ -42,43 +43,82 @@ async function queueFieldUpdate(
   linkClickId: string | null,
   publicationId: string
 ): Promise<void> {
-  try {
-    // Check if we already have a pending/completed update for this subscriber+field
-    // to avoid duplicate queue entries
-    const { data: existing } = await supabaseAdmin
-      .from('sendgrid_field_updates')
-      .select('id, status')
-      .eq('subscriber_email', email)
-      .eq('field_name', fieldName)
-      .in('status', ['pending', 'completed'])
-      .limit(1)
-      .maybeSingle()
+  const maxRetries = 2
+  const retryDelay = 500 // ms
 
-    if (existing) {
-      console.log(`[Field Update Queue] Skipping duplicate: ${email} already has ${fieldName} update (${existing.status})`)
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Check if we already have a pending/completed update for this subscriber+field
+      // to avoid duplicate queue entries
+      const { data: existing, error: checkError } = await supabaseAdmin
+        .from('sendgrid_field_updates')
+        .select('id, status')
+        .eq('subscriber_email', email)
+        .eq('field_name', fieldName)
+        .in('status', ['pending', 'completed'])
+        .limit(1)
+        .maybeSingle()
+
+      // Handle transient fetch errors with retry
+      if (checkError && checkError.message?.includes('fetch failed')) {
+        if (attempt < maxRetries) {
+          console.log(`[Field Update Queue] Fetch failed on check (attempt ${attempt}/${maxRetries}), retrying...`)
+          await new Promise(resolve => setTimeout(resolve, retryDelay * attempt))
+          continue
+        }
+        console.error(`[Field Update Queue] Fetch failed after ${maxRetries} attempts:`, checkError.message)
+        return
+      }
+
+      if (existing) {
+        console.log(`[Field Update Queue] Skipping duplicate: ${email} already has ${fieldName} update (${existing.status})`)
+        return
+      }
+
+      // Insert new queue entry
+      const { error } = await supabaseAdmin
+        .from('sendgrid_field_updates')
+        .insert({
+          subscriber_email: email,
+          field_name: fieldName,
+          field_value: true,
+          status: 'pending',
+          publication_id: publicationId,
+          issue_id: issueId,
+          link_click_id: linkClickId
+        })
+
+      // Handle transient fetch errors with retry
+      if (error && error.message?.includes('fetch failed')) {
+        if (attempt < maxRetries) {
+          console.log(`[Field Update Queue] Fetch failed on insert (attempt ${attempt}/${maxRetries}), retrying...`)
+          await new Promise(resolve => setTimeout(resolve, retryDelay * attempt))
+          continue
+        }
+        console.error(`[Field Update Queue] Fetch failed after ${maxRetries} attempts:`, error.message)
+        return
+      }
+
+      if (error) {
+        console.error('[Field Update Queue] Error queuing field update:', error)
+      } else {
+        console.log(`[Field Update Queue] Queued ${fieldName}=true for ${email}`)
+      }
+      return // Success or non-retryable error, exit loop
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+
+      // Retry on transient fetch errors
+      if (errorMessage.includes('fetch failed') && attempt < maxRetries) {
+        console.log(`[Field Update Queue] Exception fetch failed (attempt ${attempt}/${maxRetries}), retrying...`)
+        await new Promise(resolve => setTimeout(resolve, retryDelay * attempt))
+        continue
+      }
+
+      console.error('[Field Update Queue] Exception queuing field update:', error)
       return
     }
-
-    // Insert new queue entry
-    const { error } = await supabaseAdmin
-      .from('sendgrid_field_updates')
-      .insert({
-        subscriber_email: email,
-        field_name: fieldName,
-        field_value: true,
-        status: 'pending',
-        publication_id: publicationId,
-        issue_id: issueId,
-        link_click_id: linkClickId
-      })
-
-    if (error) {
-      console.error('[Field Update Queue] Error queuing field update:', error)
-    } else {
-      console.log(`[Field Update Queue] Queued ${fieldName}=true for ${email}`)
-    }
-  } catch (error) {
-    console.error('[Field Update Queue] Exception queuing field update:', error)
   }
 }
 
