@@ -239,30 +239,28 @@ export default async function ArticlePage({ params }: PageProps) {
                   href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(article.title)}&url=${encodeURIComponent(`https://${host}/news/${article.slug}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:opacity-80 transition-opacity"
+                  className="flex items-center justify-center w-10 h-10 bg-black rounded-lg hover:bg-gray-800 transition-colors"
                   title="Share on Twitter/X"
                 >
                   <img
                     src="/images/social/twitter_light.png"
                     alt="Twitter/X"
-                    width={32}
-                    height={32}
-                    className="rounded"
+                    width={24}
+                    height={24}
                   />
                 </a>
                 <a
                   href={`https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(`https://${host}/news/${article.slug}`)}&title=${encodeURIComponent(article.title)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:opacity-80 transition-opacity"
+                  className="flex items-center justify-center w-10 h-10 bg-[#0A66C2] rounded-lg hover:bg-[#004182] transition-colors"
                   title="Share on LinkedIn"
                 >
                   <img
                     src="/images/social/linkedin_light.png"
                     alt="LinkedIn"
-                    width={32}
-                    height={32}
-                    className="rounded"
+                    width={24}
+                    height={24}
                   />
                 </a>
               </div>
