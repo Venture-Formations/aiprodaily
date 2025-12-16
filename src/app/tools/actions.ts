@@ -113,6 +113,116 @@ export async function addTool(
 }
 
 /**
+ * Claim an existing unclaimed tool - updates the ai_applications record
+ * Sets the clerk_user_id and puts the tool back to pending status for review
+ */
+export async function claimTool(
+  toolId: string,
+  data: {
+    toolName: string
+    email: string
+    websiteUrl: string
+    description: string
+    category: AIAppCategory
+  },
+  clerkUserId: string | null,
+  listingImageFileName?: string,
+  submitterName?: string,
+  submitterImageUrl?: string,
+  logoImageFileName?: string,
+  keepExistingLogo?: boolean,
+  keepExistingImage?: boolean
+) {
+  try {
+    if (!clerkUserId) {
+      return { error: 'You must be signed in to claim a listing' }
+    }
+
+    // Check if the tool exists and is unclaimed
+    const { data: existingTool, error: fetchError } = await supabaseAdmin
+      .from('ai_applications')
+      .select('id, clerk_user_id, app_name')
+      .eq('id', toolId)
+      .eq('publication_id', PUBLICATION_ID)
+      .single()
+
+    if (fetchError || !existingTool) {
+      return { error: 'Tool not found' }
+    }
+
+    if (existingTool.clerk_user_id) {
+      return { error: 'This listing has already been claimed' }
+    }
+
+    // Check if user already has a listing
+    const { data: userListing } = await supabaseAdmin
+      .from('ai_applications')
+      .select('id')
+      .eq('clerk_user_id', clerkUserId)
+      .eq('publication_id', PUBLICATION_ID)
+      .single()
+
+    if (userListing) {
+      return { error: 'You already have a listing. You can only manage one listing at a time.' }
+    }
+
+    // Build update object
+    const updateData: Record<string, any> = {
+      app_name: data.toolName,
+      description: data.description,
+      category: data.category,
+      app_url: data.websiteUrl,
+      clerk_user_id: clerkUserId,
+      submitter_email: data.email,
+      submitter_name: submitterName || null,
+      submitter_image_url: submitterImageUrl || null,
+      // Reset to pending for re-review
+      is_active: false,
+      submission_status: 'pending',
+      // Reset payment/featured status - they'll need to upgrade after claiming
+      is_featured: false,
+      is_paid_placement: false,
+      listing_type: 'free',
+      billing_period: null,
+      plan: 'free'
+    }
+
+    // Handle logo image
+    if (logoImageFileName) {
+      updateData.logo_url = `${SUPABASE_STORAGE_URL}${logoImageFileName}`
+    } else if (!keepExistingLogo) {
+      updateData.logo_url = null
+    }
+
+    // Handle listing image
+    if (listingImageFileName) {
+      updateData.screenshot_url = `${SUPABASE_STORAGE_URL}${listingImageFileName}`
+    } else if (!keepExistingImage) {
+      updateData.screenshot_url = null
+    }
+
+    // Update the tool
+    const { error: updateError } = await supabaseAdmin
+      .from('ai_applications')
+      .update(updateData)
+      .eq('id', toolId)
+
+    if (updateError) {
+      console.error('[Directory] Failed to claim tool:', updateError)
+      return { error: updateError.message }
+    }
+
+    revalidatePath('/tools')
+    revalidatePath(`/tools/${toolId}`)
+    revalidatePath('/account')
+    return { error: null }
+  } catch (err) {
+    console.error('[Directory] Error claiming tool:', err)
+    return { error: 'Failed to claim tool' }
+  }
+}
+
+/**
  * Create Stripe checkout session for paid listing
  */
 export async function createCheckoutSession(

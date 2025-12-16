@@ -1,10 +1,15 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import { currentUser } from '@clerk/nextjs/server'
 import { getToolById, getApprovedTools, incrementToolViews } from '@/lib/directory'
+import { supabaseAdmin } from '@/lib/supabase'
 import { Container } from '@/components/salient/Container'
 import { Button } from '@/components/salient/Button'
 import { ToolClickTracker } from './ToolClickTracker'
+import { ClaimListingButton } from './ClaimListingButton'
+
+const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
 
 interface ToolDetailPageProps {
   params: Promise<{ id: string }>
@@ -14,7 +19,10 @@ export const dynamic = 'force-dynamic'
 
 export default async function ToolDetailPage({ params }: ToolDetailPageProps) {
   const { id } = await params
-  const tool = await getToolById(id)
+  const [tool, user] = await Promise.all([
+    getToolById(id),
+    currentUser()
+  ])
 
   if (!tool || !tool.is_active) {
     notFound()
@@ -23,8 +31,24 @@ export default async function ToolDetailPage({ params }: ToolDetailPageProps) {
   // Track page view (fire and forget, don't block render)
   incrementToolViews(id).catch(() => {})
 
+  // Check if tool is claimed (has clerk_user_id)
+  const isToolClaimed = !!tool.clerk_user_id
+
+  // Check if current user already has a listing
+  let currentUserHasListing = false
+  if (user) {
+    const { data: userListing } = await supabaseAdmin
+      .from('ai_applications')
+      .select('id')
+      .eq('clerk_user_id', user.id)
+      .eq('publication_id', PUBLICATION_ID)
+      .single()
+    currentUserHasListing = !!userListing
+  }
+
   // Use listing image (tool_image_url) for hero, logo_image_url for Quick Info
-  const heroImageUrl = tool.tool_image_url || '/placeholder-tool.png'
+  // Only show hero image if one exists (no placeholder fallback)
+  const heroImageUrl = tool.tool_image_url || null
   const logoUrl = tool.logo_image_url || null
 
   // Get related tools from same categories (randomly selected)
@@ -95,15 +119,17 @@ export default async function ToolDetailPage({ params }: ToolDetailPageProps) {
           <div className="lg:col-span-2 space-y-8">
             {/* Hero */}
             <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-900/5 overflow-hidden">
-              <div className="relative aspect-video bg-slate-100">
-                <Image
-                  src={heroImageUrl}
-                  alt={tool.tool_name}
-                  fill
-                  className="object-cover"
-                  priority
-                />
-              </div>
+              {heroImageUrl && (
+                <div className="relative aspect-video bg-slate-100">
+                  <Image
+                    src={heroImageUrl}
+                    alt={tool.tool_name}
+                    fill
+                    className="object-cover"
+                    priority
+                  />
+                </div>
+              )}
 
               <div className="p-6 sm:p-8">
                 <div className="flex items-start justify-between">
@@ -136,7 +162,7 @@ export default async function ToolDetailPage({ params }: ToolDetailPageProps) {
                 </div>
 
                 {/* CTA */}
-                <div className="mt-8">
+                <div className="mt-8 flex flex-wrap gap-3">
                   <ToolClickTracker
                     toolId={id}
                     websiteUrl={tool.website_url}
@@ -147,6 +173,17 @@ export default async function ToolDetailPage({ params }: ToolDetailPageProps) {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
                   </ToolClickTracker>
+                  <ClaimListingButton
+                    toolId={id}
+                    toolName={tool.tool_name}
+                    description={tool.description || ''}
+                    websiteUrl={tool.website_url}
+                    category={tool.categories[0]?.name || 'Productivity'}
+                    currentLogoUrl={tool.logo_image_url}
+                    currentImageUrl={tool.tool_image_url}
+                    isToolClaimed={isToolClaimed}
+                    currentUserHasListing={currentUserHasListing}
+                  />
                 </div>
               </div>
             </div>
