@@ -275,13 +275,14 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except:
-     * - api (API routes)
+     * - Most api routes (except /api/account/* which needs Clerk auth)
      * - auth (authentication pages)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - Static files (files with extensions like .ico, .png, .jpg, .svg, etc.)
      */
     '/',
+    '/api/account/:path*',
     '/((?!api|auth|_next/static|_next/image|.*\\..*).*)',
   ],
 }
