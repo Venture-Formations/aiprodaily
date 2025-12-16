@@ -1,3 +1,5 @@
+"use client"
+
 import { Calendar } from "lucide-react"
 import Link from 'next/link'
 import { Container } from '@/components/salient/Container'
