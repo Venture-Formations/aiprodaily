@@ -234,22 +234,36 @@ export default async function ArticlePage({ params }: PageProps) {
             {/* Share Section */}
             <div className="mt-12 pt-8 border-t border-gray-200">
               <p className="text-gray-600 mb-4">Share this article:</p>
-              <div className="flex gap-4">
+              <div className="flex gap-3">
                 <a
                   href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(article.title)}&url=${encodeURIComponent(`https://${host}/news/${article.slug}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  className="hover:opacity-80 transition-opacity"
+                  title="Share on Twitter/X"
                 >
-                  Twitter
+                  <img
+                    src="/images/social/twitter_light.png"
+                    alt="Twitter/X"
+                    width={32}
+                    height={32}
+                    className="rounded"
+                  />
                 </a>
                 <a
                   href={`https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(`https://${host}/news/${article.slug}`)}&title=${encodeURIComponent(article.title)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-4 py-2 bg-blue-700 text-white rounded hover:bg-blue-800"
+                  className="hover:opacity-80 transition-opacity"
+                  title="Share on LinkedIn"
                 >
-                  LinkedIn
+                  <img
+                    src="/images/social/linkedin_light.png"
+                    alt="LinkedIn"
+                    width={32}
+                    height={32}
+                    className="rounded"
+                  />
                 </a>
               </div>
             </div>
