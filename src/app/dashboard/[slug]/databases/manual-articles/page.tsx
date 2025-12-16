@@ -18,6 +18,16 @@ function generateSlug(title: string): string {
     .replace(/^-|-$/g, '')
 }
 
+// Helper to format date string without timezone issues
+// Parses YYYY-MM-DD directly to avoid UTC interpretation
+function formatDateString(dateStr: string): string {
+  if (!dateStr) return '-'
+  const [year, month, day] = dateStr.split('T')[0].split('-')
+  if (!year || !month || !day) return dateStr
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+  return date.toLocaleDateString()
+}
+
 // Section options
 const SECTION_OPTIONS = [
   { value: 'primary_articles', label: 'Latest in Accounting AI (Primary)' },
@@ -515,7 +525,7 @@ export default function ManualArticlesPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm text-gray-600">
-                        {new Date(article.publish_date).toLocaleDateString()}
+                        {formatDateString(article.publish_date)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

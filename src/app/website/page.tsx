@@ -71,13 +71,24 @@ export default async function WebsiteHome() {
     .limit(6)
 
   // Fetch manual articles (published and used)
-  const { data: manualArticles } = await supabaseAdmin
-    .from('manual_articles')
-    .select('slug, title, publish_date, image_url, body, category:article_categories(name)')
-    .eq('publication_id', publicationId)
-    .in('status', ['published', 'used'])
-    .order('publish_date', { ascending: false })
-    .limit(6)
+  let manualArticles: any[] = []
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('manual_articles')
+      .select('slug, title, publish_date, image_url, body, category:article_categories(name)')
+      .eq('publication_id', publicationId)
+      .in('status', ['published', 'used'])
+      .order('publish_date', { ascending: false })
+      .limit(6)
+
+    if (error) {
+      console.error('[Website] Error fetching manual articles:', error.message)
+    } else {
+      manualArticles = data || []
+    }
+  } catch (err) {
+    console.error('[Website] Exception fetching manual articles:', err)
+  }
 
   // Combine and format items
   const newsItems: NewsItem[] = []
@@ -96,7 +107,8 @@ export default async function WebsiteHome() {
   })
 
   // Add manual articles
-  manualArticles?.forEach(article => {
+  manualArticles.forEach(article => {
+    const bodyText = article.body ? String(article.body).replace(/<[^>]+>/g, '') : ''
     newsItems.push({
       type: 'article',
       slug: article.slug,
@@ -104,7 +116,7 @@ export default async function WebsiteHome() {
       date: article.publish_date,
       category: (article.category as any)?.name || 'Article',
       image_url: article.image_url,
-      description: article.body.replace(/<[^>]+>/g, '').substring(0, 150) + '...'
+      description: bodyText.substring(0, 150) + (bodyText.length > 150 ? '...' : '')
     })
   })
 
