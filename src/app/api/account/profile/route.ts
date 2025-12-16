@@ -98,13 +98,15 @@ export async function PUT(request: NextRequest) {
 
     if (updateError) {
       console.error('Failed to update tool:', updateError)
-      return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 })
+      console.error('Update data:', JSON.stringify(updateData, null, 2))
+      return NextResponse.json({ error: 'Failed to update profile', details: updateError.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
 
   } catch (error) {
     console.error('Profile update error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ error: 'Internal server error', details: errorMessage }, { status: 500 })
   }
 }
