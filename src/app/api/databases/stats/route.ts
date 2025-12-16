@@ -44,6 +44,15 @@ export async function GET(request: NextRequest) {
       console.error('[API] Error fetching polls count:', pollsError.message);
     }
 
+    // Manual Articles count
+    const { data: manualArticlesCount, error: manualArticlesError } = await supabase
+      .from('manual_articles')
+      .select('id', { count: 'exact' });
+
+    if (manualArticlesError) {
+      console.error('[API] Error fetching manual articles count:', manualArticlesError.message);
+    }
+
     const databases = [
       {
         name: 'AI Applications',
@@ -68,6 +77,12 @@ export async function GET(request: NextRequest) {
         description: 'Newsletter polls for subscriber engagement',
         count: pollsCount?.length || 0,
         href: '/dashboard/polls'
+      },
+      {
+        name: 'Manual Articles',
+        description: 'Custom articles for newsletters and /news pages',
+        count: manualArticlesCount?.length || 0,
+        href: '/dashboard/databases/manual-articles'
       }
     ];
 
