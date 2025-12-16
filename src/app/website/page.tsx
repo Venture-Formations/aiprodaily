@@ -31,7 +31,7 @@ export default async function WebsiteHome() {
   const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'aiaccountingdaily.com'
 
   // Get publication ID from domain
-  let publicationId = await getPublicationByDomain(host)
+  let publicationId: string = await getPublicationByDomain(host) || ''
 
   // Fallback: if domain lookup fails, try to get by slug or use first active publication
   if (!publicationId) {

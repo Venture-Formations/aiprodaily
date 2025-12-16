@@ -148,6 +148,7 @@ export default async function NewsArchivePage({
   // Add manual articles (unless filtering by 'newsletter' category only)
   if (params.category !== 'newsletter') {
     manualArticles?.forEach(article => {
+      const bodyText = article.body ? String(article.body).replace(/<[^>]+>/g, '') : ''
       newsItems.push({
         type: 'article',
         slug: article.slug,
@@ -155,7 +156,7 @@ export default async function NewsArchivePage({
         date: article.publish_date,
         category: (article.category as any)?.name || 'Uncategorized',
         image_url: article.image_url,
-        description: article.body.replace(/<[^>]+>/g, '').substring(0, 150) + '...'
+        description: bodyText.substring(0, 150) + (bodyText.length > 150 ? '...' : '')
       })
     })
   }
