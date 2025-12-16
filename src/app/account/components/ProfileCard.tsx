@@ -256,8 +256,8 @@ export function ProfileCard({ tool }: ProfileCardProps) {
             </div>
           </div>
 
-          {/* Upgrade CTA for free listings */}
-          {listingType === 'free' && tool.status === 'approved' && (
+          {/* Upgrade CTAs hidden - kept for future use */}
+          {/* {listingType === 'free' && tool.status === 'approved' && (
             <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl border border-blue-200">
               <div className="flex items-center justify-between">
                 <div>
@@ -274,10 +274,9 @@ export function ProfileCard({ tool }: ProfileCardProps) {
                 </Link>
               </div>
             </div>
-          )}
+          )} */}
 
-          {/* Upgrade to Featured CTA for paid placement listings */}
-          {listingType === 'paid_placement' && tool.status === 'approved' && (
+          {/* {listingType === 'paid_placement' && tool.status === 'approved' && (
             <div className="mt-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
               <div className="flex items-center justify-between">
                 <div>
@@ -294,7 +293,7 @@ export function ProfileCard({ tool }: ProfileCardProps) {
                 </Link>
               </div>
             </div>
-          )}
+          )} */}
         </div>
       </div>
 
