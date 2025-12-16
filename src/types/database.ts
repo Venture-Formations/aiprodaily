@@ -357,6 +357,35 @@ export interface ManualArticle {
   updated_at: string
 }
 
+// Manual Articles System (for /news pages)
+export type ManualArticleStatus = 'draft' | 'published' | 'used'
+
+export interface ArticleCategory {
+  id: string
+  publication_id: string
+  name: string
+  slug: string
+  created_at: string
+}
+
+export interface NewsArticle {
+  id: string
+  publication_id: string
+  title: string
+  slug: string
+  body: string
+  image_url: string | null
+  section_type: 'primary_articles' | 'secondary_articles'
+  category_id: string | null
+  category?: ArticleCategory
+  publish_date: string
+  status: ManualArticleStatus
+  used_in_issue_id: string | null
+  used_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface ArchivedArticle {
   id: string
   original_article_id: string
