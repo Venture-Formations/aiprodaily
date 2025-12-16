@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
     console.log('[API] Criteria config:', JSON.stringify(criteriaConfig, null, 2));
 
     // First, get issues for this newsletter (with email_metrics for recipient counts)
+    // Include mailerlite_issue_id to handle both old (pre-12/08) and new click tracking formats
     const { data: issuesRaw } = await supabase
       .from('publication_issues')
       .select(`
@@ -71,6 +72,7 @@ export async function GET(request: NextRequest) {
         date,
         publication_id,
         status,
+        mailerlite_issue_id,
         email_metrics(sent_count)
       `)
       .eq('publication_id', newsletterId);
@@ -87,6 +89,15 @@ export async function GET(request: NextRequest) {
 
     const issueIds = (issues || []).map(c => c.id);
     const issueMap = new Map((issues || []).map(c => [c.id, c]));
+
+    // Build mapping from mailerlite_issue_id to database issue_id
+    // This handles clicks from before 12/08/2025 when issue_id was mailerlite ID
+    const mailerliteToDbIdMap = new Map<string, string>();
+    (issues || []).forEach((issue: any) => {
+      if (issue.mailerlite_issue_id) {
+        mailerliteToDbIdMap.set(issue.mailerlite_issue_id, issue.id);
+      }
+    });
 
     // Fetch primary articles - if we have issues, filter by them, otherwise get all
     let primaryQuery = supabase
@@ -242,10 +253,19 @@ export async function GET(request: NextRequest) {
 
     // Fetch link clicks for sent issues to calculate article metrics
     // We'll match clicks to articles by source_url and issue_id
+    // NOTE: Before 12/08/2025, issue_id in link_clicks was mailerlite_issue_id
+    // After 12/08/2025, issue_id is the database UUID. We need to handle both.
     let linkClicks: any[] = [];
-    const sentIssueIds = issues.filter(i => i.status === 'sent').map(i => i.id);
+    const sentIssues = issues.filter(i => i.status === 'sent');
+    const sentIssueIds = sentIssues.map(i => i.id);
+    const sentMailerliteIds = sentIssues
+      .map(i => i.mailerlite_issue_id)
+      .filter((id: string | null) => id); // Filter out null/undefined
 
-    if (sentIssueIds.length > 0) {
+    // Combine both ID types for the query
+    const allIssueIdFormats = [...sentIssueIds, ...sentMailerliteIds];
+
+    if (allIssueIdFormats.length > 0) {
       // Fetch in batches to avoid pagination limits
       let allClicks: any[] = [];
       let hasMore = true;
@@ -256,7 +276,7 @@ export async function GET(request: NextRequest) {
         const { data: clicksBatch, error: clicksError } = await supabase
           .from('link_clicks')
           .select('id, link_url, subscriber_email, issue_id')
-          .in('issue_id', sentIssueIds)
+          .in('issue_id', allIssueIdFormats)
           .range(offset, offset + batchSize - 1);
 
         if (clicksError) {
@@ -278,7 +298,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build a map of clicks by issue_id + normalized source_url for quick lookup
-    // Key format: "issue_id|normalized_url"
+    // Key format: "db_issue_id|normalized_url" (always use database UUID as key)
     const normalizeUrl = (url: string): string => {
       if (!url) return '';
       return url.toLowerCase()
@@ -289,10 +309,18 @@ export async function GET(request: NextRequest) {
     };
 
     // Group clicks by issue_id and link_url
+    // Normalize mailerlite IDs to database UUIDs for consistent matching
     const clicksMap = new Map<string, { totalClicks: number; uniqueClickers: Set<string> }>();
     linkClicks.forEach(click => {
       if (!click.issue_id || !click.link_url) return;
-      const key = `${click.issue_id}|${normalizeUrl(click.link_url)}`;
+
+      // Convert mailerlite_issue_id to database UUID if needed
+      let dbIssueId = click.issue_id;
+      if (mailerliteToDbIdMap.has(click.issue_id)) {
+        dbIssueId = mailerliteToDbIdMap.get(click.issue_id)!;
+      }
+
+      const key = `${dbIssueId}|${normalizeUrl(click.link_url)}`;
       if (!clicksMap.has(key)) {
         clicksMap.set(key, { totalClicks: 0, uniqueClickers: new Set() });
       }
