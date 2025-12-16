@@ -162,7 +162,7 @@ export default async function ToolDetailPage({ params }: ToolDetailPageProps) {
                 </div>
 
                 {/* CTA */}
-                <div className="mt-8 flex flex-wrap gap-3">
+                <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
                   <ToolClickTracker
                     toolId={id}
                     websiteUrl={tool.website_url}
