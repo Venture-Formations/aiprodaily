@@ -230,7 +230,7 @@ export default async function NewsArchivePage({
                   {paginatedItems.map((item) => (
                     <Link
                       key={`${item.type}-${item.slug}`}
-                      href={item.type === 'newsletter' ? `/website/newsletter/${item.slug}` : `/website/news/${item.slug}`}
+                      href={item.type === 'newsletter' ? `/newsletter/${item.slug}` : `/news/${item.slug}`}
                       className="group block bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow h-full flex flex-col"
                     >
                       {/* Image */}
@@ -320,7 +320,7 @@ export default async function NewsArchivePage({
                 <div className="flex justify-center gap-2 mt-8">
                   {currentPage > 1 && (
                     <Link
-                      href={`/website/news${buildQueryString(currentPage - 1)}`}
+                      href={`/news${buildQueryString(currentPage - 1)}`}
                       className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
                     >
                       Previous
@@ -341,7 +341,7 @@ export default async function NewsArchivePage({
                     return (
                       <Link
                         key={pageNum}
-                        href={`/website/news${buildQueryString(pageNum)}`}
+                        href={`/news${buildQueryString(pageNum)}`}
                         className={`px-4 py-2 rounded ${
                           currentPage === pageNum
                             ? 'bg-blue-600 text-white'
@@ -355,7 +355,7 @@ export default async function NewsArchivePage({
 
                   {currentPage < totalPages && (
                     <Link
-                      href={`/website/news${buildQueryString(currentPage + 1)}`}
+                      href={`/news${buildQueryString(currentPage + 1)}`}
                       className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
                     >
                       Next
@@ -372,7 +372,7 @@ export default async function NewsArchivePage({
                 <ul className="space-y-1">
                   <li>
                     <Link
-                      href="/website/news"
+                      href="/news"
                       className={`block px-3 py-2 rounded-md transition-colors ${
                         !params.category
                           ? 'bg-blue-600 text-white'
@@ -384,7 +384,7 @@ export default async function NewsArchivePage({
                   </li>
                   <li>
                     <Link
-                      href="/website/news?category=newsletter"
+                      href="/news?category=newsletter"
                       className={`block px-3 py-2 rounded-md transition-colors ${
                         params.category === 'newsletter'
                           ? 'bg-blue-600 text-white'
@@ -397,7 +397,7 @@ export default async function NewsArchivePage({
                   {categories.map(cat => (
                     <li key={cat.id}>
                       <Link
-                        href={`/website/news?category=${cat.slug}`}
+                        href={`/news?category=${cat.slug}`}
                         className={`block px-3 py-2 rounded-md transition-colors ${
                           params.category === cat.slug
                             ? 'bg-blue-600 text-white'

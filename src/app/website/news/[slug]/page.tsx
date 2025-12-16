@@ -190,7 +190,7 @@ export default async function ArticlePage({ params }: PageProps) {
             <nav className="mb-6">
               <ol className="flex items-center space-x-2 text-sm text-gray-500">
                 <li>
-                  <Link href="/website/news" className="hover:text-blue-600">
+                  <Link href="/news" className="hover:text-blue-600">
                     News
                   </Link>
                 </li>
@@ -199,7 +199,7 @@ export default async function ArticlePage({ params }: PageProps) {
                     <li>/</li>
                     <li>
                       <Link
-                        href={`/website/news?category=${category.slug}`}
+                        href={`/news?category=${category.slug}`}
                         className="hover:text-blue-600"
                       >
                         {category.name}
@@ -236,7 +236,7 @@ export default async function ArticlePage({ params }: PageProps) {
               <p className="text-gray-600 mb-4">Share this article:</p>
               <div className="flex gap-4">
                 <a
-                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(article.title)}&url=${encodeURIComponent(`https://${host}/website/news/${article.slug}`)}`}
+                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(article.title)}&url=${encodeURIComponent(`https://${host}/news/${article.slug}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -244,7 +244,7 @@ export default async function ArticlePage({ params }: PageProps) {
                   Twitter
                 </a>
                 <a
-                  href={`https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(`https://${host}/website/news/${article.slug}`)}&title=${encodeURIComponent(article.title)}`}
+                  href={`https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(`https://${host}/news/${article.slug}`)}&title=${encodeURIComponent(article.title)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-4 py-2 bg-blue-700 text-white rounded hover:bg-blue-800"
@@ -257,7 +257,7 @@ export default async function ArticlePage({ params }: PageProps) {
             {/* Back Link */}
             <div className="mt-8">
               <Link
-                href="/website/news"
+                href="/news"
                 className="inline-flex items-center text-blue-600 hover:text-blue-800"
               >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -283,7 +283,7 @@ export default async function ArticlePage({ params }: PageProps) {
                   return (
                     <Link
                       key={related.slug}
-                      href={`/website/news/${related.slug}`}
+                      href={`/news/${related.slug}`}
                       className="group block bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden"
                     >
                       <div className="aspect-video bg-gray-100 overflow-hidden">
