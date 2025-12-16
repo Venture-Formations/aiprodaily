@@ -181,10 +181,7 @@ export async function claimTool(
       submission_status: 'pending',
       // Reset payment/featured status - they'll need to upgrade after claiming
       is_featured: false,
-      is_paid_placement: false,
-      listing_type: 'free',
-      billing_period: null,
-      plan: 'free'
+      is_paid_placement: false
     }
 
     // Handle logo image
