@@ -220,9 +220,6 @@ async function customMiddleware(request: NextRequest): Promise<NextResponse> {
   return NextResponse.next()
 }
 
-// Routes that are hidden until launch (controlled by ENABLE_CUSTOMER_PORTAL env var)
-const isCustomerPortalRoute = createRouteMatcher(['/account(.*)', '/tools(.*)'])
-
 // Main middleware - uses clerkMiddleware for /tools routes, custom logic for others
 export default clerkMiddleware(async (auth, request) => {
   const url = request.nextUrl
@@ -233,38 +230,12 @@ export default clerkMiddleware(async (auth, request) => {
     method: request.method
   })
 
-  // Block customer portal and tools directory if not enabled
-  // Set ENABLE_CUSTOMER_PORTAL=true in Vercel env vars when ready to launch
-  let previewCookieResponse: NextResponse | null = null
-
-  if (isCustomerPortalRoute(request) && process.env.ENABLE_CUSTOMER_PORTAL !== 'true') {
-    const previewSecret = url.searchParams.get('preview')
-    const previewCookie = request.cookies.get('portal_preview')?.value
-
-    // Allow access with secret query param OR valid preview cookie
-    if (previewSecret === process.env.PREVIEW_SECRET) {
-      // Set cookie so user can navigate without ?preview param
-      previewCookieResponse = NextResponse.next()
-      previewCookieResponse.cookies.set('portal_preview', 'true', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 // 24 hours
-      })
-      // Don't return yet - let subsequent logic run but use this response
-    } else if (previewCookie !== 'true') {
-      console.log('[Middleware] Customer portal not enabled, redirecting to home')
-      return NextResponse.redirect(new URL('/', request.url))
-    }
-  }
-
-  // Handle /tools and /account routes with Clerk (both need preview cookie support)
+  // Handle /tools and /account routes with Clerk
   if (isToolsRoute(request) || isAccountRoute(request)) {
     // Don't use auth.protect() here - the submit page has SignedIn/SignedOut
     // components that handle authentication state gracefully
     // Let Clerk process the request to provide auth context
-    // Return preview cookie response if we need to set the cookie
-    return previewCookieResponse || NextResponse.next()
+    return NextResponse.next()
   }
 
   // For all other routes, use custom middleware logic
