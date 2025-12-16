@@ -36,8 +36,8 @@ function DirectoryFooter({ logoUrl, newsletterName, businessName }: DirectoryFoo
           <nav className="mt-10 text-sm" aria-label="quick links">
             <div className="-my-1 flex justify-center gap-x-6">
               <NavLink href="/">Home</NavLink>
+              <NavLink href="/news">News</NavLink>
               <NavLink href="/tools">AI Tools</NavLink>
-              <NavLink href="/tools/submit">Submit Tool</NavLink>
               <NavLink href="/contactus">Contact</NavLink>
             </div>
           </nav>

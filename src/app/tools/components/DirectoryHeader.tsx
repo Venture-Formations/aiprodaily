@@ -74,6 +74,7 @@ function MobileNavigation() {
         className="absolute inset-x-0 top-full mt-4 flex origin-top flex-col rounded-2xl bg-white p-4 text-lg tracking-tight text-slate-900 shadow-xl ring-1 ring-slate-900/5 data-closed:scale-95 data-closed:opacity-0 data-enter:duration-150 data-enter:ease-out data-leave:duration-100 data-leave:ease-in"
       >
         <MobileNavLink href="/">Home</MobileNavLink>
+        <MobileNavLink href="/news">News</MobileNavLink>
         <MobileNavLink href="/tools">AI Tools</MobileNavLink>
         <MobileNavLink href="/contactus">Contact</MobileNavLink>
         <hr className="m-2 border-slate-300/40" />
@@ -112,6 +113,7 @@ export function DirectoryHeader({ logoUrl, newsletterName }: DirectoryHeaderProp
             </Link>
             <div className="hidden md:flex md:gap-x-6">
               <NavLink href="/">Home</NavLink>
+              <NavLink href="/news">News</NavLink>
               <NavLink href="/tools">AI Tools</NavLink>
               <NavLink href="/contactus">Contact</NavLink>
             </div>
