@@ -134,7 +134,7 @@ export default async function NewsletterPage({ params }: PageProps) {
 
       return processedBody.replace(
         arrowCtaPattern,
-        `${openingTag}${arrow}${closingStrongTag || '</strong>'}<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline; font-weight: bold;">${ctaText}</a>${closingPTag}${trailingSpace}`
+        `${openingTag}${arrow}${closingStrongTag || '</strong>'}<a href="${url}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; font-weight: bold;">${ctaText}</a>${closingPTag}${trailingSpace}`
       )
     }
 
@@ -174,7 +174,7 @@ export default async function NewsletterPage({ params }: PageProps) {
 
         return processedBody.replace(
           sentenceRegex,
-          `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline; font-weight: bold;">$&</a>`
+          `<a href="${url}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; font-weight: bold;">$&</a>`
         )
       }
     } else {
@@ -188,7 +188,7 @@ export default async function NewsletterPage({ params }: PageProps) {
 
         return processedBody.replace(
           textRegex,
-          `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline; font-weight: bold;">$&</a>`
+          `<a href="${url}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; font-weight: bold;">$&</a>`
         )
       }
     }
@@ -466,7 +466,7 @@ export default async function NewsletterPage({ params }: PageProps) {
                   <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{section.name}</h2>
                   <div className="p-6 sm:p-8">
                   <div className="text-center">
-                    <h3 className="text-xl font-bold text-slate-900 mb-4">{advertorial.title}</h3>
+                    <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4">{advertorial.title}</h3>
                     {advertorial.image_url && advertorial.button_url ? (
                       <div className="mb-4">
                         <a href={advertorial.button_url} target="_blank" rel="noopener noreferrer">
@@ -489,7 +489,7 @@ export default async function NewsletterPage({ params }: PageProps) {
                       </div>
                     ) : null}
                     <div
-                      className="text-slate-900 leading-relaxed text-left prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-none [&_ol]:pl-0 [&_li]:mb-1 [&_ol_li[data-list='bullet']]:pl-6 [&_ol_li[data-list='bullet']]:relative [&_ol_li[data-list='bullet']]:before:content-['•'] [&_ol_li[data-list='bullet']]:before:absolute [&_ol_li[data-list='bullet']]:before:left-0 [&_ol]:counter-reset-[item] [&_ol_li[data-list='ordered']]:pl-6 [&_ol_li[data-list='ordered']]:relative [&_ol_li[data-list='ordered']]:before:content-[counter(item)_'.'] [&_ol_li[data-list='ordered']]:before:absolute [&_ol_li[data-list='ordered']]:before:left-0 [&_ol_li[data-list='ordered']]:counter-increment-[item]"
+                      className="text-slate-900 leading-relaxed text-left prose prose-sm max-w-none [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-none [&_ol]:pl-0 [&_li]:mb-1 [&_ol_li[data-list='bullet']]:pl-6 [&_ol_li[data-list='bullet']]:relative [&_ol_li[data-list='bullet']]:before:content-['•'] [&_ol_li[data-list='bullet']]:before:absolute [&_ol_li[data-list='bullet']]:before:left-0 [&_ol]:counter-reset-[item] [&_ol_li[data-list='ordered']]:pl-6 [&_ol_li[data-list='ordered']]:relative [&_ol_li[data-list='ordered']]:before:content-[counter(item)_'.'] [&_ol_li[data-list='ordered']]:before:absolute [&_ol_li[data-list='ordered']]:before:left-0 [&_ol_li[data-list='ordered']]:counter-increment-[item]"
                       dangerouslySetInnerHTML={{ __html: processedBody }}
                     />
                   </div>
@@ -528,7 +528,7 @@ export default async function NewsletterPage({ params }: PageProps) {
                 <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">Presented By</h2>
                 <div className="p-6 sm:p-8">
                   <div className="text-center">
-                    <h3 className="text-xl font-bold text-slate-900 mb-4">{advertorial.title}</h3>
+                    <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4">{advertorial.title}</h3>
                     {advertorial.image_url && advertorial.button_url ? (
                       <div className="mb-4">
                         <a href={advertorial.button_url} target="_blank" rel="noopener noreferrer">
@@ -551,7 +551,7 @@ export default async function NewsletterPage({ params }: PageProps) {
                       </div>
                     ) : null}
                     <div
-                      className="text-slate-900 leading-relaxed text-left prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-none [&_ol]:pl-0 [&_li]:mb-1 [&_ol_li[data-list='bullet']]:pl-6 [&_ol_li[data-list='bullet']]:relative [&_ol_li[data-list='bullet']]:before:content-['•'] [&_ol_li[data-list='bullet']]:before:absolute [&_ol_li[data-list='bullet']]:before:left-0 [&_ol]:counter-reset-[item] [&_ol_li[data-list='ordered']]:pl-6 [&_ol_li[data-list='ordered']]:relative [&_ol_li[data-list='ordered']]:before:content-[counter(item)_'.'] [&_ol_li[data-list='ordered']]:before:absolute [&_ol_li[data-list='ordered']]:before:left-0 [&_ol_li[data-list='ordered']]:counter-increment-[item]"
+                      className="text-slate-900 leading-relaxed text-left prose prose-sm max-w-none [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-none [&_ol]:pl-0 [&_li]:mb-1 [&_ol_li[data-list='bullet']]:pl-6 [&_ol_li[data-list='bullet']]:relative [&_ol_li[data-list='bullet']]:before:content-['•'] [&_ol_li[data-list='bullet']]:before:absolute [&_ol_li[data-list='bullet']]:before:left-0 [&_ol]:counter-reset-[item] [&_ol_li[data-list='ordered']]:pl-6 [&_ol_li[data-list='ordered']]:relative [&_ol_li[data-list='ordered']]:before:content-[counter(item)_'.'] [&_ol_li[data-list='ordered']]:before:absolute [&_ol_li[data-list='ordered']]:before:left-0 [&_ol_li[data-list='ordered']]:counter-increment-[item]"
                       dangerouslySetInnerHTML={{ __html: processedBody }}
                     />
                   </div>
