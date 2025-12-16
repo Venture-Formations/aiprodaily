@@ -39,11 +39,12 @@ const navigation = [
       { name: 'Newsletter', href: '/account/ads/newsletter', icon: Newspaper }
     ]
   },
-  {
-    name: 'Billing',
-    href: '/account/billing',
-    icon: CreditCard,
-  },
+  // Billing navigation hidden - page kept for future use
+  // {
+  //   name: 'Billing',
+  //   href: '/account/billing',
+  //   icon: CreditCard,
+  // },
   {
     name: 'Settings',
     href: '/account/settings',

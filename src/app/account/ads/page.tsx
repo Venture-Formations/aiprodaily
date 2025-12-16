@@ -1,7 +1,6 @@
 import { currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
-import { getDirectoryPricing } from '@/lib/directory'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Star, Newspaper, ArrowRight, Crown, Clock } from 'lucide-react'
@@ -17,16 +16,13 @@ export default async function AdsOverviewPage() {
     redirect('/sign-in')
   }
 
-  // Fetch user's tool listing and pricing in parallel
-  const [toolResult, pricing] = await Promise.all([
-    supabaseAdmin
-      .from('ai_applications')
-      .select('id, app_name, logo_url, is_paid_placement, is_featured, plan, submission_status, publication_id')
-      .eq('clerk_user_id', user.id)
-      .eq('publication_id', PUBLICATION_ID)
-      .single(),
-    getDirectoryPricing()
-  ])
+  // Fetch user's tool listing
+  const toolResult = await supabaseAdmin
+    .from('ai_applications')
+    .select('id, app_name, logo_url, is_paid_placement, is_featured, plan, submission_status, publication_id')
+    .eq('clerk_user_id', user.id)
+    .eq('publication_id', PUBLICATION_ID)
+    .single()
 
   const { data: tool, error } = toolResult
 
@@ -122,19 +118,20 @@ export default async function AdsOverviewPage() {
                 <p className="text-sm text-slate-600 mb-2">
                   &ldquo;{tool.app_name}&rdquo; is listed in the directory.
                 </p>
-                <p className="text-sm font-bold text-slate-900">
+                {/* Upgrade messaging hidden - kept for future use */}
+                {/* <p className="text-sm font-bold text-slate-900">
                   Upgrade to Featured for the #1 position in your category.
-                </p>
+                </p> */}
               </div>
             )}
           </div>
 
-          <div className={`px-6 py-4 border-t ${isFeatured ? 'bg-slate-50 border-slate-100' : 'bg-gradient-to-r from-amber-500 to-orange-500'}`}>
+          <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
             <Link
               href="/account/ads/profile"
-              className={`flex items-center justify-between font-medium ${isFeatured ? 'text-blue-600 hover:underline' : 'text-white'}`}
+              className="flex items-center justify-between text-blue-600 font-medium hover:underline"
             >
-              <span>{isFeatured ? 'Manage Listing' : 'Upgrade to Featured'}</span>
+              <span>{isFeatured ? 'Manage Listing' : 'View Details'}</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -192,9 +189,9 @@ export default async function AdsOverviewPage() {
               <Crown className="w-5 h-5 text-amber-500" />
             </div>
             <div>
-              <p className="font-medium text-slate-900">Featured Listing</p>
+              <p className="font-medium text-slate-900">Featured Listing <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full ml-2">Coming Soon</span></p>
               <p className="text-sm text-slate-600">
-                ${pricing.featuredPrice}/mo. Get the #1 position in your category with premium styling.
+                Get the #1 position in your category with premium styling.
               </p>
             </div>
           </div>

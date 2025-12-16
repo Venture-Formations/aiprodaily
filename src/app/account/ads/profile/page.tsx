@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { getCategoriesWithFeaturedTools, getDirectoryPricing } from '@/lib/directory'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Star, Check, TrendingUp, Eye, ArrowRight, Crown } from 'lucide-react'
+import { Star, Check, TrendingUp, Eye, ArrowRight, Crown, Clock } from 'lucide-react'
 
 const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
 
@@ -111,14 +111,15 @@ export default async function ToolProfileAdsPage() {
                     </div>
                   </div>
                 </div>
-                {billingPeriod && (
+                {/* Billing link hidden - kept for future use */}
+                {/* {billingPeriod && (
                   <Link
                     href="/account/billing"
                     className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
                   >
                     Manage Subscription
                   </Link>
-                )}
+                )} */}
               </div>
 
               {/* Stats */}
@@ -222,114 +223,134 @@ export default async function ToolProfileAdsPage() {
             </div>
           </div>
 
-          {/* Upgrade to Featured Option */}
-          {!categoryHasFeatured ? (
-            <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl border border-amber-200 p-8">
-              {/* Urgency Banner */}
-              <div className="bg-amber-500 text-white text-center py-3 px-4 rounded-xl mb-6 shadow-md">
-                <p className="font-bold text-lg">⚡ Only 1 Featured Listing Per Category</p>
-                <p className="text-amber-100 text-sm">This spot is currently available in your category!</p>
-              </div>
-
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-center">
-                  <Crown className="w-8 h-8 text-white" />
+          {/* Upgrade Section - Coming Soon Overlay */}
+          <div className="relative">
+            {/* Coming Soon Overlay */}
+            <div className="absolute inset-0 z-10 flex items-center justify-center">
+              <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 text-center max-w-md">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-r from-amber-100 to-orange-100 flex items-center justify-center">
+                  <Clock className="w-8 h-8 text-amber-600" />
                 </div>
-                <h2 className="text-2xl font-bold text-slate-900 mb-2">Claim the #1 Position</h2>
-                <p className="text-slate-600 max-w-lg mx-auto">
-                  Be the featured tool in your category and get maximum visibility
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">Coming Soon</h2>
+                <p className="text-slate-600 mb-4">
+                  Premium listing upgrades will be available soon. We&apos;re working on bringing you the best way to boost your tool&apos;s visibility.
                 </p>
-              </div>
-
-              {/* Featured Pricing - Monthly Only */}
-              <div className="max-w-md mx-auto">
-                <div className="bg-white rounded-xl border-2 border-amber-500 p-6 relative">
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="px-3 py-1 bg-amber-500 text-white text-xs font-medium rounded-full">
-                      Premium
-                    </span>
-                  </div>
-                  <h3 className="font-semibold text-slate-900 mb-1 text-center">Featured Listing</h3>
-                  <div className="text-center mb-4">
-                    <span className="text-4xl font-bold text-slate-900">${pricing.featuredPrice}</span>
-                    <span className="text-slate-500">/month</span>
-                  </div>
-                  <ul className="space-y-3 mb-6">
-                    <li className="flex items-center gap-2 text-sm text-slate-600">
-                      <Check className="w-4 h-4 text-amber-500" />
-                      #1 position in your category
-                    </li>
-                    <li className="flex items-center gap-2 text-sm text-slate-600">
-                      <Check className="w-4 h-4 text-amber-500" />
-                      Featured badge & highlighted card
-                    </li>
-                    <li className="flex items-center gap-2 text-sm text-slate-600">
-                      <Check className="w-4 h-4 text-amber-500" />
-                      Maximum visibility
-                    </li>
-                    <li className="flex items-center gap-2 text-sm text-slate-600">
-                      <Check className="w-4 h-4 text-amber-500" />
-                      Cancel anytime
-                    </li>
-                  </ul>
-                  <Link
-                    href={`/account/ads/upgrade?listing_type=featured&billing_period=monthly&tool=${tool.id}`}
-                    className="block w-full py-3 bg-amber-500 text-white text-center rounded-full font-medium hover:bg-amber-400 transition-colors"
-                  >
-                    Upgrade to Featured
-                  </Link>
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-sm font-medium">
+                  <Clock className="w-4 h-4" />
+                  Stay tuned for updates
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="bg-amber-50 rounded-xl border border-amber-200 p-6 text-center">
-              <Crown className="w-8 h-8 text-amber-500 mx-auto mb-3" />
-              <h3 className="font-semibold text-slate-900 mb-2">Featured Slot Unavailable</h3>
-              <p className="text-sm text-slate-600">
-                Another tool is currently the Featured listing in your category.
-                Featured slots are limited to one per category.
-              </p>
-            </div>
-          )}
 
-          {/* Benefits Comparison */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <h3 className="font-semibold text-slate-900 mb-4">Why Upgrade to Featured?</h3>
-            <div className="grid grid-cols-2 gap-6">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
-                  <Crown className="w-5 h-5 text-amber-600" />
+            {/* Grayed out content behind */}
+            <div className="opacity-30 pointer-events-none select-none blur-[2px]">
+              {/* Upgrade to Featured Option */}
+              {!categoryHasFeatured ? (
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl border border-amber-200 p-8">
+                  {/* Urgency Banner */}
+                  <div className="bg-amber-500 text-white text-center py-3 px-4 rounded-xl mb-6 shadow-md">
+                    <p className="font-bold text-lg">⚡ Only 1 Featured Listing Per Category</p>
+                    <p className="text-amber-100 text-sm">This spot is currently available in your category!</p>
+                  </div>
+
+                  <div className="text-center mb-8">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-center">
+                      <Crown className="w-8 h-8 text-white" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Claim the #1 Position</h2>
+                    <p className="text-slate-600 max-w-lg mx-auto">
+                      Be the featured tool in your category and get maximum visibility
+                    </p>
+                  </div>
+
+                  {/* Featured Pricing - Monthly Only */}
+                  <div className="max-w-md mx-auto">
+                    <div className="bg-white rounded-xl border-2 border-amber-500 p-6 relative">
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                        <span className="px-3 py-1 bg-amber-500 text-white text-xs font-medium rounded-full">
+                          Premium
+                        </span>
+                      </div>
+                      <h3 className="font-semibold text-slate-900 mb-1 text-center">Featured Listing</h3>
+                      <div className="text-center mb-4">
+                        <span className="text-4xl font-bold text-slate-900">${pricing.featuredPrice}</span>
+                        <span className="text-slate-500">/month</span>
+                      </div>
+                      <ul className="space-y-3 mb-6">
+                        <li className="flex items-center gap-2 text-sm text-slate-600">
+                          <Check className="w-4 h-4 text-amber-500" />
+                          #1 position in your category
+                        </li>
+                        <li className="flex items-center gap-2 text-sm text-slate-600">
+                          <Check className="w-4 h-4 text-amber-500" />
+                          Featured badge & highlighted card
+                        </li>
+                        <li className="flex items-center gap-2 text-sm text-slate-600">
+                          <Check className="w-4 h-4 text-amber-500" />
+                          Maximum visibility
+                        </li>
+                        <li className="flex items-center gap-2 text-sm text-slate-600">
+                          <Check className="w-4 h-4 text-amber-500" />
+                          Cancel anytime
+                        </li>
+                      </ul>
+                      <span className="block w-full py-3 bg-amber-500 text-white text-center rounded-full font-medium">
+                        Upgrade to Featured
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-slate-900">#1 Position</p>
-                  <p className="text-sm text-slate-500">First listing in your category, guaranteed</p>
+              ) : (
+                <div className="bg-amber-50 rounded-xl border border-amber-200 p-6 text-center">
+                  <Crown className="w-8 h-8 text-amber-500 mx-auto mb-3" />
+                  <h3 className="font-semibold text-slate-900 mb-2">Featured Slot Unavailable</h3>
+                  <p className="text-sm text-slate-600">
+                    Another tool is currently the Featured listing in your category.
+                    Featured slots are limited to one per category.
+                  </p>
                 </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
-                  <Star className="w-5 h-5 text-orange-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-slate-900">Stand Out</p>
-                  <p className="text-sm text-slate-500">Featured badge and highlighted card styling</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
-                  <Eye className="w-5 h-5 text-teal-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-slate-900">Maximum Visibility</p>
-                  <p className="text-sm text-slate-500">Top placement drives the most traffic</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
-                  <TrendingUp className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-slate-900">Better Results</p>
-                  <p className="text-sm text-slate-500">Featured listings see 5-10x more engagement</p>
+              )}
+
+              {/* Benefits Comparison */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mt-6">
+                <h3 className="font-semibold text-slate-900 mb-4">Why Upgrade to Featured?</h3>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                      <Crown className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-900">#1 Position</p>
+                      <p className="text-sm text-slate-500">First listing in your category, guaranteed</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
+                      <Star className="w-5 h-5 text-orange-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-900">Stand Out</p>
+                      <p className="text-sm text-slate-500">Featured badge and highlighted card styling</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
+                      <Eye className="w-5 h-5 text-teal-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-900">Maximum Visibility</p>
+                      <p className="text-sm text-slate-500">Top placement drives the most traffic</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                      <TrendingUp className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-900">Better Results</p>
+                      <p className="text-sm text-slate-500">Featured listings see 5-10x more engagement</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
