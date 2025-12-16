@@ -236,6 +236,20 @@ export default async function ArticlePage({ params }: PageProps) {
               <p className="text-gray-600 mb-4">Share this article:</p>
               <div className="flex gap-3">
                 <a
+                  href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`https://${host}/news/${article.slug}`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center w-10 h-10 bg-[#1877F2] rounded-lg hover:bg-[#0d65d9] transition-colors"
+                  title="Share on Facebook"
+                >
+                  <img
+                    src="/images/social/facebook_light.png"
+                    alt="Facebook"
+                    width={24}
+                    height={24}
+                  />
+                </a>
+                <a
                   href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(article.title)}&url=${encodeURIComponent(`https://${host}/news/${article.slug}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
