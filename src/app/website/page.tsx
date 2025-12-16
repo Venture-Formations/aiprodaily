@@ -1,13 +1,29 @@
 import { Header } from "@/components/salient/Header"
 import { Hero } from "@/components/salient/Hero"
 import { Footer } from "@/components/salient/Footer"
-import { NewslettersList } from "@/components/website/newsletters-list"
+import { LatestNewsList } from "@/components/website/latest-news-list"
 import { supabaseAdmin } from "@/lib/supabase"
 import { headers } from 'next/headers'
 import { getPublicationByDomain, getPublicationSettings } from '@/lib/publication-settings'
 
 // Force dynamic rendering to fetch fresh data
 export const dynamic = 'force-dynamic'
+
+interface NewsItem {
+  type: 'newsletter' | 'article'
+  slug: string
+  title: string
+  date: string
+  category: string
+  image_url?: string | null
+  description?: string
+  metadata?: {
+    total_articles?: number
+    total_secondary_articles?: number
+    has_ai_apps?: boolean
+    has_prompt?: boolean
+  }
+}
 
 export default async function WebsiteHome() {
   // Get domain from headers (Next.js 15 requires await)
@@ -43,18 +59,64 @@ export default async function WebsiteHome() {
   const businessName = settings.business_name || 'AI Accounting Daily'
   const currentYear = new Date().getFullYear()
 
-  // Fetch newsletters with articles data for images (filtered by publication)
+  // Newsletter cover image
+  const newsletterCoverImage = "https://raw.githubusercontent.com/Venture-Formations/aiprodaily/master/public/images/accounting_website/ai_accounting_daily_cover_image.jpg"
+
+  // Fetch newsletters (filtered by publication)
   const { data: newsletters } = await supabaseAdmin
     .from('archived_newsletters')
-    .select('id, issue_id, issue_date, subject_line, send_date, metadata, articles')
+    .select('issue_date, subject_line, metadata')
     .eq('publication_id', publicationId)
     .order('issue_date', { ascending: false })
+    .limit(6)
+
+  // Fetch manual articles (published and used)
+  const { data: manualArticles } = await supabaseAdmin
+    .from('manual_articles')
+    .select('slug, title, publish_date, image_url, body, category:article_categories(name)')
+    .eq('publication_id', publicationId)
+    .in('status', ['published', 'used'])
+    .order('publish_date', { ascending: false })
+    .limit(6)
+
+  // Combine and format items
+  const newsItems: NewsItem[] = []
+
+  // Add newsletters
+  newsletters?.forEach(nl => {
+    newsItems.push({
+      type: 'newsletter',
+      slug: nl.issue_date,
+      title: nl.subject_line || `Newsletter - ${nl.issue_date}`,
+      date: nl.issue_date,
+      category: 'Newsletter',
+      image_url: newsletterCoverImage,
+      metadata: nl.metadata as NewsItem['metadata']
+    })
+  })
+
+  // Add manual articles
+  manualArticles?.forEach(article => {
+    newsItems.push({
+      type: 'article',
+      slug: article.slug,
+      title: article.title,
+      date: article.publish_date,
+      category: (article.category as any)?.name || 'Article',
+      image_url: article.image_url,
+      description: article.body.replace(/<[^>]+>/g, '').substring(0, 150) + '...'
+    })
+  })
+
+  // Sort all items by date and take latest 6
+  newsItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  const latestNews = newsItems.slice(0, 6)
 
   // JSON-LD structured data for WebPage
   const webPageSchema = {
     "@context": "https://schema.org",
     "@type": "WebPage",
-    "name": "AI Accounting Daily - Newsletter Archive",
+    "name": "AI Accounting Daily - Latest News",
     "description": "Daily insights, tools, and strategies to help accountants and finance professionals leverage AI for better outcomes.",
     "publisher": {
       "@type": "Organization",
@@ -71,10 +133,10 @@ export default async function WebsiteHome() {
       />
       <Header logoUrl={headerImageUrl} />
       <Hero />
-      {/* Newsletters Content */}
-      <NewslettersList
-        newsletters={newsletters || []}
-        imageOverride="https://raw.githubusercontent.com/Venture-Formations/aiprodaily/master/public/images/accounting_website/ai_accounting_daily_cover_image.jpg"
+      {/* Latest News Content */}
+      <LatestNewsList
+        newsItems={latestNews}
+        newsletterName={newsletterName}
       />
       <Footer logoUrl={logoUrl} newsletterName={newsletterName} businessName={businessName} currentYear={currentYear} />
     </main>
