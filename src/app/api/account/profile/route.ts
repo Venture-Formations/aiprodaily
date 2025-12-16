@@ -28,7 +28,7 @@ export async function PUT(request: NextRequest) {
     // Verify the tool belongs to this user in ai_applications table
     const { data: existingTool, error: fetchError } = await supabaseAdmin
       .from('ai_applications')
-      .select('id, clerk_user_id, submission_status, is_featured, listing_type, category')
+      .select('id, clerk_user_id, submission_status, is_featured, category')
       .eq('id', toolId)
       .eq('publication_id', PUBLICATION_ID)
       .single()
@@ -45,7 +45,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // If user is featured and trying to change category, verify the new category doesn't have a featured tool
-    const isFeatured = existingTool.is_featured || existingTool.listing_type === 'featured'
+    const isFeatured = existingTool.is_featured
     if (isFeatured && category && category !== existingTool.category) {
       const { data: featuredInCategory } = await supabaseAdmin
         .from('ai_applications')
