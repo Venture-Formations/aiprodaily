@@ -11,52 +11,47 @@ export interface ArticleExtractionResult {
   status: ExtractionStatus  // Explicit extraction status for tracking
 }
 
-// Common paywall/subscription patterns in HTML content
+// Paywall patterns - ONLY used when content extraction produces short/truncated content
+// These are specific phrases that indicate the article itself is locked, not just site-wide CTAs
 const PAYWALL_PATTERNS = [
-  /subscribe.*to\s+(continue|read|access|view)/i,
-  /subscription\s+required/i,
-  /premium\s+(content|article|story)/i,
-  /members[\s-]only/i,
-  /unlock\s+this\s+(article|story|content)/i,
-  /start\s+your\s+free\s+trial/i,
-  /already\s+a\s+subscriber/i,
-  /for\s+subscribers\s+only/i,
-  /exclusive\s+to\s+subscribers/i,
-  /read\s+the\s+full\s+(article|story)\s+with/i,
-  /this\s+(article|content)\s+is\s+for\s+subscribers/i,
-  /become\s+a\s+(member|subscriber)/i,
-  /paid\s+subscribers/i,
+  /subscription\s+required\s+to\s+(read|view|access)\s+this/i,
+  /this\s+(article|story|content)\s+is\s+(only\s+)?(available\s+)?(for|to)\s+subscribers/i,
+  /to\s+(continue|keep)\s+reading,?\s+(please\s+)?subscribe/i,
+  /unlock\s+(the\s+)?(full\s+)?(article|story|content)/i,
+  /subscribers[\s-]only\s+(content|article)/i,
+  /you['']?ve\s+(reached|hit)\s+(your|the)\s+(free\s+)?(article|story)\s+limit/i,
+  /article\s+is\s+for\s+paid\s+subscribers/i,
+  /premium\s+subscribers?\s+only/i,
 ]
 
-// Login/registration requirement patterns
+// Login patterns - ONLY used when content extraction produces short/truncated content
+// These indicate the article requires login to read, not just to comment or save
 const LOGIN_PATTERNS = [
-  /sign\s+in\s+to\s+(continue|read|access|view)/i,
-  /log\s+in\s+to\s+(continue|read|access|view)/i,
-  /create\s+(a\s+)?free\s+account/i,
-  /register\s+to\s+(continue|read|access)/i,
-  /please\s+(log|sign)\s+in/i,
-  /login\s+required/i,
-  /you\s+must\s+be\s+logged\s+in/i,
-  /sign\s+up\s+to\s+continue/i,
+  /sign\s+in\s+to\s+(continue|keep)\s+reading/i,
+  /log\s+in\s+to\s+(continue|keep)\s+reading/i,
+  /please\s+(log|sign)\s+in\s+to\s+(read|view|access)\s+this/i,
+  /you\s+must\s+be\s+logged\s+in\s+to\s+(read|view)/i,
+  /this\s+(article|content)\s+requires\s+(a\s+)?login/i,
 ]
 
-// CSS classes/IDs commonly used for paywalls
+// CSS selectors for active paywall elements - only visible blocking elements
+// These are more specific to reduce false positives from hidden/inactive elements
 const PAYWALL_SELECTORS = [
-  '[class*="paywall"]',
-  '[class*="subscription-gate"]',
-  '[class*="login-wall"]',
-  '[class*="metered"]',
-  '[class*="premium-wall"]',
-  '[id*="paywall"]',
-  '[id*="subscription-wall"]',
-  '[data-paywall]',
-  '[data-testid*="paywall"]',
-  '.piano-offer',
-  '.nytc-paywall',
-  '.article-paywall',
-  '.subscriber-only',
-  '.tp-modal', // Piano paywall modal
+  // Specific paywall overlay/modal classes (usually visible when blocking)
+  '.paywall-overlay',
+  '.paywall-modal',
+  '.subscription-gate',
+  '.login-gate',
+  '.premium-gate',
+  // Known paywall provider elements
+  '.piano-offer', // Piano paywall
+  '.nytc-paywall', // NYT paywall
+  '.tp-modal', // Piano modal
   '.pf-locked-content', // Pelcro paywall
+  // Data attributes indicating locked content
+  '[data-paywall="active"]',
+  '[data-locked="true"]',
+  '[data-content-tier="locked"]',
 ]
 
 // Known paywall domains (major publications with hard paywalls)
@@ -231,6 +226,7 @@ export class ArticleExtractor {
 
   /**
    * Fetch HTML and extract article content
+   * Strategy: Extract first, only check for paywall indicators if content is short/missing
    */
   private async fetchAndExtract(url: string): Promise<ArticleExtractionResult> {
     try {
@@ -279,17 +275,7 @@ export class ArticleExtractor {
       // Parse with linkedom
       const { document } = parseHTML(html)
 
-      // Check for paywall/login BEFORE attempting extraction
-      const restriction = this.detectAccessRestriction(html, document)
-      if (restriction.isRestricted && restriction.status) {
-        return {
-          success: false,
-          status: restriction.status,
-          error: restriction.reason
-        }
-      }
-
-      // Use Readability to extract article content
+      // EXTRACT FIRST - don't check for paywall patterns before attempting extraction
       const reader = new Readability(document, {
         charThreshold: 100, // Minimum character count
         debug: false
@@ -297,7 +283,16 @@ export class ArticleExtractor {
 
       const article = reader.parse()
 
+      // If Readability can't parse, check for restriction indicators
       if (!article) {
+        const restriction = this.detectAccessRestriction(html, document)
+        if (restriction.isRestricted && restriction.status) {
+          return {
+            success: false,
+            status: restriction.status,
+            error: restriction.reason
+          }
+        }
         return {
           success: false,
           status: 'failed',
@@ -308,9 +303,31 @@ export class ArticleExtractor {
       // Clean up the text content
       const fullText = article.textContent?.trim() || ''
 
-      // Short content check - may indicate paywall truncation
+      // If we got enough content, it's a success - don't check for paywall patterns
+      // (If content was paywalled, we wouldn't have gotten this much text)
+      if (fullText && fullText.length >= 500) {
+        return {
+          success: true,
+          status: 'success',
+          fullText,
+          title: article.title || undefined,
+          excerpt: article.excerpt || undefined
+        }
+      }
+
+      // Short content - might be truncated by paywall, check for indicators
       if (!fullText || fullText.length < 200) {
-        // If it's a known paywall domain with short content, mark as paywall
+        // Check for paywall/login indicators since content is short
+        const restriction = this.detectAccessRestriction(html, document)
+        if (restriction.isRestricted && restriction.status) {
+          return {
+            success: false,
+            status: restriction.status,
+            error: `${restriction.reason} (extracted only ${fullText.length} chars)`
+          }
+        }
+
+        // Known paywall domain with short content = likely paywall
         if (this.isKnownPaywallDomain(url)) {
           return {
             success: false,
@@ -325,6 +342,8 @@ export class ArticleExtractor {
         }
       }
 
+      // Content between 200-500 chars - borderline, but return as success
+      // This avoids false positives from short news briefs
       return {
         success: true,
         status: 'success',
