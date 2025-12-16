@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { X, Lock } from 'lucide-react'
+import { X, ChevronDown } from 'lucide-react'
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop'
 import 'react-image-crop/dist/ReactCrop.css'
 import { getCroppedImage } from '@/utils/imageCrop'
@@ -95,9 +95,8 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
     }
   }, [isOpen])
 
-  const handleCategorySelect = (categoryName: string, isDisabled?: boolean) => {
-    if (isDisabled) return
-    setSelectedCategory(categoryName)
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedCategory(e.target.value)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -234,46 +233,27 @@ export function EditProfileModal({ tool, isOpen, onClose }: EditProfileModalProp
             />
           </div>
 
-          {/* Category - Single Select */}
+          {/* Category - Dropdown Select */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Category *
             </label>
-            <p className="text-xs text-slate-500 mb-3">
-              Select one category that best fits your tool
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {categories.map(category => {
-                const isSelected = selectedCategory === category.name
-                const isDisabled = category.isDisabled
-
-                return (
-                  <button
-                    key={category.id}
-                    type="button"
-                    onClick={() => handleCategorySelect(category.name, isDisabled)}
-                    disabled={isSubmitting || isDisabled}
-                    title={category.disabledReason || undefined}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                      isDisabled
-                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                        : isSelected
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
-                  >
-                    {isDisabled && <Lock className="w-3 h-3" />}
+            <div className="relative">
+              <select
+                value={selectedCategory}
+                onChange={handleCategoryChange}
+                disabled={isSubmitting}
+                className="w-full px-4 py-2 border border-gray-200 bg-gray-50 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer"
+              >
+                <option value="">Select a category</option>
+                {categories.map(category => (
+                  <option key={category.id} value={category.name}>
                     {category.name}
-                  </button>
-                )
-              })}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
             </div>
-            {categories.some(c => c.isDisabled) && (
-              <p className="text-xs text-slate-500 mt-2">
-                <Lock className="w-3 h-3 inline mr-1" />
-                Categories with a lock already have a featured tool and cannot be selected for featured listings.
-              </p>
-            )}
           </div>
 
           {/* Images */}
