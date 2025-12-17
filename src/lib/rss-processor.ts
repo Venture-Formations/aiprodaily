@@ -9,6 +9,7 @@ import { Deduplicator } from './deduplicator'
 import {
   getArticleSettings,
   getExcludedRssSources,
+  getBlockedDomains,
   getCriteriaSettings,
   getPublicationSettings
 } from './publication-settings'
@@ -594,9 +595,28 @@ export class RSSProcessor {
 
       const newPosts: any[] = []
 
+      // Get blocked domains once for all posts in this feed
+      const blockedDomains = await getBlockedDomains(newsletterId)
+
       // Check which posts are actually new
       for (const item of recentPosts) {
         const externalId = item.guid || item.link || ''
+        const sourceUrl = item.link || ''
+
+        // Check if domain is blocked
+        if (sourceUrl && blockedDomains.length > 0) {
+          try {
+            const hostname = new URL(sourceUrl).hostname.toLowerCase().replace(/^www\./, '')
+            const isBlocked = blockedDomains.some(domain =>
+              hostname === domain || hostname.endsWith('.' + domain)
+            )
+            if (isBlocked) {
+              continue // Skip posts from blocked domains
+            }
+          } catch {
+            // Invalid URL, continue processing
+          }
+        }
 
         // Check if already exists (any issue or no issue)
         const { data: existing } = await supabaseAdmin

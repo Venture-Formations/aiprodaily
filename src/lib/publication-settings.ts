@@ -420,6 +420,21 @@ export async function getExcludedRssSources(publicationId: string): Promise<stri
 }
 
 /**
+ * Get blocked domains for a publication
+ * These domains will be completely skipped during RSS ingestion
+ */
+export async function getBlockedDomains(publicationId: string): Promise<string[]> {
+  const value = await getPublicationSetting(publicationId, 'blocked_domains')
+  if (!value) return []
+
+  try {
+    return JSON.parse(value)
+  } catch {
+    return []
+  }
+}
+
+/**
  * Get criteria settings for a publication
  */
 export async function getCriteriaSettings(publicationId: string): Promise<{

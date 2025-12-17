@@ -182,7 +182,8 @@ export class ArticleExtractor {
         lastError = result.error
         detectedStatus = result.status
 
-        // If we detected a paywall/login, don't retry - it won't help
+        // If we detected a paywall/login/blocked, don't retry Readability - it won't help
+        // But we'll still try Jina fallback for 'blocked' (bot detection) since it uses browser rendering
         if (result.status === 'paywall' || result.status === 'login_required' || result.status === 'blocked') {
           break
         }
@@ -192,16 +193,11 @@ export class ArticleExtractor {
       }
     }
 
-    // If already detected as paywall/login/blocked, skip Jina fallback
-    if (detectedStatus === 'paywall' || detectedStatus === 'login_required' || detectedStatus === 'blocked') {
-      return {
-        success: false,
-        status: detectedStatus,
-        error: lastError
-      }
+    // Always try Jina fallback - paywall/login patterns can be false positives from marketing CTAs
+    // Jina will confirm if content is actually restricted
+    if (detectedStatus === 'blocked' || detectedStatus === 'login_required' || detectedStatus === 'paywall') {
+      console.log(`[Extract] Trying Jina fallback for ${detectedStatus} site: ${new URL(url).hostname}`)
     }
-
-    // Attempt 2: Try Jina AI Reader fallback (handles JS, sometimes bypasses paywalls)
     try {
       const jinaResult = await this.extractWithJina(url)
 
