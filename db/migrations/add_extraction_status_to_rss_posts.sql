@@ -16,3 +16,4 @@ COMMENT ON COLUMN rss_posts.extraction_status IS 'Status of full article extract
 COMMENT ON COLUMN rss_posts.extraction_error IS 'Error message or reason for extraction failure';
 
 
+

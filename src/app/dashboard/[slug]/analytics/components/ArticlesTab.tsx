@@ -75,6 +75,10 @@ export default function ArticlesTab({ slug }: { slug: string }) {
   const [minScore, setMinScore] = useState<number | ''>('')
   const [maxScore, setMaxScore] = useState<number | ''>('')
 
+  // Sort states
+  const [sortColumn, setSortColumn] = useState<string | null>('issueDate')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+
   // Get unique positions for filter dropdown
   const uniquePositions = Array.from(new Set(articles.filter(a => a.finalPosition !== null).map(a => a.finalPosition as number))).sort((a, b) => a - b)
 
@@ -122,8 +126,8 @@ export default function ArticlesTab({ slug }: { slug: string }) {
   }, [slug])
 
   useEffect(() => {
-    applyFilters()
-  }, [articles, feedTypeFilter, positionFilter, searchTerm, minScore, maxScore])
+    applyFiltersAndSort()
+  }, [articles, feedTypeFilter, positionFilter, searchTerm, minScore, maxScore, sortColumn, sortDirection])
 
   const fetchArticles = async () => {
     try {
@@ -141,7 +145,7 @@ export default function ArticlesTab({ slug }: { slug: string }) {
     }
   }
 
-  const applyFilters = () => {
+  const applyFiltersAndSort = () => {
     let filtered = [...articles]
 
     if (feedTypeFilter !== 'all') {
@@ -175,7 +179,55 @@ export default function ArticlesTab({ slug }: { slug: string }) {
       filtered = filtered.filter(a => (a.totalScore || 0) <= maxScore)
     }
 
+    // Apply sorting
+    if (sortColumn) {
+      filtered.sort((a, b) => {
+        const aVal = a[sortColumn as keyof Article]
+        const bVal = b[sortColumn as keyof Article]
+
+        // Handle null/undefined values - push them to the end
+        if (aVal === null || aVal === undefined || aVal === '') {
+          return sortDirection === 'asc' ? 1 : -1
+        }
+        if (bVal === null || bVal === undefined || bVal === '') {
+          return sortDirection === 'asc' ? -1 : 1
+        }
+
+        // Date columns
+        if (sortColumn === 'issueDate' || sortColumn === 'publicationDate' || sortColumn === 'createdAt') {
+          const dateA = new Date(aVal as string).getTime()
+          const dateB = new Date(bVal as string).getTime()
+          return sortDirection === 'asc' ? dateA - dateB : dateB - dateA
+        }
+
+        // Number columns
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          return sortDirection === 'asc' ? aVal - bVal : bVal - aVal
+        }
+
+        // String columns
+        const strA = String(aVal).toLowerCase()
+        const strB = String(bVal).toLowerCase()
+        if (sortDirection === 'asc') {
+          return strA.localeCompare(strB)
+        } else {
+          return strB.localeCompare(strA)
+        }
+      })
+    }
+
     setFilteredArticles(filtered)
+  }
+
+  const handleSort = (columnKey: string) => {
+    if (sortColumn === columnKey) {
+      // Toggle direction if same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // New column - start with descending
+      setSortColumn(columnKey)
+      setSortDirection('desc')
+    }
   }
 
   const toggleColumn = (key: string) => {
@@ -194,6 +246,11 @@ export default function ArticlesTab({ slug }: { slug: string }) {
     setSearchTerm('')
     setMinScore('')
     setMaxScore('')
+  }
+
+  const clearSort = () => {
+    setSortColumn(null)
+    setSortDirection('desc')
   }
 
   const formatDate = (dateStr: string) => {
@@ -440,8 +497,21 @@ export default function ArticlesTab({ slug }: { slug: string }) {
         <div className="mt-4 flex justify-between items-center">
           <div className="text-sm text-gray-600">
             Showing {filteredArticles.length} of {articles.length} articles
+            {sortColumn && (
+              <span className="ml-2 text-gray-500">
+                | Sorted by {columns.find(c => c.key === sortColumn)?.label} ({sortDirection === 'desc' ? 'Z→A / High→Low' : 'A→Z / Low→High'})
+              </span>
+            )}
           </div>
           <div className="flex gap-3">
+            {sortColumn && (
+              <button
+                onClick={clearSort}
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
+                Clear Sort
+              </button>
+            )}
             <button
               onClick={clearFilters}
               className="text-sm text-brand-primary hover:text-blue-700"
@@ -493,9 +563,19 @@ export default function ArticlesTab({ slug }: { slug: string }) {
                 {enabledColumns.map(col => (
                   <th
                     key={col.key}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    onClick={() => handleSort(col.key)}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
                   >
-                    {col.label}
+                    <div className="flex items-center gap-1">
+                      {col.label}
+                      <span className="text-gray-400">
+                        {sortColumn === col.key ? (
+                          sortDirection === 'desc' ? '▼' : '▲'
+                        ) : (
+                          <span className="opacity-0 group-hover:opacity-50">▼</span>
+                        )}
+                      </span>
+                    </div>
                   </th>
                 ))}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">

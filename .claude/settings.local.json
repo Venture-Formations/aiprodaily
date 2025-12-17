@@ -53,7 +53,10 @@
       "Bash(dir \"C:\\Users\\dpenn\\Downloads\\Tailwind-20251205T144801Z-3-001\\Tailwind\" /s /b)",
       "Bash(dir:*)",
       "Bash(git checkout:*)",
-      "Bash(git merge:*)"
+      "Bash(git merge:*)",
+      "WebFetch(domain:www.businesswire.com)",
+      "WebFetch(domain:jina.ai)",
+      "WebFetch(domain:r.jina.ai)"
     ],
     "deny": [],
     "ask": []

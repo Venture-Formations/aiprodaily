@@ -111,6 +111,16 @@ export async function GET(request: NextRequest) {
 
     console.log('[API] Found issues:', issues?.length || 0);
 
+    // Log sample of issue dates to help diagnose N/A issue dates
+    if (issues && issues.length > 0) {
+      const issueDateSamples = issues.slice(0, 5).map((i: any) => ({ id: i.id, date: i.date }));
+      console.log('[API] Sample issue dates:', JSON.stringify(issueDateSamples));
+      const issuesWithNullDates = issues.filter((i: any) => !i.date);
+      if (issuesWithNullDates.length > 0) {
+        console.warn('[API] WARNING: Found', issuesWithNullDates.length, 'issues with null/empty dates');
+      }
+    }
+
     const issueIds = (issues || []).map(c => c.id);
     const issueMap = new Map((issues || []).map(c => [c.id, c]));
 
@@ -123,30 +133,30 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // Fetch primary articles - if we have issues, filter by them, otherwise get all
-    let primaryQuery = supabase
-      .from('articles')
-      .select(`
-        id,
-        post_id,
-        issue_id,
-        headline,
-        content,
-        rank,
-        fact_check_score,
-        word_count,
-        created_at
-      `);
-
+    // Fetch primary articles - ONLY if we have issues to filter by
+    // Without issues, we can't filter properly and would return articles from all publications
+    let primaryArticles: any[] = [];
     if (issueIds.length > 0) {
-      primaryQuery = primaryQuery.in('issue_id', issueIds);
-    }
+      const { data, error: primaryError } = await supabase
+        .from('articles')
+        .select(`
+          id,
+          post_id,
+          issue_id,
+          headline,
+          content,
+          rank,
+          fact_check_score,
+          word_count,
+          created_at
+        `)
+        .in('issue_id', issueIds);
 
-    const { data: primaryArticles, error: primaryError } = await primaryQuery;
-
-    if (primaryError) {
-      console.error('[API] Primary articles error:', primaryError.message);
-      throw primaryError;
+      if (primaryError) {
+        console.error('[API] Primary articles error:', primaryError.message);
+        throw primaryError;
+      }
+      primaryArticles = data || [];
     }
 
     console.log('[API] Found primary articles:', primaryArticles?.length || 0);
@@ -154,30 +164,29 @@ export async function GET(request: NextRequest) {
       console.log('[API] Sample primary article:', { id: primaryArticles[0].id, post_id: primaryArticles[0].post_id, issue_id: primaryArticles[0].issue_id });
     }
 
-    // Fetch secondary articles - if we have issues, filter by them, otherwise get all
-    let secondaryQuery = supabase
-      .from('secondary_articles')
-      .select(`
-        id,
-        post_id,
-        issue_id,
-        headline,
-        content,
-        rank,
-        fact_check_score,
-        word_count,
-        created_at
-      `);
-
+    // Fetch secondary articles - ONLY if we have issues to filter by
+    let secondaryArticles: any[] = [];
     if (issueIds.length > 0) {
-      secondaryQuery = secondaryQuery.in('issue_id', issueIds);
-    }
+      const { data, error: secondaryError } = await supabase
+        .from('secondary_articles')
+        .select(`
+          id,
+          post_id,
+          issue_id,
+          headline,
+          content,
+          rank,
+          fact_check_score,
+          word_count,
+          created_at
+        `)
+        .in('issue_id', issueIds);
 
-    const { data: secondaryArticles, error: secondaryError } = await secondaryQuery;
-
-    if (secondaryError) {
-      console.error('[API] Secondary articles error:', secondaryError.message);
-      throw secondaryError;
+      if (secondaryError) {
+        console.error('[API] Secondary articles error:', secondaryError.message);
+        throw secondaryError;
+      }
+      secondaryArticles = data || [];
     }
 
     console.log('[API] Found secondary articles:', secondaryArticles?.length || 0);
@@ -370,6 +379,8 @@ export async function GET(request: NextRequest) {
       }
       if (!issue) {
         console.log('[API] Missing issue for article:', article.id, 'issue_id:', article.issue_id);
+      } else if (!issue.date) {
+        console.log('[API] Issue exists but date is null/empty for article:', article.id, 'issue_id:', article.issue_id, 'issue:', JSON.stringify(issue));
       }
       if (post && !feed) {
         console.log('[API] Missing feed for post:', post.id, 'feed_id:', post.feed_id);
