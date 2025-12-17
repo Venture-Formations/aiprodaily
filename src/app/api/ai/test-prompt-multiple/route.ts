@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { provider, promptJson, publication_id, prompt_type, limit = 10 } = body
+    const { provider, promptJson, publication_id, prompt_type, limit = 10, offset = 0 } = body
 
     if (!provider || !promptJson || !publication_id || !prompt_type) {
       return NextResponse.json(
@@ -86,9 +86,9 @@ export async function POST(request: NextRequest) {
 
     console.log('[AI Test Multiple] Fetching posts from sent issues for section:', section)
 
-    // Calculate cutoff date (5 days ago)
+    // Calculate cutoff date (7 days ago)
     const cutoffDate = new Date()
-    cutoffDate.setDate(cutoffDate.getDate() - 5)
+    cutoffDate.setDate(cutoffDate.getDate() - 7)
     const cutoffDateStr = cutoffDate.toISOString().split('T')[0]
 
     // Determine which article table to query based on section
@@ -166,11 +166,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const posts = Array.from(postsMap.values()).slice(0, limit)
+    const allPosts = Array.from(postsMap.values())
+    const posts = allPosts.slice(offset, offset + limit)
 
     if (posts.length === 0) {
       return NextResponse.json(
-        { error: 'No posts found from sent issues in the last 5 days' },
+        { error: `No posts found from sent issues in the last 7 days (offset: ${offset}, limit: ${limit}, total available: ${allPosts.length})` },
         { status: 404 }
       )
     }

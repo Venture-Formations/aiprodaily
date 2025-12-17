@@ -76,7 +76,8 @@ const KNOWN_PAYWALL_DOMAINS = new Set([
 ])
 
 export class ArticleExtractor {
-  private readonly TIMEOUT_MS = 10000 // 10 seconds per article
+  private readonly TIMEOUT_MS = 10000 // 10 seconds for direct fetch
+  private readonly JINA_TIMEOUT_MS = 25000 // 25 seconds for Jina (browser rendering takes longer)
   private readonly USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
   /**
@@ -371,7 +372,7 @@ export class ArticleExtractor {
       const jinaUrl = `https://r.jina.ai/${encodeURIComponent(url)}`
 
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT_MS)
+      const timeoutId = setTimeout(() => controller.abort(), this.JINA_TIMEOUT_MS)
 
       const response = await fetch(jinaUrl, {
         signal: controller.signal,

@@ -128,7 +128,7 @@ export default function AIPromptTestingPage() {
     try {
       const section = getSection(promptType)
       console.log('[Frontend] Fetching posts from sent issues for newsletter:', slug, 'section:', section)
-      const res = await fetch(`/api/rss/recent-posts?publication_id=${slug}&limit=50&section=${section}&source=sent&days=5`)
+      const res = await fetch(`/api/rss/recent-posts?publication_id=${slug}&limit=50&section=${section}&source=sent&days=7`)
       const data = await res.json()
 
       console.log('[Frontend] Response status:', res.status, 'data:', data)
@@ -360,7 +360,7 @@ export default function AIPromptTestingPage() {
     }
   }
 
-  async function handleTestMultiple() {
+  async function handleTestMultipleWithOffset(offset: number, batchLabel: string) {
     if (!prompt.trim()) {
       alert('Please enter a prompt')
       return
@@ -396,7 +396,8 @@ export default function AIPromptTestingPage() {
           promptJson,
           publication_id: slug,
           prompt_type: promptType,
-          limit: 10
+          limit: 10,
+          offset
         })
       })
 
@@ -404,11 +405,11 @@ export default function AIPromptTestingPage() {
 
       if (data.success) {
         // Convert responses to strings if they're objects
-        const responseText = data.responses && data.responses[0] 
+        const responseText = data.responses && data.responses[0]
           ? (typeof data.responses[0] === 'string' ? data.responses[0] : JSON.stringify(data.responses[0], null, 2))
           : 'No responses'
-        
-        const responsesText = data.responses?.map((r: any) => 
+
+        const responsesText = data.responses?.map((r: any) =>
           typeof r === 'string' ? r : JSON.stringify(r, null, 2)
         ) || []
 
@@ -436,11 +437,19 @@ export default function AIPromptTestingPage() {
         alert(`Error: ${data.error}`)
       }
     } catch (error) {
-      console.error('Test multiple failed:', error)
-      alert('Failed to test prompt for multiple articles')
+      console.error(`Test multiple (${batchLabel}) failed:`, error)
+      alert(`Failed to test prompt for multiple articles (${batchLabel})`)
     } finally {
       setTesting(false)
     }
+  }
+
+  function handleTestMultiple() {
+    handleTestMultipleWithOffset(0, '1-10')
+  }
+
+  function handleTestMultipleSecondBatch() {
+    handleTestMultipleWithOffset(10, '11-20')
   }
 
   const selectedPost = recentPosts.find(p => p.id === selectedPostId)
@@ -523,7 +532,7 @@ export default function AIPromptTestingPage() {
                   Sample RSS Post
                 </label>
                 <p className="text-xs text-gray-500 mb-3">
-                  Posts from sent newsletters (last 5 days)
+                  Posts from sent newsletters (last 7 days)
                 </p>
                 {status === 'loading' ? (
                   <p className="text-gray-500 text-sm">Authenticating...</p>
@@ -532,7 +541,7 @@ export default function AIPromptTestingPage() {
                 ) : recentPosts.length === 0 ? (
                   <div className="text-gray-500 text-sm bg-yellow-50 border border-yellow-200 rounded p-3">
                     <p className="font-medium text-yellow-800">No posts found</p>
-                    <p className="text-xs mt-1">No newsletters have been sent in the last 5 days.</p>
+                    <p className="text-xs mt-1">No newsletters have been sent in the last 7 days.</p>
                   </div>
                 ) : (
                   <>
@@ -727,7 +736,15 @@ export default function AIPromptTestingPage() {
                 disabled={testing || !prompt.trim() || promptType === 'custom'}
                 className="mt-2 w-full py-3 px-4 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
               >
-                {testing ? 'Testing...' : 'Test Prompt for Multiple (10 articles)'}
+                {testing ? 'Testing...' : 'Test Prompt for Multiple (Articles 1-10)'}
+              </button>
+
+              <button
+                onClick={handleTestMultipleSecondBatch}
+                disabled={testing || !prompt.trim() || promptType === 'custom'}
+                className="mt-2 w-full py-3 px-4 bg-teal-600 text-white font-medium rounded-lg hover:bg-teal-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              >
+                {testing ? 'Testing...' : 'Test Prompt for Multiple (Articles 11-20)'}
               </button>
               {promptType === 'custom' && (
                 <p className="text-xs text-gray-500 mt-2 text-center">
