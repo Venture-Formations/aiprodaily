@@ -63,8 +63,8 @@ export async function GET(request: NextRequest) {
     console.log('[API] Criteria settings found:', criteriaSettings?.length || 0);
     console.log('[API] Criteria config:', JSON.stringify(criteriaConfig, null, 2));
 
-    // First, get issues for this newsletter (with email_metrics for recipient counts)
-    // Include mailerlite_issue_id to handle both old (pre-12/08) and new click tracking formats
+    // First, get issues for this newsletter (with email_metrics for recipient counts and mailerlite_issue_id)
+    // The mailerlite_issue_id from email_metrics handles both old (pre-12/08) and new click tracking formats
     // Use pagination to handle more than 1000 issues (Supabase default limit)
     let allIssuesRaw: any[] = [];
     let issuesOffset = 0;
@@ -79,8 +79,7 @@ export async function GET(request: NextRequest) {
           date,
           publication_id,
           status,
-          mailerlite_issue_id,
-          email_metrics(sent_count)
+          email_metrics(sent_count, mailerlite_issue_id)
         `)
         .eq('publication_id', newsletterId)
         .range(issuesOffset, issuesOffset + issuesBatchSize - 1);
@@ -128,8 +127,9 @@ export async function GET(request: NextRequest) {
     // This handles clicks from before 12/08/2025 when issue_id was mailerlite ID
     const mailerliteToDbIdMap = new Map<string, string>();
     (issues || []).forEach((issue: any) => {
-      if (issue.mailerlite_issue_id) {
-        mailerliteToDbIdMap.set(issue.mailerlite_issue_id, issue.id);
+      const mailerliteIssueId = issue.email_metrics?.mailerlite_issue_id;
+      if (mailerliteIssueId) {
+        mailerliteToDbIdMap.set(mailerliteIssueId, issue.id);
       }
     });
 
@@ -293,8 +293,8 @@ export async function GET(request: NextRequest) {
     const sentIssues = issues.filter(i => i.status === 'sent');
     const sentIssueIds = sentIssues.map(i => i.id);
     const sentMailerliteIds = sentIssues
-      .map(i => i.mailerlite_issue_id)
-      .filter((id: string | null) => id); // Filter out null/undefined
+      .map(i => i.email_metrics?.mailerlite_issue_id)
+      .filter((id: string | null | undefined) => id); // Filter out null/undefined
 
     // Combine both ID types for the query
     const allIssueIdFormats = [...sentIssueIds, ...sentMailerliteIds];
