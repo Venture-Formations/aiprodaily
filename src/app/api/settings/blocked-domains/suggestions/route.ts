@@ -81,6 +81,7 @@ export async function GET(request: NextRequest) {
       count: number
       errors: Map<string, number>
       statuses: Map<string, number>
+      latestUrl: string
     }> = new Map()
 
     failedPosts?.forEach(post => {
@@ -96,12 +97,15 @@ export async function GET(request: NextRequest) {
         domainStats.set(domain, {
           count: 0,
           errors: new Map(),
-          statuses: new Map()
+          statuses: new Map(),
+          latestUrl: post.source_url
         })
       }
 
       const stats = domainStats.get(domain)!
       stats.count++
+      // Keep updating latestUrl (last one wins, which is fine for a sample)
+      stats.latestUrl = post.source_url
 
       // Track error types
       const error = post.extraction_error || 'Unknown error'
@@ -139,7 +143,8 @@ export async function GET(request: NextRequest) {
           domain,
           failure_count: stats.count,
           most_common_error: mostCommonError,
-          most_common_status: mostCommonStatus
+          most_common_status: mostCommonStatus,
+          sample_url: stats.latestUrl
         }
       })
       .filter(s => s.failure_count >= 1) // Only show domains with at least 1 failure
