@@ -57,7 +57,9 @@
       "WebFetch(domain:www.businesswire.com)",
       "WebFetch(domain:jina.ai)",
       "WebFetch(domain:r.jina.ai)",
-      "WebFetch(domain:news.clearancejobs.com)"
+      "WebFetch(domain:news.clearancejobs.com)",
+      "Bash(timeout 90 bash:*)",
+      "Bash(git diff:*)"
     ],
     "deny": [],
     "ask": []

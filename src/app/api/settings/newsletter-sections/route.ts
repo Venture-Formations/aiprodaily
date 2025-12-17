@@ -10,11 +10,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Fetch active newsletter sections ordered by display_order
+    // Fetch all newsletter sections ordered by display_order
     const { data: sections, error } = await supabaseAdmin
       .from('newsletter_sections')
       .select('*')
-      .eq('is_active', true)
       .order('display_order', { ascending: true })
 
     if (error) {
