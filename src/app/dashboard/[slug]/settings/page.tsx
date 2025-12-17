@@ -6237,6 +6237,7 @@ function BlockedDomainsSettings() {
     failure_count: number
     most_common_error: string
     most_common_status: string
+    sample_url?: string
   }[]>([])
   const [loading, setLoading] = useState(true)
   const [newDomain, setNewDomain] = useState('')
@@ -6469,6 +6470,7 @@ function BlockedDomainsSettings() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Failures</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Error</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sample URL</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
@@ -6484,6 +6486,21 @@ function BlockedDomainsSettings() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate" title={suggestion.most_common_error}>
                       {suggestion.most_common_error}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {suggestion.sample_url ? (
+                        <a
+                          href={suggestion.sample_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 hover:underline truncate block max-w-[200px]"
+                          title={suggestion.sample_url}
+                        >
+                          View Article →
+                        </a>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right space-x-2">
                       <button
