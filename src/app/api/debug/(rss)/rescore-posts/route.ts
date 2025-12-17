@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
   const section = (searchParams.get('section') || 'primary') as 'primary' | 'secondary'
   const dryRun = searchParams.get('dry_run') !== 'false' // Default true
   const limit = parseInt(searchParams.get('limit') || '50')
+  const offset = parseInt(searchParams.get('offset') || '0')
 
   if (!since) {
     // Calculate default: 9pm CST yesterday = 3am UTC today
@@ -97,7 +98,7 @@ export async function GET(request: NextRequest) {
       .in('feed_id', feedIds)
       .gte('processed_at', since)
       .order('processed_at', { ascending: false })
-      .limit(limit)
+      .range(offset, offset + limit - 1)
 
     if (postsError) {
       throw new Error(`Failed to fetch posts: ${postsError.message}`)
@@ -254,6 +255,8 @@ export async function GET(request: NextRequest) {
       since,
       publication_id: publicationId,
       section,
+      offset,
+      next_offset: posts.length === limit ? offset + limit : null,
       total_posts: posts.length,
       succeeded: successCount,
       failed: errorCount
