@@ -8,15 +8,24 @@ import { newsletterArchiver } from '@/lib/newsletter-archiver'
 import { getEmailProviderSettings } from '@/lib/publication-settings'
 
 // Helper function to log article positions at final send
-async function logFinalArticlePositions(issue: any) {
+// Re-queries fresh data to capture any changes made after initial issue fetch
+async function logFinalArticlePositions(issueId: string) {
   console.log('=== LOGGING ARTICLE POSITIONS FOR FINAL SEND ===')
 
-  // PRIMARY ARTICLES
-  const finalActiveArticles = issue.articles
-    .filter((article: any) => article.is_active)
-    .sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999))
-    .slice(0, 3) // Top 3 for final send
+  // PRIMARY ARTICLES - Query fresh data to capture manual changes
+  const { data: primaryArticles, error: primaryError } = await supabaseAdmin
+    .from('articles')
+    .select('id, headline, rank, is_active')
+    .eq('issue_id', issueId)
+    .eq('is_active', true)
+    .order('rank', { ascending: true, nullsFirst: false })
+    .limit(3)
 
+  if (primaryError) {
+    console.error('Failed to fetch primary articles:', primaryError)
+  }
+
+  const finalActiveArticles = primaryArticles || []
   console.log('Final active primary articles:', finalActiveArticles.map((a: any) => `ID: ${a.id}, Rank: ${a.rank}, Headline: ${a.headline}`))
 
   // Update final positions for primary articles
@@ -34,12 +43,20 @@ async function logFinalArticlePositions(issue: any) {
     }
   }
 
-  // SECONDARY ARTICLES
-  const finalActiveSecondaryArticles = (issue.secondary_articles || [])
-    .filter((article: any) => article.is_active)
-    .sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999))
-    .slice(0, 3) // Top 3 for final send
+  // SECONDARY ARTICLES - Query fresh data
+  const { data: secondaryArticles, error: secondaryError } = await supabaseAdmin
+    .from('secondary_articles')
+    .select('id, headline, rank, is_active')
+    .eq('issue_id', issueId)
+    .eq('is_active', true)
+    .order('rank', { ascending: true, nullsFirst: false })
+    .limit(3)
 
+  if (secondaryError) {
+    console.error('Failed to fetch secondary articles:', secondaryError)
+  }
+
+  const finalActiveSecondaryArticles = secondaryArticles || []
   console.log('Final active secondary articles:', finalActiveSecondaryArticles.map((a: any) => `ID: ${a.id}, Rank: ${a.rank}, Headline: ${a.headline}`))
 
   // Update final positions for secondary articles
@@ -57,12 +74,20 @@ async function logFinalArticlePositions(issue: any) {
     }
   }
 
-  // MANUAL ARTICLES
-  const finalActiveManualArticles = issue.manual_articles
-    .filter((article: any) => article.is_active)
-    .sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999))
-    .slice(0, 5)
+  // MANUAL ARTICLES - Query fresh data
+  const { data: manualArticles, error: manualError } = await supabaseAdmin
+    .from('manual_articles')
+    .select('id, title, rank, is_active')
+    .eq('issue_id', issueId)
+    .eq('is_active', true)
+    .order('rank', { ascending: true, nullsFirst: false })
+    .limit(5)
 
+  if (manualError) {
+    console.error('Failed to fetch manual articles:', manualError)
+  }
+
+  const finalActiveManualArticles = manualArticles || []
   console.log('Final active manual articles:', finalActiveManualArticles.map((a: any) => `ID: ${a.id}, Rank: ${a.rank}, Title: ${a.title}`))
 
   // Update final positions for manual articles
@@ -295,7 +320,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Log article positions at final send
-    await logFinalArticlePositions(issue)
+    await logFinalArticlePositions(issue.id)
 
     // Check which email provider to use
     const providerSettings = await getEmailProviderSettings(newsletter.id)
@@ -591,7 +616,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Log article positions at final send
-    await logFinalArticlePositions(issue)
+    await logFinalArticlePositions(issue.id)
 
     // Check which email provider to use
     const providerSettings = await getEmailProviderSettings(newsletter.id)
