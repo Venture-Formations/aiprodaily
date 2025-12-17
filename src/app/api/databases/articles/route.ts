@@ -133,30 +133,30 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // Fetch primary articles - ONLY if we have issues to filter by
-    // Without issues, we can't filter properly and would return articles from all publications
-    let primaryArticles: any[] = [];
-    if (issueIds.length > 0) {
-      const { data, error: primaryError } = await supabase
-        .from('articles')
-        .select(`
-          id,
-          post_id,
-          issue_id,
-          headline,
-          content,
-          rank,
-          fact_check_score,
-          word_count,
-          created_at
-        `)
-        .in('issue_id', issueIds);
+    // Fetch primary articles - filter by issue_id if we have issues
+    let primaryQuery = supabase
+      .from('articles')
+      .select(`
+        id,
+        post_id,
+        issue_id,
+        headline,
+        content,
+        rank,
+        fact_check_score,
+        word_count,
+        created_at
+      `);
 
-      if (primaryError) {
-        console.error('[API] Primary articles error:', primaryError.message);
-        throw primaryError;
-      }
-      primaryArticles = data || [];
+    if (issueIds.length > 0) {
+      primaryQuery = primaryQuery.in('issue_id', issueIds);
+    }
+
+    const { data: primaryArticles, error: primaryError } = await primaryQuery;
+
+    if (primaryError) {
+      console.error('[API] Primary articles error:', primaryError.message);
+      throw primaryError;
     }
 
     console.log('[API] Found primary articles:', primaryArticles?.length || 0);
@@ -164,29 +164,30 @@ export async function GET(request: NextRequest) {
       console.log('[API] Sample primary article:', { id: primaryArticles[0].id, post_id: primaryArticles[0].post_id, issue_id: primaryArticles[0].issue_id });
     }
 
-    // Fetch secondary articles - ONLY if we have issues to filter by
-    let secondaryArticles: any[] = [];
-    if (issueIds.length > 0) {
-      const { data, error: secondaryError } = await supabase
-        .from('secondary_articles')
-        .select(`
-          id,
-          post_id,
-          issue_id,
-          headline,
-          content,
-          rank,
-          fact_check_score,
-          word_count,
-          created_at
-        `)
-        .in('issue_id', issueIds);
+    // Fetch secondary articles - filter by issue_id if we have issues
+    let secondaryQuery = supabase
+      .from('secondary_articles')
+      .select(`
+        id,
+        post_id,
+        issue_id,
+        headline,
+        content,
+        rank,
+        fact_check_score,
+        word_count,
+        created_at
+      `);
 
-      if (secondaryError) {
-        console.error('[API] Secondary articles error:', secondaryError.message);
-        throw secondaryError;
-      }
-      secondaryArticles = data || [];
+    if (issueIds.length > 0) {
+      secondaryQuery = secondaryQuery.in('issue_id', issueIds);
+    }
+
+    const { data: secondaryArticles, error: secondaryError } = await secondaryQuery;
+
+    if (secondaryError) {
+      console.error('[API] Secondary articles error:', secondaryError.message);
+      throw secondaryError;
     }
 
     console.log('[API] Found secondary articles:', secondaryArticles?.length || 0);
