@@ -11,7 +11,6 @@ interface RssPost {
   content: string | null
   full_article_text: string | null
   feed_id: string
-  publication_id: string
 }
 
 interface CriteriaScore {
@@ -94,7 +93,7 @@ export async function GET(request: NextRequest) {
     // Find posts to rescore
     const { data: posts, error: postsError } = await supabaseAdmin
       .from('rss_posts')
-      .select('id, title, description, content, full_article_text, feed_id, publication_id')
+      .select('id, title, description, content, full_article_text, feed_id')
       .in('feed_id', feedIds)
       .gte('processed_at', since)
       .order('processed_at', { ascending: false })
