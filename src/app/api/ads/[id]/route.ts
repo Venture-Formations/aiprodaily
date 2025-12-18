@@ -41,6 +41,12 @@ export async function PATCH(
     const { id } = await context.params
     const body = await request.json()
 
+    console.log('[Ads] PATCH request for id:', id)
+    console.log('[Ads] Update fields:', Object.keys(body))
+    if (body.body) {
+      console.log('[Ads] Body content length:', body.body.length, 'chars')
+    }
+
     // Validate required fields if they're being updated
     if (body.title !== undefined && !body.title?.trim()) {
       return NextResponse.json({ error: 'Title cannot be empty' }, { status: 400 })
@@ -49,10 +55,10 @@ export async function PATCH(
       return NextResponse.json({ error: 'URL cannot be empty' }, { status: 400 })
     }
 
-    // First verify the ad exists
+    // First verify the ad exists and get current values
     const { data: existingAd, error: fetchError } = await supabaseAdmin
       .from('advertisements')
-      .select('id')
+      .select('id, body')
       .eq('id', id)
       .single()
 
@@ -60,6 +66,8 @@ export async function PATCH(
       console.error('[Ads] Ad not found for update:', id, fetchError)
       return NextResponse.json({ error: 'Advertisement not found' }, { status: 404 })
     }
+
+    console.log('[Ads] Existing body length:', existingAd.body?.length || 0, 'chars')
 
     // Perform the update
     const { data: ad, error } = await supabaseAdmin
@@ -82,7 +90,15 @@ export async function PATCH(
       return NextResponse.json({ error: 'Update failed - no data returned' }, { status: 500 })
     }
 
-    console.log('[Ads] Successfully updated ad:', id)
+    console.log('[Ads] Successfully updated ad:', id, 'New body length:', ad.body?.length || 0, 'chars')
+
+    // Verify the update actually took effect
+    if (body.body && ad.body !== body.body) {
+      console.warn('[Ads] WARNING: Body mismatch after update!')
+      console.warn('[Ads] Sent:', body.body.substring(0, 100))
+      console.warn('[Ads] Got:', ad.body?.substring(0, 100))
+    }
+
     return NextResponse.json({ ad })
   } catch (error) {
     console.error('[Ads] PATCH exception:', error)
