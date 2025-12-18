@@ -99,7 +99,7 @@ export default function BlockOrderEditor({
   onChange,
   disabled = false
 }: BlockOrderEditorProps) {
-  const [isOpen, setIsOpen] = useState(true)
+  const [isOpen, setIsOpen] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -140,7 +140,14 @@ export default function BlockOrderEditor({
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
       >
-        <span className="font-medium text-gray-700">Block Order</span>
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-gray-700">Block Order</span>
+          {blockOrder.length > 0 && (
+            <span className="text-xs px-2 py-0.5 bg-gray-200 text-gray-600 rounded-full">
+              {blockOrder.map(b => BLOCK_LABELS[b]).join(' → ')}
+            </span>
+          )}
+        </div>
         <svg
           className={`w-5 h-5 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
           fill="none"

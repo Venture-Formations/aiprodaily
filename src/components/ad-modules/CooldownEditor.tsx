@@ -13,7 +13,7 @@ export default function CooldownEditor({
   onChange,
   disabled = false
 }: CooldownEditorProps) {
-  const [isOpen, setIsOpen] = useState(true)
+  const [isOpen, setIsOpen] = useState(false)
   const [localValue, setLocalValue] = useState(value)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,6 +41,9 @@ export default function CooldownEditor({
           <span className="font-medium text-gray-700">Company Cooldown</span>
           <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full">
             Global
+          </span>
+          <span className="text-xs px-2 py-0.5 bg-gray-200 text-gray-600 rounded-full">
+            {value} days
           </span>
         </div>
         <svg
