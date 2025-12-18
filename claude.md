@@ -1,6 +1,6 @@
 # AIProDaily — Claude Operations Guide
 
-_Last updated: 2025-11-28_
+_Last updated: 2025-12-17_
 
 This is the authoritative playbook for Claude Code when building or updating AIProDaily. Follow the checklist in order, then dive into the linked docs for deep context.
 
@@ -60,6 +60,9 @@ This project uses a **single branch** workflow:
 | RSS ingestion or workflow | docs/workflows/rss-processing.md, docs/workflows/MULTI_CRITERIA_SCORING_GUIDE.md | Verify step runtime, scoring prompts, dedupe logic. |
 | AI prompts / content generation | docs/ai/prompt-system.md, docs/examples/OPENAI_RESPONSES_API_GUIDE.md | Ensure prompt keys exist per tenant, JSON schema matches parser, provider settings valid. |
 | AI apps selection / rotation | Section 9 (below), `src/lib/app-selector.ts` | Check cooldown settings, rotation logic, affiliate vs non-affiliate handling. |
+| AI Tools Directory | Section 10 (below), `src/app/tools/`, `src/lib/directory.ts` | Check categories, submission flow, entitlements. |
+| User accounts / advertiser portal | `src/app/account/`, `src/app/api/account/` | Verify Stripe integration, ad management flows. |
+| Events system | `src/app/events/`, `src/app/api/events/` | Check event sync, submission, checkout flow. |
 | Database/schema updates | docs/architecture/system-overview.md, db/migrations/ | Maintain `publication_id` filters, update migrations. |
 | Advertorials / ads | docs/feature-summary.md (Ads section), `src/lib/newsletter-templates.ts` | Confirm Stage 1/2 unassignment behaviors and ad rotation settings. |
 | Campaign dashboard or admin UI | docs/feature-summary.md | Keep React server components aligned with workflow data. |
@@ -69,34 +72,47 @@ This project uses a **single branch** workflow:
 | External SDK integrations | docs/vercel-ai-sdk.md, docs/examples/OPENAI_RESPONSES_API_GUIDE.md | Align SDK usage, streaming patterns, and auth configuration. |
 
 ## 6. Feature Ownership Map
-| Domain | Primary Docs | Key Code Entry Points |
-|--------|--------------|-----------------------|
-| Campaign workflow | docs/workflows/rss-processing.md | `src/lib/workflows/process-rss-workflow.ts`, `/api/workflows/process-rss` |
-| RSS ingestion & scoring | docs/workflows/MULTI_CRITERIA_SCORING_GUIDE.md | `/api/cron/ingest-rss`, `src/lib/rss-processor.ts` |
-| AI prompts & scoring | docs/ai/prompt-system.md | `src/lib/openai.ts`, `publication_settings` table |
-| AI apps selection | Section 9 (below) | `src/lib/app-selector.ts`, `ai_applications` table |
-| Advertorials & ads | docs/feature-summary.md | `src/lib/newsletter-templates.ts`, `/api/cron/send-final` |
-| Dashboard UI | docs/feature-summary.md | `src/app/dashboard/[slug]/` |
-| Marketing site | docs/feature-summary.md | `src/app/website/`, `apps/marketing/` |
-| Migrations | db/migrations/ | `db/migrations/*.sql` |
+| Domain | Primary Docs | Key Code Entry Points | Status |
+|--------|--------------|-----------------------|--------|
+| Issue workflow | docs/workflows/rss-processing.md | `src/lib/workflows/process-rss-workflow.ts`, `/api/workflows/process-rss` | ✅ |
+| RSS ingestion & scoring | docs/workflows/MULTI_CRITERIA_SCORING_GUIDE.md | `/api/cron/ingest-rss`, `src/lib/rss-processor.ts` | ✅ |
+| AI prompts & scoring | docs/ai/prompt-system.md | `src/lib/openai.ts`, `publication_settings` table | ✅ |
+| AI apps selection | Section 9 (below) | `src/lib/app-selector.ts`, `ai_applications` table | ✅ |
+| AI Tools Directory | Section 10 (below) | `src/app/tools/`, `src/lib/directory.ts`, `tools` table | ✅ |
+| User accounts & billing | — | `src/app/account/`, `/api/account/`, `/api/webhooks/stripe/` | ✅ |
+| Advertorials & ads | docs/feature-summary.md | `src/lib/newsletter-templates.ts`, `/api/cron/send-final` | ✅ |
+| Dashboard UI | docs/feature-summary.md | `src/app/dashboard/[slug]/` | ✅ |
+| Tools Admin | — | `src/app/dashboard/[slug]/tools-admin/` | ✅ |
+| Marketing site | docs/feature-summary.md | `src/app/website/` | ✅ |
+| Secondary newsletter | — | `/api/cron/send-secondary`, `secondary_articles` table | ✅ |
+| Migrations | db/migrations/ | `db/migrations/*.sql` | ✅ |
+
+**Note:** "Issue" replaces "Campaign" in newer code. The `issues` table replaced `newsletter_campaigns`.
 
 ## 7. File Structure
 See [docs/structure.md](docs/structure.md) for the complete file tree.
 
 **Key directories:**
-- `src/lib/` — Core business logic (openai.ts, rss-processor.ts, app-selector.ts)
-- `src/app/api/` — API routes (cron/, campaigns/, rss/, debug/)
+- `src/lib/` — Core business logic (openai.ts, rss-processor.ts, app-selector.ts, directory.ts)
+- `src/app/api/` — API routes (cron/, campaigns/, rss/, debug/, webhooks/, account/, tools/, ads/, ai/, ai-apps/)
+- `src/app/api/debug/` — Debug endpoints organized by route groups: (ai), (campaign), (checks), (integrations), (maintenance), (media), (rss), (tests)
 - `src/app/dashboard/[slug]/` — Dashboard UI (dynamic per publication)
-- `db/migrations/` — SQL migration files
+- `src/app/tools/` — Public AI Tools Directory
+- `src/app/account/` — User account & advertiser portal
+- `src/app/website/` — Public marketing website
+- `db/migrations/` — SQL migration files (89+ files)
 - `docs/` — Documentation organized by topic
 
 ## 8. Core Workflows (Summary)
 1. **RSS ingestion:** `/api/cron/ingest-rss` keeps `rss_posts` pool fresh (Stage 0).
 2. **Workflow trigger:** `/api/cron/trigger-workflow` launches ten-step process (see docs/workflows/rss-processing.md).
-3. **AI app selection:** `AppSelector.selectAppsForissue()` picks apps with rotation logic.
-4. **Campaign review:** Dashboard surfaces drafts with generated content, advertorials, polls.
+3. **AI app selection:** `AppSelector.selectAppsForIssue()` picks apps with rotation logic.
+4. **Issue review:** Dashboard surfaces drafts with generated content, advertorials, polls.
 5. **Final send:** `/api/cron/send-final` pushes to MailerLite, logs Stage 2 cleanup.
-6. **Analytics loop:** Link tracking, polls, feedback feed back into the next cycle.
+6. **Secondary send:** `/api/cron/send-secondary` sends secondary newsletter if configured.
+7. **Analytics loop:** Link tracking, polls, feedback feed back into the next cycle.
+
+**Note:** Events sync crons (`sync-events`, `populate-events`) are registered but not implemented.
 
 ## 9. AI Apps Selection System
 The AI apps system selects apps for each newsletter issue with rotation logic:
@@ -118,13 +134,51 @@ The AI apps system selects apps for each newsletter issue with rotation logic:
 - `src/lib/app-selector.ts` — Selection logic
 - `src/app/dashboard/[slug]/settings/page.tsx` — Settings UI
 
-## 10. Implementation Patterns
+## 10. AI Tools Directory System
+The AI Tools Directory is a public-facing catalog of AI tools with submission, categorization, and admin features:
+
+### Key Features
+- **Public Directory:** Browse tools at `/tools`, view by category at `/tools/category/[slug]`
+- **Tool Submissions:** Users submit tools at `/tools/submit`
+- **Tool Claims:** Verified owners can claim listings
+- **Admin Management:** Dashboard at `/dashboard/[slug]/tools-admin/`
+
+### Key Files
+- `src/app/tools/` — Public directory pages
+- `src/lib/directory.ts` — Directory business logic
+- `src/app/dashboard/[slug]/tools-admin/` — Admin panel (entitlements, packages, settings)
+- `src/app/api/tools/` — API routes for tool CRUD
+
+### Database Tables
+| Table | Purpose |
+|-------|---------|
+| `tools` | Tool listings |
+| `tool_categories` | Category definitions |
+| `tool_claims` | Ownership claims |
+| `tool_entitlements` | Feature entitlements |
+| `sponsorship_packages` | Sponsorship tiers |
+
+## 11. User Account & Advertiser Portal
+The account system provides self-service for advertisers and users:
+
+### Key Features
+- **Ad Management:** Create, view, and manage ad campaigns at `/account/ads`
+- **Billing:** Stripe-integrated billing at `/account/billing`
+- **Profile:** User profile management at `/account/settings`
+- **Upgrade:** Subscription upgrades at `/account/upgrade`
+
+### Key Files
+- `src/app/account/` — Account pages
+- `src/app/api/account/` — Account API routes
+- `src/app/api/stripe/` — Stripe webhooks and payment processing
+
+## 12. Implementation Patterns
 - Backend template + retry logic: docs/patterns/backend.md
 - Supabase admin client only on server routes/actions; never expose service keys client-side.
-- Use helpers in `src/lib/` (RSSProcessor, AdScheduler, MailerLiteService, AppSelector) instead of reimplementing logic.
+- Use helpers in `src/lib/` (RSSProcessor, AdScheduler, MailerLiteService, AppSelector, SubjectLineGenerator, WelcomeSectionGenerator) instead of reimplementing logic.
 - Respect async boundaries in React Server Components; keep client-only code behind `"use client"` boundaries.
 
-## 11. AI & Scoring
+## 13. AI & Scoring
 - Prompt conventions and schema: docs/ai/prompt-system.md
 - Criteria weighting and adjustments: docs/workflows/MULTI_CRITERIA_SCORING_GUIDE.md
 - Example validation snippets: docs/examples/zod-validation-comparison.md, docs/examples/zod-prompt-validation-example.ts
@@ -135,24 +189,32 @@ The AI apps system selects apps for each newsletter issue with rotation logic:
 - **Access:** `callAIWithPrompt(promptKey, newsletterId, variables)`
 - **Provider:** Auto-detected from model name (claude → Anthropic, else → OpenAI)
 
-## 12. Automation & Ops
+## 14. Automation & Ops
 - Cron schedules, secrets, recovery: docs/operations/cron-jobs.md
 - Vercel deployment & API notes: docs/vercel-api.md
 - Testing checklist: docs/checklists/TESTING_CHECKLIST.md
 - Monitoring expectations: `[Workflow]`, `[CRON]`, Slack alerts from monitor cron.
 
 ### Active Cron Jobs (from `vercel.json`)
-| Cron | Schedule | Purpose |
-|------|----------|---------|
-| `trigger-workflow` | Every 5 min | Launches RSS workflow if schedule permits |
-| `ingest-rss` | Every 15 min | Fetches new posts |
-| `send-review` | Every 5 min | Sends review email when ready |
-| `send-final` | Every 5 min | Sends final newsletter |
-| `import-metrics` | Daily 6:00 AM | Syncs MailerLite metrics |
-| `health-check` | Every 5 min (8AM-10PM) | Pings core services |
-| `monitor-workflows` | Every 5 min | Detects stuck workflows |
+| Cron | Schedule | Purpose | Status |
+|------|----------|---------|--------|
+| `trigger-workflow` | Every 5 min | Launches RSS workflow if schedule permits | ✅ Active |
+| `ingest-rss` | Every 15 min | Fetches new posts | ✅ Active |
+| `create-campaign` | Every 5 min | Creates issue if schedule permits | ✅ Active |
+| `send-review` | Every 5 min | Sends review email when ready | ✅ Active |
+| `send-final` | Every 5 min | Sends final newsletter | ✅ Active |
+| `send-secondary` | Every 5 min | Sends secondary newsletter | ✅ Active |
+| `import-metrics` | Daily 6:00 AM | Syncs MailerLite metrics | ✅ Active |
+| `health-check` | Every 5 min (8AM-10PM) | Pings core services | ✅ Active |
+| `monitor-workflows` | Every 5 min | Detects stuck workflows | ✅ Active |
+| `process-mailerlite-updates` | Every 5 min | Processes MailerLite webhooks | ✅ Active |
+| `cleanup-pending-submissions` | Daily 7:00 AM | Clears stale ad submissions | ✅ Active |
+| `generate-weather` | Daily 8:00 PM | Generates weather module (if enabled) | ⚠️ Not Implemented |
+| `collect-wordle` | Daily 7:00 PM | Collects Wordle stats (if enabled) | ⚠️ Not Implemented |
 
-## 13. Testing & Verification
+**Note:** Crons marked "Not Implemented" are registered in `vercel.json` but have empty route folders.
+
+## 15. Testing & Verification
 Before completing work, confirm:
 - `npm run build` passes and affected tests are updated/added.
 - All new/updated queries filter by `publication_id` and avoid `SELECT *`.
@@ -173,17 +235,21 @@ Before completing work, confirm:
 | Migrations | Apply on staging via Supabase; verify roll-forward/back | Update `docs/migrations/` status file. |
 | Marketing site | `npm run build` on marketing app; Lighthouse smoke check | Confirm assets relocated to `public/`. |
 
-## 14. Environment Overview
+## 16. Environment Overview
 | Area | Key Env Vars | Notes |
 |------|--------------|-------|
 | Supabase | `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL` | Keep server-only; never expose client side. |
-| AI | `OPENAI_API_KEY`, optional `ANTHROPIC_API_KEY` | Set per environment; rate limits vary. |
+| AI | `OPENAI_API_KEY`, optional `ANTHROPIC_API_KEY`, `PERPLEXITY_API_KEY` | Set per environment; rate limits vary. |
 | Cron/workflows | `CRON_SECRET` | Required for secured cron endpoints. |
 | Auth | `NEXTAUTH_SECRET`, `NEXTAUTH_URL` | Ensure correct domain per environment. |
 | MailerLite | `MAILERLITE_API_KEY` | Needed for review/final send crons. |
+| SendGrid | `SENDGRID_API_KEY` (optional) | Alternative email provider. |
+| Stripe | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Required for billing/payments. |
+| GitHub | `GITHUB_TOKEN`, `GITHUB_REPO` | For image hosting. |
+| Google | `GOOGLE_VISION_API_KEY` (optional) | For image analysis. |
 | Slack | `SLACK_WEBHOOK_URL` (optional) | Enables alerts from monitor cron. |
 
-## 15. Cross-Feature Checklist
+## 17. Cross-Feature Checklist
 When changes span multiple domains (e.g., workflow + UI):
 - Update backend logic and corresponding UI components.
 - Adjust prompts or `publication_settings` if new content paths introduced.
@@ -191,12 +257,12 @@ When changes span multiple domains (e.g., workflow + UI):
 - Update docs: core guide here plus impacted feature doc(s).
 - Mention cross-feature impact in pull request notes.
 
-## 16. Documentation Hygiene
+## 18. Documentation Hygiene
 - After modifying workflows, prompts, migrations, or notable features, update the specific doc in `docs/` and ensure this guide references it.
 - If a new area lacks documentation, create it in the appropriate subfolder (`docs/workflows/`, `docs/guides/`, etc.) and add a reference here.
 - Keep links accurate; update them when files move/rename.
 
-## 17. Troubleshooting Primer
+## 19. Troubleshooting Primer
 If issues arise, start with docs/troubleshooting/common-issues.md. For deeper historical context or session notes, consult docs in `docs/status/` as needed.
 
 ### Common Debug Endpoints
@@ -207,19 +273,19 @@ If issues arise, start with docs/troubleshooting/common-issues.md. For deeper hi
 | `/api/debug/(campaign)/recent-campaigns` | List recent campaigns |
 | `/api/cron/health-check` | System health status |
 
-## 18. External Integrations
+## 20. External Integrations
 - Vercel AI SDK usage patterns: docs/vercel-ai-sdk.md
 - OpenAI Responses API specifics: docs/examples/OPENAI_RESPONSES_API_GUIDE.md
 - Vercel API workflows and cron deployment: docs/vercel-api.md
 - If Supabase edge cases occur, review platform notes in `docs/migrations/` and Supabase dashboard configuration.
 
-## 19. Security Guidelines
+## 21. Security Guidelines
 - Never log API keys, secrets, or Personally Identifiable Information.
 - Do not bypass authentication/authorization checks in API routes.
 - Keep service-role interactions on server only; sanitize user input.
 - Audit third-party calls (Slack, MailerLite, Stripe) for retries and error handling.
 
-## 20. Hand-off Notes
+## 22. Hand-off Notes
 - Document any new prompts, migrations, or cron jobs in the appropriate doc before finishing.
 - Update `package.json` scripts or environment instructions only after aligning with deployment strategy.
 - Leave concise pull request notes summarizing impacted workflows, tests run, and linked docs.

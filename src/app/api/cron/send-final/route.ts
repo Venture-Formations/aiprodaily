@@ -6,6 +6,7 @@ import { ScheduleChecker } from '@/lib/schedule-checker'
 import { SlackNotificationService } from '@/lib/slack'
 import { newsletterArchiver } from '@/lib/newsletter-archiver'
 import { getEmailProviderSettings } from '@/lib/publication-settings'
+import { ModuleAdSelector } from '@/lib/ad-modules'
 
 // Helper function to log article positions at final send
 // Re-queries fresh data to capture any changes made after initial issue fetch
@@ -354,7 +355,7 @@ export async function POST(request: NextRequest) {
       console.log('MailerLite campaign created:', result.campaignId)
     }
 
-    // Record advertisement usage and advance rotation
+    // Record advertisement usage and advance rotation (legacy system)
     try {
       const { data: adAssignment } = await supabaseAdmin
         .from('issue_advertisements')
@@ -370,6 +371,18 @@ export async function POST(request: NextRequest) {
     } catch (adError) {
       console.error('[Send Final] Failed to record ad usage (non-critical):', adError)
       // Don't fail the send if ad tracking fails
+    }
+
+    // Record ad module usage (new dynamic ad sections system)
+    try {
+      const issueDate = new Date(issue.date)
+      const moduleUsageResult = await ModuleAdSelector.recordUsageSimple(issue.id, issueDate)
+      if (moduleUsageResult.recorded > 0) {
+        console.log(`[Send Final] ✓ Ad module usage recorded (${moduleUsageResult.recorded} ads)`)
+      }
+    } catch (moduleAdError) {
+      console.error('[Send Final] Failed to record ad module usage (non-critical):', moduleAdError)
+      // Don't fail the send if ad module tracking fails
     }
 
     // Record AI app usage (starts cooldown timer for affiliates)
@@ -650,7 +663,7 @@ export async function GET(request: NextRequest) {
       console.log('MailerLite campaign created:', result.campaignId)
     }
 
-    // Record advertisement usage and advance rotation
+    // Record advertisement usage and advance rotation (legacy system)
     try {
       const { data: adAssignment } = await supabaseAdmin
         .from('issue_advertisements')
@@ -666,6 +679,18 @@ export async function GET(request: NextRequest) {
     } catch (adError) {
       console.error('[Send Final] Failed to record ad usage (non-critical):', adError)
       // Don't fail the send if ad tracking fails
+    }
+
+    // Record ad module usage (new dynamic ad sections system)
+    try {
+      const issueDate = new Date(issue.date)
+      const moduleUsageResult = await ModuleAdSelector.recordUsageSimple(issue.id, issueDate)
+      if (moduleUsageResult.recorded > 0) {
+        console.log(`[Send Final] ✓ Ad module usage recorded (${moduleUsageResult.recorded} ads)`)
+      }
+    } catch (moduleAdError) {
+      console.error('[Send Final] Failed to record ad module usage (non-critical):', moduleAdError)
+      // Don't fail the send if ad module tracking fails
     }
 
     // Record AI app usage (starts cooldown timer for affiliates)

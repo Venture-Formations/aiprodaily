@@ -13,7 +13,8 @@ import {
   generateBreakingNewsSection,
   generateBeyondTheFeedSection,
   generatePromptIdeasSection,
-  generateAIAppsSection
+  generateAIAppsSection,
+  generateAdModulesSection
 } from '@/lib/newsletter-templates'
 
 export async function GET(
@@ -253,8 +254,14 @@ async function generateNewsletterHtml(issue: any): Promise<string> {
       sectionsHtml = ''
     }
 
+    // Generate ad modules sections (new dynamic ad sections system)
+    const adModulesHtml = await generateAdModulesSection(issue)
+    if (adModulesHtml) {
+      console.log('Ad modules HTML generated, length:', adModulesHtml.length)
+    }
+
     // Combine all sections (welcome section goes after header, before all other sections)
-    const html = header + welcomeHtml + sectionsHtml + footer
+    const html = header + welcomeHtml + sectionsHtml + adModulesHtml + footer
 
     console.log('HTML template generated successfully, length:', html.length)
     return html

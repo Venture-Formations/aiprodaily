@@ -1,6 +1,6 @@
 ## AI Pros Newsletter Platform – Feature Summaries
 
-_Last updated: 2025-11-28_
+_Last updated: 2025-12-17_
 
 ### Documentation Map
 - `docs/guides/` – feature implementations, onboarding plans, troubleshooting playbooks
@@ -122,9 +122,10 @@ _Last updated: 2025-11-28_
 - **What it does:** Hosts the marketing site (`aiaccountingdaily.com`) and archive of published newsletters.
 - **How it works:** Next.js routes render static-dynamic hybrid pages pulling from issue articles and metadata. Archive pages iterate over issue history with SSR caching.
 - **Key Files / Functions:** `src/app/website/page.tsx`, `src/app/website/newsletters/page.tsx`, `src/app/website/newsletter/[date]/page.tsx`; `src/app/api/newsletters/archived/route.ts`; `src/lib/newsletter-templates.ts` (`renderPublicNewsletterHtml`).
-- **Standalone Marketing App:** `apps/marketing/` (separate Next.js instance for aiaccountingdaily.com landing pages)
 - **Database Tables:** `issues`, `issue_articles`, `secondary_articles`, `manual_articles`, `newsletter_sections`, `archived_articles`.
 - **Connections:** Issue lifecycle completion publishes entries to the archive, and manual edits in admin dashboards reflect on the public site. Link tracking leverages archive URLs.
+
+**Note:** The `apps/marketing/` folder referenced in older docs does not exist. Marketing pages are now at `src/app/website/`.
 
 ### Comprehensive Admin Settings
 - **What it does:** Provides granular configuration panels for scoring weights, prompts, email settings, schedules, Slack notifications, branding assets, and more.
@@ -153,3 +154,66 @@ _Last updated: 2025-11-28_
 - **Key Files / Functions:** `src/lib/slack.ts` (`SlackNotificationService`, `sendRSSIncompleteAlert`); `src/app/api/notifications/slack/route.ts`; `src/app/api/logs/route.ts`; `src/app/dashboard/logs/page.tsx`; `src/app/api/debug/recent-campaigns/route.ts`; `src/app/api/debug/campaign-articles/route.ts`; `src/app/api/debug/test-ai-prompts/route.ts`.
 - **Database Tables:** `system_logs`, `debug_reports`, `issues`, `issue_articles`, `rss_posts`.
 - **Connections:** Supports every feature by enabling rapid troubleshooting. Workflows, cron jobs, and manual UIs reference logs to resolve failures quickly.
+
+### AI Tools Directory
+- **What it does:** Public-facing catalog of AI tools with browsing, search, categorization, and submission capabilities.
+- **How it works:** Tools are stored in the database with categories, descriptions, and metadata. Users can browse by category, search, view individual tools, and submit new listings. Tool owners can claim listings for verified status.
+- **Key Files / Functions:** `src/app/tools/page.tsx` (listing); `src/app/tools/[id]/page.tsx` (detail); `src/app/tools/submit/page.tsx` (submission form); `src/app/tools/category/[slug]/page.tsx` (category view); `src/lib/directory.ts` (business logic); `src/app/api/tools/route.ts` (API).
+- **Database Tables:** `tools`, `tool_categories`, `tool_claims`, `tool_entitlements`, `sponsorship_packages`.
+- **Connections:** Integrated with account system for tool claims. Admin panel at `/dashboard/[slug]/tools-admin/` manages entitlements, packages, and settings.
+
+### User Account & Advertiser Portal
+- **What it does:** Self-service portal for users and advertisers to manage ads, billing, and profile settings.
+- **How it works:** Users can create ad campaigns, view their ads, manage billing through Stripe integration, and update profile settings. Advertisers can track ad performance and upgrade subscriptions.
+- **Key Files / Functions:** `src/app/account/page.tsx` (dashboard); `src/app/account/ads/page.tsx` (ad management); `src/app/account/billing/page.tsx` (billing); `src/app/account/upgrade/page.tsx` (subscription upgrade); `src/app/api/account/` (API routes); `src/app/api/stripe/` (Stripe webhooks).
+- **Database Tables:** `users`, `user_profiles`, `advertisements`, `ad_orders`, `payments`, `subscriptions`.
+- **Connections:** Integrates with Stripe for payments, MailerLite for subscriber data, and the advertisement system for ad placement.
+
+### Events System
+⚠️ **Status: NOT IMPLEMENTED** — Folder structure exists but no routes are implemented.
+
+- **What it does:** (Planned) Community events management with submission, display, and ticketing capabilities.
+- **Current State:**
+  - `src/app/events/` — Folder structure exists but all page routes are empty
+  - `src/app/api/events/` — Does NOT exist
+  - `/api/cron/sync-events` — Folder exists but no route.ts
+  - `/api/cron/populate-events` — Folder exists but no route.ts
+- **To Implement:**
+  1. Create API routes at `src/app/api/events/route.ts`
+  2. Add page components to `src/app/events/*/page.tsx`
+  3. Implement cron routes for event sync
+  4. Create `events` and `event_registrations` tables if needed
+
+### Secondary Newsletter System
+- **What it does:** Supports sending a secondary newsletter with distinct content from the primary.
+- **How it works:** Secondary articles are generated and stored separately. A dedicated send cron (`send-secondary`) handles distribution via MailerLite.
+- **Key Files / Functions:** `/api/cron/send-secondary/route.ts` (send trigger); `src/lib/workflows/process-rss-workflow.ts` (secondary article generation); `src/lib/newsletter-templates.ts` (secondary template rendering).
+- **Database Tables:** `secondary_articles`, `issues`, `rss_posts` (with `use_for_secondary_section` flag).
+- **Connections:** Uses same infrastructure as primary newsletter but with separate content pipeline and send schedule.
+
+### SendGrid Integration
+- **What it does:** Alternative email provider to MailerLite for sending newsletters.
+- **How it works:** SendGrid API integration with webhook processing for delivery events. Configurable per publication.
+- **Key Files / Functions:** `src/lib/sendgrid.ts` (SendGrid client); `/api/cron/process-sendgrid-updates/route.ts` (webhook processing).
+- **Database Tables:** `email_metrics`, `mailerlite_field_updates` (shared with MailerLite).
+- **Connections:** Can be used alongside or instead of MailerLite. Shares analytics infrastructure.
+
+### Breaking News Processing
+- **What it does:** Handles urgent breaking news content for immediate distribution.
+- **How it works:** Breaking news processor evaluates incoming content for urgency and can trigger expedited publication workflows.
+- **Key Files / Functions:** `src/lib/breaking-news-processor.ts` (processor); `/api/cron/process-breaking-news/route.ts` (cron trigger).
+- **Database Tables:** `rss_posts` (with breaking news flags), `issues`.
+- **Connections:** Integrates with RSS ingestion and workflow systems for prioritized content handling.
+
+### Weather & Wordle Modules (Legacy)
+⚠️ **Status: PARTIALLY IMPLEMENTED** — Library code exists but cron routes are empty.
+
+- **What it does:** Optional content modules for weather forecasts and Wordle statistics.
+- **Current State:**
+  - `src/lib/wordle-scraper.ts` — Library code EXISTS ✅
+  - `/api/cron/generate-weather/` — Folder exists but no route.ts ⚠️
+  - `/api/cron/collect-wordle/` — Folder exists but no route.ts ⚠️
+- **To Complete:**
+  1. Create `src/app/api/cron/generate-weather/route.ts`
+  2. Create `src/app/api/cron/collect-wordle/route.ts`
+  3. Or remove from `vercel.json` if not needed

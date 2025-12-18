@@ -988,6 +988,10 @@ export interface Advertisement {
   company_name: string | null   // Advertiser company/product name
   ad_type: string | null        // 'main_sponsor', 'sidebar', 'footer', etc.
   preview_image_url: string | null  // Admin-created preview for customer approval
+  // Ad modules integration
+  ad_module_id: string | null   // Links ad to a specific ad module/section. NULL = legacy advertorial.
+  advertiser_id: string | null  // Links ad to an advertiser for company-level cooldown tracking
+  priority: number              // Priority for selection mode (higher = shown first)
 }
 
 export interface IssueAdvertisement {
@@ -1184,4 +1188,103 @@ export interface CustomerEntitlementWithDetails extends CustomerEntitlement {
   is_valid: boolean
   customer_email?: string
   customer_name?: string
+}
+
+// ============================================
+// Ad Modules System Types
+// ============================================
+
+export type AdBlockType = 'title' | 'image' | 'body' | 'button'
+
+export type AdSelectionMode = 'sequential' | 'random' | 'priority' | 'manual'
+
+export type ModuleAdStatus = 'draft' | 'active' | 'paused' | 'completed'
+
+export interface AdBlockTypeDefinition {
+  id: string
+  name: AdBlockType
+  label: string
+  description?: string
+  default_config: Record<string, unknown>
+  created_at: string
+}
+
+export interface Advertiser {
+  id: string
+  publication_id: string
+  company_name: string
+  contact_email?: string
+  contact_name?: string
+  logo_url?: string
+  website_url?: string
+  notes?: string
+  last_used_date?: string
+  times_used: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface AdModule {
+  id: string
+  publication_id: string
+  name: string
+  display_order: number
+  is_active: boolean
+  selection_mode: AdSelectionMode
+  block_order: AdBlockType[]
+  config: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface ModuleAd {
+  id: string
+  ad_module_id: string | null  // null = orphaned
+  advertiser_id: string
+  title?: string
+  body?: string
+  image_url?: string
+  button_text: string
+  button_url?: string
+  status: ModuleAdStatus
+  priority: number
+  display_order: number  // Order for sequential rotation (set via drag-drop on ads page)
+  times_used: number
+  last_used_date?: string
+  start_date?: string
+  end_date?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface IssueModuleAd {
+  id: string
+  issue_id: string
+  ad_module_id: string
+  advertisement_id: string | null  // References advertisements table
+  selection_mode?: AdSelectionMode
+  selected_at: string
+  used_at?: string
+}
+
+// Extended types with joins
+/** @deprecated Use AdvertisementWithAdvertiser instead */
+export interface ModuleAdWithAdvertiser extends ModuleAd {
+  advertiser: Advertiser
+}
+
+// Advertisement with joined advertiser data
+export interface AdvertisementWithAdvertiser extends Advertisement {
+  advertiser?: Advertiser
+}
+
+export interface IssueModuleAdWithDetails extends IssueModuleAd {
+  ad_module: AdModule
+  advertisement?: AdvertisementWithAdvertiser  // The selected advertisement
+}
+
+export interface AdModuleWithAds extends AdModule {
+  advertisements: Advertisement[]  // Ads assigned to this module
+  ad_count?: number
 }

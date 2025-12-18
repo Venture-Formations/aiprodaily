@@ -1,6 +1,6 @@
 # RSS Processing Workflow
 
-_Last updated: 2025-11-28_
+_Last updated: 2025-12-17_
 
 ## When to use this
 - You are modifying the nightly issue generation workflow

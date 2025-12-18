@@ -1,30 +1,84 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Layout from '@/components/Layout'
 import RichTextEditor from '@/components/RichTextEditor'
 import ReactCrop, { Crop, PixelCrop } from 'react-image-crop'
 import 'react-image-crop/dist/ReactCrop.css'
-import type { Advertisement } from '@/types/database'
+import type { Advertisement, AdModule } from '@/types/database'
 import { getCroppedImage } from '@/utils/imageCrop'
 
+interface AdWithRelations extends Advertisement {
+  ad_module?: { id: string; name: string } | null
+  advertiser?: { id: string; company_name: string; logo_url?: string } | null
+}
+
 export default function AdsManagementPage() {
+  const pathname = usePathname()
   const [activeTab, setActiveTab] = useState<'active' | 'inactive' | 'review'>('active')
-  const [ads, setAds] = useState<Advertisement[]>([])
+  const [ads, setAds] = useState<AdWithRelations[]>([])
+  const [adModules, setAdModules] = useState<AdModule[]>([])
+  const [selectedModuleId, setSelectedModuleId] = useState<string>('all')
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
-  const [editingAd, setEditingAd] = useState<Advertisement | null>(null)
-  const [previewingAd, setPreviewingAd] = useState<Advertisement | null>(null)
+  const [editingAd, setEditingAd] = useState<AdWithRelations | null>(null)
+  const [previewingAd, setPreviewingAd] = useState<AdWithRelations | null>(null)
   const [nextAdPosition, setNextAdPosition] = useState<number>(1)
   const [draggedItem, setDraggedItem] = useState<number | null>(null)
+  const [publicationId, setPublicationId] = useState<string | null>(null)
+
+  // Fetch publication ID from pathname
+  useEffect(() => {
+    if (pathname) {
+      const match = pathname.match(/^\/dashboard\/([^\/]+)/)
+      if (match && match[1]) {
+        fetchPublicationId(match[1])
+      }
+    }
+  }, [pathname])
+
+  const fetchPublicationId = async (slug: string) => {
+    try {
+      const response = await fetch('/api/newsletters')
+      if (response.ok) {
+        const data = await response.json()
+        const publication = data.newsletters?.find((n: { slug: string; id: string }) => n.slug === slug)
+        if (publication) {
+          setPublicationId(publication.id)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch publication:', error)
+    }
+  }
+
+  // Fetch ad modules when publication ID is available
+  useEffect(() => {
+    if (publicationId) {
+      fetchAdModules()
+    }
+  }, [publicationId])
+
+  const fetchAdModules = async () => {
+    try {
+      const response = await fetch(`/api/ad-modules?publication_id=${publicationId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setAdModules(data.modules || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch ad modules:', error)
+    }
+  }
 
   useEffect(() => {
     fetchAds()
     if (activeTab === 'active') {
       fetchNextAdPosition()
     }
-  }, [activeTab])
+  }, [activeTab, selectedModuleId])
 
   const fetchNextAdPosition = async () => {
     try {
@@ -44,16 +98,22 @@ export default function AdsManagementPage() {
   const fetchAds = async () => {
     setLoading(true)
     try {
-      let status = ''
+      const params = new URLSearchParams()
+
       if (activeTab === 'active') {
-        status = '?status=active'
+        params.set('status', 'active')
       } else if (activeTab === 'inactive') {
-        status = '?status=rejected,completed'
+        params.set('status', 'rejected,completed')
       } else if (activeTab === 'review') {
-        status = '?status=pending_review'
+        params.set('status', 'pending_review')
       }
 
-      const response = await fetch(`/api/ads${status}`)
+      // Add module filter
+      if (selectedModuleId !== 'all') {
+        params.set('ad_module_id', selectedModuleId)
+      }
+
+      const response = await fetch(`/api/ads?${params.toString()}`)
       if (response.ok) {
         const data = await response.json()
         let fetchedAds = data.ads || []
@@ -340,6 +400,50 @@ export default function AdsManagementPage() {
             </div>
           </div>
         </div>
+
+        {/* Module Filter */}
+        {adModules.length > 0 && (
+          <div className="mb-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center gap-4">
+              <label className="text-sm font-medium text-gray-700">Filter by Section:</label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setSelectedModuleId('all')}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                    selectedModuleId === 'all'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  All Ads
+                </button>
+                <button
+                  onClick={() => setSelectedModuleId('legacy')}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                    selectedModuleId === 'legacy'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  Legacy Advertorial
+                </button>
+                {adModules.map(module => (
+                  <button
+                    key={module.id}
+                    onClick={() => setSelectedModuleId(module.id)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      selectedModuleId === module.id
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-white border border-purple-300 text-purple-700 hover:bg-purple-50'
+                    }`}
+                  >
+                    {module.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="border-b border-gray-200 mb-6">

@@ -24,6 +24,7 @@ import {
   useSortable
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { SectionsPanel } from '@/components/ad-modules'
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('system')
@@ -496,6 +497,17 @@ function NewsletterSettings() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Ad Sections Management - New Two-Panel UI */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <div className="mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Ad Sections</h3>
+          <p className="text-sm text-gray-600 mt-1">
+            Create and manage dynamic ad sections. Configure block order, selection logic, and company cooldown.
+          </p>
+        </div>
+        <SectionsPanel />
       </div>
 
       {message && (

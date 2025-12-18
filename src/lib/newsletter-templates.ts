@@ -6,6 +6,8 @@ import { wrapTrackingUrl } from './url-tracking'
 import { AdScheduler } from './ad-scheduler'
 import { normalizeEmailHtml } from './html-normalizer'
 import { getBusinessSettings as getPublicationBusinessSettings } from './publication-settings'
+import { AdModuleRenderer } from './ad-modules'
+import type { AdBlockType } from '@/types/database'
 
 // ==================== UTILITY FUNCTIONS ====================
 
@@ -904,6 +906,119 @@ export async function generateAdvertorialSection(issue: any, _recordUsage: boole
     )
   } catch (error) {
     console.error('Error generating Advertorial section:', error)
+    return ''
+  }
+}
+
+// ==================== AD MODULES (DYNAMIC AD SECTIONS) ====================
+
+/**
+ * Generate all ad module sections for an issue
+ * Uses the block-based renderer for configurable ad layouts
+ */
+export async function generateAdModulesSection(issue: any): Promise<string> {
+  try {
+    console.log('Generating Ad Modules sections for issue:', issue?.id)
+
+    // Fetch colors from business settings
+    const { primaryColor, headingFont, bodyFont, websiteUrl } = await fetchBusinessSettings(issue?.publication_id)
+
+    // Get all ad module selections for this issue
+    // Uses unified advertisements table
+    const { data: selections, error } = await supabaseAdmin
+      .from('issue_module_ads')
+      .select(`
+        selection_mode,
+        selected_at,
+        ad_module:ad_modules(
+          id,
+          name,
+          display_order,
+          block_order
+        ),
+        advertisement:advertisements(
+          id,
+          title,
+          body,
+          image_url,
+          button_text,
+          button_url,
+          company_name,
+          advertiser:advertisers(
+            id,
+            company_name,
+            logo_url,
+            website_url
+          )
+        )
+      `)
+      .eq('issue_id', issue.id)
+      .order('ad_module(display_order)', { ascending: true })
+
+    if (error) {
+      console.error('Error fetching ad module selections:', error)
+      return ''
+    }
+
+    if (!selections || selections.length === 0) {
+      console.log('No ad module selections found for issue')
+      return ''
+    }
+
+    console.log(`Found ${selections.length} ad module selections`)
+
+    // Generate HTML for each ad module
+    const sectionsHtml: string[] = []
+
+    for (const selection of selections) {
+      const module = selection.ad_module as any
+      const ad = selection.advertisement as any
+
+      if (!module) {
+        console.log('Skipping selection without module')
+        continue
+      }
+
+      // If no ad selected (manual mode not filled), skip this section
+      if (!ad) {
+        console.log(`No ad selected for module "${module.name}" (mode: ${selection.selection_mode})`)
+        continue
+      }
+
+      // Generate tracked URL for the ad
+      const buttonUrl = ad.button_url || '#'
+      const trackedUrl = buttonUrl !== '#'
+        ? wrapTrackingUrl(buttonUrl, module.name, issue.date, issue.mailerlite_issue_id, issue.id)
+        : '#'
+
+      // Get block order from module config
+      const blockOrder = (module.block_order || ['title', 'image', 'body', 'button']) as AdBlockType[]
+
+      // Use the AdModuleRenderer for block-based rendering
+      const html = AdModuleRenderer.renderForArchive(
+        module.name,
+        {
+          title: ad.title,
+          body: ad.body,
+          image_url: ad.image_url,
+          button_text: ad.button_text,
+          button_url: trackedUrl // Use tracked URL
+        },
+        blockOrder,
+        {
+          primaryColor,
+          headingFont,
+          bodyFont
+        }
+      )
+
+      sectionsHtml.push(html)
+    }
+
+    return sectionsHtml.join('')
+
+  } catch (error) {
+    console.error('Error generating Ad Modules sections:', error)
     return ''
   }
 }

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// GET all ads with optional status filter
+// GET all ads with optional status and ad_module_id filters
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
+    const adModuleId = searchParams.get('ad_module_id')
 
     // Get the first active newsletter for publication_id
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
@@ -24,9 +25,21 @@ export async function GET(request: NextRequest) {
 
     let query = supabaseAdmin
       .from('advertisements')
-      .select('*')
+      .select(`
+        *,
+        ad_module:ad_modules(id, name),
+        advertiser:advertisers(id, company_name, logo_url)
+      `)
       .eq('publication_id', newsletter.id)
       .order('created_at', { ascending: false })
+
+    // Filter by ad_module_id
+    if (adModuleId === 'null' || adModuleId === 'legacy') {
+      // Legacy advertorial ads (no ad_module_id)
+      query = query.is('ad_module_id', null)
+    } else if (adModuleId) {
+      query = query.eq('ad_module_id', adModuleId)
+    }
 
     if (status) {
       // Handle comma-separated status values
@@ -173,7 +186,10 @@ export async function POST(request: NextRequest) {
         paid: body.paid !== undefined ? body.paid : true,
         image_url: body.image_url || null,
         submission_date: new Date().toISOString(),
-        publication_id: newsletterId // Associate ad with newsletter
+        publication_id: newsletterId, // Associate ad with newsletter
+        ad_module_id: body.ad_module_id || null, // Optional ad module assignment
+        advertiser_id: body.advertiser_id || null, // Optional advertiser assignment
+        priority: body.priority || 0 // Priority for selection mode
       })
       .select()
       .single()

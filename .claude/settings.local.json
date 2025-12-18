@@ -59,7 +59,12 @@
       "WebFetch(domain:r.jina.ai)",
       "WebFetch(domain:news.clearancejobs.com)",
       "Bash(timeout 90 bash:*)",
-      "Bash(git diff:*)"
+      "Bash(git diff:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(cat:*)",
+      "mcp__supabase__list_migrations",
+      "Bash(git revert:*)"
     ],
     "deny": [],
     "ask": []

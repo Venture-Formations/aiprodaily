@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { RSSProcessor } from '@/lib/rss-processor'
 import { AdScheduler } from '@/lib/ad-scheduler'
+import { ModuleAdSelector } from '@/lib/ad-modules'
 
 /**
  * RSS Processing Workflow (REFACTORED)
@@ -616,6 +617,34 @@ async function finalizeIssue(issueId: string) {
       } catch (adError) {
         console.log('[Workflow Step 11/11] Ad selection failed (non-critical):', adError)
         // Don't fail the entire step if ad selection fails
+      }
+
+      // Select ads for dynamic ad modules (new system)
+      try {
+        const { data: issueData } = await supabaseAdmin
+          .from('publication_issues')
+          .select('date, publication_id')
+          .eq('id', issueId)
+          .single()
+
+        if (issueData) {
+          const issueDate = new Date(issueData.date)
+          const moduleSelections = await ModuleAdSelector.selectAdsForIssue(
+            issueId,
+            issueData.publication_id,
+            issueDate
+          )
+
+          const selectedCount = moduleSelections.filter(s => s.result.ad !== null).length
+          const manualCount = moduleSelections.filter(s => s.result.reason === 'Manual selection required').length
+
+          if (moduleSelections.length > 0) {
+            console.log(`[Workflow Step 11/11] Ad modules: ${selectedCount} selected, ${manualCount} manual pending`)
+          }
+        }
+      } catch (moduleAdError) {
+        console.log('[Workflow Step 11/11] Ad module selection failed (non-critical):', moduleAdError)
+        // Don't fail workflow if ad module selection fails
       }
 
       // Set status to draft

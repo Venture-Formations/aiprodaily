@@ -1,0 +1,160 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { supabaseAdmin } from '@/lib/supabase'
+import { authOptions } from '@/lib/auth'
+
+/**
+ * GET /api/campaigns/[id]/ad-modules - Get ad module selections for an issue
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { id: issueId } = await params
+
+    // Get the issue to get publication_id
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
+      .select('publication_id')
+      .eq('id', issueId)
+      .single()
+
+    if (issueError || !issue) {
+      return NextResponse.json({ error: 'Issue not found' }, { status: 404 })
+    }
+
+    // Get all ad module selections for this issue
+    const { data: selections, error: selectionsError } = await supabaseAdmin
+      .from('issue_module_ads')
+      .select(`
+        id,
+        selection_mode,
+        selected_at,
+        used_at,
+        ad_module:ad_modules(
+          id,
+          name,
+          display_order,
+          block_order,
+          selection_mode,
+          is_active
+        ),
+        advertisement:advertisements(
+          id,
+          title,
+          body,
+          image_url,
+          button_text,
+          button_url,
+          company_name,
+          advertiser:advertisers(
+            id,
+            company_name,
+            logo_url
+          )
+        )
+      `)
+      .eq('issue_id', issueId)
+
+    if (selectionsError) {
+      console.error('[AdModules] Error fetching selections:', selectionsError)
+      return NextResponse.json(
+        { error: 'Failed to fetch ad module selections' },
+        { status: 500 }
+      )
+    }
+
+    // Also get all active ad modules for the publication (to show modules without selections)
+    const { data: allModules } = await supabaseAdmin
+      .from('ad_modules')
+      .select('id, name, display_order, block_order, selection_mode, is_active')
+      .eq('publication_id', issue.publication_id)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+
+    // Get available ads for each module (for manual selection dropdown)
+    // Uses advertisements table with ad_module_id filter
+    const moduleAds: Record<string, any[]> = {}
+    if (allModules) {
+      for (const module of allModules) {
+        const { data: ads } = await supabaseAdmin
+          .from('advertisements')
+          .select(`
+            id,
+            title,
+            image_url,
+            status,
+            company_name,
+            advertiser:advertisers(company_name)
+          `)
+          .eq('ad_module_id', module.id)
+          .eq('publication_id', issue.publication_id)
+          .eq('status', 'active')
+          .order('title')
+
+        moduleAds[module.id] = ads || []
+      }
+    }
+
+    return NextResponse.json({
+      selections: selections || [],
+      modules: allModules || [],
+      moduleAds
+    })
+
+  } catch (error: any) {
+    console.error('[AdModules] Error:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch ad modules', details: error.message },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * POST /api/campaigns/[id]/ad-modules - Manually select an ad for a module
+ * Body: { moduleId, adId }
+ */
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { id: issueId } = await params
+    const body = await request.json()
+    const { moduleId, adId } = body
+
+    if (!moduleId) {
+      return NextResponse.json({ error: 'moduleId is required' }, { status: 400 })
+    }
+
+    // Import the selector to use its manual selection method
+    const { ModuleAdSelector } = await import('@/lib/ad-modules')
+
+    const result = await ModuleAdSelector.manuallySelectAd(issueId, moduleId, adId)
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 })
+    }
+
+    return NextResponse.json({ success: true })
+
+  } catch (error: any) {
+    console.error('[AdModules] Error selecting ad:', error)
+    return NextResponse.json(
+      { error: 'Failed to select ad', details: error.message },
+      { status: 500 }
+    )
+  }
+}

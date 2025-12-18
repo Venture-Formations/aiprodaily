@@ -190,6 +190,61 @@ export class NewsletterArchiver {
         sections.advertorial = advertorialData.advertisement
       }
 
+      // Ad Modules section (new dynamic ad sections)
+      // Uses unified advertisements table
+      const { data: adModuleSelections } = await supabaseAdmin
+        .from('issue_module_ads')
+        .select(`
+          selection_mode,
+          selected_at,
+          used_at,
+          ad_module:ad_modules(
+            id,
+            name,
+            display_order,
+            block_order
+          ),
+          advertisement:advertisements(
+            id,
+            title,
+            body,
+            image_url,
+            button_text,
+            button_url,
+            company_name,
+            advertiser:advertisers(
+              id,
+              company_name,
+              logo_url,
+              website_url
+            )
+          )
+        `)
+        .eq('issue_id', issueId)
+
+      if (adModuleSelections && adModuleSelections.length > 0) {
+        sections.ad_modules = adModuleSelections.map((selection: any) => ({
+          module_id: selection.ad_module?.id,
+          module_name: selection.ad_module?.name,
+          display_order: selection.ad_module?.display_order,
+          block_order: selection.ad_module?.block_order,
+          selection_mode: selection.selection_mode,
+          selected_at: selection.selected_at,
+          used_at: selection.used_at,
+          ad: selection.advertisement ? {
+            id: selection.advertisement.id,
+            title: selection.advertisement.title,
+            body: selection.advertisement.body,
+            image_url: selection.advertisement.image_url,
+            button_text: selection.advertisement.button_text,
+            button_url: selection.advertisement.button_url,
+            company_name: selection.advertisement.company_name || selection.advertisement.advertiser?.company_name,
+            company_logo: selection.advertisement.advertiser?.logo_url,
+            company_url: selection.advertisement.advertiser?.website_url
+          } : null
+        }))
+      }
+
       // 4. Gather metadata
       const metadata = {
         total_articles: articles?.length || 0,
@@ -200,6 +255,8 @@ export class NewsletterArchiver {
         has_poll: !!poll,
         has_prompt: !!promptSelection,
         has_advertorial: !!advertorialData,
+        has_ad_modules: !!adModuleSelections && adModuleSelections.length > 0,
+        ad_modules_count: adModuleSelections?.length || 0,
         archived_at: new Date().toISOString()
       }
 

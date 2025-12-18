@@ -38,7 +38,7 @@ Newsletter (slug: "accounting")
 
 **CRITICAL**: ALL database queries MUST filter by `publication_id`
 
-### Campaign Status Lifecycle
+### Issue Status Lifecycle
 
 ```
 draft → processing → ready → approved → sent
@@ -47,12 +47,14 @@ draft → processing → ready → approved → sent
 ```
 
 **Status Meanings**:
-- `draft`: Campaign created, ready for workflow
+- `draft`: Issue created, ready for workflow
 - `processing`: Workflow actively running
 - `ready`: Content generated, ready for review
 - `approved`: Manual approval for sending
 - `sent`: Published to subscribers
 - `failed`: Workflow error occurred
+
+**Note:** "Issue" replaced "campaign" in the codebase. The `issues` table was formerly `newsletter_campaigns`.
 
 ---
 
@@ -241,18 +243,20 @@ VALUES (
 
 ## Database Schema (Key Tables)
 
+**Note:** "Issues" replaced "campaigns" in the database. The table `issues` was formerly `newsletter_campaigns`.
+
 ```
-newsletters
-  ├── newsletter_campaigns (status: draft → processing → ready → sent)
-  │   ├── articles (primary section, 6 generated, 3 active)
+publications (formerly newsletters)
+  ├── issues (status: draft → processing → ready → sent)
+  │   ├── issue_articles (primary section, 6 generated, 3 active)
   │   ├── secondary_articles (secondary section, 6 generated, 3 active)
   │   └── rss_posts (assigned posts)
   │       └── post_ratings (multi-criteria scores)
   │
   ├── rss_feeds (active/inactive, section assignment)
-  ├── app_settings (key-value config, scoped by publication_id)
+  ├── publication_settings (key-value config, scoped by publication_id)
   ├── advertisements (advertorials for rotation)
-  ├── campaign_advertisements (tracks ad usage per campaign)
+  ├── issue_advertisements (tracks ad usage per issue)
   └── archived_articles, archived_rss_posts (historical data)
 ```
 
@@ -356,13 +360,28 @@ await supabaseAdmin
 
 **Configuration**: `vercel.json`
 
+### Active Crons
 | Cron | Schedule | Purpose |
 |------|----------|---------|
 | `/api/cron/trigger-workflow` | Every 5 min | Trigger RSS workflow if scheduled |
 | `/api/cron/ingest-rss` | Every 15 min | Fetch & score new RSS posts |
+| `/api/cron/create-campaign` | Every 5 min | Create issue if schedule permits |
 | `/api/cron/send-review` | Every 5 min | Send review emails (status: ready) |
-| `/api/cron/send-final` | Every 5 min | Send final campaigns (status: approved) |
+| `/api/cron/send-final` | Every 5 min | Send final issues (status: approved) |
+| `/api/cron/send-secondary` | Every 5 min | Send secondary newsletter |
 | `/api/cron/monitor-workflows` | Every 5 min | Check for failed/stuck workflows |
+| `/api/cron/process-mailerlite-updates` | Every 5 min | Process MailerLite webhooks |
+| `/api/cron/cleanup-pending-submissions` | Daily 7 AM | Clear stale ad submissions |
+| `/api/cron/import-metrics` | Daily 6 AM | Sync MailerLite metrics |
+| `/api/cron/health-check` | Every 5 min (8AM-10PM) | System health check |
+
+### Not Implemented (registered in vercel.json but empty)
+| Cron | Schedule | Notes |
+|------|----------|-------|
+| `/api/cron/populate-events` | Every 5 min | Events system not implemented |
+| `/api/cron/sync-events` | Daily midnight | Events system not implemented |
+| `/api/cron/generate-weather` | Daily 8 PM | Route file missing |
+| `/api/cron/collect-wordle` | Daily 7 PM | Route file missing |
 
 ---
 
