@@ -381,7 +381,7 @@ export default function AdsManagementPage() {
               </p>
             </div>
             <div className="flex gap-3">
-              {activeStatusTab === 'active' && (
+              {activeStatusTab === 'active' && selectedSection === 'legacy' && (
                 <button
                   onClick={handleResetOrder}
                   className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
@@ -462,8 +462,8 @@ export default function AdsManagementPage() {
           </button>
         </div>
 
-        {/* Next Ad Position Indicator (Active Tab Only) */}
-        {activeStatusTab === 'active' && !loading && ads.length > 0 && (
+        {/* Next Ad Position Indicator (Active Tab Only - Legacy Section) */}
+        {activeStatusTab === 'active' && !loading && ads.length > 0 && selectedSection === 'legacy' && (
           <div className="mb-4 bg-purple-50 border border-purple-200 rounded-lg p-4">
             <p className="text-sm text-purple-800">
               <strong>Next ad in rotation:</strong> Position {nextAdPosition}
@@ -475,6 +475,28 @@ export default function AdsManagementPage() {
             </p>
           </div>
         )}
+
+        {/* Selection Mode Info for Ad Module Sections */}
+        {activeStatusTab === 'active' && !loading && ads.length > 0 && selectedSection !== 'legacy' && (() => {
+          const currentModule = adModules.find(m => m.id === selectedSection)
+          if (!currentModule) return null
+          const selectionMode = currentModule.selection_mode || 'sequential'
+          const modeLabels: Record<string, { label: string; description: string }> = {
+            sequential: { label: 'Sequential', description: 'Ads rotate in order by position' },
+            random: { label: 'Random', description: 'A random ad is selected each time' },
+            priority: { label: 'Priority', description: 'Highest priority ad is selected first' },
+            manual: { label: 'Manual', description: 'Admin selects ad manually per issue' }
+          }
+          const modeInfo = modeLabels[selectionMode] || modeLabels.sequential
+          return (
+            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800">
+                <strong>Selection Mode:</strong> {modeInfo.label}
+                <span className="ml-2 text-blue-600">— {modeInfo.description}</span>
+              </p>
+            </div>
+          )
+        })()}
 
         {/* Loading State */}
         {loading && (
@@ -499,28 +521,34 @@ export default function AdsManagementPage() {
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, index)}
                   className={`bg-white rounded-lg shadow p-6 cursor-move hover:shadow-lg transition-shadow ${
-                    ad.display_order === nextAdPosition ? 'ring-4 ring-purple-400 bg-purple-50' : ''
+                    selectedSection === 'legacy' && ad.display_order === nextAdPosition ? 'ring-4 ring-purple-400 bg-purple-50' : ''
                   }`}
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex-1 flex items-center gap-4">
                       <div className="flex items-center gap-2">
                         <span className="text-2xl font-bold text-gray-400">☰</span>
-                        <input
-                          type="number"
-                          min="1"
-                          max={ads.length}
-                          value={ad.display_order || 0}
-                          onChange={(e) => handleOrderChange(ad.id, parseInt(e.target.value))}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-16 px-2 py-1 border border-gray-300 rounded text-center font-bold"
-                        />
+                        {selectedSection === 'legacy' ? (
+                          <input
+                            type="number"
+                            min="1"
+                            max={ads.length}
+                            value={ad.display_order || 0}
+                            onChange={(e) => handleOrderChange(ad.id, parseInt(e.target.value))}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-16 px-2 py-1 border border-gray-300 rounded text-center font-bold"
+                          />
+                        ) : (
+                          <span className="w-16 px-2 py-1 border border-gray-200 bg-gray-50 rounded text-center font-bold text-gray-600">
+                            {index + 1}
+                          </span>
+                        )}
                       </div>
                       <div>
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="text-xl font-semibold">{ad.title}</h3>
                           {getStatusBadge(ad.status)}
-                          {ad.display_order === nextAdPosition && (
+                          {selectedSection === 'legacy' && ad.display_order === nextAdPosition && (
                             <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-200 text-purple-800">
                               NEXT IN ROTATION
                             </span>
@@ -1113,22 +1141,24 @@ function AddAdModal({ onClose, onSuccess, publicationId, selectedSection, sectio
             </div>
           )}
 
-          {/* Use in Next Newsletter Checkbox */}
-          <div className="flex items-center gap-3 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-            <input
-              type="checkbox"
-              id="useInNextNewsletter"
-              checked={useInNextNewsletter}
-              onChange={(e) => setUseInNextNewsletter(e.target.checked)}
-              className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-            />
-            <label htmlFor="useInNextNewsletter" className="text-sm font-medium text-gray-700 cursor-pointer">
-              Use in next newsletter
-              <p className="text-xs text-gray-600 font-normal mt-1">
-                Check this to insert the ad at the next position in the rotation queue (position immediately after the last used ad). Other ads will shift down by one.
-              </p>
-            </label>
-          </div>
+          {/* Use in Next Newsletter Checkbox - Only for Legacy section */}
+          {selectedSection === 'legacy' && (
+            <div className="flex items-center gap-3 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+              <input
+                type="checkbox"
+                id="useInNextNewsletter"
+                checked={useInNextNewsletter}
+                onChange={(e) => setUseInNextNewsletter(e.target.checked)}
+                className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+              />
+              <label htmlFor="useInNextNewsletter" className="text-sm font-medium text-gray-700 cursor-pointer">
+                Use in next newsletter
+                <p className="text-xs text-gray-600 font-normal mt-1">
+                  Check this to insert the ad at the next position in the rotation queue (position immediately after the last used ad). Other ads will shift down by one.
+                </p>
+              </label>
+            </div>
+          )}
 
           {/* URL */}
           <div>

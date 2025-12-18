@@ -52,7 +52,8 @@ export default function AdModuleSettings({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   const handleNameChange = async (newName: string) => {
-    if (newName.trim() === localModule.name) return
+    // Compare against the original module prop, not localModule (which already has the typed value)
+    if (newName.trim() === module.name) return
 
     setSaving(true)
     setSaveStatus('saving')
