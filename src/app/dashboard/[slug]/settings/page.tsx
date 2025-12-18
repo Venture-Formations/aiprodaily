@@ -445,16 +445,10 @@ function NewsletterSettings() {
 
 function SystemStatus() {
   const [status, setStatus] = useState<any>(null)
-  const [scheduleDisplay, setScheduleDisplay] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-
-  // Get newsletter slug from pathname
-  const pathname = usePathname()
-  const newsletterSlug = pathname ? pathname.match(/^\/dashboard\/([^\/]+)/)?.[1] : null
 
   useEffect(() => {
     fetchSystemStatus()
-    fetchScheduleDisplay()
   }, [])
 
   const fetchSystemStatus = async () => {
@@ -466,20 +460,6 @@ function SystemStatus() {
       console.error('Failed to fetch system status:', error)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const fetchScheduleDisplay = async () => {
-    if (!newsletterSlug) return
-
-    try {
-      const response = await fetch(`/api/settings/schedule-display?publication_id=${newsletterSlug}`)
-      if (response.ok) {
-        const data = await response.json()
-        setScheduleDisplay(data)
-      }
-    } catch (error) {
-      console.error('Failed to fetch schedule display:', error)
     }
   }
 
@@ -541,64 +521,143 @@ function SystemStatus() {
       <div className="bg-white shadow rounded-lg p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Cron Jobs</h3>
 
-        <div className="space-y-3">
-          <div className="flex justify-between items-center py-2 border-b">
-            <div>
-              <div className="font-medium">RSS Processing</div>
-              <div className="text-sm text-gray-600">
-                Daily at {scheduleDisplay?.rssProcessing || '20:30'} CT
+        {/* Workflow & Processing */}
+        <div className="mb-4">
+          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Workflow & Processing</h4>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center py-2 border-b">
+              <div>
+                <div className="font-medium">Trigger Workflow</div>
+                <div className="text-sm text-gray-600">Every 5 minutes - Launches RSS workflow if schedule permits</div>
               </div>
+              <span className="text-green-600 text-sm">Active</span>
             </div>
-            <span className={`text-sm ${scheduleDisplay?.reviewEnabled ? 'text-green-600' : 'text-gray-500'}`}>
-              {scheduleDisplay?.reviewEnabled ? 'Active' : 'Disabled'}
-            </span>
-          </div>
-          <div className="flex justify-between items-center py-2 border-b">
-            <div>
-              <div className="font-medium">Subject Line Generation</div>
-              <div className="text-sm text-gray-600">
-                Daily at {scheduleDisplay?.subjectGeneration || '20:45'} CT
+            <div className="flex justify-between items-center py-2 border-b">
+              <div>
+                <div className="font-medium">RSS Ingestion</div>
+                <div className="text-sm text-gray-600">Every 15 minutes - Fetches new posts from RSS feeds</div>
               </div>
+              <span className="text-green-600 text-sm">Active</span>
             </div>
-            <span className={`text-sm ${scheduleDisplay?.reviewEnabled ? 'text-green-600' : 'text-gray-500'}`}>
-              {scheduleDisplay?.reviewEnabled ? 'Active' : 'Disabled'}
-            </span>
-          </div>
-          <div className="flex justify-between items-center py-2 border-b">
-            <div>
-              <div className="font-medium">Issue Creation</div>
-              <div className="text-sm text-gray-600">
-                Daily at {scheduleDisplay?.issueCreation || '20:50'} CT
+            <div className="flex justify-between items-center py-2 border-b">
+              <div>
+                <div className="font-medium">Create Campaign</div>
+                <div className="text-sm text-gray-600">Every 5 minutes - Creates issues when ready</div>
               </div>
+              <span className="text-green-600 text-sm">Active</span>
             </div>
-            <span className={`text-sm ${scheduleDisplay?.reviewEnabled ? 'text-green-600' : 'text-gray-500'}`}>
-              {scheduleDisplay?.reviewEnabled ? 'Active' : 'Disabled'}
-            </span>
-          </div>
-          <div className="flex justify-between items-center py-2 border-b">
-            <div>
-              <div className="font-medium">Final Publication Send</div>
-              <div className="text-sm text-gray-600">
-                Daily at {scheduleDisplay?.finalSend || '04:55'} CT
+            <div className="flex justify-between items-center py-2 border-b">
+              <div>
+                <div className="font-medium">Monitor Workflows</div>
+                <div className="text-sm text-gray-600">Every 5 minutes - Detects stuck workflows</div>
               </div>
+              <span className="text-green-600 text-sm">Active</span>
             </div>
-            <span className={`text-sm ${scheduleDisplay?.dailyEnabled ? 'text-green-600' : 'text-gray-500'}`}>
-              {scheduleDisplay?.dailyEnabled ? 'Active' : 'Disabled'}
-            </span>
           </div>
-          <div className="flex justify-between items-center py-2 border-b">
-            <div>
-              <div className="font-medium">Metrics Import</div>
-              <div className="text-sm text-gray-600">Daily at 6:00 AM CT</div>
+        </div>
+
+        {/* Email */}
+        <div className="mb-4">
+          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Email</h4>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center py-2 border-b">
+              <div>
+                <div className="font-medium">Send Review</div>
+                <div className="text-sm text-gray-600">Every 5 minutes - Sends review emails when ready</div>
+              </div>
+              <span className="text-green-600 text-sm">Active</span>
             </div>
-            <span className="text-green-600 text-sm">Active</span>
+            <div className="flex justify-between items-center py-2 border-b">
+              <div>
+                <div className="font-medium">Send Final</div>
+                <div className="text-sm text-gray-600">Every 5 minutes - Sends final newsletters</div>
+              </div>
+              <span className="text-green-600 text-sm">Active</span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b">
+              <div>
+                <div className="font-medium">Send Secondary</div>
+                <div className="text-sm text-gray-600">Every 5 minutes - Sends secondary newsletters</div>
+              </div>
+              <span className="text-green-600 text-sm">Active</span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b">
+              <div>
+                <div className="font-medium">Process MailerLite Updates</div>
+                <div className="text-sm text-gray-600">Every 5 minutes - Processes webhook updates</div>
+              </div>
+              <span className="text-green-600 text-sm">Active</span>
+            </div>
           </div>
-          <div className="flex justify-between items-center py-2">
-            <div>
-              <div className="font-medium">Health Checks</div>
-              <div className="text-sm text-gray-600">Every 5 minutes (8 AM - 10 PM CT)</div>
+        </div>
+
+        {/* Events */}
+        <div className="mb-4">
+          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Events</h4>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center py-2 border-b">
+              <div>
+                <div className="font-medium">Populate Events</div>
+                <div className="text-sm text-gray-600">Every 5 minutes - Populates events for upcoming issues</div>
+              </div>
+              <span className="text-green-600 text-sm">Active</span>
             </div>
-            <span className="text-green-600 text-sm">Active</span>
+            <div className="flex justify-between items-center py-2 border-b">
+              <div>
+                <div className="font-medium">Sync Events</div>
+                <div className="text-sm text-gray-600">Daily at midnight CT - Syncs events from external sources</div>
+              </div>
+              <span className="text-green-600 text-sm">Active</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Content Generation */}
+        <div className="mb-4">
+          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Content Generation</h4>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center py-2 border-b">
+              <div>
+                <div className="font-medium">Generate Weather</div>
+                <div className="text-sm text-gray-600">Daily at 8:00 PM CT - Generates weather content</div>
+              </div>
+              <span className="text-green-600 text-sm">Active</span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b">
+              <div>
+                <div className="font-medium">Collect Wordle</div>
+                <div className="text-sm text-gray-600">Daily at 7:00 PM CT - Collects daily Wordle data</div>
+              </div>
+              <span className="text-green-600 text-sm">Active</span>
+            </div>
+          </div>
+        </div>
+
+        {/* System & Maintenance */}
+        <div>
+          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">System & Maintenance</h4>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center py-2 border-b">
+              <div>
+                <div className="font-medium">Health Check</div>
+                <div className="text-sm text-gray-600">Every 5 minutes (8 AM - 10 PM CT) - Monitors system health</div>
+              </div>
+              <span className="text-green-600 text-sm">Active</span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b">
+              <div>
+                <div className="font-medium">Import Metrics</div>
+                <div className="text-sm text-gray-600">Daily at 6:00 AM CT - Syncs MailerLite metrics</div>
+              </div>
+              <span className="text-green-600 text-sm">Active</span>
+            </div>
+            <div className="flex justify-between items-center py-2">
+              <div>
+                <div className="font-medium">Cleanup Pending Submissions</div>
+                <div className="text-sm text-gray-600">Daily at 7:00 AM CT - Removes stale pending submissions</div>
+              </div>
+              <span className="text-green-600 text-sm">Active</span>
+            </div>
           </div>
         </div>
       </div>
