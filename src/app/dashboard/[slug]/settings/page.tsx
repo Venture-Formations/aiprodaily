@@ -5695,7 +5695,10 @@ function BusinessSettings() {
             Email Header Image
           </label>
           {settings.header_image_url && (
-            <div className="mb-2 p-4 rounded border">
+            <div
+              className="mb-2 p-4 rounded border"
+              style={{ backgroundColor: settings.primary_color }}
+            >
               <img
                 src={settings.header_image_url}
                 alt="Header preview"
