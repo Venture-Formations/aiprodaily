@@ -22,6 +22,8 @@ interface ModuleAd {
   image_url?: string
   button_text?: string
   button_url?: string
+  times_used?: number
+  display_order?: number
   advertiser?: {
     id: string
     company_name: string
@@ -36,6 +38,37 @@ interface AdSelection {
   used_at?: string
   ad_module?: AdModule
   advertisement?: ModuleAd  // Changed from selected_ad to match unified schema
+}
+
+// Process ad body to make last sentence a link (matches email format)
+function processAdBody(body: string, buttonUrl?: string): string {
+  if (!buttonUrl || !body) return body
+
+  const plainText = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  const sentenceEndPattern = /[.!?](?=\s+[A-Z]|$)/g
+  const matches = Array.from(plainText.matchAll(sentenceEndPattern))
+
+  if (matches.length > 0) {
+    const lastMatch = matches[matches.length - 1] as RegExpMatchArray
+    const lastPeriodIndex = lastMatch.index!
+
+    let startIndex = 0
+    if (matches.length > 1) {
+      const secondLastMatch = matches[matches.length - 2] as RegExpMatchArray
+      startIndex = secondLastMatch.index! + 1
+    }
+
+    const lastSentence = plainText.substring(startIndex, lastPeriodIndex + 1).trim()
+    const beforeLastSentence = plainText.substring(0, startIndex).trim()
+
+    const linkedLastSentence = `<a href="${buttonUrl}" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline;">${lastSentence}</a>`
+
+    return beforeLastSentence
+      ? `<p>${beforeLastSentence}</p><p>${linkedLastSentence}</p>`
+      : `<p>${linkedLastSentence}</p>`
+  }
+
+  return `<p><a href="${buttonUrl}" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline;">${plainText}</a></p>`
 }
 
 export default function AdModulesPanel({ issueId }: AdModulesPanelProps) {
@@ -210,44 +243,62 @@ export default function AdModulesPanel({ issueId }: AdModulesPanelProps) {
                     </div>
                   )}
 
-                  {/* Selected Ad Preview */}
+                  {/* Selected Ad Preview - Styled to match email appearance */}
                   {selectedAd && (
-                    <div className="border border-gray-200 rounded-lg overflow-hidden">
-                      <div className="bg-blue-600 px-4 py-2">
-                        <h3 className="text-white font-bold">{module.name}</h3>
+                    <div>
+                      {/* Meta info bar */}
+                      <div className="mb-4 text-sm text-gray-600 flex justify-between items-center">
+                        <div>
+                          <strong>Selected Ad:</strong> {selectedAd.title}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          Times used: {selectedAd.times_used || 0}
+                          {selectedAd.advertiser && ` | ${selectedAd.advertiser.company_name}`}
+                        </div>
                       </div>
-                      <div className="p-4">
-                        <h4 className="font-bold text-lg mb-2">{selectedAd.title}</h4>
-                        {selectedAd.image_url && (
-                          <div className="mb-3">
-                            <img
-                              src={selectedAd.image_url}
-                              alt={selectedAd.title}
-                              className="max-w-full max-h-48 rounded"
+
+                      {/* Email-style card */}
+                      <div className="max-w-3xl mx-auto">
+                        <div className="border border-gray-300 rounded-lg bg-white shadow-lg overflow-hidden">
+                          {/* Header - part of the card with no gap */}
+                          <div className="bg-blue-600 px-4 py-3">
+                            <h2 className="text-white text-2xl font-bold m-0">{module.name}</h2>
+                          </div>
+
+                          {/* Title - inside card, left-justified */}
+                          <div className="px-4 pt-4 pb-2">
+                            <h3 className="text-xl font-bold text-left m-0">{selectedAd.title}</h3>
+                          </div>
+
+                          {/* Image - clickable */}
+                          {selectedAd.image_url && (
+                            <div className="px-4 text-center">
+                              {selectedAd.button_url ? (
+                                <a href={selectedAd.button_url} target="_blank" rel="noopener noreferrer">
+                                  <img
+                                    src={selectedAd.image_url}
+                                    alt={selectedAd.title}
+                                    className="inline-block max-w-full max-h-[500px] rounded cursor-pointer"
+                                  />
+                                </a>
+                              ) : (
+                                <img
+                                  src={selectedAd.image_url}
+                                  alt={selectedAd.title}
+                                  className="inline-block max-w-full max-h-[500px] rounded"
+                                />
+                              )}
+                            </div>
+                          )}
+
+                          {/* Body - with last line as link */}
+                          {selectedAd.body && (
+                            <div
+                              className="px-4 pb-4 text-base leading-relaxed [&_a]:text-blue-600 [&_a]:underline [&_b]:font-bold [&_strong]:font-bold"
+                              dangerouslySetInnerHTML={{ __html: processAdBody(selectedAd.body, selectedAd.button_url) }}
                             />
-                          </div>
-                        )}
-                        {selectedAd.body && (
-                          <div
-                            className="text-sm text-gray-600 mb-3"
-                            dangerouslySetInnerHTML={{ __html: selectedAd.body.substring(0, 200) + '...' }}
-                          />
-                        )}
-                        {selectedAd.button_url && (
-                          <a
-                            href={selectedAd.button_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-block px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium"
-                          >
-                            {selectedAd.button_text || 'Learn More'}
-                          </a>
-                        )}
-                        {selectedAd.advertiser && (
-                          <div className="mt-3 text-xs text-gray-500">
-                            Advertiser: {selectedAd.advertiser.company_name}
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
