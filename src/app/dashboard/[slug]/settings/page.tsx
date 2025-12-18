@@ -45,7 +45,6 @@ export default function SettingsPage() {
                 { id: 'business', name: 'Publication Settings' },
                 { id: 'newsletter', name: 'Sections' },
                 { id: 'email', name: 'Email' },
-                { id: 'slack', name: 'Slack' },
                 { id: 'ai-prompts', name: 'AI Prompts' },
                 { id: 'ai-apps', name: 'AI Apps' },
                 { id: 'rss', name: 'RSS Feeds' },
@@ -75,7 +74,6 @@ export default function SettingsPage() {
           {activeTab === 'business' && <BusinessSettings />}
           {activeTab === 'newsletter' && <NewsletterSettings />}
           {activeTab === 'email' && <EmailSettings />}
-          {activeTab === 'slack' && <SlackSettings />}
           {activeTab === 'ai-prompts' && <AIPromptsSettings />}
           {activeTab === 'ai-apps' && <AIAppsSettings />}
           {activeTab === 'rss' && <RSSFeeds />}
@@ -1026,39 +1024,245 @@ function RSSFeeds() {
 }
 
 function Notifications() {
+  const [settings, setSettings] = useState({
+    campaignStatusUpdates: true,
+    workflowFailure: true,
+    systemErrors: true,
+    rssProcessingUpdates: true,
+    rssProcessingIncomplete: true,
+    lowArticleCount: true,
+    scheduledSendFailure: true,
+    scheduledSendTiming: true,
+    healthCheckAlerts: true,
+    emailDeliveryUpdates: true
+  })
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    loadSettings()
+  }, [])
+
+  const loadSettings = async () => {
+    try {
+      const response = await fetch('/api/settings/slack')
+      if (response.ok) {
+        const data = await response.json()
+        setSettings(prev => ({ ...prev, ...data }))
+      }
+    } catch (error) {
+      console.error('Failed to load notification settings:', error)
+    }
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    setMessage('')
+
+    try {
+      const response = await fetch('/api/settings/slack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+      })
+
+      if (response.ok) {
+        setMessage('Notification settings saved successfully!')
+        setTimeout(() => setMessage(''), 3000)
+      } else {
+        throw new Error('Failed to save settings')
+      }
+    } catch (error) {
+      console.error('Failed to save notification settings:', error)
+      setMessage('Failed to save settings. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleToggle = (field: string, value: boolean) => {
+    setSettings(prev => ({ ...prev, [field]: value }))
+  }
+
+  const notificationTypes = [
+    {
+      id: 'campaignStatusUpdates',
+      name: 'Issue Status Updates',
+      description: 'Notifications when campaigns are marked as "Changes Made" by reviewers',
+      examples: [
+        'issue marked as "Changes Made" for Dec 15 by John Doe',
+        'issue requires review before proceeding to send',
+        'Manual edits detected - status updated to "Changes Made"'
+      ]
+    },
+    {
+      id: 'workflowFailure',
+      name: 'Workflow Failures',
+      description: 'Critical alerts when automated workflows fail after all retry attempts',
+      examples: [
+        'Workflow failed after retries - issue ID: abc123',
+        'RSS processing workflow terminated due to repeated errors',
+        'issue creation workflow failed - manual intervention required'
+      ]
+    },
+    {
+      id: 'rssProcessingUpdates',
+      name: 'RSS Processing Completion',
+      description: 'Success notifications when RSS processing completes',
+      examples: [
+        'RSS Processing Complete - issue abc123 - 8 articles generated',
+        'Archive: 12 articles, 45 posts preserved',
+        'Ready for review and scheduling'
+      ]
+    },
+    {
+      id: 'rssProcessingIncomplete',
+      name: 'RSS Processing Incomplete',
+      description: 'Alerts when RSS processing fails partway through steps',
+      examples: [
+        'RSS Processing Incomplete - Completed: Archive, Fetch - Failed at: Score Posts',
+        'issue may be missing content or in invalid state',
+        'Error: OpenAI API timeout during article generation'
+      ]
+    },
+    {
+      id: 'lowArticleCount',
+      name: 'Low Article Count (≤6 articles)',
+      description: 'Alerts when article count is too low for quality delivery',
+      examples: [
+        'Low Article Count Alert - 4 articles (≤6 threshold)',
+        'Newsletter may not have enough content for quality delivery',
+        'Action Required: Manual review before sending'
+      ]
+    },
+    {
+      id: 'scheduledSendFailure',
+      name: 'Scheduled Send Failures',
+      description: 'Alerts when scheduled sends fail to deliver to SendGrid',
+      examples: [
+        'Scheduled Send Failed - issue abc123',
+        'Send triggered but no email delivered to SendGrid',
+        'SendGrid API authentication failed during scheduled send'
+      ]
+    },
+    {
+      id: 'scheduledSendTiming',
+      name: 'Scheduled Send Timing Issues',
+      description: 'Warnings when scheduling logic detects configuration problems',
+      examples: [
+        'Found 2 issues with ready_to_send status but shouldRun returned false',
+        'Timing configuration issue detected',
+        'Send window may be misconfigured'
+      ]
+    },
+    {
+      id: 'emailDeliveryUpdates',
+      name: 'Email Delivery Success',
+      description: 'SendGrid campaign delivery confirmations',
+      examples: [
+        'Review issue sent successfully for issue abc123',
+        'Final issue sent successfully for issue xyz789',
+        'SendGrid delivery confirmed'
+      ]
+    },
+    {
+      id: 'healthCheckAlerts',
+      name: 'Health Check Alerts',
+      description: 'System health monitoring alerts for degraded or down services',
+      examples: [
+        'Health Check: RSS Feeds is degraded - 3 feeds have multiple errors',
+        'Health Check: Database is down - Unable to connect',
+        'System health check failed - some components not healthy'
+      ]
+    },
+    {
+      id: 'systemErrors',
+      name: 'System Errors',
+      description: 'Critical system-wide errors from various components',
+      examples: [
+        'Critical error in rss_processor during article generation',
+        'System Alert: Database connection lost',
+        'Authentication system failure detected'
+      ]
+    }
+  ]
+
   return (
-    <div className="bg-white shadow rounded-lg p-6">
-      <h3 className="text-lg font-medium text-gray-900 mb-4">Notification Settings</h3>
+    <div className="space-y-6">
+      {/* Slack Notification Types */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Slack Notification Types</h3>
+        <p className="text-sm text-gray-600 mb-6">
+          Control which types of notifications are sent to your Slack channel.
+        </p>
 
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <div>
-            <div className="font-medium">Slack Notifications</div>
-            <div className="text-sm text-gray-600">Receive alerts for system errors and status updates</div>
-          </div>
-          <span className="text-green-600 text-sm">
-            {process.env.SLACK_WEBHOOK_URL ? 'Configured' : 'Not Configured'}
-          </span>
-        </div>
+        <div className="space-y-6">
+          {notificationTypes.map((type) => (
+            <div key={type.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900 mb-1">{type.name}</div>
+                  <div className="text-sm text-gray-600 mb-3">{type.description}</div>
 
-        <div className="flex justify-between items-center">
-          <div>
-            <div className="font-medium">Email Notifications</div>
-            <div className="text-sm text-gray-600">Publication review and delivery confirmations</div>
-          </div>
-          <span className="text-green-600 text-sm">Active</span>
-        </div>
+                  {/* Examples Section */}
+                  <div className="bg-white rounded-md p-3 border border-gray-100">
+                    <div className="text-xs font-medium text-gray-500 mb-2">Example notifications:</div>
+                    <ul className="text-xs text-gray-600 space-y-1">
+                      {type.examples.map((example, index) => (
+                        <li key={index} className="flex items-start">
+                          <span className="text-gray-400 mr-2">•</span>
+                          <span className="font-mono bg-gray-100 px-1 py-0.5 rounded text-xs">{example}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
 
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <h4 className="font-medium mb-2">Notification Types:</h4>
-          <ul className="space-y-1 text-sm text-gray-600">
-            <li>• RSS processing completion/failure</li>
-            <li>• Email issue delivery status</li>
-            <li>• System health alerts</li>
-            <li>• Error monitoring</li>
-          </ul>
+                <div className="flex flex-col items-end ml-4">
+                  <button
+                    onClick={() => handleToggle(type.id, !settings[type.id as keyof typeof settings])}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      settings[type.id as keyof typeof settings] ? 'bg-brand-primary' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        settings[type.id as keyof typeof settings] ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                  <span className={`mt-2 text-sm font-medium ${
+                    settings[type.id as keyof typeof settings] ? 'text-green-600' : 'text-gray-500'
+                  }`}>
+                    {settings[type.id as keyof typeof settings] ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
+
+      {/* Save Button */}
+      <div className="flex justify-end">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="bg-brand-primary hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-2 rounded-md font-medium"
+        >
+          {saving ? 'Saving...' : 'Save Settings'}
+        </button>
+      </div>
+
+      {message && (
+        <div className={`mt-4 p-4 rounded-md ${
+          message.includes('successfully')
+            ? 'bg-green-50 border border-green-200 text-green-800'
+            : 'bg-red-50 border border-red-200 text-red-800'
+        }`}>
+          {message}
+        </div>
+      )}
     </div>
   )
 }
@@ -4488,261 +4692,6 @@ function AIPromptsSettings() {
   )
 }
 
-function SlackSettings() {
-  const [settings, setSettings] = useState({
-    campaignStatusUpdates: true,
-    workflowFailure: true,
-    systemErrors: true,
-    rssProcessingUpdates: true,
-    rssProcessingIncomplete: true,
-    lowArticleCount: true,
-    scheduledSendFailure: true,
-    scheduledSendTiming: true,
-    healthCheckAlerts: true,
-    emailDeliveryUpdates: true
-  })
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('')
-
-  useEffect(() => {
-    loadSettings()
-  }, [])
-
-  const loadSettings = async () => {
-    try {
-      const response = await fetch('/api/settings/slack')
-      if (response.ok) {
-        const data = await response.json()
-        setSettings(prev => ({ ...prev, ...data }))
-      }
-    } catch (error) {
-      console.error('Failed to load Slack settings:', error)
-    }
-  }
-
-  const handleSave = async () => {
-    console.log('[Slack Settings] Save button clicked')
-    console.log('[Slack Settings] Current settings:', settings)
-
-    setSaving(true)
-    setMessage('')
-
-    try {
-      console.log('[Slack Settings] Sending request to /api/settings/slack')
-      const response = await fetch('/api/settings/slack', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings)
-      })
-
-      console.log('[Slack Settings] Response status:', response.status)
-
-      if (response.ok) {
-        const data = await response.json()
-        console.log('[Slack Settings] Save successful:', data)
-        setMessage('Slack settings saved successfully!')
-        setTimeout(() => setMessage(''), 3000)
-      } else {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('[Slack Settings] Save failed:', response.status, errorData)
-        throw new Error('Failed to save settings')
-      }
-    } catch (error) {
-      console.error('[Slack Settings] Save error:', error)
-      setMessage('Failed to save settings. Please try again.')
-    } finally {
-      setSaving(false)
-      console.log('[Slack Settings] Save complete')
-    }
-  }
-
-  const handleToggle = (field: string, value: boolean) => {
-    setSettings(prev => ({ ...prev, [field]: value }))
-  }
-
-  const notificationTypes = [
-    {
-      id: 'campaignStatusUpdates',
-      name: 'Issue Status Updates',
-      description: 'Notifications when campaigns are marked as "Changes Made" by reviewers',
-      examples: [
-        'issue marked as "Changes Made" for Dec 15 by John Doe',
-        'issue requires review before proceeding to send',
-        'Manual edits detected - status updated to "Changes Made"'
-      ]
-    },
-    {
-      id: 'workflowFailure',
-      name: 'Workflow Failures',
-      description: 'Critical alerts when automated workflows fail after all retry attempts',
-      examples: [
-        'Workflow failed after retries - issue ID: abc123',
-        'RSS processing workflow terminated due to repeated errors',
-        'issue creation workflow failed - manual intervention required'
-      ]
-    },
-    {
-      id: 'rssProcessingUpdates',
-      name: 'RSS Processing Completion',
-      description: 'Success notifications when RSS processing completes',
-      examples: [
-        'RSS Processing Complete - issue abc123 - 8 articles generated',
-        'Archive: 12 articles, 45 posts preserved',
-        'Ready for review and scheduling'
-      ]
-    },
-    {
-      id: 'rssProcessingIncomplete',
-      name: 'RSS Processing Incomplete',
-      description: 'Alerts when RSS processing fails partway through steps',
-      examples: [
-        'RSS Processing Incomplete - Completed: Archive, Fetch - Failed at: Score Posts',
-        'issue may be missing content or in invalid state',
-        'Error: OpenAI API timeout during article generation'
-      ]
-    },
-    {
-      id: 'lowArticleCount',
-      name: 'Low Article Count (≤6 articles)',
-      description: 'Alerts when article count is too low for quality delivery',
-      examples: [
-        'Low Article Count Alert - 4 articles (≤6 threshold)',
-        'Newsletter may not have enough content for quality delivery',
-        'Action Required: Manual review before sending'
-      ]
-    },
-    {
-      id: 'scheduledSendFailure',
-      name: 'Scheduled Send Failures',
-      description: 'Alerts when scheduled sends fail to deliver to SendGrid',
-      examples: [
-        'Scheduled Send Failed - issue abc123',
-        'Send triggered but no email delivered to SendGrid',
-        'SendGrid API authentication failed during scheduled send'
-      ]
-    },
-    {
-      id: 'scheduledSendTiming',
-      name: 'Scheduled Send Timing Issues',
-      description: 'Warnings when scheduling logic detects configuration problems',
-      examples: [
-        'Found 2 issues with ready_to_send status but shouldRun returned false',
-        'Timing configuration issue detected',
-        'Send window may be misconfigured'
-      ]
-    },
-    {
-      id: 'emailDeliveryUpdates',
-      name: 'Email Delivery Success',
-      description: 'SendGrid campaign delivery confirmations',
-      examples: [
-        'Review issue sent successfully for issue abc123',
-        'Final issue sent successfully for issue xyz789',
-        'SendGrid delivery confirmed'
-      ]
-    },
-    {
-      id: 'healthCheckAlerts',
-      name: 'Health Check Alerts',
-      description: 'System health monitoring alerts for degraded or down services',
-      examples: [
-        'Health Check: RSS Feeds is degraded - 3 feeds have multiple errors',
-        'Health Check: Database is down - Unable to connect',
-        'System health check failed - some components not healthy'
-      ]
-    },
-    {
-      id: 'systemErrors',
-      name: 'System Errors',
-      description: 'Critical system-wide errors from various components',
-      examples: [
-        'Critical error in rss_processor during article generation',
-        'System Alert: Database connection lost',
-        'Authentication system failure detected'
-      ]
-    }
-  ]
-
-  return (
-    <div className="space-y-6">
-      {/* Notification Types */}
-      <div className="bg-white shadow rounded-lg p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Notification Types</h3>
-        <p className="text-sm text-gray-600 mb-6">
-          Control which types of notifications are sent to your Slack channel.
-        </p>
-
-        <div className="space-y-6">
-          {notificationTypes.map((type) => (
-            <div key={type.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="font-medium text-gray-900 mb-1">{type.name}</div>
-                  <div className="text-sm text-gray-600 mb-3">{type.description}</div>
-
-                  {/* Examples Section */}
-                  <div className="bg-white rounded-md p-3 border border-gray-100">
-                    <div className="text-xs font-medium text-gray-500 mb-2">Example notifications:</div>
-                    <ul className="text-xs text-gray-600 space-y-1">
-                      {type.examples.map((example, index) => (
-                        <li key={index} className="flex items-start">
-                          <span className="text-gray-400 mr-2">•</span>
-                          <span className="font-mono bg-gray-100 px-1 py-0.5 rounded text-xs">{example}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-end ml-4">
-                  <button
-                    onClick={() => handleToggle(type.id, !settings[type.id as keyof typeof settings])}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      settings[type.id as keyof typeof settings] ? 'bg-brand-primary' : 'bg-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        settings[type.id as keyof typeof settings] ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                  <span className={`mt-2 text-sm font-medium ${
-                    settings[type.id as keyof typeof settings] ? 'text-green-600' : 'text-gray-500'
-                  }`}>
-                    {settings[type.id as keyof typeof settings] ? 'Enabled' : 'Disabled'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Save Button */}
-      <div className="flex justify-end">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="bg-brand-primary hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-2 rounded-md font-medium"
-        >
-          {saving ? 'Saving...' : 'Save Settings'}
-        </button>
-      </div>
-
-      {message && (
-        <div className={`mt-4 p-4 rounded-md ${
-          message.includes('successfully')
-            ? 'bg-green-50 border border-green-200 text-green-800'
-            : 'bg-red-50 border border-red-200 text-red-800'
-        }`}>
-          {message}
-        </div>
-      )}
-    </div>
-  )
-}
-
 function PublicEventsSettings() {
   const [settings, setSettings] = useState({
     paidPlacementPrice: '5',
@@ -5424,9 +5373,7 @@ function BusinessSettings() {
     linkedin_enabled: false,
     linkedin_url: '',
     instagram_enabled: false,
-    instagram_url: '',
-    sendgrid_list_name: '',
-    sendgrid_list_id: ''
+    instagram_url: ''
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -5619,39 +5566,6 @@ function BusinessSettings() {
             />
           </div>
 
-          {/* SendGrid List Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              SendGrid List Name
-            </label>
-            <input
-              type="text"
-              value={settings.sendgrid_list_name || ''}
-              onChange={(e) => setSettings({ ...settings, sendgrid_list_name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              placeholder="e.g., AI Accounting Daily"
-            />
-            <p className="mt-1 text-sm text-gray-500">
-              Name of the SendGrid list for website subscribers
-            </p>
-          </div>
-
-          {/* SendGrid List ID */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              SendGrid List ID
-            </label>
-            <input
-              type="text"
-              value={settings.sendgrid_list_id || ''}
-              onChange={(e) => setSettings({ ...settings, sendgrid_list_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              placeholder="e.g., abc123-def456-ghi789"
-            />
-            <p className="mt-1 text-sm text-gray-500">
-              The list ID from SendGrid to add new subscribers to
-            </p>
-          </div>
         </div>
       </div>
 
