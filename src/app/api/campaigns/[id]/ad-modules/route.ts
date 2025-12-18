@@ -30,7 +30,7 @@ export async function GET(
     }
 
     // Get all ad module selections for this issue
-    const { data: selections, error: selectionsError } = await supabaseAdmin
+    let { data: selections, error: selectionsError } = await supabaseAdmin
       .from('issue_module_ads')
       .select(`
         id,
@@ -68,6 +68,58 @@ export async function GET(
         { error: 'Failed to fetch ad module selections' },
         { status: 500 }
       )
+    }
+
+    // If no selections exist, run automatic ad selection
+    if (!selections || selections.length === 0) {
+      const { ModuleAdSelector } = await import('@/lib/ad-modules')
+
+      // Get issue date for cooldown calculation
+      const { data: issueData } = await supabaseAdmin
+        .from('newsletter_campaigns')
+        .select('issue_date')
+        .eq('id', issueId)
+        .single()
+
+      const issueDate = issueData?.issue_date ? new Date(issueData.issue_date) : new Date()
+
+      // Run ad selection for all modules
+      await ModuleAdSelector.selectAdsForIssue(issueId, issue.publication_id, issueDate)
+
+      // Re-fetch selections after creating them
+      const { data: newSelections } = await supabaseAdmin
+        .from('issue_module_ads')
+        .select(`
+          id,
+          selection_mode,
+          selected_at,
+          used_at,
+          ad_module:ad_modules(
+            id,
+            name,
+            display_order,
+            block_order,
+            selection_mode,
+            is_active
+          ),
+          advertisement:advertisements(
+            id,
+            title,
+            body,
+            image_url,
+            button_text,
+            button_url,
+            company_name,
+            advertiser:advertisers(
+              id,
+              company_name,
+              logo_url
+            )
+          )
+        `)
+        .eq('issue_id', issueId)
+
+      selections = newSelections || []
     }
 
     // Also get all active ad modules for the publication (to show modules without selections)
