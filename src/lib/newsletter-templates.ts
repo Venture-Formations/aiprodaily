@@ -1001,6 +1001,7 @@ export async function generateAdModulesSection(issue: any, moduleId?: string): P
 
       // Get block order from module config
       const blockOrder = (module.block_order || ['title', 'image', 'body', 'button']) as AdBlockType[]
+      console.log(`[AdModules] Module "${module.name}" block_order:`, module.block_order, '-> using:', blockOrder)
 
       // Use the AdModuleRenderer for block-based rendering
       const html = AdModuleRenderer.renderForArchive(

@@ -65,7 +65,10 @@ export async function PATCH(
     if (body.display_order !== undefined) updates.display_order = body.display_order
     if (body.is_active !== undefined) updates.is_active = body.is_active
     if (body.selection_mode !== undefined) updates.selection_mode = body.selection_mode
-    if (body.block_order !== undefined) updates.block_order = body.block_order
+    if (body.block_order !== undefined) {
+      updates.block_order = body.block_order
+      console.log(`[AdModules] Saving block_order:`, body.block_order)
+    }
     if (body.config !== undefined) updates.config = body.config
 
     const { data: module, error } = await supabaseAdmin

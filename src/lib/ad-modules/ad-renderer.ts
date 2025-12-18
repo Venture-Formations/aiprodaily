@@ -1,21 +1,13 @@
 import { wrapTrackingUrl } from '../url-tracking'
-import { normalizeEmailHtml } from '../html-normalizer'
 import { getBusinessSettings } from '../publication-settings'
+import { renderBlock } from '../blocks'
+import type { BlockType, BlockStyleOptions, BlockData } from '../blocks'
 import type {
   AdModule,
   ModuleAd,
   AdBlockType,
   ModuleAdWithAdvertiser
 } from '@/types/database'
-
-/**
- * Styling options passed to block renderers
- */
-interface BlockStyleOptions {
-  primaryColor: string
-  headingFont: string
-  bodyFont: string
-}
 
 /**
  * Context for rendering (issue info for URL tracking)
@@ -38,181 +30,37 @@ interface RenderResult {
 /**
  * Ad Module Renderer
  * Renders ad modules with configurable block order
+ * Uses the global block library for rendering individual blocks
  */
 export class AdModuleRenderer {
   /**
-   * Render a title block
+   * Convert ad data to BlockData format for the global renderer
    */
-  private static renderTitleBlock(
-    title: string | undefined,
-    styles: BlockStyleOptions
-  ): string {
-    if (!title) return ''
-
-    return `
-        <tr>
-          <td style='padding: 10px 10px 4px; font-size: 20px; font-weight: bold; text-align: left; font-family: ${styles.headingFont};'>
-            ${title}
-          </td>
-        </tr>`
-  }
-
-  /**
-   * Render an image block with optional link
-   */
-  private static renderImageBlock(
-    imageUrl: string | undefined,
-    linkUrl: string,
-    title: string | undefined
-  ): string {
-    if (!imageUrl) return ''
-
-    const altText = title || 'Advertisement'
-    const imageTag = `<img src='${imageUrl}' alt='${altText}' style='max-width: 100%; max-height: 500px; border-radius: 4px; display: block; margin: 0 auto;'>`
-
-    if (linkUrl && linkUrl !== '#') {
-      return `
-        <tr>
-          <td style='padding: 0 12px; text-align: center;'>
-            <a href='${linkUrl}'>${imageTag}</a>
-          </td>
-        </tr>`
+  private static toBlockData(
+    ad: ModuleAd | ModuleAdWithAdvertiser,
+    trackingUrl: string
+  ): BlockData {
+    return {
+      title: ad.title,
+      body: ad.body,
+      image_url: ad.image_url,
+      button_text: ad.button_text,
+      button_url: ad.button_url,
+      trackingUrl
     }
-
-    return `
-        <tr>
-          <td style='padding: 0 12px; text-align: center;'>
-            ${imageTag}
-          </td>
-        </tr>`
   }
 
   /**
-   * Render a body block (HTML content)
-   * Processes content for email compatibility
+   * Render a single block using the global block registry
    */
-  private static renderBodyBlock(
-    body: string | undefined,
-    linkUrl: string,
-    styles: BlockStyleOptions
-  ): string {
-    if (!body) return ''
-
-    // Normalize HTML for email compatibility
-    let processedBody = normalizeEmailHtml(body)
-
-    // Make the last sentence a hyperlink if we have a valid URL
-    if (linkUrl && linkUrl !== '#' && processedBody) {
-      processedBody = this.addLastSentenceLink(processedBody, linkUrl)
-    }
-
-    return `
-        <tr>
-          <td style='padding: 0 10px 10px; font-family: ${styles.bodyFont}; font-size: 16px; line-height: 24px; color: #333;'>
-            ${processedBody}
-          </td>
-        </tr>`
-  }
-
-  /**
-   * Render a button/CTA block
-   */
-  private static renderButtonBlock(
-    buttonText: string | undefined,
-    buttonUrl: string,
-    styles: BlockStyleOptions
-  ): string {
-    if (!buttonUrl || buttonUrl === '#') return ''
-
-    const text = buttonText || 'Learn More'
-
-    return `
-        <tr>
-          <td style='padding: 10px; text-align: center;'>
-            <a href='${buttonUrl}' style='display: inline-block; padding: 12px 24px; background-color: ${styles.primaryColor}; color: #ffffff; text-decoration: none; border-radius: 6px; font-family: ${styles.headingFont}; font-weight: bold; font-size: 14px;'>
-              ${text}
-            </a>
-          </td>
-        </tr>`
-  }
-
-  /**
-   * Add hyperlink to the last sentence of body text
-   * Adapted from newsletter-templates.ts advertorial logic
-   */
-  private static addLastSentenceLink(body: string, linkUrl: string): string {
-    // Check for arrow CTA pattern (→ text)
-    const arrowPattern = /(→\s*)([^<\n→]+?)(\s*<\/p>|\s*<\/strong>|\s*$)/i
-    const arrowMatch = body.match(arrowPattern)
-
-    if (arrowMatch && arrowMatch[2].trim().length > 3) {
-      const arrow = arrowMatch[1]
-      const ctaText = arrowMatch[2].trim()
-      const afterCta = arrowMatch[3] || ''
-
-      return body.replace(
-        arrowPattern,
-        `<strong>${arrow}</strong><a href='${linkUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${ctaText}</a>${afterCta}`
-      )
-    }
-
-    // Strip HTML to get plain text for sentence detection
-    const plainText = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-
-    // Find sentence-ending punctuation
-    const sentenceEndPattern = /[.!?](?=\s+[A-Z]|$)/g
-    const matches = Array.from(plainText.matchAll(sentenceEndPattern))
-
-    if (matches.length > 0) {
-      const lastMatch = matches[matches.length - 1] as RegExpMatchArray
-      const lastPeriodIndex = lastMatch.index!
-
-      let startIndex = 0
-      if (matches.length > 1) {
-        const secondLastMatch = matches[matches.length - 2] as RegExpMatchArray
-        startIndex = secondLastMatch.index! + 1
-      }
-
-      const lastSentence = plainText.substring(startIndex, lastPeriodIndex + 1).trim()
-
-      if (lastSentence.length > 5) {
-        const escapedSentence = lastSentence.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        const parts = escapedSentence.split(/\s+/)
-        const flexiblePattern = parts.join('\\s*(?:<[^>]*>\\s*)*')
-        const sentenceRegex = new RegExp(flexiblePattern, 'i')
-
-        return body.replace(
-          sentenceRegex,
-          `<a href='${linkUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>$&</a>`
-        )
-      }
-    }
-
-    return body
-  }
-
-  /**
-   * Render a single block based on its type
-   */
-  private static renderBlock(
+  private static renderBlockFromRegistry(
     blockType: AdBlockType,
     ad: ModuleAd | ModuleAdWithAdvertiser,
-    linkUrl: string,
+    trackingUrl: string,
     styles: BlockStyleOptions
   ): string {
-    switch (blockType) {
-      case 'title':
-        return this.renderTitleBlock(ad.title, styles)
-      case 'image':
-        return this.renderImageBlock(ad.image_url, linkUrl, ad.title)
-      case 'body':
-        return this.renderBodyBlock(ad.body, linkUrl, styles)
-      case 'button':
-        return this.renderButtonBlock(ad.button_text, linkUrl, styles)
-      default:
-        console.warn(`[AdRenderer] Unknown block type: ${blockType}`)
-        return ''
-    }
+    const blockData = this.toBlockData(ad, trackingUrl)
+    return renderBlock(blockType as BlockType, blockData, styles)
   }
 
   /**
@@ -279,12 +127,12 @@ export class AdModuleRenderer {
         )
       : baseUrl
 
-    // Render each block in the configured order
+    // Render each block in the configured order using global block library
     const blockOrder = module.block_order as AdBlockType[]
     let blocksHtml = ''
 
     for (const blockType of blockOrder) {
-      blocksHtml += this.renderBlock(blockType, ad, trackedUrl, styles)
+      blocksHtml += this.renderBlockFromRegistry(blockType, ad, trackedUrl, styles)
     }
 
     // Wrap in section container
@@ -357,12 +205,12 @@ export class AdModuleRenderer {
     // Use the raw button URL without tracking for preview
     const linkUrl = ad.button_url || '#'
 
-    // Render blocks
+    // Render blocks using global block library
     const blockOrder = module.block_order as AdBlockType[]
     let blocksHtml = ''
 
     for (const blockType of blockOrder) {
-      blocksHtml += this.renderBlock(blockType, ad, linkUrl, styles)
+      blocksHtml += this.renderBlockFromRegistry(blockType, ad, linkUrl, styles)
     }
 
     return this.wrapInSection(module.name, blocksHtml, styles)
@@ -370,6 +218,7 @@ export class AdModuleRenderer {
 
   /**
    * Render an ad for the website archive (static HTML, no tracking needed)
+   * Uses the global block library for consistent rendering
    */
   static renderForArchive(
     moduleName: string,
@@ -384,23 +233,21 @@ export class AdModuleRenderer {
     styles: { primaryColor: string; headingFont: string; bodyFont: string }
   ): string {
     const linkUrl = ad.button_url || '#'
-    let blocksHtml = ''
 
+    // Convert to BlockData format
+    const blockData: BlockData = {
+      title: ad.title,
+      body: ad.body,
+      image_url: ad.image_url,
+      button_text: ad.button_text,
+      button_url: ad.button_url,
+      trackingUrl: linkUrl
+    }
+
+    // Render each block using the global registry
+    let blocksHtml = ''
     for (const blockType of blockOrder) {
-      switch (blockType) {
-        case 'title':
-          blocksHtml += this.renderTitleBlock(ad.title, styles)
-          break
-        case 'image':
-          blocksHtml += this.renderImageBlock(ad.image_url, linkUrl, ad.title)
-          break
-        case 'body':
-          blocksHtml += this.renderBodyBlock(ad.body, linkUrl, styles)
-          break
-        case 'button':
-          blocksHtml += this.renderButtonBlock(ad.button_text, linkUrl, styles)
-          break
-      }
+      blocksHtml += renderBlock(blockType as BlockType, blockData, styles)
     }
 
     return this.wrapInSection(moduleName, blocksHtml, styles)
