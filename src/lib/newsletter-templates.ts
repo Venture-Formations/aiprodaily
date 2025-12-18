@@ -913,19 +913,21 @@ export async function generateAdvertorialSection(issue: any, _recordUsage: boole
 // ==================== AD MODULES (DYNAMIC AD SECTIONS) ====================
 
 /**
- * Generate all ad module sections for an issue
+ * Generate ad module sections for an issue
  * Uses the block-based renderer for configurable ad layouts
+ * @param issue - The issue data
+ * @param moduleId - Optional: Generate only for a specific module (used for ordered rendering)
  */
-export async function generateAdModulesSection(issue: any): Promise<string> {
+export async function generateAdModulesSection(issue: any, moduleId?: string): Promise<string> {
   try {
-    console.log('Generating Ad Modules sections for issue:', issue?.id)
+    console.log('Generating Ad Modules sections for issue:', issue?.id, moduleId ? `(module: ${moduleId})` : '(all modules)')
 
     // Fetch colors from business settings
     const { primaryColor, headingFont, bodyFont, websiteUrl } = await fetchBusinessSettings(issue?.publication_id)
 
-    // Get all ad module selections for this issue
+    // Build query for ad module selections
     // Uses unified advertisements table
-    const { data: selections, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('issue_module_ads')
       .select(`
         selection_mode,
@@ -953,7 +955,13 @@ export async function generateAdModulesSection(issue: any): Promise<string> {
         )
       `)
       .eq('issue_id', issue.id)
-      .order('ad_module(display_order)', { ascending: true })
+
+    // Filter to specific module if provided
+    if (moduleId) {
+      query = query.eq('ad_module_id', moduleId)
+    }
+
+    const { data: selections, error } = await query.order('ad_module(display_order)', { ascending: true })
 
     if (error) {
       console.error('Error fetching ad module selections:', error)

@@ -153,7 +153,16 @@ async function generateNewsletterHtml(issue: any): Promise<string> {
       .eq('is_active', true)
       .order('display_order', { ascending: true })
 
+    // Fetch ad modules for this publication
+    const { data: adModules } = await supabaseAdmin
+      .from('ad_modules')
+      .select('*')
+      .eq('publication_id', issue.publication_id)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+
     console.log('Active newsletter sections:', sections?.map(s => `${s.name} (order: ${s.display_order})`).join(', '))
+    console.log('Active ad modules:', adModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
 
     const formatDate = (dateString: string) => {
       try {
@@ -198,10 +207,28 @@ async function generateNewsletterHtml(issue: any): Promise<string> {
       ADVERTISEMENT: 'c0bc7173-de47-41b2-a260-77f55525ee3d'
     }
 
-    // Generate sections in order based on database configuration
+    // Merge newsletter sections and ad modules into a single sorted list
+    type SectionItem = { type: 'section'; data: any } | { type: 'ad_module'; data: any }
+    const allItems: SectionItem[] = [
+      ...(sections || []).map(s => ({ type: 'section' as const, data: s })),
+      ...(adModules || []).map(m => ({ type: 'ad_module' as const, data: m }))
+    ].sort((a, b) => (a.data.display_order || 999) - (b.data.display_order || 999))
+
+    console.log('Combined section order:', allItems.map(item =>
+      `${item.data.name} (${item.type}, order: ${item.data.display_order})`
+    ).join(', '))
+
+    // Generate sections in order based on merged configuration
     let sectionsHtml = ''
-    if (sections && sections.length > 0) {
-      for (const section of sections) {
+    for (const item of allItems) {
+      if (item.type === 'ad_module') {
+        // Generate single ad module section
+        const adModuleHtml = await generateAdModulesSection(issue, item.data.id)
+        if (adModuleHtml) {
+          sectionsHtml += adModuleHtml
+        }
+      } else {
+        const section = item.data
         // Check section_type to determine what to render
         if (section.section_type === 'primary_articles' && activeArticles.length > 0) {
           const primaryHtml = await generatePrimaryArticlesSection(activeArticles, issue.date, issue.id, section.name, issue.publication_id, issue.mailerlite_issue_id)
@@ -248,20 +275,10 @@ async function generateNewsletterHtml(issue: any): Promise<string> {
           }
         }
       }
-    } else {
-      // Fallback to default order if no sections configured
-      console.log('No sections found, using default order')
-      sectionsHtml = ''
-    }
-
-    // Generate ad modules sections (new dynamic ad sections system)
-    const adModulesHtml = await generateAdModulesSection(issue)
-    if (adModulesHtml) {
-      console.log('Ad modules HTML generated, length:', adModulesHtml.length)
     }
 
     // Combine all sections (welcome section goes after header, before all other sections)
-    const html = header + welcomeHtml + sectionsHtml + adModulesHtml + footer
+    const html = header + welcomeHtml + sectionsHtml + footer
 
     console.log('HTML template generated successfully, length:', html.length)
     return html
