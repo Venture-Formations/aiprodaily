@@ -192,6 +192,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
   const [cooldownDays, setCooldownDays] = useState(7)
   const [showAddModal, setShowAddModal] = useState(false)
   const [newModuleName, setNewModuleName] = useState('')
+  const [newSectionType, setNewSectionType] = useState<'ad' | 'standard'>('ad')
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -387,29 +388,51 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     }
   }
 
-  const handleAddModule = async () => {
+  const handleAddSection = async () => {
     if (!newModuleName.trim() || !publicationId) return
 
     setSaving(true)
     try {
-      const res = await fetch('/api/ad-modules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          publication_id: publicationId,
-          name: newModuleName.trim()
+      if (newSectionType === 'ad') {
+        // Create ad module
+        const res = await fetch('/api/ad-modules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            publication_id: publicationId,
+            name: newModuleName.trim()
+          })
         })
-      })
 
-      if (res.ok) {
-        const data = await res.json()
-        setAdModules(prev => [...prev, data.module])
-        setSelectedItem({ type: 'ad_module', data: data.module })
-        setShowAddModal(false)
-        setNewModuleName('')
+        if (res.ok) {
+          const data = await res.json()
+          setAdModules(prev => [...prev, data.module])
+          setSelectedItem({ type: 'ad_module', data: data.module })
+        }
+      } else {
+        // Create standard section
+        const res = await fetch('/api/settings/newsletter-sections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: newModuleName.trim(),
+            display_order: allItems.length + 1,
+            is_active: true
+          })
+        })
+
+        if (res.ok) {
+          const data = await res.json()
+          setSections(prev => [...prev, data.section])
+          setSelectedItem({ type: 'section', data: data.section })
+        }
       }
+
+      setShowAddModal(false)
+      setNewModuleName('')
+      setNewSectionType('ad')
     } catch (error) {
-      console.error('Failed to add module:', error)
+      console.error('Failed to add section:', error)
     } finally {
       setSaving(false)
     }
@@ -584,31 +607,69 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
         )}
       </div>
 
-      {/* Add Module Modal */}
+      {/* Add Section Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96">
             <h3 className="text-lg font-semibold mb-4">Add New Section</h3>
-            <input
-              type="text"
-              value={newModuleName}
-              onChange={(e) => setNewModuleName(e.target.value)}
-              placeholder="Section name (e.g., Sidebar Sponsor)"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              autoFocus
-            />
-            <div className="flex justify-end gap-3 mt-4">
+
+            {/* Section Type Selector */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Section Type</label>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setNewSectionType('ad')}
+                  className={`flex-1 px-4 py-3 rounded-lg border-2 transition-colors ${
+                    newSectionType === 'ad'
+                      ? 'border-purple-500 bg-purple-50 text-purple-700'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                  }`}
+                >
+                  <div className="font-medium">Ad Section</div>
+                  <div className="text-xs mt-1 opacity-75">Configurable ad placement</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewSectionType('standard')}
+                  className={`flex-1 px-4 py-3 rounded-lg border-2 transition-colors ${
+                    newSectionType === 'standard'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                  }`}
+                >
+                  <div className="font-medium">Standard</div>
+                  <div className="text-xs mt-1 opacity-75">Content section</div>
+                </button>
+              </div>
+            </div>
+
+            {/* Section Name Input */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Section Name</label>
+              <input
+                type="text"
+                value={newModuleName}
+                onChange={(e) => setNewModuleName(e.target.value)}
+                placeholder={newSectionType === 'ad' ? "e.g., Sidebar Sponsor" : "e.g., Featured Content"}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowAddModal(false)
                   setNewModuleName('')
+                  setNewSectionType('ad')
                 }}
                 className="px-4 py-2 text-gray-600 hover:text-gray-800"
               >
                 Cancel
               </button>
               <button
-                onClick={handleAddModule}
+                onClick={handleAddSection}
                 disabled={!newModuleName.trim() || saving}
                 className={`px-4 py-2 rounded-lg ${
                   newModuleName.trim() && !saving
