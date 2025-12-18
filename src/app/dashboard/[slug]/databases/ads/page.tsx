@@ -977,7 +977,7 @@ function AddAdModal({ onClose, onSuccess, publicationId, selectedSection, sectio
           advertiser_id: advertiserId,
           company_name: companyName,
           ad_module_id: selectedSection === 'legacy' ? null : selectedSection, // Link to ad module
-          ad_type: selectedSection // Store section ID (or 'legacy') - names may change
+          ad_type: selectedSection === 'legacy' ? 'c0bc7173-de47-41b2-a260-77f55525ee3d' : selectedSection // Store section ID from newsletter_sections
         })
       })
 
