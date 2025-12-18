@@ -294,14 +294,19 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
 
     if (oldIndex === -1 || newIndex === -1) return
 
-    // Reorder local state
+    // Reorder local state - assign display_order based on position in combined list
     const reorderedItems = arrayMove(allItems, oldIndex, newIndex)
-    const newSections = reorderedItems
-      .filter((item): item is { type: 'section'; data: NewsletterSection } => item.type === 'section')
-      .map((item, idx) => ({ ...item.data, display_order: idx + 1 }))
-    const newModules = reorderedItems
-      .filter((item): item is { type: 'ad_module'; data: AdModule } => item.type === 'ad_module')
-      .map((item, idx) => ({ ...item.data, display_order: idx + 1 }))
+    const newSections: NewsletterSection[] = []
+    const newModules: AdModule[] = []
+
+    reorderedItems.forEach((item, idx) => {
+      const newOrder = idx + 1
+      if (item.type === 'section') {
+        newSections.push({ ...item.data, display_order: newOrder })
+      } else {
+        newModules.push({ ...item.data, display_order: newOrder })
+      }
+    })
 
     setSections(newSections)
     setAdModules(newModules)
