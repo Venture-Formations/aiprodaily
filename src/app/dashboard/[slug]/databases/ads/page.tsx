@@ -588,7 +588,13 @@ export default function AdsManagementPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 pt-4 border-t text-sm">
+                  <div className="grid grid-cols-3 gap-4 pt-4 border-t text-sm">
+                    <div>
+                      <span className="font-medium">Company:</span>
+                      <p className="text-gray-600 truncate" title={ad.advertiser?.company_name || ad.company_name || ''}>
+                        {ad.advertiser?.company_name || ad.company_name || '—'}
+                      </p>
+                    </div>
                     <div>
                       <span className="font-medium">URL:</span>
                       <p className="text-gray-600 truncate" title={ad.button_url}>{ad.button_url}</p>
@@ -670,17 +676,21 @@ export default function AdsManagementPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 pt-4 border-t text-sm">
+                  <div className="grid grid-cols-3 gap-4 pt-4 border-t text-sm">
+                    <div>
+                      <span className="font-medium">Company:</span>
+                      <p className="text-gray-600 truncate" title={ad.advertiser?.company_name || ad.company_name || ''}>
+                        {ad.advertiser?.company_name || ad.company_name || '—'}
+                      </p>
+                    </div>
                     <div>
                       <span className="font-medium">URL:</span>
                       <p className="text-gray-600 truncate" title={ad.button_url}>{ad.button_url}</p>
                     </div>
-                    {ad.image_url && (
-                      <div>
-                        <span className="font-medium">Has Image:</span>
-                        <p className="text-gray-600">Yes</p>
-                      </div>
-                    )}
+                    <div>
+                      <span className="font-medium">Has Image:</span>
+                      <p className="text-gray-600">{ad.image_url ? 'Yes' : 'No'}</p>
+                    </div>
                   </div>
                 </div>
               ))
@@ -757,7 +767,13 @@ export default function AdsManagementPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 pt-4 border-t text-sm">
+                  <div className="grid grid-cols-3 gap-4 pt-4 border-t text-sm">
+                    <div>
+                      <span className="font-medium">Company:</span>
+                      <p className="text-gray-600 truncate" title={ad.advertiser?.company_name || ad.company_name || ''}>
+                        {ad.advertiser?.company_name || ad.company_name || '—'}
+                      </p>
+                    </div>
                     <div>
                       <span className="font-medium">URL:</span>
                       <p className="text-gray-600 truncate" title={ad.button_url}>{ad.button_url}</p>
