@@ -977,7 +977,7 @@ function AddAdModal({ onClose, onSuccess, publicationId, selectedSection, sectio
           advertiser_id: advertiserId,
           company_name: companyName,
           ad_module_id: selectedSection === 'legacy' ? null : selectedSection, // Link to ad module
-          ad_type: sectionName // Label the ad with section name
+          ad_type: selectedSection // Store section ID (or 'legacy') - names may change
         })
       })
 
