@@ -17,10 +17,10 @@ interface AdWithRelations extends Advertisement {
 
 export default function AdsManagementPage() {
   const pathname = usePathname()
-  const [activeTab, setActiveTab] = useState<'active' | 'inactive' | 'review'>('active')
+  const [activeStatusTab, setActiveStatusTab] = useState<'active' | 'inactive' | 'review'>('active')
   const [ads, setAds] = useState<AdWithRelations[]>([])
   const [adModules, setAdModules] = useState<AdModule[]>([])
-  const [selectedModuleId, setSelectedModuleId] = useState<string>('all')
+  const [selectedSection, setSelectedSection] = useState<string>('legacy') // 'legacy' or ad_module_id
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingAd, setEditingAd] = useState<AdWithRelations | null>(null)
@@ -75,10 +75,10 @@ export default function AdsManagementPage() {
 
   useEffect(() => {
     fetchAds()
-    if (activeTab === 'active') {
+    if (activeStatusTab === 'active') {
       fetchNextAdPosition()
     }
-  }, [activeTab, selectedModuleId])
+  }, [activeStatusTab, selectedSection])
 
   const fetchNextAdPosition = async () => {
     try {
@@ -100,18 +100,16 @@ export default function AdsManagementPage() {
     try {
       const params = new URLSearchParams()
 
-      if (activeTab === 'active') {
+      if (activeStatusTab === 'active') {
         params.set('status', 'active')
-      } else if (activeTab === 'inactive') {
+      } else if (activeStatusTab === 'inactive') {
         params.set('status', 'rejected,completed')
-      } else if (activeTab === 'review') {
+      } else if (activeStatusTab === 'review') {
         params.set('status', 'pending_review')
       }
 
-      // Add module filter
-      if (selectedModuleId !== 'all') {
-        params.set('ad_module_id', selectedModuleId)
-      }
+      // Add section filter (always filter by section now)
+      params.set('ad_module_id', selectedSection)
 
       const response = await fetch(`/api/ads?${params.toString()}`)
       if (response.ok) {
@@ -119,7 +117,7 @@ export default function AdsManagementPage() {
         let fetchedAds = data.ads || []
 
         // Sort active ads by display_order (show all, even without display_order)
-        if (activeTab === 'active') {
+        if (activeStatusTab === 'active') {
           fetchedAds = fetchedAds.sort((a: Advertisement, b: Advertisement) => {
             // Ads with display_order come first, sorted by their order
             if (a.display_order !== null && b.display_order !== null) {
@@ -379,11 +377,11 @@ export default function AdsManagementPage() {
                 Advertisement Management
               </h1>
               <p className="text-gray-600 mt-1">
-                {ads.length} {activeTab} {ads.length === 1 ? 'advertisement' : 'advertisements'}
+                {ads.length} {activeStatusTab} {ads.length === 1 ? 'advertisement' : 'advertisements'}
               </p>
             </div>
             <div className="flex gap-3">
-              {activeTab === 'active' && (
+              {activeStatusTab === 'active' && (
                 <button
                   onClick={handleResetOrder}
                   className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
@@ -401,88 +399,71 @@ export default function AdsManagementPage() {
           </div>
         </div>
 
-        {/* Module Filter */}
-        {adModules.length > 0 && (
-          <div className="mb-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center gap-4">
-              <label className="text-sm font-medium text-gray-700">Filter by Section:</label>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setSelectedModuleId('all')}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                    selectedModuleId === 'all'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  All Ads
-                </button>
-                <button
-                  onClick={() => setSelectedModuleId('legacy')}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                    selectedModuleId === 'legacy'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  Legacy Advertorial
-                </button>
-                {adModules.map(module => (
-                  <button
-                    key={module.id}
-                    onClick={() => setSelectedModuleId(module.id)}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                      selectedModuleId === module.id
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-white border border-purple-300 text-purple-700 hover:bg-purple-50'
-                    }`}
-                  >
-                    {module.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tabs */}
-        <div className="border-b border-gray-200 mb-6">
-          <nav className="-mb-px flex space-x-8">
+        {/* Section Tabs - Primary Navigation */}
+        <div className="border-b border-gray-200 mb-4">
+          <nav className="-mb-px flex space-x-1 overflow-x-auto">
             <button
-              onClick={() => setActiveTab('active')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'active'
-                  ? 'border-blue-500 text-blue-600'
+              onClick={() => setSelectedSection('legacy')}
+              className={`py-3 px-4 border-b-2 font-medium text-sm whitespace-nowrap ${
+                selectedSection === 'legacy'
+                  ? 'border-blue-500 text-blue-600 bg-blue-50'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Active Ads (Ordered)
+              Legacy Advertorial
             </button>
-            <button
-              onClick={() => setActiveTab('review')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'review'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Review Submissions
-            </button>
-            <button
-              onClick={() => setActiveTab('inactive')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'inactive'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Inactive & Rejected
-            </button>
+            {adModules.map(module => (
+              <button
+                key={module.id}
+                onClick={() => setSelectedSection(module.id)}
+                className={`py-3 px-4 border-b-2 font-medium text-sm whitespace-nowrap ${
+                  selectedSection === module.id
+                    ? 'border-purple-500 text-purple-600 bg-purple-50'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                {module.name}
+              </button>
+            ))}
           </nav>
         </div>
 
+        {/* Status Tabs - Secondary Navigation */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setActiveStatusTab('active')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeStatusTab === 'active'
+                ? 'bg-green-100 text-green-800 border border-green-300'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Active
+          </button>
+          <button
+            onClick={() => setActiveStatusTab('review')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeStatusTab === 'review'
+                ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Review
+          </button>
+          <button
+            onClick={() => setActiveStatusTab('inactive')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeStatusTab === 'inactive'
+                ? 'bg-gray-200 text-gray-800 border border-gray-400'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Inactive
+          </button>
+        </div>
+
         {/* Next Ad Position Indicator (Active Tab Only) */}
-        {activeTab === 'active' && !loading && ads.length > 0 && (
+        {activeStatusTab === 'active' && !loading && ads.length > 0 && (
           <div className="mb-4 bg-purple-50 border border-purple-200 rounded-lg p-4">
             <p className="text-sm text-purple-800">
               <strong>Next ad in rotation:</strong> Position {nextAdPosition}
@@ -503,7 +484,7 @@ export default function AdsManagementPage() {
         )}
 
         {/* Active Ads List (Drag & Drop) */}
-        {!loading && activeTab === 'active' && (
+        {!loading && activeStatusTab === 'active' && (
           <div className="space-y-4">
             {ads.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-lg shadow">
@@ -613,7 +594,7 @@ export default function AdsManagementPage() {
         )}
 
         {/* Review Ads List */}
-        {!loading && activeTab === 'review' && (
+        {!loading && activeStatusTab === 'review' && (
           <div className="space-y-4">
             {ads.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-lg shadow">
@@ -699,7 +680,7 @@ export default function AdsManagementPage() {
         )}
 
         {/* Inactive & Rejected Ads List */}
-        {!loading && activeTab === 'inactive' && (
+        {!loading && activeStatusTab === 'inactive' && (
           <div className="space-y-4">
             {ads.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-lg shadow">
@@ -800,6 +781,8 @@ export default function AdsManagementPage() {
               fetchAds()
             }}
             publicationId={publicationId}
+            selectedSection={selectedSection}
+            sectionName={selectedSection === 'legacy' ? 'Legacy Advertorial' : adModules.find(m => m.id === selectedSection)?.name || 'Ad'}
           />
         )}
 
@@ -829,7 +812,13 @@ export default function AdsManagementPage() {
 }
 
 // Add Advertisement Modal Component (Simplified - No frequency/payment fields)
-function AddAdModal({ onClose, onSuccess, publicationId }: { onClose: () => void; onSuccess: () => void; publicationId: string | null }) {
+function AddAdModal({ onClose, onSuccess, publicationId, selectedSection, sectionName }: {
+  onClose: () => void
+  onSuccess: () => void
+  publicationId: string | null
+  selectedSection: string  // 'legacy' or ad_module_id
+  sectionName: string
+}) {
   const [formData, setFormData] = useState({
     title: '',
     body: '',
@@ -958,7 +947,9 @@ function AddAdModal({ onClose, onSuccess, publicationId }: { onClose: () => void
           status: 'active', // Admin-created ads go directly to active status
           useInNextNewsletter: useInNextNewsletter, // Flag for special positioning
           advertiser_id: advertiserId,
-          company_name: companyName
+          company_name: companyName,
+          ad_module_id: selectedSection === 'legacy' ? null : selectedSection, // Link to ad module
+          ad_type: sectionName // Label the ad with section name
         })
       })
 
@@ -987,7 +978,7 @@ function AddAdModal({ onClose, onSuccess, publicationId }: { onClose: () => void
       <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200">
           <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold">Add Advertisement</h2>
+            <h2 className="text-2xl font-bold">Add Advertisement - {sectionName}</h2>
             <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl">
               ×
             </button>

@@ -189,7 +189,9 @@ export async function POST(request: NextRequest) {
         publication_id: newsletterId, // Associate ad with newsletter
         ad_module_id: body.ad_module_id || null, // Optional ad module assignment
         advertiser_id: body.advertiser_id || null, // Optional advertiser assignment
-        priority: body.priority || 0 // Priority for selection mode
+        priority: body.priority || 0, // Priority for selection mode
+        ad_type: body.ad_type || null, // Section type label
+        company_name: body.company_name || null // Company name
       })
       .select()
       .single()
