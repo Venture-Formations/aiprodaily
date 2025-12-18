@@ -783,6 +783,7 @@ export default function AdsManagementPage() {
               setShowAddModal(false)
               fetchAds()
             }}
+            publicationId={publicationId}
           />
         )}
 
@@ -795,6 +796,7 @@ export default function AdsManagementPage() {
               setEditingAd(null)
               fetchAds()
             }}
+            publicationId={publicationId}
           />
         )}
 
@@ -811,7 +813,7 @@ export default function AdsManagementPage() {
 }
 
 // Add Advertisement Modal Component (Simplified - No frequency/payment fields)
-function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+function AddAdModal({ onClose, onSuccess, publicationId }: { onClose: () => void; onSuccess: () => void; publicationId: string | null }) {
   const [formData, setFormData] = useState({
     title: '',
     body: '',
@@ -824,6 +826,26 @@ function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
   const imgRef = useRef<HTMLImageElement>(null)
   const [submitting, setSubmitting] = useState(false)
   const [useInNextNewsletter, setUseInNextNewsletter] = useState(false)
+
+  // Company/Advertiser state
+  const [advertisers, setAdvertisers] = useState<Array<{ id: string; company_name: string }>>([])
+  const [selectedAdvertiserId, setSelectedAdvertiserId] = useState<string>('')
+  const [newCompanyName, setNewCompanyName] = useState('')
+  const [companyMode, setCompanyMode] = useState<'existing' | 'new'>('new')
+
+  // Fetch existing advertisers
+  useEffect(() => {
+    if (publicationId) {
+      fetch(`/api/advertisers?publication_id=${publicationId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.advertisers) {
+            setAdvertisers(data.advertisers)
+          }
+        })
+        .catch(err => console.error('Failed to fetch advertisers:', err))
+    }
+  }, [publicationId])
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -873,6 +895,35 @@ function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
         }
       }
 
+      // Handle company/advertiser
+      let advertiserId = null
+      let companyName = ''
+
+      if (companyMode === 'existing' && selectedAdvertiserId) {
+        advertiserId = selectedAdvertiserId
+        const selectedAd = advertisers.find(a => a.id === selectedAdvertiserId)
+        companyName = selectedAd?.company_name || ''
+      } else if (companyMode === 'new' && newCompanyName.trim()) {
+        // Create new advertiser
+        const advertiserResponse = await fetch('/api/advertisers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            publication_id: publicationId,
+            company_name: newCompanyName.trim()
+          })
+        })
+
+        if (advertiserResponse.ok) {
+          const advertiserData = await advertiserResponse.json()
+          advertiserId = advertiserData.advertiser.id
+          companyName = newCompanyName.trim()
+        } else {
+          console.warn('Failed to create advertiser, continuing without')
+          companyName = newCompanyName.trim()
+        }
+      }
+
       // Calculate word count
       const text = formData.body.replace(/<[^>]*>/g, '').trim()
       const words = text.split(/\s+/).filter(w => w.length > 0)
@@ -889,7 +940,9 @@ function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
           payment_status: 'manual',
           paid: true,
           status: 'active', // Admin-created ads go directly to active status
-          useInNextNewsletter: useInNextNewsletter // Flag for special positioning
+          useInNextNewsletter: useInNextNewsletter, // Flag for special positioning
+          advertiser_id: advertiserId,
+          company_name: companyName
         })
       })
 
@@ -941,15 +994,76 @@ function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
             />
           </div>
 
+          {/* Company/Advertiser */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Company
+            </label>
+            <div className="space-y-3">
+              {/* Mode toggle */}
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="companyMode"
+                    checked={companyMode === 'new'}
+                    onChange={() => setCompanyMode('new')}
+                    className="text-blue-600"
+                  />
+                  <span className="text-sm text-gray-700">New Company</span>
+                </label>
+                {advertisers.length > 0 && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="companyMode"
+                      checked={companyMode === 'existing'}
+                      onChange={() => setCompanyMode('existing')}
+                      className="text-blue-600"
+                    />
+                    <span className="text-sm text-gray-700">Existing Company</span>
+                  </label>
+                )}
+              </div>
+
+              {/* New company input */}
+              {companyMode === 'new' && (
+                <input
+                  type="text"
+                  value={newCompanyName}
+                  onChange={(e) => setNewCompanyName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="Enter company name"
+                />
+              )}
+
+              {/* Existing company dropdown */}
+              {companyMode === 'existing' && advertisers.length > 0 && (
+                <select
+                  value={selectedAdvertiserId}
+                  onChange={(e) => setSelectedAdvertiserId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                >
+                  <option value="">Select a company...</option>
+                  {advertisers.map(adv => (
+                    <option key={adv.id} value={adv.id}>
+                      {adv.company_name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          </div>
+
           {/* Body */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Ad Content * (max 100 words)
+              Ad Content *
             </label>
             <RichTextEditor
               value={formData.body}
               onChange={(html) => setFormData(prev => ({ ...prev, body: html }))}
-              maxWords={100}
+              maxWords={10000}
             />
           </div>
 
@@ -1059,7 +1173,7 @@ function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
 }
 
 // Edit Advertisement Modal Component
-function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: () => void; onSuccess: () => void }) {
+function EditAdModal({ ad, onClose, onSuccess, publicationId }: { ad: AdWithRelations; onClose: () => void; onSuccess: () => void; publicationId: string | null }) {
   const [formData, setFormData] = useState({
     title: ad.title,
     body: ad.body,
@@ -1072,6 +1186,34 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
+
+  // Company/Advertiser state
+  const [advertisers, setAdvertisers] = useState<Array<{ id: string; company_name: string }>>([])
+  const [selectedAdvertiserId, setSelectedAdvertiserId] = useState<string>(ad.advertiser_id || '')
+  const [newCompanyName, setNewCompanyName] = useState('')
+  const [companyMode, setCompanyMode] = useState<'existing' | 'new'>(ad.advertiser_id ? 'existing' : 'new')
+
+  // Fetch existing advertisers
+  useEffect(() => {
+    if (publicationId) {
+      fetch(`/api/advertisers?publication_id=${publicationId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.advertisers) {
+            setAdvertisers(data.advertisers)
+          }
+        })
+        .catch(err => console.error('Failed to fetch advertisers:', err))
+    }
+  }, [publicationId])
+
+  // Initialize company name if editing existing ad
+  useEffect(() => {
+    if (!ad.advertiser_id && ad.company_name) {
+      setNewCompanyName(ad.company_name)
+      setCompanyMode('new')
+    }
+  }, [ad])
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -1121,6 +1263,41 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
         }
       }
 
+      // Handle company/advertiser
+      let advertiserId = ad.advertiser_id
+      let companyName = ad.company_name || ''
+
+      if (companyMode === 'existing' && selectedAdvertiserId) {
+        advertiserId = selectedAdvertiserId
+        const selectedAdv = advertisers.find(a => a.id === selectedAdvertiserId)
+        companyName = selectedAdv?.company_name || ''
+      } else if (companyMode === 'new' && newCompanyName.trim()) {
+        // Check if this is a new company name different from existing
+        if (!ad.advertiser_id || newCompanyName.trim() !== ad.company_name) {
+          // Create new advertiser
+          const advertiserResponse = await fetch('/api/advertisers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              publication_id: publicationId,
+              company_name: newCompanyName.trim()
+            })
+          })
+
+          if (advertiserResponse.ok) {
+            const advertiserData = await advertiserResponse.json()
+            advertiserId = advertiserData.advertiser.id
+            companyName = newCompanyName.trim()
+          } else {
+            console.warn('Failed to create advertiser, continuing without')
+            advertiserId = null
+            companyName = newCompanyName.trim()
+          }
+        } else {
+          companyName = newCompanyName.trim()
+        }
+      }
+
       // Log what we're sending to help debug
       console.log('[EditAdModal] Sending update:', {
         id: ad.id,
@@ -1128,7 +1305,9 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
         body: formData.body?.substring(0, 100) + '...', // Truncate for logging
         button_url: formData.button_url,
         status: formData.status,
-        image_url: imageUrl
+        image_url: imageUrl,
+        advertiser_id: advertiserId,
+        company_name: companyName
       })
 
       const response = await fetch(`/api/ads/${ad.id}`, {
@@ -1136,7 +1315,9 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          image_url: imageUrl
+          image_url: imageUrl,
+          advertiser_id: advertiserId,
+          company_name: companyName
         })
       })
 
@@ -1193,15 +1374,88 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
             />
           </div>
 
+          {/* Company/Advertiser */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Company
+            </label>
+            <div className="space-y-3">
+              {/* Current company display */}
+              {ad.advertiser?.company_name && (
+                <p className="text-sm text-gray-600">
+                  Current: <span className="font-medium">{ad.advertiser.company_name}</span>
+                </p>
+              )}
+              {!ad.advertiser?.company_name && ad.company_name && (
+                <p className="text-sm text-gray-600">
+                  Current: <span className="font-medium">{ad.company_name}</span>
+                </p>
+              )}
+
+              {/* Mode toggle */}
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="editCompanyMode"
+                    checked={companyMode === 'new'}
+                    onChange={() => setCompanyMode('new')}
+                    className="text-blue-600"
+                  />
+                  <span className="text-sm text-gray-700">{ad.advertiser_id || ad.company_name ? 'Change Company' : 'New Company'}</span>
+                </label>
+                {advertisers.length > 0 && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="editCompanyMode"
+                      checked={companyMode === 'existing'}
+                      onChange={() => setCompanyMode('existing')}
+                      className="text-blue-600"
+                    />
+                    <span className="text-sm text-gray-700">Select Existing</span>
+                  </label>
+                )}
+              </div>
+
+              {/* New company input */}
+              {companyMode === 'new' && (
+                <input
+                  type="text"
+                  value={newCompanyName}
+                  onChange={(e) => setNewCompanyName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="Enter company name"
+                />
+              )}
+
+              {/* Existing company dropdown */}
+              {companyMode === 'existing' && advertisers.length > 0 && (
+                <select
+                  value={selectedAdvertiserId}
+                  onChange={(e) => setSelectedAdvertiserId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                >
+                  <option value="">Select a company...</option>
+                  {advertisers.map(adv => (
+                    <option key={adv.id} value={adv.id}>
+                      {adv.company_name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          </div>
+
           {/* Body */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Ad Content * (max 100 words)
+              Ad Content *
             </label>
             <RichTextEditor
               value={formData.body}
               onChange={(html) => setFormData(prev => ({ ...prev, body: html }))}
-              maxWords={100}
+              maxWords={10000}
             />
           </div>
 
