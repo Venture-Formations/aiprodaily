@@ -121,6 +121,66 @@ function SortableSectionItem({
   )
 }
 
+// Section settings component for regular newsletter sections
+function SectionSettings({
+  section,
+  onUpdate,
+  saving
+}: {
+  section: NewsletterSection
+  onUpdate: (updates: Partial<NewsletterSection>) => Promise<void>
+  saving: boolean
+}) {
+  const [localName, setLocalName] = useState(section.name)
+
+  // Update local state when section changes
+  useEffect(() => {
+    setLocalName(section.name)
+  }, [section.name])
+
+  const handleNameChange = async (newName: string) => {
+    if (newName.trim() && newName !== section.name) {
+      await onUpdate({ name: newName.trim() })
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Section Name */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Section Name</label>
+        <input
+          type="text"
+          value={localName}
+          onChange={(e) => setLocalName(e.target.value)}
+          onBlur={(e) => handleNameChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleNameChange(localName)
+              ;(e.target as HTMLInputElement).blur()
+            }
+          }}
+          disabled={saving}
+          className="w-full text-xl font-semibold text-gray-900 bg-transparent border-b-2 border-transparent hover:border-gray-200 focus:border-blue-500 focus:outline-none transition-colors px-1 py-1"
+        />
+      </div>
+
+      {/* Section Type Info */}
+      <div className="p-4 bg-gray-50 rounded-lg">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-sm font-medium text-gray-700">Section Type:</span>
+          <span className="text-sm px-2 py-0.5 bg-gray-200 text-gray-700 rounded-full capitalize">
+            {section.section_type || 'Standard'}
+          </span>
+        </div>
+        <p className="text-sm text-gray-500">
+          This is a standard newsletter section. Use the toggle in the section list to enable or disable it.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 export default function SectionsPanel({ publicationId: propPublicationId }: SectionsPanelProps) {
   const pathname = usePathname()
   const [publicationId, setPublicationId] = useState<string | null>(propPublicationId || null)
@@ -404,6 +464,41 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     }
   }
 
+  const handleUpdateSection = async (updates: Partial<NewsletterSection>) => {
+    if (!selectedItem || selectedItem.type !== 'section') return
+
+    const sectionId = selectedItem.data.id
+    setSaving(true)
+    try {
+      const res = await fetch('/api/settings/newsletter-sections', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          section_id: sectionId,
+          ...updates
+        })
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        // Update local state
+        setSections(prev => prev.map(s =>
+          s.id === sectionId ? { ...s, ...updates } : s
+        ))
+        setSelectedItem({
+          type: 'section',
+          data: { ...selectedItem.data, ...updates } as NewsletterSection
+        })
+      } else {
+        throw new Error('Failed to update section')
+      }
+    } catch (error) {
+      console.error('Failed to update section:', error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -425,7 +520,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Add Ad Section
+            Add Section
           </button>
         </div>
 
@@ -473,17 +568,11 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           ) : selectedItem.type === 'ad_module' ? (
             <div className="text-gray-500">Loading publication...</div>
           ) : (
-            <div className="space-y-6">
-              <h2 className="text-xl font-semibold text-gray-900">{selectedItem.data.name}</h2>
-              <p className="text-gray-500">
-                This is a standard newsletter section. Settings for standard sections are managed through the existing section configuration.
-              </p>
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm text-blue-700">
-                  To add detailed settings for this section type, convert it to an ad module or configure it through the section-specific settings.
-                </p>
-              </div>
-            </div>
+            <SectionSettings
+              section={selectedItem.data}
+              onUpdate={handleUpdateSection}
+              saving={saving}
+            />
           )
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-gray-400">
@@ -499,7 +588,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96">
-            <h3 className="text-lg font-semibold mb-4">Add New Ad Section</h3>
+            <h3 className="text-lg font-semibold mb-4">Add New Section</h3>
             <input
               type="text"
               value={newModuleName}

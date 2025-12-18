@@ -421,90 +421,12 @@ function NewsletterSettings() {
 
   return (
     <div className="space-y-6">
-      {/* Section Order Management */}
-      <div className="bg-white shadow rounded-lg p-6">
-        <div className="flex justify-between items-start mb-4">
-          <div className="flex-1">
-            <h3 className="text-lg font-medium text-gray-900">Publication Section Order</h3>
-            <p className="text-sm text-gray-600 mt-1">
-              Drag sections to reorder them in the publication. Toggle sections on/off to control what appears.
-            </p>
-          </div>
-          {sections.length < 6 && (
-            <button
-              onClick={runMigration}
-              disabled={migrating}
-              className={`ml-4 px-4 py-2 text-sm font-medium rounded-md border ${
-                migrating
-                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                  : 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
-              }`}
-            >
-              {migrating ? 'Adding Sections...' : 'Add Missing Sections'}
-            </button>
-          )}
-        </div>
-
-        {sections.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <p>No newsletter sections found.</p>
-            <p className="text-sm mt-1">Sections are created automatically when features are enabled.</p>
-          </div>
-        ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="space-y-3">
-              <SortableContext
-                items={sections.map(section => section.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                {sections
-                  .sort((a, b) => a.display_order - b.display_order)
-                  .map((section) => (
-                    <SortableSection
-                      key={section.id}
-                      section={section}
-                      toggleSection={toggleSection}
-                      saving={saving}
-                      onEditName={handleEditName}
-                    />
-                  ))}
-              </SortableContext>
-            </div>
-          </DndContext>
-        )}
-
-        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h4 className="font-medium text-blue-900 mb-3">Publication Section Information</h4>
-          <div className="text-sm text-blue-800 space-y-2">
-            <div className="space-y-2 mb-3">
-              <p><strong>Manage Your Publication Sections:</strong></p>
-              <ul className="list-disc list-inside space-y-1 ml-2">
-                <li><strong>Drag & Drop:</strong> Reorder sections to change how they appear in your publication</li>
-                <li><strong>Toggle On/Off:</strong> Use the switch to activate or deactivate sections</li>
-                <li><strong>Edit Names:</strong> Click "Edit name" to customize section titles for your audience</li>
-                <li><strong>Custom Content:</strong> Each section pulls dynamic content based on its type</li>
-              </ul>
-            </div>
-            <div className="border-t border-blue-300 pt-2 space-y-1">
-              <div>📋 <strong>Display Order:</strong> Sections appear in newsletters in the order shown above</div>
-              <div>🔄 <strong>Status:</strong> Inactive sections are hidden but can be reactivated anytime</div>
-              <div>✏️ <strong>Customization:</strong> Section names can be customized to match your newsletter's voice</div>
-              <div>⚠️ <strong>Missing sections?</strong> Use "Add Missing Sections" button to enable additional features</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Ad Sections Management - New Two-Panel UI */}
+      {/* Section Settings - Unified Section Management */}
       <div className="bg-white shadow rounded-lg p-6">
         <div className="mb-4">
-          <h3 className="text-lg font-medium text-gray-900">Ad Sections</h3>
+          <h3 className="text-lg font-medium text-gray-900">Section Settings</h3>
           <p className="text-sm text-gray-600 mt-1">
-            Create and manage dynamic ad sections. Configure block order, selection logic, and company cooldown.
+            Manage newsletter section order and settings. Configure ad sections with block order, selection logic, and company cooldown.
           </p>
         </div>
         <SectionsPanel />
