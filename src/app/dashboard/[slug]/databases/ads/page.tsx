@@ -1121,6 +1121,16 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
         }
       }
 
+      // Log what we're sending to help debug
+      console.log('[EditAdModal] Sending update:', {
+        id: ad.id,
+        title: formData.title,
+        body: formData.body?.substring(0, 100) + '...', // Truncate for logging
+        button_url: formData.button_url,
+        status: formData.status,
+        image_url: imageUrl
+      })
+
       const response = await fetch(`/api/ads/${ad.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -1131,6 +1141,7 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
       })
 
       const data = await response.json()
+      console.log('[EditAdModal] API response:', response.status, data)
 
       if (!response.ok) {
         throw new Error(data.error || data.message || 'Failed to update advertisement')
@@ -1140,10 +1151,15 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
         throw new Error('Server returned success but no ad data - please try again')
       }
 
+      // Verify the saved data matches what we sent
+      if (data.ad.body !== formData.body) {
+        console.warn('[EditAdModal] Body mismatch! Sent:', formData.body?.substring(0, 50), 'Got:', data.ad.body?.substring(0, 50))
+      }
+
       alert('Advertisement updated successfully!')
       onSuccess()
     } catch (error) {
-      console.error('Update error:', error)
+      console.error('[EditAdModal] Update error:', error)
       alert(error instanceof Error ? error.message : 'Failed to update advertisement')
     } finally {
       setSubmitting(false)
