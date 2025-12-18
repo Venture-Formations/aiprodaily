@@ -41,6 +41,27 @@ export async function PATCH(
     const { id } = await context.params
     const body = await request.json()
 
+    // Validate required fields if they're being updated
+    if (body.title !== undefined && !body.title?.trim()) {
+      return NextResponse.json({ error: 'Title cannot be empty' }, { status: 400 })
+    }
+    if (body.button_url !== undefined && !body.button_url?.trim()) {
+      return NextResponse.json({ error: 'URL cannot be empty' }, { status: 400 })
+    }
+
+    // First verify the ad exists
+    const { data: existingAd, error: fetchError } = await supabaseAdmin
+      .from('advertisements')
+      .select('id')
+      .eq('id', id)
+      .single()
+
+    if (fetchError || !existingAd) {
+      console.error('[Ads] Ad not found for update:', id, fetchError)
+      return NextResponse.json({ error: 'Advertisement not found' }, { status: 404 })
+    }
+
+    // Perform the update
     const { data: ad, error } = await supabaseAdmin
       .from('advertisements')
       .update({
@@ -52,11 +73,19 @@ export async function PATCH(
       .single()
 
     if (error) {
+      console.error('[Ads] Update error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    if (!ad) {
+      console.error('[Ads] Update returned no data for id:', id)
+      return NextResponse.json({ error: 'Update failed - no data returned' }, { status: 500 })
+    }
+
+    console.log('[Ads] Successfully updated ad:', id)
     return NextResponse.json({ ad })
   } catch (error) {
+    console.error('[Ads] PATCH exception:', error)
     return NextResponse.json({
       error: 'Failed to update ad',
       message: error instanceof Error ? error.message : 'Unknown error'

@@ -444,9 +444,13 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
   }
 
   const handleUpdateModule = async (updates: Partial<AdModule>) => {
-    if (!selectedItem || selectedItem.type !== 'ad_module') return
+    if (!selectedItem || selectedItem.type !== 'ad_module') {
+      throw new Error('No ad module selected')
+    }
 
     const moduleId = selectedItem.data.id
+    console.log('[SectionsPanel] Updating module:', moduleId, updates)
+
     const res = await fetch(`/api/ad-modules/${moduleId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -455,10 +459,13 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
 
     if (res.ok) {
       const data = await res.json()
+      console.log('[SectionsPanel] Module updated successfully:', data.module)
       setAdModules(prev => prev.map(m => m.id === moduleId ? data.module : m))
       setSelectedItem({ type: 'ad_module', data: data.module })
     } else {
-      throw new Error('Failed to update module')
+      const errorData = await res.json().catch(() => ({}))
+      console.error('[SectionsPanel] Failed to update module:', res.status, errorData)
+      throw new Error(errorData.error || `Failed to update module (${res.status})`)
     }
   }
 

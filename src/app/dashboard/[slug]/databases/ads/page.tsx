@@ -893,13 +893,18 @@ function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
         })
       })
 
-      if (response.ok) {
-        alert('Advertisement created successfully!')
-        onSuccess()
-      } else {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to create advertisement')
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Failed to create advertisement')
       }
+
+      if (!data.ad) {
+        throw new Error('Server returned success but no ad data - please try again')
+      }
+
+      alert('Advertisement created successfully!')
+      onSuccess()
     } catch (error) {
       console.error('Create error:', error)
       alert(error instanceof Error ? error.message : 'Failed to create advertisement')
@@ -1125,12 +1130,18 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
         })
       })
 
-      if (response.ok) {
-        alert('Advertisement updated successfully!')
-        onSuccess()
-      } else {
-        throw new Error('Failed to update advertisement')
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Failed to update advertisement')
       }
+
+      if (!data.ad) {
+        throw new Error('Server returned success but no ad data - please try again')
+      }
+
+      alert('Advertisement updated successfully!')
+      onSuccess()
     } catch (error) {
       console.error('Update error:', error)
       alert(error instanceof Error ? error.message : 'Failed to update advertisement')

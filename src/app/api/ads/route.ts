@@ -195,9 +195,16 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
+      console.error('[Ads] Insert error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    if (!ad) {
+      console.error('[Ads] Insert returned no data')
+      return NextResponse.json({ error: 'Failed to create ad - no data returned' }, { status: 500 })
+    }
+
+    console.log('[Ads] Successfully created ad:', ad.id)
     return NextResponse.json({ ad })
   } catch (error) {
     return NextResponse.json({

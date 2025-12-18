@@ -17,6 +17,7 @@ const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false })
 export default function RichTextEditor({ value, onChange, maxWords = 100, placeholder = 'Enter text...' }: RichTextEditorProps) {
   const [wordCount, setWordCount] = useState(0)
   const [editorValue, setEditorValue] = useState(value)
+  const [isOverLimit, setIsOverLimit] = useState(false)
 
   // Update local state when prop changes
   useEffect(() => {
@@ -28,18 +29,22 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
     const text = html.replace(/<[^>]+>/g, '').trim()
     const words = text.split(/\s+/).filter(w => w.length > 0)
     setWordCount(words.length)
+    setIsOverLimit(words.length > maxWords)
   }
 
   const handleChange = (content: string) => {
     const text = content.replace(/<[^>]+>/g, '').trim()
     const words = text.split(/\s+/).filter(w => w.length > 0)
+    const overLimit = words.length > maxWords
 
-    // Check word limit
-    if (words.length <= maxWords) {
-      setEditorValue(content)
-      onChange(content)
-      updateWordCount(content)
-    }
+    // Always update local state and word count so user sees their typing
+    setEditorValue(content)
+    setWordCount(words.length)
+    setIsOverLimit(overLimit)
+
+    // Always call onChange - let the parent handle validation if needed
+    // This ensures the form state is always in sync with the editor
+    onChange(content)
   }
 
   // Quill toolbar configuration
@@ -74,8 +79,9 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
 
       {/* Word count display */}
       <div className="flex justify-end p-2 border-t border-gray-300 bg-gray-50">
-        <span className="text-sm text-gray-600">
+        <span className={`text-sm ${isOverLimit ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
           {wordCount} / {maxWords} words
+          {isOverLimit && <span className="ml-2">(over limit!)</span>}
         </span>
       </div>
 
