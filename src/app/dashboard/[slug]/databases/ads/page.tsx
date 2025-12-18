@@ -935,7 +935,7 @@ function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
               type="text"
               required
               value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="Enter ad title"
             />
@@ -948,7 +948,7 @@ function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
             </label>
             <RichTextEditor
               value={formData.body}
-              onChange={(html) => setFormData({ ...formData, body: html })}
+              onChange={(html) => setFormData(prev => ({ ...prev, body: html }))}
               maxWords={100}
             />
           </div>
@@ -1024,7 +1024,7 @@ function AddAdModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: ()
                 if (!value.startsWith('http://') && !value.startsWith('https://')) {
                   value = 'https://' + value.replace(/^https?:\/\//, '');
                 }
-                setFormData({ ...formData, button_url: value });
+                setFormData(prev => ({ ...prev, button_url: value }));
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="https://example.com"
@@ -1188,7 +1188,7 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
               type="text"
               required
               value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
             />
           </div>
@@ -1200,7 +1200,7 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
             </label>
             <RichTextEditor
               value={formData.body}
-              onChange={(html) => setFormData({ ...formData, body: html })}
+              onChange={(html) => setFormData(prev => ({ ...prev, body: html }))}
               maxWords={100}
             />
           </div>
@@ -1300,10 +1300,10 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
             </div>
             <button
               type="button"
-              onClick={() => setFormData({
-                ...formData,
-                status: formData.status === 'active' ? 'approved' : 'active'
-              })}
+              onClick={() => setFormData(prev => ({
+                ...prev,
+                status: prev.status === 'active' ? 'approved' : 'active'
+              }))}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                 formData.status === 'active' ? 'bg-green-600' : 'bg-gray-300'
               }`}
@@ -1331,7 +1331,7 @@ function EditAdModal({ ad, onClose, onSuccess }: { ad: Advertisement; onClose: (
                 if (!value.startsWith('http://') && !value.startsWith('https://')) {
                   value = 'https://' + value.replace(/^https?:\/\//, '');
                 }
-                setFormData({ ...formData, button_url: value });
+                setFormData(prev => ({ ...prev, button_url: value }));
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="https://example.com"

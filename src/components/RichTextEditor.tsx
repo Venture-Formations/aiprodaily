@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import 'react-quill-new/dist/quill.snow.css'
 
@@ -18,11 +18,21 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
   const [wordCount, setWordCount] = useState(0)
   const [editorValue, setEditorValue] = useState(value)
   const [isOverLimit, setIsOverLimit] = useState(false)
+  // Track if the last change came from the editor to avoid sync loops
+  const isInternalChange = useRef(false)
 
-  // Update local state when prop changes
+  // Update local state when prop changes from external source
   useEffect(() => {
-    setEditorValue(value)
-    updateWordCount(value)
+    // Skip if the change originated from the editor itself
+    if (isInternalChange.current) {
+      isInternalChange.current = false
+      return
+    }
+    // Only update if the value actually differs
+    if (value !== editorValue) {
+      setEditorValue(value)
+      updateWordCount(value)
+    }
   }, [value])
 
   const updateWordCount = (html: string) => {
@@ -36,6 +46,9 @@ export default function RichTextEditor({ value, onChange, maxWords = 100, placeh
     const text = content.replace(/<[^>]+>/g, '').trim()
     const words = text.split(/\s+/).filter(w => w.length > 0)
     const overLimit = words.length > maxWords
+
+    // Mark this as an internal change so the useEffect doesn't override it
+    isInternalChange.current = true
 
     // Always update local state and word count so user sees their typing
     setEditorValue(content)
