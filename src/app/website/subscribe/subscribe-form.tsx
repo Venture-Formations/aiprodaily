@@ -126,7 +126,7 @@ export function SubscribeForm() {
 
       {!error && (
         <p className="text-lg font-bold text-slate-600 tracking-wide">
-          Free forever. Unsubscribe anytime.
+          FREE FOREVER
         </p>
       )}
     </div>
