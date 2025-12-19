@@ -712,14 +712,8 @@ function NewsletterSectionComponent({
       return <PromptIdeasSection issue={issue} />
     }
 
-    // Advertisement section is now handled by Ad Sections panel (AdModulesPanel)
-    if (section.id === SECTION_IDS.ADVERTISEMENT) {
-      return (
-        <div className="text-center py-8 text-gray-500">
-          <span className="text-sm">Ad content is managed in the <strong>Ad Sections</strong> panel below.</span>
-        </div>
-      )
-    }
+    // Note: Advertisement section (SECTION_IDS.ADVERTISEMENT) is filtered out at the list level
+    // and handled by AdModulesPanel instead
 
     // Legacy name-based matching for other sections
     switch (section.name) {
@@ -2758,8 +2752,9 @@ export default function issueDetailPage() {
         </div>
 
         {/* Dynamic Newsletter Sections */}
+        {/* Note: Advertisement section (c0bc7173-de47-41b2-a260-77f55525ee3d) is excluded - handled by AdModulesPanel */}
         {newsletterSections
-          .filter(section => section.is_active && section.id !== primaryArticlesSection?.id && section.id !== secondaryArticlesSection?.id)
+          .filter(section => section.is_active && section.id !== primaryArticlesSection?.id && section.id !== secondaryArticlesSection?.id && section.id !== 'c0bc7173-de47-41b2-a260-77f55525ee3d')
           .map(section => (
             <NewsletterSectionComponent
               key={section.id}
