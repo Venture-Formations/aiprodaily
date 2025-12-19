@@ -20,7 +20,7 @@ export default function AdsManagementPage() {
   const [activeStatusTab, setActiveStatusTab] = useState<'active' | 'inactive' | 'review'>('active')
   const [ads, setAds] = useState<AdWithRelations[]>([])
   const [adModules, setAdModules] = useState<AdModule[]>([])
-  const [selectedSection, setSelectedSection] = useState<string>('legacy') // 'legacy' or ad_module_id
+  const [selectedSection, setSelectedSection] = useState<string>('') // ad_module_id
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingAd, setEditingAd] = useState<AdWithRelations | null>(null)
@@ -70,7 +70,7 @@ export default function AdsManagementPage() {
         setAdModules(modules)
 
         // Default to first ad module (or "Presented By" if found)
-        if (modules.length > 0 && selectedSection === 'legacy') {
+        if (modules.length > 0 && selectedSection === '') {
           const presentedBy = modules.find((m: AdModule) => m.name === 'Presented By')
           setSelectedSection(presentedBy ? presentedBy.id : modules[0].id)
         }
@@ -388,14 +388,6 @@ export default function AdsManagementPage() {
               </p>
             </div>
             <div className="flex gap-3">
-              {activeStatusTab === 'active' && selectedSection === 'legacy' && (
-                <button
-                  onClick={handleResetOrder}
-                  className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
-                >
-                  Reset Order
-                </button>
-              )}
               <button
                 onClick={() => setShowAddModal(true)}
                 className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
@@ -409,16 +401,6 @@ export default function AdsManagementPage() {
         {/* Section Tabs - Primary Navigation */}
         <div className="border-b border-gray-200 mb-4">
           <nav className="-mb-px flex space-x-1 overflow-x-auto">
-            <button
-              onClick={() => setSelectedSection('legacy')}
-              className={`py-3 px-4 border-b-2 font-medium text-sm whitespace-nowrap ${
-                selectedSection === 'legacy'
-                  ? 'border-blue-500 text-blue-600 bg-blue-50'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Legacy Advertorial
-            </button>
             {adModules.map(module => (
               <button
                 key={module.id}
@@ -469,22 +451,8 @@ export default function AdsManagementPage() {
           </button>
         </div>
 
-        {/* Next Ad Position Indicator (Active Tab Only - Legacy Section) */}
-        {activeStatusTab === 'active' && !loading && ads.length > 0 && selectedSection === 'legacy' && (
-          <div className="mb-4 bg-purple-50 border border-purple-200 rounded-lg p-4">
-            <p className="text-sm text-purple-800">
-              <strong>Next ad in rotation:</strong> Position {nextAdPosition}
-              {nextAdPosition <= ads.length && (
-                <span className="ml-2 text-purple-600">
-                  ({ads[nextAdPosition - 1]?.title})
-                </span>
-              )}
-            </p>
-          </div>
-        )}
-
         {/* Selection Mode Info for Ad Module Sections */}
-        {activeStatusTab === 'active' && !loading && ads.length > 0 && selectedSection !== 'legacy' && (() => {
+        {activeStatusTab === 'active' && !loading && ads.length > 0 && (() => {
           const currentModule = adModules.find(m => m.id === selectedSection)
           if (!currentModule) return null
           const selectionMode = currentModule.selection_mode || 'sequential'
@@ -495,12 +463,19 @@ export default function AdsManagementPage() {
             manual: { label: 'Manual', description: 'Admin selects ad manually per issue' }
           }
           const modeInfo = modeLabels[selectionMode] || modeLabels.sequential
+          // For sequential mode, show which ad is next
+          const nextAd = selectionMode === 'sequential' && ads.length > 0 ? ads[0] : null
           return (
-            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
+            <div className={`mb-4 border rounded-lg p-4 ${selectionMode === 'sequential' ? 'bg-purple-50 border-purple-200' : 'bg-blue-50 border-blue-200'}`}>
+              <p className={`text-sm ${selectionMode === 'sequential' ? 'text-purple-800' : 'text-blue-800'}`}>
                 <strong>Selection Mode:</strong> {modeInfo.label}
-                <span className="ml-2 text-blue-600">— {modeInfo.description}</span>
+                <span className={`ml-2 ${selectionMode === 'sequential' ? 'text-purple-600' : 'text-blue-600'}`}>— {modeInfo.description}</span>
               </p>
+              {selectionMode === 'sequential' && nextAd && (
+                <p className="text-sm text-purple-800 mt-1">
+                  <strong>Next in rotation:</strong> <span className="text-purple-600">{nextAd.title}</span>
+                </p>
+              )}
             </div>
           )
         })()}
@@ -520,7 +495,12 @@ export default function AdsManagementPage() {
                 <p className="text-gray-500">No active advertisements found.</p>
               </div>
             ) : (
-              ads.map((ad, index) => (
+              ads.map((ad, index) => {
+                const currentModule = adModules.find(m => m.id === selectedSection)
+                const selectionMode = currentModule?.selection_mode || 'sequential'
+                const isNextInSequential = selectionMode === 'sequential' && index === 0
+
+                return (
                 <div
                   key={ad.id}
                   draggable
@@ -528,34 +508,22 @@ export default function AdsManagementPage() {
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, index)}
                   className={`bg-white rounded-lg shadow p-6 cursor-move hover:shadow-lg transition-shadow ${
-                    selectedSection === 'legacy' && ad.display_order === nextAdPosition ? 'ring-4 ring-purple-400 bg-purple-50' : ''
+                    isNextInSequential ? 'ring-4 ring-purple-400 bg-purple-50' : ''
                   }`}
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex-1 flex items-center gap-4">
                       <div className="flex items-center gap-2">
                         <span className="text-2xl font-bold text-gray-400">☰</span>
-                        {selectedSection === 'legacy' ? (
-                          <input
-                            type="number"
-                            min="1"
-                            max={ads.length}
-                            value={ad.display_order || 0}
-                            onChange={(e) => handleOrderChange(ad.id, parseInt(e.target.value))}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-16 px-2 py-1 border border-gray-300 rounded text-center font-bold"
-                          />
-                        ) : (
-                          <span className="w-16 px-2 py-1 border border-gray-200 bg-gray-50 rounded text-center font-bold text-gray-600">
-                            {index + 1}
-                          </span>
-                        )}
+                        <span className="w-16 px-2 py-1 border border-gray-200 bg-gray-50 rounded text-center font-bold text-gray-600">
+                          {index + 1}
+                        </span>
                       </div>
                       <div>
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="text-xl font-semibold">{ad.title}</h3>
                           {getStatusBadge(ad.status)}
-                          {selectedSection === 'legacy' && ad.display_order === nextAdPosition && (
+                          {isNextInSequential && (
                             <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-200 text-purple-800">
                               NEXT IN ROTATION
                             </span>
@@ -623,7 +591,7 @@ export default function AdsManagementPage() {
                     </div>
                   </div>
                 </div>
-              ))
+              )})
             )}
           </div>
         )}
@@ -817,7 +785,7 @@ export default function AdsManagementPage() {
             }}
             publicationId={publicationId}
             selectedSection={selectedSection}
-            sectionName={selectedSection === 'legacy' ? 'Legacy Advertorial' : adModules.find(m => m.id === selectedSection)?.name || 'Ad'}
+            sectionName={adModules.find(m => m.id === selectedSection)?.name || 'Ad'}
           />
         )}
 
@@ -851,7 +819,7 @@ function AddAdModal({ onClose, onSuccess, publicationId, selectedSection, sectio
   onClose: () => void
   onSuccess: () => void
   publicationId: string | null
-  selectedSection: string  // 'legacy' or ad_module_id
+  selectedSection: string  // ad_module_id
   sectionName: string
 }) {
   const [formData, setFormData] = useState({
@@ -865,7 +833,6 @@ function AddAdModal({ onClose, onSuccess, publicationId, selectedSection, sectio
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [useInNextNewsletter, setUseInNextNewsletter] = useState(false)
 
   // Company/Advertiser state
   const [advertisers, setAdvertisers] = useState<Array<{ id: string; company_name: string }>>([])
@@ -980,11 +947,10 @@ function AddAdModal({ onClose, onSuccess, publicationId, selectedSection, sectio
           payment_status: 'manual',
           paid: true,
           status: 'active', // Admin-created ads go directly to active status
-          useInNextNewsletter: useInNextNewsletter, // Flag for special positioning
           advertiser_id: advertiserId,
           company_name: companyName,
-          ad_module_id: selectedSection === 'legacy' ? null : selectedSection, // Link to ad module
-          ad_type: selectedSection === 'legacy' ? 'c0bc7173-de47-41b2-a260-77f55525ee3d' : selectedSection // Store section ID from newsletter_sections
+          ad_module_id: selectedSection, // Link to ad module
+          ad_type: selectedSection // Store section ID
         })
       })
 
@@ -1145,25 +1111,6 @@ function AddAdModal({ onClose, onSuccess, publicationId, selectedSection, sectio
                   style={{ maxWidth: '100%' }}
                 />
               </ReactCrop>
-            </div>
-          )}
-
-          {/* Use in Next Newsletter Checkbox - Only for Legacy section */}
-          {selectedSection === 'legacy' && (
-            <div className="flex items-center gap-3 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-              <input
-                type="checkbox"
-                id="useInNextNewsletter"
-                checked={useInNextNewsletter}
-                onChange={(e) => setUseInNextNewsletter(e.target.checked)}
-                className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-              />
-              <label htmlFor="useInNextNewsletter" className="text-sm font-medium text-gray-700 cursor-pointer">
-                Use in next newsletter
-                <p className="text-xs text-gray-600 font-normal mt-1">
-                  Check this to insert the ad at the next position in the rotation queue (position immediately after the last used ad). Other ads will shift down by one.
-                </p>
-              </label>
             </div>
           )}
 
