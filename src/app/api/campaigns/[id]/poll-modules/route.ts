@@ -50,10 +50,22 @@ export async function GET(
     // Get all active polls for manual selection dropdown
     const availablePolls = await PollModuleSelector.getAvailablePolls(issue.publication_id)
 
+    // Get publication settings for preview styling
+    const { data: pubSettings } = await supabaseAdmin
+      .from('publication_settings')
+      .select('primary_color, tertiary_color, body_font')
+      .eq('publication_id', issue.publication_id)
+      .single()
+
     return NextResponse.json({
       selections: selections || [],
       modules: allModules || [],
-      availablePolls
+      availablePolls,
+      styles: {
+        primaryColor: pubSettings?.primary_color || '#667eea',
+        tertiaryColor: pubSettings?.tertiary_color || '#ffffff',
+        bodyFont: pubSettings?.body_font || 'Arial, sans-serif'
+      }
     })
 
   } catch (error: any) {

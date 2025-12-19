@@ -17,11 +17,22 @@ interface PollSelection {
   poll?: Poll
 }
 
+interface PublicationStyles {
+  primaryColor: string
+  tertiaryColor: string
+  bodyFont: string
+}
+
 export default function PollModulesPanel({ issueId }: PollModulesPanelProps) {
   const [loading, setLoading] = useState(true)
   const [selections, setSelections] = useState<PollSelection[]>([])
   const [modules, setModules] = useState<PollModule[]>([])
   const [availablePolls, setAvailablePolls] = useState<Poll[]>([])
+  const [styles, setStyles] = useState<PublicationStyles>({
+    primaryColor: '#667eea',
+    tertiaryColor: '#ffffff',
+    bodyFont: 'Arial, sans-serif'
+  })
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [saving, setSaving] = useState<string | null>(null)
 
@@ -37,6 +48,9 @@ export default function PollModulesPanel({ issueId }: PollModulesPanelProps) {
         setSelections(data.selections || [])
         setModules(data.modules || [])
         setAvailablePolls(data.availablePolls || [])
+        if (data.styles) {
+          setStyles(data.styles)
+        }
       }
     } catch (error) {
       console.error('Failed to fetch poll modules:', error)
@@ -141,27 +155,63 @@ export default function PollModulesPanel({ issueId }: PollModulesPanelProps) {
               {/* Expanded Content */}
               {isExpanded && (
                 <div className="mt-4 pl-5">
-                  {/* Current Selection Preview */}
+                  {/* Current Selection Preview - Matches Email Design */}
                   {selectedPoll && (
-                    <div className="mb-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
-                      <div className="font-medium text-purple-900">{selectedPoll.title}</div>
-                      <div className="text-sm text-purple-700 mt-1">{selectedPoll.question}</div>
-                      {selectedPoll.image_url && (
-                        <img
-                          src={selectedPoll.image_url}
-                          alt={selectedPoll.title}
-                          className="mt-2 max-w-xs rounded"
-                        />
-                      )}
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {selectedPoll.options?.map((option, idx) => (
-                          <span
-                            key={idx}
-                            className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded"
-                          >
-                            {option}
-                          </span>
-                        ))}
+                    <div
+                      className="mb-4 rounded-lg shadow-lg overflow-hidden"
+                      style={{
+                        backgroundColor: styles.primaryColor,
+                        border: `2px solid ${styles.primaryColor}`,
+                        fontFamily: styles.bodyFont
+                      }}
+                    >
+                      <div className="p-4 text-center text-white">
+                        {/* Render blocks in configured order */}
+                        {(module.block_order || ['title', 'question', 'image', 'options']).map((blockType: string) => {
+                          if (blockType === 'title' && selectedPoll.title) {
+                            return (
+                              <p key="title" className="font-bold text-xl mb-1.5">
+                                {selectedPoll.title}
+                              </p>
+                            )
+                          }
+                          if (blockType === 'question' && selectedPoll.question) {
+                            return (
+                              <p key="question" className="text-base mb-3.5">
+                                {selectedPoll.question}
+                              </p>
+                            )
+                          }
+                          if (blockType === 'image' && selectedPoll.image_url) {
+                            return (
+                              <img
+                                key="image"
+                                src={selectedPoll.image_url}
+                                alt={selectedPoll.title || 'Poll image'}
+                                className="max-w-full h-auto rounded-lg mb-3.5 mx-auto"
+                              />
+                            )
+                          }
+                          if (blockType === 'options' && selectedPoll.options?.length > 0) {
+                            return (
+                              <div key="options" className="max-w-[350px] mx-auto space-y-2">
+                                {selectedPoll.options.map((option, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="block font-bold text-base py-3 px-4 rounded-lg text-center"
+                                    style={{
+                                      backgroundColor: styles.tertiaryColor,
+                                      color: styles.primaryColor
+                                    }}
+                                  >
+                                    {option}
+                                  </div>
+                                ))}
+                              </div>
+                            )
+                          }
+                          return null
+                        })}
                       </div>
                     </div>
                   )}
