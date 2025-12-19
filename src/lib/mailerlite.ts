@@ -6,8 +6,7 @@ import {
   generateNewsletterHeader,
   generateNewsletterFooter,
   generateWelcomeSection,
-  generatePollSection,
-  generateAdvertorialSection
+  generatePollSection
 } from './newsletter-templates'
 import { getEmailSettings, getScheduleSettings, getPublicationSetting } from './publication-settings'
 
@@ -361,7 +360,16 @@ export class MailerLiteService {
       .eq('is_active', true)
       .order('display_order', { ascending: true })
 
+    // Fetch ad modules for this publication
+    const { data: adModules } = await supabaseAdmin
+      .from('ad_modules')
+      .select('*')
+      .eq('publication_id', issue.publication_id)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+
     console.log('MailerLite - Active newsletter sections:', sections?.map(s => `${s.name} (order: ${s.display_order})`).join(', '))
+    console.log('MailerLite - Active ad modules:', adModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
 
     // Format date using local date parsing (same as preview)
     const [year, month, day] = issue.date.split('-').map(Number)
@@ -404,14 +412,32 @@ export class MailerLiteService {
     // Section ID constants (stable across name changes) - SAME AS PREVIEW
     const SECTION_IDS = {
       AI_APPLICATIONS: '853f8d0b-bc76-473a-bfc6-421418266222',
-      PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b',
-      ADVERTISEMENT: 'c0bc7173-de47-41b2-a260-77f55525ee3d'
+      PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b'
     }
 
-    // Generate sections in order based on database configuration - SAME AS PREVIEW
+    // Merge newsletter sections and ad modules into a single sorted list - SAME AS PREVIEW
+    type SectionItem = { type: 'section'; data: any } | { type: 'ad_module'; data: any }
+    const allItems: SectionItem[] = [
+      ...(sections || []).map(s => ({ type: 'section' as const, data: s })),
+      ...(adModules || []).map(m => ({ type: 'ad_module' as const, data: m }))
+    ].sort((a, b) => (a.data.display_order || 999) - (b.data.display_order || 999))
+
+    console.log('MailerLite - Combined section order:', allItems.map(item =>
+      `${item.data.name} (${item.type}, order: ${item.data.display_order})`
+    ).join(', '))
+
+    // Generate sections in order based on merged configuration - SAME AS PREVIEW
     let sectionsHtml = ''
-    if (sections && sections.length > 0) {
-      for (const section of sections) {
+    for (const item of allItems) {
+      if (item.type === 'ad_module') {
+        // Generate ad module section using the global block library
+        const { generateAdModulesSection } = await import('./newsletter-templates')
+        const adModuleHtml = await generateAdModulesSection(issue, item.data.id)
+        if (adModuleHtml) {
+          sectionsHtml += adModuleHtml
+        }
+      } else {
+        const section = item.data
         // Check section_type to determine what to render
         if (section.section_type === 'primary_articles' && activeArticles.length > 0) {
           const { generatePrimaryArticlesSection } = await import('./newsletter-templates')
@@ -457,17 +483,8 @@ export class MailerLiteService {
             sectionsHtml += beyondFeedHtml
           }
         }
-        else if (section.section_type === 'advertorial' || section.id === SECTION_IDS.ADVERTISEMENT) {
-          const advertorialHtml = await generateAdvertorialSection(issue, !isReview, section.name) // Record usage for final issues only, pass section name
-          if (advertorialHtml) {
-            sectionsHtml += advertorialHtml
-          }
-        }
+        // Note: 'advertorial' section_type is deprecated - ads are now handled via ad_modules
       }
-    } else {
-      // Fallback to default order if no sections configured
-      console.log('MailerLite - No sections found, using default order')
-      sectionsHtml = ''
     }
 
     // Combine using the SAME template structure as preview (welcome section goes after header)

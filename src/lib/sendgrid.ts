@@ -20,8 +20,7 @@ import {
   generateNewsletterHeader,
   generateNewsletterFooter,
   generateWelcomeSection,
-  generatePollSection,
-  generateAdvertorialSection
+  generatePollSection
 } from './newsletter-templates'
 import { getEmailSettings, getScheduleSettings, getPublicationSetting, getPublicationSettings } from './publication-settings'
 
@@ -743,6 +742,16 @@ export class SendGridService {
       .eq('is_active', true)
       .order('display_order', { ascending: true })
 
+    // Fetch ad modules for this publication
+    const { data: adModules } = await supabaseAdmin
+      .from('ad_modules')
+      .select('*')
+      .eq('publication_id', issue.publication_id)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+
+    console.log('[SendGrid] Active ad modules:', adModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
+
     // Format date using local date parsing
     const [year, month, day] = issue.date.split('-').map(Number)
     const date = new Date(year, month - 1, day)
@@ -782,14 +791,32 @@ export class SendGridService {
     // Section ID constants
     const SECTION_IDS = {
       AI_APPLICATIONS: '853f8d0b-bc76-473a-bfc6-421418266222',
-      PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b',
-      ADVERTISEMENT: 'c0bc7173-de47-41b2-a260-77f55525ee3d'
+      PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b'
     }
+
+    // Merge newsletter sections and ad modules into a single sorted list
+    type SectionItem = { type: 'section'; data: any } | { type: 'ad_module'; data: any }
+    const allItems: SectionItem[] = [
+      ...(sections || []).map(s => ({ type: 'section' as const, data: s })),
+      ...(adModules || []).map(m => ({ type: 'ad_module' as const, data: m }))
+    ].sort((a, b) => (a.data.display_order || 999) - (b.data.display_order || 999))
+
+    console.log('[SendGrid] Combined section order:', allItems.map(item =>
+      `${item.data.name} (${item.type}, order: ${item.data.display_order})`
+    ).join(', '))
 
     // Generate sections in order
     let sectionsHtml = ''
-    if (sections && sections.length > 0) {
-      for (const section of sections) {
+    for (const item of allItems) {
+      if (item.type === 'ad_module') {
+        // Generate ad module section using the global block library
+        const { generateAdModulesSection } = await import('./newsletter-templates')
+        const adModuleHtml = await generateAdModulesSection(issue, item.data.id)
+        if (adModuleHtml) {
+          sectionsHtml += adModuleHtml
+        }
+      } else {
+        const section = item.data
         if (section.section_type === 'primary_articles' && activeArticles.length > 0) {
           const { generatePrimaryArticlesSection } = await import('./newsletter-templates')
           const primaryHtml = await generatePrimaryArticlesSection(activeArticles, issue.date, issue.id, section.name, issue.publication_id, undefined)
@@ -834,12 +861,7 @@ export class SendGridService {
             sectionsHtml += beyondFeedHtml
           }
         }
-        else if (section.section_type === 'advertorial' || section.id === SECTION_IDS.ADVERTISEMENT) {
-          const advertorialHtml = await generateAdvertorialSection(issue, !isReview, section.name)
-          if (advertorialHtml) {
-            sectionsHtml += advertorialHtml
-          }
-        }
+        // Note: 'advertorial' section_type is deprecated - ads are now handled via ad_modules
       }
     }
 

@@ -8,7 +8,6 @@ import {
   generateWelcomeSection,
   generatePrimaryArticlesSection,
   generateSecondaryArticlesSection,
-  generateAdvertorialSection,
   generatePollSection,
   generateBreakingNewsSection,
   generateBeyondTheFeedSection,
@@ -203,8 +202,7 @@ async function generateNewsletterHtml(issue: any): Promise<string> {
     // These IDs are stable and won't change even if section names are updated
     const SECTION_IDS = {
       AI_APPLICATIONS: '853f8d0b-bc76-473a-bfc6-421418266222',
-      PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b',
-      ADVERTISEMENT: 'c0bc7173-de47-41b2-a260-77f55525ee3d'
+      PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b'
     }
 
     // Merge newsletter sections and ad modules into a single sorted list
@@ -268,12 +266,7 @@ async function generateNewsletterHtml(issue: any): Promise<string> {
             sectionsHtml += beyondFeedHtml
           }
         }
-        else if (section.section_type === 'advertorial' || section.id === SECTION_IDS.ADVERTISEMENT) {
-          const advertorialHtml = await generateAdvertorialSection(issue, false, section.name) // Don't record usage during preview, pass section name
-          if (advertorialHtml) {
-            sectionsHtml += advertorialHtml
-          }
-        }
+        // Note: 'advertorial' section_type is deprecated - ads are now handled via ad_modules
       }
     }
 

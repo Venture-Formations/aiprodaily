@@ -66,7 +66,14 @@ export default function AdsManagementPage() {
       const response = await fetch(`/api/ad-modules?publication_id=${publicationId}`)
       if (response.ok) {
         const data = await response.json()
-        setAdModules(data.modules || [])
+        const modules = data.modules || []
+        setAdModules(modules)
+
+        // Default to first ad module (or "Presented By" if found)
+        if (modules.length > 0 && selectedSection === 'legacy') {
+          const presentedBy = modules.find((m: AdModule) => m.name === 'Presented By')
+          setSelectedSection(presentedBy ? presentedBy.id : modules[0].id)
+        }
       }
     } catch (error) {
       console.error('Failed to fetch ad modules:', error)

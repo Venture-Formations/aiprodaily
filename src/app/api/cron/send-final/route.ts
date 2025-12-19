@@ -355,25 +355,7 @@ export async function POST(request: NextRequest) {
       console.log('MailerLite campaign created:', result.campaignId)
     }
 
-    // Record advertisement usage and advance rotation (legacy system)
-    try {
-      const { data: adAssignment } = await supabaseAdmin
-        .from('issue_advertisements')
-        .select('advertisement_id')
-        .eq('issue_id', issue.id)
-        .maybeSingle()
-
-      if (adAssignment) {
-        const { AdScheduler } = await import('@/lib/ad-scheduler')
-        await AdScheduler.recordAdUsage(issue.id, adAssignment.advertisement_id, issue.date, newsletter.id)
-        console.log('[Send Final] ✓ Advertisement usage recorded and rotation advanced')
-      }
-    } catch (adError) {
-      console.error('[Send Final] Failed to record ad usage (non-critical):', adError)
-      // Don't fail the send if ad tracking fails
-    }
-
-    // Record ad module usage (new dynamic ad sections system)
+    // Record ad module usage (ads are now handled via ad_modules system)
     try {
       const issueDate = new Date(issue.date)
       const moduleUsageResult = await ModuleAdSelector.recordUsageSimple(issue.id, issueDate)
@@ -663,25 +645,7 @@ export async function GET(request: NextRequest) {
       console.log('MailerLite campaign created:', result.campaignId)
     }
 
-    // Record advertisement usage and advance rotation (legacy system)
-    try {
-      const { data: adAssignment } = await supabaseAdmin
-        .from('issue_advertisements')
-        .select('advertisement_id')
-        .eq('issue_id', issue.id)
-        .maybeSingle()
-
-      if (adAssignment) {
-        const { AdScheduler } = await import('@/lib/ad-scheduler')
-        await AdScheduler.recordAdUsage(issue.id, adAssignment.advertisement_id, issue.date, newsletter.id)
-        console.log('[Send Final] ✓ Advertisement usage recorded and rotation advanced')
-      }
-    } catch (adError) {
-      console.error('[Send Final] Failed to record ad usage (non-critical):', adError)
-      // Don't fail the send if ad tracking fails
-    }
-
-    // Record ad module usage (new dynamic ad sections system)
+    // Record ad module usage (ads are now handled via ad_modules system)
     try {
       const issueDate = new Date(issue.date)
       const moduleUsageResult = await ModuleAdSelector.recordUsageSimple(issue.id, issueDate)

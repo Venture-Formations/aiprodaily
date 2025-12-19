@@ -1,6 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { RSSProcessor } from '@/lib/rss-processor'
-import { AdScheduler } from '@/lib/ad-scheduler'
 import { ModuleAdSelector } from '@/lib/ad-modules'
 
 /**
@@ -572,54 +571,7 @@ async function finalizeIssue(issueId: string) {
 
       console.log(`Subject line: "${issue?.subject_line?.substring(0, 50) || 'Not found'}..."`)
 
-      // Select and assign advertisement for this issue
-      try {
-        const { data: issueData } = await supabaseAdmin
-          .from('publication_issues')
-          .select('date, publication_id')
-          .eq('id', issueId)
-          .single()
-
-        if (issueData) {
-          const selectedAd = await AdScheduler.selectAdForissue({
-            issueId: issueId,
-            issueDate: issueData.date,
-            newsletterId: issueData.publication_id
-          })
-
-          if (selectedAd) {
-            // Check if ad already assigned to prevent duplicates
-            const { data: existingAssignment } = await supabaseAdmin
-              .from('issue_advertisements')
-              .select('id')
-              .eq('issue_id', issueId)
-              .maybeSingle()
-
-            if (!existingAssignment) {
-              // Store the selected ad (usage will be recorded at send-final via AdScheduler.recordAdUsage)
-              await supabaseAdmin
-                .from('issue_advertisements')
-                .insert({
-                  issue_id: issueId,
-                  advertisement_id: selectedAd.id,
-                  issue_date: issueData.date
-                  // Note: used_at is NOT set here - it will be set at send-final time
-                })
-
-              console.log(`[Workflow Step 11/11] Selected ad: ${selectedAd.title}`)
-            } else {
-              console.log('[Workflow Step 11/11] Ad already assigned')
-            }
-          } else {
-            console.log('[Workflow Step 11/11] No active ads available')
-          }
-        }
-      } catch (adError) {
-        console.log('[Workflow Step 11/11] Ad selection failed (non-critical):', adError)
-        // Don't fail the entire step if ad selection fails
-      }
-
-      // Select ads for dynamic ad modules (new system)
+      // Select ads for all ad modules (includes "Presented By")
       try {
         const { data: issueData } = await supabaseAdmin
           .from('publication_issues')
