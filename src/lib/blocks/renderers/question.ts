@@ -16,12 +16,8 @@ export function renderQuestion(
   }
 
   return `
-    <tr>
-      <td style="padding: 12px 16px; text-align: center;">
-        <p style="margin: 0; font-size: 18px; line-height: 1.5; color: #ffffff; font-family: ${styles.bodyFont};">
-          ${data.question}
-        </p>
-      </td>
-    </tr>
+    <p style="margin:0 0 14px 0; font-size:16px; color:#ffffff; text-align:center;">
+      ${data.question}
+    </p>
   `
 }

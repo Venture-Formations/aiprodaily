@@ -17,6 +17,10 @@ export function renderOptions(
 
   const { poll_id, issue_id, base_url, options } = data
 
+  // Use tertiary color for button background, primary color for text (matching legacy design)
+  const buttonBgColor = styles.tertiaryColor || '#ffffff'
+  const buttonTextColor = styles.primaryColor
+
   // Generate option buttons
   const optionsHtml = options.map((option, index) => {
     // Build response URL if we have poll_id and base_url
@@ -26,41 +30,23 @@ export function renderOptions(
       responseUrl = `${base_url}/api/polls/${poll_id}/respond?option=${encodedOption}${issue_id ? `&issue_id=${issue_id}` : ''}&email={$email}`
     }
 
-    // Alternate colors for visual variety
-    const bgColor = index % 2 === 0 ? styles.primaryColor : (styles.secondaryColor || '#6B7280')
+    const isLast = index === options.length - 1
+    const paddingStyle = isLast ? 'padding:0;' : 'padding:0 0 8px 0;'
 
     return `
       <tr>
-        <td style="padding: 4px 16px;">
+        <td style="${paddingStyle}">
           <a href="${responseUrl}"
-             style="display: block;
-                    width: 100%;
-                    max-width: 400px;
-                    margin: 0 auto;
-                    padding: 14px 24px;
-                    background: ${bgColor};
-                    color: #ffffff;
-                    text-decoration: none;
-                    font-weight: 600;
-                    font-size: 16px;
-                    font-family: ${styles.bodyFont};
-                    border-radius: 8px;
-                    text-align: center;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-            ${option}
-          </a>
+             style="display:block; text-decoration:none; background:${buttonBgColor}; color:${buttonTextColor}; font-weight:bold;
+                    font-size:16px; line-height:20px; padding:12px; border-radius:8px; text-align:center;">${option}</a>
         </td>
       </tr>
     `
   }).join('')
 
   return `
-    <tr>
-      <td style="padding: 8px 0;">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-          ${optionsHtml}
-        </table>
-      </td>
-    </tr>
+    <table cellpadding="0" cellspacing="0" border="0" role="presentation" align="center" style="margin:0 auto; width:100%; max-width:350px;">
+      ${optionsHtml}
+    </table>
   `
 }

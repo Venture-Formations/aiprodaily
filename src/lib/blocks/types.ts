@@ -53,6 +53,7 @@ export type PollBlockType = 'title' | 'question' | 'image' | 'options'
 export interface BlockStyleOptions {
   primaryColor: string
   secondaryColor?: string
+  tertiaryColor?: string
   headingFont: string
   bodyFont: string
 }

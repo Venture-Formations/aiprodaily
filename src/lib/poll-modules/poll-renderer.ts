@@ -2,12 +2,11 @@
  * Poll Module Renderer
  *
  * Renders poll modules with configurable block order.
- * Uses the global block library for rendering individual blocks.
+ * Uses legacy poll styling for consistency with existing design.
  */
 
 import { getBusinessSettings } from '../publication-settings'
-import { renderBlock } from '../blocks'
-import type { BlockType, BlockStyleOptions, BlockData } from '../blocks'
+import type { BlockStyleOptions } from '../blocks'
 import type { PollModule, Poll, PollSnapshot, PollBlockType } from '@/types/database'
 
 /**
@@ -34,45 +33,33 @@ interface RenderResult {
  */
 export class PollModuleRenderer {
   /**
-   * Convert poll data to BlockData format for the global renderer
-   */
-  private static toBlockData(
-    poll: Poll | PollSnapshot,
-    context: RenderContext
-  ): BlockData {
-    return {
-      title: poll.title,
-      question: poll.question,
-      options: poll.options,
-      image_url: poll.image_url,
-      poll_id: poll.id,
-      issue_id: context.issueId,
-      base_url: context.baseUrl || process.env.NEXT_PUBLIC_SITE_URL || ''
-    }
-  }
-
-  /**
    * Wrap the content in the poll section container
-   * Uses gradient background like the legacy poll section
+   * Uses solid primary color background to match legacy poll design
    */
   private static wrapInSection(
     sectionName: string,
     content: string,
     styles: BlockStyleOptions
   ): string {
+    // Note: sectionName is used for the module name, but the poll title/question
+    // are rendered separately via block renderers
     return `
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
   <tr>
     <td style="padding:0 10px;">
-      <table width='100%' cellpadding='0' cellspacing='0' style='border-radius: 10px; background: linear-gradient(135deg, ${styles.primaryColor} 0%, ${styles.secondaryColor || '#764ba2'} 100%); font-family: ${styles.bodyFont}; font-size: 16px; line-height: 26px; box-shadow:0 4px 12px rgba(0,0,0,.15); margin-top: 10px; overflow: hidden;'>
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation">
         <tr>
-          <td style="padding: 16px; text-align: center;">
-            <h2 style="font-size: 1.5em; line-height: 1.2em; font-family: ${styles.headingFont}; color: #ffffff; margin: 0 0 8px 0; padding: 0;">${sectionName}</h2>
+          <td style="padding:5px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"
+                   style="width:100%; max-width:650px; margin:10px auto; background-color:${styles.primaryColor};
+                          border:2px solid ${styles.primaryColor}; border-radius:10px; font-family:${styles.bodyFont}; box-shadow:0 4px 12px rgba(0,0,0,.15);">
+              <tr>
+                <td style="padding:14px; color:#ffffff; font-size:16px; line-height:1.5; text-align:center;">
+                  ${content}
+                </td>
+              </tr>
+            </table>
           </td>
-        </tr>
-        ${content}
-        <tr>
-          <td style="padding: 16px;"></td>
         </tr>
       </table>
     </td>
@@ -104,28 +91,51 @@ export class PollModuleRenderer {
     const styles: BlockStyleOptions = {
       primaryColor: settings.primary_color,
       secondaryColor: settings.secondary_color || '#764ba2',
+      tertiaryColor: settings.tertiary_color || '#ffffff',
       headingFont: settings.heading_font,
       bodyFont: settings.body_font
     }
 
-    // Prepare block data
-    const blockData = this.toBlockData(poll, context)
-
-    // Render each block in the configured order
+    // Render blocks in legacy poll style (not using generic block renderers)
     const blockOrder = module.block_order as PollBlockType[]
     let blocksHtml = ''
+    const baseUrl = context.baseUrl || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.aiprodaily.com'
 
     for (const blockType of blockOrder) {
-      // Skip image block if poll doesn't have an image
-      if (blockType === 'image' && !poll.image_url) {
-        continue
+      if (blockType === 'title' && poll.title) {
+        blocksHtml += `<p style="margin:0 0 6px 0; font-weight:bold; font-size:20px; color:#ffffff; text-align:center;">${poll.title}</p>`
       }
+      else if (blockType === 'question' && poll.question) {
+        blocksHtml += `<p style="margin:0 0 14px 0; font-size:16px; color:#ffffff; text-align:center;">${poll.question}</p>`
+      }
+      else if (blockType === 'image' && poll.image_url) {
+        blocksHtml += `<img src="${poll.image_url}" alt="${poll.title || 'Poll image'}" style="max-width:100%; height:auto; border-radius:8px; margin:0 0 14px 0;" />`
+      }
+      else if (blockType === 'options' && poll.options && poll.options.length > 0) {
+        // Use tertiary color for button background, primary color for text
+        const buttonBgColor = styles.tertiaryColor || '#ffffff'
+        const buttonTextColor = styles.primaryColor
 
-      // Map poll block types to block registry types
-      // 'title' and 'image' can reuse existing renderers
-      // 'question' and 'options' use new poll-specific renderers
-      const mappedType = blockType as BlockType
-      blocksHtml += renderBlock(mappedType, blockData, styles)
+        const optionsHtml = poll.options.map((option: string, index: number) => {
+          const isLast = index === poll.options.length - 1
+          const paddingStyle = isLast ? 'padding:0;' : 'padding:0 0 8px 0;'
+          const responseUrl = `${baseUrl}/api/polls/${poll.id}/respond?option=${encodeURIComponent(option)}&issue_id=${context.issueId || ''}&email={$email}`
+
+          return `
+            <tr>
+              <td style="${paddingStyle}">
+                <a href="${responseUrl}"
+                   style="display:block; text-decoration:none; background:${buttonBgColor}; color:${buttonTextColor}; font-weight:bold;
+                          font-size:16px; line-height:20px; padding:12px; border-radius:8px; text-align:center;">${option}</a>
+              </td>
+            </tr>`
+        }).join('')
+
+        blocksHtml += `
+          <table cellpadding="0" cellspacing="0" border="0" role="presentation" align="center" style="margin:0 auto; width:100%; max-width:350px;">
+            ${optionsHtml}
+          </table>`
+      }
     }
 
     // Wrap in section container
@@ -157,48 +167,49 @@ export class PollModuleRenderer {
     moduleName: string,
     pollSnapshot: PollSnapshot,
     blockOrder: PollBlockType[],
-    styles: { primaryColor: string; secondaryColor?: string; headingFont: string; bodyFont: string }
+    styles: { primaryColor: string; secondaryColor?: string; tertiaryColor?: string; headingFont: string; bodyFont: string }
   ): string {
     // For archive, we render a static version without voting links
-    const blockStyles: BlockStyleOptions = {
-      primaryColor: styles.primaryColor,
-      secondaryColor: styles.secondaryColor || '#764ba2',
-      headingFont: styles.headingFont,
-      bodyFont: styles.bodyFont
-    }
-
-    // Prepare block data without response URLs
-    const blockData: BlockData = {
-      title: pollSnapshot.title,
-      question: pollSnapshot.question,
-      options: pollSnapshot.options,
-      image_url: pollSnapshot.image_url,
-      // No poll_id or base_url = options won't have clickable links
-    }
-
     let blocksHtml = ''
+    const tertiaryColor = styles.tertiaryColor || '#ffffff'
 
     for (const blockType of blockOrder) {
-      if (blockType === 'image' && !pollSnapshot.image_url) {
-        continue
+      if (blockType === 'title' && pollSnapshot.title) {
+        blocksHtml += `<p style="margin:0 0 6px 0; font-weight:bold; font-size:20px; color:#ffffff; text-align:center;">${pollSnapshot.title}</p>`
       }
-      blocksHtml += renderBlock(blockType as BlockType, blockData, blockStyles)
+      else if (blockType === 'question' && pollSnapshot.question) {
+        blocksHtml += `<p style="margin:0 0 14px 0; font-size:16px; color:#ffffff; text-align:center;">${pollSnapshot.question}</p>`
+      }
+      else if (blockType === 'image' && pollSnapshot.image_url) {
+        blocksHtml += `<img src="${pollSnapshot.image_url}" alt="${pollSnapshot.title || 'Poll image'}" style="max-width:100%; height:auto; border-radius:8px; margin:0 0 14px 0;" />`
+      }
+      else if (blockType === 'options' && pollSnapshot.options && pollSnapshot.options.length > 0) {
+        // Static options display (no clickable links for archive)
+        const optionsHtml = pollSnapshot.options.map((option: string, index: number) => {
+          const isLast = index === pollSnapshot.options.length - 1
+          const paddingStyle = isLast ? 'padding:0;' : 'padding:0 0 8px 0;'
+
+          return `
+            <tr>
+              <td style="${paddingStyle}">
+                <span style="display:block; background:${tertiaryColor}; color:${styles.primaryColor}; font-weight:bold;
+                       font-size:16px; line-height:20px; padding:12px; border-radius:8px; text-align:center;">${option}</span>
+              </td>
+            </tr>`
+        }).join('')
+
+        blocksHtml += `
+          <table cellpadding="0" cellspacing="0" border="0" role="presentation" align="center" style="margin:0 auto; width:100%; max-width:350px;">
+            ${optionsHtml}
+          </table>`
+      }
     }
 
-    // Use section wrapper
+    // Use legacy poll section wrapper
     return `
-<div style="border-radius: 10px; background: linear-gradient(135deg, ${styles.primaryColor} 0%, ${styles.secondaryColor || '#764ba2'} 100%); font-family: ${styles.bodyFont}; margin: 16px 0; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,.15);">
-  <div style="padding: 16px; text-align: center;">
-    <h3 style="font-size: 1.5em; color: #ffffff; margin: 0 0 8px 0; font-family: ${styles.headingFont};">${moduleName}</h3>
-    ${pollSnapshot.question ? `<p style="color: #ffffff; font-size: 18px; margin: 0 0 16px 0;">${pollSnapshot.question}</p>` : ''}
-    ${pollSnapshot.image_url && blockOrder.includes('image') ? `<img src="${pollSnapshot.image_url}" alt="" style="max-width: 100%; border-radius: 8px; margin-bottom: 16px;" />` : ''}
-    <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
-      ${pollSnapshot.options.map((option, i) => `
-        <span style="display: inline-block; padding: 10px 20px; background: ${i % 2 === 0 ? styles.primaryColor : (styles.secondaryColor || '#6B7280')}; color: #ffffff; border-radius: 8px; font-weight: 600;">
-          ${option}
-        </span>
-      `).join('')}
-    </div>
+<div style="max-width:650px; margin:10px auto; background-color:${styles.primaryColor}; border:2px solid ${styles.primaryColor}; border-radius:10px; font-family:${styles.bodyFont}; box-shadow:0 4px 12px rgba(0,0,0,.15);">
+  <div style="padding:14px; color:#ffffff; font-size:16px; line-height:1.5; text-align:center;">
+    ${blocksHtml}
   </div>
 </div>`
   }
