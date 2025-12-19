@@ -5,8 +5,7 @@ import type { issueWithArticles, issueWithEvents, Article } from '@/types/databa
 import {
   generateNewsletterHeader,
   generateNewsletterFooter,
-  generateWelcomeSection,
-  generatePollSection
+  generateWelcomeSection
 } from './newsletter-templates'
 import { getEmailSettings, getScheduleSettings, getPublicationSetting } from './publication-settings'
 
@@ -480,12 +479,7 @@ export class MailerLiteService {
             sectionsHtml += promptHtml
           }
         }
-        else if (section.section_type === 'poll') {
-          const pollHtml = await generatePollSection(issue)
-          if (pollHtml) {
-            sectionsHtml += pollHtml
-          }
-        }
+        // Note: 'poll' section_type is deprecated - polls are now handled via poll_modules
         else if (section.section_type === 'breaking_news') {
           const { generateBreakingNewsSection } = await import('./newsletter-templates')
           const breakingNewsHtml = await generateBreakingNewsSection(issue)
