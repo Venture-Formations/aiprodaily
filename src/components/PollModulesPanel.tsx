@@ -109,17 +109,15 @@ export default function PollModulesPanel({ issueId }: PollModulesPanelProps) {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow">
-      <div className="px-4 py-3 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-          <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-          </svg>
-          Poll Modules
-        </h3>
+    <div className="bg-white shadow rounded-lg mt-6">
+      <div className="px-6 py-4 border-b border-gray-200">
+        <h2 className="text-lg font-medium text-gray-900">Poll Sections</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          Dynamic poll sections configured in Settings
+        </p>
       </div>
 
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-gray-200 space-y-2 p-2">
         {modules.map(module => {
           const selection = selections.find(s => s.poll_module_id === module.id)
           const selectedPoll = selection?.poll
