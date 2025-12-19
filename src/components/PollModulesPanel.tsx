@@ -158,11 +158,12 @@ export default function PollModulesPanel({ issueId }: PollModulesPanelProps) {
                   {/* Current Selection Preview - Matches Email Design */}
                   {selectedPoll && (
                     <div
-                      className="mb-4 rounded-lg shadow-lg overflow-hidden"
+                      className="mb-4 rounded-lg shadow-lg overflow-hidden mx-auto"
                       style={{
                         backgroundColor: styles.primaryColor,
                         border: `2px solid ${styles.primaryColor}`,
-                        fontFamily: styles.bodyFont
+                        fontFamily: styles.bodyFont,
+                        maxWidth: '650px'
                       }}
                     >
                       <div className="p-4 text-center text-white">
