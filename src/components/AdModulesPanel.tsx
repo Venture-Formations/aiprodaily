@@ -197,6 +197,7 @@ export default function AdModulesPanel({ issueId }: AdModulesPanelProps) {
               >
                 <div className="flex items-center space-x-3">
                   <span className="font-medium text-gray-900">{module.name}</span>
+                  <span className="text-xs text-gray-400">Display Order: {module.display_order}</span>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${
                     module.selection_mode === 'manual'
                       ? 'bg-yellow-100 text-yellow-800'
@@ -356,12 +357,6 @@ export default function AdModulesPanel({ issueId }: AdModulesPanelProps) {
                       Check advertiser cooldowns and ad date ranges.
                     </div>
                   )}
-
-                  {/* Module info */}
-                  <div className="text-xs text-gray-400 flex items-center justify-between">
-                    <span>Display order: {module.display_order}</span>
-                    <span>Blocks: {(module.block_order || []).join(', ')}</span>
-                  </div>
                 </div>
               )}
             </div>
