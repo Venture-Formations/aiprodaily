@@ -79,7 +79,7 @@ export async function GET(
 
 /**
  * POST /api/campaigns/[id]/poll-modules - Manually select a poll for a module
- * Body: { moduleId, pollId }
+ * Body: { moduleId, pollId } - pollId can be null to clear selection
  */
 export async function POST(
   request: NextRequest,
@@ -99,8 +99,13 @@ export async function POST(
       return NextResponse.json({ error: 'moduleId is required' }, { status: 400 })
     }
 
-    if (!pollId) {
-      return NextResponse.json({ error: 'pollId is required' }, { status: 400 })
+    // Handle clearing the poll selection (pollId = null)
+    if (pollId === null || pollId === '') {
+      const result = await PollModuleSelector.clearPollSelection(issueId, moduleId)
+      if (!result.success) {
+        return NextResponse.json({ error: result.error }, { status: 400 })
+      }
+      return NextResponse.json({ success: true })
     }
 
     const result = await PollModuleSelector.manuallySelectPoll(issueId, moduleId, pollId)

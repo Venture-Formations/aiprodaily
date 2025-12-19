@@ -10,7 +10,8 @@ import type { PollModule, Poll, IssuePollModule, PollSnapshot } from '@/types/da
 
 export class PollModuleSelector {
   /**
-   * Initialize empty selections for all active poll modules
+   * Initialize selections for all active poll modules
+   * Defaults to the last used poll for each module (if any)
    * Called during issue creation workflow
    */
   static async initializeSelectionsForIssue(
@@ -41,22 +42,64 @@ export class PollModuleSelector {
       return
     }
 
-    // Create empty selection for each module (admin will pick manually)
+    // For each module, find the last used poll and default to it
     for (const module of modules) {
+      // Find the most recent selection for this module that had a poll
+      const { data: lastSelection } = await supabaseAdmin
+        .from('issue_poll_modules')
+        .select('poll_id')
+        .eq('poll_module_id', module.id)
+        .not('poll_id', 'is', null)
+        .order('selected_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const lastPollId = lastSelection?.poll_id || null
+
       const { error: insertError } = await supabaseAdmin
         .from('issue_poll_modules')
         .insert({
           issue_id: issueId,
           poll_module_id: module.id,
-          poll_id: null  // Manual selection required
+          poll_id: lastPollId,  // Default to last used poll
+          selected_at: lastPollId ? new Date().toISOString() : null
         })
 
       if (insertError) {
         console.error('[PollSelector] Error creating selection:', insertError)
+      } else if (lastPollId) {
+        console.log(`[PollSelector] Defaulted module ${module.name} to last used poll: ${lastPollId}`)
       }
     }
 
     console.log(`[PollSelector] Initialized ${modules.length} poll module selections for issue ${issueId}`)
+  }
+
+  /**
+   * Clear poll selection for a module (set to No Poll)
+   */
+  static async clearPollSelection(
+    issueId: string,
+    moduleId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const { error } = await supabaseAdmin
+      .from('issue_poll_modules')
+      .upsert({
+        issue_id: issueId,
+        poll_module_id: moduleId,
+        poll_id: null,
+        selected_at: new Date().toISOString()
+      }, {
+        onConflict: 'issue_id,poll_module_id'
+      })
+
+    if (error) {
+      console.error('[PollSelector] Error clearing selection:', error)
+      return { success: false, error: error.message }
+    }
+
+    console.log(`[PollSelector] Cleared poll for issue ${issueId}, module ${moduleId}`)
+    return { success: true }
   }
 
   /**
