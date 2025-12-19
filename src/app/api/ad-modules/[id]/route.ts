@@ -70,6 +70,10 @@ export async function PATCH(
       console.log(`[AdModules] Saving block_order:`, body.block_order)
     }
     if (body.config !== undefined) updates.config = body.config
+    if (body.next_position !== undefined) {
+      updates.next_position = Math.max(1, body.next_position) // Ensure at least 1
+      console.log(`[AdModules] Setting next_position:`, body.next_position)
+    }
 
     const { data: module, error } = await supabaseAdmin
       .from('ad_modules')

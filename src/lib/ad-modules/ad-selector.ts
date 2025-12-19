@@ -120,21 +120,33 @@ export class ModuleAdSelector {
   /**
    * Select ad using Sequential mode (fixed order rotation)
    * Follows the display_order set on the ads page, cycling through in order.
-   * Uses times_used to track position - picks the ad with lowest times_used,
-   * and if tied, picks by display_order (lowest first).
+   * Uses the module's next_position field to track which display_order to pick next.
+   * Loops back to position 1 after reaching the last ad.
    */
-  private static selectSequential(ads: AdvertisementWithAdvertiser[]): AdvertisementWithAdvertiser | null {
+  private static selectSequential(
+    ads: AdvertisementWithAdvertiser[],
+    nextPosition: number
+  ): AdvertisementWithAdvertiser | null {
     if (ads.length === 0) return null
 
-    // Sort by times_used (to find current cycle position), then by display_order
-    const sorted = [...ads].sort((a, b) => {
-      if (a.times_used !== b.times_used) {
-        return a.times_used - b.times_used
+    // Sort by display_order
+    const sorted = [...ads].sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+
+    // Find ad at the next_position
+    let selectedAd = sorted.find(ad => ad.display_order === nextPosition)
+
+    // If no ad at that position (gap or past end), find next available
+    if (!selectedAd) {
+      // Find first ad with display_order >= nextPosition
+      selectedAd = sorted.find(ad => (ad.display_order || 0) >= nextPosition)
+
+      // If still none found (past the end), loop back to first ad
+      if (!selectedAd) {
+        selectedAd = sorted[0]
       }
-      // Same times_used = same cycle position, pick by display_order
-      return (a.display_order || 0) - (b.display_order || 0)
-    })
-    return sorted[0]
+    }
+
+    return selectedAd
   }
 
   /**
@@ -190,11 +202,12 @@ export class ModuleAdSelector {
    * Select an ad for a module based on its selection mode
    */
   static async selectAd(
-    moduleId: string,
+    module: AdModule,
     publicationId: string,
-    issueDate: Date,
-    selectionMode: AdSelectionMode
+    issueDate: Date
   ): Promise<AdSelectionResult> {
+    const selectionMode = module.selection_mode
+
     // Manual mode returns null - admin must pick
     if (selectionMode === 'manual') {
       return { ad: null, reason: 'Manual selection required' }
@@ -204,7 +217,7 @@ export class ModuleAdSelector {
     const cooldownDays = await this.getCooldownDays(publicationId)
 
     // Get eligible ads
-    const eligibleAds = await this.getEligibleAds(moduleId, publicationId, issueDate, cooldownDays)
+    const eligibleAds = await this.getEligibleAds(module.id, publicationId, issueDate, cooldownDays)
 
     if (eligibleAds.length === 0) {
       return { ad: null, reason: 'No eligible ads available (check cooldown, dates, status)' }
@@ -215,7 +228,8 @@ export class ModuleAdSelector {
 
     switch (selectionMode) {
       case 'sequential':
-        selectedAd = this.selectSequential(eligibleAds)
+        // Use the module's next_position for sequential mode
+        selectedAd = this.selectSequential(eligibleAds, module.next_position || 1)
         break
       case 'random':
         selectedAd = this.selectRandom(eligibleAds)
@@ -224,7 +238,7 @@ export class ModuleAdSelector {
         selectedAd = this.selectPriority(eligibleAds)
         break
       default:
-        selectedAd = this.selectSequential(eligibleAds)
+        selectedAd = this.selectSequential(eligibleAds, module.next_position || 1)
     }
 
     if (!selectedAd) {
@@ -233,7 +247,7 @@ export class ModuleAdSelector {
 
     return {
       ad: selectedAd,
-      reason: `Selected via ${selectionMode} mode from ${eligibleAds.length} eligible ads`
+      reason: `Selected via ${selectionMode} mode from ${eligibleAds.length} eligible ads (position ${module.next_position || 1})`
     }
   }
 
@@ -274,10 +288,9 @@ export class ModuleAdSelector {
     // Select ad for each module
     for (const module of modules) {
       const result = await this.selectAd(
-        module.id,
+        module as AdModule,
         publicationId,
-        issueDate,
-        module.selection_mode as AdSelectionMode
+        issueDate
       )
 
       // Store selection in database (using advertisement_id)
@@ -302,7 +315,7 @@ export class ModuleAdSelector {
   }
 
   /**
-   * Record ad usage at send time (updates cooldown tracking)
+   * Record ad usage at send time (updates cooldown tracking and advances sequential position)
    * Uses the unified advertisements table
    */
   static async recordUsageSimple(
@@ -313,11 +326,16 @@ export class ModuleAdSelector {
       .from('issue_module_ads')
       .select(`
         id,
+        ad_module_id,
         advertisement_id,
+        selection_mode,
+        ad_module:ad_modules(id, selection_mode, next_position),
         advertisement:advertisements(
           id,
           advertiser_id,
           times_used,
+          display_order,
+          ad_module_id,
           advertiser:advertisers(id, times_used)
         )
       `)
@@ -337,6 +355,7 @@ export class ModuleAdSelector {
 
       const ad = selection.advertisement as any
       const advertiser = ad.advertiser
+      const adModule = selection.ad_module as any
 
       // Update ad in advertisements table
       await supabaseAdmin
@@ -366,11 +385,103 @@ export class ModuleAdSelector {
         .update({ used_at: new Date().toISOString() })
         .eq('id', selection.id)
 
+      // Advance next_position for sequential modules
+      if (adModule && adModule.selection_mode === 'sequential') {
+        await this.advanceSequentialPosition(adModule.id, ad.display_order)
+      }
+
       recorded++
     }
 
     console.log(`[AdSelector] Recorded usage for ${recorded} ad selections`)
     return { success: true, recorded }
+  }
+
+  /**
+   * Advance the next_position for a sequential module after an ad is used
+   */
+  private static async advanceSequentialPosition(
+    moduleId: string,
+    usedDisplayOrder: number
+  ): Promise<void> {
+    // Get all active ads for this module to find max position
+    const { data: ads } = await supabaseAdmin
+      .from('advertisements')
+      .select('display_order')
+      .eq('ad_module_id', moduleId)
+      .eq('status', 'active')
+      .order('display_order', { ascending: true })
+
+    if (!ads || ads.length === 0) return
+
+    const maxPosition = Math.max(...ads.map(ad => ad.display_order || 0))
+    let nextPosition = usedDisplayOrder + 1
+
+    // Loop back to 1 if we've passed the max
+    if (nextPosition > maxPosition) {
+      nextPosition = 1
+      console.log(`[AdSelector] Module ${moduleId}: Reached end of rotation, looping back to position 1`)
+    } else {
+      console.log(`[AdSelector] Module ${moduleId}: Advancing to position ${nextPosition}`)
+    }
+
+    // Update the module's next_position
+    await supabaseAdmin
+      .from('ad_modules')
+      .update({
+        next_position: nextPosition,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', moduleId)
+  }
+
+  /**
+   * Reset the next_position for a module to 1
+   */
+  static async resetPosition(moduleId: string): Promise<{ success: boolean; error?: string }> {
+    const { error } = await supabaseAdmin
+      .from('ad_modules')
+      .update({
+        next_position: 1,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', moduleId)
+
+    if (error) {
+      console.error('[AdSelector] Error resetting position:', error)
+      return { success: false, error: error.message }
+    }
+
+    console.log(`[AdSelector] Reset position to 1 for module ${moduleId}`)
+    return { success: true }
+  }
+
+  /**
+   * Set a specific next_position for a module
+   */
+  static async setPosition(
+    moduleId: string,
+    position: number
+  ): Promise<{ success: boolean; error?: string }> {
+    if (position < 1) {
+      return { success: false, error: 'Position must be at least 1' }
+    }
+
+    const { error } = await supabaseAdmin
+      .from('ad_modules')
+      .update({
+        next_position: position,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', moduleId)
+
+    if (error) {
+      console.error('[AdSelector] Error setting position:', error)
+      return { success: false, error: error.message }
+    }
+
+    console.log(`[AdSelector] Set position to ${position} for module ${moduleId}`)
+    return { success: true }
   }
 
   /**

@@ -463,19 +463,66 @@ export default function AdsManagementPage() {
             manual: { label: 'Manual', description: 'Admin selects ad manually per issue' }
           }
           const modeInfo = modeLabels[selectionMode] || modeLabels.sequential
-          // For sequential mode, show which ad is next
-          const nextAd = selectionMode === 'sequential' && ads.length > 0 ? ads[0] : null
+          // For sequential mode, find the next ad based on next_position
+          const nextPosition = currentModule.next_position || 1
+          const nextAd = selectionMode === 'sequential'
+            ? ads.find(ad => ad.display_order === nextPosition) || ads[0]
+            : null
           return (
             <div className={`mb-4 border rounded-lg p-4 ${selectionMode === 'sequential' ? 'bg-purple-50 border-purple-200' : 'bg-blue-50 border-blue-200'}`}>
-              <p className={`text-sm ${selectionMode === 'sequential' ? 'text-purple-800' : 'text-blue-800'}`}>
-                <strong>Selection Mode:</strong> {modeInfo.label}
-                <span className={`ml-2 ${selectionMode === 'sequential' ? 'text-purple-600' : 'text-blue-600'}`}>— {modeInfo.description}</span>
-              </p>
-              {selectionMode === 'sequential' && nextAd && (
-                <p className="text-sm text-purple-800 mt-1">
-                  <strong>Next in rotation:</strong> <span className="text-purple-600">{nextAd.title}</span>
-                </p>
-              )}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm ${selectionMode === 'sequential' ? 'text-purple-800' : 'text-blue-800'}`}>
+                    <strong>Selection Mode:</strong> {modeInfo.label}
+                    <span className={`ml-2 ${selectionMode === 'sequential' ? 'text-purple-600' : 'text-blue-600'}`}>— {modeInfo.description}</span>
+                  </p>
+                  {selectionMode === 'sequential' && nextAd && (
+                    <p className="text-sm text-purple-800 mt-1">
+                      <strong>Next in rotation:</strong> Position {nextPosition} — <span className="text-purple-600">{nextAd.title}</span>
+                    </p>
+                  )}
+                </div>
+                {selectionMode === 'sequential' && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={async () => {
+                        if (confirm('Reset rotation to position 1?')) {
+                          const res = await fetch(`/api/ad-modules/${currentModule.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ next_position: 1 })
+                          })
+                          if (res.ok) {
+                            fetchAdModules()
+                          }
+                        }
+                      }}
+                      className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700"
+                    >
+                      Reset to #1
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      max={ads.length}
+                      value={nextPosition}
+                      onChange={async (e) => {
+                        const newPos = parseInt(e.target.value) || 1
+                        const res = await fetch(`/api/ad-modules/${currentModule.id}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ next_position: newPos })
+                        })
+                        if (res.ok) {
+                          fetchAdModules()
+                        }
+                      }}
+                      className="w-16 px-2 py-1 border border-purple-300 rounded text-center text-sm"
+                      title="Set next position"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           )
         })()}
@@ -498,7 +545,8 @@ export default function AdsManagementPage() {
               ads.map((ad, index) => {
                 const currentModule = adModules.find(m => m.id === selectedSection)
                 const selectionMode = currentModule?.selection_mode || 'sequential'
-                const isNextInSequential = selectionMode === 'sequential' && index === 0
+                const nextPosition = currentModule?.next_position || 1
+                const isNextInSequential = selectionMode === 'sequential' && ad.display_order === nextPosition
 
                 return (
                 <div

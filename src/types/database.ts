@@ -1271,6 +1271,7 @@ export interface AdModule {
   selection_mode: AdSelectionMode
   block_order: AdBlockType[]
   config: Record<string, unknown>
+  next_position: number  // For sequential mode: which display_order to select next
   created_at: string
   updated_at: string
 }
