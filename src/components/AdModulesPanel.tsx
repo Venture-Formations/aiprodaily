@@ -40,11 +40,30 @@ interface AdSelection {
   advertisement?: ModuleAd  // Changed from selected_ad to match unified schema
 }
 
-// Process ad body to make last sentence a link (matches email format)
+// Process ad body to make last sentence a link (matches email format exactly)
 function processAdBody(body: string, buttonUrl?: string): string {
-  if (!buttonUrl || !body) return body
+  if (!body) return body
+  if (!buttonUrl) return body
 
+  // Check for arrow CTA pattern (→ text) first
+  const arrowPattern = /(→\s*)([^<\n→]+?)(\s*<\/p>|\s*<\/strong>|\s*$)/i
+  const arrowMatch = body.match(arrowPattern)
+
+  if (arrowMatch && arrowMatch[2].trim().length > 3) {
+    const arrow = arrowMatch[1]
+    const ctaText = arrowMatch[2].trim()
+    const afterCta = arrowMatch[3] || ''
+
+    return body.replace(
+      arrowPattern,
+      `<strong>${arrow}</strong><a href='${buttonUrl}' target='_blank' rel='noopener noreferrer' style='color: #000; text-decoration: underline; font-weight: bold;'>${ctaText}</a>${afterCta}`
+    )
+  }
+
+  // Strip HTML to get plain text for sentence detection
   const plainText = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+
+  // Find sentence-ending punctuation
   const sentenceEndPattern = /[.!?](?=\s+[A-Z]|$)/g
   const matches = Array.from(plainText.matchAll(sentenceEndPattern))
 
@@ -59,16 +78,21 @@ function processAdBody(body: string, buttonUrl?: string): string {
     }
 
     const lastSentence = plainText.substring(startIndex, lastPeriodIndex + 1).trim()
-    const beforeLastSentence = plainText.substring(0, startIndex).trim()
 
-    const linkedLastSentence = `<a href="${buttonUrl}" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline;">${lastSentence}</a>`
+    if (lastSentence.length > 5) {
+      const escapedSentence = lastSentence.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const parts = escapedSentence.split(/\s+/)
+      const flexiblePattern = parts.join('\\s*(?:<[^>]*>\\s*)*')
+      const sentenceRegex = new RegExp(flexiblePattern, 'i')
 
-    return beforeLastSentence
-      ? `<p>${beforeLastSentence}</p><p>${linkedLastSentence}</p>`
-      : `<p>${linkedLastSentence}</p>`
+      return body.replace(
+        sentenceRegex,
+        `<a href='${buttonUrl}' target='_blank' rel='noopener noreferrer' style='color: #000; text-decoration: underline; font-weight: bold;'>$&</a>`
+      )
+    }
   }
 
-  return `<p><a href="${buttonUrl}" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline;">${plainText}</a></p>`
+  return body
 }
 
 export default function AdModulesPanel({ issueId }: AdModulesPanelProps) {
@@ -265,39 +289,60 @@ export default function AdModulesPanel({ issueId }: AdModulesPanelProps) {
                             <h2 className="text-white text-2xl font-bold m-0">{module.name}</h2>
                           </div>
 
-                          {/* Title - inside card, left-justified */}
-                          <div className="px-4 pt-4 pb-2">
-                            <h3 className="text-xl font-bold text-left m-0">{selectedAd.title}</h3>
-                          </div>
-
-                          {/* Image - clickable */}
-                          {selectedAd.image_url && (
-                            <div className="px-4 text-center">
-                              {selectedAd.button_url ? (
-                                <a href={selectedAd.button_url} target="_blank" rel="noopener noreferrer">
-                                  <img
-                                    src={selectedAd.image_url}
-                                    alt={selectedAd.title}
-                                    className="inline-block max-w-full max-h-[500px] rounded cursor-pointer"
+                          {/* Render blocks in configured order */}
+                          {(module.block_order || ['title', 'image', 'body', 'button']).map((blockType, idx) => {
+                            switch (blockType) {
+                              case 'title':
+                                return selectedAd.title ? (
+                                  <div key={idx} className="px-4 pt-4 pb-2">
+                                    <h3 className="text-xl font-bold text-left m-0">{selectedAd.title}</h3>
+                                  </div>
+                                ) : null
+                              case 'image':
+                                return selectedAd.image_url ? (
+                                  <div key={idx} className="px-4 text-center">
+                                    {selectedAd.button_url ? (
+                                      <a href={selectedAd.button_url} target="_blank" rel="noopener noreferrer">
+                                        <img
+                                          src={selectedAd.image_url}
+                                          alt={selectedAd.title}
+                                          className="inline-block max-w-full max-h-[500px] rounded cursor-pointer"
+                                        />
+                                      </a>
+                                    ) : (
+                                      <img
+                                        src={selectedAd.image_url}
+                                        alt={selectedAd.title}
+                                        className="inline-block max-w-full max-h-[500px] rounded"
+                                      />
+                                    )}
+                                  </div>
+                                ) : null
+                              case 'body':
+                                return selectedAd.body ? (
+                                  <div
+                                    key={idx}
+                                    className="px-4 pb-4 pt-2 text-base leading-relaxed [&_a]:underline [&_a]:font-bold [&_b]:font-bold [&_strong]:font-bold"
+                                    dangerouslySetInnerHTML={{ __html: processAdBody(selectedAd.body, selectedAd.button_url) }}
                                   />
-                                </a>
-                              ) : (
-                                <img
-                                  src={selectedAd.image_url}
-                                  alt={selectedAd.title}
-                                  className="inline-block max-w-full max-h-[500px] rounded"
-                                />
-                              )}
-                            </div>
-                          )}
-
-                          {/* Body - with last line as link */}
-                          {selectedAd.body && (
-                            <div
-                              className="px-4 pb-4 text-base leading-relaxed [&_a]:text-blue-600 [&_a]:underline [&_b]:font-bold [&_strong]:font-bold"
-                              dangerouslySetInnerHTML={{ __html: processAdBody(selectedAd.body, selectedAd.button_url) }}
-                            />
-                          )}
+                                ) : null
+                              case 'button':
+                                return selectedAd.button_url ? (
+                                  <div key={idx} className="px-4 pb-4 text-center">
+                                    <a
+                                      href={selectedAd.button_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-block px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors"
+                                    >
+                                      {selectedAd.button_text || 'Learn More'}
+                                    </a>
+                                  </div>
+                                ) : null
+                              default:
+                                return null
+                            }
+                          })}
                         </div>
                       </div>
                     </div>

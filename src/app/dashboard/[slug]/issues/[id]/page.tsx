@@ -28,67 +28,6 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
-// Helper function to process ad body and make last sentence a link
-function processAdBody(body: string, buttonUrl?: string): string {
-  if (!buttonUrl || !body) return body
-
-  // Strip HTML to get plain text
-  const plainText = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-
-  // Find all sentence-ending punctuation marks (., !, ?)
-  // But exclude periods that are part of domains (.com, .ai, .io, etc.) or abbreviations
-  const sentenceEndPattern = /[.!?](?=\s+[A-Z]|$)/g
-  const matches = Array.from(plainText.matchAll(sentenceEndPattern))
-
-  if (matches.length > 0) {
-    // Get the position of the last sentence-ending punctuation
-    const lastMatch = matches[matches.length - 1] as RegExpMatchArray
-    const lastPeriodIndex = lastMatch.index!
-
-    // Find the second-to-last sentence-ending punctuation
-    let startIndex = 0
-    if (matches.length > 1) {
-      const secondLastMatch = matches[matches.length - 2] as RegExpMatchArray
-      startIndex = secondLastMatch.index! + 1
-    }
-
-    // Extract the last complete sentence (from after previous punctuation to end, including the final punctuation)
-    const lastSentence = plainText.substring(startIndex, lastPeriodIndex + 1).trim()
-
-    if (lastSentence.length > 5) {
-      // Escape special regex characters
-      const escapedSentence = lastSentence.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
-      // Replace in the original HTML
-      // Look for the sentence text, accounting for HTML tags that might be in between
-      const parts = escapedSentence.split(/\s+/)
-      const flexiblePattern = parts.join('\\s*(?:<[^>]*>\\s*)*')
-      const sentenceRegex = new RegExp(flexiblePattern, 'i')
-
-      return body.replace(
-        sentenceRegex,
-        `<a href='${buttonUrl}' target='_blank' rel='noopener noreferrer' style='color: #000; text-decoration: underline; font-weight: bold;'>$&</a>`
-      )
-    }
-  } else {
-    // No sentence-ending punctuation found - wrap the entire text
-    const trimmedText = plainText.trim()
-    if (trimmedText.length > 5) {
-      const escapedText = trimmedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      const parts = escapedText.split(/\s+/)
-      const flexiblePattern = parts.join('\\s*(?:<[^>]*>\\s*)*')
-      const textRegex = new RegExp(flexiblePattern, 'i')
-
-      return body.replace(
-        textRegex,
-        `<a href='${buttonUrl}' target='_blank' rel='noopener noreferrer' style='color: #000; text-decoration: underline; font-weight: bold;'>$&</a>`
-      )
-    }
-  }
-
-  return body
-}
-
 // Section Components
 function WelcomeSection({ issue, onRegenerate }: { issue: any; onRegenerate?: () => void }) {
   const [regenerating, setRegenerating] = useState(false)
@@ -358,78 +297,6 @@ function AIAppsSection({ issue }: { issue: any }) {
             </div>
           )
         })}
-      </div>
-    </div>
-  )
-}
-
-function AdvertorialSection({ issue, sectionName }: { issue: any; sectionName: string }) {
-  // Get ad from issue data
-  const ad = issue?.issue_advertisements?.[0]?.advertisement
-
-  if (!ad) {
-    return (
-      <div className="text-center py-8 text-gray-500">
-        No advertisement selected for this issue.
-        <br />
-        <span className="text-sm text-gray-400">
-          An ad will be automatically selected during RSS processing.
-        </span>
-      </div>
-    )
-  }
-
-  return (
-    <div className="p-6">
-      <div className="mb-4 text-sm text-gray-600 flex justify-between items-center">
-        <div>
-          <strong>Selected Ad:</strong> {ad.title}
-        </div>
-        <div className="text-xs text-gray-400">
-          Times used: {ad.times_used || 0} | Display order: {ad.display_order}
-        </div>
-      </div>
-
-      {/* Styled to match email appearance - single card with header as first element */}
-      <div className="max-w-3xl mx-auto">
-        <div className="border border-gray-300 rounded-lg bg-white shadow-lg overflow-hidden">
-          {/* Header - part of the card with no gap */}
-          <div className="bg-blue-600 px-4 py-3">
-            <h2 className="text-white text-2xl font-bold m-0">{sectionName}</h2>
-          </div>
-
-          {/* Title - inside card, left-justified */}
-          <div className="px-4 pt-4 pb-2">
-            <h3 className="text-xl font-bold text-left m-0">{ad.title}</h3>
-          </div>
-
-          {/* Image - clickable */}
-          {ad.image_url && (
-            <div className="px-4 text-center">
-              {ad.button_url ? (
-                <a href={ad.button_url} target="_blank" rel="noopener noreferrer">
-                  <img
-                    src={ad.image_url}
-                    alt={ad.title}
-                    className="inline-block max-w-full max-h-[500px] rounded cursor-pointer"
-                  />
-                </a>
-              ) : (
-                <img
-                  src={ad.image_url}
-                  alt={ad.title}
-                  className="inline-block max-w-full max-h-[500px] rounded"
-                />
-              )}
-            </div>
-          )}
-
-          {/* Body - with last line as link */}
-          <div
-            className="px-4 pb-4 text-base leading-relaxed [&_a]:text-blue-600 [&_a]:underline [&_b]:font-bold [&_strong]:font-bold"
-            dangerouslySetInnerHTML={{ __html: processAdBody(ad.body, ad.button_url) }}
-          />
-        </div>
       </div>
     </div>
   )
@@ -845,9 +712,13 @@ function NewsletterSectionComponent({
       return <PromptIdeasSection issue={issue} />
     }
 
-    // Use section ID for Advertisement (stable across name changes)
+    // Advertisement section is now handled by Ad Sections panel (AdModulesPanel)
     if (section.id === SECTION_IDS.ADVERTISEMENT) {
-      return <AdvertorialSection issue={issue} sectionName={section.name} />
+      return (
+        <div className="text-center py-8 text-gray-500">
+          <span className="text-sm">Ad content is managed in the <strong>Ad Sections</strong> panel below.</span>
+        </div>
+      )
     }
 
     // Legacy name-based matching for other sections
