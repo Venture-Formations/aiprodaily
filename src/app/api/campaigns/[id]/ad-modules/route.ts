@@ -37,6 +37,7 @@ export async function GET(
         selection_mode,
         selected_at,
         used_at,
+        advertisement_id,
         ad_module:ad_modules(
           id,
           name,
@@ -44,23 +45,44 @@ export async function GET(
           block_order,
           selection_mode,
           is_active
-        ),
-        advertisement:advertisements(
-          id,
-          title,
-          body,
-          image_url,
-          button_text,
-          button_url,
-          company_name,
-          advertiser:advertisers(
-            id,
-            company_name,
-            logo_url
-          )
         )
       `)
       .eq('issue_id', issueId)
+
+    // Fetch advertisement details separately for each selection that has an advertisement_id
+    if (selections && selections.length > 0) {
+      const adIds = selections
+        .filter(s => s.advertisement_id)
+        .map(s => s.advertisement_id)
+
+      if (adIds.length > 0) {
+        const { data: advertisements } = await supabaseAdmin
+          .from('advertisements')
+          .select(`
+            id,
+            title,
+            body,
+            image_url,
+            button_text,
+            button_url,
+            company_name,
+            times_used,
+            advertiser:advertisers(
+              id,
+              company_name,
+              logo_url
+            )
+          `)
+          .in('id', adIds)
+
+        // Map advertisements to selections
+        const adMap = new Map(advertisements?.map(a => [a.id, a]) || [])
+        selections = selections.map(s => ({
+          ...s,
+          advertisement: s.advertisement_id ? adMap.get(s.advertisement_id) || null : null
+        }))
+      }
+    }
 
     if (selectionsError) {
       console.error('[AdModules] Error fetching selections:', selectionsError)
@@ -87,13 +109,14 @@ export async function GET(
       await ModuleAdSelector.selectAdsForIssue(issueId, issue.publication_id, issueDate)
 
       // Re-fetch selections after creating them
-      const { data: newSelections } = await supabaseAdmin
+      let { data: newSelections } = await supabaseAdmin
         .from('issue_module_ads')
         .select(`
           id,
           selection_mode,
           selected_at,
           used_at,
+          advertisement_id,
           ad_module:ad_modules(
             id,
             name,
@@ -101,23 +124,43 @@ export async function GET(
             block_order,
             selection_mode,
             is_active
-          ),
-          advertisement:advertisements(
-            id,
-            title,
-            body,
-            image_url,
-            button_text,
-            button_url,
-            company_name,
-            advertiser:advertisers(
-              id,
-              company_name,
-              logo_url
-            )
           )
         `)
         .eq('issue_id', issueId)
+
+      // Fetch advertisement details for new selections
+      if (newSelections && newSelections.length > 0) {
+        const newAdIds = newSelections
+          .filter(s => s.advertisement_id)
+          .map(s => s.advertisement_id)
+
+        if (newAdIds.length > 0) {
+          const { data: newAdvertisements } = await supabaseAdmin
+            .from('advertisements')
+            .select(`
+              id,
+              title,
+              body,
+              image_url,
+              button_text,
+              button_url,
+              company_name,
+              times_used,
+              advertiser:advertisers(
+                id,
+                company_name,
+                logo_url
+              )
+            `)
+            .in('id', newAdIds)
+
+          const newAdMap = new Map(newAdvertisements?.map(a => [a.id, a]) || [])
+          newSelections = newSelections.map(s => ({
+            ...s,
+            advertisement: s.advertisement_id ? newAdMap.get(s.advertisement_id) || null : null
+          }))
+        }
+      }
 
       selections = newSelections || []
     }
