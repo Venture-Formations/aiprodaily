@@ -245,6 +245,47 @@ export class NewsletterArchiver {
         }))
       }
 
+      // Poll Modules section (new dynamic poll sections)
+      const { data: pollModuleSelections } = await supabaseAdmin
+        .from('issue_poll_modules')
+        .select(`
+          selected_at,
+          used_at,
+          poll_snapshot,
+          poll_module:poll_modules(
+            id,
+            name,
+            display_order,
+            block_order
+          ),
+          poll:polls(
+            id,
+            title,
+            question,
+            options,
+            image_url
+          )
+        `)
+        .eq('issue_id', issueId)
+
+      if (pollModuleSelections && pollModuleSelections.length > 0) {
+        sections.poll_modules = pollModuleSelections.map((selection: any) => ({
+          module_id: selection.poll_module?.id,
+          module_name: selection.poll_module?.name,
+          display_order: selection.poll_module?.display_order,
+          block_order: selection.poll_module?.block_order,
+          selected_at: selection.selected_at,
+          used_at: selection.used_at,
+          poll: selection.poll_snapshot || (selection.poll ? {
+            id: selection.poll.id,
+            title: selection.poll.title,
+            question: selection.poll.question,
+            options: selection.poll.options,
+            image_url: selection.poll.image_url
+          } : null)
+        }))
+      }
+
       // 4. Gather metadata
       const metadata = {
         total_articles: articles?.length || 0,
@@ -257,6 +298,8 @@ export class NewsletterArchiver {
         has_advertorial: !!advertorialData,
         has_ad_modules: !!adModuleSelections && adModuleSelections.length > 0,
         ad_modules_count: adModuleSelections?.length || 0,
+        has_poll_modules: !!pollModuleSelections && pollModuleSelections.length > 0,
+        poll_modules_count: pollModuleSelections?.length || 0,
         archived_at: new Date().toISOString()
       }
 

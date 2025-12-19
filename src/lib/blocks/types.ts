@@ -20,6 +20,9 @@ export type BlockType =
   | 'source'
   | 'snippet'
   | 'read_more'
+  // Poll blocks
+  | 'question'   // Poll question text
+  | 'options'    // Poll voting options
 
 /**
  * Block types specifically for ad modules
@@ -36,6 +39,12 @@ export type PrimaryArticleBlockType = 'headline' | 'image' | 'content' | 'source
  * Block types specifically for secondary articles
  */
 export type SecondaryArticleBlockType = 'headline' | 'snippet' | 'source' | 'read_more'
+
+/**
+ * Block types specifically for poll modules
+ * Matches database poll_modules.block_order schema
+ */
+export type PollBlockType = 'title' | 'question' | 'image' | 'options'
 
 /**
  * Styling options passed to block renderers
@@ -85,6 +94,13 @@ export interface BlockData {
 
   // Tracking
   trackingUrl?: string
+
+  // Poll-specific
+  question?: string
+  options?: string[]
+  poll_id?: string
+  issue_id?: string
+  base_url?: string
 }
 
 /**

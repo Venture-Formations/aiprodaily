@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabaseAdmin
       .from('polls')
-      .select('id, publication_id, title, question, options, is_active, created_at, updated_at')
+      .select('id, publication_id, title, question, options, image_url, is_active, created_at, updated_at')
       .eq('publication_id', publicationId)
       .order('created_at', { ascending: false })
 
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { publication_id, title, question, options, is_active } = body
+    const { publication_id, title, question, options, image_url, is_active } = body
 
     if (!publication_id) {
       return NextResponse.json(
@@ -88,9 +88,10 @@ export async function POST(request: NextRequest) {
         title,
         question,
         options,
+        image_url: image_url || null,
         is_active: is_active || false
       })
-      .select('id, publication_id, title, question, options, is_active, created_at, updated_at')
+      .select('id, publication_id, title, question, options, image_url, is_active, created_at, updated_at')
       .single()
 
     if (error) {

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Layout from '@/components/Layout'
 import DeleteIssueModal from '@/components/DeleteIssueModal'
 import AdModulesPanel from '@/components/AdModulesPanel'
+import PollModulesPanel from '@/components/PollModulesPanel'
 import type { issueWithArticles, ArticleWithPost, issueEvent, Event, NewsletterSection } from '@/types/database'
 import {
   DndContext,
@@ -2772,6 +2773,9 @@ export default function issueDetailPage() {
 
         {/* Dynamic Ad Sections */}
         {issue && <AdModulesPanel issueId={issue.id} />}
+
+        {/* Dynamic Poll Sections */}
+        {issue && <PollModulesPanel issueId={issue.id} />}
 
         {/* Preview Modal */}
         {showPreview && (

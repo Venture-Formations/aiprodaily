@@ -377,6 +377,18 @@ export async function POST(request: NextRequest) {
       // Don't fail the send if app tracking fails
     }
 
+    // Record poll module usage (stores snapshots for archive)
+    try {
+      const { PollModuleSelector } = await import('@/lib/poll-modules')
+      const pollResult = await PollModuleSelector.recordUsage(issue.id)
+      if (pollResult.recorded > 0) {
+        console.log(`[Send Final] ✓ Poll module usage recorded (${pollResult.recorded} polls)`)
+      }
+    } catch (pollError) {
+      console.error('[Send Final] Failed to record poll module usage (non-critical):', pollError)
+      // Don't fail the send if poll tracking fails
+    }
+
     // Capture the active poll for this issue
     const { poll_id, poll_snapshot } = await capturePollForIssue(issue.id, newsletter.id)
 
@@ -665,6 +677,18 @@ export async function GET(request: NextRequest) {
     } catch (appError) {
       console.error('[Send Final] Failed to record AI app usage (non-critical):', appError)
       // Don't fail the send if app tracking fails
+    }
+
+    // Record poll module usage (stores snapshots for archive)
+    try {
+      const { PollModuleSelector } = await import('@/lib/poll-modules')
+      const pollResult = await PollModuleSelector.recordUsage(issue.id)
+      if (pollResult.recorded > 0) {
+        console.log(`[Send Final] ✓ Poll module usage recorded (${pollResult.recorded} polls)`)
+      }
+    } catch (pollError) {
+      console.error('[Send Final] Failed to record poll module usage (non-critical):', pollError)
+      // Don't fail the send if poll tracking fails
     }
 
     // Capture the active poll for this issue

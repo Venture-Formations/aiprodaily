@@ -105,6 +105,7 @@ export default async function NewsletterPage({ params }: PageProps) {
   const welcome = newsletter.sections?.welcome
   const advertorial = newsletter.sections?.advertorial
   const adModules = newsletter.sections?.ad_modules || []
+  const pollModules = newsletter.sections?.poll_modules || []
 
   // Section IDs for stable matching
   const SECTION_IDS = {
@@ -594,6 +595,71 @@ export default async function NewsletterPage({ params }: PageProps) {
                           Sponsored by {adModule.advertiser.company_name}
                         </div>
                       )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+
+          {/* Dynamic Poll Modules (new poll sections system) */}
+          {pollModules.length > 0 && pollModules
+            .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0))
+            .map((pollModule: any) => {
+              const poll = pollModule.poll
+              if (!poll) return null
+
+              const blockOrder: string[] = pollModule.block_order || ['title', 'question', 'image', 'options']
+
+              return (
+                <div key={pollModule.module_name} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-purple-600 text-white">{pollModule.module_name}</h2>
+                  <div className="p-6 sm:p-8">
+                    <div className="text-center">
+                      {blockOrder.map((blockType: string) => {
+                        switch (blockType) {
+                          case 'title':
+                            return poll.title ? (
+                              <h3 key="title" className="text-xl sm:text-2xl font-bold text-slate-900 mb-4">{poll.title}</h3>
+                            ) : null
+                          case 'question':
+                            return poll.question ? (
+                              <div key="question" className="text-lg text-slate-700 mb-4">{poll.question}</div>
+                            ) : null
+                          case 'image':
+                            if (!poll.image_url) return null
+                            return (
+                              <div key="image" className="mb-4">
+                                <img
+                                  src={poll.image_url}
+                                  alt={poll.title || pollModule.module_name}
+                                  className="mx-auto max-w-full rounded-lg"
+                                  style={{ maxHeight: '400px' }}
+                                />
+                              </div>
+                            )
+                          case 'options':
+                            return poll.options && poll.options.length > 0 ? (
+                              <div key="options" className="mt-4">
+                                <div className="text-sm text-slate-500 mb-2">Poll options:</div>
+                                <div className="flex flex-wrap justify-center gap-2">
+                                  {poll.options.map((option: string, idx: number) => (
+                                    <span
+                                      key={idx}
+                                      className="px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-sm font-medium"
+                                    >
+                                      {option}
+                                    </span>
+                                  ))}
+                                </div>
+                                <div className="mt-4 text-xs text-slate-500">
+                                  This poll was available in the email newsletter.
+                                </div>
+                              </div>
+                            ) : null
+                          default:
+                            return null
+                        }
+                      })}
                     </div>
                   </div>
                 </div>

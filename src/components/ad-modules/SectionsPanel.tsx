@@ -20,7 +20,8 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import AdModuleSettings from './AdModuleSettings'
-import type { NewsletterSection, AdModule, AdBlockType } from '@/types/database'
+import PollModuleSettings from '../poll-modules/PollModuleSettings'
+import type { NewsletterSection, AdModule, PollModule } from '@/types/database'
 
 interface SectionsPanelProps {
   publicationId?: string // Optional - will be fetched from URL if not provided
@@ -29,6 +30,7 @@ interface SectionsPanelProps {
 type SectionItem =
   | { type: 'section'; data: NewsletterSection }
   | { type: 'ad_module'; data: AdModule }
+  | { type: 'poll_module'; data: PollModule }
 
 function SortableSectionItem({
   item,
@@ -43,10 +45,15 @@ function SortableSectionItem({
   onToggle: () => void
   disabled: boolean
 }) {
-  const id = item.type === 'section' ? `section-${item.data.id}` : `module-${item.data.id}`
+  const id = item.type === 'section'
+    ? `section-${item.data.id}`
+    : item.type === 'ad_module'
+      ? `ad-module-${item.data.id}`
+      : `poll-module-${item.data.id}`
   const name = item.data.name
-  const isActive = item.type === 'section' ? item.data.is_active : item.data.is_active
+  const isActive = item.data.is_active
   const isAdModule = item.type === 'ad_module'
+  const isPollModule = item.type === 'poll_module'
 
   const {
     attributes,
@@ -93,8 +100,13 @@ function SortableSectionItem({
             {name}
           </span>
           {isAdModule && (
-            <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
+            <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
               Ad
+            </span>
+          )}
+          {isPollModule && (
+            <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
+              Poll
             </span>
           )}
         </div>
@@ -186,13 +198,14 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
   const [publicationId, setPublicationId] = useState<string | null>(propPublicationId || null)
   const [sections, setSections] = useState<NewsletterSection[]>([])
   const [adModules, setAdModules] = useState<AdModule[]>([])
+  const [pollModules, setPollModules] = useState<PollModule[]>([])
   const [selectedItem, setSelectedItem] = useState<SectionItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [cooldownDays, setCooldownDays] = useState(7)
   const [showAddModal, setShowAddModal] = useState(false)
   const [newModuleName, setNewModuleName] = useState('')
-  const [newSectionType, setNewSectionType] = useState<'ad' | 'standard'>('ad')
+  const [newSectionType, setNewSectionType] = useState<'ad' | 'poll' | 'standard'>('ad')
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -252,10 +265,17 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
       }
 
       // Fetch ad modules
-      const modulesRes = await fetch(`/api/ad-modules?publication_id=${publicationId}`)
-      if (modulesRes.ok) {
-        const modulesData = await modulesRes.json()
-        setAdModules(modulesData.modules || [])
+      const adModulesRes = await fetch(`/api/ad-modules?publication_id=${publicationId}`)
+      if (adModulesRes.ok) {
+        const adModulesData = await adModulesRes.json()
+        setAdModules(adModulesData.modules || [])
+      }
+
+      // Fetch poll modules
+      const pollModulesRes = await fetch(`/api/poll-modules?publication_id=${publicationId}`)
+      if (pollModulesRes.ok) {
+        const pollModulesData = await pollModulesRes.json()
+        setPollModules(pollModulesData.modules || [])
       }
 
       // Fetch cooldown setting
@@ -274,7 +294,8 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
   // Combine and sort all items by display_order
   const allItems: SectionItem[] = [
     ...sections.map(s => ({ type: 'section' as const, data: s })),
-    ...adModules.map(m => ({ type: 'ad_module' as const, data: m }))
+    ...adModules.map(m => ({ type: 'ad_module' as const, data: m })),
+    ...pollModules.map(m => ({ type: 'poll_module' as const, data: m }))
   ].sort((a, b) => {
     const orderA = a.data.display_order ?? 999
     const orderB = b.data.display_order ?? 999
@@ -282,7 +303,11 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
   })
 
   const itemIds = allItems.map(item =>
-    item.type === 'section' ? `section-${item.data.id}` : `module-${item.data.id}`
+    item.type === 'section'
+      ? `section-${item.data.id}`
+      : item.type === 'ad_module'
+        ? `ad-module-${item.data.id}`
+        : `poll-module-${item.data.id}`
   )
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -297,19 +322,23 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     // Reorder local state - assign display_order based on position in combined list
     const reorderedItems = arrayMove(allItems, oldIndex, newIndex)
     const newSections: NewsletterSection[] = []
-    const newModules: AdModule[] = []
+    const newAdModules: AdModule[] = []
+    const newPollModules: PollModule[] = []
 
     reorderedItems.forEach((item, idx) => {
       const newOrder = idx + 1
       if (item.type === 'section') {
         newSections.push({ ...item.data, display_order: newOrder })
+      } else if (item.type === 'ad_module') {
+        newAdModules.push({ ...item.data, display_order: newOrder })
       } else {
-        newModules.push({ ...item.data, display_order: newOrder })
+        newPollModules.push({ ...item.data, display_order: newOrder })
       }
     })
 
     setSections(newSections)
-    setAdModules(newModules)
+    setAdModules(newAdModules)
+    setPollModules(newPollModules)
 
     // Save to server
     setSaving(true)
@@ -325,13 +354,24 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
         })
       }
 
-      // Update modules order
-      if (newModules.length > 0) {
+      // Update ad modules order
+      if (newAdModules.length > 0) {
         await fetch('/api/ad-modules', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            modules: newModules.map(m => ({ id: m.id, display_order: m.display_order }))
+            modules: newAdModules.map(m => ({ id: m.id, display_order: m.display_order }))
+          })
+        })
+      }
+
+      // Update poll modules order
+      if (newPollModules.length > 0) {
+        await fetch('/api/poll-modules', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            modules: newPollModules.map(m => ({ id: m.id, display_order: m.display_order }))
           })
         })
       }
@@ -361,7 +401,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
         setSections(prev => prev.map(s =>
           s.id === item.data.id ? { ...s, is_active: newActive } : s
         ))
-      } else {
+      } else if (item.type === 'ad_module') {
         await fetch(`/api/ad-modules/${item.data.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -370,21 +410,24 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
         setAdModules(prev => prev.map(m =>
           m.id === item.data.id ? { ...m, is_active: newActive } : m
         ))
+      } else {
+        // Poll module
+        await fetch(`/api/poll-modules/${item.data.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_active: newActive })
+        })
+        setPollModules(prev => prev.map(m =>
+          m.id === item.data.id ? { ...m, is_active: newActive } : m
+        ))
       }
 
       // Update selected item if it's the one being toggled
-      if (selectedItem && selectedItem.data.id === item.data.id) {
-        if (item.type === 'section') {
-          setSelectedItem({
-            type: 'section',
-            data: { ...item.data, is_active: newActive }
-          })
-        } else {
-          setSelectedItem({
-            type: 'ad_module',
-            data: { ...item.data, is_active: newActive }
-          })
-        }
+      if (selectedItem && selectedItem.data.id === item.data.id && selectedItem.type === item.type) {
+        setSelectedItem({
+          ...item,
+          data: { ...item.data, is_active: newActive }
+        } as SectionItem)
       }
     } catch (error) {
       console.error('Failed to toggle:', error)
@@ -413,6 +456,22 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           const data = await res.json()
           setAdModules(prev => [...prev, data.module])
           setSelectedItem({ type: 'ad_module', data: data.module })
+        }
+      } else if (newSectionType === 'poll') {
+        // Create poll module
+        const res = await fetch('/api/poll-modules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            publication_id: publicationId,
+            name: newModuleName.trim()
+          })
+        })
+
+        if (res.ok) {
+          const data = await res.json()
+          setPollModules(prev => [...prev, data.module])
+          setSelectedItem({ type: 'poll_module', data: data.module })
         }
       } else {
         // Create standard section
@@ -479,6 +538,46 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
 
     if (res.ok) {
       setAdModules(prev => prev.filter(m => m.id !== moduleId))
+      setSelectedItem(null)
+    }
+  }
+
+  const handleUpdatePollModule = async (updates: Partial<PollModule>) => {
+    if (!selectedItem || selectedItem.type !== 'poll_module') {
+      throw new Error('No poll module selected')
+    }
+
+    const moduleId = selectedItem.data.id
+    console.log('[SectionsPanel] Updating poll module:', moduleId, updates)
+
+    const res = await fetch(`/api/poll-modules/${moduleId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      console.log('[SectionsPanel] Poll module updated successfully:', data.module)
+      setPollModules(prev => prev.map(m => m.id === moduleId ? data.module : m))
+      setSelectedItem({ type: 'poll_module', data: data.module })
+    } else {
+      const errorData = await res.json().catch(() => ({}))
+      console.error('[SectionsPanel] Failed to update poll module:', res.status, errorData)
+      throw new Error(errorData.error || `Failed to update poll module (${res.status})`)
+    }
+  }
+
+  const handleDeletePollModule = async () => {
+    if (!selectedItem || selectedItem.type !== 'poll_module') return
+
+    const moduleId = selectedItem.data.id
+    const res = await fetch(`/api/poll-modules/${moduleId}`, {
+      method: 'DELETE'
+    })
+
+    if (res.ok) {
+      setPollModules(prev => prev.filter(m => m.id !== moduleId))
       setSelectedItem(null)
     }
   }
@@ -602,6 +701,12 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
             />
           ) : selectedItem.type === 'ad_module' ? (
             <div className="text-gray-500">Loading publication...</div>
+          ) : selectedItem.type === 'poll_module' ? (
+            <PollModuleSettings
+              module={selectedItem.data}
+              onUpdate={handleUpdatePollModule}
+              onDelete={handleDeletePollModule}
+            />
           ) : (
             <SectionSettings
               section={selectedItem.data}
@@ -628,30 +733,42 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
             {/* Section Type Selector */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">Section Type</label>
-              <div className="flex gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => setNewSectionType('ad')}
-                  className={`flex-1 px-4 py-3 rounded-lg border-2 transition-colors ${
+                  className={`px-3 py-3 rounded-lg border-2 transition-colors ${
                     newSectionType === 'ad'
-                      ? 'border-purple-500 bg-purple-50 text-purple-700'
-                      : 'border-gray-200 hover:border-gray-300 text-gray-600'
-                  }`}
-                >
-                  <div className="font-medium">Ad Section</div>
-                  <div className="text-xs mt-1 opacity-75">Configurable ad placement</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setNewSectionType('standard')}
-                  className={`flex-1 px-4 py-3 rounded-lg border-2 transition-colors ${
-                    newSectionType === 'standard'
                       ? 'border-blue-500 bg-blue-50 text-blue-700'
                       : 'border-gray-200 hover:border-gray-300 text-gray-600'
                   }`}
                 >
-                  <div className="font-medium">Standard</div>
-                  <div className="text-xs mt-1 opacity-75">Content section</div>
+                  <div className="font-medium text-sm">Ad</div>
+                  <div className="text-xs mt-1 opacity-75">Ad placement</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewSectionType('poll')}
+                  className={`px-3 py-3 rounded-lg border-2 transition-colors ${
+                    newSectionType === 'poll'
+                      ? 'border-purple-500 bg-purple-50 text-purple-700'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                  }`}
+                >
+                  <div className="font-medium text-sm">Poll</div>
+                  <div className="text-xs mt-1 opacity-75">Poll section</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewSectionType('standard')}
+                  className={`px-3 py-3 rounded-lg border-2 transition-colors ${
+                    newSectionType === 'standard'
+                      ? 'border-gray-500 bg-gray-100 text-gray-700'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                  }`}
+                >
+                  <div className="font-medium text-sm">Standard</div>
+                  <div className="text-xs mt-1 opacity-75">Content</div>
                 </button>
               </div>
             </div>
@@ -663,7 +780,13 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
                 type="text"
                 value={newModuleName}
                 onChange={(e) => setNewModuleName(e.target.value)}
-                placeholder={newSectionType === 'ad' ? "e.g., Sidebar Sponsor" : "e.g., Featured Content"}
+                placeholder={
+                  newSectionType === 'ad'
+                    ? "e.g., Sidebar Sponsor"
+                    : newSectionType === 'poll'
+                      ? "e.g., Weekly Poll"
+                      : "e.g., Featured Content"
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 autoFocus
               />

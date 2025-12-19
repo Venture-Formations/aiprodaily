@@ -20,7 +20,7 @@ export async function GET(
 
     const { data: poll, error } = await supabaseAdmin
       .from('polls')
-      .select('id, publication_id, title, question, options, is_active, created_at, updated_at')
+      .select('id, publication_id, title, question, options, image_url, is_active, created_at, updated_at')
       .eq('id', id)
       .eq('publication_id', publicationId)
       .single()
@@ -51,7 +51,7 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await request.json()
-    const { publication_id, title, question, options, is_active } = body
+    const { publication_id, title, question, options, image_url, is_active } = body
 
     if (!publication_id) {
       return NextResponse.json(
@@ -82,6 +82,7 @@ export async function PATCH(
       }
       updateData.options = options
     }
+    if (image_url !== undefined) updateData.image_url = image_url
     if (is_active !== undefined) updateData.is_active = is_active
 
     const { data: poll, error } = await supabaseAdmin
@@ -89,7 +90,7 @@ export async function PATCH(
       .update(updateData)
       .eq('id', id)
       .eq('publication_id', publication_id)
-      .select('id, publication_id, title, question, options, is_active, created_at, updated_at')
+      .select('id, publication_id, title, question, options, image_url, is_active, created_at, updated_at')
       .single()
 
     if (error) {

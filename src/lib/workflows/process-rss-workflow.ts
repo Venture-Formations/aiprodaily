@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { RSSProcessor } from '@/lib/rss-processor'
 import { ModuleAdSelector } from '@/lib/ad-modules'
+import { PollModuleSelector } from '@/lib/poll-modules'
 
 /**
  * RSS Processing Workflow (REFACTORED)
@@ -597,6 +598,23 @@ async function finalizeIssue(issueId: string) {
       } catch (moduleAdError) {
         console.log('[Workflow Step 11/11] Ad module selection failed (non-critical):', moduleAdError)
         // Don't fail workflow if ad module selection fails
+      }
+
+      // Initialize poll module selections (empty - for manual picking)
+      try {
+        const { data: issueData } = await supabaseAdmin
+          .from('publication_issues')
+          .select('publication_id')
+          .eq('id', issueId)
+          .single()
+
+        if (issueData) {
+          await PollModuleSelector.initializeSelectionsForIssue(issueId, issueData.publication_id)
+          console.log(`[Workflow Step 11/11] Poll module selections initialized (manual selection required)`)
+        }
+      } catch (pollModuleError) {
+        console.log('[Workflow Step 11/11] Poll module initialization failed (non-critical):', pollModuleError)
+        // Don't fail workflow if poll module initialization fails
       }
 
       // Set status to draft

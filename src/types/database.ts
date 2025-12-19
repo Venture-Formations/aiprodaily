@@ -547,6 +547,7 @@ export interface Poll {
   title: string
   question: string
   options: string[]
+  image_url?: string
   is_active: boolean
   created_at: string
   updated_at: string
@@ -560,6 +561,42 @@ export interface PollResponse {
   subscriber_email: string
   selected_option: string
   responded_at: string
+}
+
+// Poll Module Types
+export type PollBlockType = 'title' | 'question' | 'image' | 'options'
+
+export interface PollModule {
+  id: string
+  publication_id: string
+  name: string
+  display_order: number
+  is_active: boolean
+  block_order: PollBlockType[]
+  config: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface PollSnapshot {
+  id: string
+  title: string
+  question: string
+  options: string[]
+  image_url?: string
+}
+
+export interface IssuePollModule {
+  id: string
+  issue_id: string
+  poll_module_id: string
+  poll_id: string | null
+  poll_snapshot: PollSnapshot | null
+  selected_at: string
+  used_at: string | null
+  // Joined relations
+  poll_module?: PollModule
+  poll?: Poll
 }
 
 // Combined types for API responses

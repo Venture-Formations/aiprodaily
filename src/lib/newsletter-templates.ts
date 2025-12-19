@@ -661,6 +661,49 @@ ${optionsHtml}
   }
 }
 
+// ==================== POLL MODULES SECTION ====================
+
+/**
+ * Generate HTML for a single poll module.
+ * This uses the new modular poll system with block ordering.
+ *
+ * @param issue - The issue data
+ * @param moduleId - The poll module ID to render
+ * @returns The generated HTML for the poll module
+ */
+export async function generatePollModulesSection(
+  issue: { id: string; publication_id: string; status?: string },
+  moduleId: string
+): Promise<string> {
+  try {
+    const { PollModuleSelector, PollModuleRenderer } = await import('./poll-modules')
+
+    // Get all poll selections for this issue
+    const selections = await PollModuleSelector.getIssuePollSelections(issue.id)
+
+    // Find the selection for this specific module
+    const selection = selections.find(s => s.poll_module_id === moduleId)
+
+    if (!selection || !selection.poll || !selection.poll_module) {
+      console.log(`[PollModules] No selection/poll found for module ${moduleId} in issue ${issue.id}`)
+      return ''
+    }
+
+    // Render the poll module
+    const result = await PollModuleRenderer.renderPollModule(
+      selection.poll_module,
+      selection.poll,
+      issue.publication_id,
+      { issueId: issue.id }
+    )
+
+    return result.html
+  } catch (error) {
+    console.error('[PollModules] Error generating poll module section:', error)
+    return ''
+  }
+}
+
 // ==================== DINING DEALS ====================
 // Feature not needed in this newsletter
 

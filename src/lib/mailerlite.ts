@@ -368,8 +368,17 @@ export class MailerLiteService {
       .eq('is_active', true)
       .order('display_order', { ascending: true })
 
+    // Fetch poll modules for this publication
+    const { data: pollModules } = await supabaseAdmin
+      .from('poll_modules')
+      .select('*')
+      .eq('publication_id', issue.publication_id)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+
     console.log('MailerLite - Active newsletter sections:', sections?.map(s => `${s.name} (order: ${s.display_order})`).join(', '))
     console.log('MailerLite - Active ad modules:', adModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
+    console.log('MailerLite - Active poll modules:', pollModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
 
     // Format date using local date parsing (same as preview)
     const [year, month, day] = issue.date.split('-').map(Number)
@@ -415,11 +424,12 @@ export class MailerLiteService {
       PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b'
     }
 
-    // Merge newsletter sections and ad modules into a single sorted list - SAME AS PREVIEW
-    type SectionItem = { type: 'section'; data: any } | { type: 'ad_module'; data: any }
+    // Merge newsletter sections, ad modules, and poll modules into a single sorted list - SAME AS PREVIEW
+    type SectionItem = { type: 'section'; data: any } | { type: 'ad_module'; data: any } | { type: 'poll_module'; data: any }
     const allItems: SectionItem[] = [
       ...(sections || []).map(s => ({ type: 'section' as const, data: s })),
-      ...(adModules || []).map(m => ({ type: 'ad_module' as const, data: m }))
+      ...(adModules || []).map(m => ({ type: 'ad_module' as const, data: m })),
+      ...(pollModules || []).map(m => ({ type: 'poll_module' as const, data: m }))
     ].sort((a, b) => (a.data.display_order || 999) - (b.data.display_order || 999))
 
     console.log('MailerLite - Combined section order:', allItems.map(item =>
@@ -435,6 +445,13 @@ export class MailerLiteService {
         const adModuleHtml = await generateAdModulesSection(issue, item.data.id)
         if (adModuleHtml) {
           sectionsHtml += adModuleHtml
+        }
+      } else if (item.type === 'poll_module') {
+        // Generate poll module section using the poll modules library
+        const { generatePollModulesSection } = await import('./newsletter-templates')
+        const pollModuleHtml = await generatePollModulesSection(issue, item.data.id)
+        if (pollModuleHtml) {
+          sectionsHtml += pollModuleHtml
         }
       } else {
         const section = item.data

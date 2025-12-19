@@ -27,6 +27,7 @@ export default function PollsPage() {
   const [formTitle, setFormTitle] = useState('')
   const [formQuestion, setFormQuestion] = useState('')
   const [formOptions, setFormOptions] = useState<string[]>(['', '', ''])
+  const [formImageUrl, setFormImageUrl] = useState('')
 
   // Extract publication slug from pathname and fetch publication ID
   useEffect(() => {
@@ -118,6 +119,7 @@ export default function PollsPage() {
           title: formTitle,
           question: formQuestion,
           options: validOptions,
+          image_url: formImageUrl || null,
           is_active: false
         })
       })
@@ -154,7 +156,8 @@ export default function PollsPage() {
           publication_id: publicationId,
           title: formTitle,
           question: formQuestion,
-          options: validOptions
+          options: validOptions,
+          image_url: formImageUrl || null
         })
       })
 
@@ -227,6 +230,7 @@ export default function PollsPage() {
     setFormTitle('')
     setFormQuestion('')
     setFormOptions(['', '', ''])
+    setFormImageUrl('')
   }
 
   const openEditForm = (poll: PollWithAnalytics) => {
@@ -234,6 +238,7 @@ export default function PollsPage() {
     setFormTitle(poll.title)
     setFormQuestion(poll.question)
     setFormOptions([...poll.options])
+    setFormImageUrl(poll.image_url || '')
     setShowEditForm(true)
   }
 
@@ -372,6 +377,32 @@ export default function PollsPage() {
                     + Add Option
                   </button>
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Image URL (Optional)</label>
+                  <input
+                    type="url"
+                    value={formImageUrl}
+                    onChange={(e) => setFormImageUrl(e.target.value)}
+                    className="w-full border rounded px-3 py-2"
+                    placeholder="https://example.com/poll-image.jpg"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Add an image to display with the poll (only shown if poll module has image block enabled)
+                  </p>
+                  {formImageUrl && (
+                    <div className="mt-2">
+                      <img
+                        src={formImageUrl}
+                        alt="Poll preview"
+                        className="max-w-xs max-h-32 rounded border"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none'
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-2 mt-6">
@@ -419,6 +450,14 @@ export default function PollsPage() {
                       {poll.is_active && (
                         <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">
                           ACTIVE
+                        </span>
+                      )}
+                      {poll.image_url && (
+                        <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          Image
                         </span>
                       )}
                     </div>

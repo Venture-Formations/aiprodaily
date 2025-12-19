@@ -17,6 +17,8 @@ import { renderTitleBlock } from './renderers/title'
 import { renderImageBlock } from './renderers/image'
 import { renderBodyBlock } from './renderers/body'
 import { renderButtonBlock } from './renderers/button'
+import { renderQuestion } from './renderers/question'
+import { renderOptions } from './renderers/options'
 
 /**
  * Block definitions with metadata
@@ -78,6 +80,20 @@ const blockDefinitions: Record<BlockType, BlockDefinition> = {
     name: 'Read More',
     description: 'Link to full article',
     render: () => '' // TODO: Implement
+  },
+
+  // Poll blocks
+  question: {
+    type: 'question',
+    name: 'Question',
+    description: 'Poll question text',
+    render: renderQuestion
+  },
+  options: {
+    type: 'options',
+    name: 'Options',
+    description: 'Poll voting options/buttons',
+    render: renderOptions
   }
 }
 
@@ -109,12 +125,15 @@ export function getAllBlockTypes(): BlockType[] {
 
 /**
  * Get block types for a specific category
- * @param category - 'ad' | 'article'
+ * @param category - 'ad' | 'article' | 'poll'
  * @returns Array of block types for that category
  */
-export function getBlockTypesByCategory(category: 'ad' | 'article'): BlockType[] {
+export function getBlockTypesByCategory(category: 'ad' | 'article' | 'poll'): BlockType[] {
   if (category === 'ad') {
     return ['title', 'image', 'body', 'button']
+  }
+  if (category === 'poll') {
+    return ['title', 'question', 'image', 'options']
   }
   return ['headline', 'image', 'content', 'source', 'snippet', 'read_more']
 }
