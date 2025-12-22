@@ -122,10 +122,15 @@ export default function AIAppModulesPanel({ issueId }: AIAppModulesPanelProps) {
               >
                 <div className="flex items-center space-x-3">
                   <span className="font-medium text-gray-900">{module.name}</span>
-                  <span className="text-xs text-gray-400">Order: {module.display_order}</span>
-                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                    {module.selection_mode}
-                  </span>
+                  {selection?.selection_mode === 'legacy' ? (
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                      Legacy
+                    </span>
+                  ) : (
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                      {module.selection_mode}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center space-x-3">
                   {appIds.length > 0 ? (
@@ -151,15 +156,6 @@ export default function AIAppModulesPanel({ issueId }: AIAppModulesPanelProps) {
               {/* Expanded Content */}
               {isExpanded && (
                 <div className="mt-4 space-y-3">
-                  {/* Module Settings Summary */}
-                  <div className="bg-gray-50 p-3 rounded-lg text-sm text-gray-600">
-                    <div className="flex flex-wrap gap-4">
-                      <span>Apps per issue: <strong>{module.apps_count}</strong></span>
-                      <span>Max per category: <strong>{module.max_per_category}</strong></span>
-                      <span>Affiliate cooldown: <strong>{module.affiliate_cooldown_days} days</strong></span>
-                    </div>
-                  </div>
-
                   {/* Selected Apps List */}
                   {appIds.length > 0 ? (
                     <div className="space-y-2">
