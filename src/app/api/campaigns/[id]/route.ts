@@ -65,6 +65,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       `)
       .eq('issue_id', id)
 
+    // Also fetch legacy AI app selections for backward compatibility with old issues
+    const { data: legacyAiApps } = await supabaseAdmin
+      .from('issue_ai_app_selections')
+      .select(`
+        *,
+        app:ai_applications(*)
+      `)
+      .eq('issue_id', id)
+      .order('selection_order', { ascending: true })
+
     // Transform email_metrics from array to single object (or null)
     // Supabase returns email_metrics(*) as an array even for one-to-one relationships
     const transformedIssue = {
@@ -72,7 +82,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       email_metrics: Array.isArray(issue.email_metrics) && issue.email_metrics.length > 0
         ? issue.email_metrics[0]
         : null,
-      issue_ai_app_modules: aiAppModules || []
+      issue_ai_app_modules: aiAppModules || [],
+      issue_ai_app_selections: legacyAiApps || []
     }
 
     return NextResponse.json({ issue: transformedIssue })

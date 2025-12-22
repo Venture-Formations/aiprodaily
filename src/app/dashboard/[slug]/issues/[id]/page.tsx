@@ -201,15 +201,18 @@ function PromptIdeasSection({ issue }: { issue: any }) {
 
 function AIAppsSection({ issue }: { issue: any }) {
   const [modules, setModules] = useState<any[]>([])
+  const [legacyApps, setLegacyApps] = useState<any[]>([])
   const [apps, setApps] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
+  const [isLegacy, setIsLegacy] = useState(false)
 
   useEffect(() => {
     const fetchAIApps = async () => {
       try {
-        // Get module selections from issue data
+        // Try new module system first
         if (issue?.issue_ai_app_modules && issue.issue_ai_app_modules.length > 0) {
           setModules(issue.issue_ai_app_modules)
+          setIsLegacy(false)
 
           // Collect all app IDs from all modules
           const allAppIds: string[] = []
@@ -231,6 +234,11 @@ function AIAppsSection({ issue }: { issue: any }) {
             }
           }
         }
+        // Fall back to legacy system for old issues
+        else if (issue?.issue_ai_app_selections && issue.issue_ai_app_selections.length > 0) {
+          setLegacyApps(issue.issue_ai_app_selections)
+          setIsLegacy(true)
+        }
       } catch (error) {
         console.error('Failed to load AI apps:', error)
       } finally {
@@ -246,6 +254,72 @@ function AIAppsSection({ issue }: { issue: any }) {
       <div className="flex items-center justify-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
         <span className="ml-3 text-gray-600">Loading AI Applications...</span>
+      </div>
+    )
+  }
+
+  // Show legacy apps for old issues
+  if (isLegacy && legacyApps.length > 0) {
+    return (
+      <div className="p-6">
+        <div className="border rounded-lg overflow-hidden">
+          <div className="bg-gray-50 px-4 py-2 border-b flex items-center justify-between">
+            <h3 className="font-semibold text-gray-700">AI Applications</h3>
+            <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded">
+              {legacyApps.length} apps (legacy)
+            </span>
+          </div>
+          <div className="p-4 grid gap-3">
+            {legacyApps.map((selection, index) => {
+              const app = selection.app
+              if (!app) return null
+
+              return (
+                <div
+                  key={selection.id}
+                  className="border border-gray-200 rounded-lg p-3 bg-white hover:bg-gray-50"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-900">
+                        <span className="text-gray-500 mr-2">{index + 1}.</span>
+                        {app.app_name}
+                        {app.is_affiliate && (
+                          <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">
+                            Affiliate
+                          </span>
+                        )}
+                      </h4>
+                      {app.tagline && (
+                        <p className="text-sm text-gray-600 italic mt-1">
+                          {app.tagline}
+                        </p>
+                      )}
+                      <p className="text-sm text-gray-700 mt-1 line-clamp-2">
+                        {app.description}
+                      </p>
+                      {app.app_url && (
+                        <a
+                          href={app.app_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline mt-1 inline-block"
+                        >
+                          Visit site →
+                        </a>
+                      )}
+                    </div>
+                    {app.category && (
+                      <span className="ml-3 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                        {app.category}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
       </div>
     )
   }
