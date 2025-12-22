@@ -309,9 +309,17 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     }
   }
 
+  // Section IDs that are now handled by modules (exclude from sections list)
+  const EXCLUDED_SECTION_IDS = [
+    'c0bc7173-de47-41b2-a260-77f55525ee3d', // Advertisement - handled by AdModulesPanel
+    '853f8d0b-bc76-473a-bfc6-421418266222'  // AI Applications - handled by AIAppModulesPanel
+  ]
+
   // Combine and sort all items by display_order
   const allItems: SectionItem[] = [
-    ...sections.map(s => ({ type: 'section' as const, data: s })),
+    ...sections
+      .filter(s => !EXCLUDED_SECTION_IDS.includes(s.id))
+      .map(s => ({ type: 'section' as const, data: s })),
     ...adModules.map(m => ({ type: 'ad_module' as const, data: m })),
     ...pollModules.map(m => ({ type: 'poll_module' as const, data: m })),
     ...aiAppModules.map(m => ({ type: 'ai_app_module' as const, data: m }))
