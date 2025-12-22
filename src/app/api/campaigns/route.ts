@@ -3,30 +3,19 @@ import { getServerSession } from 'next-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authOptions } from '@/lib/auth'
 import { PromptSelector } from '@/lib/prompt-selector'
-import { AppSelector } from '@/lib/app-selector'
+import { AppModuleSelector } from '@/lib/ai-app-modules'
 
 // Helper function to initialize AI app selection for a new issue
-async function initializeAIAppSelection(issueId: string) {
+async function initializeAIAppSelection(issueId: string, publicationId: string) {
   try {
     console.log(`Initializing AI app selection for issue ${issueId}`)
 
-    // Get accounting newsletter ID
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('slug', 'accounting')
-      .single()
+    // Use AppModuleSelector to select apps for all active modules
+    const results = await AppModuleSelector.selectAppsForIssue(issueId, publicationId, new Date())
 
-    if (!newsletter) {
-      console.error('Accounting newsletter not found')
-      return
-    }
-
-    // Use AppSelector to select apps with proper category rotation logic
-    const selectedApps = await AppSelector.selectAppsForissue(issueId, newsletter.id)
-
-    if (selectedApps.length > 0) {
-      console.log(`Successfully selected ${selectedApps.length} AI applications`)
+    const totalApps = results.reduce((sum, r) => sum + r.result.apps.length, 0)
+    if (totalApps > 0) {
+      console.log(`Successfully selected ${totalApps} AI applications across ${results.length} modules`)
     } else {
       console.log('No apps available for selection')
     }
@@ -203,7 +192,7 @@ export async function POST(request: NextRequest) {
 
     // Run all initializations in parallel for better performance
     await Promise.all([
-      initializeAIAppSelection(issue.id),
+      initializeAIAppSelection(issue.id, newsletter.id),
       initializePromptSelection(issue.id)
     ])
 
