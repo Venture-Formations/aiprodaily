@@ -6,6 +6,7 @@ import Layout from '@/components/Layout'
 import DeleteIssueModal from '@/components/DeleteIssueModal'
 import AdModulesPanel from '@/components/AdModulesPanel'
 import PollModulesPanel from '@/components/PollModulesPanel'
+import AIAppModulesPanel from '@/components/AIAppModulesPanel'
 import type { issueWithArticles, ArticleWithPost, issueEvent, Event, NewsletterSection } from '@/types/database'
 import {
   DndContext,
@@ -2882,6 +2883,9 @@ export default function issueDetailPage() {
 
         {/* Dynamic Poll Sections */}
         {issue && <PollModulesPanel issueId={issue.id} />}
+
+        {/* Dynamic AI App Sections */}
+        {issue && <AIAppModulesPanel issueId={issue.id} />}
 
         {/* Preview Modal */}
         {showPreview && (
