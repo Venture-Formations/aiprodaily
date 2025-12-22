@@ -1339,62 +1339,9 @@ export async function generateAIAppsSection(issue: any): Promise<string> {
       }
     }
 
-    // Fall back to legacy rendering if no modules configured
-    console.log('No AI app modules found, using legacy AI Apps rendering...')
-
-    // Import AppSelector for legacy
-    const { AppSelector } = await import('./app-selector')
-
-    // Fetch colors and fonts from business settings (using publication_id if available)
-    const { primaryColor, secondaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue?.publication_id)
-
-    // Get the selected apps for this issue
-    const apps = await AppSelector.getAppsForissue(issue.id)
-
-    if (!apps || apps.length === 0) {
-      console.log('No AI apps selected for this issue, skipping AI Apps section')
-      return ''
-    }
-
-    console.log(`Found ${apps.length} AI apps for issue (legacy)`)
-
-    // Generate numbered list HTML
-    const appsHtml = apps.map((app, index) => {
-      const emoji = getAIAppEmoji(app.app_name, app.category || '', app.description || '')
-      const appUrl = app.app_url || '#'
-
-      // Wrap URL with tracking
-      const trackedUrl = appUrl !== '#'
-        ? wrapTrackingUrl(appUrl, 'AI Apps', issue.date, issue.mailerlite_issue_id, issue.id)
-        : '#'
-
-      // Format: number. emoji Title Description
-      return `
-      <div style='padding: 12px 0; border-bottom: 1px solid #e0e0e0; font-size: 16px; line-height: 24px; font-family: ${bodyFont};'>
-        <strong>${index + 1}.</strong> ${emoji} <a href='${trackedUrl}' style='color: ${secondaryColor}; text-decoration: underline; font-weight: bold;'>${app.app_name}</a> ${app.description || 'AI-powered application'}
-      </div>`
-    }).join('')
-
-    return `
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
-  <tr>
-    <td style="padding:0 10px;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
-        <tr>
-          <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">AI Applications</h2>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding: 0 10px 10px 10px;">
-            ${appsHtml}
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-</table>
-<br>`
+    // No modules configured
+    console.log('No AI app modules found, skipping AI Apps section')
+    return ''
 
   } catch (error) {
     console.error('Error generating AI Apps section:', error)

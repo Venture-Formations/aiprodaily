@@ -113,28 +113,63 @@ export class NewsletterArchiver {
         }
       }
 
-      // AI Apps section
-      const { data: aiApps } = await supabaseAdmin
-        .from('issue_ai_app_selections')
+      // AI Apps section - using module system
+      const { data: moduleSelections } = await supabaseAdmin
+        .from('issue_ai_app_modules')
         .select(`
-          selection_order,
-          is_featured,
-          app:ai_applications(
+          app_ids,
+          ai_app_module:ai_app_modules(
             id,
-            app_name,
-            tagline,
-            description,
-            app_url,
-            logo_url,
-            category,
-            tool_type
+            name,
+            block_order
           )
         `)
         .eq('issue_id', issueId)
-        .order('selection_order', { ascending: true })
 
-      if (aiApps && aiApps.length > 0) {
-        sections.ai_apps = aiApps
+      if (moduleSelections && moduleSelections.length > 0) {
+        // Flatten all app_ids from all modules
+        const allAppIds: string[] = []
+        const moduleInfo: { name: string; block_order: any }[] = []
+
+        for (const selection of moduleSelections) {
+          const appIds = selection.app_ids as string[] || []
+          allAppIds.push(...appIds)
+          // Supabase returns joined relations as arrays, get first element
+          const moduleData = selection.ai_app_module as any
+          const module = Array.isArray(moduleData) ? moduleData[0] : moduleData
+          if (module) {
+            moduleInfo.push({
+              name: module.name,
+              block_order: module.block_order
+            })
+          }
+        }
+
+        if (allAppIds.length > 0) {
+          const { data: apps } = await supabaseAdmin
+            .from('ai_applications')
+            .select('id, app_name, tagline, description, app_url, logo_url, category, tool_type')
+            .in('id', allAppIds)
+
+          if (apps) {
+            // Preserve order based on app_ids
+            const aiAppsData = allAppIds
+              .map((id, index) => {
+                const app = apps.find(a => a.id === id)
+                return app ? { selection_order: index + 1, is_featured: false, app } : null
+              })
+              .filter(Boolean)
+
+            if (aiAppsData.length > 0) {
+              sections.ai_apps = aiAppsData
+            }
+
+            // Store module info for rendering
+            if (moduleInfo.length > 0) {
+              sections.ai_app_modules = moduleInfo
+            }
+          }
+        }
       }
 
       // Poll section
@@ -292,7 +327,7 @@ export class NewsletterArchiver {
         total_secondary_articles: secondaryArticles?.length || 0,
         has_welcome: !!(issue?.welcome_intro || issue?.welcome_tagline || issue?.welcome_summary),
         has_road_work: !!roadWork,
-        has_ai_apps: !!aiApps && aiApps.length > 0,
+        has_ai_apps: !!sections.ai_apps && Array.isArray(sections.ai_apps) && sections.ai_apps.length > 0,
         has_poll: !!poll,
         has_prompt: !!promptSelection,
         has_advertorial: !!advertorialData,

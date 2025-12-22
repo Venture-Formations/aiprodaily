@@ -40,9 +40,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         ),
         manual_articles:manual_articles(*),
         email_metrics(*),
-        issue_ai_app_selections(
+        issue_ai_app_modules(
           *,
-          app:ai_applications(*)
+          ai_app_module:ai_app_modules(*)
         ),
         issue_advertisements(
           *,

@@ -119,24 +119,15 @@ async function setupissue(newsletterId: string) {
       // Select AI apps and prompts
       try {
         const { AppModuleSelector } = await import('@/lib/ai-app-modules')
-        const { AppSelector } = await import('@/lib/app-selector')
         const { PromptSelector } = await import('@/lib/prompt-selector')
 
         console.log('[Workflow Step 1/11] Selecting AI apps...')
 
-        // Try new module-based selection first
         const issueDateTime = new Date(issueDate)
         const moduleResults = await AppModuleSelector.selectAppsForIssue(id, newsletter.id, issueDateTime)
 
-        if (moduleResults.length > 0) {
-          const totalApps = moduleResults.reduce((sum, r) => sum + r.result.apps.length, 0)
-          console.log(`[Workflow Step 1/11] Selected ${totalApps} AI apps via ${moduleResults.length} modules`)
-        } else {
-          // Fall back to legacy selection if no modules configured
-          console.log('[Workflow Step 1/11] No AI app modules found, using legacy selection...')
-          const selectedApps = await AppSelector.selectAppsForissue(id, newsletter.id)
-          console.log(`[Workflow Step 1/11] Selected ${selectedApps.length} AI apps (legacy)`)
-        }
+        const totalApps = moduleResults.reduce((sum, r) => sum + r.result.apps.length, 0)
+        console.log(`[Workflow Step 1/11] Selected ${totalApps} AI apps via ${moduleResults.length} modules`)
 
         console.log('[Workflow Step 1/11] Selecting prompt...')
         await PromptSelector.selectPromptForissue(id)
