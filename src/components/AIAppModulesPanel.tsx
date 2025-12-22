@@ -129,6 +129,7 @@ export default function AIAppModulesPanel({ issueId }: AIAppModulesPanelProps) {
               >
                 <div className="flex items-center space-x-3">
                   <span className="font-medium text-gray-900">{module.name}</span>
+                  <span className="text-xs text-gray-400">Display Order: {module.display_order}</span>
                   {selection?.selection_mode === 'legacy' ? (
                     <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
                       Legacy
