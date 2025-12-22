@@ -40,10 +40,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         ),
         manual_articles:manual_articles(*),
         email_metrics(*),
-        issue_ai_app_modules(
-          *,
-          ai_app_module:ai_app_modules(*)
-        ),
         issue_advertisements(
           *,
           advertisement:advertisements(*)
@@ -60,13 +56,23 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'issue not found' }, { status: 404 })
     }
 
+    // Fetch AI app modules separately (no FK relationship to publication_issues)
+    const { data: aiAppModules } = await supabaseAdmin
+      .from('issue_ai_app_modules')
+      .select(`
+        *,
+        ai_app_module:ai_app_modules(*)
+      `)
+      .eq('issue_id', id)
+
     // Transform email_metrics from array to single object (or null)
     // Supabase returns email_metrics(*) as an array even for one-to-one relationships
     const transformedIssue = {
       ...issue,
       email_metrics: Array.isArray(issue.email_metrics) && issue.email_metrics.length > 0
         ? issue.email_metrics[0]
-        : null
+        : null,
+      issue_ai_app_modules: aiAppModules || []
     }
 
     return NextResponse.json({ issue: transformedIssue })
