@@ -114,6 +114,23 @@ export default async function NewsletterPage({ params }: PageProps) {
     ADVERTISEMENT: 'c0bc7173-de47-41b2-a260-77f55525ee3d'
   }
 
+  // Combine all renderable items and sort by display_order
+  type RenderItem =
+    | { type: 'section'; data: any; display_order: number }
+    | { type: 'ad_module'; data: any; display_order: number }
+    | { type: 'poll_module'; data: any; display_order: number }
+
+  const allRenderItems: RenderItem[] = [
+    // Newsletter sections (excluding Advertisement and AI Applications which are handled by modules)
+    ...(sections || [])
+      .filter((s: any) => s.id !== SECTION_IDS.ADVERTISEMENT && s.id !== SECTION_IDS.AI_APPLICATIONS)
+      .map((s: any) => ({ type: 'section' as const, data: s, display_order: s.display_order ?? 999 })),
+    // Ad modules
+    ...adModules.map((m: any) => ({ type: 'ad_module' as const, data: m, display_order: m.display_order ?? 999 })),
+    // Poll modules
+    ...pollModules.map((m: any) => ({ type: 'poll_module' as const, data: m, display_order: m.display_order ?? 999 }))
+  ].sort((a, b) => a.display_order - b.display_order)
+
   // Process advertorial body to make last sentence or arrow CTA a hyperlink (like email template)
   const processAdvertorialBody = (body: string, url: string) => {
     if (!url || url === '#' || !body) return body
@@ -265,274 +282,201 @@ export default async function NewsletterPage({ params }: PageProps) {
       <section className="py-12">
         <Container>
           <div className="mx-auto max-w-4xl">
-          {/* Render sections in database order */}
-          {sections && sections.map((section: any) => {
-            // Welcome Section
-            if (section.section_type === 'welcome' && welcome && (welcome.intro || welcome.tagline || welcome.summary)) {
-              return (
-                <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6 ring-1 ring-slate-200">
-                  <div className="p-6 sm:p-8">
-                  {/* Cover Image */}
-                  <div className="mb-4">
-                    <img
-                      src="/images/accounting_website/ai_accounting_daily_cover_image.jpg"
-                      alt="AI Accounting Daily"
-                      className="mx-auto max-w-full rounded-lg"
-                      style={{ maxHeight: '400px' }}
-                    />
-                  </div>
-                  <div className="space-y-3">
-                    <div className="text-slate-900 leading-relaxed">
-                      Hey, Accounting Pros!
+          {/* Render all items in display_order (sections, ad modules, poll modules combined) */}
+          {allRenderItems.map((item) => {
+            // Render newsletter sections
+            if (item.type === 'section') {
+              const section = item.data
+
+              // Welcome Section
+              if (section.section_type === 'welcome' && welcome && (welcome.intro || welcome.tagline || welcome.summary)) {
+                return (
+                  <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6 ring-1 ring-slate-200">
+                    <div className="p-6 sm:p-8">
+                    {/* Cover Image */}
+                    <div className="mb-4">
+                      <img
+                        src="/images/accounting_website/ai_accounting_daily_cover_image.jpg"
+                        alt="AI Accounting Daily"
+                        className="mx-auto max-w-full rounded-lg"
+                        style={{ maxHeight: '400px' }}
+                      />
                     </div>
-                    {welcome.tagline && (
-                      <div className="text-slate-900 leading-relaxed font-bold whitespace-pre-wrap">
-                        {cleanMergeTags(welcome.tagline)}
+                    <div className="space-y-3">
+                      <div className="text-slate-900 leading-relaxed">
+                        Hey, Accounting Pros!
                       </div>
-                    )}
-                    {welcome.summary && (
-                      <div className="text-slate-900 leading-relaxed whitespace-pre-wrap">
-                        {cleanMergeTags(welcome.summary)}
-                      </div>
-                    )}
+                      {welcome.tagline && (
+                        <div className="text-slate-900 leading-relaxed font-bold whitespace-pre-wrap">
+                          {cleanMergeTags(welcome.tagline)}
+                        </div>
+                      )}
+                      {welcome.summary && (
+                        <div className="text-slate-900 leading-relaxed whitespace-pre-wrap">
+                          {cleanMergeTags(welcome.summary)}
+                        </div>
+                      )}
+                    </div>
+                    </div>
                   </div>
-                  </div>
-                </div>
-              )
-            }
+                )
+              }
 
-            // Primary Articles Section
-            if (section.section_type === 'primary_articles' && articles.length > 0) {
-              return (
-                <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{section.name}</h2>
-                  <div className="p-6 sm:p-8">
-                  <div className="space-y-8">
-                    {articles.map((article: any, index: number) => (
-                      <article key={article.id} className="border-b border-slate-200 last:border-0 pb-8 last:pb-0">
-                        <div className="flex items-start gap-4">
-                          <div className="flex-shrink-0 w-8 h-8 bg-slate-800 text-white rounded-full flex items-center justify-center font-bold text-sm">
-                            {index + 1}
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-3">
-                              {article.headline}
-                            </h3>
-
-                            <div className="text-slate-900/80 leading-relaxed mb-4 whitespace-pre-wrap">
-                              {article.content}
+              // Primary Articles Section
+              if (section.section_type === 'primary_articles' && articles.length > 0) {
+                return (
+                  <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                    <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{section.name}</h2>
+                    <div className="p-6 sm:p-8">
+                    <div className="space-y-8">
+                      {articles.map((article: any, index: number) => (
+                        <article key={article.id} className="border-b border-slate-200 last:border-0 pb-8 last:pb-0">
+                          <div className="flex items-start gap-4">
+                            <div className="flex-shrink-0 w-8 h-8 bg-slate-800 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                              {index + 1}
                             </div>
+                            <div className="flex-1">
+                              <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-3">
+                                {article.headline}
+                              </h3>
 
-                            {article.rss_post?.source_url && (
-                              <a
-                                href={article.rss_post.source_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-500 text-sm font-medium inline-flex items-center gap-1"
-                              >
-                                Read full story
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                </svg>
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                  </div>
-                </div>
-              )
-            }
+                              <div className="text-slate-900/80 leading-relaxed mb-4 whitespace-pre-wrap">
+                                {article.content}
+                              </div>
 
-            // Secondary Articles Section
-            if (section.section_type === 'secondary_articles' && secondaryArticles.length > 0) {
-              return (
-                <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{section.name}</h2>
-                  <div className="p-6 sm:p-8">
-                  <div className="space-y-8">
-                    {secondaryArticles.map((article: any, index: number) => (
-                      <article key={article.id} className="border-b border-slate-200 last:border-0 pb-8 last:pb-0">
-                        <div className="flex items-start gap-4">
-                          <div className="flex-shrink-0 w-8 h-8 bg-slate-800 text-white rounded-full flex items-center justify-center font-bold text-sm">
-                            {index + 1}
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-3">
-                              {article.headline}
-                            </h3>
-
-                            <div className="text-slate-900/80 leading-relaxed mb-4 whitespace-pre-wrap">
-                              {article.content}
+                              {article.rss_post?.source_url && (
+                                <a
+                                  href={article.rss_post.source_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:text-blue-500 text-sm font-medium inline-flex items-center gap-1"
+                                >
+                                  Read full story
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                  </svg>
+                                </a>
+                              )}
                             </div>
-
-                            {article.rss_post?.source_url && (
-                              <a
-                                href={article.rss_post.source_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-500 text-sm font-medium inline-flex items-center gap-1"
-                              >
-                                Read full story
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                </svg>
-                              </a>
-                            )}
                           </div>
+                        </article>
+                      ))}
+                    </div>
+                    </div>
+                  </div>
+                )
+              }
+
+              // Secondary Articles Section
+              if (section.section_type === 'secondary_articles' && secondaryArticles.length > 0) {
+                return (
+                  <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                    <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{section.name}</h2>
+                    <div className="p-6 sm:p-8">
+                    <div className="space-y-8">
+                      {secondaryArticles.map((article: any, index: number) => (
+                        <article key={article.id} className="border-b border-slate-200 last:border-0 pb-8 last:pb-0">
+                          <div className="flex items-start gap-4">
+                            <div className="flex-shrink-0 w-8 h-8 bg-slate-800 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                              {index + 1}
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-3">
+                                {article.headline}
+                              </h3>
+
+                              <div className="text-slate-900/80 leading-relaxed mb-4 whitespace-pre-wrap">
+                                {article.content}
+                              </div>
+
+                              {article.rss_post?.source_url && (
+                                <a
+                                  href={article.rss_post.source_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:text-blue-500 text-sm font-medium inline-flex items-center gap-1"
+                                >
+                                  Read full story
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                  </svg>
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                    </div>
+                  </div>
+                )
+              }
+
+              // Prompt Ideas Section (by ID)
+              if (section.id === SECTION_IDS.PROMPT_IDEAS && newsletter.sections?.prompt) {
+                const prompt = newsletter.sections.prompt
+                return (
+                  <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                    <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{section.name}</h2>
+                    <div className="p-6 sm:p-8">
+                    <div className="text-center mb-4">
+                      <div className="text-xl font-bold text-slate-900">{prompt.title}</div>
+                    </div>
+                    <div className="bg-black text-white p-4 rounded-md font-mono text-sm leading-relaxed whitespace-pre-wrap border-2 border-gray-800">
+                      {prompt.prompt_text}
+                    </div>
+                    </div>
+                  </div>
+                )
+              }
+
+              // Poll Section (legacy)
+              if (section.section_type === 'poll' && poll) {
+                return (
+                  <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                    <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{section.name}</h2>
+                    <div className="p-6 sm:p-8">
+                    <div className="text-xl font-bold text-center text-slate-900 mb-4">{poll.question}</div>
+                    <p className="text-slate-900/60 text-sm text-center">
+                      This poll was available in the email newsletter.
+                    </p>
+                    </div>
+                  </div>
+                )
+              }
+
+              // Road Work Section
+              if (section.name === 'Road Work' && roadWork) {
+                return (
+                  <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                    <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{section.name}</h2>
+                    <div className="p-6 sm:p-8">
+                    <div className="space-y-3">
+                      {roadWork.items && roadWork.items.map((item: any, index: number) => (
+                        <div key={index} className="border-b border-slate-200 last:border-0 pb-3 last:pb-0">
+                          <div className="font-bold text-slate-900">{item.title}</div>
+                          <div className="text-slate-900/80 text-sm mt-1">{item.description}</div>
                         </div>
-                      </article>
-                    ))}
+                      ))}
+                    </div>
+                    </div>
                   </div>
-                  </div>
-                </div>
-              )
+                )
+              }
+
+              return null
             }
 
-            // AI Applications Section (by ID)
-            if (section.id === SECTION_IDS.AI_APPLICATIONS && aiApps.length > 0) {
-              return (
-                <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{section.name}</h2>
-                  <div className="p-6 sm:p-8">
-                  <div className="space-y-3">
-                    {aiApps.map((item: any, index: number) => {
-                      const app = item.app
-                      return (
-                        <div
-                          key={app.id}
-                          className="border-b border-slate-200 last:border-0 pb-3 last:pb-0 text-base leading-relaxed"
-                        >
-                          <strong>{index + 1}.</strong> {app.app_url ? (
-                            <a
-                              href={app.app_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-red-600 hover:text-red-500 underline font-bold"
-                            >
-                              {app.app_name}
-                            </a>
-                          ) : (
-                            <span className="font-bold">{app.app_name}</span>
-                          )} - {app.description || app.tagline || 'AI-powered application'}
-                        </div>
-                      )
-                    })}
-                  </div>
-                  </div>
-                </div>
-              )
-            }
-
-            // Prompt Ideas Section (by ID)
-            if (section.id === SECTION_IDS.PROMPT_IDEAS && newsletter.sections?.prompt) {
-              const prompt = newsletter.sections.prompt
-              return (
-                <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{section.name}</h2>
-                  <div className="p-6 sm:p-8">
-                  <div className="text-center mb-4">
-                    <div className="text-xl font-bold text-slate-900">{prompt.title}</div>
-                  </div>
-                  <div className="bg-black text-white p-4 rounded-md font-mono text-sm leading-relaxed whitespace-pre-wrap border-2 border-gray-800">
-                    {prompt.prompt_text}
-                  </div>
-                  </div>
-                </div>
-              )
-            }
-
-            // Poll Section
-            if (section.section_type === 'poll' && poll) {
-              return (
-                <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{section.name}</h2>
-                  <div className="p-6 sm:p-8">
-                  <div className="text-xl font-bold text-center text-slate-900 mb-4">{poll.question}</div>
-                  <p className="text-slate-900/60 text-sm text-center">
-                    This poll was available in the email newsletter.
-                  </p>
-                  </div>
-                </div>
-              )
-            }
-
-            // Advertorial Section (by ID)
-            if (section.id === SECTION_IDS.ADVERTISEMENT && advertorial) {
-              const processedBody = processAdvertorialBody(advertorial.body, advertorial.button_url)
-
-              return (
-                <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{section.name}</h2>
-                  <div className="p-6 sm:p-8">
-                  <div className="text-center">
-                    <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4">{advertorial.title}</h3>
-                    {advertorial.image_url && advertorial.button_url ? (
-                      <div className="mb-4">
-                        <a href={advertorial.button_url} target="_blank" rel="noopener noreferrer">
-                          <img
-                            src={advertorial.image_url}
-                            alt={advertorial.title}
-                            className="mx-auto max-w-full rounded-lg hover:opacity-90 transition-opacity"
-                            style={{ maxHeight: '400px' }}
-                          />
-                        </a>
-                      </div>
-                    ) : advertorial.image_url ? (
-                      <div className="mb-4">
-                        <img
-                          src={advertorial.image_url}
-                          alt={advertorial.title}
-                          className="mx-auto max-w-full rounded-lg"
-                          style={{ maxHeight: '400px' }}
-                        />
-                      </div>
-                    ) : null}
-                    <div
-                      className="text-slate-900 leading-relaxed text-left prose prose-sm max-w-none [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-none [&_ol]:pl-0 [&_li]:mb-1 [&_ol_li[data-list='bullet']]:pl-6 [&_ol_li[data-list='bullet']]:relative [&_ol_li[data-list='bullet']]:before:content-['•'] [&_ol_li[data-list='bullet']]:before:absolute [&_ol_li[data-list='bullet']]:before:left-0 [&_ol]:counter-reset-[item] [&_ol_li[data-list='ordered']]:pl-6 [&_ol_li[data-list='ordered']]:relative [&_ol_li[data-list='ordered']]:before:content-[counter(item)_'.'] [&_ol_li[data-list='ordered']]:before:absolute [&_ol_li[data-list='ordered']]:before:left-0 [&_ol_li[data-list='ordered']]:counter-increment-[item]"
-                      dangerouslySetInnerHTML={{ __html: processedBody }}
-                    />
-                  </div>
-                  </div>
-                </div>
-              )
-            }
-
-            // Road Work Section
-            if (section.name === 'Road Work' && roadWork) {
-              return (
-                <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{section.name}</h2>
-                  <div className="p-6 sm:p-8">
-                  <div className="space-y-3">
-                    {roadWork.items && roadWork.items.map((item: any, index: number) => (
-                      <div key={index} className="border-b border-slate-200 last:border-0 pb-3 last:pb-0">
-                        <div className="font-bold text-slate-900">{item.title}</div>
-                        <div className="text-slate-900/80 text-sm mt-1">{item.description}</div>
-                      </div>
-                    ))}
-                  </div>
-                  </div>
-                </div>
-              )
-            }
-
-            return null
-          })}
-
-          {/* Dynamic Ad Modules (new ad sections system) */}
-          {adModules.length > 0 && adModules
-            .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0))
-            .map((adModule: any) => {
+            // Render Ad Modules
+            if (item.type === 'ad_module') {
+              const adModule = item.data
               const ad = adModule.ad
               if (!ad) return null
 
               const blockOrder: string[] = adModule.block_order || ['title', 'image', 'body', 'button']
 
               return (
-                <div key={adModule.module_name} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                <div key={`ad-${adModule.module_name}`} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
                   <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{adModule.module_name}</h2>
                   <div className="p-6 sm:p-8">
                     <div className="text-center">
@@ -599,50 +543,49 @@ export default async function NewsletterPage({ params }: PageProps) {
                   </div>
                 </div>
               )
-            })}
+            }
 
-          {/* Dynamic Poll Modules (new poll sections system) */}
-          {pollModules.length > 0 && pollModules
-            .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0))
-            .map((pollModule: any) => {
-              const poll = pollModule.poll
-              if (!poll) return null
+            // Render Poll Modules
+            if (item.type === 'poll_module') {
+              const pollModule = item.data
+              const modulePoll = pollModule.poll
+              if (!modulePoll) return null
 
               const blockOrder: string[] = pollModule.block_order || ['title', 'question', 'image', 'options']
 
               return (
-                <div key={pollModule.module_name} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                <div key={`poll-${pollModule.module_name}`} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
                   <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-purple-600 text-white">{pollModule.module_name}</h2>
                   <div className="p-6 sm:p-8">
                     <div className="text-center">
                       {blockOrder.map((blockType: string) => {
                         switch (blockType) {
                           case 'title':
-                            return poll.title ? (
-                              <h3 key="title" className="text-xl sm:text-2xl font-bold text-slate-900 mb-4">{poll.title}</h3>
+                            return modulePoll.title ? (
+                              <h3 key="title" className="text-xl sm:text-2xl font-bold text-slate-900 mb-4">{modulePoll.title}</h3>
                             ) : null
                           case 'question':
-                            return poll.question ? (
-                              <div key="question" className="text-lg text-slate-700 mb-4">{poll.question}</div>
+                            return modulePoll.question ? (
+                              <div key="question" className="text-lg text-slate-700 mb-4">{modulePoll.question}</div>
                             ) : null
                           case 'image':
-                            if (!poll.image_url) return null
+                            if (!modulePoll.image_url) return null
                             return (
                               <div key="image" className="mb-4">
                                 <img
-                                  src={poll.image_url}
-                                  alt={poll.title || pollModule.module_name}
+                                  src={modulePoll.image_url}
+                                  alt={modulePoll.title || pollModule.module_name}
                                   className="mx-auto max-w-full rounded-lg"
                                   style={{ maxHeight: '400px' }}
                                 />
                               </div>
                             )
                           case 'options':
-                            return poll.options && poll.options.length > 0 ? (
+                            return modulePoll.options && modulePoll.options.length > 0 ? (
                               <div key="options" className="mt-4">
                                 <div className="text-sm text-slate-500 mb-2">Poll options:</div>
                                 <div className="flex flex-wrap justify-center gap-2">
-                                  {poll.options.map((option: string, idx: number) => (
+                                  {modulePoll.options.map((option: string, idx: number) => (
                                     <span
                                       key={idx}
                                       className="px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-sm font-medium"
@@ -664,7 +607,10 @@ export default async function NewsletterPage({ params }: PageProps) {
                   </div>
                 </div>
               )
-            })}
+            }
+
+            return null
+          })}
 
           {/* Fallback: Render advertorial if it exists but wasn't rendered in sections loop */}
           {advertorial && !sections?.some((s: any) => s.id === SECTION_IDS.ADVERTISEMENT) && (() => {
