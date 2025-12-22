@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       `
 
       // Send via Gmail SMTP
-      console.log('[CONTACT] Sending notification via Gmail SMTP')
+      console.log('[CONTACT] Sending notification via Gmail SMTP to:', contactEmail)
       await gmailTransporter.sendMail({
         from: `"AI Accounting Daily" <${process.env.GMAIL_USER}>`,
         to: contactEmail,
