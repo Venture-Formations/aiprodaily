@@ -98,8 +98,8 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
   // Select prompt and AI apps for the issue
   await PromptSelector.selectPromptForissue(issueId)
   try {
-    const { AppSelector } = await import('@/lib/app-selector')
-    await AppSelector.selectAppsForissue(issueId, newsletter.id)
+    const { AppModuleSelector } = await import('@/lib/ai-app-modules')
+    await AppModuleSelector.selectAppsForIssue(issueId, newsletter.id, new Date())
   } catch (appSelectionError) {
     console.error('AI app selection failed:', appSelectionError instanceof Error ? appSelectionError.message : 'Unknown error')
   }

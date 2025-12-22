@@ -899,7 +899,7 @@ export class RSSProcessor {
       console.log('[Step 2/10] Selecting AI apps and prompts...')
 
       try {
-        const { AppSelector } = await import('./app-selector')
+        const { AppModuleSelector } = await import('./ai-app-modules')
         const { PromptSelector } = await import('./prompt-selector')
         const { data: newsletter } = await supabaseAdmin
           .from('publications')
@@ -909,7 +909,7 @@ export class RSSProcessor {
           .single()
 
         if (newsletter) {
-          await AppSelector.selectAppsForissue(issueId, newsletter.id)
+          await AppModuleSelector.selectAppsForIssue(issueId, newsletter.id, new Date())
           await PromptSelector.selectPromptForissue(issueId)
         }
       } catch (error) {
@@ -1424,12 +1424,12 @@ export class RSSProcessor {
 
     // Initialize AI Applications and Prompt Ideas if not already done
     try {
-      const { AppSelector } = await import('./app-selector')
+      const { AppModuleSelector } = await import('./ai-app-modules')
       const { PromptSelector } = await import('./prompt-selector')
 
-      // Check if AI Apps already selected
+      // Check if AI Apps already selected (check new module system)
       const { data: existingApps } = await supabaseAdmin
-        .from('issue_ai_app_selections')
+        .from('issue_ai_app_modules')
         .select('id')
         .eq('issue_id', issueId)
         .limit(1)
@@ -1454,7 +1454,7 @@ export class RSSProcessor {
 
         if (newsletter) {
           if (needsApps) {
-            await AppSelector.selectAppsForissue(issueId, newsletter.id)
+            await AppModuleSelector.selectAppsForIssue(issueId, newsletter.id, new Date())
           }
           if (needsPrompt) {
             await PromptSelector.selectPromptForissue(issueId)
