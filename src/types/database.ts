@@ -89,6 +89,10 @@ export interface AIApplication {
   // Analytics
   view_count: number
   click_count: number
+
+  // Module assignment (for AI App Modules system)
+  ai_app_module_id: string | null  // Links to ai_app_modules. NULL = available for any module
+  priority: number  // Higher priority = selected first in affiliate_priority mode
 }
 
 export interface IssueAIAppSelection {
@@ -597,6 +601,52 @@ export interface IssuePollModule {
   // Joined relations
   poll_module?: PollModule
   poll?: Poll
+}
+
+// AI App Module Types
+export type AIAppBlockType = 'title' | 'logo' | 'image' | 'tagline' | 'description' | 'button'
+
+export type AIAppSelectionMode = 'affiliate_priority' | 'random' | 'manual'
+
+export interface AIAppModule {
+  id: string
+  publication_id: string
+  name: string
+  display_order: number
+  is_active: boolean
+  selection_mode: AIAppSelectionMode
+  block_order: AIAppBlockType[]
+  config: Record<string, unknown>
+  // Module-specific settings
+  apps_count: number
+  max_per_category: number
+  affiliate_cooldown_days: number
+  next_position: number
+  created_at: string
+  updated_at: string
+}
+
+export interface IssueAIAppModule {
+  id: string
+  issue_id: string
+  ai_app_module_id: string
+  app_ids: string[]  // Array of selected app IDs
+  selection_mode?: AIAppSelectionMode
+  selected_at: string
+  used_at: string | null
+  // Joined relations
+  ai_app_module?: AIAppModule
+  apps?: AIApplication[]
+}
+
+export interface AIAppModuleWithApps extends AIAppModule {
+  apps: AIApplication[]  // Apps assigned to or selected for this module
+  app_count?: number
+}
+
+export interface IssueAIAppModuleWithDetails extends IssueAIAppModule {
+  ai_app_module: AIAppModule
+  apps: AIApplication[]  // The selected apps
 }
 
 // Combined types for API responses

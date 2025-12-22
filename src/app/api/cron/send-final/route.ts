@@ -369,9 +369,18 @@ export async function POST(request: NextRequest) {
 
     // Record AI app usage (starts cooldown timer for affiliates)
     try {
-      const { AppSelector } = await import('@/lib/app-selector')
-      await AppSelector.recordAppUsageOnSend(issue.id)
-      console.log('[Send Final] ✓ AI app usage recorded (cooldown started)')
+      // Try new module system first
+      const { AppModuleSelector } = await import('@/lib/ai-app-modules')
+      const moduleResult = await AppModuleSelector.recordUsage(issue.id)
+
+      if (moduleResult.recorded > 0) {
+        console.log(`[Send Final] ✓ AI app module usage recorded (${moduleResult.recorded} modules, cooldown started)`)
+      } else {
+        // Fall back to legacy if no module selections found
+        const { AppSelector } = await import('@/lib/app-selector')
+        await AppSelector.recordAppUsageOnSend(issue.id)
+        console.log('[Send Final] ✓ AI app usage recorded (legacy, cooldown started)')
+      }
     } catch (appError) {
       console.error('[Send Final] Failed to record AI app usage (non-critical):', appError)
       // Don't fail the send if app tracking fails
@@ -671,9 +680,18 @@ export async function GET(request: NextRequest) {
 
     // Record AI app usage (starts cooldown timer for affiliates)
     try {
-      const { AppSelector } = await import('@/lib/app-selector')
-      await AppSelector.recordAppUsageOnSend(issue.id)
-      console.log('[Send Final] ✓ AI app usage recorded (cooldown started)')
+      // Try new module system first
+      const { AppModuleSelector } = await import('@/lib/ai-app-modules')
+      const moduleResult = await AppModuleSelector.recordUsage(issue.id)
+
+      if (moduleResult.recorded > 0) {
+        console.log(`[Send Final] ✓ AI app module usage recorded (${moduleResult.recorded} modules, cooldown started)`)
+      } else {
+        // Fall back to legacy if no module selections found
+        const { AppSelector } = await import('@/lib/app-selector')
+        await AppSelector.recordAppUsageOnSend(issue.id)
+        console.log('[Send Final] ✓ AI app usage recorded (legacy, cooldown started)')
+      }
     } catch (appError) {
       console.error('[Send Final] Failed to record AI app usage (non-critical):', appError)
       // Don't fail the send if app tracking fails

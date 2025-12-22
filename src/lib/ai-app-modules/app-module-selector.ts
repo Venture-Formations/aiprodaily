@@ -1,0 +1,492 @@
+/**
+ * AI App Module Selector
+ * Handles app selection for AI app modules with three modes:
+ * - affiliate_priority: Affiliates first (respecting cooldown), then non-affiliates
+ * - random: Random selection from all active apps
+ * - manual: Admin manually selects apps
+ */
+
+import { supabaseAdmin } from '../supabase'
+import type {
+  AIAppModule,
+  AIApplication,
+  AIAppSelectionMode,
+  IssueAIAppModule
+} from '@/types/database'
+
+interface AppSelectionResult {
+  apps: AIApplication[]
+  reason: string
+}
+
+export class AppModuleSelector {
+  /**
+   * Check if an affiliate app is within cooldown period
+   * Cooldown is based on last_used_date which is set during send-final
+   */
+  private static isInCooldown(
+    app: AIApplication,
+    cooldownDays: number,
+    issueDate: Date
+  ): boolean {
+    if (!app.is_affiliate || !app.last_used_date) {
+      return false
+    }
+
+    const lastUsed = new Date(app.last_used_date)
+    const daysSinceLastUsed = Math.floor(
+      (issueDate.getTime() - lastUsed.getTime()) / (1000 * 60 * 60 * 24)
+    )
+
+    return daysSinceLastUsed < cooldownDays
+  }
+
+  /**
+   * Count how many apps from each category are already selected
+   */
+  private static getCategoryCounts(apps: AIApplication[]): Map<string, number> {
+    const counts = new Map<string, number>()
+    for (const app of apps) {
+      const category = app.category || 'Unknown'
+      counts.set(category, (counts.get(category) || 0) + 1)
+    }
+    return counts
+  }
+
+  /**
+   * Check if adding an app would exceed the category maximum
+   */
+  private static wouldExceedCategoryMax(
+    app: AIApplication,
+    selectedApps: AIApplication[],
+    maxPerCategory: number
+  ): boolean {
+    const categoryCounts = this.getCategoryCounts(selectedApps)
+    const category = app.category || 'Unknown'
+    const currentCount = categoryCounts.get(category) || 0
+    return currentCount >= maxPerCategory
+  }
+
+  /**
+   * Select apps using affiliate_priority mode (current logic)
+   * Phase 1: Affiliates first (respecting cooldown and category max)
+   * Phase 2: Non-affiliates to fill remaining (respecting category max)
+   */
+  private static async selectAffiliatePriority(
+    allApps: AIApplication[],
+    module: AIAppModule,
+    issueDate: Date
+  ): Promise<AIApplication[]> {
+    const { apps_count, max_per_category, affiliate_cooldown_days } = module
+    const selectedApps: AIApplication[] = []
+    const selectedAppIds = new Set<string>()
+
+    // Separate affiliates and non-affiliates
+    const affiliates = allApps.filter(app => app.is_affiliate)
+    const nonAffiliates = allApps.filter(app => !app.is_affiliate)
+
+    // Phase 1: Select affiliates first
+    const availableAffiliates = affiliates.filter(
+      app => !this.isInCooldown(app, affiliate_cooldown_days, issueDate)
+    )
+
+    // Sort by priority (higher first), then shuffle for variety
+    const sortedAffiliates = [...availableAffiliates]
+      .sort((a, b) => (b.priority || 0) - (a.priority || 0))
+
+    for (const app of sortedAffiliates) {
+      if (selectedApps.length >= apps_count) break
+
+      // Check category maximum
+      if (this.wouldExceedCategoryMax(app, selectedApps, max_per_category)) {
+        console.log(`[AppModuleSelector] Skipping affiliate ${app.app_name} - would exceed ${max_per_category} max for ${app.category}`)
+        continue
+      }
+
+      selectedApps.push(app)
+      selectedAppIds.add(app.id)
+      console.log(`[AppModuleSelector] Selected affiliate: ${app.app_name} (${app.category})`)
+    }
+
+    // Phase 2: Fill remaining slots with non-affiliates
+    if (selectedApps.length < apps_count) {
+      // Shuffle for variety
+      const shuffledNonAffiliates = [...nonAffiliates].sort(() => Math.random() - 0.5)
+
+      for (const app of shuffledNonAffiliates) {
+        if (selectedApps.length >= apps_count) break
+        if (selectedAppIds.has(app.id)) continue
+
+        // Check category maximum
+        if (this.wouldExceedCategoryMax(app, selectedApps, max_per_category)) {
+          console.log(`[AppModuleSelector] Skipping non-affiliate ${app.app_name} - would exceed max for ${app.category}`)
+          continue
+        }
+
+        selectedApps.push(app)
+        selectedAppIds.add(app.id)
+        console.log(`[AppModuleSelector] Selected non-affiliate: ${app.app_name} (${app.category})`)
+      }
+    }
+
+    return selectedApps
+  }
+
+  /**
+   * Select apps using random mode
+   * Random selection respecting category limits
+   */
+  private static selectRandom(
+    allApps: AIApplication[],
+    module: AIAppModule
+  ): AIApplication[] {
+    const { apps_count, max_per_category } = module
+    const selectedApps: AIApplication[] = []
+
+    // Shuffle all apps
+    const shuffled = [...allApps].sort(() => Math.random() - 0.5)
+
+    for (const app of shuffled) {
+      if (selectedApps.length >= apps_count) break
+
+      // Check category maximum
+      if (this.wouldExceedCategoryMax(app, selectedApps, max_per_category)) {
+        continue
+      }
+
+      selectedApps.push(app)
+    }
+
+    return selectedApps
+  }
+
+  /**
+   * Select apps for a module based on its selection mode
+   */
+  static async selectAppsForModule(
+    module: AIAppModule,
+    publicationId: string,
+    issueDate: Date
+  ): Promise<AppSelectionResult> {
+    // Manual mode returns empty - admin must pick
+    if (module.selection_mode === 'manual') {
+      return { apps: [], reason: 'Manual selection required' }
+    }
+
+    // Get all active apps for this publication
+    // Apps can be assigned to specific module OR available for all (null module_id)
+    const { data: allApps, error } = await supabaseAdmin
+      .from('ai_applications')
+      .select('*')
+      .eq('publication_id', publicationId)
+      .eq('is_active', true)
+      .or(`ai_app_module_id.eq.${module.id},ai_app_module_id.is.null`)
+
+    if (error) {
+      console.error('[AppModuleSelector] Error fetching apps:', error)
+      return { apps: [], reason: `Error fetching apps: ${error.message}` }
+    }
+
+    if (!allApps || allApps.length === 0) {
+      return { apps: [], reason: 'No active apps available' }
+    }
+
+    let selectedApps: AIApplication[]
+
+    switch (module.selection_mode) {
+      case 'affiliate_priority':
+        selectedApps = await this.selectAffiliatePriority(allApps, module, issueDate)
+        break
+      case 'random':
+        selectedApps = this.selectRandom(allApps, module)
+        break
+      default:
+        selectedApps = await this.selectAffiliatePriority(allApps, module, issueDate)
+    }
+
+    const affiliateCount = selectedApps.filter(a => a.is_affiliate).length
+    return {
+      apps: selectedApps,
+      reason: `Selected ${selectedApps.length} apps via ${module.selection_mode} (${affiliateCount} affiliates, ${selectedApps.length - affiliateCount} non-affiliates)`
+    }
+  }
+
+  /**
+   * Select apps for all active modules for an issue
+   */
+  static async selectAppsForIssue(
+    issueId: string,
+    publicationId: string,
+    issueDate: Date
+  ): Promise<{ moduleId: string; result: AppSelectionResult }[]> {
+    // Check if selections already exist
+    const { data: existing } = await supabaseAdmin
+      .from('issue_ai_app_modules')
+      .select('ai_app_module_id')
+      .eq('issue_id', issueId)
+
+    if (existing && existing.length > 0) {
+      console.log('[AppModuleSelector] Apps already selected for issue:', issueId)
+      return []
+    }
+
+    // Get all active AI app modules
+    const { data: modules, error } = await supabaseAdmin
+      .from('ai_app_modules')
+      .select('*')
+      .eq('publication_id', publicationId)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+
+    if (error || !modules || modules.length === 0) {
+      console.log('[AppModuleSelector] No active AI app modules found')
+      return []
+    }
+
+    const results: { moduleId: string; result: AppSelectionResult }[] = []
+
+    for (const module of modules) {
+      const result = await this.selectAppsForModule(
+        module as AIAppModule,
+        publicationId,
+        issueDate
+      )
+
+      // Store selection
+      const { error: insertError } = await supabaseAdmin
+        .from('issue_ai_app_modules')
+        .insert({
+          issue_id: issueId,
+          ai_app_module_id: module.id,
+          app_ids: result.apps.map(a => a.id),
+          selection_mode: module.selection_mode
+        })
+
+      if (insertError) {
+        console.error('[AppModuleSelector] Error storing selection:', insertError)
+      }
+
+      results.push({ moduleId: module.id, result })
+      console.log(`[AppModuleSelector] Module "${module.name}": ${result.reason}`)
+    }
+
+    return results
+  }
+
+  /**
+   * Record app usage at send time
+   * Updates last_used_date and times_used for selected apps
+   */
+  static async recordUsage(issueId: string): Promise<{ success: boolean; recorded: number }> {
+    const { data: selections, error } = await supabaseAdmin
+      .from('issue_ai_app_modules')
+      .select('*, ai_app_module:ai_app_modules(*)')
+      .eq('issue_id', issueId)
+      .is('used_at', null)
+
+    if (error || !selections) {
+      console.error('[AppModuleSelector] Error fetching selections:', error)
+      return { success: false, recorded: 0 }
+    }
+
+    const now = new Date().toISOString()
+    let recorded = 0
+
+    for (const selection of selections) {
+      const appIds = selection.app_ids as string[]
+
+      // Update each app's usage tracking
+      for (const appId of appIds) {
+        const { data: app } = await supabaseAdmin
+          .from('ai_applications')
+          .select('times_used')
+          .eq('id', appId)
+          .single()
+
+        await supabaseAdmin
+          .from('ai_applications')
+          .update({
+            last_used_date: now,
+            times_used: (app?.times_used || 0) + 1
+          })
+          .eq('id', appId)
+      }
+
+      // Mark selection as used
+      await supabaseAdmin
+        .from('issue_ai_app_modules')
+        .update({ used_at: now })
+        .eq('id', selection.id)
+
+      recorded++
+    }
+
+    console.log(`[AppModuleSelector] Recorded usage for ${recorded} module selections`)
+    return { success: true, recorded }
+  }
+
+  /**
+   * Get selections for an issue
+   */
+  static async getIssueSelections(issueId: string): Promise<IssueAIAppModule[]> {
+    const { data, error } = await supabaseAdmin
+      .from('issue_ai_app_modules')
+      .select('*, ai_app_module:ai_app_modules(*)')
+      .eq('issue_id', issueId)
+
+    if (error) {
+      console.error('[AppModuleSelector] Error fetching selections:', error)
+      return []
+    }
+
+    // Fetch apps for each selection
+    const results: IssueAIAppModule[] = []
+    for (const selection of data || []) {
+      const appIds = selection.app_ids as string[]
+
+      let apps: AIApplication[] = []
+      if (appIds && appIds.length > 0) {
+        const { data: appsData } = await supabaseAdmin
+          .from('ai_applications')
+          .select('*')
+          .in('id', appIds)
+
+        // Preserve order based on app_ids
+        apps = appIds
+          .map(id => appsData?.find(a => a.id === id))
+          .filter((a): a is AIApplication => a !== undefined)
+      }
+
+      results.push({
+        ...selection,
+        apps
+      } as IssueAIAppModule)
+    }
+
+    return results
+  }
+
+  /**
+   * Manually select apps for a module
+   */
+  static async manuallySelectApps(
+    issueId: string,
+    moduleId: string,
+    appIds: string[]
+  ): Promise<{ success: boolean; error?: string }> {
+    const { error } = await supabaseAdmin
+      .from('issue_ai_app_modules')
+      .upsert({
+        issue_id: issueId,
+        ai_app_module_id: moduleId,
+        app_ids: appIds,
+        selection_mode: 'manual',
+        selected_at: new Date().toISOString()
+      }, {
+        onConflict: 'issue_id,ai_app_module_id'
+      })
+
+    if (error) {
+      console.error('[AppModuleSelector] Error manual selection:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  }
+
+  /**
+   * Clear app selection for a module (set app_ids to empty)
+   */
+  static async clearSelection(
+    issueId: string,
+    moduleId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const { error } = await supabaseAdmin
+      .from('issue_ai_app_modules')
+      .upsert({
+        issue_id: issueId,
+        ai_app_module_id: moduleId,
+        app_ids: [],
+        selection_mode: 'manual',
+        selected_at: new Date().toISOString()
+      }, {
+        onConflict: 'issue_id,ai_app_module_id'
+      })
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  }
+
+  /**
+   * Get available apps for a module (for dropdown selection)
+   */
+  static async getAvailableApps(
+    publicationId: string,
+    moduleId?: string
+  ): Promise<AIApplication[]> {
+    let query = supabaseAdmin
+      .from('ai_applications')
+      .select('*')
+      .eq('publication_id', publicationId)
+      .eq('is_active', true)
+
+    // Filter to module-assigned or unassigned apps
+    if (moduleId) {
+      query = query.or(`ai_app_module_id.eq.${moduleId},ai_app_module_id.is.null`)
+    }
+
+    const { data, error } = await query.order('app_name', { ascending: true })
+
+    if (error) {
+      console.error('[AppModuleSelector] Error fetching available apps:', error)
+      return []
+    }
+
+    return data || []
+  }
+
+  /**
+   * Initialize selections for an issue (creates empty selections for all active modules)
+   */
+  static async initializeSelectionsForIssue(
+    issueId: string,
+    publicationId: string
+  ): Promise<void> {
+    // Get all active AI app modules
+    const { data: modules, error } = await supabaseAdmin
+      .from('ai_app_modules')
+      .select('*')
+      .eq('publication_id', publicationId)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+
+    if (error || !modules || modules.length === 0) {
+      return
+    }
+
+    // Check for existing selections
+    const { data: existing } = await supabaseAdmin
+      .from('issue_ai_app_modules')
+      .select('ai_app_module_id')
+      .eq('issue_id', issueId)
+
+    const existingModuleIds = new Set(existing?.map(e => e.ai_app_module_id) || [])
+
+    // Create selections for modules without existing selections
+    for (const module of modules) {
+      if (existingModuleIds.has(module.id)) continue
+
+      await supabaseAdmin
+        .from('issue_ai_app_modules')
+        .insert({
+          issue_id: issueId,
+          ai_app_module_id: module.id,
+          app_ids: [],
+          selection_mode: module.selection_mode
+        })
+    }
+  }
+}

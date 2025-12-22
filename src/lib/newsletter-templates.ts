@@ -1303,7 +1303,46 @@ export async function generateAIAppsSection(issue: any): Promise<string> {
   try {
     console.log('Generating AI Apps section for issue:', issue?.id)
 
-    // Import AppSelector
+    // Try new module-based rendering first
+    const { AppModuleSelector, AppModuleRenderer } = await import('./ai-app-modules')
+
+    const moduleSelections = await AppModuleSelector.getIssueSelections(issue.id)
+
+    if (moduleSelections && moduleSelections.length > 0) {
+      // Use new module-based rendering
+      console.log(`Found ${moduleSelections.length} AI app module(s) for issue`)
+
+      let combinedHtml = ''
+      for (const selection of moduleSelections) {
+        const module = selection.ai_app_module
+        const apps = selection.apps || []
+
+        if (!module || apps.length === 0) continue
+
+        const result = await AppModuleRenderer.renderModule(
+          module,
+          apps,
+          issue.publication_id,
+          {
+            issueDate: issue.date,
+            issueId: issue.id,
+            mailerliteIssueId: issue.mailerlite_issue_id
+          }
+        )
+
+        combinedHtml += result.html
+        console.log(`Rendered module "${result.moduleName}" with ${result.appCount} apps`)
+      }
+
+      if (combinedHtml) {
+        return combinedHtml
+      }
+    }
+
+    // Fall back to legacy rendering if no modules configured
+    console.log('No AI app modules found, using legacy AI Apps rendering...')
+
+    // Import AppSelector for legacy
     const { AppSelector } = await import('./app-selector')
 
     // Fetch colors and fonts from business settings (using publication_id if available)
@@ -1317,7 +1356,7 @@ export async function generateAIAppsSection(issue: any): Promise<string> {
       return ''
     }
 
-    console.log(`Found ${apps.length} AI apps for issue`)
+    console.log(`Found ${apps.length} AI apps for issue (legacy)`)
 
     // Generate numbered list HTML
     const appsHtml = apps.map((app, index) => {

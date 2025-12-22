@@ -21,7 +21,8 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import AdModuleSettings from './AdModuleSettings'
 import PollModuleSettings from '../poll-modules/PollModuleSettings'
-import type { NewsletterSection, AdModule, PollModule } from '@/types/database'
+import { AIAppModuleSettings } from '../ai-app-modules'
+import type { NewsletterSection, AdModule, PollModule, AIAppModule } from '@/types/database'
 
 interface SectionsPanelProps {
   publicationId?: string // Optional - will be fetched from URL if not provided
@@ -31,6 +32,7 @@ type SectionItem =
   | { type: 'section'; data: NewsletterSection }
   | { type: 'ad_module'; data: AdModule }
   | { type: 'poll_module'; data: PollModule }
+  | { type: 'ai_app_module'; data: AIAppModule }
 
 function SortableSectionItem({
   item,
@@ -49,11 +51,14 @@ function SortableSectionItem({
     ? `section-${item.data.id}`
     : item.type === 'ad_module'
       ? `ad-module-${item.data.id}`
-      : `poll-module-${item.data.id}`
+      : item.type === 'poll_module'
+        ? `poll-module-${item.data.id}`
+        : `ai-app-module-${item.data.id}`
   const name = item.data.name
   const isActive = item.data.is_active
   const isAdModule = item.type === 'ad_module'
   const isPollModule = item.type === 'poll_module'
+  const isAIAppModule = item.type === 'ai_app_module'
 
   const {
     attributes,
@@ -107,6 +112,11 @@ function SortableSectionItem({
           {isPollModule && (
             <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
               Poll
+            </span>
+          )}
+          {isAIAppModule && (
+            <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+              AI Apps
             </span>
           )}
         </div>
@@ -199,13 +209,14 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
   const [sections, setSections] = useState<NewsletterSection[]>([])
   const [adModules, setAdModules] = useState<AdModule[]>([])
   const [pollModules, setPollModules] = useState<PollModule[]>([])
+  const [aiAppModules, setAIAppModules] = useState<AIAppModule[]>([])
   const [selectedItem, setSelectedItem] = useState<SectionItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [cooldownDays, setCooldownDays] = useState(7)
   const [showAddModal, setShowAddModal] = useState(false)
   const [newModuleName, setNewModuleName] = useState('')
-  const [newSectionType, setNewSectionType] = useState<'ad' | 'poll' | 'standard'>('ad')
+  const [newSectionType, setNewSectionType] = useState<'ad' | 'poll' | 'ai_app' | 'standard'>('ad')
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -278,6 +289,13 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
         setPollModules(pollModulesData.modules || [])
       }
 
+      // Fetch AI app modules
+      const aiAppModulesRes = await fetch(`/api/ai-app-modules?publication_id=${publicationId}`)
+      if (aiAppModulesRes.ok) {
+        const aiAppModulesData = await aiAppModulesRes.json()
+        setAIAppModules(aiAppModulesData.modules || [])
+      }
+
       // Fetch cooldown setting
       const settingsRes = await fetch(`/api/settings/publication?key=ad_company_cooldown_days`)
       if (settingsRes.ok) {
@@ -295,7 +313,8 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
   const allItems: SectionItem[] = [
     ...sections.map(s => ({ type: 'section' as const, data: s })),
     ...adModules.map(m => ({ type: 'ad_module' as const, data: m })),
-    ...pollModules.map(m => ({ type: 'poll_module' as const, data: m }))
+    ...pollModules.map(m => ({ type: 'poll_module' as const, data: m })),
+    ...aiAppModules.map(m => ({ type: 'ai_app_module' as const, data: m }))
   ].sort((a, b) => {
     const orderA = a.data.display_order ?? 999
     const orderB = b.data.display_order ?? 999
@@ -307,7 +326,9 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
       ? `section-${item.data.id}`
       : item.type === 'ad_module'
         ? `ad-module-${item.data.id}`
-        : `poll-module-${item.data.id}`
+        : item.type === 'poll_module'
+          ? `poll-module-${item.data.id}`
+          : `ai-app-module-${item.data.id}`
   )
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -324,6 +345,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     const newSections: NewsletterSection[] = []
     const newAdModules: AdModule[] = []
     const newPollModules: PollModule[] = []
+    const newAIAppModules: AIAppModule[] = []
 
     reorderedItems.forEach((item, idx) => {
       const newOrder = idx + 1
@@ -331,14 +353,17 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
         newSections.push({ ...item.data, display_order: newOrder })
       } else if (item.type === 'ad_module') {
         newAdModules.push({ ...item.data, display_order: newOrder })
-      } else {
+      } else if (item.type === 'poll_module') {
         newPollModules.push({ ...item.data, display_order: newOrder })
+      } else {
+        newAIAppModules.push({ ...item.data, display_order: newOrder })
       }
     })
 
     setSections(newSections)
     setAdModules(newAdModules)
     setPollModules(newPollModules)
+    setAIAppModules(newAIAppModules)
 
     // Save to server
     setSaving(true)
@@ -372,6 +397,17 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             modules: newPollModules.map(m => ({ id: m.id, display_order: m.display_order }))
+          })
+        })
+      }
+
+      // Update AI app modules order
+      if (newAIAppModules.length > 0) {
+        await fetch('/api/ai-app-modules', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            modules: newAIAppModules.map(m => ({ id: m.id, display_order: m.display_order }))
           })
         })
       }
@@ -410,7 +446,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
         setAdModules(prev => prev.map(m =>
           m.id === item.data.id ? { ...m, is_active: newActive } : m
         ))
-      } else {
+      } else if (item.type === 'poll_module') {
         // Poll module
         await fetch(`/api/poll-modules/${item.data.id}`, {
           method: 'PATCH',
@@ -418,6 +454,16 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           body: JSON.stringify({ is_active: newActive })
         })
         setPollModules(prev => prev.map(m =>
+          m.id === item.data.id ? { ...m, is_active: newActive } : m
+        ))
+      } else {
+        // AI App module
+        await fetch(`/api/ai-app-modules/${item.data.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_active: newActive })
+        })
+        setAIAppModules(prev => prev.map(m =>
           m.id === item.data.id ? { ...m, is_active: newActive } : m
         ))
       }
@@ -472,6 +518,22 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           const data = await res.json()
           setPollModules(prev => [...prev, data.module])
           setSelectedItem({ type: 'poll_module', data: data.module })
+        }
+      } else if (newSectionType === 'ai_app') {
+        // Create AI app module
+        const res = await fetch('/api/ai-app-modules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            publication_id: publicationId,
+            name: newModuleName.trim()
+          })
+        })
+
+        if (res.ok) {
+          const data = await res.json()
+          setAIAppModules(prev => [...prev, data.module])
+          setSelectedItem({ type: 'ai_app_module', data: data.module })
         }
       } else {
         // Create standard section
@@ -578,6 +640,46 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
 
     if (res.ok) {
       setPollModules(prev => prev.filter(m => m.id !== moduleId))
+      setSelectedItem(null)
+    }
+  }
+
+  const handleUpdateAIAppModule = async (updates: Partial<AIAppModule>) => {
+    if (!selectedItem || selectedItem.type !== 'ai_app_module') {
+      throw new Error('No AI app module selected')
+    }
+
+    const moduleId = selectedItem.data.id
+    console.log('[SectionsPanel] Updating AI app module:', moduleId, updates)
+
+    const res = await fetch(`/api/ai-app-modules/${moduleId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      console.log('[SectionsPanel] AI app module updated successfully:', data.module)
+      setAIAppModules(prev => prev.map(m => m.id === moduleId ? data.module : m))
+      setSelectedItem({ type: 'ai_app_module', data: data.module })
+    } else {
+      const errorData = await res.json().catch(() => ({}))
+      console.error('[SectionsPanel] Failed to update AI app module:', res.status, errorData)
+      throw new Error(errorData.error || `Failed to update AI app module (${res.status})`)
+    }
+  }
+
+  const handleDeleteAIAppModule = async () => {
+    if (!selectedItem || selectedItem.type !== 'ai_app_module') return
+
+    const moduleId = selectedItem.data.id
+    const res = await fetch(`/api/ai-app-modules/${moduleId}`, {
+      method: 'DELETE'
+    })
+
+    if (res.ok) {
+      setAIAppModules(prev => prev.filter(m => m.id !== moduleId))
       setSelectedItem(null)
     }
   }
@@ -707,6 +809,15 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
               onUpdate={handleUpdatePollModule}
               onDelete={handleDeletePollModule}
             />
+          ) : selectedItem.type === 'ai_app_module' && publicationId ? (
+            <AIAppModuleSettings
+              module={selectedItem.data}
+              publicationId={publicationId}
+              onUpdate={handleUpdateAIAppModule}
+              onDelete={handleDeleteAIAppModule}
+            />
+          ) : selectedItem.type === 'ai_app_module' ? (
+            <div className="text-gray-500">Loading publication...</div>
           ) : (
             <SectionSettings
               section={selectedItem.data}
@@ -733,7 +844,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
             {/* Section Type Selector */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">Section Type</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setNewSectionType('ad')}
@@ -757,6 +868,18 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
                 >
                   <div className="font-medium text-sm">Poll</div>
                   <div className="text-xs mt-1 opacity-75">Poll section</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewSectionType('ai_app')}
+                  className={`px-3 py-3 rounded-lg border-2 transition-colors ${
+                    newSectionType === 'ai_app'
+                      ? 'border-green-500 bg-green-50 text-green-700'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                  }`}
+                >
+                  <div className="font-medium text-sm">AI Apps</div>
+                  <div className="text-xs mt-1 opacity-75">App showcase</div>
                 </button>
                 <button
                   type="button"
@@ -785,7 +908,9 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
                     ? "e.g., Sidebar Sponsor"
                     : newSectionType === 'poll'
                       ? "e.g., Weekly Poll"
-                      : "e.g., Featured Content"
+                      : newSectionType === 'ai_app'
+                        ? "e.g., AI Tools Spotlight"
+                        : "e.g., Featured Content"
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 autoFocus

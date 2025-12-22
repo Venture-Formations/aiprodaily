@@ -46,7 +46,6 @@ export default function SettingsPage() {
                 { id: 'newsletter', name: 'Sections' },
                 { id: 'email', name: 'Email' },
                 { id: 'ai-prompts', name: 'AI Prompts' },
-                { id: 'ai-apps', name: 'AI Apps' },
                 { id: 'rss', name: 'RSS Feeds' },
                 { id: 'blocked-domains', name: 'Blocked Domains' },
                 { id: 'notifications', name: 'Notifications' },
@@ -75,7 +74,6 @@ export default function SettingsPage() {
           {activeTab === 'newsletter' && <NewsletterSettings />}
           {activeTab === 'email' && <EmailSettings />}
           {activeTab === 'ai-prompts' && <AIPromptsSettings />}
-          {activeTab === 'ai-apps' && <AIAppsSettings />}
           {activeTab === 'rss' && <RSSFeeds />}
           {activeTab === 'blocked-domains' && <BlockedDomainsSettings />}
           {activeTab === 'notifications' && <Notifications />}
@@ -5987,7 +5985,12 @@ function Users() {
   )
 }
 
-// AI Apps Settings Component
+/**
+ * @deprecated This component is no longer used. AI Apps settings have been moved
+ * to per-module configuration in the Sections panel (Settings > Sections).
+ * Each AI App module now has its own apps_count, max_per_category, and
+ * affiliate_cooldown_days settings. Keeping for reference only.
+ */
 function AIAppsSettings() {
   const [settings, setSettings] = useState<any>({})
   const [loading, setLoading] = useState(true)
