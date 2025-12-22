@@ -200,216 +200,6 @@ function PromptIdeasSection({ issue }: { issue: any }) {
   )
 }
 
-function AIAppsSection({ issue }: { issue: any }) {
-  const [modules, setModules] = useState<any[]>([])
-  const [legacyApps, setLegacyApps] = useState<any[]>([])
-  const [apps, setApps] = useState<Record<string, any>>({})
-  const [loading, setLoading] = useState(true)
-  const [isLegacy, setIsLegacy] = useState(false)
-
-  useEffect(() => {
-    const fetchAIApps = async () => {
-      try {
-        // Try new module system first
-        if (issue?.issue_ai_app_modules && issue.issue_ai_app_modules.length > 0) {
-          setModules(issue.issue_ai_app_modules)
-          setIsLegacy(false)
-
-          // Collect all app IDs from all modules
-          const allAppIds: string[] = []
-          for (const moduleSelection of issue.issue_ai_app_modules) {
-            const appIds = moduleSelection.app_ids || []
-            allAppIds.push(...appIds)
-          }
-
-          // Fetch app details if we have IDs
-          if (allAppIds.length > 0) {
-            const response = await fetch(`/api/ai-apps?ids=${allAppIds.join(',')}`)
-            if (response.ok) {
-              const data = await response.json()
-              const appsMap: Record<string, any> = {}
-              for (const app of data.apps || []) {
-                appsMap[app.id] = app
-              }
-              setApps(appsMap)
-            }
-          }
-        }
-        // Fall back to legacy system for old issues
-        else if (issue?.issue_ai_app_selections && issue.issue_ai_app_selections.length > 0) {
-          setLegacyApps(issue.issue_ai_app_selections)
-          setIsLegacy(true)
-        }
-      } catch (error) {
-        console.error('Failed to load AI apps:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchAIApps()
-  }, [issue])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
-        <span className="ml-3 text-gray-600">Loading AI Applications...</span>
-      </div>
-    )
-  }
-
-  // Show legacy apps for old issues
-  if (isLegacy && legacyApps.length > 0) {
-    return (
-      <div className="p-6">
-        <div className="border rounded-lg overflow-hidden">
-          <div className="bg-gray-50 px-4 py-2 border-b flex items-center justify-between">
-            <h3 className="font-semibold text-gray-700">AI Applications</h3>
-            <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded">
-              {legacyApps.length} apps (legacy)
-            </span>
-          </div>
-          <div className="p-4 grid gap-3">
-            {legacyApps.map((selection, index) => {
-              const app = selection.app
-              if (!app) return null
-
-              return (
-                <div
-                  key={selection.id}
-                  className="border border-gray-200 rounded-lg p-3 bg-white hover:bg-gray-50"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900">
-                        <span className="text-gray-500 mr-2">{index + 1}.</span>
-                        {app.app_name}
-                        {app.is_affiliate && (
-                          <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">
-                            Affiliate
-                          </span>
-                        )}
-                      </h4>
-                      {app.tagline && (
-                        <p className="text-sm text-gray-600 italic mt-1">
-                          {app.tagline}
-                        </p>
-                      )}
-                      <p className="text-sm text-gray-700 mt-1 line-clamp-2">
-                        {app.description}
-                      </p>
-                      {app.app_url && (
-                        <a
-                          href={app.app_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-blue-600 hover:underline mt-1 inline-block"
-                        >
-                          Visit site →
-                        </a>
-                      )}
-                    </div>
-                    {app.category && (
-                      <span className="ml-3 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                        {app.category}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!modules || modules.length === 0) {
-    return (
-      <div className="text-center py-8 text-gray-500">
-        No AI Applications selected for this issue
-      </div>
-    )
-  }
-
-  return (
-    <div className="p-6 space-y-6">
-      {modules.map((moduleSelection) => {
-        const module = moduleSelection.ai_app_module
-        const appIds = moduleSelection.app_ids || []
-
-        if (!module || appIds.length === 0) return null
-
-        return (
-          <div key={moduleSelection.id} className="border rounded-lg overflow-hidden">
-            <div className="bg-green-50 px-4 py-2 border-b flex items-center justify-between">
-              <h3 className="font-semibold text-green-800">{module.name}</h3>
-              <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded">
-                {appIds.length} apps
-              </span>
-            </div>
-            <div className="p-4 grid gap-3">
-              {appIds.map((appId: string, index: number) => {
-                const app = apps[appId]
-                if (!app) return (
-                  <div key={appId} className="text-sm text-gray-400 italic">
-                    Loading app...
-                  </div>
-                )
-
-                return (
-                  <div
-                    key={appId}
-                    className="border border-gray-200 rounded-lg p-3 bg-white hover:bg-gray-50"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900">
-                          <span className="text-gray-500 mr-2">{index + 1}.</span>
-                          {app.app_name}
-                          {app.is_affiliate && (
-                            <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">
-                              Affiliate
-                            </span>
-                          )}
-                        </h4>
-                        {app.tagline && (
-                          <p className="text-sm text-gray-600 italic mt-1">
-                            {app.tagline}
-                          </p>
-                        )}
-                        <p className="text-sm text-gray-700 mt-1 line-clamp-2">
-                          {app.description}
-                        </p>
-                        {app.app_url && (
-                          <a
-                            href={app.app_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-blue-600 hover:underline mt-1 inline-block"
-                          >
-                            Visit site →
-                          </a>
-                        )}
-                      </div>
-                      {app.category && (
-                        <span className="ml-3 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                          {app.category}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 function BreakingNewsSection({ issue }: { issue: any }) {
   const [articles, setArticles] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -804,17 +594,12 @@ function NewsletterSectionComponent({
   // Section ID constants (reference IDs from newsletter_sections table)
   // These IDs are stable and won't change even if section names are updated
   const SECTION_IDS = {
-    AI_APPLICATIONS: '853f8d0b-bc76-473a-bfc6-421418266222',
     PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b',
-    ADVERTISEMENT: 'c0bc7173-de47-41b2-a260-77f55525ee3d'
+    ADVERTISEMENT: 'c0bc7173-de47-41b2-a260-77f55525ee3d',
+    AI_APPLICATIONS: '853f8d0b-bc76-473a-bfc6-421418266222'
   }
 
   const renderSectionContent = () => {
-    // Use section ID for AI Applications (stable across name changes)
-    if (section.id === SECTION_IDS.AI_APPLICATIONS) {
-      return <AIAppsSection issue={issue} />
-    }
-
     // Use section ID for Prompt Ideas (stable across name changes)
     if (section.id === SECTION_IDS.PROMPT_IDEAS) {
       return <PromptIdeasSection issue={issue} />
@@ -822,6 +607,8 @@ function NewsletterSectionComponent({
 
     // Note: Advertisement section (SECTION_IDS.ADVERTISEMENT) is filtered out at the list level
     // and handled by AdModulesPanel instead
+    // Note: AI Applications section (SECTION_IDS.AI_APPLICATIONS) is filtered out at the list level
+    // and handled by AIAppModulesPanel instead
 
     // Legacy name-based matching for other sections
     switch (section.name) {
@@ -2861,8 +2648,9 @@ export default function issueDetailPage() {
 
         {/* Dynamic Newsletter Sections */}
         {/* Note: Advertisement section (c0bc7173-de47-41b2-a260-77f55525ee3d) is excluded - handled by AdModulesPanel */}
+        {/* Note: AI Applications section (853f8d0b-bc76-473a-bfc6-421418266222) is excluded - handled by AIAppModulesPanel */}
         {newsletterSections
-          .filter(section => section.is_active && section.id !== primaryArticlesSection?.id && section.id !== secondaryArticlesSection?.id && section.id !== 'c0bc7173-de47-41b2-a260-77f55525ee3d')
+          .filter(section => section.is_active && section.id !== primaryArticlesSection?.id && section.id !== secondaryArticlesSection?.id && section.id !== 'c0bc7173-de47-41b2-a260-77f55525ee3d' && section.id !== '853f8d0b-bc76-473a-bfc6-421418266222')
           .map(section => (
             <NewsletterSectionComponent
               key={section.id}
