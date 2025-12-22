@@ -200,17 +200,36 @@ function PromptIdeasSection({ issue }: { issue: any }) {
 }
 
 function AIAppsSection({ issue }: { issue: any }) {
-  const [aiApps, setAiApps] = useState<any[]>([])
+  const [modules, setModules] = useState<any[]>([])
+  const [apps, setApps] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchAIApps = async () => {
       try {
-        // AI apps are already loaded with issue data
-        if (issue?.issue_ai_app_selections) {
-          const sortedApps = [...issue.issue_ai_app_selections]
-            .sort((a, b) => a.selection_order - b.selection_order)
-          setAiApps(sortedApps)
+        // Get module selections from issue data
+        if (issue?.issue_ai_app_modules && issue.issue_ai_app_modules.length > 0) {
+          setModules(issue.issue_ai_app_modules)
+
+          // Collect all app IDs from all modules
+          const allAppIds: string[] = []
+          for (const moduleSelection of issue.issue_ai_app_modules) {
+            const appIds = moduleSelection.app_ids || []
+            allAppIds.push(...appIds)
+          }
+
+          // Fetch app details if we have IDs
+          if (allAppIds.length > 0) {
+            const response = await fetch(`/api/ai-apps?ids=${allAppIds.join(',')}`)
+            if (response.ok) {
+              const data = await response.json()
+              const appsMap: Record<string, any> = {}
+              for (const app of data.apps || []) {
+                appsMap[app.id] = app
+              }
+              setApps(appsMap)
+            }
+          }
         }
       } catch (error) {
         console.error('Failed to load AI apps:', error)
@@ -231,7 +250,7 @@ function AIAppsSection({ issue }: { issue: any }) {
     )
   }
 
-  if (!aiApps || aiApps.length === 0) {
+  if (!modules || modules.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
         No AI Applications selected for this issue
@@ -240,65 +259,78 @@ function AIAppsSection({ issue }: { issue: any }) {
   }
 
   return (
-    <div className="p-6">
-      <div className="grid gap-4">
-        {aiApps.map((selection) => {
-          const app = selection.app
-          if (!app) return null
+    <div className="p-6 space-y-6">
+      {modules.map((moduleSelection) => {
+        const module = moduleSelection.ai_app_module
+        const appIds = moduleSelection.app_ids || []
 
-          return (
-            <div
-              key={selection.id}
-              className={`border rounded-lg p-4 ${
-                selection.is_featured
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 bg-white'
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h4 className="text-lg font-bold text-gray-900">
-                    {app.app_name}
-                    {selection.is_featured && (
-                      <span className="ml-2 text-sm text-blue-600 font-normal">
-                        ⭐ Featured
-                      </span>
-                    )}
-                    {app.is_affiliate && (
-                      <span className="ml-2 text-sm text-green-600 font-normal bg-green-50 px-2 py-0.5 rounded">
-                        Affiliate
-                      </span>
-                    )}
-                  </h4>
-                  {app.tagline && (
-                    <p className="text-sm text-gray-600 italic mt-1">
-                      {app.tagline}
-                    </p>
-                  )}
-                  <p className="text-sm text-gray-700 mt-2">
-                    {app.description}
-                  </p>
-                  {app.website_url && (
-                    <a
-                      href={app.website_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:underline mt-2 inline-block"
-                    >
-                      Learn more →
-                    </a>
-                  )}
-                </div>
-                {app.category && (
-                  <span className="ml-4 text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                    {app.category}
-                  </span>
-                )}
-              </div>
+        if (!module || appIds.length === 0) return null
+
+        return (
+          <div key={moduleSelection.id} className="border rounded-lg overflow-hidden">
+            <div className="bg-green-50 px-4 py-2 border-b flex items-center justify-between">
+              <h3 className="font-semibold text-green-800">{module.name}</h3>
+              <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded">
+                {appIds.length} apps
+              </span>
             </div>
-          )
-        })}
-      </div>
+            <div className="p-4 grid gap-3">
+              {appIds.map((appId: string, index: number) => {
+                const app = apps[appId]
+                if (!app) return (
+                  <div key={appId} className="text-sm text-gray-400 italic">
+                    Loading app...
+                  </div>
+                )
+
+                return (
+                  <div
+                    key={appId}
+                    className="border border-gray-200 rounded-lg p-3 bg-white hover:bg-gray-50"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900">
+                          <span className="text-gray-500 mr-2">{index + 1}.</span>
+                          {app.app_name}
+                          {app.is_affiliate && (
+                            <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">
+                              Affiliate
+                            </span>
+                          )}
+                        </h4>
+                        {app.tagline && (
+                          <p className="text-sm text-gray-600 italic mt-1">
+                            {app.tagline}
+                          </p>
+                        )}
+                        <p className="text-sm text-gray-700 mt-1 line-clamp-2">
+                          {app.description}
+                        </p>
+                        {app.app_url && (
+                          <a
+                            href={app.app_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-600 hover:underline mt-1 inline-block"
+                          >
+                            Visit site →
+                          </a>
+                        )}
+                      </div>
+                      {app.category && (
+                        <span className="ml-3 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                          {app.category}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

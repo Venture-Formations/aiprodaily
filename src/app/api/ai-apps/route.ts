@@ -3,14 +3,27 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * GET /api/ai-apps - List AI applications
+ * Query params:
+ *   - ids: comma-separated list of app IDs to fetch
  */
 export async function GET(request: NextRequest) {
   try {
-    // Get all apps for now (can filter by publication_id later if needed)
-    const { data: apps, error } = await supabaseAdmin
+    const { searchParams } = new URL(request.url)
+    const idsParam = searchParams.get('ids')
+
+    let query = supabaseAdmin
       .from('ai_applications')
       .select('*')
-      .order('created_at', { ascending: false })
+
+    // Filter by specific IDs if provided
+    if (idsParam) {
+      const ids = idsParam.split(',').filter(id => id.trim())
+      if (ids.length > 0) {
+        query = query.in('id', ids)
+      }
+    }
+
+    const { data: apps, error } = await query.order('created_at', { ascending: false })
 
     if (error) throw error
 
