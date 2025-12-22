@@ -174,18 +174,19 @@ export class AppModuleSelector {
     }
 
     // Get all active apps for this publication
-    // Apps can be assigned to specific module OR available for all (null module_id)
+    // For now, get all active apps - module filtering can be added later when apps are assigned to modules
     const { data: allApps, error } = await supabaseAdmin
       .from('ai_applications')
       .select('*')
       .eq('publication_id', publicationId)
       .eq('is_active', true)
-      .or(`ai_app_module_id.eq.${module.id},ai_app_module_id.is.null`)
 
     if (error) {
       console.error('[AppModuleSelector] Error fetching apps:', error)
       return { apps: [], reason: `Error fetching apps: ${error.message}` }
     }
+
+    console.log(`[AppModuleSelector] Found ${allApps?.length || 0} active apps for publication`)
 
     if (!allApps || allApps.length === 0) {
       return { apps: [], reason: 'No active apps available' }
@@ -219,6 +220,8 @@ export class AppModuleSelector {
     publicationId: string,
     issueDate: Date
   ): Promise<{ moduleId: string; result: AppSelectionResult }[]> {
+    console.log(`[AppModuleSelector] Starting selection for issue ${issueId}, publication ${publicationId}`)
+
     // Check if selections already exist
     const { data: existing } = await supabaseAdmin
       .from('issue_ai_app_modules')
@@ -238,10 +241,17 @@ export class AppModuleSelector {
       .eq('is_active', true)
       .order('display_order', { ascending: true })
 
-    if (error || !modules || modules.length === 0) {
-      console.log('[AppModuleSelector] No active AI app modules found')
+    if (error) {
+      console.error('[AppModuleSelector] Error fetching modules:', error)
       return []
     }
+
+    if (!modules || modules.length === 0) {
+      console.log('[AppModuleSelector] No active AI app modules found for publication:', publicationId)
+      return []
+    }
+
+    console.log(`[AppModuleSelector] Found ${modules.length} active module(s):`, modules.map(m => m.name))
 
     const results: { moduleId: string; result: AppSelectionResult }[] = []
 
@@ -425,20 +435,16 @@ export class AppModuleSelector {
    */
   static async getAvailableApps(
     publicationId: string,
-    moduleId?: string
+    _moduleId?: string
   ): Promise<AIApplication[]> {
-    let query = supabaseAdmin
+    // Get all active apps for this publication
+    // Module filtering can be added later when apps are assigned to specific modules
+    const { data, error } = await supabaseAdmin
       .from('ai_applications')
       .select('*')
       .eq('publication_id', publicationId)
       .eq('is_active', true)
-
-    // Filter to module-assigned or unassigned apps
-    if (moduleId) {
-      query = query.or(`ai_app_module_id.eq.${moduleId},ai_app_module_id.is.null`)
-    }
-
-    const { data, error } = await query.order('app_name', { ascending: true })
+      .order('app_name', { ascending: true })
 
     if (error) {
       console.error('[AppModuleSelector] Error fetching available apps:', error)
