@@ -2284,7 +2284,7 @@ export class RSSProcessor {
           )
         `)
         .gte('created_at', lookbackTimestamp)
-        .gte('fact_check_score', 15)
+        .gte('fact_check_score', 12)
         .is('final_position', null)  // Only articles NOT used in sent newsletters
 
       console.log(`[Primary Selection] Target: ${finalArticleCount} articles`)
@@ -2300,7 +2300,7 @@ export class RSSProcessor {
         return
       }
 
-      console.log(`[Primary Selection] Found ${availableArticles.length} articles meeting criteria (fact_check_score >= 15, not used in sent newsletters)`)
+      console.log(`[Primary Selection] Found ${availableArticles.length} articles meeting criteria (fact_check_score >= 12, not used in sent newsletters)`)
 
       // Sort ALL available articles by rating (highest first) and take the top N
       const sortedArticles = availableArticles
