@@ -72,10 +72,10 @@ export async function POST(request: NextRequest) {
 
     // Step 3: Select AI apps and prompts (like setupissue does)
     try {
-      const { AppSelector } = await import('@/lib/app-selector')
+      const { AppModuleSelector } = await import('@/lib/ai-app-modules')
       const { PromptSelector } = await import('@/lib/prompt-selector')
 
-      await AppSelector.selectAppsForissue(issueId, newsletterUuid)
+      await AppModuleSelector.selectAppsForIssue(issueId, newsletterUuid, new Date())
       await PromptSelector.selectPromptForissue(issueId)
       console.log('[Create issue] Selected AI apps and prompts')
     } catch (error) {
