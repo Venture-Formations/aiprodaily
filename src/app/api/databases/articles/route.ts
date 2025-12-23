@@ -207,49 +207,39 @@ export async function GET(request: NextRequest) {
     console.log('[API] Post IDs to fetch:', allPostIds.length, 'Sample IDs:', allPostIds.slice(0, 5), 'Types:', allPostIds.slice(0, 3).map(id => typeof id));
 
     // Fetch RSS posts (only if we have post IDs)
+    // Use chunked queries to avoid Supabase .in() limit (fails silently with large arrays)
+    const CHUNK_SIZE = 100;
     let rssPosts: any[] = [];
     if (allPostIds.length > 0) {
-      console.log('[API] Fetching RSS posts for', allPostIds.length, 'post_ids...');
+      console.log('[API] Fetching RSS posts for', allPostIds.length, 'post_ids in chunks of', CHUNK_SIZE);
 
-      const { data, error: rssPostsError } = await supabase
-        .from('rss_posts')
-        .select(`
-          id,
-          feed_id,
-          title,
-          description,
-          full_article_text,
-          publication_date,
-          author,
-          source_url,
-          image_url
-        `)
-        .in('id', allPostIds);
-
-      if (rssPostsError) {
-        console.error('[API] RSS posts error:', rssPostsError.message, 'Code:', rssPostsError.code, 'Details:', rssPostsError.details);
-      }
-
-      rssPosts = data || [];
-      console.log('[API] RSS posts query returned:', rssPosts?.length || 0, 'rows');
-
-      if (rssPosts.length === 0 && allPostIds.length > 0) {
-        // Debug: Try fetching a single post to verify the query works
-        console.log('[API] DEBUG: No RSS posts found. Testing single post fetch for ID:', allPostIds[0]);
-        const { data: singlePost, error: singleError } = await supabase
+      for (let i = 0; i < allPostIds.length; i += CHUNK_SIZE) {
+        const chunk = allPostIds.slice(i, i + CHUNK_SIZE);
+        const { data, error: rssPostsError } = await supabase
           .from('rss_posts')
-          .select('id, title')
-          .eq('id', allPostIds[0])
-          .single();
+          .select(`
+            id,
+            feed_id,
+            title,
+            description,
+            full_article_text,
+            publication_date,
+            author,
+            source_url,
+            image_url
+          `)
+          .in('id', chunk);
 
-        if (singleError) {
-          console.error('[API] DEBUG: Single post fetch error:', singleError.message);
-        } else {
-          console.log('[API] DEBUG: Single post found:', singlePost);
+        if (rssPostsError) {
+          console.error('[API] RSS posts chunk error:', rssPostsError.message, 'Chunk:', i, '-', i + chunk.length);
+        } else if (data) {
+          rssPosts = rssPosts.concat(data);
         }
       }
 
-      if (rssPosts && rssPosts.length > 0) {
+      console.log('[API] RSS posts query returned:', rssPosts.length, 'rows from', Math.ceil(allPostIds.length / CHUNK_SIZE), 'chunks');
+
+      if (rssPosts.length > 0) {
         console.log('[API] Sample RSS post:', rssPosts[0]);
       }
     } else {
@@ -260,51 +250,41 @@ export async function GET(request: NextRequest) {
     console.log('[API] Post map size:', postMap.size, 'Keys:', Array.from(postMap.keys()).slice(0, 5));
 
     // Fetch post ratings (only if we have post IDs)
+    // Use chunked queries to avoid Supabase .in() limit (fails silently with large arrays)
     let postRatings: any[] = [];
     if (allPostIds.length > 0) {
-      console.log('[API] Fetching post ratings for', allPostIds.length, 'post_ids...');
+      console.log('[API] Fetching post ratings for', allPostIds.length, 'post_ids in chunks of', CHUNK_SIZE);
 
-      const { data, error: ratingsError } = await supabase
-        .from('post_ratings')
-        .select(`
-          post_id,
-          criteria_1_score,
-          criteria_1_reason,
-          criteria_2_score,
-          criteria_2_reason,
-          criteria_3_score,
-          criteria_3_reason,
-          criteria_4_score,
-          criteria_4_reason,
-          criteria_5_score,
-          criteria_5_reason,
-          total_score
-        `)
-        .in('post_id', allPostIds);
-
-      if (ratingsError) {
-        console.error('[API] Post ratings error:', ratingsError.message, 'Code:', ratingsError.code);
-      }
-      postRatings = data || [];
-      console.log('[API] Post ratings query returned:', postRatings?.length || 0, 'rows');
-
-      if (postRatings.length === 0 && allPostIds.length > 0) {
-        // Debug: Try fetching a single rating
-        console.log('[API] DEBUG: No ratings found. Testing single rating fetch for post_id:', allPostIds[0]);
-        const { data: singleRating, error: singleError } = await supabase
+      for (let i = 0; i < allPostIds.length; i += CHUNK_SIZE) {
+        const chunk = allPostIds.slice(i, i + CHUNK_SIZE);
+        const { data, error: ratingsError } = await supabase
           .from('post_ratings')
-          .select('post_id, total_score')
-          .eq('post_id', allPostIds[0])
-          .single();
+          .select(`
+            post_id,
+            criteria_1_score,
+            criteria_1_reason,
+            criteria_2_score,
+            criteria_2_reason,
+            criteria_3_score,
+            criteria_3_reason,
+            criteria_4_score,
+            criteria_4_reason,
+            criteria_5_score,
+            criteria_5_reason,
+            total_score
+          `)
+          .in('post_id', chunk);
 
-        if (singleError) {
-          console.error('[API] DEBUG: Single rating fetch error:', singleError.message);
-        } else {
-          console.log('[API] DEBUG: Single rating found:', singleRating);
+        if (ratingsError) {
+          console.error('[API] Post ratings chunk error:', ratingsError.message, 'Chunk:', i, '-', i + chunk.length);
+        } else if (data) {
+          postRatings = postRatings.concat(data);
         }
       }
 
-      if (postRatings && postRatings.length > 0) {
+      console.log('[API] Post ratings query returned:', postRatings.length, 'rows from', Math.ceil(allPostIds.length / CHUNK_SIZE), 'chunks');
+
+      if (postRatings.length > 0) {
         console.log('[API] Sample rating:', postRatings[0]);
       }
     }
