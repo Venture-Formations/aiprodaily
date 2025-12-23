@@ -632,74 +632,22 @@ export default async function NewsletterPage({ params }: PageProps) {
                   <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{aiAppModule.module_name}</h2>
                   <div className="px-4 sm:px-6 py-2">
                     {apps.map((app: any, index: number) => (
-                      <div key={app.id || index} className="py-3">
-                        {blockOrder.map((blockType: string) => {
-                          switch (blockType) {
-                            case 'title':
-                            case 'name':
-                              return (
-                                <div key="title" className="font-bold text-base leading-snug">
-                                  <span className="font-bold">{index + 1}.</span> {getAppEmoji(app)}{' '}
-                                  {app.app_url ? (
-                                    <a
-                                      href={app.app_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-red-600 hover:text-red-700 underline font-bold"
-                                    >
-                                      {app.app_name}
-                                    </a>
-                                  ) : (
-                                    <span className="font-bold text-slate-900">{app.app_name}</span>
-                                  )}
-                                </div>
-                              )
-                            case 'description':
-                              return (
-                                <div key="description" className="text-base text-slate-800 leading-normal">
-                                  {app.description || 'AI-powered application'}
-                                </div>
-                              )
-                            case 'logo':
-                              return app.logo_url ? (
-                                <div key="logo" className="my-2">
-                                  <img
-                                    src={app.logo_url}
-                                    alt={app.app_name}
-                                    className="h-12 w-12 object-contain rounded-lg"
-                                  />
-                                </div>
-                              ) : null
-                            case 'tagline':
-                              return app.tagline ? (
-                                <p key="tagline" className="text-sm text-slate-500 italic mt-1">{app.tagline}</p>
-                              ) : null
-                            case 'category':
-                              return app.category ? (
-                                <div key="category" className="mt-2">
-                                  <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs font-medium">
-                                    {app.category}
-                                  </span>
-                                </div>
-                              ) : null
-                            case 'button':
-                              return app.app_url ? (
-                                <div key="button" className="mt-2">
-                                  <a
-                                    href={app.app_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-block px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
-                                  >
-                                    Try {app.app_name}
-                                  </a>
-                                </div>
-                              ) : null
-                            default:
-                              return null
-                          }
-                        })}
-                      </div>
+                      <p key={app.id || index} className="py-3 text-base leading-relaxed">
+                        <span className="font-bold">{index + 1}.</span> {getAppEmoji(app)}{' '}
+                        {app.app_url ? (
+                          <a
+                            href={app.app_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-red-600 hover:text-red-700 underline font-bold"
+                          >
+                            {app.app_name}
+                          </a>
+                        ) : (
+                          <span className="font-bold text-slate-900">{app.app_name}</span>
+                        )}{' '}
+                        <span className="text-slate-800">{app.description || ''}</span>
+                      </p>
                     ))}
                   </div>
                 </div>
@@ -787,31 +735,22 @@ export default async function NewsletterPage({ params }: PageProps) {
                     const app = item.app
                     if (!app) return null
                     return (
-                      <div key={app.id || index} className="py-3">
-                        <div className="font-bold text-base leading-snug">
-                          <span className="font-bold">{index + 1}.</span> {getAppEmoji(app)}{' '}
-                          {app.app_url ? (
-                            <a
-                              href={app.app_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-red-600 hover:text-red-700 underline font-bold"
-                            >
-                              {app.app_name}
-                            </a>
-                          ) : (
-                            <span className="font-bold text-slate-900">{app.app_name}</span>
-                          )}
-                        </div>
-                        {app.description && (
-                          <div className="text-base text-slate-800 leading-normal">
-                            {app.description}
-                          </div>
-                        )}
-                        {!app.description && app.tagline && (
-                          <p className="text-sm text-slate-500 italic">{app.tagline}</p>
-                        )}
-                      </div>
+                      <p key={app.id || index} className="py-3 text-base leading-relaxed">
+                        <span className="font-bold">{index + 1}.</span> {getAppEmoji(app)}{' '}
+                        {app.app_url ? (
+                          <a
+                            href={app.app_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-red-600 hover:text-red-700 underline font-bold"
+                          >
+                            {app.app_name}
+                          </a>
+                        ) : (
+                          <span className="font-bold text-slate-900">{app.app_name}</span>
+                        )}{' '}
+                        <span className="text-slate-800">{app.description || app.tagline || ''}</span>
+                      </p>
                     )
                   })}
                 </div>
