@@ -710,53 +710,6 @@ export default async function NewsletterPage({ params }: PageProps) {
             )
           })()}
 
-          {/* Fallback: Render legacy AI Apps if exists but no ai_app_modules with apps rendered */}
-          {/* This handles old archive format where modules exist but don't contain apps array */}
-          {aiApps.length > 0 && (aiAppModules.length === 0 || !aiAppModules.some((m: any) => m.apps?.length > 0)) && (() => {
-            // Helper to get emoji based on category (matching email template)
-            const getAppEmoji = (app: any): string => {
-              const category = (app.category || '').toLowerCase()
-              if (category.includes('accounting') || category.includes('bookkeeping')) return '📊'
-              if (category.includes('tax') || category.includes('compliance')) return '📋'
-              if (category.includes('payroll')) return '💰'
-              if (category.includes('finance') || category.includes('analysis')) return '📈'
-              if (category.includes('expense')) return '🧾'
-              if (category.includes('client')) return '🤝'
-              if (category.includes('productivity')) return '⚡'
-              if (category.includes('hr') || category.includes('human')) return '👥'
-              if (category.includes('banking') || category.includes('payment')) return '🏦'
-              return '✨'
-            }
-            return (
-              <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">AI Applications</h2>
-                <div className="px-4 sm:px-6 py-2">
-                  {aiApps.map((item: any, index: number) => {
-                    const app = item.app
-                    if (!app) return null
-                    return (
-                      <p key={app.id || index} className="py-3 text-base leading-relaxed">
-                        <span className="font-bold">{index + 1}.</span> {getAppEmoji(app)}{' '}
-                        {app.app_url ? (
-                          <a
-                            href={app.app_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-red-600 hover:text-red-700 underline font-bold"
-                          >
-                            {app.app_name}
-                          </a>
-                        ) : (
-                          <span className="font-bold text-slate-900">{app.app_name}</span>
-                        )}{' '}
-                        <span className="text-slate-800">{app.description || app.tagline || ''}</span>
-                      </p>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })()}
 
           {/* Fallback: Render advertorial if it exists but wasn't rendered in sections loop */}
           {advertorial && !newsletterSectionsConfig?.some((s: any) => s.id === SECTION_IDS.ADVERTISEMENT) && (() => {
