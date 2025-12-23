@@ -626,10 +626,15 @@ export default async function NewsletterPage({ params }: PageProps) {
                                     />
                                   </div>
                                 ) : null
+                              case 'title':
                               case 'name':
                                 return (
                                   <h3 key="name" className="font-bold text-slate-900 text-center mb-1">{app.app_name}</h3>
                                 )
+                              case 'description':
+                                return app.description ? (
+                                  <p key="description" className="text-sm text-slate-600 text-center mb-2 line-clamp-3">{app.description}</p>
+                                ) : null
                               case 'tagline':
                                 return app.tagline ? (
                                   <p key="tagline" className="text-sm text-slate-600 text-center mb-2">{app.tagline}</p>
