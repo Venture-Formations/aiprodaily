@@ -22,7 +22,8 @@ import { CSS } from '@dnd-kit/utilities'
 import AdModuleSettings from './AdModuleSettings'
 import PollModuleSettings from '../poll-modules/PollModuleSettings'
 import { AIAppModuleSettings } from '../ai-app-modules'
-import type { NewsletterSection, AdModule, PollModule, AIAppModule } from '@/types/database'
+import PromptModuleSettings from '../prompt-modules/PromptModuleSettings'
+import type { NewsletterSection, AdModule, PollModule, AIAppModule, PromptModule } from '@/types/database'
 
 interface SectionsPanelProps {
   publicationId?: string // Optional - will be fetched from URL if not provided
@@ -33,6 +34,7 @@ type SectionItem =
   | { type: 'ad_module'; data: AdModule }
   | { type: 'poll_module'; data: PollModule }
   | { type: 'ai_app_module'; data: AIAppModule }
+  | { type: 'prompt_module'; data: PromptModule }
 
 function SortableSectionItem({
   item,
@@ -53,12 +55,15 @@ function SortableSectionItem({
       ? `ad-module-${item.data.id}`
       : item.type === 'poll_module'
         ? `poll-module-${item.data.id}`
-        : `ai-app-module-${item.data.id}`
+        : item.type === 'ai_app_module'
+          ? `ai-app-module-${item.data.id}`
+          : `prompt-module-${item.data.id}`
   const name = item.data.name
   const isActive = item.data.is_active
   const isAdModule = item.type === 'ad_module'
   const isPollModule = item.type === 'poll_module'
   const isAIAppModule = item.type === 'ai_app_module'
+  const isPromptModule = item.type === 'prompt_module'
 
   const {
     attributes,
@@ -117,6 +122,11 @@ function SortableSectionItem({
           {isAIAppModule && (
             <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
               AI Apps
+            </span>
+          )}
+          {isPromptModule && (
+            <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">
+              Prompt
             </span>
           )}
         </div>
@@ -210,13 +220,14 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
   const [adModules, setAdModules] = useState<AdModule[]>([])
   const [pollModules, setPollModules] = useState<PollModule[]>([])
   const [aiAppModules, setAIAppModules] = useState<AIAppModule[]>([])
+  const [promptModules, setPromptModules] = useState<PromptModule[]>([])
   const [selectedItem, setSelectedItem] = useState<SectionItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [cooldownDays, setCooldownDays] = useState(7)
   const [showAddModal, setShowAddModal] = useState(false)
   const [newModuleName, setNewModuleName] = useState('')
-  const [newSectionType, setNewSectionType] = useState<'ad' | 'poll' | 'ai_app' | 'standard'>('ad')
+  const [newSectionType, setNewSectionType] = useState<'ad' | 'poll' | 'ai_app' | 'prompt' | 'standard'>('ad')
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -296,6 +307,13 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
         setAIAppModules(aiAppModulesData.modules || [])
       }
 
+      // Fetch prompt modules
+      const promptModulesRes = await fetch(`/api/prompt-modules?publication_id=${publicationId}`)
+      if (promptModulesRes.ok) {
+        const promptModulesData = await promptModulesRes.json()
+        setPromptModules(promptModulesData.modules || [])
+      }
+
       // Fetch cooldown setting
       const settingsRes = await fetch(`/api/settings/publication?key=ad_company_cooldown_days`)
       if (settingsRes.ok) {
@@ -322,7 +340,8 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
       .map(s => ({ type: 'section' as const, data: s })),
     ...adModules.map(m => ({ type: 'ad_module' as const, data: m })),
     ...pollModules.map(m => ({ type: 'poll_module' as const, data: m })),
-    ...aiAppModules.map(m => ({ type: 'ai_app_module' as const, data: m }))
+    ...aiAppModules.map(m => ({ type: 'ai_app_module' as const, data: m })),
+    ...promptModules.map(m => ({ type: 'prompt_module' as const, data: m }))
   ].sort((a, b) => {
     const orderA = a.data.display_order ?? 999
     const orderB = b.data.display_order ?? 999
@@ -336,7 +355,9 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
         ? `ad-module-${item.data.id}`
         : item.type === 'poll_module'
           ? `poll-module-${item.data.id}`
-          : `ai-app-module-${item.data.id}`
+          : item.type === 'ai_app_module'
+            ? `ai-app-module-${item.data.id}`
+            : `prompt-module-${item.data.id}`
   )
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -354,6 +375,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     const newAdModules: AdModule[] = []
     const newPollModules: PollModule[] = []
     const newAIAppModules: AIAppModule[] = []
+    const newPromptModules: PromptModule[] = []
 
     reorderedItems.forEach((item, idx) => {
       const newOrder = idx + 1
@@ -363,8 +385,10 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
         newAdModules.push({ ...item.data, display_order: newOrder })
       } else if (item.type === 'poll_module') {
         newPollModules.push({ ...item.data, display_order: newOrder })
-      } else {
+      } else if (item.type === 'ai_app_module') {
         newAIAppModules.push({ ...item.data, display_order: newOrder })
+      } else {
+        newPromptModules.push({ ...item.data, display_order: newOrder })
       }
     })
 
@@ -372,6 +396,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     setAdModules(newAdModules)
     setPollModules(newPollModules)
     setAIAppModules(newAIAppModules)
+    setPromptModules(newPromptModules)
 
     // Save to server
     setSaving(true)
@@ -416,6 +441,17 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             modules: newAIAppModules.map(m => ({ id: m.id, display_order: m.display_order }))
+          })
+        })
+      }
+
+      // Update prompt modules order
+      if (newPromptModules.length > 0) {
+        await fetch('/api/prompt-modules', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            modules: newPromptModules.map(m => ({ id: m.id, display_order: m.display_order }))
           })
         })
       }
@@ -464,7 +500,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
         setPollModules(prev => prev.map(m =>
           m.id === item.data.id ? { ...m, is_active: newActive } : m
         ))
-      } else {
+      } else if (item.type === 'ai_app_module') {
         // AI App module
         await fetch(`/api/ai-app-modules/${item.data.id}`, {
           method: 'PATCH',
@@ -472,6 +508,16 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           body: JSON.stringify({ is_active: newActive })
         })
         setAIAppModules(prev => prev.map(m =>
+          m.id === item.data.id ? { ...m, is_active: newActive } : m
+        ))
+      } else {
+        // Prompt module
+        await fetch(`/api/prompt-modules/${item.data.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_active: newActive })
+        })
+        setPromptModules(prev => prev.map(m =>
           m.id === item.data.id ? { ...m, is_active: newActive } : m
         ))
       }
@@ -542,6 +588,22 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           const data = await res.json()
           setAIAppModules(prev => [...prev, data.module])
           setSelectedItem({ type: 'ai_app_module', data: data.module })
+        }
+      } else if (newSectionType === 'prompt') {
+        // Create prompt module
+        const res = await fetch('/api/prompt-modules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            publication_id: publicationId,
+            name: newModuleName.trim()
+          })
+        })
+
+        if (res.ok) {
+          const data = await res.json()
+          setPromptModules(prev => [...prev, data.module])
+          setSelectedItem({ type: 'prompt_module', data: data.module })
         }
       } else {
         // Create standard section
@@ -692,6 +754,46 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     }
   }
 
+  const handleUpdatePromptModule = async (updates: Partial<PromptModule>) => {
+    if (!selectedItem || selectedItem.type !== 'prompt_module') {
+      throw new Error('No prompt module selected')
+    }
+
+    const moduleId = selectedItem.data.id
+    console.log('[SectionsPanel] Updating prompt module:', moduleId, updates)
+
+    const res = await fetch(`/api/prompt-modules/${moduleId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      console.log('[SectionsPanel] Prompt module updated successfully:', data.module)
+      setPromptModules(prev => prev.map(m => m.id === moduleId ? data.module : m))
+      setSelectedItem({ type: 'prompt_module', data: data.module })
+    } else {
+      const errorData = await res.json().catch(() => ({}))
+      console.error('[SectionsPanel] Failed to update prompt module:', res.status, errorData)
+      throw new Error(errorData.error || `Failed to update prompt module (${res.status})`)
+    }
+  }
+
+  const handleDeletePromptModule = async () => {
+    if (!selectedItem || selectedItem.type !== 'prompt_module') return
+
+    const moduleId = selectedItem.data.id
+    const res = await fetch(`/api/prompt-modules/${moduleId}`, {
+      method: 'DELETE'
+    })
+
+    if (res.ok) {
+      setPromptModules(prev => prev.filter(m => m.id !== moduleId))
+      setSelectedItem(null)
+    }
+  }
+
   const handleCooldownChange = async (days: number) => {
     try {
       await fetch('/api/settings/publication', {
@@ -826,6 +928,12 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
             />
           ) : selectedItem.type === 'ai_app_module' ? (
             <div className="text-gray-500">Loading publication...</div>
+          ) : selectedItem.type === 'prompt_module' ? (
+            <PromptModuleSettings
+              module={selectedItem.data}
+              onUpdate={handleUpdatePromptModule}
+              onDelete={handleDeletePromptModule}
+            />
           ) : (
             <SectionSettings
               section={selectedItem.data}
@@ -891,6 +999,18 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
                 </button>
                 <button
                   type="button"
+                  onClick={() => setNewSectionType('prompt')}
+                  className={`px-3 py-3 rounded-lg border-2 transition-colors ${
+                    newSectionType === 'prompt'
+                      ? 'border-amber-500 bg-amber-50 text-amber-700'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                  }`}
+                >
+                  <div className="font-medium text-sm">Prompt</div>
+                  <div className="text-xs mt-1 opacity-75">AI prompt</div>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setNewSectionType('standard')}
                   className={`px-3 py-3 rounded-lg border-2 transition-colors ${
                     newSectionType === 'standard'
@@ -918,7 +1038,9 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
                       ? "e.g., Weekly Poll"
                       : newSectionType === 'ai_app'
                         ? "e.g., AI Tools Spotlight"
-                        : "e.g., Featured Content"
+                        : newSectionType === 'prompt'
+                          ? "e.g., Prompt of the Day"
+                          : "e.g., Featured Content"
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 autoFocus

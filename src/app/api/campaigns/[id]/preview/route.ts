@@ -13,7 +13,8 @@ import {
   generatePromptIdeasSection,
   generateAIAppsSection,
   generateAdModulesSection,
-  generatePollModulesSection
+  generatePollModulesSection,
+  generatePromptModulesSection
 } from '@/lib/newsletter-templates'
 
 export async function GET(
@@ -168,9 +169,18 @@ async function generateNewsletterHtml(issue: any): Promise<string> {
       .eq('is_active', true)
       .order('display_order', { ascending: true })
 
+    // Fetch prompt modules for this publication
+    const { data: promptModules } = await supabaseAdmin
+      .from('prompt_modules')
+      .select('*')
+      .eq('publication_id', issue.publication_id)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+
     console.log('Active newsletter sections:', sections?.map(s => `${s.name} (order: ${s.display_order})`).join(', '))
     console.log('Active ad modules:', adModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
     console.log('Active poll modules:', pollModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
+    console.log('Active prompt modules:', promptModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
 
     const formatDate = (dateString: string) => {
       try {
@@ -214,12 +224,13 @@ async function generateNewsletterHtml(issue: any): Promise<string> {
       PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b'
     }
 
-    // Merge newsletter sections, ad modules, and poll modules into a single sorted list
-    type SectionItem = { type: 'section'; data: any } | { type: 'ad_module'; data: any } | { type: 'poll_module'; data: any }
+    // Merge newsletter sections, ad modules, poll modules, and prompt modules into a single sorted list
+    type SectionItem = { type: 'section'; data: any } | { type: 'ad_module'; data: any } | { type: 'poll_module'; data: any } | { type: 'prompt_module'; data: any }
     const allItems: SectionItem[] = [
       ...(sections || []).map(s => ({ type: 'section' as const, data: s })),
       ...(adModules || []).map(m => ({ type: 'ad_module' as const, data: m })),
-      ...(pollModules || []).map(m => ({ type: 'poll_module' as const, data: m }))
+      ...(pollModules || []).map(m => ({ type: 'poll_module' as const, data: m })),
+      ...(promptModules || []).map(m => ({ type: 'prompt_module' as const, data: m }))
     ].sort((a, b) => (a.data.display_order || 999) - (b.data.display_order || 999))
 
     console.log('Combined section order:', allItems.map(item =>
@@ -240,6 +251,12 @@ async function generateNewsletterHtml(issue: any): Promise<string> {
         const pollModuleHtml = await generatePollModulesSection(issue, item.data.id)
         if (pollModuleHtml) {
           sectionsHtml += pollModuleHtml
+        }
+      } else if (item.type === 'prompt_module') {
+        // Generate single prompt module section
+        const promptModuleHtml = await generatePromptModulesSection(issue, item.data.id)
+        if (promptModuleHtml) {
+          sectionsHtml += promptModuleHtml
         }
       } else {
         const section = item.data

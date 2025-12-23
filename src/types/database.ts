@@ -123,6 +123,9 @@ export interface PromptIdea {
   display_order: number | null
   last_used_date: string | null
   times_used: number
+  // Module system fields
+  prompt_module_id: string | null
+  priority: number
   created_at: string
   updated_at: string
 }
@@ -647,6 +650,43 @@ export interface AIAppModuleWithApps extends AIAppModule {
 export interface IssueAIAppModuleWithDetails extends IssueAIAppModule {
   ai_app_module: AIAppModule
   apps: AIApplication[]  // The selected apps
+}
+
+// Prompt Module Types
+export type PromptBlockType = 'title' | 'body'
+
+export type PromptSelectionMode = 'sequential' | 'random' | 'priority' | 'manual'
+
+export interface PromptModule {
+  id: string
+  publication_id: string
+  name: string
+  display_order: number
+  is_active: boolean
+  selection_mode: PromptSelectionMode
+  block_order: PromptBlockType[]
+  config: Record<string, unknown>
+  next_position: number
+  created_at: string
+  updated_at: string
+}
+
+export interface IssuePromptModule {
+  id: string
+  issue_id: string
+  prompt_module_id: string
+  prompt_id: string | null
+  selection_mode?: PromptSelectionMode
+  selected_at: string
+  used_at: string | null
+  // Joined relations
+  prompt_module?: PromptModule
+  prompt?: PromptIdea | null
+}
+
+export interface IssuePromptModuleWithDetails extends IssuePromptModule {
+  prompt_module: PromptModule
+  prompt: PromptIdea | null
 }
 
 // Combined types for API responses

@@ -1351,61 +1351,77 @@ export async function generateAIAppsSection(issue: any): Promise<string> {
 
 // ==================== PROMPT IDEAS ====================
 
+/**
+ * Generate a single prompt module section (module-based system)
+ * Used when iterating through prompt_modules
+ */
+export async function generatePromptModulesSection(
+  issue: { id: string; publication_id: string; status?: string },
+  moduleId: string
+): Promise<string> {
+  try {
+    const { PromptModuleSelector, PromptModuleRenderer } = await import('./prompt-modules')
+
+    // Get all prompt selections for this issue
+    const selections = await PromptModuleSelector.getIssuePromptSelections(issue.id)
+
+    // Find the selection for this specific module
+    const selection = selections.find(s => s.prompt_module_id === moduleId)
+
+    if (!selection || !selection.prompt || !selection.prompt_module) {
+      console.log(`[PromptModules] No selection/prompt found for module ${moduleId} in issue ${issue.id}`)
+      return ''
+    }
+
+    // Render the prompt module
+    const result = await PromptModuleRenderer.renderPromptModule(
+      selection.prompt_module,
+      selection.prompt,
+      issue.publication_id,
+      { issueId: issue.id }
+    )
+
+    return result.html
+  } catch (error) {
+    console.error('[PromptModules] Error generating prompt module section:', error)
+    return ''
+  }
+}
+
+/**
+ * Generate all prompt module sections for an issue
+ * Legacy function - used for backward compatibility
+ * @deprecated Use generatePromptModulesSection with individual module IDs instead
+ */
 export async function generatePromptIdeasSection(issue: any): Promise<string> {
   try {
     console.log('Generating Prompt Ideas section for issue:', issue?.id)
 
-    // Import PromptSelector
-    const { PromptSelector } = await import('./prompt-selector')
+    const { PromptModuleSelector, PromptModuleRenderer } = await import('./prompt-modules')
 
-    // Fetch colors from business settings (using publication_id if available)
-    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue?.publication_id)
+    // Get all prompt selections for this issue
+    const selections = await PromptModuleSelector.getIssuePromptSelections(issue.id)
 
-    // Get the selected prompt for this issue
-    const prompt = await PromptSelector.getPromptForissue(issue.id)
-
-    if (!prompt) {
-      console.log('No prompt selected for this issue, skipping Prompt Ideas section')
+    if (!selections || selections.length === 0) {
+      console.log('No prompt module selections for this issue')
       return ''
     }
 
-    console.log(`Found prompt: ${prompt.title}`)
+    // Generate HTML for all modules
+    let combinedHtml = ''
+    for (const selection of selections) {
+      if (selection.prompt && selection.prompt_module) {
+        const result = await PromptModuleRenderer.renderPromptModule(
+          selection.prompt_module,
+          selection.prompt,
+          issue.publication_id,
+          { issueId: issue.id }
+        )
+        combinedHtml += result.html
+      }
+    }
 
-    // Convert line breaks to <br> tags for email compatibility
-    const formattedPromptText = prompt.prompt_text.replace(/\n/g, '<br>')
-
-    // Generate HTML with terminal styling (email-safe)
-    return `
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
-  <tr>
-    <td style="padding:0 10px;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
-        <tr>
-          <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">Prompt Ideas</h2>
-          </td>
-        </tr>
-        <tr class='row'>
-          <td class='column' style='padding:8px; vertical-align: top;'>
-            <table width='100%' cellpadding='0' cellspacing='0' style='font-family: ${bodyFont}; font-size: 16px; line-height: 26px;'>
-              <tr><td style='padding: 10px 10px 8px; font-size: 20px; font-weight: bold; text-align: center;'>${prompt.title}</td></tr>
-              <tr>
-                <td align='center' style='padding: 0 10px 10px;'>
-                  <table width="100%" cellpadding='0' cellspacing='0' style='max-width: 550px; margin: 0 auto;'>
-                    <tr>
-                      <td bgcolor="#000000" style='background-color: #000000; color: #FFFFFF; padding: 16px; border-radius: 6px; border: 2px solid #333; font-family: Courier New, Courier, monospace; font-size: 14px; line-height: 22px; text-align: left;'>${formattedPromptText}</td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-</table>
-<br>`
+    return combinedHtml
 
   } catch (error) {
     console.error('Error generating Prompt Ideas section:', error)
