@@ -127,6 +127,53 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const sectionId = searchParams.get('id')
+
+    if (!sectionId) {
+      return NextResponse.json({
+        error: 'Section ID is required'
+      }, { status: 400 })
+    }
+
+    // Get section info before deleting
+    const { data: section } = await supabaseAdmin
+      .from('newsletter_sections')
+      .select('name')
+      .eq('id', sectionId)
+      .single()
+
+    // Delete the section
+    const { error } = await supabaseAdmin
+      .from('newsletter_sections')
+      .delete()
+      .eq('id', sectionId)
+
+    if (error) {
+      throw error
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Section "${section?.name || sectionId}" deleted successfully`
+    })
+
+  } catch (error) {
+    console.error('Failed to delete newsletter section:', error)
+    return NextResponse.json({
+      error: 'Failed to delete newsletter section',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
