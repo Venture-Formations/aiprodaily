@@ -113,12 +113,19 @@ export default async function NewsletterPage({ params }: PageProps) {
   const pollModules = newsletter.sections?.poll_modules || []
   const aiAppModules = newsletter.sections?.ai_app_modules || []
   const promptModules = newsletter.sections?.prompt_modules || []
+  const legacyPrompt = newsletter.sections?.prompt // Legacy single prompt
 
   // Section IDs for stable matching
   const SECTION_IDS = {
     AI_APPLICATIONS: '853f8d0b-bc76-473a-bfc6-421418266222',
     PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b',
     ADVERTISEMENT: 'c0bc7173-de47-41b2-a260-77f55525ee3d'
+  }
+
+  // Get display_order for legacy sections from newsletterSectionsConfig
+  const getDisplayOrder = (sectionId: string): number => {
+    const section = newsletterSectionsConfig?.find((s: any) => s.id === sectionId)
+    return section?.display_order ?? 999
   }
 
   // Combine all renderable items and sort by display_order
@@ -128,9 +135,11 @@ export default async function NewsletterPage({ params }: PageProps) {
     | { type: 'poll_module'; data: any; display_order: number }
     | { type: 'ai_app_module'; data: any; display_order: number }
     | { type: 'prompt_module'; data: any; display_order: number }
+    | { type: 'legacy_ai_apps'; data: any; display_order: number }
+    | { type: 'legacy_prompt'; data: any; display_order: number }
 
   const allRenderItems: RenderItem[] = [
-    // Newsletter sections (excluding Advertisement, AI Applications, and Prompt Ideas which are handled by modules)
+    // Newsletter sections (excluding Advertisement, AI Applications, and Prompt Ideas which are handled by modules/legacy)
     ...(newsletterSectionsConfig || [])
       .filter((s: any) => s.id !== SECTION_IDS.ADVERTISEMENT && s.id !== SECTION_IDS.AI_APPLICATIONS && s.id !== SECTION_IDS.PROMPT_IDEAS)
       .map((s: any) => ({ type: 'section' as const, data: s, display_order: s.display_order ?? 999 })),
@@ -138,10 +147,22 @@ export default async function NewsletterPage({ params }: PageProps) {
     ...adModules.map((m: any) => ({ type: 'ad_module' as const, data: m, display_order: m.display_order ?? 999 })),
     // Poll modules
     ...pollModules.map((m: any) => ({ type: 'poll_module' as const, data: m, display_order: m.display_order ?? 999 })),
-    // AI App modules
+    // AI App modules (new system)
     ...aiAppModules.map((m: any) => ({ type: 'ai_app_module' as const, data: m, display_order: m.display_order ?? 999 })),
-    // Prompt modules
-    ...promptModules.map((m: any) => ({ type: 'prompt_module' as const, data: m, display_order: m.display_order ?? 999 }))
+    // Legacy AI Apps (only if no ai_app_modules)
+    ...(aiApps.length > 0 && aiAppModules.length === 0 ? [{
+      type: 'legacy_ai_apps' as const,
+      data: aiApps,
+      display_order: getDisplayOrder(SECTION_IDS.AI_APPLICATIONS)
+    }] : []),
+    // Prompt modules (new system)
+    ...promptModules.map((m: any) => ({ type: 'prompt_module' as const, data: m, display_order: m.display_order ?? 999 })),
+    // Legacy Prompt (only if no prompt_modules)
+    ...(legacyPrompt && promptModules.length === 0 ? [{
+      type: 'legacy_prompt' as const,
+      data: legacyPrompt,
+      display_order: getDisplayOrder(SECTION_IDS.PROMPT_IDEAS)
+    }] : [])
   ].sort((a, b) => a.display_order - b.display_order)
 
   // Process advertorial body to make last sentence or arrow CTA a hyperlink (like email template)
@@ -689,69 +710,75 @@ export default async function NewsletterPage({ params }: PageProps) {
               )
             }
 
+            // Render Legacy AI Apps (in correct position based on newsletter_sections)
+            if (item.type === 'legacy_ai_apps') {
+              const apps = item.data
+              const getAppEmoji = (app: any): string => {
+                const category = (app.category || '').toLowerCase()
+                if (category.includes('accounting') || category.includes('bookkeeping')) return '📊'
+                if (category.includes('tax') || category.includes('compliance')) return '📋'
+                if (category.includes('payroll')) return '💰'
+                if (category.includes('finance') || category.includes('analysis')) return '📈'
+                if (category.includes('expense')) return '🧾'
+                if (category.includes('client')) return '🤝'
+                if (category.includes('productivity')) return '⚡'
+                if (category.includes('hr') || category.includes('human')) return '👥'
+                if (category.includes('banking') || category.includes('payment')) return '🏦'
+                return '✨'
+              }
+              return (
+                <div key="legacy-ai-apps" className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">AI Applications</h2>
+                  <div className="px-4 sm:px-6 py-2">
+                    {apps.map((appItem: any, index: number) => {
+                      const app = appItem.app
+                      if (!app) return null
+                      return (
+                        <p key={app.id || index} className="py-3 text-base leading-relaxed">
+                          <span className="font-bold">{index + 1}.</span> {getAppEmoji(app)}{' '}
+                          {app.app_url ? (
+                            <a href={app.app_url} target="_blank" rel="noopener noreferrer"
+                              className="text-red-600 hover:text-red-700 underline font-bold">
+                              {app.app_name}
+                            </a>
+                          ) : (
+                            <span className="font-bold text-slate-900">{app.app_name}</span>
+                          )}{' '}
+                          <span className="text-slate-800">{app.description || app.tagline || ''}</span>
+                        </p>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            }
+
+            // Render Legacy Prompt (in correct position based on newsletter_sections)
+            if (item.type === 'legacy_prompt') {
+              const prompt = item.data
+              return (
+                <div key="legacy-prompt" className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">Prompt Ideas</h2>
+                  <div className="p-6 sm:p-8">
+                    <div className="text-center">
+                      {prompt.title && (
+                        <div className="text-xl font-bold text-slate-900 mb-4">{prompt.title}</div>
+                      )}
+                      {prompt.prompt_text && (
+                        <div className="bg-black text-white p-4 rounded-md font-mono text-sm leading-relaxed whitespace-pre-wrap border-2 border-gray-800">
+                          {prompt.prompt_text}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
             return null
           })}
 
-          {/* Fallback: Render legacy prompt if exists but no prompt modules rendered */}
-          {newsletter.sections?.prompt && promptModules.length === 0 && (() => {
-            const prompt = newsletter.sections.prompt
-            return (
-              <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">Prompt Ideas</h2>
-                <div className="p-6 sm:p-8">
-                  <div className="text-center mb-4">
-                    <div className="text-xl font-bold text-slate-900">{prompt.title}</div>
-                  </div>
-                  <div className="bg-black text-white p-4 rounded-md font-mono text-sm leading-relaxed whitespace-pre-wrap border-2 border-gray-800">
-                    {prompt.prompt_text}
-                  </div>
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* Fallback: Render legacy AI Apps ONLY if no ai_app_modules with apps exist */}
-          {/* This handles old archives that predate the module system */}
-          {aiApps.length > 0 && aiAppModules.length === 0 && (() => {
-            const getAppEmoji = (app: any): string => {
-              const category = (app.category || '').toLowerCase()
-              if (category.includes('accounting') || category.includes('bookkeeping')) return '📊'
-              if (category.includes('tax') || category.includes('compliance')) return '📋'
-              if (category.includes('payroll')) return '💰'
-              if (category.includes('finance') || category.includes('analysis')) return '📈'
-              if (category.includes('expense')) return '🧾'
-              if (category.includes('client')) return '🤝'
-              if (category.includes('productivity')) return '⚡'
-              if (category.includes('hr') || category.includes('human')) return '👥'
-              if (category.includes('banking') || category.includes('payment')) return '🏦'
-              return '✨'
-            }
-            return (
-              <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">AI Applications</h2>
-                <div className="px-4 sm:px-6 py-2">
-                  {aiApps.map((item: any, index: number) => {
-                    const app = item.app
-                    if (!app) return null
-                    return (
-                      <p key={app.id || index} className="py-3 text-base leading-relaxed">
-                        <span className="font-bold">{index + 1}.</span> {getAppEmoji(app)}{' '}
-                        {app.app_url ? (
-                          <a href={app.app_url} target="_blank" rel="noopener noreferrer"
-                            className="text-red-600 hover:text-red-700 underline font-bold">
-                            {app.app_name}
-                          </a>
-                        ) : (
-                          <span className="font-bold text-slate-900">{app.app_name}</span>
-                        )}{' '}
-                        <span className="text-slate-800">{app.description || app.tagline || ''}</span>
-                      </p>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })()}
+          {/* Legacy fallbacks are now rendered in the main loop with correct display_order */}
 
           {/* Fallback: Render advertorial if it exists but wasn't rendered in sections loop */}
           {advertorial && !newsletterSectionsConfig?.some((s: any) => s.id === SECTION_IDS.ADVERTISEMENT) && (() => {
