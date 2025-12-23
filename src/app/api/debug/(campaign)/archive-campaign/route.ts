@@ -15,6 +15,35 @@ export async function GET(request: NextRequest) {
       }, { status: 400 })
     }
 
+    // View mode - just show archive contents
+    const viewMode = searchParams.get('view') === 'true'
+    if (viewMode) {
+      const { data: archived, error: archiveError } = await supabaseAdmin
+        .from('archived_newsletters')
+        .select('*')
+        .eq('issue_date', issueDate || '')
+        .single()
+
+      if (archiveError || !archived) {
+        return NextResponse.json({
+          error: 'Archive not found',
+          details: archiveError?.message
+        }, { status: 404 })
+      }
+
+      return NextResponse.json({
+        success: true,
+        archive: {
+          id: archived.id,
+          issue_date: archived.issue_date,
+          subject_line: archived.subject_line,
+          metadata: archived.metadata,
+          sections_keys: Object.keys(archived.sections || {}),
+          sections: archived.sections
+        }
+      })
+    }
+
     console.log('[ARCHIVE] Manual archive request:', { issueId, issueDate })
 
     // Fetch issue
