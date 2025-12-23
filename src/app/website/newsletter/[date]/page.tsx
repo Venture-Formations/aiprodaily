@@ -629,7 +629,7 @@ export default async function NewsletterPage({ params }: PageProps) {
 
               return (
                 <div key={`ai-app-${aiAppModule.module_name}`} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-emerald-600 text-white">{aiAppModule.module_name}</h2>
+                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{aiAppModule.module_name}</h2>
                   <div className="px-4 sm:px-6 py-4">
                     {apps.map((app: any, index: number) => (
                       <div key={app.id || index} className="py-3 border-b border-slate-200 last:border-b-0">
@@ -645,7 +645,7 @@ export default async function NewsletterPage({ params }: PageProps) {
                                       href={app.app_url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-emerald-600 hover:text-emerald-700 underline font-bold"
+                                      className="text-blue-600 hover:text-blue-700 underline font-bold"
                                     >
                                       {app.app_name}
                                     </a>
@@ -677,7 +677,7 @@ export default async function NewsletterPage({ params }: PageProps) {
                             case 'category':
                               return app.category ? (
                                 <div key="category" className="mt-2">
-                                  <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-medium">
+                                  <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs font-medium">
                                     {app.category}
                                   </span>
                                 </div>
@@ -689,7 +689,7 @@ export default async function NewsletterPage({ params }: PageProps) {
                                     href={app.app_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-block px-4 py-2 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700"
+                                    className="inline-block px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
                                   >
                                     Try {app.app_name}
                                   </a>
@@ -781,7 +781,7 @@ export default async function NewsletterPage({ params }: PageProps) {
             }
             return (
               <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-emerald-600 text-white">AI Applications</h2>
+                <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">AI Applications</h2>
                 <div className="px-4 sm:px-6 py-4">
                   {aiApps.map((item: any, index: number) => {
                     const app = item.app
@@ -795,7 +795,7 @@ export default async function NewsletterPage({ params }: PageProps) {
                               href={app.app_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-emerald-600 hover:text-emerald-700 underline font-bold"
+                              className="text-blue-600 hover:text-blue-700 underline font-bold"
                             >
                               {app.app_name}
                             </a>

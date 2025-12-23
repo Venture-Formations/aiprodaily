@@ -65,7 +65,8 @@
       "Bash(cat:*)",
       "mcp__supabase__list_migrations",
       "Bash(git revert:*)",
-      "WebFetch(domain:www.aiaccountingdaily.com)"
+      "WebFetch(domain:www.aiaccountingdaily.com)",
+      "Bash(git show:*)"
     ],
     "deny": [],
     "ask": []
