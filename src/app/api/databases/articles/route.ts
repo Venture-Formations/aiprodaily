@@ -537,6 +537,36 @@ export async function GET(request: NextRequest) {
 
     console.log(`[API] Articles fetched: ${allArticles.length} total`);
 
+    // Check for debug parameter
+    const debug = searchParams.get('debug') === 'true';
+    if (debug) {
+      return NextResponse.json({
+        data: allArticles.slice(0, 5),
+        debug: {
+          issuesCount: issues?.length || 0,
+          primaryArticlesCount: primaryArticles?.length || 0,
+          secondaryArticlesCount: secondaryArticles?.length || 0,
+          postIdsCount: allPostIds.length,
+          postIdsSample: allPostIds.slice(0, 5),
+          rssPostsCount: rssPosts?.length || 0,
+          postMapSize: postMap.size,
+          postMapKeysSample: Array.from(postMap.keys()).slice(0, 5),
+          postRatingsCount: postRatings?.length || 0,
+          ratingsMapSize: ratingsMap.size,
+          // Check if first article's post_id is in the map
+          firstArticleCheck: primaryArticles && primaryArticles.length > 0 ? {
+            articleId: primaryArticles[0].id,
+            articlePostId: primaryArticles[0].post_id,
+            postFound: postMap.has(primaryArticles[0].post_id),
+            postData: postMap.get(primaryArticles[0].post_id) ? {
+              id: postMap.get(primaryArticles[0].post_id).id,
+              title: postMap.get(primaryArticles[0].post_id).title?.slice(0, 50)
+            } : null
+          } : null
+        }
+      });
+    }
+
     return NextResponse.json({ data: allArticles });
 
   } catch (error: any) {
