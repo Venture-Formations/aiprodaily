@@ -76,11 +76,16 @@ export default async function NewsletterPage({ params }: PageProps) {
     'business_name'
   ])
 
-  const { data: sections } = await supabaseAdmin
-    .from('newsletter_sections')
-    .select('*')
-    .eq('is_active', true)
-    .order('display_order', { ascending: true })
+  // Use archived newsletter_sections if available (snapshot at time of send), otherwise fetch live
+  let newsletterSectionsConfig = newsletter.sections?.newsletter_sections || null
+  if (!newsletterSectionsConfig) {
+    const { data: liveSections } = await supabaseAdmin
+      .from('newsletter_sections')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+    newsletterSectionsConfig = liveSections
+  }
 
   const headerImageUrl = settings.website_header_url || '/logo.png'
   const logoUrl = settings.logo_url || '/logo.png'
@@ -126,7 +131,7 @@ export default async function NewsletterPage({ params }: PageProps) {
 
   const allRenderItems: RenderItem[] = [
     // Newsletter sections (excluding Advertisement, AI Applications, and Prompt Ideas which are handled by modules)
-    ...(sections || [])
+    ...(newsletterSectionsConfig || [])
       .filter((s: any) => s.id !== SECTION_IDS.ADVERTISEMENT && s.id !== SECTION_IDS.AI_APPLICATIONS && s.id !== SECTION_IDS.PROMPT_IDEAS)
       .map((s: any) => ({ type: 'section' as const, data: s, display_order: s.display_order ?? 999 })),
     // Ad modules
@@ -599,74 +604,103 @@ export default async function NewsletterPage({ params }: PageProps) {
               )
             }
 
-            // Render AI App Modules
+            // Render AI App Modules (matching email template format)
             if (item.type === 'ai_app_module') {
               const aiAppModule = item.data
               const apps = aiAppModule.apps
               if (!apps || apps.length === 0) return null
 
-              const blockOrder: string[] = aiAppModule.block_order || ['logo', 'name', 'tagline', 'category', 'button']
+              const blockOrder: string[] = aiAppModule.block_order || ['title', 'description']
+
+              // Helper to get emoji based on category (matching email template)
+              const getAppEmoji = (app: any): string => {
+                const category = (app.category || '').toLowerCase()
+                if (category.includes('accounting') || category.includes('bookkeeping')) return '📊'
+                if (category.includes('tax') || category.includes('compliance')) return '📋'
+                if (category.includes('payroll')) return '💰'
+                if (category.includes('finance') || category.includes('analysis')) return '📈'
+                if (category.includes('expense')) return '🧾'
+                if (category.includes('client')) return '🤝'
+                if (category.includes('productivity')) return '⚡'
+                if (category.includes('hr') || category.includes('human')) return '👥'
+                if (category.includes('banking') || category.includes('payment')) return '🏦'
+                return '✨'
+              }
 
               return (
                 <div key={`ai-app-${aiAppModule.module_name}`} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
                   <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-emerald-600 text-white">{aiAppModule.module_name}</h2>
-                  <div className="p-6 sm:p-8">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {apps.map((app: any) => (
-                        <div key={app.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                          {blockOrder.map((blockType: string) => {
-                            switch (blockType) {
-                              case 'logo':
-                                return app.logo_url ? (
-                                  <div key="logo" className="flex justify-center mb-3">
-                                    <img
-                                      src={app.logo_url}
-                                      alt={app.app_name}
-                                      className="h-12 w-12 object-contain rounded-lg"
-                                    />
-                                  </div>
-                                ) : null
-                              case 'title':
-                              case 'name':
-                                return (
-                                  <h3 key="name" className="font-bold text-slate-900 text-center mb-1">{app.app_name}</h3>
-                                )
-                              case 'description':
-                                return app.description ? (
-                                  <p key="description" className="text-sm text-slate-600 text-center mb-2 line-clamp-3">{app.description}</p>
-                                ) : null
-                              case 'tagline':
-                                return app.tagline ? (
-                                  <p key="tagline" className="text-sm text-slate-600 text-center mb-2">{app.tagline}</p>
-                                ) : null
-                              case 'category':
-                                return app.category ? (
-                                  <div key="category" className="flex justify-center mb-3">
-                                    <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-medium">
-                                      {app.category}
-                                    </span>
-                                  </div>
-                                ) : null
-                              case 'button':
-                                return app.app_url ? (
-                                  <div key="button" className="text-center">
+                  <div className="px-4 sm:px-6 py-4">
+                    {apps.map((app: any, index: number) => (
+                      <div key={app.id || index} className="py-3 border-b border-slate-200 last:border-b-0">
+                        {blockOrder.map((blockType: string) => {
+                          switch (blockType) {
+                            case 'title':
+                            case 'name':
+                              return (
+                                <div key="title" className="font-bold text-base">
+                                  <span className="font-bold">{index + 1}.</span> {getAppEmoji(app)}{' '}
+                                  {app.app_url ? (
                                     <a
                                       href={app.app_url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-emerald-600 hover:text-emerald-700 text-sm font-medium"
+                                      className="text-emerald-600 hover:text-emerald-700 underline font-bold"
                                     >
-                                      Learn More →
+                                      {app.app_name}
                                     </a>
-                                  </div>
-                                ) : null
-                              default:
-                                return null
-                            }
-                          })}
-                        </div>
-                      ))}
-                    </div>
+                                  ) : (
+                                    <span className="font-bold text-slate-900">{app.app_name}</span>
+                                  )}
+                                </div>
+                              )
+                            case 'description':
+                              return (
+                                <div key="description" className="text-base text-slate-700 leading-relaxed mt-1">
+                                  {app.description || 'AI-powered application'}
+                                </div>
+                              )
+                            case 'logo':
+                              return app.logo_url ? (
+                                <div key="logo" className="my-2">
+                                  <img
+                                    src={app.logo_url}
+                                    alt={app.app_name}
+                                    className="h-12 w-12 object-contain rounded-lg"
+                                  />
+                                </div>
+                              ) : null
+                            case 'tagline':
+                              return app.tagline ? (
+                                <p key="tagline" className="text-sm text-slate-500 italic mt-1">{app.tagline}</p>
+                              ) : null
+                            case 'category':
+                              return app.category ? (
+                                <div key="category" className="mt-2">
+                                  <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-medium">
+                                    {app.category}
+                                  </span>
+                                </div>
+                              ) : null
+                            case 'button':
+                              return app.app_url ? (
+                                <div key="button" className="mt-2">
+                                  <a
+                                    href={app.app_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-block px-4 py-2 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700"
+                                  >
+                                    Try {app.app_name}
+                                  </a>
+                                </div>
+                              ) : null
+                            default:
+                              return null
+                          }
+                        })}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )
@@ -730,45 +764,63 @@ export default async function NewsletterPage({ params }: PageProps) {
 
           {/* Fallback: Render legacy AI Apps if exists but no ai_app_modules with apps rendered */}
           {/* This handles old archive format where modules exist but don't contain apps array */}
-          {aiApps.length > 0 && (aiAppModules.length === 0 || !aiAppModules.some((m: any) => m.apps?.length > 0)) && (
-            <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-              <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-emerald-600 text-white">AI Applications</h2>
-              <div className="p-6 sm:p-8">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {aiApps.map((item: any) => {
+          {aiApps.length > 0 && (aiAppModules.length === 0 || !aiAppModules.some((m: any) => m.apps?.length > 0)) && (() => {
+            // Helper to get emoji based on category (matching email template)
+            const getAppEmoji = (app: any): string => {
+              const category = (app.category || '').toLowerCase()
+              if (category.includes('accounting') || category.includes('bookkeeping')) return '📊'
+              if (category.includes('tax') || category.includes('compliance')) return '📋'
+              if (category.includes('payroll')) return '💰'
+              if (category.includes('finance') || category.includes('analysis')) return '📈'
+              if (category.includes('expense')) return '🧾'
+              if (category.includes('client')) return '🤝'
+              if (category.includes('productivity')) return '⚡'
+              if (category.includes('hr') || category.includes('human')) return '👥'
+              if (category.includes('banking') || category.includes('payment')) return '🏦'
+              return '✨'
+            }
+            return (
+              <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-emerald-600 text-white">AI Applications</h2>
+                <div className="px-4 sm:px-6 py-4">
+                  {aiApps.map((item: any, index: number) => {
                     const app = item.app
                     if (!app) return null
                     return (
-                      <div key={app.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                        {app.logo_url && (
-                          <div className="flex justify-center mb-3">
-                            <img src={app.logo_url} alt={app.app_name} className="h-12 w-12 object-contain rounded-lg" />
-                          </div>
-                        )}
-                        <h3 className="font-bold text-slate-900 text-center mb-1">{app.app_name}</h3>
-                        {app.tagline && <p className="text-sm text-slate-600 text-center mb-2">{app.tagline}</p>}
-                        {app.category && (
-                          <div className="flex justify-center mb-3">
-                            <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-medium">{app.category}</span>
-                          </div>
-                        )}
-                        {app.app_url && (
-                          <div className="text-center">
-                            <a href={app.app_url} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:text-emerald-700 text-sm font-medium">
-                              Learn More →
+                      <div key={app.id || index} className="py-3 border-b border-slate-200 last:border-b-0">
+                        <div className="font-bold text-base">
+                          <span className="font-bold">{index + 1}.</span> {getAppEmoji(app)}{' '}
+                          {app.app_url ? (
+                            <a
+                              href={app.app_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-emerald-600 hover:text-emerald-700 underline font-bold"
+                            >
+                              {app.app_name}
                             </a>
+                          ) : (
+                            <span className="font-bold text-slate-900">{app.app_name}</span>
+                          )}
+                        </div>
+                        {app.description && (
+                          <div className="text-base text-slate-700 leading-relaxed mt-1">
+                            {app.description}
                           </div>
+                        )}
+                        {!app.description && app.tagline && (
+                          <p className="text-sm text-slate-500 italic mt-1">{app.tagline}</p>
                         )}
                       </div>
                     )
                   })}
                 </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           {/* Fallback: Render advertorial if it exists but wasn't rendered in sections loop */}
-          {advertorial && !sections?.some((s: any) => s.id === SECTION_IDS.ADVERTISEMENT) && (() => {
+          {advertorial && !newsletterSectionsConfig?.some((s: any) => s.id === SECTION_IDS.ADVERTISEMENT) && (() => {
             const processedBody = processAdvertorialBody(advertorial.body, advertorial.button_url)
             return (
               <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">

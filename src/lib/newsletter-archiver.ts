@@ -370,6 +370,23 @@ export class NewsletterArchiver {
         }))
       }
 
+      // Newsletter sections configuration snapshot (for section ordering)
+      const { data: newsletterSections } = await supabaseAdmin
+        .from('newsletter_sections')
+        .select('id, name, display_order, section_type, is_active')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+
+      if (newsletterSections && newsletterSections.length > 0) {
+        sections.newsletter_sections = newsletterSections.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          display_order: s.display_order,
+          section_type: s.section_type,
+          is_active: s.is_active
+        }))
+      }
+
       // 4. Gather metadata
       const metadata = {
         total_articles: articles?.length || 0,
