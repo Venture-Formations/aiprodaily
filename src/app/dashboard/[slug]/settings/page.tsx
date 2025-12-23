@@ -589,48 +589,6 @@ function SystemStatus() {
           </div>
         </div>
 
-        {/* Events */}
-        <div className="mb-4">
-          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Events</h4>
-          <div className="space-y-2">
-            <div className="flex justify-between items-center py-2 border-b">
-              <div>
-                <div className="font-medium">Populate Events</div>
-                <div className="text-sm text-gray-600">Every 5 minutes - Populates events for upcoming issues</div>
-              </div>
-              <span className="text-green-600 text-sm">Active</span>
-            </div>
-            <div className="flex justify-between items-center py-2 border-b">
-              <div>
-                <div className="font-medium">Sync Events</div>
-                <div className="text-sm text-gray-600">Daily at midnight CT - Syncs events from external sources</div>
-              </div>
-              <span className="text-green-600 text-sm">Active</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Content Generation */}
-        <div className="mb-4">
-          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Content Generation</h4>
-          <div className="space-y-2">
-            <div className="flex justify-between items-center py-2 border-b">
-              <div>
-                <div className="font-medium">Generate Weather</div>
-                <div className="text-sm text-gray-600">Daily at 8:00 PM CT - Generates weather content</div>
-              </div>
-              <span className="text-green-600 text-sm">Active</span>
-            </div>
-            <div className="flex justify-between items-center py-2 border-b">
-              <div>
-                <div className="font-medium">Collect Wordle</div>
-                <div className="text-sm text-gray-600">Daily at 7:00 PM CT - Collects daily Wordle data</div>
-              </div>
-              <span className="text-green-600 text-sm">Active</span>
-            </div>
-          </div>
-        </div>
-
         {/* System & Maintenance */}
         <div>
           <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">System & Maintenance</h4>
