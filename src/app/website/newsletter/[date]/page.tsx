@@ -630,22 +630,22 @@ export default async function NewsletterPage({ params }: PageProps) {
               return (
                 <div key={`ai-app-${aiAppModule.module_name}`} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
                   <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{aiAppModule.module_name}</h2>
-                  <div className="px-4 sm:px-6 py-4">
+                  <div className="px-4 sm:px-6 py-2">
                     {apps.map((app: any, index: number) => (
-                      <div key={app.id || index} className="py-3 border-b border-slate-200 last:border-b-0">
+                      <div key={app.id || index} className="py-3">
                         {blockOrder.map((blockType: string) => {
                           switch (blockType) {
                             case 'title':
                             case 'name':
                               return (
-                                <div key="title" className="font-bold text-base">
+                                <div key="title" className="font-bold text-base leading-snug">
                                   <span className="font-bold">{index + 1}.</span> {getAppEmoji(app)}{' '}
                                   {app.app_url ? (
                                     <a
                                       href={app.app_url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-blue-600 hover:text-blue-700 underline font-bold"
+                                      className="text-red-600 hover:text-red-700 underline font-bold"
                                     >
                                       {app.app_name}
                                     </a>
@@ -656,7 +656,7 @@ export default async function NewsletterPage({ params }: PageProps) {
                               )
                             case 'description':
                               return (
-                                <div key="description" className="text-base text-slate-700 leading-relaxed mt-1">
+                                <div key="description" className="text-base text-slate-800 leading-normal">
                                   {app.description || 'AI-powered application'}
                                 </div>
                               )
@@ -782,20 +782,20 @@ export default async function NewsletterPage({ params }: PageProps) {
             return (
               <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
                 <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">AI Applications</h2>
-                <div className="px-4 sm:px-6 py-4">
+                <div className="px-4 sm:px-6 py-2">
                   {aiApps.map((item: any, index: number) => {
                     const app = item.app
                     if (!app) return null
                     return (
-                      <div key={app.id || index} className="py-3 border-b border-slate-200 last:border-b-0">
-                        <div className="font-bold text-base">
+                      <div key={app.id || index} className="py-3">
+                        <div className="font-bold text-base leading-snug">
                           <span className="font-bold">{index + 1}.</span> {getAppEmoji(app)}{' '}
                           {app.app_url ? (
                             <a
                               href={app.app_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-700 underline font-bold"
+                              className="text-red-600 hover:text-red-700 underline font-bold"
                             >
                               {app.app_name}
                             </a>
@@ -804,12 +804,12 @@ export default async function NewsletterPage({ params }: PageProps) {
                           )}
                         </div>
                         {app.description && (
-                          <div className="text-base text-slate-700 leading-relaxed mt-1">
+                          <div className="text-base text-slate-800 leading-normal">
                             {app.description}
                           </div>
                         )}
                         {!app.description && app.tagline && (
-                          <p className="text-sm text-slate-500 italic mt-1">{app.tagline}</p>
+                          <p className="text-sm text-slate-500 italic">{app.tagline}</p>
                         )}
                       </div>
                     )
