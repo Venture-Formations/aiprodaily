@@ -772,7 +772,7 @@ export default async function NewsletterPage({ params }: PageProps) {
                       <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4">{prompt.title}</h3>
                     )}
                     {prompt.prompt_text && (
-                      <div className="bg-black text-white p-4 rounded-lg font-mono text-sm leading-relaxed whitespace-pre-wrap">
+                      <div className="bg-black text-white p-4 rounded-lg font-mono text-sm leading-relaxed whitespace-pre-wrap" style={{ maxWidth: '710px' }}>
                         {prompt.prompt_text}
                       </div>
                     )}
