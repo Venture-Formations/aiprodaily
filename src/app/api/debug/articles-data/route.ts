@@ -17,12 +17,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Newsletter not found', newsletterError });
     }
 
-    // Get a few recent articles
-    const { data: articles, error: articlesError } = await supabaseAdmin
+    // First get issues like the articles API does
+    const { data: issues, error: issuesError } = await supabaseAdmin
+      .from('publication_issues')
+      .select('id, date')
+      .eq('publication_id', newsletter.id)
+      .order('date', { ascending: false })
+      .limit(10);
+
+    const issueIds = issues?.map(i => i.id) || [];
+
+    // Get articles filtered by issue_id (like the articles API does)
+    let articlesQuery = supabaseAdmin
       .from('articles')
       .select('id, post_id, headline, issue_id')
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(10);
+
+    if (issueIds.length > 0) {
+      articlesQuery = articlesQuery.in('issue_id', issueIds);
+    }
+
+    const { data: articles, error: articlesError } = await articlesQuery;
 
     if (articlesError) {
       return NextResponse.json({ error: 'Articles fetch error', articlesError });
@@ -63,8 +79,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       newsletter: newsletter.id,
+      issues: issues?.length || 0,
+      issuesSample: issues?.slice(0, 3).map(i => ({ id: i.id, date: i.date })),
+      issuesError: issuesError ? { message: issuesError.message } : null,
       articles: articles?.length || 0,
-      articleSamples: articles?.slice(0, 3).map(a => ({ id: a.id, post_id: a.post_id, headline: a.headline?.slice(0, 50) })),
+      articleSamples: articles?.slice(0, 3).map(a => ({ id: a.id, post_id: a.post_id, issue_id: a.issue_id, headline: a.headline?.slice(0, 50) })),
       postIds: postIds.slice(0, 5),
       postIdTypes: postIds.slice(0, 3).map(id => typeof id),
       rssPostsFound: rssPosts?.length || 0,
