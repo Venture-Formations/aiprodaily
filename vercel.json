@@ -1,10 +1,6 @@
 {
   "crons": [
     {
-      "path": "/api/cron/populate-events",
-      "schedule": "*/5 * * * *"
-    },
-    {
       "path": "/api/cron/process-mailerlite-updates",
       "schedule": "*/5 * * * *"
     },
@@ -41,18 +37,6 @@
       "schedule": "*/5 8-22 * * *"
     },
     {
-      "path": "/api/cron/sync-events",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/generate-weather",
-      "schedule": "0 20 * * *"
-    },
-    {
-      "path": "/api/cron/collect-wordle",
-      "schedule": "0 19 * * *"
-    },
-    {
       "path": "/api/cron/cleanup-pending-submissions",
       "schedule": "0 7 * * *"
     },
@@ -62,9 +46,6 @@
     }
   ],
   "functions": {
-    "app/api/cron/populate-events/route.ts": {
-      "maxDuration": 600
-    },
     "app/api/cron/rss-processing/route.ts": {
       "maxDuration": 600
     },
@@ -90,15 +71,6 @@
       "maxDuration": 600
     },
     "app/api/cron/health-check/route.ts": {
-      "maxDuration": 600
-    },
-    "app/api/cron/sync-events/route.ts": {
-      "maxDuration": 600
-    },
-    "app/api/cron/generate-weather/route.ts": {
-      "maxDuration": 600
-    },
-    "app/api/cron/collect-wordle/route.ts": {
       "maxDuration": 600
     },
     "app/api/events/sync/route.ts": {
