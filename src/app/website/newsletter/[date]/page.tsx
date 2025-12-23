@@ -723,8 +723,9 @@ export default async function NewsletterPage({ params }: PageProps) {
             )
           })()}
 
-          {/* Fallback: Render legacy AI Apps if exists but no ai_app_modules rendered */}
-          {aiApps.length > 0 && aiAppModules.length === 0 && (
+          {/* Fallback: Render legacy AI Apps if exists but no ai_app_modules with apps rendered */}
+          {/* This handles old archive format where modules exist but don't contain apps array */}
+          {aiApps.length > 0 && (aiAppModules.length === 0 || !aiAppModules.some((m: any) => m.apps?.length > 0)) && (
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
               <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-emerald-600 text-white">AI Applications</h2>
               <div className="p-6 sm:p-8">
