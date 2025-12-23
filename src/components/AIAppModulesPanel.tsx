@@ -163,55 +163,75 @@ export default function AIAppModulesPanel({ issueId }: AIAppModulesPanelProps) {
 
               {/* Expanded Content */}
               {isExpanded && (
-                <div className="mt-4 space-y-3">
-                  {/* Selected Apps List */}
+                <div className="mt-4 space-y-4">
+                  {/* Email-style Preview */}
                   {appIds.length > 0 ? (
-                    <div className="space-y-2">
-                      {appIds.map((appId, index) => {
-                        const app = apps[appId]
-                        if (!app) {
-                          return (
-                            <div key={appId} className="p-3 bg-gray-100 rounded-lg text-gray-400 text-sm">
-                              App not found: {appId}
-                            </div>
-                          )
-                        }
-                        return (
-                          <div
-                            key={appId}
-                            className="p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-gray-400 font-mono text-sm">{index + 1}.</span>
-                                  <span className="font-medium text-gray-900">{app.app_name}</span>
-                                  {app.is_affiliate && (
-                                    <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
-                                      Affiliate
-                                    </span>
-                                  )}
-                                </div>
-                                {app.tagline && (
-                                  <p className="text-sm text-gray-500 italic mt-0.5 ml-6">
-                                    {app.tagline}
-                                  </p>
-                                )}
-                                {app.description && (
-                                  <p className="text-sm text-gray-600 mt-1 ml-6 line-clamp-2">
-                                    {app.description}
-                                  </p>
-                                )}
-                              </div>
-                              {app.category && (
-                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded ml-2">
-                                  {app.category}
-                                </span>
-                              )}
-                            </div>
+                    <div>
+                      <div className="mb-2 text-sm text-gray-600">
+                        <strong>Preview:</strong>
+                      </div>
+                      <div className="max-w-3xl mx-auto">
+                        <div className="border border-gray-300 rounded-lg bg-white shadow-lg overflow-hidden">
+                          {/* Header */}
+                          <div className="bg-blue-600 px-4 py-3">
+                            <h2 className="text-white text-2xl font-bold m-0">{module.name}</h2>
                           </div>
-                        )
-                      })}
+
+                          {/* Apps List */}
+                          <div className="p-4 divide-y divide-gray-100">
+                            {appIds.map((appId, index) => {
+                              const app = apps[appId]
+                              if (!app) return null
+
+                              // Get emoji based on category
+                              const getEmoji = (category?: string) => {
+                                const emojiMap: Record<string, string> = {
+                                  'Accounting': '📊',
+                                  'Tax': '📋',
+                                  'Bookkeeping': '📒',
+                                  'Audit': '🔍',
+                                  'Practice Management': '⚙️',
+                                  'Client Communication': '💬',
+                                  'Document Management': '📁',
+                                  'Financial Analysis': '📈',
+                                  'Payroll': '💰',
+                                  'Invoicing': '🧾'
+                                }
+                                return emojiMap[category || ''] || '🤖'
+                              }
+
+                              return (
+                                <div key={appId} className="py-3 first:pt-0 last:pb-0">
+                                  <p className="text-base leading-relaxed m-0">
+                                    <span className="font-bold">{index + 1}.</span>{' '}
+                                    {getEmoji(app.category)}{' '}
+                                    {app.app_url ? (
+                                      <a
+                                        href={app.app_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-red-600 hover:text-red-700 underline font-bold"
+                                      >
+                                        {app.app_name}
+                                      </a>
+                                    ) : (
+                                      <span className="font-bold text-gray-900">{app.app_name}</span>
+                                    )}{' '}
+                                    <span className="text-gray-700">
+                                      {app.description || app.tagline || ''}
+                                    </span>
+                                    {app.is_affiliate && (
+                                      <span className="ml-2 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                                        Affiliate
+                                      </span>
+                                    )}
+                                  </p>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <div className="text-center py-4 text-gray-500 text-sm">

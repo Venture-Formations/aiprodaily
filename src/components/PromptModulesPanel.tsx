@@ -151,6 +151,7 @@ export default function PromptModulesPanel({ issueId }: PromptModulesPanelProps)
               >
                 <div className="flex items-center space-x-3">
                   <span className="font-medium text-gray-900">{module.name}</span>
+                  <span className="text-xs text-gray-400">Display Order: {module.display_order}</span>
                   <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
                     {SELECTION_MODE_LABELS[selectionMode]}
                   </span>
