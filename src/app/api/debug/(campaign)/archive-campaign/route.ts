@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Check if already archived
+    const force = searchParams.get('force') === 'true'
     const { data: existing, error: existingError } = await supabaseAdmin
       .from('archived_newsletters')
       .select('id, issue_date')
@@ -54,13 +55,29 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (existing && !existingError) {
-      return NextResponse.json({
-        success: false,
-        message: 'issue already archived',
-        archive_id: existing.id,
-        issue_date: existing.issue_date,
-        note: 'Delete the existing archive first if you want to re-archive'
-      })
+      if (!force) {
+        return NextResponse.json({
+          success: false,
+          message: 'issue already archived',
+          archive_id: existing.id,
+          issue_date: existing.issue_date,
+          note: 'Add &force=true to re-archive and overwrite'
+        })
+      }
+      // Delete existing archive to re-archive
+      console.log('[ARCHIVE] Force re-archive requested, deleting existing archive:', existing.id)
+      const { error: deleteError } = await supabaseAdmin
+        .from('archived_newsletters')
+        .delete()
+        .eq('id', existing.id)
+
+      if (deleteError) {
+        return NextResponse.json({
+          success: false,
+          error: 'Failed to delete existing archive',
+          details: deleteError.message
+        }, { status: 500 })
+      }
     }
 
     // Archive the newsletter
