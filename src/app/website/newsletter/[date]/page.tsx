@@ -138,6 +138,10 @@ export default async function NewsletterPage({ params }: PageProps) {
     | { type: 'legacy_ai_apps'; data: any; display_order: number }
     | { type: 'legacy_prompt'; data: any; display_order: number }
 
+  // Check if any modules have actual content (not just empty module entries)
+  const hasValidAiAppModules = aiAppModules.some((m: any) => m.apps && m.apps.length > 0)
+  const hasValidPromptModules = promptModules.some((m: any) => m.prompt)
+
   const allRenderItems: RenderItem[] = [
     // Newsletter sections (excluding Advertisement, AI Applications, and Prompt Ideas which are handled by modules/legacy)
     ...(newsletterSectionsConfig || [])
@@ -147,18 +151,22 @@ export default async function NewsletterPage({ params }: PageProps) {
     ...adModules.map((m: any) => ({ type: 'ad_module' as const, data: m, display_order: m.display_order ?? 999 })),
     // Poll modules
     ...pollModules.map((m: any) => ({ type: 'poll_module' as const, data: m, display_order: m.display_order ?? 999 })),
-    // AI App modules (new system)
-    ...aiAppModules.map((m: any) => ({ type: 'ai_app_module' as const, data: m, display_order: m.display_order ?? 999 })),
-    // Legacy AI Apps (only if no ai_app_modules)
-    ...(aiApps.length > 0 && aiAppModules.length === 0 ? [{
+    // AI App modules (new system) - only include if they have apps
+    ...aiAppModules
+      .filter((m: any) => m.apps && m.apps.length > 0)
+      .map((m: any) => ({ type: 'ai_app_module' as const, data: m, display_order: m.display_order ?? 999 })),
+    // Legacy AI Apps (only if no valid ai_app_modules with actual apps)
+    ...(aiApps.length > 0 && !hasValidAiAppModules ? [{
       type: 'legacy_ai_apps' as const,
       data: aiApps,
       display_order: getDisplayOrder(SECTION_IDS.AI_APPLICATIONS)
     }] : []),
-    // Prompt modules (new system)
-    ...promptModules.map((m: any) => ({ type: 'prompt_module' as const, data: m, display_order: m.display_order ?? 999 })),
-    // Legacy Prompt (only if no prompt_modules)
-    ...(legacyPrompt && promptModules.length === 0 ? [{
+    // Prompt modules (new system) - only include if they have a prompt
+    ...promptModules
+      .filter((m: any) => m.prompt)
+      .map((m: any) => ({ type: 'prompt_module' as const, data: m, display_order: m.display_order ?? 999 })),
+    // Legacy Prompt (only if no valid prompt_modules with actual prompts)
+    ...(legacyPrompt && !hasValidPromptModules ? [{
       type: 'legacy_prompt' as const,
       data: legacyPrompt,
       display_order: getDisplayOrder(SECTION_IDS.PROMPT_IDEAS)
