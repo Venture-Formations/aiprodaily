@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    // Use the shared supabaseAdmin client for consistent behavior
+    const supabase = supabaseAdmin;
 
     const { searchParams } = new URL(request.url);
     const newsletterSlug = searchParams.get('publication_id'); // Actually a slug, not UUID
@@ -193,16 +191,26 @@ export async function GET(request: NextRequest) {
     console.log('[API] Found secondary articles:', secondaryArticles?.length || 0);
 
     // Get all post IDs
-    const allPostIds = [
+    const rawPostIds = [
       ...(primaryArticles || []).map(a => a.post_id),
       ...(secondaryArticles || []).map(a => a.post_id)
-    ].filter((id, index, self) => id && self.indexOf(id) === index); // Filter out null/undefined
+    ];
 
-    console.log('[API] Post IDs to fetch:', allPostIds.length, 'IDs:', allPostIds.slice(0, 5));
+    // Debug: Log raw post IDs before filtering
+    console.log('[API] Raw post IDs (before filter):', rawPostIds.length, 'Sample:', rawPostIds.slice(0, 5));
+    const nullCount = rawPostIds.filter(id => !id).length;
+    if (nullCount > 0) {
+      console.warn('[API] Found', nullCount, 'null/undefined post_ids');
+    }
+
+    const allPostIds = rawPostIds.filter((id, index, self) => id && self.indexOf(id) === index);
+    console.log('[API] Post IDs to fetch:', allPostIds.length, 'Sample IDs:', allPostIds.slice(0, 5), 'Types:', allPostIds.slice(0, 3).map(id => typeof id));
 
     // Fetch RSS posts (only if we have post IDs)
     let rssPosts: any[] = [];
     if (allPostIds.length > 0) {
+      console.log('[API] Fetching RSS posts for', allPostIds.length, 'post_ids...');
+
       const { data, error: rssPostsError } = await supabase
         .from('rss_posts')
         .select(`
@@ -219,10 +227,28 @@ export async function GET(request: NextRequest) {
         .in('id', allPostIds);
 
       if (rssPostsError) {
-        console.error('[API] RSS posts error:', rssPostsError.message);
+        console.error('[API] RSS posts error:', rssPostsError.message, 'Code:', rssPostsError.code, 'Details:', rssPostsError.details);
       }
+
       rssPosts = data || [];
-      console.log('[API] Found RSS posts:', rssPosts?.length || 0);
+      console.log('[API] RSS posts query returned:', rssPosts?.length || 0, 'rows');
+
+      if (rssPosts.length === 0 && allPostIds.length > 0) {
+        // Debug: Try fetching a single post to verify the query works
+        console.log('[API] DEBUG: No RSS posts found. Testing single post fetch for ID:', allPostIds[0]);
+        const { data: singlePost, error: singleError } = await supabase
+          .from('rss_posts')
+          .select('id, title')
+          .eq('id', allPostIds[0])
+          .single();
+
+        if (singleError) {
+          console.error('[API] DEBUG: Single post fetch error:', singleError.message);
+        } else {
+          console.log('[API] DEBUG: Single post found:', singlePost);
+        }
+      }
+
       if (rssPosts && rssPosts.length > 0) {
         console.log('[API] Sample RSS post:', rssPosts[0]);
       }
@@ -236,6 +262,8 @@ export async function GET(request: NextRequest) {
     // Fetch post ratings (only if we have post IDs)
     let postRatings: any[] = [];
     if (allPostIds.length > 0) {
+      console.log('[API] Fetching post ratings for', allPostIds.length, 'post_ids...');
+
       const { data, error: ratingsError } = await supabase
         .from('post_ratings')
         .select(`
@@ -255,10 +283,27 @@ export async function GET(request: NextRequest) {
         .in('post_id', allPostIds);
 
       if (ratingsError) {
-        console.error('[API] Post ratings error:', ratingsError.message);
+        console.error('[API] Post ratings error:', ratingsError.message, 'Code:', ratingsError.code);
       }
       postRatings = data || [];
-      console.log('[API] Found post ratings:', postRatings?.length || 0);
+      console.log('[API] Post ratings query returned:', postRatings?.length || 0, 'rows');
+
+      if (postRatings.length === 0 && allPostIds.length > 0) {
+        // Debug: Try fetching a single rating
+        console.log('[API] DEBUG: No ratings found. Testing single rating fetch for post_id:', allPostIds[0]);
+        const { data: singleRating, error: singleError } = await supabase
+          .from('post_ratings')
+          .select('post_id, total_score')
+          .eq('post_id', allPostIds[0])
+          .single();
+
+        if (singleError) {
+          console.error('[API] DEBUG: Single rating fetch error:', singleError.message);
+        } else {
+          console.log('[API] DEBUG: Single rating found:', singleRating);
+        }
+      }
+
       if (postRatings && postRatings.length > 0) {
         console.log('[API] Sample rating:', postRatings[0]);
       }
