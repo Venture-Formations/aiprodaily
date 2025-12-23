@@ -66,7 +66,9 @@
       "mcp__supabase__list_migrations",
       "Bash(git revert:*)",
       "WebFetch(domain:www.aiaccountingdaily.com)",
-      "Bash(git show:*)"
+      "Bash(git show:*)",
+      "Bash(timeout 30 curl:*)",
+      "Bash(timeout 60 curl:*)"
     ],
     "deny": [],
     "ask": []

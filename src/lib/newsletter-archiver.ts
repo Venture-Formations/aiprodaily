@@ -114,6 +114,14 @@ export class NewsletterArchiver {
       }
 
       // AI Apps section - using module system (structured like ad_modules)
+      // First get the AI_APPLICATIONS section display_order for proper positioning
+      const { data: aiAppSection } = await supabaseAdmin
+        .from('newsletter_sections')
+        .select('display_order')
+        .eq('section_type', 'ai_applications')
+        .single()
+      const aiAppSectionOrder = aiAppSection?.display_order ?? 999
+
       const { data: aiAppModuleSelections } = await supabaseAdmin
         .from('issue_ai_app_modules')
         .select(`
@@ -162,7 +170,8 @@ export class NewsletterArchiver {
           return {
             module_id: module?.id,
             module_name: module?.name,
-            display_order: module?.display_order ?? 999,
+            // Use newsletter_sections AI_APPLICATIONS display_order for proper positioning
+            display_order: aiAppSectionOrder,
             block_order: module?.block_order,
             apps: moduleApps
           }
@@ -215,6 +224,14 @@ export class NewsletterArchiver {
       }
 
       // Prompt Modules section (new dynamic prompt sections)
+      // First get the PROMPT_IDEAS section display_order for proper positioning
+      const { data: promptSection } = await supabaseAdmin
+        .from('newsletter_sections')
+        .select('display_order')
+        .eq('section_type', 'prompt_ideas')
+        .single()
+      const promptSectionOrder = promptSection?.display_order ?? 999
+
       const { data: promptModuleSelections } = await supabaseAdmin
         .from('issue_prompt_modules')
         .select(`
@@ -239,7 +256,8 @@ export class NewsletterArchiver {
         sections.prompt_modules = promptModuleSelections.map((selection: any) => ({
           module_id: selection.prompt_module?.id,
           module_name: selection.prompt_module?.name,
-          display_order: selection.prompt_module?.display_order ?? 999,
+          // Use newsletter_sections PROMPT_IDEAS display_order for proper positioning
+          display_order: promptSectionOrder,
           block_order: selection.prompt_module?.block_order,
           selected_at: selection.selected_at,
           used_at: selection.used_at,
