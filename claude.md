@@ -112,8 +112,6 @@ See [docs/structure.md](docs/structure.md) for the complete file tree.
 6. **Secondary send:** `/api/cron/send-secondary` sends secondary newsletter if configured.
 7. **Analytics loop:** Link tracking, polls, feedback feed back into the next cycle.
 
-**Note:** Events sync crons (`sync-events`, `populate-events`) are registered but not implemented.
-
 ## 9. AI Apps Selection System
 The AI apps system selects apps for each newsletter issue with rotation logic:
 
@@ -134,7 +132,58 @@ The AI apps system selects apps for each newsletter issue with rotation logic:
 - `src/lib/app-selector.ts` — Selection logic
 - `src/app/dashboard/[slug]/settings/page.tsx` — Settings UI
 
-## 10. AI Tools Directory System
+## 10. Newsletter Module System (Block-Based Sections)
+The newsletter uses a modular block-based architecture for dynamic content sections. Each module type follows the same pattern:
+
+### Module Types
+| Module Type | Table | Selection Table | Selector |
+|-------------|-------|-----------------|----------|
+| Prompt Modules | `prompt_modules` | `issue_prompt_modules` | `src/lib/prompt-modules/prompt-selector.ts` |
+| AI App Modules | `ai_app_modules` | `issue_ai_app_modules` | `src/lib/app-selector.ts` |
+| Ad Modules | `ad_modules` | `issue_ad_modules` | `src/lib/ad-scheduler.ts` |
+| Poll Modules | `poll_modules` | `issue_poll_modules` | `src/lib/poll-selector.ts` |
+
+### Common Module Properties
+All module types share these core properties:
+- `name` — Display name for the section header
+- `display_order` — Position in newsletter (lower = higher)
+- `is_active` — Whether module appears in newsletters
+- `selection_mode` — How content is selected: `sequential`, `random`, `priority`, or `manual`
+- `block_order` — Array defining block rendering order (e.g., `['title', 'body']`)
+
+### Selection Modes
+| Mode | Behavior |
+|------|----------|
+| `sequential` | Cycles through content in order, tracks `next_position` |
+| `random` | Randomly selects from available content |
+| `priority` | Selects highest priority content first |
+| `manual` | Requires explicit selection per issue |
+
+### Per-Issue Selections
+Each issue gets its own selections stored in `issue_*_modules` tables:
+- Selections are created when issue is generated
+- Can be manually overridden in the issue editing UI
+- `used_at` timestamp records when content was sent
+
+### Key Files
+- `src/lib/prompt-modules/` — Prompt module selector and renderer
+- `src/components/PromptModulesPanel.tsx` — Issue UI for prompt selections
+- `src/components/AIAppModulesPanel.tsx` — Issue UI for AI app selections
+- `src/app/api/campaigns/[id]/prompt-modules/route.ts` — API for prompt module selections
+- `src/app/api/campaigns/[id]/ai-app-modules/route.ts` — API for AI app module selections
+
+### Database Tables
+| Table | Purpose |
+|-------|---------|
+| `prompt_modules` | Prompt section configuration |
+| `issue_prompt_modules` | Per-issue prompt selections |
+| `prompt_ideas` | Prompt content pool |
+| `ai_app_modules` | AI app section configuration |
+| `issue_ai_app_modules` | Per-issue AI app selections |
+| `ai_applications` | AI app content pool |
+| `newsletter_sections` | Master section ordering across all module types |
+
+## 11. AI Tools Directory System
 The AI Tools Directory is a public-facing catalog of AI tools with submission, categorization, and admin features:
 
 ### Key Features
@@ -158,7 +207,7 @@ The AI Tools Directory is a public-facing catalog of AI tools with submission, c
 | `tool_entitlements` | Feature entitlements |
 | `sponsorship_packages` | Sponsorship tiers |
 
-## 11. User Account & Advertiser Portal
+## 12. User Account & Advertiser Portal
 The account system provides self-service for advertisers and users:
 
 ### Key Features
@@ -172,13 +221,13 @@ The account system provides self-service for advertisers and users:
 - `src/app/api/account/` — Account API routes
 - `src/app/api/stripe/` — Stripe webhooks and payment processing
 
-## 12. Implementation Patterns
+## 13. Implementation Patterns
 - Backend template + retry logic: docs/patterns/backend.md
 - Supabase admin client only on server routes/actions; never expose service keys client-side.
 - Use helpers in `src/lib/` (RSSProcessor, AdScheduler, MailerLiteService, AppSelector, SubjectLineGenerator, WelcomeSectionGenerator) instead of reimplementing logic.
 - Respect async boundaries in React Server Components; keep client-only code behind `"use client"` boundaries.
 
-## 13. AI & Scoring
+## 14. AI & Scoring
 - Prompt conventions and schema: docs/ai/prompt-system.md
 - Criteria weighting and adjustments: docs/workflows/MULTI_CRITERIA_SCORING_GUIDE.md
 - Example validation snippets: docs/examples/zod-validation-comparison.md, docs/examples/zod-prompt-validation-example.ts
@@ -189,7 +238,7 @@ The account system provides self-service for advertisers and users:
 - **Access:** `callAIWithPrompt(promptKey, newsletterId, variables)`
 - **Provider:** Auto-detected from model name (claude → Anthropic, else → OpenAI)
 
-## 14. Automation & Ops
+## 15. Automation & Ops
 - Cron schedules, secrets, recovery: docs/operations/cron-jobs.md
 - Vercel deployment & API notes: docs/vercel-api.md
 - Testing checklist: docs/checklists/TESTING_CHECKLIST.md
@@ -209,12 +258,8 @@ The account system provides self-service for advertisers and users:
 | `monitor-workflows` | Every 5 min | Detects stuck workflows | ✅ Active |
 | `process-mailerlite-updates` | Every 5 min | Processes MailerLite webhooks | ✅ Active |
 | `cleanup-pending-submissions` | Daily 7:00 AM | Clears stale ad submissions | ✅ Active |
-| `generate-weather` | Daily 8:00 PM | Generates weather module (if enabled) | ⚠️ Not Implemented |
-| `collect-wordle` | Daily 7:00 PM | Collects Wordle stats (if enabled) | ⚠️ Not Implemented |
 
-**Note:** Crons marked "Not Implemented" are registered in `vercel.json` but have empty route folders.
-
-## 15. Testing & Verification
+## 16. Testing & Verification
 Before completing work, confirm:
 - `npm run build` passes and affected tests are updated/added.
 - All new/updated queries filter by `publication_id` and avoid `SELECT *`.
@@ -235,7 +280,7 @@ Before completing work, confirm:
 | Migrations | Apply on staging via Supabase; verify roll-forward/back | Update `docs/migrations/` status file. |
 | Marketing site | `npm run build` on marketing app; Lighthouse smoke check | Confirm assets relocated to `public/`. |
 
-## 16. Environment Overview
+## 17. Environment Overview
 | Area | Key Env Vars | Notes |
 |------|--------------|-------|
 | Supabase | `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL` | Keep server-only; never expose client side. |
@@ -249,7 +294,7 @@ Before completing work, confirm:
 | Google | `GOOGLE_VISION_API_KEY` (optional) | For image analysis. |
 | Slack | `SLACK_WEBHOOK_URL` (optional) | Enables alerts from monitor cron. |
 
-## 17. Cross-Feature Checklist
+## 18. Cross-Feature Checklist
 When changes span multiple domains (e.g., workflow + UI):
 - Update backend logic and corresponding UI components.
 - Adjust prompts or `publication_settings` if new content paths introduced.
@@ -257,12 +302,12 @@ When changes span multiple domains (e.g., workflow + UI):
 - Update docs: core guide here plus impacted feature doc(s).
 - Mention cross-feature impact in pull request notes.
 
-## 18. Documentation Hygiene
+## 19. Documentation Hygiene
 - After modifying workflows, prompts, migrations, or notable features, update the specific doc in `docs/` and ensure this guide references it.
 - If a new area lacks documentation, create it in the appropriate subfolder (`docs/workflows/`, `docs/guides/`, etc.) and add a reference here.
 - Keep links accurate; update them when files move/rename.
 
-## 19. Troubleshooting Primer
+## 20. Troubleshooting Primer
 If issues arise, start with docs/troubleshooting/common-issues.md. For deeper historical context or session notes, consult docs in `docs/status/` as needed.
 
 ### Common Debug Endpoints
@@ -273,19 +318,19 @@ If issues arise, start with docs/troubleshooting/common-issues.md. For deeper hi
 | `/api/debug/(campaign)/recent-campaigns` | List recent campaigns |
 | `/api/cron/health-check` | System health status |
 
-## 20. External Integrations
+## 21. External Integrations
 - Vercel AI SDK usage patterns: docs/vercel-ai-sdk.md
 - OpenAI Responses API specifics: docs/examples/OPENAI_RESPONSES_API_GUIDE.md
 - Vercel API workflows and cron deployment: docs/vercel-api.md
 - If Supabase edge cases occur, review platform notes in `docs/migrations/` and Supabase dashboard configuration.
 
-## 21. Security Guidelines
+## 22. Security Guidelines
 - Never log API keys, secrets, or Personally Identifiable Information.
 - Do not bypass authentication/authorization checks in API routes.
 - Keep service-role interactions on server only; sanitize user input.
 - Audit third-party calls (Slack, MailerLite, Stripe) for retries and error handling.
 
-## 22. Hand-off Notes
+## 23. Hand-off Notes
 - Document any new prompts, migrations, or cron jobs in the appropriate doc before finishing.
 - Update `package.json` scripts or environment instructions only after aligning with deployment strategy.
 - Leave concise pull request notes summarizing impacted workflows, tests run, and linked docs.

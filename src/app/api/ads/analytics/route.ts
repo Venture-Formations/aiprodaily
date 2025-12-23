@@ -97,16 +97,36 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Fetch all issue_advertisements for these ads
-    const { data: issueAds, error: issueAdsError } = await supabaseAdmin
+    // Fetch issue associations from BOTH legacy (issue_advertisements) and new (issue_module_ads) tables
+    const adIds = ads.map(ad => ad.id)
+
+    // Legacy table
+    const { data: legacyIssueAds, error: legacyError } = await supabaseAdmin
       .from('issue_advertisements')
       .select('id, issue_id, advertisement_id, used_at')
-      .in('advertisement_id', ads.map(ad => ad.id))
+      .in('advertisement_id', adIds)
 
-    if (issueAdsError) {
-      console.error('[Ads Analytics] Error fetching issue advertisements:', issueAdsError)
-      return NextResponse.json({ error: issueAdsError.message }, { status: 500 })
+    if (legacyError) {
+      console.error('[Ads Analytics] Error fetching legacy issue advertisements:', legacyError)
     }
+
+    // New module-based table
+    const { data: moduleIssueAds, error: moduleError } = await supabaseAdmin
+      .from('issue_module_ads')
+      .select('id, issue_id, advertisement_id, used_at')
+      .in('advertisement_id', adIds)
+
+    if (moduleError) {
+      console.error('[Ads Analytics] Error fetching module issue ads:', moduleError)
+    }
+
+    // Combine both result sets
+    const issueAds = [
+      ...(legacyIssueAds || []),
+      ...(moduleIssueAds || [])
+    ]
+
+    console.log(`[Ads Analytics] Found ${legacyIssueAds?.length || 0} legacy + ${moduleIssueAds?.length || 0} module associations`)
 
     // Fetch campaigns for these issues
     const issueIds = Array.from(new Set((issueAds || []).map((ia: any) => ia.issue_id)))
@@ -138,7 +158,25 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Ads Analytics] Filtered to ${filteredIssueAds.length} issue_ads in date range`)
 
-    // Fetch ALL link clicks for Advertorial section in date range
+    // Get all ad module names for this publication (for link_section matching)
+    const { data: adModules } = await supabaseAdmin
+      .from('ad_modules')
+      .select('name')
+      .eq('publication_id', publicationId)
+
+    // Build list of section names to look for (legacy + all module names)
+    const adSectionNames = ['Advertorial'] // Legacy name
+    if (adModules) {
+      for (const module of adModules) {
+        if (module.name && !adSectionNames.includes(module.name)) {
+          adSectionNames.push(module.name)
+        }
+      }
+    }
+
+    console.log(`[Ads Analytics] Looking for link sections: ${adSectionNames.join(', ')}`)
+
+    // Fetch ALL link clicks for ad-related sections in date range
     // Fetch in batches to avoid pagination limits
     let allLinkClicks: any[] = []
     let hasMore = true
@@ -148,8 +186,8 @@ export async function GET(request: NextRequest) {
     while (hasMore) {
       const { data: linkClicksBatch, error: clicksError } = await supabaseAdmin
         .from('link_clicks')
-        .select('id, link_url, subscriber_email, issue_date, issue_id, clicked_at')
-        .eq('link_section', 'Advertorial')
+        .select('id, link_url, subscriber_email, issue_date, issue_id, clicked_at, link_section')
+        .in('link_section', adSectionNames)
         .gte('issue_date', startDateStr)
         .lte('issue_date', endDateStr)
         .range(offset, offset + batchSize - 1)
@@ -171,7 +209,7 @@ export async function GET(request: NextRequest) {
 
     const linkClicks = allLinkClicks
 
-    console.log(`[Ads Analytics] Found ${linkClicks?.length || 0} link clicks with section='Advertorial'`)
+    console.log(`[Ads Analytics] Found ${linkClicks?.length || 0} link clicks for ad sections`)
 
     // Fetch issues in date range for recipient counts (for CTR calculation)
     const { data: issuesRaw, error: issuesError } = await supabaseAdmin
