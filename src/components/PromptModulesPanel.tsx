@@ -233,18 +233,8 @@ export default function PromptModulesPanel({ issueId }: PromptModulesPanelProps)
                         }}
                       >
                         {/* Header */}
-                        <div
-                          className="px-2 py-2"
-                          style={{ backgroundColor: styles.primaryColor }}
-                        >
-                          <h2
-                            className="text-white m-0"
-                            style={{
-                              fontFamily: styles.headingFont,
-                              fontSize: '1.625em',
-                              lineHeight: '1.16em'
-                            }}
-                          >
+                        <div className="bg-blue-600 px-4 py-3">
+                          <h2 className="text-white text-2xl font-bold m-0">
                             {module.name}
                           </h2>
                         </div>
