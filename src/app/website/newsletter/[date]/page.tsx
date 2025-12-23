@@ -106,6 +106,8 @@ export default async function NewsletterPage({ params }: PageProps) {
   const advertorial = newsletter.sections?.advertorial
   const adModules = newsletter.sections?.ad_modules || []
   const pollModules = newsletter.sections?.poll_modules || []
+  const aiAppModules = newsletter.sections?.ai_app_modules || []
+  const promptModules = newsletter.sections?.prompt_modules || []
 
   // Section IDs for stable matching
   const SECTION_IDS = {
@@ -119,16 +121,22 @@ export default async function NewsletterPage({ params }: PageProps) {
     | { type: 'section'; data: any; display_order: number }
     | { type: 'ad_module'; data: any; display_order: number }
     | { type: 'poll_module'; data: any; display_order: number }
+    | { type: 'ai_app_module'; data: any; display_order: number }
+    | { type: 'prompt_module'; data: any; display_order: number }
 
   const allRenderItems: RenderItem[] = [
-    // Newsletter sections (excluding Advertisement and AI Applications which are handled by modules)
+    // Newsletter sections (excluding Advertisement, AI Applications, and Prompt Ideas which are handled by modules)
     ...(sections || [])
-      .filter((s: any) => s.id !== SECTION_IDS.ADVERTISEMENT && s.id !== SECTION_IDS.AI_APPLICATIONS)
+      .filter((s: any) => s.id !== SECTION_IDS.ADVERTISEMENT && s.id !== SECTION_IDS.AI_APPLICATIONS && s.id !== SECTION_IDS.PROMPT_IDEAS)
       .map((s: any) => ({ type: 'section' as const, data: s, display_order: s.display_order ?? 999 })),
     // Ad modules
     ...adModules.map((m: any) => ({ type: 'ad_module' as const, data: m, display_order: m.display_order ?? 999 })),
     // Poll modules
-    ...pollModules.map((m: any) => ({ type: 'poll_module' as const, data: m, display_order: m.display_order ?? 999 }))
+    ...pollModules.map((m: any) => ({ type: 'poll_module' as const, data: m, display_order: m.display_order ?? 999 })),
+    // AI App modules
+    ...aiAppModules.map((m: any) => ({ type: 'ai_app_module' as const, data: m, display_order: m.display_order ?? 999 })),
+    // Prompt modules
+    ...promptModules.map((m: any) => ({ type: 'prompt_module' as const, data: m, display_order: m.display_order ?? 999 }))
   ].sort((a, b) => a.display_order - b.display_order)
 
   // Process advertorial body to make last sentence or arrow CTA a hyperlink (like email template)
@@ -412,24 +420,6 @@ export default async function NewsletterPage({ params }: PageProps) {
                 )
               }
 
-              // Prompt Ideas Section (by ID)
-              if (section.id === SECTION_IDS.PROMPT_IDEAS && newsletter.sections?.prompt) {
-                const prompt = newsletter.sections.prompt
-                return (
-                  <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-                    <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{section.name}</h2>
-                    <div className="p-6 sm:p-8">
-                    <div className="text-center mb-4">
-                      <div className="text-xl font-bold text-slate-900">{prompt.title}</div>
-                    </div>
-                    <div className="bg-black text-white p-4 rounded-md font-mono text-sm leading-relaxed whitespace-pre-wrap border-2 border-gray-800">
-                      {prompt.prompt_text}
-                    </div>
-                    </div>
-                  </div>
-                )
-              }
-
               // Poll Section (legacy)
               if (section.section_type === 'poll' && poll) {
                 return (
@@ -609,8 +599,167 @@ export default async function NewsletterPage({ params }: PageProps) {
               )
             }
 
+            // Render AI App Modules
+            if (item.type === 'ai_app_module') {
+              const aiAppModule = item.data
+              const apps = aiAppModule.apps
+              if (!apps || apps.length === 0) return null
+
+              const blockOrder: string[] = aiAppModule.block_order || ['logo', 'name', 'tagline', 'category', 'button']
+
+              return (
+                <div key={`ai-app-${aiAppModule.module_name}`} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-emerald-600 text-white">{aiAppModule.module_name}</h2>
+                  <div className="p-6 sm:p-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {apps.map((app: any) => (
+                        <div key={app.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                          {blockOrder.map((blockType: string) => {
+                            switch (blockType) {
+                              case 'logo':
+                                return app.logo_url ? (
+                                  <div key="logo" className="flex justify-center mb-3">
+                                    <img
+                                      src={app.logo_url}
+                                      alt={app.app_name}
+                                      className="h-12 w-12 object-contain rounded-lg"
+                                    />
+                                  </div>
+                                ) : null
+                              case 'name':
+                                return (
+                                  <h3 key="name" className="font-bold text-slate-900 text-center mb-1">{app.app_name}</h3>
+                                )
+                              case 'tagline':
+                                return app.tagline ? (
+                                  <p key="tagline" className="text-sm text-slate-600 text-center mb-2">{app.tagline}</p>
+                                ) : null
+                              case 'category':
+                                return app.category ? (
+                                  <div key="category" className="flex justify-center mb-3">
+                                    <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-medium">
+                                      {app.category}
+                                    </span>
+                                  </div>
+                                ) : null
+                              case 'button':
+                                return app.app_url ? (
+                                  <div key="button" className="text-center">
+                                    <a
+                                      href={app.app_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-emerald-600 hover:text-emerald-700 text-sm font-medium"
+                                    >
+                                      Learn More →
+                                    </a>
+                                  </div>
+                                ) : null
+                              default:
+                                return null
+                            }
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
+            // Render Prompt Modules
+            if (item.type === 'prompt_module') {
+              const promptModule = item.data
+              const prompt = promptModule.prompt
+              if (!prompt) return null
+
+              const blockOrder: string[] = promptModule.block_order || ['title', 'body']
+
+              return (
+                <div key={`prompt-${promptModule.module_name}`} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{promptModule.module_name}</h2>
+                  <div className="p-6 sm:p-8">
+                    <div className="text-center">
+                      {blockOrder.map((blockType: string) => {
+                        switch (blockType) {
+                          case 'title':
+                            return prompt.title ? (
+                              <div key="title" className="text-xl font-bold text-slate-900 mb-4">{prompt.title}</div>
+                            ) : null
+                          case 'body':
+                            return prompt.prompt_text ? (
+                              <div key="body" className="bg-black text-white p-4 rounded-md font-mono text-sm leading-relaxed whitespace-pre-wrap border-2 border-gray-800">
+                                {prompt.prompt_text}
+                              </div>
+                            ) : null
+                          default:
+                            return null
+                        }
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
             return null
           })}
+
+          {/* Fallback: Render legacy prompt if exists but no prompt modules rendered */}
+          {newsletter.sections?.prompt && promptModules.length === 0 && (() => {
+            const prompt = newsletter.sections.prompt
+            return (
+              <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">Prompt Ideas</h2>
+                <div className="p-6 sm:p-8">
+                  <div className="text-center mb-4">
+                    <div className="text-xl font-bold text-slate-900">{prompt.title}</div>
+                  </div>
+                  <div className="bg-black text-white p-4 rounded-md font-mono text-sm leading-relaxed whitespace-pre-wrap border-2 border-gray-800">
+                    {prompt.prompt_text}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Fallback: Render legacy AI Apps if exists but no ai_app_modules rendered */}
+          {aiApps.length > 0 && aiAppModules.length === 0 && (
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+              <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-emerald-600 text-white">AI Applications</h2>
+              <div className="p-6 sm:p-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {aiApps.map((item: any) => {
+                    const app = item.app
+                    if (!app) return null
+                    return (
+                      <div key={app.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        {app.logo_url && (
+                          <div className="flex justify-center mb-3">
+                            <img src={app.logo_url} alt={app.app_name} className="h-12 w-12 object-contain rounded-lg" />
+                          </div>
+                        )}
+                        <h3 className="font-bold text-slate-900 text-center mb-1">{app.app_name}</h3>
+                        {app.tagline && <p className="text-sm text-slate-600 text-center mb-2">{app.tagline}</p>}
+                        {app.category && (
+                          <div className="flex justify-center mb-3">
+                            <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-medium">{app.category}</span>
+                          </div>
+                        )}
+                        {app.app_url && (
+                          <div className="text-center">
+                            <a href={app.app_url} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:text-emerald-700 text-sm font-medium">
+                              Learn More →
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Fallback: Render advertorial if it exists but wasn't rendered in sections loop */}
           {advertorial && !sections?.some((s: any) => s.id === SECTION_IDS.ADVERTISEMENT) && (() => {

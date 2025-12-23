@@ -113,38 +113,30 @@ export class NewsletterArchiver {
         }
       }
 
-      // AI Apps section - using module system
-      const { data: moduleSelections } = await supabaseAdmin
+      // AI Apps section - using module system (structured like ad_modules)
+      const { data: aiAppModuleSelections } = await supabaseAdmin
         .from('issue_ai_app_modules')
         .select(`
           app_ids,
           ai_app_module:ai_app_modules(
             id,
             name,
+            display_order,
             block_order
           )
         `)
         .eq('issue_id', issueId)
 
-      if (moduleSelections && moduleSelections.length > 0) {
-        // Flatten all app_ids from all modules
+      if (aiAppModuleSelections && aiAppModuleSelections.length > 0) {
+        // Collect all app_ids to fetch apps in a single query
         const allAppIds: string[] = []
-        const moduleInfo: { name: string; block_order: any }[] = []
-
-        for (const selection of moduleSelections) {
+        for (const selection of aiAppModuleSelections) {
           const appIds = selection.app_ids as string[] || []
           allAppIds.push(...appIds)
-          // Supabase returns joined relations as arrays, get first element
-          const moduleData = selection.ai_app_module as any
-          const module = Array.isArray(moduleData) ? moduleData[0] : moduleData
-          if (module) {
-            moduleInfo.push({
-              name: module.name,
-              block_order: module.block_order
-            })
-          }
         }
 
+        // Fetch all apps at once
+        let appsMap: Map<string, any> = new Map()
         if (allAppIds.length > 0) {
           const { data: apps } = await supabaseAdmin
             .from('ai_applications')
@@ -152,22 +144,41 @@ export class NewsletterArchiver {
             .in('id', allAppIds)
 
           if (apps) {
-            // Preserve order based on app_ids
-            const aiAppsData = allAppIds
-              .map((id, index) => {
-                const app = apps.find(a => a.id === id)
-                return app ? { selection_order: index + 1, is_featured: false, app } : null
-              })
-              .filter(Boolean)
+            appsMap = new Map(apps.map(app => [app.id, app]))
+          }
+        }
 
-            if (aiAppsData.length > 0) {
-              sections.ai_apps = aiAppsData
-            }
+        // Structure AI App modules like ad_modules (with display_order and apps per module)
+        sections.ai_app_modules = aiAppModuleSelections.map((selection: any) => {
+          const moduleData = selection.ai_app_module as any
+          const module = Array.isArray(moduleData) ? moduleData[0] : moduleData
+          const appIds = selection.app_ids as string[] || []
 
-            // Store module info for rendering
-            if (moduleInfo.length > 0) {
-              sections.ai_app_modules = moduleInfo
-            }
+          // Get apps for this module in order
+          const moduleApps = appIds
+            .map(id => appsMap.get(id))
+            .filter(Boolean)
+
+          return {
+            module_id: module?.id,
+            module_name: module?.name,
+            display_order: module?.display_order ?? 999,
+            block_order: module?.block_order,
+            apps: moduleApps
+          }
+        })
+
+        // Also keep legacy ai_apps flat array for backwards compatibility
+        if (allAppIds.length > 0) {
+          const aiAppsData = allAppIds
+            .map((id, index) => {
+              const app = appsMap.get(id)
+              return app ? { selection_order: index + 1, is_featured: false, app } : null
+            })
+            .filter(Boolean)
+
+          if (aiAppsData.length > 0) {
+            sections.ai_apps = aiAppsData
           }
         }
       }
@@ -183,7 +194,7 @@ export class NewsletterArchiver {
         sections.poll = poll
       }
 
-      // Prompt Ideas section
+      // Prompt Ideas section (legacy - single prompt)
       const { data: promptSelection } = await supabaseAdmin
         .from('issue_prompt_selections')
         .select(`
@@ -201,6 +212,44 @@ export class NewsletterArchiver {
 
       if (promptSelection && promptSelection.prompt) {
         sections.prompt = promptSelection.prompt
+      }
+
+      // Prompt Modules section (new dynamic prompt sections)
+      const { data: promptModuleSelections } = await supabaseAdmin
+        .from('issue_prompt_modules')
+        .select(`
+          selected_at,
+          used_at,
+          prompt_module:prompt_modules(
+            id,
+            name,
+            display_order,
+            block_order
+          ),
+          prompt:prompt_ideas(
+            id,
+            title,
+            prompt_text,
+            category
+          )
+        `)
+        .eq('issue_id', issueId)
+
+      if (promptModuleSelections && promptModuleSelections.length > 0) {
+        sections.prompt_modules = promptModuleSelections.map((selection: any) => ({
+          module_id: selection.prompt_module?.id,
+          module_name: selection.prompt_module?.name,
+          display_order: selection.prompt_module?.display_order ?? 999,
+          block_order: selection.prompt_module?.block_order,
+          selected_at: selection.selected_at,
+          used_at: selection.used_at,
+          prompt: selection.prompt ? {
+            id: selection.prompt.id,
+            title: selection.prompt.title,
+            prompt_text: selection.prompt.prompt_text,
+            category: selection.prompt.category
+          } : null
+        }))
       }
 
       // Advertorial section
@@ -328,8 +377,12 @@ export class NewsletterArchiver {
         has_welcome: !!(issue?.welcome_intro || issue?.welcome_tagline || issue?.welcome_summary),
         has_road_work: !!roadWork,
         has_ai_apps: !!sections.ai_apps && Array.isArray(sections.ai_apps) && sections.ai_apps.length > 0,
+        has_ai_app_modules: !!sections.ai_app_modules && Array.isArray(sections.ai_app_modules) && sections.ai_app_modules.length > 0,
+        ai_app_modules_count: sections.ai_app_modules?.length || 0,
         has_poll: !!poll,
         has_prompt: !!promptSelection,
+        has_prompt_modules: !!promptModuleSelections && promptModuleSelections.length > 0,
+        prompt_modules_count: promptModuleSelections?.length || 0,
         has_advertorial: !!advertorialData,
         has_ad_modules: !!adModuleSelections && adModuleSelections.length > 0,
         ad_modules_count: adModuleSelections?.length || 0,
