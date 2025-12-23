@@ -772,10 +772,8 @@ export default async function NewsletterPage({ params }: PageProps) {
                       <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4">{prompt.title}</h3>
                     )}
                     {prompt.prompt_text && (
-                      <div className="mx-auto max-w-full" style={{ maxHeight: '400px' }}>
-                        <div className="bg-black text-white p-4 rounded-lg font-mono leading-relaxed whitespace-pre-wrap text-left prose prose-sm prose-invert max-w-none">
-                          {prompt.prompt_text}
-                        </div>
+                      <div className="bg-black text-white p-4 rounded-lg font-mono text-sm leading-relaxed whitespace-pre-wrap">
+                        {prompt.prompt_text}
                       </div>
                     )}
                   </div>
