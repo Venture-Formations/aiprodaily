@@ -19,10 +19,10 @@ export async function GET(
 
     const { id: issueId } = await params
 
-    // Get the issue to get publication_id
+    // Get the issue to get publication_id and status
     const { data: issue, error: issueError } = await supabaseAdmin
       .from('publication_issues')
-      .select('publication_id')
+      .select('publication_id, status')
       .eq('id', issueId)
       .single()
 
@@ -33,8 +33,55 @@ export async function GET(
     // Get all prompt module selections for this issue
     let selections = await PromptModuleSelector.getIssuePromptSelections(issueId)
 
-    // If no selections exist, initialize them (empty - admin must pick manually or auto-select runs later)
-    if (!selections || selections.length === 0) {
+    // If no selections exist or they have null prompt_ids for a sent issue,
+    // check the legacy issue_prompt_selections table
+    const hasNoPrompts = !selections || selections.length === 0 ||
+      (issue.status === 'sent' && selections.every(s => !s.prompt_id))
+
+    if (hasNoPrompts && issue.status === 'sent') {
+      // Check legacy table for sent issues
+      const { data: legacySelections } = await supabaseAdmin
+        .from('issue_prompt_selections')
+        .select(`
+          id,
+          prompt_id,
+          selection_order,
+          is_featured,
+          created_at,
+          prompt:prompt_ideas(*)
+        `)
+        .eq('issue_id', issueId)
+        .order('selection_order', { ascending: true })
+
+      if (legacySelections && legacySelections.length > 0) {
+        // Get all active prompt modules to map legacy selections
+        const { data: allModules } = await supabaseAdmin
+          .from('prompt_modules')
+          .select('*')
+          .eq('publication_id', issue.publication_id)
+          .eq('is_active', true)
+          .order('display_order', { ascending: true })
+
+        // Map legacy selections to the new format for display
+        // Assign legacy selections to modules based on order
+        if (allModules && allModules.length > 0) {
+          selections = legacySelections.map((legacy: any, idx: number) => ({
+            id: legacy.id,
+            issue_id: issueId,
+            prompt_module_id: allModules[idx]?.id || '',
+            prompt_id: legacy.prompt_id,
+            selection_mode: 'random' as const,
+            selected_at: legacy.created_at || new Date().toISOString(),
+            used_at: null,
+            prompt_module: allModules[idx] || undefined,
+            prompt: Array.isArray(legacy.prompt) ? legacy.prompt[0] : legacy.prompt
+          }))
+        }
+      }
+    }
+
+    // If still no selections and not a sent issue, initialize them
+    if ((!selections || selections.length === 0) && issue.status !== 'sent') {
       await PromptModuleSelector.initializeSelectionsForIssue(issueId, issue.publication_id)
       selections = await PromptModuleSelector.getIssuePromptSelections(issueId)
     }

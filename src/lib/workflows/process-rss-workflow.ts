@@ -119,7 +119,7 @@ async function setupissue(newsletterId: string) {
       // Select AI apps and prompts
       try {
         const { AppModuleSelector } = await import('@/lib/ai-app-modules')
-        const { PromptSelector } = await import('@/lib/prompt-selector')
+        const { PromptModuleSelector } = await import('@/lib/prompt-modules')
 
         console.log('[Workflow Step 1/11] Selecting AI apps...')
 
@@ -129,9 +129,10 @@ async function setupissue(newsletterId: string) {
         const totalApps = moduleResults.reduce((sum, r) => sum + r.result.apps.length, 0)
         console.log(`[Workflow Step 1/11] Selected ${totalApps} AI apps via ${moduleResults.length} modules`)
 
-        console.log('[Workflow Step 1/11] Selecting prompt...')
-        await PromptSelector.selectPromptForissue(id)
-        console.log('[Workflow Step 1/11] Prompt selected')
+        console.log('[Workflow Step 1/11] Selecting prompts via modules...')
+        const promptResults = await PromptModuleSelector.selectPromptsForIssue(id, newsletter.id)
+        const promptsSelected = promptResults.filter(r => r.result.prompt !== null).length
+        console.log(`[Workflow Step 1/11] Selected ${promptsSelected} prompts via ${promptResults.length} modules`)
       } catch (error) {
         console.error('[Workflow Step 1/11] AI selection failed:', error)
         console.error('[Workflow Step 1/11] Error details:', error instanceof Error ? error.message : String(error))
