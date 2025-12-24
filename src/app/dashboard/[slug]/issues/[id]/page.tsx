@@ -2677,7 +2677,7 @@ export default function issueDetailPage() {
         {issue && <AIAppModulesPanel issueId={issue.id} />}
 
         {/* Dynamic Prompt Sections */}
-        {issue && <PromptModulesPanel issueId={issue.id} />}
+        {issue && <PromptModulesPanel issueId={issue.id} issueStatus={issue.status} />}
 
         {/* Preview Modal */}
         {showPreview && (

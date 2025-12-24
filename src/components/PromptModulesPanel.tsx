@@ -5,6 +5,7 @@ import type { PromptModule, PromptIdea, IssuePromptModule, PromptSelectionMode }
 
 interface PromptModulesPanelProps {
   issueId: string
+  issueStatus?: string
 }
 
 interface PromptSelection {
@@ -32,7 +33,8 @@ const SELECTION_MODE_LABELS: Record<PromptSelectionMode, string> = {
   manual: 'Manual'
 }
 
-export default function PromptModulesPanel({ issueId }: PromptModulesPanelProps) {
+export default function PromptModulesPanel({ issueId, issueStatus }: PromptModulesPanelProps) {
+  const isSent = issueStatus === 'sent'
   const [loading, setLoading] = useState(true)
   const [selections, setSelections] = useState<PromptSelection[]>([])
   const [modules, setModules] = useState<PromptModule[]>([])
@@ -180,43 +182,45 @@ export default function PromptModulesPanel({ issueId }: PromptModulesPanelProps)
               {/* Expanded Content */}
               {isExpanded && (
                 <div className="mt-4 space-y-4">
-                  {/* Prompt Selection Dropdown */}
-                  <div className="bg-yellow-50 p-3 rounded-lg">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {selectionMode === 'manual'
-                        ? 'Select Prompt for this Section'
-                        : 'Override Auto-Selected Prompt (optional)'}
-                    </label>
-                    <div className="flex items-center space-x-3">
-                      <select
-                        value={selection?.prompt_id || ''}
-                        onChange={(e) => {
-                          handleSelectPrompt(module.id, e.target.value || null)
-                        }}
-                        disabled={isSaving}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">-- No Prompt --</option>
-                        {availablePrompts.map(prompt => (
-                          <option key={prompt.id} value={prompt.id}>
-                            {prompt.title}
-                          </option>
-                        ))}
-                      </select>
-                      {isSaving && (
-                        <svg className="animate-spin h-5 w-5 text-blue-600" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
+                  {/* Prompt Selection Dropdown - Hide for sent issues */}
+                  {!isSent && (
+                    <div className="bg-yellow-50 p-3 rounded-lg">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {selectionMode === 'manual'
+                          ? 'Select Prompt for this Section'
+                          : 'Override Auto-Selected Prompt (optional)'}
+                      </label>
+                      <div className="flex items-center space-x-3">
+                        <select
+                          value={selection?.prompt_id || ''}
+                          onChange={(e) => {
+                            handleSelectPrompt(module.id, e.target.value || null)
+                          }}
+                          disabled={isSaving}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">-- No Prompt --</option>
+                          {availablePrompts.map(prompt => (
+                            <option key={prompt.id} value={prompt.id}>
+                              {prompt.title}
+                            </option>
+                          ))}
+                        </select>
+                        {isSaving && (
+                          <svg className="animate-spin h-5 w-5 text-blue-600" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                        )}
+                      </div>
+                      {selectionMode !== 'manual' && (
+                        <p className="text-xs text-gray-500 mt-2">
+                          This module uses {SELECTION_MODE_LABELS[selectionMode].toLowerCase()} selection.
+                          You can manually override the auto-selected prompt here.
+                        </p>
                       )}
                     </div>
-                    {selectionMode !== 'manual' && (
-                      <p className="text-xs text-gray-500 mt-2">
-                        This module uses {SELECTION_MODE_LABELS[selectionMode].toLowerCase()} selection.
-                        You can manually override the auto-selected prompt here.
-                      </p>
-                    )}
-                  </div>
+                  )}
 
                   {/* Current Selection Preview - Terminal Styling */}
                   {selectedPrompt && (
