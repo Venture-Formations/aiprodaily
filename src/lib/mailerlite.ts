@@ -2,11 +2,7 @@ import axios from 'axios'
 import { supabaseAdmin } from './supabase'
 import { ErrorHandler, SlackNotificationService } from './slack'
 import type { issueWithArticles, issueWithEvents, Article } from '@/types/database'
-import {
-  generateNewsletterHeader,
-  generateNewsletterFooter,
-  generateWelcomeSection
-} from './newsletter-templates'
+import { generateFullNewsletterHtml } from './newsletter-templates'
 import { getEmailSettings, getScheduleSettings, getPublicationSetting } from './publication-settings'
 
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
@@ -344,162 +340,10 @@ export class MailerLiteService {
 
 
   private async generateEmailHTML(issue: issueWithEvents, isReview: boolean): Promise<string> {
-    // Filter active articles and sort by rank (custom order)
-    const activeArticles = issue.articles
-      .filter(article => article.is_active)
-      .sort((a, b) => (a.rank || 999) - (b.rank || 999))
-
-    console.log('MAILERLITE - Active articles to render:', activeArticles.length)
-    console.log('MAILERLITE - Article order:', activeArticles.map(a => `${a.headline} (rank: ${a.rank})`).join(', '))
-
-    // Fetch newsletter sections order
-    const { data: sections } = await supabaseAdmin
-      .from('newsletter_sections')
-      .select('*')
-      .eq('is_active', true)
-      .order('display_order', { ascending: true })
-
-    // Fetch ad modules for this publication
-    const { data: adModules } = await supabaseAdmin
-      .from('ad_modules')
-      .select('*')
-      .eq('publication_id', issue.publication_id)
-      .eq('is_active', true)
-      .order('display_order', { ascending: true })
-
-    // Fetch poll modules for this publication
-    const { data: pollModules } = await supabaseAdmin
-      .from('poll_modules')
-      .select('*')
-      .eq('publication_id', issue.publication_id)
-      .eq('is_active', true)
-      .order('display_order', { ascending: true })
-
-    console.log('MailerLite - Active newsletter sections:', sections?.map(s => `${s.name} (order: ${s.display_order})`).join(', '))
-    console.log('MailerLite - Active ad modules:', adModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
-    console.log('MailerLite - Active poll modules:', pollModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
-
-    // Format date using local date parsing (same as preview)
-    const [year, month, day] = issue.date.split('-').map(Number)
-    const date = new Date(year, month - 1, day) // month is 0-indexed
-    const formattedDate = date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-
-    // Use the modular template functions with tracking - SAME AS PREVIEW
-    // mailerlite_issue_id might not exist yet during review, so it's optional
-    const mailerliteId = (issue as any).mailerlite_issue_id || undefined
-    const header = await generateNewsletterHeader(formattedDate, issue.date, mailerliteId, issue.publication_id)
-    const footer = await generateNewsletterFooter(issue.date, mailerliteId, issue.publication_id)
-
-    // Generate welcome section (if it exists)
-    const welcomeHtml = await generateWelcomeSection(
-      issue.welcome_intro || null,
-      issue.welcome_tagline || null,
-      issue.welcome_summary || null,
-      issue.publication_id
-    )
-
-    // Review banner for review issues
-    const reviewBanner = isReview ? `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin: 10px auto; max-width: 750px; background-color: #FEF3C7; font-family: Arial, sans-serif;">
-  <tr>
-    <td style="padding: 12px; text-align: center;">
-      <h3 style="margin: 0; color: #92400E; font-size: 18px; font-weight: bold;">📝 Newsletter Review</h3>
-      <p style="margin: 8px 0 0 0; color: #92400E; font-size: 14px;">
-        This is a preview of tomorrow's newsletter. Please review and make any necessary changes in the dashboard.
-      </p>
-    </td>
-  </tr>
-</table>
-<br>` : ''
-
-    // Section ID constants (stable across name changes) - SAME AS PREVIEW
-    const SECTION_IDS = {
-      AI_APPLICATIONS: '853f8d0b-bc76-473a-bfc6-421418266222',
-      PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b'
-    }
-
-    // Merge newsletter sections, ad modules, and poll modules into a single sorted list - SAME AS PREVIEW
-    type SectionItem = { type: 'section'; data: any } | { type: 'ad_module'; data: any } | { type: 'poll_module'; data: any }
-    const allItems: SectionItem[] = [
-      ...(sections || []).map(s => ({ type: 'section' as const, data: s })),
-      ...(adModules || []).map(m => ({ type: 'ad_module' as const, data: m })),
-      ...(pollModules || []).map(m => ({ type: 'poll_module' as const, data: m }))
-    ].sort((a, b) => (a.data.display_order || 999) - (b.data.display_order || 999))
-
-    console.log('MailerLite - Combined section order:', allItems.map(item =>
-      `${item.data.name} (${item.type}, order: ${item.data.display_order})`
-    ).join(', '))
-
-    // Generate sections in order based on merged configuration - SAME AS PREVIEW
-    let sectionsHtml = ''
-    for (const item of allItems) {
-      if (item.type === 'ad_module') {
-        // Generate ad module section using the global block library
-        const { generateAdModulesSection } = await import('./newsletter-templates')
-        const adModuleHtml = await generateAdModulesSection(issue, item.data.id)
-        if (adModuleHtml) {
-          sectionsHtml += adModuleHtml
-        }
-      } else if (item.type === 'poll_module') {
-        // Generate poll module section using the poll modules library
-        const { generatePollModulesSection } = await import('./newsletter-templates')
-        const pollModuleHtml = await generatePollModulesSection(issue, item.data.id)
-        if (pollModuleHtml) {
-          sectionsHtml += pollModuleHtml
-        }
-      } else {
-        const section = item.data
-        // Check section_type to determine what to render
-        if (section.section_type === 'primary_articles' && activeArticles.length > 0) {
-          const { generatePrimaryArticlesSection } = await import('./newsletter-templates')
-          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, issue.date, issue.id, section.name, issue.publication_id, issue.mailerlite_issue_id ?? undefined)
-          sectionsHtml += primaryHtml
-        }
-        else if (section.section_type === 'secondary_articles') {
-          const { generateSecondaryArticlesSection } = await import('./newsletter-templates')
-          const secondaryHtml = await generateSecondaryArticlesSection(issue, section.name)
-          sectionsHtml += secondaryHtml
-        }
-        else if (section.section_type === 'ai_applications' || section.id === SECTION_IDS.AI_APPLICATIONS) {
-          const { generateAIAppsSection } = await import('./newsletter-templates')
-          const aiAppsHtml = await generateAIAppsSection(issue)
-          if (aiAppsHtml) {
-            sectionsHtml += aiAppsHtml
-          }
-        }
-        else if (section.section_type === 'prompt_ideas' || section.id === SECTION_IDS.PROMPT_IDEAS) {
-          const { generatePromptIdeasSection } = await import('./newsletter-templates')
-          const promptHtml = await generatePromptIdeasSection(issue)
-          if (promptHtml) {
-            sectionsHtml += promptHtml
-          }
-        }
-        // Note: 'poll' section_type is deprecated - polls are now handled via poll_modules
-        else if (section.section_type === 'breaking_news') {
-          const { generateBreakingNewsSection } = await import('./newsletter-templates')
-          const breakingNewsHtml = await generateBreakingNewsSection(issue)
-          if (breakingNewsHtml) {
-            sectionsHtml += breakingNewsHtml
-          }
-        }
-        else if (section.section_type === 'beyond_the_feed') {
-          const { generateBeyondTheFeedSection } = await import('./newsletter-templates')
-          const beyondFeedHtml = await generateBeyondTheFeedSection(issue)
-          if (beyondFeedHtml) {
-            sectionsHtml += beyondFeedHtml
-          }
-        }
-        // Note: 'advertorial' section_type is deprecated - ads are now handled via ad_modules
-      }
-    }
-
-    // Combine using the SAME template structure as preview (welcome section goes after header)
-    return reviewBanner + header + welcomeHtml + sectionsHtml + footer
+    // Use the shared template function (single source of truth)
+    // This ensures preview and actual send always match
+    console.log(`[MailerLite] Generating email HTML using shared template (isReview: ${isReview})`)
+    return generateFullNewsletterHtml(issue, { isReview })
   }
 
 

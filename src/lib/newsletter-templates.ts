@@ -1566,3 +1566,216 @@ ${socialMediaSection}
 </body>
 </html>`
 }
+
+// ==================== FULL NEWSLETTER HTML GENERATOR ====================
+
+/**
+ * Generate the complete newsletter HTML.
+ * This is the single source of truth used by both preview and actual send.
+ *
+ * @param issue - The issue data with articles
+ * @param options - Optional settings
+ * @param options.isReview - Whether to include the review banner (default: false)
+ * @returns The complete newsletter HTML
+ */
+export async function generateFullNewsletterHtml(
+  issue: any,
+  options: { isReview?: boolean } = {}
+): Promise<string> {
+  const { isReview = false } = options
+
+  try {
+    console.log('Generating full newsletter HTML for issue:', issue?.id, isReview ? '(review)' : '(final)')
+
+    // Filter active articles and sort by rank (custom order)
+    const activeArticles = (issue.articles || [])
+      .filter((article: any) => article.is_active)
+      .sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999))
+
+    console.log('Active articles to render:', activeArticles.length)
+    console.log('Article order:', activeArticles.map((a: any) => `${a.headline} (rank: ${a.rank})`).join(', '))
+
+    // Fetch newsletter sections order
+    const { data: sections } = await supabaseAdmin
+      .from('newsletter_sections')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+
+    // Fetch ad modules for this publication
+    const { data: adModules } = await supabaseAdmin
+      .from('ad_modules')
+      .select('*')
+      .eq('publication_id', issue.publication_id)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+
+    // Fetch poll modules for this publication
+    const { data: pollModules } = await supabaseAdmin
+      .from('poll_modules')
+      .select('*')
+      .eq('publication_id', issue.publication_id)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+
+    // Fetch prompt modules for this publication
+    const { data: promptModules } = await supabaseAdmin
+      .from('prompt_modules')
+      .select('*')
+      .eq('publication_id', issue.publication_id)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+
+    console.log('Active newsletter sections:', sections?.map(s => `${s.name} (order: ${s.display_order})`).join(', '))
+    console.log('Active ad modules:', adModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
+    console.log('Active poll modules:', pollModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
+    console.log('Active prompt modules:', promptModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
+
+    // Format date using local date parsing
+    const formatDate = (dateString: string) => {
+      try {
+        const [year, month, day] = dateString.split('-').map(Number)
+        const date = new Date(year, month - 1, day)
+        return date.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })
+      } catch (e) {
+        console.error('Date formatting error:', e)
+        return dateString
+      }
+    }
+
+    const formattedDate = formatDate(issue.date)
+    console.log('Formatted date:', formattedDate)
+
+    // Generate header and footer with tracking parameters
+    const mailerliteId = issue.mailerlite_issue_id || undefined
+    const header = await generateNewsletterHeader(formattedDate, issue.date, mailerliteId, issue.publication_id)
+    const footer = await generateNewsletterFooter(issue.date, mailerliteId, issue.publication_id)
+
+    // Generate welcome section (if it exists)
+    const welcomeHtml = await generateWelcomeSection(
+      issue.welcome_intro || null,
+      issue.welcome_tagline || null,
+      issue.welcome_summary || null,
+      issue.publication_id
+    )
+
+    // Review banner for review emails
+    const reviewBanner = isReview ? `
+<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin: 10px auto; max-width: 750px; background-color: #FEF3C7; font-family: Arial, sans-serif;">
+  <tr>
+    <td style="padding: 12px; text-align: center;">
+      <h3 style="margin: 0; color: #92400E; font-size: 18px; font-weight: bold;">📝 Newsletter Review</h3>
+      <p style="margin: 8px 0 0 0; color: #92400E; font-size: 14px;">
+        This is a preview of tomorrow's newsletter. Please review and make any necessary changes in the dashboard.
+      </p>
+    </td>
+  </tr>
+</table>
+<br>` : ''
+
+    // Section ID constants (stable across name changes)
+    const SECTION_IDS = {
+      AI_APPLICATIONS: '853f8d0b-bc76-473a-bfc6-421418266222',
+      PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b'
+    }
+
+    // Merge newsletter sections, ad modules, poll modules, and prompt modules into a single sorted list
+    type SectionItem =
+      | { type: 'section'; data: any }
+      | { type: 'ad_module'; data: any }
+      | { type: 'poll_module'; data: any }
+      | { type: 'prompt_module'; data: any }
+
+    const allItems: SectionItem[] = [
+      ...(sections || []).map(s => ({ type: 'section' as const, data: s })),
+      ...(adModules || []).map(m => ({ type: 'ad_module' as const, data: m })),
+      ...(pollModules || []).map(m => ({ type: 'poll_module' as const, data: m })),
+      ...(promptModules || []).map(m => ({ type: 'prompt_module' as const, data: m }))
+    ].sort((a, b) => (a.data.display_order || 999) - (b.data.display_order || 999))
+
+    console.log('Combined section order:', allItems.map(item =>
+      `${item.data.name} (${item.type}, order: ${item.data.display_order})`
+    ).join(', '))
+
+    // Generate sections in order based on merged configuration
+    let sectionsHtml = ''
+    for (const item of allItems) {
+      if (item.type === 'ad_module') {
+        // Generate single ad module section
+        const adModuleHtml = await generateAdModulesSection(issue, item.data.id)
+        if (adModuleHtml) {
+          sectionsHtml += adModuleHtml
+        }
+      } else if (item.type === 'poll_module') {
+        // Generate single poll module section
+        const pollModuleHtml = await generatePollModulesSection(issue, item.data.id)
+        if (pollModuleHtml) {
+          sectionsHtml += pollModuleHtml
+        }
+      } else if (item.type === 'prompt_module') {
+        // Generate single prompt module section
+        const promptModuleHtml = await generatePromptModulesSection(issue, item.data.id)
+        if (promptModuleHtml) {
+          sectionsHtml += promptModuleHtml
+        }
+      } else {
+        const section = item.data
+        // Check section_type to determine what to render
+        if (section.section_type === 'primary_articles' && activeArticles.length > 0) {
+          const primaryHtml = await generatePrimaryArticlesSection(
+            activeArticles,
+            issue.date,
+            issue.id,
+            section.name,
+            issue.publication_id,
+            issue.mailerlite_issue_id
+          )
+          sectionsHtml += primaryHtml
+        }
+        else if (section.section_type === 'secondary_articles') {
+          const secondaryHtml = await generateSecondaryArticlesSection(issue, section.name)
+          sectionsHtml += secondaryHtml
+        }
+        else if (section.section_type === 'ai_applications' || section.id === SECTION_IDS.AI_APPLICATIONS) {
+          const aiAppsHtml = await generateAIAppsSection(issue)
+          if (aiAppsHtml) {
+            sectionsHtml += aiAppsHtml
+          }
+        }
+        else if (section.section_type === 'prompt_ideas' || section.id === SECTION_IDS.PROMPT_IDEAS) {
+          const promptHtml = await generatePromptIdeasSection(issue)
+          if (promptHtml) {
+            sectionsHtml += promptHtml
+          }
+        }
+        else if (section.section_type === 'breaking_news') {
+          const breakingNewsHtml = await generateBreakingNewsSection(issue)
+          if (breakingNewsHtml) {
+            sectionsHtml += breakingNewsHtml
+          }
+        }
+        else if (section.section_type === 'beyond_the_feed') {
+          const beyondFeedHtml = await generateBeyondTheFeedSection(issue)
+          if (beyondFeedHtml) {
+            sectionsHtml += beyondFeedHtml
+          }
+        }
+      }
+    }
+
+    // Combine all sections (review banner first if applicable, then header, welcome, sections, footer)
+    const html = reviewBanner + header + welcomeHtml + sectionsHtml + footer
+
+    console.log('Full newsletter HTML generated, length:', html.length)
+    return html
+
+  } catch (error) {
+    console.error('Error generating full newsletter HTML:', error)
+    throw new Error(`HTML generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+}

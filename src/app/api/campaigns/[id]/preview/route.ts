@@ -2,20 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
-import {
-  generateNewsletterHeader,
-  generateNewsletterFooter,
-  generateWelcomeSection,
-  generatePrimaryArticlesSection,
-  generateSecondaryArticlesSection,
-  generateBreakingNewsSection,
-  generateBeyondTheFeedSection,
-  generatePromptIdeasSection,
-  generateAIAppsSection,
-  generateAdModulesSection,
-  generatePollModulesSection,
-  generatePromptModulesSection
-} from '@/lib/newsletter-templates'
+import { generateFullNewsletterHtml } from '@/lib/newsletter-templates'
 
 export async function GET(
   request: NextRequest,
@@ -110,9 +97,9 @@ export async function GET(
       .sort((a: any, b: any) => (a.display_order || 999) - (b.display_order || 999))
     console.log('Selected events after filter:', eventsData.length)
 
-    console.log('Generating HTML newsletter')
-    // Generate HTML newsletter
-    const newsletterHtml = await generateNewsletterHtml(issue)
+    console.log('Generating HTML newsletter using shared template')
+    // Generate HTML newsletter using the shared function (single source of truth)
+    const newsletterHtml = await generateFullNewsletterHtml(issue, { isReview: false })
     console.log('HTML generated, length:', newsletterHtml.length)
 
     return NextResponse.json({
@@ -128,184 +115,5 @@ export async function GET(
       { error: `Failed to generate newsletter preview: ${error instanceof Error ? error.message : 'Unknown error'}` },
       { status: 500 }
     )
-  }
-}
-
-async function generateNewsletterHtml(issue: any): Promise<string> {
-  try {
-    console.log('Generating HTML for issue:', issue?.id)
-
-    // Filter active articles and sort by rank (custom order)
-    const activeArticles = (issue.articles || [])
-      .filter((article: any) => article.is_active)
-      .sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999))
-
-    console.log('PREVIEW - Active articles to render:', activeArticles.length)
-    console.log('PREVIEW - Article order:', activeArticles.map((a: any) => `${a.headline} (rank: ${a.rank})`).join(', '))
-    console.log('PREVIEW - Raw article data:', activeArticles.map((a: any) => `ID: ${a.id}, Rank: ${a.rank}, Active: ${a.is_active}`).join(' | '))
-
-    console.log('Generating events section using calculated dates...')
-
-    // Fetch newsletter sections order
-    const { data: sections } = await supabaseAdmin
-      .from('newsletter_sections')
-      .select('*')
-      .eq('is_active', true)
-      .order('display_order', { ascending: true })
-
-    // Fetch ad modules for this publication
-    const { data: adModules } = await supabaseAdmin
-      .from('ad_modules')
-      .select('*')
-      .eq('publication_id', issue.publication_id)
-      .eq('is_active', true)
-      .order('display_order', { ascending: true })
-
-    // Fetch poll modules for this publication
-    const { data: pollModules } = await supabaseAdmin
-      .from('poll_modules')
-      .select('*')
-      .eq('publication_id', issue.publication_id)
-      .eq('is_active', true)
-      .order('display_order', { ascending: true })
-
-    // Fetch prompt modules for this publication
-    const { data: promptModules } = await supabaseAdmin
-      .from('prompt_modules')
-      .select('*')
-      .eq('publication_id', issue.publication_id)
-      .eq('is_active', true)
-      .order('display_order', { ascending: true })
-
-    console.log('Active newsletter sections:', sections?.map(s => `${s.name} (order: ${s.display_order})`).join(', '))
-    console.log('Active ad modules:', adModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
-    console.log('Active poll modules:', pollModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
-    console.log('Active prompt modules:', promptModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
-
-    const formatDate = (dateString: string) => {
-      try {
-        // Parse date as local date to avoid timezone offset issues
-        const [year, month, day] = dateString.split('-').map(Number)
-        const date = new Date(year, month - 1, day) // month is 0-indexed
-        return date.toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        })
-      } catch (e) {
-        console.error('Date formatting error:', e)
-        return dateString
-      }
-    }
-
-    const formattedDate = formatDate(issue.date)
-    console.log('Formatted date:', formattedDate)
-    console.log('PREVIEW DEBUG: issue.publication_id =', issue.publication_id)
-
-    // Generate modular HTML sections with tracking parameters
-    // mailerlite_issue_id might not exist yet, so it's optional
-    const mailerliteId = (issue as any).mailerlite_issue_id || undefined
-    const header = await generateNewsletterHeader(formattedDate, issue.date, mailerliteId, issue.publication_id)
-    const footer = await generateNewsletterFooter(issue.date, mailerliteId, issue.publication_id)
-
-    // Generate welcome section (if it exists)
-    const welcomeHtml = await generateWelcomeSection(
-      issue.welcome_intro || null,
-      issue.welcome_tagline || null,
-      issue.welcome_summary || null,
-      issue.publication_id
-    )
-
-    // Section ID constants (reference IDs from newsletter_sections table)
-    // These IDs are stable and won't change even if section names are updated
-    const SECTION_IDS = {
-      AI_APPLICATIONS: '853f8d0b-bc76-473a-bfc6-421418266222',
-      PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b'
-    }
-
-    // Merge newsletter sections, ad modules, poll modules, and prompt modules into a single sorted list
-    type SectionItem = { type: 'section'; data: any } | { type: 'ad_module'; data: any } | { type: 'poll_module'; data: any } | { type: 'prompt_module'; data: any }
-    const allItems: SectionItem[] = [
-      ...(sections || []).map(s => ({ type: 'section' as const, data: s })),
-      ...(adModules || []).map(m => ({ type: 'ad_module' as const, data: m })),
-      ...(pollModules || []).map(m => ({ type: 'poll_module' as const, data: m })),
-      ...(promptModules || []).map(m => ({ type: 'prompt_module' as const, data: m }))
-    ].sort((a, b) => (a.data.display_order || 999) - (b.data.display_order || 999))
-
-    console.log('Combined section order:', allItems.map(item =>
-      `${item.data.name} (${item.type}, order: ${item.data.display_order})`
-    ).join(', '))
-
-    // Generate sections in order based on merged configuration
-    let sectionsHtml = ''
-    for (const item of allItems) {
-      if (item.type === 'ad_module') {
-        // Generate single ad module section
-        const adModuleHtml = await generateAdModulesSection(issue, item.data.id)
-        if (adModuleHtml) {
-          sectionsHtml += adModuleHtml
-        }
-      } else if (item.type === 'poll_module') {
-        // Generate single poll module section
-        const pollModuleHtml = await generatePollModulesSection(issue, item.data.id)
-        if (pollModuleHtml) {
-          sectionsHtml += pollModuleHtml
-        }
-      } else if (item.type === 'prompt_module') {
-        // Generate single prompt module section
-        const promptModuleHtml = await generatePromptModulesSection(issue, item.data.id)
-        if (promptModuleHtml) {
-          sectionsHtml += promptModuleHtml
-        }
-      } else {
-        const section = item.data
-        // Check section_type to determine what to render
-        if (section.section_type === 'primary_articles' && activeArticles.length > 0) {
-          const primaryHtml = await generatePrimaryArticlesSection(activeArticles, issue.date, issue.id, section.name, issue.publication_id, issue.mailerlite_issue_id)
-          sectionsHtml += primaryHtml
-        }
-        else if (section.section_type === 'secondary_articles') {
-          const secondaryHtml = await generateSecondaryArticlesSection(issue, section.name)
-          sectionsHtml += secondaryHtml
-        }
-        else if (section.section_type === 'ai_applications' || section.id === SECTION_IDS.AI_APPLICATIONS) {
-          const aiAppsHtml = await generateAIAppsSection(issue)
-          if (aiAppsHtml) {
-            sectionsHtml += aiAppsHtml
-          }
-        }
-        else if (section.section_type === 'prompt_ideas' || section.id === SECTION_IDS.PROMPT_IDEAS) {
-          const promptHtml = await generatePromptIdeasSection(issue)
-          if (promptHtml) {
-            sectionsHtml += promptHtml
-          }
-        }
-        // Note: 'poll' section_type is deprecated - polls are now handled via poll_modules
-        else if (section.section_type === 'breaking_news') {
-          const breakingNewsHtml = await generateBreakingNewsSection(issue)
-          if (breakingNewsHtml) {
-            sectionsHtml += breakingNewsHtml
-          }
-        }
-        else if (section.section_type === 'beyond_the_feed') {
-          const beyondFeedHtml = await generateBeyondTheFeedSection(issue)
-          if (beyondFeedHtml) {
-            sectionsHtml += beyondFeedHtml
-          }
-        }
-        // Note: 'advertorial' section_type is deprecated - ads are now handled via ad_modules
-      }
-    }
-
-    // Combine all sections (welcome section goes after header, before all other sections)
-    const html = header + welcomeHtml + sectionsHtml + footer
-
-    console.log('HTML template generated successfully, length:', html.length)
-    return html
-
-  } catch (error) {
-    console.error('HTML generation error:', error)
-    throw new Error(`HTML generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
