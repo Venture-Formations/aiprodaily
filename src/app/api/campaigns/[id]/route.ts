@@ -28,8 +28,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             *,
             post_rating:post_ratings(*),
             rss_feed:rss_feeds(*)
-          ),
-          article_module:article_modules(name, display_order)
+          )
         ),
         manual_articles:manual_articles(*),
         email_metrics(*),
