@@ -8,6 +8,7 @@ import AdModulesPanel from '@/components/AdModulesPanel'
 import PollModulesPanel from '@/components/PollModulesPanel'
 import AIAppModulesPanel from '@/components/AIAppModulesPanel'
 import PromptModulesPanel from '@/components/PromptModulesPanel'
+import ArticleModulesPanel from '@/components/ArticleModulesPanel'
 import type { issueWithArticles, ArticleWithPost, issueEvent, Event, NewsletterSection } from '@/types/database'
 import {
   DndContext,
@@ -2666,6 +2667,9 @@ export default function issueDetailPage() {
               }}
             />
           ))}
+
+        {/* Dynamic Article Sections */}
+        {issue && <ArticleModulesPanel issueId={issue.id} issueStatus={issue.status} />}
 
         {/* Dynamic Ad Sections */}
         {issue && <AdModulesPanel issueId={issue.id} />}
