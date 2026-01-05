@@ -93,17 +93,20 @@ export default function ArticleModulePromptsTab({
     }
   }, [publicationId, moduleId])
 
-  // Fetch global prompts from publication_settings
+  // Fetch global prompts from publication_settings via ai-prompts API
   const fetchGlobalPrompts = useCallback(async () => {
     setLoadingGlobalPrompts(true)
     try {
-      const res = await fetch(`/api/publications/${publicationId}/settings?keys=ai_prompt_topic_deduper,ai_prompt_fact_checker`)
+      const res = await fetch('/api/settings/ai-prompts')
       if (res.ok) {
         const data = await res.json()
-        const settings = data.settings || {}
+        const allPrompts = data.prompts || []
+        // Find the specific global prompts we need
+        const dedupePrompt = allPrompts.find((p: any) => p.key === 'ai_prompt_topic_deduper')
+        const factCheckPrompt = allPrompts.find((p: any) => p.key === 'ai_prompt_fact_checker')
         setGlobalPrompts({
-          deduplication: settings.ai_prompt_topic_deduper || null,
-          factChecker: settings.ai_prompt_fact_checker || null
+          deduplication: dedupePrompt?.value || null,
+          factChecker: factCheckPrompt?.value || null
         })
       }
     } catch (err) {
@@ -111,7 +114,7 @@ export default function ArticleModulePromptsTab({
     } finally {
       setLoadingGlobalPrompts(false)
     }
-  }, [publicationId])
+  }, [])
 
   // Fetch latest data
   const fetchData = useCallback(async () => {
