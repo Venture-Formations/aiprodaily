@@ -29,7 +29,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // Get assigned feeds
     const { data: assignedFeeds, error: assignedError } = await supabaseAdmin
       .from('rss_feeds')
-      .select('id, name, url, active, last_fetched_at')
+      .select('id, name, url, active, last_processed')
       .eq('article_module_id', moduleId)
       .order('name', { ascending: true })
 
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // Get unassigned feeds (available to assign)
     const { data: unassignedFeeds, error: unassignedError } = await supabaseAdmin
       .from('rss_feeds')
-      .select('id, name, url, active, last_fetched_at')
+      .select('id, name, url, active, last_processed')
       .eq('publication_id', module.publication_id)
       .is('article_module_id', null)
       .order('name', { ascending: true })
@@ -117,13 +117,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     // Return updated feed lists
     const { data: assignedFeeds } = await supabaseAdmin
       .from('rss_feeds')
-      .select('id, name, url, active, last_fetched_at')
+      .select('id, name, url, active, last_processed')
       .eq('article_module_id', moduleId)
       .order('name', { ascending: true })
 
     const { data: unassignedFeeds } = await supabaseAdmin
       .from('rss_feeds')
-      .select('id, name, url, active, last_fetched_at')
+      .select('id, name, url, active, last_processed')
       .eq('publication_id', module.publication_id)
       .is('article_module_id', null)
       .order('name', { ascending: true })

@@ -7,7 +7,7 @@ interface Feed {
   name: string
   url: string
   active: boolean
-  last_fetched_at: string | null
+  last_processed: string | null
 }
 
 interface ArticleModuleFeedsTabProps {
