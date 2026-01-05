@@ -35,33 +35,33 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       )
     }
 
-    // Fetch ALL active PRIMARY articles for this issue (welcome section only uses primary articles)
-    const { data: primaryArticles, error: primaryError } = await supabaseAdmin
-      .from('articles')
+    // Fetch ALL active module articles for this issue
+    const { data: moduleArticles, error: articlesError } = await supabaseAdmin
+      .from('module_articles')
       .select('headline, content')
       .eq('issue_id', issueId)
       .eq('is_active', true)
       .order('rank', { ascending: true })
 
-    if (primaryError) {
-      console.error('[API] Error fetching primary articles:', primaryError)
-      throw primaryError
+    if (articlesError) {
+      console.error('[API] Error fetching module articles:', articlesError)
+      throw articlesError
     }
 
-    if (!primaryArticles || primaryArticles.length === 0) {
+    if (!moduleArticles || moduleArticles.length === 0) {
       return NextResponse.json(
         {
-          error: 'No primary articles found',
-          message: 'Cannot generate welcome section without primary articles'
+          error: 'No active articles found',
+          message: 'Cannot generate welcome section without active articles'
         },
         { status: 400 }
       )
     }
 
-    console.log(`[API] Generating welcome from ${primaryArticles.length} primary articles`)
+    console.log(`[API] Generating welcome from ${moduleArticles.length} module articles`)
 
     // Generate welcome text using AI with the standardized AI_CALL interface
-    const result = await AI_CALL.welcomeSection(primaryArticles, issue.publication_id)
+    const result = await AI_CALL.welcomeSection(moduleArticles, issue.publication_id)
 
     console.log('[API] AI_CALL.welcomeSection result type:', typeof result)
 
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             issue_id: issueId,
             action: 'welcome_regenerated',
             details: {
-              primary_article_count: primaryArticles.length,
+              article_count: moduleArticles.length,
               welcome_intro_length: welcomeIntro.length,
               welcome_tagline_length: welcomeTagline.length,
               welcome_summary_length: welcomeSummary.length
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       welcome_intro: welcomeIntro,
       welcome_tagline: welcomeTagline,
       welcome_summary: welcomeSummary,
-      primary_article_count: primaryArticles.length
+      article_count: moduleArticles.length
     })
 
   } catch (error) {

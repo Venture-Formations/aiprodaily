@@ -19,13 +19,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
-    // Fetch issue with active articles
-    let { data: issue, error } = await supabaseAdmin
+    // Fetch issue with active module articles
+    const { data: issue, error } = await supabaseAdmin
       .from('publication_issues')
       .select(`
         *,
         publication_id,
-        articles:articles(
+        module_articles:module_articles(
           headline,
           content,
           is_active,
@@ -41,36 +41,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (error) {
       console.error('issue fetch error:', error)
-
-      // If the error is about the skipped column not existing, try without it
-      if (error.message?.includes('column "skipped" of relation "articles" does not exist')) {
-        console.log('Skipped column does not exist, trying without it...')
-        const { data: issueFallback, error: fallbackError } = await supabaseAdmin
-          .from('publication_issues')
-          .select(`
-            *,
-            articles:articles(
-              headline,
-              content,
-              is_active,
-              rank,
-              rss_post:rss_posts(
-                post_rating:post_ratings(total_score)
-              )
-            )
-          `)
-          .eq('id', id)
-          .single()
-
-        if (fallbackError || !issueFallback) {
-          return NextResponse.json({ error: 'issue not found' }, { status: 404 })
-        }
-
-        // Use fallback data and filter without skipped check
-        issue = issueFallback
-      } else {
-        return NextResponse.json({ error: 'issue not found' }, { status: 404 })
-      }
+      return NextResponse.json({ error: 'issue not found' }, { status: 404 })
     }
 
     if (!issue) {
@@ -78,13 +49,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get active articles sorted by rank (custom order, rank 1 = #1 position)
-    // Exclude skipped articles to ensure we use the current #1 article (if skipped field exists)
-    const activeArticles = issue.articles
+    // Exclude skipped articles to ensure we use the current #1 article
+    const activeArticles = (issue.module_articles || [])
       .filter((article: any) => {
         // Always check is_active
         if (!article.is_active) return false
 
-        // Check skipped only if the field exists (avoid errors if column missing)
+        // Check skipped only if the field exists
         if (article.hasOwnProperty('skipped') && article.skipped) return false
 
         return true
