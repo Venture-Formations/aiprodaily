@@ -22,21 +22,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .from('publication_issues')
       .select(`
         *,
-        articles:articles(
+        module_articles:module_articles(
           *,
           rss_post:rss_posts(
             *,
             post_rating:post_ratings(*),
             rss_feed:rss_feeds(*)
-          )
-        ),
-        secondary_articles:secondary_articles(
-          *,
-          rss_post:rss_posts(
-            *,
-            post_rating:post_ratings(*),
-            rss_feed:rss_feeds(*)
-          )
+          ),
+          article_module:article_modules(name, display_order)
         ),
         manual_articles:manual_articles(*),
         email_metrics(*),
@@ -77,8 +70,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Transform email_metrics from array to single object (or null)
     // Supabase returns email_metrics(*) as an array even for one-to-one relationships
+    // Also alias module_articles as 'articles' for frontend compatibility
     const transformedIssue = {
       ...issue,
+      articles: issue.module_articles || [], // Frontend expects 'articles' property
+      secondary_articles: [], // No longer used, but keep for compatibility
       email_metrics: Array.isArray(issue.email_metrics) && issue.email_metrics.length > 0
         ? issue.email_metrics[0]
         : null,
