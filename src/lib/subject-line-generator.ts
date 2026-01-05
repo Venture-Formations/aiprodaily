@@ -17,13 +17,13 @@ export async function generateSubjectLine(issueId: string, userEmail?: string): 
   try {
     console.log(`Auto-generating subject line for issue: ${issueId}`)
 
-    // Fetch issue with active articles
+    // Fetch issue with active module articles
     let { data: issue, error } = await supabaseAdmin
       .from('publication_issues')
       .select(`
         *,
         publication_id,
-        articles:articles(
+        module_articles:module_articles(
           headline,
           content,
           is_active,
@@ -39,35 +39,7 @@ export async function generateSubjectLine(issueId: string, userEmail?: string): 
 
     if (error) {
       console.error('issue fetch error:', error)
-
-      // If the error is about the skipped column not existing, try without it
-      if (error.message?.includes('column "skipped" of relation "articles" does not exist')) {
-        console.log('Skipped column does not exist, trying without it...')
-        const { data: issueFallback, error: fallbackError } = await supabaseAdmin
-          .from('publication_issues')
-          .select(`
-            *,
-            articles:articles(
-              headline,
-              content,
-              is_active,
-              rank,
-              rss_post:rss_posts(
-                post_rating:post_ratings(total_score)
-              )
-            )
-          `)
-          .eq('id', issueId)
-          .single()
-
-        if (fallbackError || !issueFallback) {
-          return { success: false, error: 'issue not found' }
-        }
-
-        issue = issueFallback
-      } else {
-        return { success: false, error: 'issue not found' }
-      }
+      return { success: false, error: 'issue not found' }
     }
 
     if (!issue) {
@@ -81,7 +53,7 @@ export async function generateSubjectLine(issueId: string, userEmail?: string): 
     }
 
     // Get active articles sorted by rank (excluding skipped)
-    const activeArticles = issue.articles
+    const activeArticles = (issue.module_articles || [])
       .filter((article: any) => {
         // Always check is_active
         if (!article.is_active) return false
@@ -191,11 +163,11 @@ export async function generateSubjectLine(issueId: string, userEmail?: string): 
  */
 export async function getCurrentTopArticle(issueId: string): Promise<{ article: any | null, error?: string }> {
   try {
-    // Fetch issue articles
-    let { data: issue, error } = await supabaseAdmin
+    // Fetch issue module articles
+    const { data: issue, error } = await supabaseAdmin
       .from('publication_issues')
       .select(`
-        articles:articles(
+        module_articles:module_articles(
           id,
           headline,
           is_active,
@@ -207,35 +179,7 @@ export async function getCurrentTopArticle(issueId: string): Promise<{ article: 
       .single()
 
     if (error) {
-      // Try without skipped column if it doesn't exist
-      if (error.message?.includes('column "skipped" of relation "articles" does not exist')) {
-        const { data: issueFallback, error: fallbackError } = await supabaseAdmin
-          .from('publication_issues')
-          .select(`
-            articles:articles(
-              id,
-              headline,
-              is_active,
-              rank
-            )
-          `)
-          .eq('id', issueId)
-          .single()
-
-        if (fallbackError || !issueFallback) {
-          return { article: null, error: 'issue not found' }
-        }
-
-        // Add skipped: false to each article since the column doesn't exist
-        issueFallback.articles = issueFallback.articles.map((article: any) => ({
-          ...article,
-          skipped: false
-        }))
-
-        issue = issueFallback as any
-      } else {
-        return { article: null, error: 'issue not found' }
-      }
+      return { article: null, error: 'issue not found' }
     }
 
     if (!issue) {
@@ -243,7 +187,7 @@ export async function getCurrentTopArticle(issueId: string): Promise<{ article: 
     }
 
     // Get the current #1 article (active, non-skipped, lowest rank)
-    const activeArticles = issue.articles
+    const activeArticles = (issue.module_articles || [])
       .filter((article: any) => {
         if (!article.is_active) return false
         if (article.hasOwnProperty('skipped') && article.skipped) return false

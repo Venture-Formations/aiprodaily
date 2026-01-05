@@ -2828,26 +2828,26 @@ export class RSSProcessor {
       // Get publication_id from issue
       const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
-      // Fetch ALL active PRIMARY articles for this issue (welcome section only uses primary articles)
-      const { data: primaryArticles, error: primaryError } = await supabaseAdmin
-        .from('articles')
+      // Fetch ALL active module articles for this issue
+      const { data: moduleArticles, error: articlesError } = await supabaseAdmin
+        .from('module_articles')
         .select('headline, content')
         .eq('issue_id', issueId)
         .eq('is_active', true)
         .order('rank', { ascending: true })
 
-      if (primaryError) {
-        throw primaryError
+      if (articlesError) {
+        throw articlesError
       }
 
-      if (!primaryArticles || primaryArticles.length === 0) {
+      if (!moduleArticles || moduleArticles.length === 0) {
         return ''
       }
 
       // Generate welcome text using AI_CALL (uses callAIWithPrompt like other prompts)
       let result
       try {
-        result = await AI_CALL.welcomeSection(primaryArticles, newsletterId, 500, 0.8)
+        result = await AI_CALL.welcomeSection(moduleArticles, newsletterId, 500, 0.8)
       } catch (callError) {
         throw new Error(`AI call failed for welcome section: ${callError instanceof Error ? callError.message : 'Unknown error'}`)
       }
@@ -2941,7 +2941,7 @@ export class RSSProcessor {
       // Get publication_id from issue
       const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
-      // Get the issue with its articles for subject line generation
+      // Get the issue with its module articles for subject line generation
       const { data: issueWithArticles, error: issueError } = await supabaseAdmin
         .from('publication_issues')
         .select(`
@@ -2949,7 +2949,7 @@ export class RSSProcessor {
           date,
           status,
           subject_line,
-          articles:articles(
+          module_articles:module_articles(
             headline,
             content,
             is_active,
@@ -2971,13 +2971,13 @@ export class RSSProcessor {
       }
 
       // Get active articles sorted by AI score
-      const activeArticles = issueWithArticles.articles
-        ?.filter((article: any) => article.is_active)
-        ?.sort((a: any, b: any) => {
+      const activeArticles = (issueWithArticles.module_articles || [])
+        .filter((article: any) => article.is_active)
+        .sort((a: any, b: any) => {
           const scoreA = a.rss_post?.post_rating?.[0]?.total_score || 0
           const scoreB = b.rss_post?.post_rating?.[0]?.total_score || 0
           return scoreB - scoreA
-        }) || []
+        })
 
       if (activeArticles.length === 0) {
         return
