@@ -33,6 +33,12 @@ export default function ArticleModuleFeedsTab({
   const [newFeedUrl, setNewFeedUrl] = useState('')
   const [addingFeed, setAddingFeed] = useState(false)
 
+  // Edit feed state
+  const [editingFeedId, setEditingFeedId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editUrl, setEditUrl] = useState('')
+  const [editActive, setEditActive] = useState(true)
+
   const fetchFeeds = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -132,6 +138,161 @@ export default function ArticleModuleFeedsTab({
     }
   }
 
+  const startEditing = (feed: Feed) => {
+    setEditingFeedId(feed.id)
+    setEditName(feed.name)
+    setEditUrl(feed.url)
+    setEditActive(feed.active)
+  }
+
+  const cancelEditing = () => {
+    setEditingFeedId(null)
+    setEditName('')
+    setEditUrl('')
+    setEditActive(true)
+  }
+
+  const handleSaveEdit = async (feedId: string) => {
+    if (!editName.trim() || !editUrl.trim()) return
+
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/rss-feeds/${feedId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editName.trim(),
+          url: editUrl.trim(),
+          active: editActive
+        })
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to update feed')
+      }
+
+      // Refresh the feed list
+      await fetchFeeds()
+      cancelEditing()
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const renderFeedRow = (feed: Feed, showAssignButton: boolean) => {
+    const isEditing = editingFeedId === feed.id
+
+    if (isEditing) {
+      return (
+        <div key={feed.id} className="p-3 space-y-3 bg-gray-50">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Feed Name
+            </label>
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Feed URL
+            </label>
+            <input
+              type="url"
+              value={editUrl}
+              onChange={(e) => setEditUrl(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id={`active-${feed.id}`}
+              checked={editActive}
+              onChange={(e) => setEditActive(e.target.checked)}
+              className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+            />
+            <label htmlFor={`active-${feed.id}`} className="text-sm text-gray-700">
+              Active
+            </label>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <button
+              onClick={cancelEditing}
+              disabled={saving}
+              className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleSaveEdit(feed.id)}
+              disabled={saving || !editName.trim() || !editUrl.trim()}
+              className="px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div key={feed.id} className="p-3 flex items-center justify-between">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${feed.active ? 'bg-green-500' : 'bg-gray-300'}`} />
+            <p className="text-sm font-medium text-gray-900 truncate">
+              {feed.name}
+            </p>
+            {!feed.active && (
+              <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">
+                Inactive
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 truncate mt-0.5">
+            {feed.url}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 ml-3">
+          <button
+            onClick={() => startEditing(feed)}
+            disabled={saving}
+            className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+            title="Edit feed"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+          {showAssignButton ? (
+            <button
+              onClick={() => handleAssign(feed.id)}
+              disabled={saving}
+              className="px-3 py-1 text-xs text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded transition-colors disabled:opacity-50"
+            >
+              Assign
+            </button>
+          ) : (
+            <button
+              onClick={() => handleUnassign(feed.id)}
+              disabled={saving}
+              className="px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+            >
+              Remove
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -148,6 +309,12 @@ export default function ArticleModuleFeedsTab({
       {error && (
         <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">
           {error}
+          <button
+            onClick={() => setError(null)}
+            className="ml-2 text-red-500 hover:text-red-700"
+          >
+            ×
+          </button>
         </div>
       )}
 
@@ -165,28 +332,7 @@ export default function ArticleModuleFeedsTab({
           </div>
         ) : (
           <div className="border rounded-lg divide-y">
-            {assignedFeeds.map(feed => (
-              <div key={feed.id} className="p-3 flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${feed.active ? 'bg-green-500' : 'bg-gray-300'}`} />
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {feed.name}
-                    </p>
-                  </div>
-                  <p className="text-xs text-gray-500 truncate mt-0.5">
-                    {feed.url}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleUnassign(feed.id)}
-                  disabled={saving}
-                  className="ml-3 px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
+            {assignedFeeds.map(feed => renderFeedRow(feed, false))}
           </div>
         )}
       </div>
@@ -202,28 +348,7 @@ export default function ArticleModuleFeedsTab({
           </p>
 
           <div className="border rounded-lg divide-y max-h-60 overflow-y-auto">
-            {availableFeeds.map(feed => (
-              <div key={feed.id} className="p-3 flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${feed.active ? 'bg-green-500' : 'bg-gray-300'}`} />
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {feed.name}
-                    </p>
-                  </div>
-                  <p className="text-xs text-gray-500 truncate mt-0.5">
-                    {feed.url}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleAssign(feed.id)}
-                  disabled={saving}
-                  className="ml-3 px-3 py-1 text-xs text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded transition-colors disabled:opacity-50"
-                >
-                  Assign
-                </button>
-              </div>
-            ))}
+            {availableFeeds.map(feed => renderFeedRow(feed, true))}
           </div>
         </div>
       )}
