@@ -50,6 +50,18 @@ async function initializePromptSelection(issueId: string) {
 
     if (selectedPrompt) {
       console.log(`Successfully selected prompt: ${selectedPrompt.title}`)
+
+      // Also update issue_prompt_modules with the selected prompt (for new module UI)
+      const { error: updateError } = await supabaseAdmin
+        .from('issue_prompt_modules')
+        .update({ prompt_id: selectedPrompt.id })
+        .eq('issue_id', issueId)
+
+      if (updateError) {
+        console.error('Error syncing prompt to issue_prompt_modules:', updateError)
+      } else {
+        console.log('Synced prompt selection to issue_prompt_modules')
+      }
     } else {
       console.log('No prompts available for selection')
     }
