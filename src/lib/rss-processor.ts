@@ -1,6 +1,6 @@
 import Parser from 'rss-parser'
 import { supabaseAdmin } from './supabase'
-import { AI_CALL, callAIWithPrompt, AI_PROMPTS, callOpenAI } from './openai'
+import { AI_CALL, callAIWithPrompt, callWithStructuredPrompt, AI_PROMPTS, callOpenAI } from './openai'
 import { ErrorHandler, SlackNotificationService } from './slack'
 import { GitHubImageStorage } from './github-storage'
 import { ArticleArchiveService } from './article-archive'
@@ -654,6 +654,7 @@ export class RSSProcessor {
           .insert([{
             feed_id: feed.id,
             issue_id: null, // ← Not assigned to issue yet
+            article_module_id: feed.article_module_id || null, // ← Inherit from feed
             external_id: externalId,
             title: item.title || '',
             description: item.contentSnippet || item.content || '',
@@ -784,7 +785,7 @@ export class RSSProcessor {
    * Score a single post and store rating
    */
   private async scoreAndStorePost(post: any, newsletterId: string): Promise<void> {
-    const evaluation = await this.evaluatePost(post, newsletterId)
+    const evaluation = await this.evaluatePost(post, newsletterId, 'primary', post.article_module_id)
 
     if (typeof evaluation.interest_level !== 'number' ||
         typeof evaluation.local_relevance !== 'number' ||
@@ -1744,46 +1745,71 @@ export class RSSProcessor {
     await this.generateNewsletterArticles(issueId, section)
   }
 
-  private async evaluatePost(post: RssPost, newsletterId: string, section: 'primary' | 'secondary' = 'primary'): Promise<ContentEvaluation> {
-    // Fetch enabled criteria configuration from database (section-specific)
-    const enabledCountKey = section === 'primary' ? 'primary_criteria_enabled_count' : 'secondary_criteria_enabled_count'
-    const criteriaPrefix = section === 'primary' ? 'criteria_' : 'secondary_criteria_'
+  private async evaluatePost(post: RssPost, newsletterId: string, section: 'primary' | 'secondary' = 'primary', moduleId?: string | null): Promise<ContentEvaluation> {
+    // Try to use module criteria if moduleId is provided
+    let criteria: Array<{ number: number; name: string; weight: number; ai_prompt?: string }> = []
+    let useModuleCriteria = false
 
-    const { data: criteriaConfig, error: configError } = await supabaseAdmin
-      .from('publication_settings')
-      .select('key, value')
-      .eq('publication_id', newsletterId)
-      .or(`key.eq.${enabledCountKey},key.eq.criteria_enabled_count,key.like.${criteriaPrefix}%_name,key.like.${criteriaPrefix}%_weight,key.like.criteria_%_name,key.like.criteria_%_weight`)
+    if (moduleId) {
+      const { data: moduleCriteria, error: moduleError } = await supabaseAdmin
+        .from('article_module_criteria')
+        .select('criteria_number, name, weight, ai_prompt, is_active')
+        .eq('article_module_id', moduleId)
+        .eq('is_active', true)
+        .order('criteria_number', { ascending: true })
 
-    if (configError) {
-      const errorMsg = configError instanceof Error
-        ? configError.message
-        : typeof configError === 'object' && configError !== null
-          ? JSON.stringify(configError, null, 2)
-          : String(configError)
-      console.error('Failed to fetch criteria configuration:', errorMsg)
-      throw new Error('Failed to fetch criteria configuration')
+      if (!moduleError && moduleCriteria && moduleCriteria.length > 0) {
+        criteria = moduleCriteria.map(c => ({
+          number: c.criteria_number,
+          name: c.name,
+          weight: c.weight,
+          ai_prompt: c.ai_prompt
+        }))
+        useModuleCriteria = true
+        console.log(`[Score] Using ${criteria.length} criteria from module ${moduleId}`)
+      }
     }
 
-    // Parse criteria configuration (try section-specific first, fallback to primary)
-    const enabledCountSetting = criteriaConfig?.find(s => s.key === enabledCountKey) ||
-                                 criteriaConfig?.find(s => s.key === 'criteria_enabled_count')
-    const enabledCount = enabledCountSetting?.value ? parseInt(enabledCountSetting.value) : 3
+    // Fallback to legacy publication_settings if no module criteria
+    if (!useModuleCriteria) {
+      const enabledCountKey = section === 'primary' ? 'primary_criteria_enabled_count' : 'secondary_criteria_enabled_count'
+      const criteriaPrefix = section === 'primary' ? 'criteria_' : 'secondary_criteria_'
 
-    // Collect enabled criteria with their weights
-    const criteria: Array<{ number: number; name: string; weight: number }> = []
-    for (let i = 1; i <= enabledCount; i++) {
-      // Try section-specific keys first, then fallback to primary keys
-      const nameSetting = criteriaConfig?.find(s => s.key === `${criteriaPrefix}${i}_name`) ||
-                         criteriaConfig?.find(s => s.key === `criteria_${i}_name`)
-      const weightSetting = criteriaConfig?.find(s => s.key === `${criteriaPrefix}${i}_weight`) ||
-                           criteriaConfig?.find(s => s.key === `criteria_${i}_weight`)
+      const { data: criteriaConfig, error: configError } = await supabaseAdmin
+        .from('publication_settings')
+        .select('key, value')
+        .eq('publication_id', newsletterId)
+        .or(`key.eq.${enabledCountKey},key.eq.criteria_enabled_count,key.like.${criteriaPrefix}%_name,key.like.${criteriaPrefix}%_weight,key.like.criteria_%_name,key.like.criteria_%_weight`)
 
-      criteria.push({
-        number: i,
-        name: nameSetting?.value || `Criteria ${i}`,
-        weight: weightSetting?.value ? parseFloat(weightSetting.value) : 1.0
-      })
+      if (configError) {
+        const errorMsg = configError instanceof Error
+          ? configError.message
+          : typeof configError === 'object' && configError !== null
+            ? JSON.stringify(configError, null, 2)
+            : String(configError)
+        console.error('Failed to fetch criteria configuration:', errorMsg)
+        throw new Error('Failed to fetch criteria configuration')
+      }
+
+      // Parse criteria configuration (try section-specific first, fallback to primary)
+      const enabledCountSetting = criteriaConfig?.find(s => s.key === enabledCountKey) ||
+                                   criteriaConfig?.find(s => s.key === 'criteria_enabled_count')
+      const enabledCount = enabledCountSetting?.value ? parseInt(enabledCountSetting.value) : 3
+
+      // Collect enabled criteria with their weights
+      for (let i = 1; i <= enabledCount; i++) {
+        // Try section-specific keys first, then fallback to primary keys
+        const nameSetting = criteriaConfig?.find(s => s.key === `${criteriaPrefix}${i}_name`) ||
+                           criteriaConfig?.find(s => s.key === `criteria_${i}_name`)
+        const weightSetting = criteriaConfig?.find(s => s.key === `${criteriaPrefix}${i}_weight`) ||
+                             criteriaConfig?.find(s => s.key === `criteria_${i}_weight`)
+
+        criteria.push({
+          number: i,
+          name: nameSetting?.value || `Criteria ${i}`,
+          weight: weightSetting?.value ? parseFloat(weightSetting.value) : 1.0
+        })
+      }
     }
 
     // Evaluate post against each enabled criterion
@@ -1794,18 +1820,48 @@ export class RSSProcessor {
         // Use full article text if available, otherwise fall back to RSS content/description
         const fullText = post.full_article_text || post.content || post.description || ''
 
-        // Call AI with structured prompt from database (includes all parameters)
-        const promptKey = `ai_prompt_criteria_${criterion.number}`
-        
         let result
-        try {
-          result = await callAIWithPrompt(promptKey, newsletterId, {
-            title: post.title,
-            description: post.description || '',
-            content: fullText
-          })
-        } catch (callError) {
-          throw new Error(`AI call failed for criterion ${criterion.number}: ${callError instanceof Error ? callError.message : 'Unknown error'}`)
+
+        // Use module criteria ai_prompt if available, otherwise fall back to legacy prompt
+        if (useModuleCriteria && criterion.ai_prompt) {
+          try {
+            // Parse the JSON prompt configuration from module criteria
+            const promptConfig = JSON.parse(criterion.ai_prompt)
+
+            // Determine provider from model name
+            const model = promptConfig.model || 'gpt-4o'
+            const provider: 'openai' | 'claude' = model.toLowerCase().includes('claude') ? 'claude' : 'openai'
+
+            // Call AI with the parsed prompt config
+            result = await callWithStructuredPrompt(
+              promptConfig,
+              {
+                title: post.title,
+                description: post.description || '',
+                content: fullText
+              },
+              provider,
+              `module_criteria_${criterion.number}`
+            )
+
+            console.log(`[Score] Used module criteria ${criterion.number} (${criterion.name}) prompt`)
+          } catch (parseError) {
+            console.error(`[Score] Failed to parse module criteria ${criterion.number} prompt:`, parseError)
+            throw new Error(`Invalid ai_prompt JSON for criterion ${criterion.number}: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`)
+          }
+        } else {
+          // Fall back to legacy publication_settings prompt
+          const promptKey = `ai_prompt_criteria_${criterion.number}`
+
+          try {
+            result = await callAIWithPrompt(promptKey, newsletterId, {
+              title: post.title,
+              description: post.description || '',
+              content: fullText
+            })
+          } catch (callError) {
+            throw new Error(`AI call failed for criterion ${criterion.number}: ${callError instanceof Error ? callError.message : 'Unknown error'}`)
+          }
         }
 
         if (!result || typeof result !== 'object') {
