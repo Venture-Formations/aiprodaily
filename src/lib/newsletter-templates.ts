@@ -1727,12 +1727,18 @@ export async function generateFullNewsletterHtml(
     console.log('Active articles to render:', activeArticles.length)
     console.log('Article order:', activeArticles.map((a: any) => `${a.headline} (rank: ${a.rank})`).join(', '))
 
-    // Fetch newsletter sections order
-    const { data: sections } = await supabaseAdmin
+    // Fetch newsletter sections order (exclude legacy article section types - now handled by article_modules)
+    const { data: allSections } = await supabaseAdmin
       .from('newsletter_sections')
       .select('*')
       .eq('is_active', true)
       .order('display_order', { ascending: true })
+
+    // Filter out legacy article section types (primary_articles and secondary_articles)
+    // These are now handled by the article_modules system
+    const sections = (allSections || []).filter(s =>
+      s.section_type !== 'primary_articles' && s.section_type !== 'secondary_articles'
+    )
 
     // Fetch ad modules for this publication
     const { data: adModules } = await supabaseAdmin
@@ -1875,22 +1881,8 @@ export async function generateFullNewsletterHtml(
       } else {
         const section = item.data
         // Check section_type to determine what to render
-        if (section.section_type === 'primary_articles' && activeArticles.length > 0) {
-          const primaryHtml = await generatePrimaryArticlesSection(
-            activeArticles,
-            issue.date,
-            issue.id,
-            section.name,
-            issue.publication_id,
-            issue.mailerlite_issue_id
-          )
-          sectionsHtml += primaryHtml
-        }
-        else if (section.section_type === 'secondary_articles') {
-          const secondaryHtml = await generateSecondaryArticlesSection(issue, section.name)
-          sectionsHtml += secondaryHtml
-        }
-        else if (section.section_type === 'ai_applications' || section.id === SECTION_IDS.AI_APPLICATIONS) {
+        // Note: primary_articles and secondary_articles are now handled by article_modules
+        if (section.section_type === 'ai_applications' || section.id === SECTION_IDS.AI_APPLICATIONS) {
           const aiAppsHtml = await generateAIAppsSection(issue)
           if (aiAppsHtml) {
             sectionsHtml += aiAppsHtml
