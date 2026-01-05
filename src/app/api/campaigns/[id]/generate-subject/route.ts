@@ -19,23 +19,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
-    // Fetch issue with active module articles
+    // Fetch issue with publication_id
     const { data: issue, error } = await supabaseAdmin
       .from('publication_issues')
-      .select(`
-        *,
-        publication_id,
-        module_articles:module_articles(
-          headline,
-          content,
-          is_active,
-          skipped,
-          rank,
-          rss_post:rss_posts(
-            post_rating:post_ratings(total_score)
-          )
-        )
-      `)
+      .select('*, publication_id')
       .eq('id', id)
       .single()
 
@@ -48,19 +35,48 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'issue not found' }, { status: 404 })
     }
 
-    // Get active articles sorted by rank (custom order, rank 1 = #1 position)
-    // Exclude skipped articles to ensure we use the current #1 article
-    const activeArticles = (issue.module_articles || [])
-      .filter((article: any) => {
-        // Always check is_active
-        if (!article.is_active) return false
+    // Fetch module articles with their article_module's display_order
+    // to ensure we use the #1 article from the FIRST section (lowest display_order)
+    const { data: moduleArticles, error: articlesError } = await supabaseAdmin
+      .from('module_articles')
+      .select(`
+        headline,
+        content,
+        is_active,
+        skipped,
+        rank,
+        article_module_id,
+        article_module:article_modules(display_order),
+        rss_post:rss_posts(
+          post_rating:post_ratings(total_score)
+        )
+      `)
+      .eq('issue_id', id)
+      .eq('is_active', true)
 
+    if (articlesError) {
+      console.error('articles fetch error:', articlesError)
+      return NextResponse.json({ error: 'Failed to fetch articles' }, { status: 500 })
+    }
+
+    // Get active articles sorted by module display_order first, then by rank
+    // This ensures we use the #1 article from the FIRST article section
+    const activeArticles = (moduleArticles || [])
+      .filter((article: any) => {
         // Check skipped only if the field exists
         if (article.hasOwnProperty('skipped') && article.skipped) return false
-
         return true
       })
-      .sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999))
+      .sort((a: any, b: any) => {
+        // First sort by article_module display_order (lower = first section)
+        const aModuleOrder = a.article_module?.display_order ?? 999
+        const bModuleOrder = b.article_module?.display_order ?? 999
+        if (aModuleOrder !== bModuleOrder) {
+          return aModuleOrder - bModuleOrder
+        }
+        // Then sort by rank within the same module
+        return (a.rank || 999) - (b.rank || 999)
+      })
 
     if (activeArticles.length === 0) {
       return NextResponse.json({
