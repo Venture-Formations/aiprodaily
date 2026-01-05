@@ -1,34 +1,24 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { RSSProcessor } from '@/lib/rss-processor'
+import { ArticleModuleSelector } from '@/lib/article-modules'
 
 /**
- * Reprocess Articles Workflow
- * Regenerates all articles for an existing issue
+ * Reprocess Articles Workflow (ARTICLE MODULES VERSION)
+ * Regenerates all articles for an existing issue using the new module system
  *
  * Steps:
- * 1. Cleanup (delete articles, null posts, set processing status)
- * 2. Select & dedupe (top 12 primary + 12 secondary)
- * 3. Generate 6 primary titles
- * 4. Generate 3 primary bodies (batch 1)
- * 5. Generate 3 primary bodies (batch 2)
- * 6. Generate 6 secondary titles
- * 7. Generate 3 secondary bodies (batch 1)
- * 8. Generate 3 secondary bodies (batch 2)
- * 9. Fact-check all articles
- * 10. Finalize (select top 3 each, regenerate welcome, set draft)
+ * 1. Cleanup (delete module_articles, unassign posts, set processing status)
+ * 2. Deduplication (global, cross-module)
  *
- * Note: Includes OIDC error handling and idempotency checks
+ * For each active article module (sequentially):
+ *   Step N+0: Assign posts and generate titles
+ *   Step N+1: Generate bodies batch 1
+ *   Step N+2: Generate bodies batch 2
+ *   Step N+3: Fact-check articles
+ *
+ * Final: Select top articles, regenerate welcome, set draft
  */
 
-/**
- * Helper to detect if an error is an OIDC token error
- */
-function isOidcError(error: any): boolean {
-  const errorMsg = error?.message || String(error)
-  return errorMsg.includes('VercelOidcTokenError') ||
-         errorMsg.includes('Failed to refresh OIDC token') ||
-         errorMsg.includes('Unable to find root directory')
-}
 export async function reprocessArticlesWorkflow(input: {
   issue_id: string
   publication_id: string
@@ -40,62 +30,68 @@ export async function reprocessArticlesWorkflow(input: {
   console.log(`[Reprocess Workflow] Starting for issue: ${issue_id}`)
 
   // STEP 1: Cleanup
-  await cleanupissue(issue_id)
+  await cleanupIssue(issue_id)
 
-  // STEP 2: Select & Dedupe
-  await selectAndDedupe(issue_id, publication_id)
+  // STEP 2: Deduplication
+  await deduplicateIssue(issue_id)
 
-  // PRIMARY SECTION
-  // STEP 3: Generate all 6 primary titles
-  await generatePrimaryTitles(issue_id)
+  // Get active article modules
+  const modules = await ArticleModuleSelector.getActiveModules(publication_id)
+  const moduleIds = modules.map(m => m.id)
 
-  // STEP 4-5: Generate primary bodies in 2 batches (3 articles each)
-  await generatePrimaryBodiesBatch1(issue_id)
-  await generatePrimaryBodiesBatch2(issue_id)
+  console.log(`[Reprocess Workflow] Found ${modules.length} active article modules`)
 
-  // SECONDARY SECTION
-  // STEP 6: Generate all 6 secondary titles
-  await generateSecondaryTitles(issue_id)
+  // Process each module sequentially
+  for (let i = 0; i < moduleIds.length; i++) {
+    const moduleId = moduleIds[i]
+    const moduleNum = i + 1
+    const totalModules = moduleIds.length
+    const stepOffset = 3 + (i * 4)
 
-  // STEP 7-8: Generate secondary bodies in 2 batches (3 articles each)
-  await generateSecondaryBodiesBatch1(issue_id)
-  await generateSecondaryBodiesBatch2(issue_id)
+    // Generate titles for this module
+    await generateModuleTitles(issue_id, moduleId, moduleNum, totalModules, stepOffset)
 
-  // STEP 9: Fact-check all articles
-  await factCheckAllArticles(issue_id)
+    // Generate bodies in 2 batches
+    await generateModuleBodiesBatch1(issue_id, moduleId, moduleNum, totalModules, stepOffset + 1)
+    await generateModuleBodiesBatch2(issue_id, moduleId, moduleNum, totalModules, stepOffset + 2)
 
-  // STEP 10: Finalize
-  await finalizeIssue(issue_id)
+    // Fact-check articles for this module
+    await factCheckModule(issue_id, moduleId, moduleNum, totalModules, stepOffset + 3)
+  }
 
-  console.log('[Reprocess Workflow] ✓ Complete')
+  // Final step
+  const finalStepNum = 3 + (moduleIds.length * 4) + 1
+  await finalizeIssue(issue_id, moduleIds, finalStepNum)
+
+  console.log('[Reprocess Workflow] Complete')
 
   return { issue_id, success: true }
 }
 
 // Step 1: Cleanup
-async function cleanupissue(issueId: string) {
+async function cleanupIssue(issueId: string) {
   "use step"
 
-  console.log('[Reprocess Step 1/10] Cleaning up issue...')
+  console.log('[Reprocess Step 1] Cleaning up issue...')
 
-  // Delete all existing articles
-  const { error: deleteArticlesError } = await supabaseAdmin
-    .from('articles')
+  // Delete all module_articles for this issue
+  const { error: deleteModuleArticlesError } = await supabaseAdmin
+    .from('module_articles')
     .delete()
     .eq('issue_id', issueId)
 
-  if (deleteArticlesError) {
-    console.error('[Reprocess Step 1/10] Error deleting articles:', deleteArticlesError)
+  if (deleteModuleArticlesError) {
+    console.error('[Reprocess Step 1] Error deleting module_articles:', deleteModuleArticlesError)
   }
 
-  // Delete all existing secondary articles
-  const { error: deleteSecondaryError } = await supabaseAdmin
-    .from('secondary_articles')
-    .delete()
+  // Reset issue_article_modules selections
+  const { error: resetSelectionsError } = await supabaseAdmin
+    .from('issue_article_modules')
+    .update({ article_ids: [], used_at: null })
     .eq('issue_id', issueId)
 
-  if (deleteSecondaryError) {
-    console.error('[Reprocess Step 1/10] Error deleting secondary articles:', deleteSecondaryError)
+  if (resetSelectionsError) {
+    console.error('[Reprocess Step 1] Error resetting selections:', resetSelectionsError)
   }
 
   // Unassign all posts (set issue_id to null)
@@ -105,7 +101,7 @@ async function cleanupissue(issueId: string) {
     .eq('issue_id', issueId)
 
   if (nullPostsError) {
-    console.error('[Reprocess Step 1/10] Error nulling posts:', nullPostsError)
+    console.error('[Reprocess Step 1] Error nulling posts:', nullPostsError)
   }
 
   // Set issue status to processing
@@ -115,284 +111,196 @@ async function cleanupissue(issueId: string) {
     .eq('id', issueId)
 
   if (updateStatusError) {
-    console.error('[Reprocess Step 1/10] Error updating status:', updateStatusError)
+    console.error('[Reprocess Step 1] Error updating status:', updateStatusError)
   }
 
-  console.log('[Reprocess Step 1/10] ✓ Cleanup complete')
+  console.log('[Reprocess Step 1] Cleanup complete')
 }
 
-// Step 2: Select & Dedupe
-async function selectAndDedupe(issueId: string, newsletterId: string) {
+// Step 2: Deduplication
+async function deduplicateIssue(issueId: string) {
   "use step"
 
-  console.log('[Reprocess Step 2/10] Selecting and deduplicating posts...')
+  console.log('[Reprocess Step 2] Running deduplication...')
 
-  // Get primary and secondary feed IDs
-  const { data: primaryFeeds } = await supabaseAdmin
-    .from('rss_feeds')
-    .select('id')
-    .eq('active', true)
-    .eq('use_for_primary_section', true)
-
-  const { data: secondaryFeeds } = await supabaseAdmin
-    .from('rss_feeds')
-    .select('id')
-    .eq('active', true)
-    .eq('use_for_secondary_section', true)
-
-  const primaryFeedIds = primaryFeeds?.map(f => f.id) || []
-  const secondaryFeedIds = secondaryFeeds?.map(f => f.id) || []
-
-  // Get lookback window
-  const { data: lookbackSetting } = await supabaseAdmin
-    .from('publication_settings')
-    .select('value')
-    .eq('publication_id', newsletterId)
-    .eq('key', 'primary_article_lookback_hours')
-    .single()
-
-  const lookbackHours = lookbackSetting ? parseInt(lookbackSetting.value) : 72
-  const lookbackDate = new Date()
-  lookbackDate.setHours(lookbackDate.getHours() - lookbackHours)
-  const lookbackTimestamp = lookbackDate.toISOString()
-
-  // Get and assign top 12 primary posts
-  const { data: allPrimaryPosts } = await supabaseAdmin
-    .from('rss_posts')
-    .select('id, post_ratings(total_score)')
-    .in('feed_id', primaryFeedIds)
-    .is('issue_id', null)
-    .gte('processed_at', lookbackTimestamp)
-    .not('post_ratings', 'is', null)
-
-  const topPrimary = allPrimaryPosts
-    ?.sort((a: any, b: any) => {
-      const scoreA = a.post_ratings?.[0]?.total_score || 0
-      const scoreB = b.post_ratings?.[0]?.total_score || 0
-      return scoreB - scoreA
-    })
-    .slice(0, 12) || []
-
-  // Get and assign top 12 secondary posts
-  const { data: allSecondaryPosts } = await supabaseAdmin
-    .from('rss_posts')
-    .select('id, post_ratings(total_score)')
-    .in('feed_id', secondaryFeedIds)
-    .is('issue_id', null)
-    .gte('processed_at', lookbackTimestamp)
-    .not('post_ratings', 'is', null)
-
-  const topSecondary = allSecondaryPosts
-    ?.sort((a: any, b: any) => {
-      const scoreA = a.post_ratings?.[0]?.total_score || 0
-      const scoreB = b.post_ratings?.[0]?.total_score || 0
-      return scoreB - scoreA
-    })
-    .slice(0, 12) || []
-
-  // Assign to issue
-  if (topPrimary.length > 0) {
-    await supabaseAdmin
-      .from('rss_posts')
-      .update({ issue_id: issueId })
-      .in('id', topPrimary.map(p => p.id))
-  }
-
-  if (topSecondary.length > 0) {
-    await supabaseAdmin
-      .from('rss_posts')
-      .update({ issue_id: issueId })
-      .in('id', topSecondary.map(p => p.id))
-  }
-
-  console.log(`[Reprocess Step 2/10] Assigned ${topPrimary.length} primary, ${topSecondary.length} secondary posts`)
-
-  // Deduplicate
   const processor = new RSSProcessor()
   const dedupeResult = await processor.handleDuplicatesForissue(issueId)
-  console.log(`[Reprocess Step 2/10] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicates found`)
-  console.log('[Reprocess Step 2/10] ✓ Select & dedupe complete')
+
+  console.log(`[Reprocess Step 2] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicates found`)
 }
 
-// PRIMARY SECTION
-async function generatePrimaryTitles(issueId: string) {
+// Module processing steps
+async function generateModuleTitles(
+  issueId: string,
+  moduleId: string,
+  moduleNum: number,
+  totalModules: number,
+  stepNum: number
+) {
   "use step"
 
-  let workCompleted = false
+  const module = await ArticleModuleSelector.getModule(moduleId)
+  const moduleName = module?.name || `Module ${moduleNum}`
 
-  try {
-    // Idempotency check: skip if already done
-    const { data: existing } = await supabaseAdmin
-      .from('articles')
-      .select('id')
-      .eq('issue_id', issueId)
-      .not('headline', 'is', null)
+  console.log(`[Reprocess Step ${stepNum}] Generating titles for ${moduleName} (${moduleNum}/${totalModules})...`)
 
-    if (existing && existing.length >= 6) {
-      console.log(`[Reprocess Step 3/10] ✓ Already have ${existing.length} primary titles (skip)`)
-      return
-    }
-
-    console.log('[Reprocess Step 3/10] Generating 6 primary titles...')
-    const processor = new RSSProcessor()
-    await processor.generateTitlesOnly(issueId, 'primary', 6)
-
-    // Mark work as complete
-    workCompleted = true
-
-    const { data: articles } = await supabaseAdmin
-      .from('articles')
-      .select('id, headline')
-      .eq('issue_id', issueId)
-      .not('headline', 'is', null)
-
-    console.log(`[Reprocess Step 3/10] ✓ Generated ${articles?.length || 0} primary titles`)
-  } catch (error: any) {
-    if (workCompleted && isOidcError(error)) {
-      console.log('[Reprocess Step 3/10] ⚠️ OIDC token error after completion - continuing')
-      return
-    }
-    throw error
-  }
-}
-
-async function generatePrimaryBodiesBatch1(issueId: string) {
-  "use step"
-
-  console.log('[Reprocess Step 4/10] Generating 3 primary bodies (batch 1)...')
   const processor = new RSSProcessor()
-  await processor.generateBodiesOnly(issueId, 'primary', 0, 3)
+
+  // Assign posts to this module first
+  const assignResult = await processor.assignPostsToModule(issueId, moduleId)
+  console.log(`[Reprocess Step ${stepNum}] Assigned ${assignResult.assigned} posts to ${moduleName}`)
+
+  // Generate titles
+  await processor.generateTitlesForModule(issueId, moduleId)
 
   const { data: articles } = await supabaseAdmin
-    .from('articles')
-    .select('id, content')
-    .eq('issue_id', issueId)
-    .not('content', 'is', null)
-
-  console.log(`[Reprocess Step 4/10] ✓ Total bodies generated: ${articles?.length || 0}`)
-}
-
-async function generatePrimaryBodiesBatch2(issueId: string) {
-  "use step"
-
-  console.log('[Reprocess Step 5/10] Generating 3 more primary bodies (batch 2)...')
-  const processor = new RSSProcessor()
-  await processor.generateBodiesOnly(issueId, 'primary', 3, 3)
-
-  const { data: articles } = await supabaseAdmin
-    .from('articles')
-    .select('id, content')
-    .eq('issue_id', issueId)
-    .not('content', 'is', null)
-
-  console.log(`[Reprocess Step 5/10] ✓ Total primary bodies: ${articles?.length || 0}`)
-}
-
-// SECONDARY SECTION
-async function generateSecondaryTitles(issueId: string) {
-  "use step"
-
-  console.log('[Reprocess Step 6/10] Generating 6 secondary titles...')
-  const processor = new RSSProcessor()
-  await processor.generateTitlesOnly(issueId, 'secondary', 6)
-
-  const { data: articles } = await supabaseAdmin
-    .from('secondary_articles')
+    .from('module_articles')
     .select('id, headline')
     .eq('issue_id', issueId)
+    .eq('article_module_id', moduleId)
     .not('headline', 'is', null)
 
-  console.log(`[Reprocess Step 6/10] ✓ Generated ${articles?.length || 0} secondary titles`)
+  console.log(`[Reprocess Step ${stepNum}] Generated ${articles?.length || 0} titles for ${moduleName}`)
 }
 
-async function generateSecondaryBodiesBatch1(issueId: string) {
+async function generateModuleBodiesBatch1(
+  issueId: string,
+  moduleId: string,
+  moduleNum: number,
+  totalModules: number,
+  stepNum: number
+) {
   "use step"
 
-  console.log('[Reprocess Step 7/10] Generating 3 secondary bodies (batch 1)...')
+  const module = await ArticleModuleSelector.getModule(moduleId)
+  const moduleName = module?.name || `Module ${moduleNum}`
+
+  console.log(`[Reprocess Step ${stepNum}] Generating bodies batch 1 for ${moduleName}...`)
+
   const processor = new RSSProcessor()
-  await processor.generateBodiesOnly(issueId, 'secondary', 0, 3)
+  await processor.generateBodiesForModule(issueId, moduleId, 0, 3)
 
   const { data: articles } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('id, content')
+    .from('module_articles')
+    .select('id')
     .eq('issue_id', issueId)
+    .eq('article_module_id', moduleId)
     .not('content', 'is', null)
 
-  console.log(`[Reprocess Step 7/10] ✓ Total bodies generated: ${articles?.length || 0}`)
+  console.log(`[Reprocess Step ${stepNum}] ${moduleName} has ${articles?.length || 0} articles with bodies`)
 }
 
-async function generateSecondaryBodiesBatch2(issueId: string) {
+async function generateModuleBodiesBatch2(
+  issueId: string,
+  moduleId: string,
+  moduleNum: number,
+  totalModules: number,
+  stepNum: number
+) {
   "use step"
 
-  console.log('[Reprocess Step 8/10] Generating 3 more secondary bodies (batch 2)...')
+  const module = await ArticleModuleSelector.getModule(moduleId)
+  const moduleName = module?.name || `Module ${moduleNum}`
+
+  console.log(`[Reprocess Step ${stepNum}] Generating bodies batch 2 for ${moduleName}...`)
+
   const processor = new RSSProcessor()
-  await processor.generateBodiesOnly(issueId, 'secondary', 3, 3)
+  await processor.generateBodiesForModule(issueId, moduleId, 3, 3)
 
   const { data: articles } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('id, content')
+    .from('module_articles')
+    .select('id')
     .eq('issue_id', issueId)
+    .eq('article_module_id', moduleId)
     .not('content', 'is', null)
 
-  console.log(`[Reprocess Step 8/10] ✓ Total secondary bodies: ${articles?.length || 0}`)
+  console.log(`[Reprocess Step ${stepNum}] ${moduleName} total bodies: ${articles?.length || 0}`)
 }
 
-// FACT-CHECK
-async function factCheckAllArticles(issueId: string) {
+async function factCheckModule(
+  issueId: string,
+  moduleId: string,
+  moduleNum: number,
+  totalModules: number,
+  stepNum: number
+) {
   "use step"
 
-  console.log('[Reprocess Step 9/10] Fact-checking all articles...')
+  const module = await ArticleModuleSelector.getModule(moduleId)
+  const moduleName = module?.name || `Module ${moduleNum}`
+
+  console.log(`[Reprocess Step ${stepNum}] Fact-checking ${moduleName}...`)
+
   const processor = new RSSProcessor()
+  await processor.factCheckArticlesForModule(issueId, moduleId)
 
-  // Fact-check primary articles
-  await processor.factCheckArticles(issueId, 'primary')
-
-  const { data: primaryArticles } = await supabaseAdmin
-    .from('articles')
+  const { data: articles } = await supabaseAdmin
+    .from('module_articles')
     .select('id, fact_check_score')
     .eq('issue_id', issueId)
+    .eq('article_module_id', moduleId)
     .not('fact_check_score', 'is', null)
 
-  const primaryAvg = (primaryArticles?.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) || 0) / (primaryArticles?.length || 1)
-  console.log(`[Reprocess Step 9/10] Fact-checked ${primaryArticles?.length || 0} primary articles (avg: ${primaryAvg.toFixed(1)}/10)`)
+  const avgScore = articles && articles.length > 0
+    ? articles.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) / articles.length
+    : 0
 
-  // Fact-check secondary articles
-  await processor.factCheckArticles(issueId, 'secondary')
-
-  const { data: secondaryArticles } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('id, fact_check_score')
-    .eq('issue_id', issueId)
-    .not('fact_check_score', 'is', null)
-
-  const secondaryAvg = (secondaryArticles?.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) || 0) / (secondaryArticles?.length || 1)
-  console.log(`[Reprocess Step 9/10] Fact-checked ${secondaryArticles?.length || 0} secondary articles (avg: ${secondaryAvg.toFixed(1)}/10)`)
-  console.log('[Reprocess Step 9/10] ✓ Fact-check complete')
+  console.log(`[Reprocess Step ${stepNum}] Fact-checked ${articles?.length || 0} articles (avg: ${avgScore.toFixed(1)}/10)`)
 }
 
-// FINALIZE
-async function finalizeIssue(issueId: string) {
+// Final step
+async function finalizeIssue(issueId: string, moduleIds: string[], stepNum: number) {
   "use step"
 
-  console.log('[Reprocess Step 10/10] Finalizing issue...')
+  console.log(`[Reprocess Step ${stepNum}] Finalizing issue...`)
+
   const processor = new RSSProcessor()
 
-  // Auto-select top 3 per section
-  await processor.selectTopArticlesForissue(issueId)
+  // Select top articles for each module and update issue_article_modules
+  for (const moduleId of moduleIds) {
+    const module = await ArticleModuleSelector.getModule(moduleId)
+    const articlesCount = module?.articles_count || 3
 
-  const { data: activeArticles } = await supabaseAdmin
-    .from('articles')
-    .select('id')
-    .eq('issue_id', issueId)
-    .eq('is_active', true)
+    // Get top articles by score
+    const { data: topArticles } = await supabaseAdmin
+      .from('module_articles')
+      .select('id, post_id, rss_post:rss_posts(post_ratings(total_score))')
+      .eq('issue_id', issueId)
+      .eq('article_module_id', moduleId)
+      .not('content', 'is', null)
+      .not('headline', 'is', null)
 
-  const { data: activeSecondary } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('id')
-    .eq('issue_id', issueId)
-    .eq('is_active', true)
+    // Sort by score and take top N
+    const sorted = (topArticles || [])
+      .sort((a: any, b: any) => {
+        const scoreA = a.rss_post?.post_ratings?.[0]?.total_score || 0
+        const scoreB = b.rss_post?.post_ratings?.[0]?.total_score || 0
+        return scoreB - scoreA
+      })
+      .slice(0, articlesCount)
 
-  console.log(`[Reprocess Step 10/10] Selected ${activeArticles?.length || 0} primary, ${activeSecondary?.length || 0} secondary`)
+    // Mark selected articles as active
+    const selectedIds = sorted.map(a => a.id)
+
+    if (selectedIds.length > 0) {
+      // Set is_active and rank
+      for (let i = 0; i < selectedIds.length; i++) {
+        await supabaseAdmin
+          .from('module_articles')
+          .update({ is_active: true, rank: i + 1 })
+          .eq('id', selectedIds[i])
+      }
+
+      // Update issue_article_modules
+      await supabaseAdmin
+        .from('issue_article_modules')
+        .update({ article_ids: selectedIds })
+        .eq('issue_id', issueId)
+        .eq('article_module_id', moduleId)
+    }
+
+    console.log(`[Reprocess Step ${stepNum}] Selected ${selectedIds.length} articles for ${module?.name}`)
+  }
 
   // Generate welcome section
   await processor.generateWelcomeSection(issueId)
@@ -405,5 +313,5 @@ async function finalizeIssue(issueId: string) {
 
   // Unassign unused posts
   const unassignResult = await processor.unassignUnusedPosts(issueId)
-  console.log(`[Reprocess Step 10/10] ✓ Finalized. Unassigned ${unassignResult.unassigned} unused posts`)
+  console.log(`[Reprocess Step ${stepNum}] Finalized. Unassigned ${unassignResult.unassigned} unused posts`)
 }
