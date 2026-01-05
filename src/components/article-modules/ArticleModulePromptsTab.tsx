@@ -12,6 +12,25 @@ interface ArticleModulePromptsTabProps {
   onAiImagePromptChange: (prompt: string | null) => Promise<void>
 }
 
+// Helper to detect provider from prompt JSON
+function detectProviderFromPrompt(promptJson: string | null): 'claude' | 'openai' {
+  if (!promptJson) return 'openai'
+  const lower = promptJson.toLowerCase()
+  if (lower.includes('claude') || lower.includes('anthropic')) return 'claude'
+  return 'openai'
+}
+
+// Helper to format JSON for display
+function formatJSON(value: string | null, pretty: boolean): string {
+  if (!value) return ''
+  try {
+    const parsed = JSON.parse(value)
+    return pretty ? JSON.stringify(parsed, null, 2) : JSON.stringify(parsed)
+  } catch {
+    return value
+  }
+}
+
 export default function ArticleModulePromptsTab({
   moduleId,
   publicationId,
@@ -23,14 +42,46 @@ export default function ArticleModulePromptsTab({
   const [criteria, setCriteria] = useState<ArticleModuleCriteria[]>(initialCriteria)
   const [prompts, setPrompts] = useState<ArticleModulePrompt[]>(initialPrompts)
   const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
 
-  // Modal states
-  const [editingCriterion, setEditingCriterion] = useState<ArticleModuleCriteria | null>(null)
-  const [editingPrompt, setEditingPrompt] = useState<ArticleModulePrompt | null>(null)
-  const [editingAiImagePrompt, setEditingAiImagePrompt] = useState(false)
+  // Expansion and editing states (matching Settings page pattern)
+  const [expandedPrompt, setExpandedPrompt] = useState<string | null>(null)
+  const [editingPrompt, setEditingPrompt] = useState<{key: string, value: string} | null>(null)
+  const [editingWeight, setEditingWeight] = useState<{key: string, value: string} | null>(null)
+  const [editingCriteriaName, setEditingCriteriaName] = useState<{id: string, value: string} | null>(null)
+  const [prettyPrint, setPrettyPrint] = useState(true)
+
+  // RSS Posts for testing
+  const [rssPosts, setRssPosts] = useState<any[]>([])
+  const [selectedRssPost, setSelectedRssPost] = useState<string>('')
+  const [loadingRssPosts, setLoadingRssPosts] = useState(false)
+  const [testResult, setTestResult] = useState<any>(null)
+  const [testingPrompt, setTestingPrompt] = useState(false)
+
+  // AI Image state
   const [localAiImagePrompt, setLocalAiImagePrompt] = useState(aiImagePrompt || '')
+  const [editingAiImagePrompt, setEditingAiImagePrompt] = useState(false)
+
+  // Fetch RSS posts for testing
+  const fetchRssPosts = useCallback(async () => {
+    setLoadingRssPosts(true)
+    try {
+      const res = await fetch(`/api/rss-posts?publication_id=${publicationId}&article_module_id=${moduleId}&limit=20`)
+      if (res.ok) {
+        const data = await res.json()
+        setRssPosts(data.posts || [])
+        if (data.posts?.length > 0) {
+          setSelectedRssPost(data.posts[0].id)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch RSS posts:', err)
+    } finally {
+      setLoadingRssPosts(false)
+    }
+  }, [publicationId, moduleId])
 
   // Fetch latest data
   const fetchData = useCallback(async () => {
@@ -60,100 +111,216 @@ export default function ArticleModulePromptsTab({
     if (!initialCriteria.length || !initialPrompts.length) {
       fetchData()
     }
-  }, [fetchData, initialCriteria.length, initialPrompts.length])
+    fetchRssPosts()
+  }, [fetchData, fetchRssPosts, initialCriteria.length, initialPrompts.length])
 
-  // Calculate total weight (multiplier system - weights don't need to sum to 100%)
-  const activeCriteria = criteria.filter(c => c.is_active)
-
+  // Handlers for criteria
   const handleAddCriterion = async () => {
     if (criteria.length >= 5) return
 
-    setSaving(true)
+    setSaving('add_criterion')
     try {
       const res = await fetch(`/api/article-modules/${moduleId}/criteria`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: `Criterion ${criteria.length + 1}`,
-          weight: 0.2,
+          weight: 1.0,
           is_active: true
         })
       })
       if (!res.ok) throw new Error('Failed to add criterion')
       await fetchData()
+      setMessage('Criterion added successfully')
     } catch (err: any) {
       setError(err.message)
     } finally {
-      setSaving(false)
+      setSaving(null)
     }
   }
 
   const handleDeleteCriterion = async (criterionId: string) => {
     if (criteria.length <= 1) return
 
-    setSaving(true)
+    setSaving(`delete_${criterionId}`)
     try {
       const res = await fetch(`/api/article-modules/${moduleId}/criteria?criteria_id=${criterionId}`, {
         method: 'DELETE'
       })
       if (!res.ok) throw new Error('Failed to delete criterion')
       await fetchData()
+      setMessage('Criterion removed successfully')
     } catch (err: any) {
       setError(err.message)
     } finally {
-      setSaving(false)
+      setSaving(null)
     }
   }
 
-  const handleSaveCriterion = async (criterion: ArticleModuleCriteria) => {
-    setSaving(true)
+  // Handle weight edit
+  const handleWeightEdit = (criterion: ArticleModuleCriteria) => {
+    setEditingWeight({ key: criterion.id, value: (criterion.weight || 1).toString() })
+  }
+
+  const handleWeightSave = async (criterion: ArticleModuleCriteria) => {
+    if (!editingWeight) return
+    setSaving(`weight_${criterion.id}`)
     try {
       const res = await fetch(`/api/article-modules/${moduleId}/criteria`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           criteria_id: criterion.id,
-          name: criterion.name,
-          weight: criterion.weight,
-          ai_prompt: criterion.ai_prompt,
-          is_active: criterion.is_active
+          weight: parseFloat(editingWeight.value) || 1.0
         })
       })
-      if (!res.ok) throw new Error('Failed to update criterion')
+      if (!res.ok) throw new Error('Failed to update weight')
       await fetchData()
-      setEditingCriterion(null)
+      setEditingWeight(null)
+      setMessage('Weight updated successfully')
     } catch (err: any) {
       setError(err.message)
     } finally {
-      setSaving(false)
+      setSaving(null)
     }
   }
 
-  const handleSavePrompt = async (prompt: ArticleModulePrompt) => {
-    setSaving(true)
+  // Handle criteria name edit
+  const handleNameEdit = (criterion: ArticleModuleCriteria) => {
+    setEditingCriteriaName({ id: criterion.id, value: criterion.name })
+  }
+
+  const handleNameSave = async (criterion: ArticleModuleCriteria) => {
+    if (!editingCriteriaName) return
+    setSaving(`name_${criterion.id}`)
+    try {
+      const res = await fetch(`/api/article-modules/${moduleId}/criteria`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          criteria_id: criterion.id,
+          name: editingCriteriaName.value
+        })
+      })
+      if (!res.ok) throw new Error('Failed to update name')
+      await fetchData()
+      setEditingCriteriaName(null)
+      setMessage('Name updated successfully')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  // Handle prompt edit (inline editing like Settings page)
+  const handleEdit = (key: string, value: string) => {
+    setEditingPrompt({ key, value })
+  }
+
+  const handleCancel = () => {
+    setEditingPrompt(null)
+    setTestResult(null)
+  }
+
+  // Save criterion prompt
+  const handleSaveCriterionPrompt = async (criterion: ArticleModuleCriteria) => {
+    if (!editingPrompt) return
+    setSaving(criterion.id)
+    try {
+      const res = await fetch(`/api/article-modules/${moduleId}/criteria`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          criteria_id: criterion.id,
+          ai_prompt: editingPrompt.value
+        })
+      })
+      if (!res.ok) throw new Error('Failed to update prompt')
+      await fetchData()
+      setEditingPrompt(null)
+      setTestResult(null)
+      setMessage('Prompt saved successfully')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  // Save article prompt (title/body)
+  const handleSaveArticlePrompt = async (prompt: ArticleModulePrompt) => {
+    if (!editingPrompt) return
+    setSaving(prompt.id)
     try {
       const res = await fetch(`/api/article-modules/${moduleId}/prompts`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt_id: prompt.id,
-          ai_prompt: prompt.ai_prompt,
-          ai_model: prompt.ai_model,
-          ai_provider: prompt.ai_provider
+          ai_prompt: editingPrompt.value
         })
       })
       if (!res.ok) throw new Error('Failed to update prompt')
       await fetchData()
       setEditingPrompt(null)
+      setTestResult(null)
+      setMessage('Prompt saved successfully')
     } catch (err: any) {
       setError(err.message)
     } finally {
-      setSaving(false)
+      setSaving(null)
     }
   }
 
-  const handleAiImagePromptSave = async () => {
-    await onAiImagePromptChange(localAiImagePrompt || null)
+  // Reset to default
+  const handleResetToDefault = async (key: string, type: 'criterion' | 'prompt') => {
+    setSaving(key)
+    try {
+      // For now, just show a message - actual default handling requires app_settings integration
+      setMessage('Reset to default functionality requires Publication Settings integration')
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  // Save as default
+  const handleSaveAsDefault = async (key: string, type: 'criterion' | 'prompt') => {
+    setSaving(key)
+    try {
+      // For now, just show a message - actual default handling requires app_settings integration
+      setMessage('Save as default functionality requires Publication Settings integration')
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  // Test prompt
+  const handleTestPrompt = async (promptKey: string) => {
+    if (!selectedRssPost) {
+      setError('Please select an RSS post to test with')
+      return
+    }
+    setTestingPrompt(true)
+    setTestResult(null)
+    try {
+      const res = await fetch('/api/debug/ai/test-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt_key: promptKey,
+          post_id: selectedRssPost,
+          publication_id: publicationId,
+          custom_prompt: editingPrompt?.value
+        })
+      })
+      const data = await res.json()
+      setTestResult(data)
+    } catch (err: any) {
+      setTestResult({ error: err.message })
+    } finally {
+      setTestingPrompt(false)
+    }
   }
 
   const getPromptByType = (type: string) => prompts.find(p => p.prompt_type === type)
@@ -173,6 +340,7 @@ export default function ArticleModulePromptsTab({
 
   return (
     <div className="space-y-6">
+      {/* Messages */}
       {error && (
         <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm flex items-center justify-between">
           <span>{error}</span>
@@ -183,116 +351,403 @@ export default function ArticleModulePromptsTab({
           </button>
         </div>
       )}
+      {message && (
+        <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm flex items-center justify-between">
+          <span>{message}</span>
+          <button onClick={() => setMessage(null)} className="text-green-500 hover:text-green-700">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* RSS Post Selector for Testing */}
+      <div className="p-4 bg-gray-50 rounded-lg">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          RSS Post for Testing Prompts
+        </label>
+        <select
+          value={selectedRssPost}
+          onChange={(e) => setSelectedRssPost(e.target.value)}
+          disabled={loadingRssPosts}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-emerald-500 focus:border-emerald-500"
+        >
+          {loadingRssPosts ? (
+            <option>Loading posts...</option>
+          ) : rssPosts.length === 0 ? (
+            <option>No RSS posts available</option>
+          ) : (
+            rssPosts.map((post) => (
+              <option key={post.id} value={post.id}>
+                {post.title?.substring(0, 80)}... {post.rss_feed?.name ? `(${post.rss_feed.name})` : ''}
+              </option>
+            ))
+          )}
+        </select>
+        <p className="mt-1 text-xs text-gray-500">
+          Select a post to use when testing prompts
+        </p>
+      </div>
 
       {/* Scoring Criteria */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium text-gray-700">Scoring Criteria</h4>
-          {criteria.length < 5 && (
-            <button
-              onClick={handleAddCriterion}
-              disabled={saving}
-              className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800 disabled:opacity-50"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Criterion
-            </button>
-          )}
-        </div>
-
-
-        <div className="border rounded-lg divide-y">
-          {criteria.map((criterion, index) => (
-            <div key={criterion.id} className="p-3 flex items-center gap-3">
-              <span className="text-xs text-gray-400 w-4">{index + 1}</span>
-              <div className="flex-1">
-                <p className={`text-sm font-medium ${criterion.is_active ? 'text-gray-900' : 'text-gray-400'}`}>
-                  {criterion.name}
-                </p>
-                <p className="text-xs text-gray-500">
-                  Weight: <span className="font-semibold text-emerald-600">{criterion.weight || 0}</span>
-                  {' '}(Max score contribution: {((criterion.weight || 0) * 10).toFixed(1)} points)
-                </p>
-              </div>
+      <div className="bg-white border border-gray-200 rounded-lg">
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-medium text-gray-900">Scoring Criteria</h4>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Configure evaluation criteria for scoring articles. {criteria.filter(c => c.is_active).length} of {criteria.length} criteria active.
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
               <button
-                onClick={() => setEditingCriterion(criterion)}
-                className="px-2 py-1 text-xs text-emerald-600 hover:bg-emerald-50 rounded"
+                onClick={handleAddCriterion}
+                disabled={criteria.length >= 5 || saving === 'add_criterion'}
+                className="px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Edit
+                {saving === 'add_criterion' ? 'Adding...' : 'Add Criteria'}
               </button>
               {criteria.length > 1 && (
                 <button
-                  onClick={() => handleDeleteCriterion(criterion.id)}
-                  disabled={saving}
-                  className="px-2 py-1 text-xs text-red-500 hover:bg-red-50 rounded disabled:opacity-50"
+                  onClick={() => handleDeleteCriterion(criteria[criteria.length - 1].id)}
+                  disabled={saving?.startsWith('delete_')}
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Delete
+                  {saving?.startsWith('delete_') ? 'Removing...' : 'Remove Criteria'}
                 </button>
               )}
             </div>
-          ))}
+          </div>
+        </div>
+
+        <div className="divide-y divide-gray-200">
+          {criteria.filter(c => c.is_active).map((criterion) => {
+            const promptKey = `criterion_${criterion.id}`
+            const isExpanded = expandedPrompt === promptKey
+            const isEditing = editingPrompt?.key === promptKey
+            const isSaving = saving === criterion.id
+            const isEditingWeight = editingWeight?.key === criterion.id
+            const isEditingName = editingCriteriaName?.id === criterion.id
+
+            return (
+              <div key={criterion.id} className="p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1">
+                    {/* Criteria Name */}
+                    <div className="flex items-center space-x-2 mb-2">
+                      <label className="text-xs font-medium text-gray-500 uppercase">Criteria Name:</label>
+                      {isEditingName ? (
+                        <>
+                          <input
+                            type="text"
+                            value={editingCriteriaName?.value || ''}
+                            onChange={(e) => setEditingCriteriaName({ id: criterion.id, value: e.target.value })}
+                            className="px-2 py-1 border border-gray-300 rounded text-sm flex-1 max-w-xs"
+                            placeholder="Enter criteria name"
+                          />
+                          <button
+                            onClick={() => handleNameSave(criterion)}
+                            disabled={saving === `name_${criterion.id}`}
+                            className="text-xs px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            {saving === `name_${criterion.id}` ? 'Saving...' : 'Save'}
+                          </button>
+                          <button
+                            onClick={() => setEditingCriteriaName(null)}
+                            disabled={saving === `name_${criterion.id}`}
+                            className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <h4 className="text-sm font-medium text-gray-900">{criterion.name}</h4>
+                          {!isEditing && criterion.ai_prompt && (
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                              detectProviderFromPrompt(criterion.ai_prompt) === 'claude'
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {detectProviderFromPrompt(criterion.ai_prompt) === 'claude' ? 'Claude' : 'OpenAI'}
+                            </span>
+                          )}
+                          <button
+                            onClick={() => handleNameEdit(criterion)}
+                            className="text-xs text-emerald-600 hover:text-emerald-800"
+                          >
+                            Edit Name
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Weight Input */}
+                    <div className="mt-2 flex items-center space-x-3">
+                      <label className="text-sm font-medium text-gray-700">Weight:</label>
+                      {isEditingWeight ? (
+                        <>
+                          <input
+                            type="number"
+                            min="0"
+                            max="10"
+                            step="0.1"
+                            value={editingWeight?.value || '1.0'}
+                            onChange={(e) => setEditingWeight({ key: criterion.id, value: e.target.value })}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                          />
+                          <button
+                            onClick={() => handleWeightSave(criterion)}
+                            disabled={saving === `weight_${criterion.id}`}
+                            className="text-xs px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            {saving === `weight_${criterion.id}` ? 'Saving...' : 'Save'}
+                          </button>
+                          <button
+                            onClick={() => setEditingWeight(null)}
+                            disabled={saving === `weight_${criterion.id}`}
+                            className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-sm font-semibold text-emerald-600">{criterion.weight || 1.0}</span>
+                          <button
+                            onClick={() => handleWeightEdit(criterion)}
+                            className="text-xs text-emerald-600 hover:text-emerald-800"
+                          >
+                            Edit
+                          </button>
+                          <span className="text-xs text-gray-500">
+                            (Max final score contribution: {((criterion.weight || 1) * 10).toFixed(1)} points)
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setExpandedPrompt(isExpanded ? null : promptKey)}
+                    className="ml-4 text-emerald-600 hover:text-emerald-800 text-sm font-medium"
+                  >
+                    {isExpanded ? 'Collapse' : 'View/Edit Prompt'}
+                  </button>
+                </div>
+
+                {isExpanded && (
+                  <div className="mt-4">
+                    <div className="mb-2 flex items-center justify-between">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Prompt Content
+                      </label>
+                      <span className="text-xs text-gray-500">
+                        {isEditing
+                          ? editingPrompt?.value.length || 0
+                          : (criterion.ai_prompt?.length || 0)} characters
+                      </span>
+                    </div>
+                    {isEditing ? (
+                      <>
+                        <textarea
+                          value={editingPrompt?.value || ''}
+                          onChange={(e) => editingPrompt && setEditingPrompt({ ...editingPrompt, value: e.target.value })}
+                          rows={15}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                        <div className="mt-3 flex items-center justify-between">
+                          <button
+                            onClick={() => handleTestPrompt(promptKey)}
+                            disabled={testingPrompt}
+                            className="px-4 py-2 text-sm font-medium text-purple-700 bg-white border border-purple-300 rounded-md hover:bg-purple-50 disabled:opacity-50"
+                          >
+                            {testingPrompt ? 'Testing...' : 'Test Prompt'}
+                          </button>
+                          <div className="flex items-center space-x-3">
+                            <button
+                              onClick={handleCancel}
+                              disabled={isSaving}
+                              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleSaveCriterionPrompt(criterion)}
+                              disabled={isSaving}
+                              className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              {isSaving ? 'Saving...' : 'Save Changes'}
+                            </button>
+                          </div>
+                        </div>
+                        {/* Test Results */}
+                        {testResult && (
+                          <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                            <h5 className="text-xs font-medium text-gray-700 mb-2">Test Result</h5>
+                            <pre className="text-xs font-mono overflow-x-auto whitespace-pre-wrap">
+                              {JSON.stringify(testResult, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div className="mb-2 flex items-center">
+                          <label className="flex items-center text-sm text-gray-600 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={prettyPrint}
+                              onChange={(e) => setPrettyPrint(e.target.checked)}
+                              className="mr-2 h-4 w-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                            />
+                            Pretty-print
+                          </label>
+                        </div>
+                        <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
+                          {criterion.ai_prompt ? formatJSON(criterion.ai_prompt, prettyPrint) : 'No prompt configured'}
+                        </div>
+                        <div className="mt-3 flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <button
+                              onClick={() => handleResetToDefault(criterion.id, 'criterion')}
+                              disabled={isSaving}
+                              className="px-4 py-2 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50"
+                            >
+                              Reset to Default
+                            </button>
+                            <button
+                              onClick={() => handleSaveAsDefault(criterion.id, 'criterion')}
+                              disabled={isSaving}
+                              className="px-4 py-2 text-sm font-medium text-green-700 bg-white border border-green-300 rounded-md hover:bg-green-50 disabled:opacity-50"
+                            >
+                              Save as Default
+                            </button>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <button
+                              onClick={() => handleEdit(promptKey, criterion.ai_prompt || '')}
+                              className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700"
+                            >
+                              Edit Prompt
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
 
       {/* Article Prompts */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-gray-700">Article Prompts</h4>
+      <div className="bg-white border border-gray-200 rounded-lg">
+        <div className="p-4 border-b border-gray-200">
+          <h4 className="text-sm font-medium text-gray-900">Article Prompts</h4>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Configure prompts for generating article titles and body content.
+          </p>
+        </div>
 
-        <div className="space-y-2">
+        <div className="divide-y divide-gray-200">
           {/* Title Prompt */}
-          <div className="flex items-center justify-between p-3 border rounded-lg">
-            <div>
-              <p className="text-sm font-medium text-gray-900">Article Title Prompt</p>
-              <p className="text-xs text-gray-500">
-                {titlePrompt ? `Model: ${titlePrompt.ai_model}` : 'Not configured'}
-              </p>
-            </div>
-            <button
-              onClick={() => titlePrompt && setEditingPrompt(titlePrompt)}
-              disabled={!titlePrompt}
-              className="px-3 py-1 text-xs text-emerald-600 hover:bg-emerald-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {titlePrompt ? 'Edit' : 'N/A'}
-            </button>
-          </div>
+          {titlePrompt && (
+            <ArticlePromptCard
+              prompt={titlePrompt}
+              label="Article Title Prompt"
+              description="Generates headlines for articles based on the original content"
+              isExpanded={expandedPrompt === `prompt_${titlePrompt.id}`}
+              isEditing={editingPrompt?.key === `prompt_${titlePrompt.id}`}
+              editingValue={editingPrompt?.key === `prompt_${titlePrompt.id}` ? editingPrompt.value : null}
+              isSaving={saving === titlePrompt.id}
+              prettyPrint={prettyPrint}
+              onToggleExpand={() => setExpandedPrompt(expandedPrompt === `prompt_${titlePrompt.id}` ? null : `prompt_${titlePrompt.id}`)}
+              onEdit={() => handleEdit(`prompt_${titlePrompt.id}`, titlePrompt.ai_prompt || '')}
+              onEditChange={(value) => setEditingPrompt({ key: `prompt_${titlePrompt.id}`, value })}
+              onCancel={handleCancel}
+              onSave={() => handleSaveArticlePrompt(titlePrompt)}
+              onTestPrompt={() => handleTestPrompt(`prompt_${titlePrompt.id}`)}
+              onResetToDefault={() => handleResetToDefault(titlePrompt.id, 'prompt')}
+              onSaveAsDefault={() => handleSaveAsDefault(titlePrompt.id, 'prompt')}
+              testingPrompt={testingPrompt}
+              testResult={testResult}
+              setPrettyPrint={setPrettyPrint}
+            />
+          )}
 
           {/* Body Prompt */}
-          <div className="flex items-center justify-between p-3 border rounded-lg">
-            <div>
-              <p className="text-sm font-medium text-gray-900">Article Body Prompt</p>
-              <p className="text-xs text-gray-500">
-                {bodyPrompt ? `Model: ${bodyPrompt.ai_model}` : 'Not configured'}
-              </p>
+          {bodyPrompt && (
+            <ArticlePromptCard
+              prompt={bodyPrompt}
+              label="Article Body Prompt"
+              description="Generates the main content/summary for articles"
+              isExpanded={expandedPrompt === `prompt_${bodyPrompt.id}`}
+              isEditing={editingPrompt?.key === `prompt_${bodyPrompt.id}`}
+              editingValue={editingPrompt?.key === `prompt_${bodyPrompt.id}` ? editingPrompt.value : null}
+              isSaving={saving === bodyPrompt.id}
+              prettyPrint={prettyPrint}
+              onToggleExpand={() => setExpandedPrompt(expandedPrompt === `prompt_${bodyPrompt.id}` ? null : `prompt_${bodyPrompt.id}`)}
+              onEdit={() => handleEdit(`prompt_${bodyPrompt.id}`, bodyPrompt.ai_prompt || '')}
+              onEditChange={(value) => setEditingPrompt({ key: `prompt_${bodyPrompt.id}`, value })}
+              onCancel={handleCancel}
+              onSave={() => handleSaveArticlePrompt(bodyPrompt)}
+              onTestPrompt={() => handleTestPrompt(`prompt_${bodyPrompt.id}`)}
+              onResetToDefault={() => handleResetToDefault(bodyPrompt.id, 'prompt')}
+              onSaveAsDefault={() => handleSaveAsDefault(bodyPrompt.id, 'prompt')}
+              testingPrompt={testingPrompt}
+              testResult={testResult}
+              setPrettyPrint={setPrettyPrint}
+            />
+          )}
+
+          {!titlePrompt && !bodyPrompt && (
+            <div className="p-4 text-center text-sm text-gray-500">
+              No article prompts configured. Prompts will be migrated from Publication Settings.
             </div>
-            <button
-              onClick={() => bodyPrompt && setEditingPrompt(bodyPrompt)}
-              disabled={!bodyPrompt}
-              className="px-3 py-1 text-xs text-emerald-600 hover:bg-emerald-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {bodyPrompt ? 'Edit' : 'N/A'}
-            </button>
-          </div>
+          )}
         </div>
       </div>
 
       {/* AI Image Prompt */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-gray-700">AI Image Generation</h4>
-        <div className="flex items-center justify-between p-3 border rounded-lg">
-          <div>
-            <p className="text-sm font-medium text-gray-900">AI Image Prompt</p>
-            <p className="text-xs text-gray-500">
-              {localAiImagePrompt ? 'Configured - AI will generate images for articles' : 'Not configured (optional)'}
-            </p>
+      <div className="bg-white border border-gray-200 rounded-lg">
+        <div className="p-4 border-b border-gray-200">
+          <h4 className="text-sm font-medium text-gray-900">AI Image Generation</h4>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Configure prompt for generating AI images for articles in this section.
+          </p>
+        </div>
+
+        <div className="p-4">
+          <div className="flex items-start justify-between mb-2">
+            <div>
+              <p className="text-sm font-medium text-gray-900">AI Image Prompt</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {localAiImagePrompt ? 'Configured - AI will generate images for articles' : 'Not configured (optional)'}
+              </p>
+            </div>
+            <button
+              onClick={() => setEditingAiImagePrompt(true)}
+              className="text-emerald-600 hover:text-emerald-800 text-sm font-medium"
+            >
+              {localAiImagePrompt ? 'View/Edit Prompt' : 'Configure'}
+            </button>
           </div>
-          <button
-            onClick={() => setEditingAiImagePrompt(true)}
-            className="px-3 py-1 text-xs text-emerald-600 hover:bg-emerald-50 rounded"
-          >
-            {localAiImagePrompt ? 'Edit' : 'Configure'}
-          </button>
+
+          {editingAiImagePrompt && (
+            <AIImagePromptModal
+              prompt={localAiImagePrompt}
+              onSave={async (newPrompt) => {
+                setLocalAiImagePrompt(newPrompt)
+                await onAiImagePromptChange(newPrompt || null)
+                setEditingAiImagePrompt(false)
+              }}
+              onClose={() => setEditingAiImagePrompt(false)}
+              saving={saving === 'ai_image'}
+            />
+          )}
         </div>
       </div>
 
@@ -311,235 +766,179 @@ export default function ArticleModulePromptsTab({
           </div>
         </div>
       </div>
-
-      {/* Criterion Edit Modal */}
-      {editingCriterion && (
-        <CriterionEditModal
-          criterion={editingCriterion}
-          onSave={handleSaveCriterion}
-          onClose={() => setEditingCriterion(null)}
-          saving={saving}
-        />
-      )}
-
-      {/* Prompt Edit Modal */}
-      {editingPrompt && (
-        <PromptEditModal
-          prompt={editingPrompt}
-          onSave={handleSavePrompt}
-          onClose={() => setEditingPrompt(null)}
-          saving={saving}
-        />
-      )}
-
-      {/* AI Image Prompt Modal */}
-      {editingAiImagePrompt && (
-        <AIImagePromptModal
-          prompt={localAiImagePrompt}
-          onSave={async (newPrompt) => {
-            setLocalAiImagePrompt(newPrompt)
-            await onAiImagePromptChange(newPrompt || null)
-            setEditingAiImagePrompt(false)
-          }}
-          onClose={() => setEditingAiImagePrompt(false)}
-          saving={saving}
-        />
-      )}
     </div>
   )
 }
 
-// Criterion Edit Modal Component
-function CriterionEditModal({
-  criterion,
-  onSave,
-  onClose,
-  saving
-}: {
-  criterion: ArticleModuleCriteria
-  onSave: (criterion: ArticleModuleCriteria) => Promise<void>
-  onClose: () => void
-  saving: boolean
-}) {
-  const [localCriterion, setLocalCriterion] = useState(criterion)
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="text-lg font-semibold">Edit Criterion</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="p-4 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-            <input
-              type="text"
-              value={localCriterion.name}
-              onChange={(e) => setLocalCriterion(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Weight Multiplier
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                type="number"
-                min={0}
-                max={10}
-                step={0.1}
-                value={localCriterion.weight || 0}
-                onChange={(e) => setLocalCriterion(prev => ({ ...prev, weight: parseFloat(e.target.value) || 0 }))}
-                className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-              <span className="text-sm text-gray-500">
-                Max score contribution: {((localCriterion.weight || 0) * 10).toFixed(1)} points
-              </span>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Higher weight = more influence on final score. Typical range: 0.5 - 3.0
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">AI Prompt (optional)</label>
-            <textarea
-              value={localCriterion.ai_prompt || ''}
-              onChange={(e) => setLocalCriterion(prev => ({ ...prev, ai_prompt: e.target.value || null }))}
-              rows={4}
-              placeholder="Custom prompt for scoring this criterion..."
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="criterion-active"
-              checked={localCriterion.is_active}
-              onChange={(e) => setLocalCriterion(prev => ({ ...prev, is_active: e.target.checked }))}
-              className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-            />
-            <label htmlFor="criterion-active" className="text-sm text-gray-700">Active</label>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 p-4 border-t">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => onSave(localCriterion)}
-            disabled={saving}
-            className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Prompt Edit Modal Component
-function PromptEditModal({
+// Article Prompt Card Component (reusable for title/body prompts)
+function ArticlePromptCard({
   prompt,
+  label,
+  description,
+  isExpanded,
+  isEditing,
+  editingValue,
+  isSaving,
+  prettyPrint,
+  onToggleExpand,
+  onEdit,
+  onEditChange,
+  onCancel,
   onSave,
-  onClose,
-  saving
+  onTestPrompt,
+  onResetToDefault,
+  onSaveAsDefault,
+  testingPrompt,
+  testResult,
+  setPrettyPrint
 }: {
   prompt: ArticleModulePrompt
-  onSave: (prompt: ArticleModulePrompt) => Promise<void>
-  onClose: () => void
-  saving: boolean
+  label: string
+  description: string
+  isExpanded: boolean
+  isEditing: boolean
+  editingValue: string | null
+  isSaving: boolean
+  prettyPrint: boolean
+  onToggleExpand: () => void
+  onEdit: () => void
+  onEditChange: (value: string) => void
+  onCancel: () => void
+  onSave: () => void
+  onTestPrompt: () => void
+  onResetToDefault: () => void
+  onSaveAsDefault: () => void
+  testingPrompt: boolean
+  testResult: any
+  setPrettyPrint: (value: boolean) => void
 }) {
-  const [localPrompt, setLocalPrompt] = useState(prompt)
-  const promptTypeLabels: Record<string, string> = {
-    article_title: 'Article Title Prompt',
-    article_body: 'Article Body Prompt'
-  }
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="text-lg font-semibold">
-            {promptTypeLabels[prompt.prompt_type] || prompt.prompt_type}
-          </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="p-4 space-y-4 overflow-y-auto flex-1">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">AI Provider</label>
-              <select
-                value={localPrompt.ai_provider || 'openai'}
-                onChange={(e) => setLocalPrompt(prev => ({ ...prev, ai_provider: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Model</label>
-              <input
-                type="text"
-                value={localPrompt.ai_model || ''}
-                onChange={(e) => setLocalPrompt(prev => ({ ...prev, ai_model: e.target.value }))}
-                placeholder="gpt-4o"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
+    <div className="p-4">
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex-1">
+          <div className="flex items-center space-x-2">
+            <h4 className="text-sm font-medium text-gray-900">{label}</h4>
+            {prompt.ai_model && (
+              <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                prompt.ai_provider === 'anthropic' || prompt.ai_model?.toLowerCase().includes('claude')
+                  ? 'bg-purple-100 text-purple-800'
+                  : 'bg-blue-100 text-blue-800'
+              }`}>
+                {prompt.ai_model}
+              </span>
+            )}
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Prompt (JSON)</label>
-            <textarea
-              value={localPrompt.ai_prompt || ''}
-              onChange={(e) => setLocalPrompt(prev => ({ ...prev, ai_prompt: e.target.value }))}
-              rows={15}
-              className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              JSON format with messages array. Use placeholders: {'{{title}}'}, {'{{description}}'}, {'{{content}}'}, {'{{headline}}'}
-            </p>
-          </div>
+          <p className="text-xs text-gray-500 mt-0.5">{description}</p>
         </div>
-
-        <div className="flex justify-end gap-2 p-4 border-t">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => onSave(localPrompt)}
-            disabled={saving}
-            className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-        </div>
+        <button
+          onClick={onToggleExpand}
+          className="ml-4 text-emerald-600 hover:text-emerald-800 text-sm font-medium"
+        >
+          {isExpanded ? 'Collapse' : 'View/Edit Prompt'}
+        </button>
       </div>
+
+      {isExpanded && (
+        <div className="mt-4">
+          <div className="mb-2 flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-700">
+              Prompt Content
+            </label>
+            <span className="text-xs text-gray-500">
+              {isEditing
+                ? editingValue?.length || 0
+                : (prompt.ai_prompt?.length || 0)} characters
+            </span>
+          </div>
+          {isEditing ? (
+            <>
+              <textarea
+                value={editingValue || ''}
+                onChange={(e) => onEditChange(e.target.value)}
+                rows={15}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <div className="mt-3 flex items-center justify-between">
+                <button
+                  onClick={onTestPrompt}
+                  disabled={testingPrompt}
+                  className="px-4 py-2 text-sm font-medium text-purple-700 bg-white border border-purple-300 rounded-md hover:bg-purple-50 disabled:opacity-50"
+                >
+                  {testingPrompt ? 'Testing...' : 'Test Prompt'}
+                </button>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={onCancel}
+                    disabled={isSaving}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={onSave}
+                    disabled={isSaving}
+                    className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {isSaving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </div>
+              {/* Test Results */}
+              {testResult && (
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                  <h5 className="text-xs font-medium text-gray-700 mb-2">Test Result</h5>
+                  <pre className="text-xs font-mono overflow-x-auto whitespace-pre-wrap">
+                    {JSON.stringify(testResult, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="mb-2 flex items-center">
+                <label className="flex items-center text-sm text-gray-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={prettyPrint}
+                    onChange={(e) => setPrettyPrint(e.target.checked)}
+                    className="mr-2 h-4 w-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                  />
+                  Pretty-print
+                </label>
+              </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
+                {prompt.ai_prompt ? formatJSON(prompt.ai_prompt, prettyPrint) : 'No prompt configured'}
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={onResetToDefault}
+                    disabled={isSaving}
+                    className="px-4 py-2 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50"
+                  >
+                    Reset to Default
+                  </button>
+                  <button
+                    onClick={onSaveAsDefault}
+                    disabled={isSaving}
+                    className="px-4 py-2 text-sm font-medium text-green-700 bg-white border border-green-300 rounded-md hover:bg-green-50 disabled:opacity-50"
+                  >
+                    Save as Default
+                  </button>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={onEdit}
+                    className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700"
+                  >
+                    Edit Prompt
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -567,7 +966,6 @@ function AIImagePromptModal({
     setTesting(true)
     setTestResult(null)
     try {
-      // For now just show a success message - actual testing would require an API endpoint
       await new Promise(resolve => setTimeout(resolve, 1000))
       setTestResult('Prompt syntax looks valid. Full testing requires generating an image.')
     } catch (err: any) {
@@ -577,7 +975,6 @@ function AIImagePromptModal({
     }
   }
 
-  // Build the full JSON prompt config
   const getFullPromptConfig = () => {
     return JSON.stringify({
       provider,
@@ -657,7 +1054,6 @@ function AIImagePromptModal({
             </pre>
           </div>
 
-          {/* Test Section */}
           <div className="border-t pt-4">
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-gray-700">Test Prompt</label>
