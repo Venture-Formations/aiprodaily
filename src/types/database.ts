@@ -1416,3 +1416,116 @@ export interface AdModuleWithAds extends AdModule {
   advertisements: Advertisement[]  // Ads assigned to this module
   ad_count?: number
 }
+
+// ===========================================
+// Article Module System Types
+// ===========================================
+
+export type ArticleBlockType = 'source_image' | 'ai_image' | 'title' | 'body'
+export type ArticleSelectionMode = 'top_score' | 'manual'
+
+export interface ArticleModule {
+  id: string
+  publication_id: string
+  name: string
+  display_order: number
+  is_active: boolean
+  selection_mode: ArticleSelectionMode
+  block_order: ArticleBlockType[]
+  config: Record<string, unknown>
+  articles_count: number
+  lookback_hours: number
+  ai_image_prompt: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ArticleModuleCriteria {
+  id: string
+  article_module_id: string
+  criteria_number: number
+  name: string
+  weight: number
+  ai_prompt: string | null
+  ai_model: string
+  ai_provider: string
+  temperature: number
+  max_tokens: number
+  expected_output: string | null
+  is_active: boolean
+  display_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ArticleModulePrompt {
+  id: string
+  article_module_id: string
+  prompt_type: 'article_title' | 'article_body'
+  ai_prompt: string
+  ai_model: string
+  ai_provider: string
+  temperature: number
+  max_tokens: number
+  expected_output: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ModuleArticle {
+  id: string
+  post_id: string | null
+  issue_id: string
+  article_module_id: string
+  headline: string | null
+  content: string | null
+  rank: number | null
+  is_active: boolean
+  skipped: boolean
+  fact_check_score: number | null
+  fact_check_details: string | null
+  word_count: number | null
+  review_position: number | null
+  final_position: number | null
+  breaking_news_score: number | null
+  breaking_news_category: string | null
+  ai_summary: string | null
+  ai_title: string | null
+  ai_image_url: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface IssueArticleModule {
+  id: string
+  issue_id: string
+  article_module_id: string
+  article_ids: string[]
+  selection_mode: ArticleSelectionMode | null
+  selected_at: string
+  used_at: string | null
+}
+
+// Extended types with joins
+export interface ArticleModuleWithCriteria extends ArticleModule {
+  criteria: ArticleModuleCriteria[]
+}
+
+export interface ArticleModuleWithPrompts extends ArticleModule {
+  prompts: ArticleModulePrompt[]
+}
+
+export interface ArticleModuleWithAll extends ArticleModule {
+  criteria: ArticleModuleCriteria[]
+  prompts: ArticleModulePrompt[]
+  feeds?: RssFeed[]
+}
+
+export interface ModuleArticleWithPost extends ModuleArticle {
+  rss_post?: RssPost
+}
+
+export interface IssueArticleModuleWithDetails extends IssueArticleModule {
+  article_module: ArticleModule
+  articles?: ModuleArticleWithPost[]
+}

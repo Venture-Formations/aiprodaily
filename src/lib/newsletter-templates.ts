@@ -7,7 +7,7 @@ import { AdScheduler } from './ad-scheduler'
 import { normalizeEmailHtml } from './html-normalizer'
 import { getBusinessSettings as getPublicationBusinessSettings } from './publication-settings'
 import { AdModuleRenderer } from './ad-modules'
-import type { AdBlockType } from '@/types/database'
+import type { AdBlockType, ArticleBlockType } from '@/types/database'
 
 // ==================== UTILITY FUNCTIONS ====================
 
@@ -524,6 +524,126 @@ export async function generateSecondaryArticlesSection(issue: any, sectionName: 
         <tr>
           <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
             <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">${sectionName}</h2>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0 10px 10px 10px;">
+            ${articlesHtml}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+<br>`
+}
+
+// ==================== ARTICLE MODULE SECTION ====================
+
+export async function generateArticleModuleSection(
+  issue: any,
+  moduleId: string
+): Promise<string> {
+  // Fetch the article module
+  const { data: module } = await supabaseAdmin
+    .from('article_modules')
+    .select('*')
+    .eq('id', moduleId)
+    .single()
+
+  if (!module) {
+    console.log(`[Article Module] Module ${moduleId} not found`)
+    return ''
+  }
+
+  // Fetch active articles for this module and issue
+  const { data: articles } = await supabaseAdmin
+    .from('module_articles')
+    .select(`
+      id,
+      headline,
+      content,
+      is_active,
+      rank,
+      ai_image_url,
+      rss_post:rss_posts(
+        source_url,
+        image_url
+      )
+    `)
+    .eq('issue_id', issue.id)
+    .eq('article_module_id', moduleId)
+    .eq('is_active', true)
+    .order('rank', { ascending: true })
+
+  if (!articles || articles.length === 0) {
+    console.log(`[Article Module] No active articles for module ${module.name}`)
+    return ''
+  }
+
+  // Fetch colors and fonts from business settings
+  const { primaryColor, secondaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue.publication_id)
+
+  // Get block order from module settings
+  const blockOrder: ArticleBlockType[] = module.block_order || ['title', 'body']
+
+  const articlesHtml = articles.map((article: any) => {
+    const headline = article.headline || 'No headline'
+    const content = article.content || ''
+    const rssPost = Array.isArray(article.rss_post) ? article.rss_post[0] : article.rss_post
+    const sourceUrl = rssPost?.source_url || '#'
+    const sourceImage = rssPost?.image_url || null
+    const aiImage = article.ai_image_url || null
+    const emoji = getArticleEmoji(headline, content)
+
+    // Wrap URL with tracking
+    const trackedUrl = sourceUrl !== '#' ? wrapTrackingUrl(sourceUrl, module.name, issue.date, issue.mailerlite_issue_id, issue.id) : '#'
+
+    // Convert newlines to <br> for proper HTML display
+    const formattedContent = content.replace(/\n/g, '<br>')
+
+    // Build blocks based on block_order
+    const blocks: string[] = []
+    for (const blockType of blockOrder) {
+      if (blockType === 'source_image' && sourceImage) {
+        blocks.push(`
+          <div style="margin-bottom: 12px;">
+            <img src="${sourceImage}" alt="${headline}" style="max-width: 100%; height: auto; border-radius: 8px;" />
+          </div>
+        `)
+      } else if (blockType === 'ai_image' && aiImage) {
+        blocks.push(`
+          <div style="margin-bottom: 12px;">
+            <img src="${aiImage}" alt="${headline}" style="max-width: 100%; height: auto; border-radius: 8px;" />
+          </div>
+        `)
+      } else if (blockType === 'title') {
+        blocks.push(`
+          <div style='font-size: 18px; font-weight: bold; margin-bottom: 8px; font-family: ${bodyFont};'>
+            ${emoji} <a href='${trackedUrl}' style='color: ${secondaryColor}; text-decoration: underline;'>${headline}</a>
+          </div>
+        `)
+      } else if (blockType === 'body') {
+        blocks.push(`
+          <div style='font-size: 16px; line-height: 24px; color: #333; font-family: ${bodyFont};'>${formattedContent}</div>
+        `)
+      }
+    }
+
+    return `
+      <div style='padding: 16px 0; border-bottom: 1px solid #e0e0e0;'>
+        ${blocks.join('')}
+      </div>`
+  }).join('')
+
+  return `
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
+  <tr>
+    <td style="padding:0 10px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
+        <tr>
+          <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">${module.name}</h2>
           </td>
         </tr>
         <tr>
@@ -1360,16 +1480,28 @@ export async function generatePromptModulesSection(
   moduleId: string
 ): Promise<string> {
   try {
-    const { PromptModuleSelector, PromptModuleRenderer } = await import('./prompt-modules')
+    const { PromptModuleRenderer } = await import('./prompt-modules')
 
-    // Get all prompt selections for this issue
-    const selections = await PromptModuleSelector.getIssuePromptSelections(issue.id)
+    // Directly query the specific selection for this module
+    const { data: selection, error } = await supabaseAdmin
+      .from('issue_prompt_modules')
+      .select(`
+        *,
+        prompt_module:prompt_modules(*),
+        prompt:prompt_ideas(*)
+      `)
+      .eq('issue_id', issue.id)
+      .eq('prompt_module_id', moduleId)
+      .single()
 
-    // Find the selection for this specific module
-    const selection = selections.find(s => s.prompt_module_id === moduleId)
+    if (error) {
+      console.log(`[PromptModules] No selection found for module ${moduleId} in issue ${issue.id}: ${error.message}`)
+      return ''
+    }
 
     if (!selection || !selection.prompt || !selection.prompt_module) {
-      console.log(`[PromptModules] No selection/prompt found for module ${moduleId} in issue ${issue.id}`)
+      console.log(`[PromptModules] Selection exists but prompt/module is null for module ${moduleId} in issue ${issue.id}`)
+      console.log(`[PromptModules] Selection details: prompt_id=${selection?.prompt_id}, has_prompt=${!!selection?.prompt}, has_module=${!!selection?.prompt_module}`)
       return ''
     }
 
@@ -1626,10 +1758,19 @@ export async function generateFullNewsletterHtml(
       .eq('is_active', true)
       .order('display_order', { ascending: true })
 
+    // Fetch article modules for this publication
+    const { data: articleModules } = await supabaseAdmin
+      .from('article_modules')
+      .select('*')
+      .eq('publication_id', issue.publication_id)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+
     console.log('Active newsletter sections:', sections?.map(s => `${s.name} (order: ${s.display_order})`).join(', '))
     console.log('Active ad modules:', adModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
     console.log('Active poll modules:', pollModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
     console.log('Active prompt modules:', promptModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
+    console.log('Active article modules:', articleModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
 
     // Format date using local date parsing
     const formatDate = (dateString: string) => {
@@ -1684,18 +1825,20 @@ export async function generateFullNewsletterHtml(
       PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b'
     }
 
-    // Merge newsletter sections, ad modules, poll modules, and prompt modules into a single sorted list
+    // Merge newsletter sections, ad modules, poll modules, prompt modules, and article modules into a single sorted list
     type SectionItem =
       | { type: 'section'; data: any }
       | { type: 'ad_module'; data: any }
       | { type: 'poll_module'; data: any }
       | { type: 'prompt_module'; data: any }
+      | { type: 'article_module'; data: any }
 
     const allItems: SectionItem[] = [
       ...(sections || []).map(s => ({ type: 'section' as const, data: s })),
       ...(adModules || []).map(m => ({ type: 'ad_module' as const, data: m })),
       ...(pollModules || []).map(m => ({ type: 'poll_module' as const, data: m })),
-      ...(promptModules || []).map(m => ({ type: 'prompt_module' as const, data: m }))
+      ...(promptModules || []).map(m => ({ type: 'prompt_module' as const, data: m })),
+      ...(articleModules || []).map(m => ({ type: 'article_module' as const, data: m }))
     ].sort((a, b) => (a.data.display_order || 999) - (b.data.display_order || 999))
 
     console.log('Combined section order:', allItems.map(item =>
@@ -1722,6 +1865,12 @@ export async function generateFullNewsletterHtml(
         const promptModuleHtml = await generatePromptModulesSection(issue, item.data.id)
         if (promptModuleHtml) {
           sectionsHtml += promptModuleHtml
+        }
+      } else if (item.type === 'article_module') {
+        // Generate single article module section
+        const articleModuleHtml = await generateArticleModuleSection(issue, item.data.id)
+        if (articleModuleHtml) {
+          sectionsHtml += articleModuleHtml
         }
       } else {
         const section = item.data

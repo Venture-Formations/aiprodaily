@@ -3662,4 +3662,454 @@ export class RSSProcessor {
       // Don't throw - article extraction is optional, RSS processing should continue
     }
   }
+
+  // ============================================================================
+  // MODULE-BASED ARTICLE GENERATION METHODS
+  // These methods work with the new article_modules system
+  // ============================================================================
+
+  /**
+   * Assign top posts to a module based on its feeds
+   * Gets highest-scored posts from the module's assigned feeds
+   */
+  async assignPostsToModule(issueId: string, moduleId: string): Promise<{ assigned: number }> {
+    const { ArticleModuleSelector } = await import('@/lib/article-modules')
+
+    const module = await ArticleModuleSelector.getModule(moduleId)
+    if (!module) {
+      console.log(`[Module] Module ${moduleId} not found`)
+      return { assigned: 0 }
+    }
+
+    const feedIds = await ArticleModuleSelector.getModuleFeeds(moduleId)
+    if (feedIds.length === 0) {
+      console.log(`[Module] No feeds assigned to module ${module.name}`)
+      return { assigned: 0 }
+    }
+
+    // Get lookback window from module settings
+    const lookbackHours = module.lookback_hours || 72
+    const lookbackDate = new Date()
+    lookbackDate.setHours(lookbackDate.getHours() - lookbackHours)
+    const lookbackTimestamp = lookbackDate.toISOString()
+
+    // Get double the needed articles (for backup options)
+    const articlesNeeded = module.articles_count || 3
+    const postsToAssign = articlesNeeded * 4
+
+    // Get top scored posts from module's feeds that aren't assigned yet
+    const { data: topPosts } = await supabaseAdmin
+      .from('rss_posts')
+      .select('id, post_ratings(total_score)')
+      .in('feed_id', feedIds)
+      .is('issue_id', null)
+      .gte('processed_at', lookbackTimestamp)
+      .not('post_ratings', 'is', null)
+
+    if (!topPosts || topPosts.length === 0) {
+      console.log(`[Module] No available posts for module ${module.name}`)
+      return { assigned: 0 }
+    }
+
+    // Sort by score and take top N
+    const sortedPosts = topPosts
+      .sort((a: any, b: any) => {
+        const scoreA = a.post_ratings?.[0]?.total_score || 0
+        const scoreB = b.post_ratings?.[0]?.total_score || 0
+        return scoreB - scoreA
+      })
+      .slice(0, postsToAssign)
+
+    // Assign posts to issue and module
+    if (sortedPosts.length > 0) {
+      await supabaseAdmin
+        .from('rss_posts')
+        .update({
+          issue_id: issueId,
+          article_module_id: moduleId
+        })
+        .in('id', sortedPosts.map(p => p.id))
+    }
+
+    console.log(`[Module] Assigned ${sortedPosts.length} posts to module ${module.name}`)
+    return { assigned: sortedPosts.length }
+  }
+
+  /**
+   * Generate titles for articles in a module
+   * Creates module_articles records with headlines
+   */
+  async generateTitlesForModule(issueId: string, moduleId: string): Promise<void> {
+    const { ArticleModuleSelector } = await import('@/lib/article-modules')
+    const newsletterId = await this.getNewsletterIdFromissue(issueId)
+
+    const module = await ArticleModuleSelector.getModule(moduleId)
+    if (!module) {
+      console.log(`[Module Titles] Module ${moduleId} not found`)
+      return
+    }
+
+    const feedIds = await ArticleModuleSelector.getModuleFeeds(moduleId)
+    if (feedIds.length === 0) {
+      console.log(`[Module Titles] No feeds for module ${module.name}`)
+      return
+    }
+
+    // Get posts assigned to this module for this issue
+    const { data: posts } = await supabaseAdmin
+      .from('rss_posts')
+      .select('*, post_ratings(*)')
+      .eq('issue_id', issueId)
+      .eq('article_module_id', moduleId)
+      .in('feed_id', feedIds)
+
+    if (!posts || posts.length === 0) {
+      console.log(`[Module Titles] No posts assigned to module ${module.name}`)
+      return
+    }
+
+    // Get duplicate post IDs to exclude
+    const { data: duplicateGroups } = await supabaseAdmin
+      .from('duplicate_groups')
+      .select('id')
+      .eq('issue_id', issueId)
+
+    const groupIds = duplicateGroups?.map(g => g.id) || []
+    let duplicatePostIds = new Set<string>()
+
+    if (groupIds.length > 0) {
+      const { data: duplicatePosts } = await supabaseAdmin
+        .from('duplicate_posts')
+        .select('post_id')
+        .in('group_id', groupIds)
+      duplicatePostIds = new Set(duplicatePosts?.map(d => d.post_id) || [])
+    }
+
+    // Get prompts for this module
+    const { prompts } = await ArticleModuleSelector.getModulePrompts(moduleId)
+    const titlePrompt = prompts.find(p => p.prompt_type === 'article_title')
+
+    // Filter and sort posts
+    const limit = module.articles_count ? module.articles_count * 2 : 6
+    const postsWithRatings = posts
+      .filter(post =>
+        post.post_ratings?.[0] &&
+        !duplicatePostIds.has(post.id) &&
+        post.full_article_text
+      )
+      .sort((a, b) => {
+        const scoreA = a.post_ratings?.[0]?.total_score || 0
+        const scoreB = b.post_ratings?.[0]?.total_score || 0
+        return scoreB - scoreA
+      })
+      .slice(0, limit)
+
+    console.log(`[Module Titles] Generating ${postsWithRatings.length} titles for ${module.name}...`)
+
+    // Generate titles in batches
+    const BATCH_SIZE = 3
+    for (let i = 0; i < postsWithRatings.length; i += BATCH_SIZE) {
+      const batch = postsWithRatings.slice(i, i + BATCH_SIZE)
+
+      await Promise.all(batch.map(async (post) => {
+        try {
+          // Check if article already exists
+          const { data: existing } = await supabaseAdmin
+            .from('module_articles')
+            .select('id')
+            .eq('post_id', post.id)
+            .eq('issue_id', issueId)
+            .eq('article_module_id', moduleId)
+            .maybeSingle()
+
+          if (existing) {
+            console.log(`[Module Titles] Article already exists for post ${post.id}`)
+            return
+          }
+
+          const fullText = post.full_article_text || post.content || post.description || ''
+          const postData = {
+            title: post.title,
+            description: post.description || '',
+            content: fullText,
+            source_url: post.source_url || ''
+          }
+
+          // Generate title using module-specific prompt or default
+          let titleResult
+          if (titlePrompt?.ai_prompt) {
+            // Use custom module prompt - interpolate variables into prompt
+            const customPrompt = titlePrompt.ai_prompt
+              .replace('{{title}}', postData.title)
+              .replace('{{description}}', postData.description)
+              .replace('{{content}}', postData.content.substring(0, 3000))
+              .replace('{{source_url}}', postData.source_url)
+            titleResult = await callOpenAI(
+              customPrompt,
+              titlePrompt.max_tokens || 200,
+              titlePrompt.temperature || 0.7
+            )
+          } else {
+            // Fall back to primary article title prompt
+            titleResult = await AI_CALL.primaryArticleTitle(postData, newsletterId, 200, 0.7)
+          }
+
+          const headline = typeof titleResult === 'string'
+            ? titleResult.trim()
+            : (titleResult.raw || titleResult.headline || '').trim()
+
+          if (!headline) {
+            console.error(`[Module Titles] Failed to generate title for post ${post.id}`)
+            return
+          }
+
+          // Create module_article record
+          const { error: insertError } = await supabaseAdmin
+            .from('module_articles')
+            .insert([{
+              post_id: post.id,
+              issue_id: issueId,
+              article_module_id: moduleId,
+              headline: headline,
+              content: '', // Placeholder - filled by body generation
+              rank: null,
+              is_active: false,
+              skipped: false,
+              fact_check_score: null,
+              fact_check_details: null,
+              word_count: 0
+            }])
+
+          if (insertError && insertError.code !== '23505') {
+            console.error(`[Module Titles] Insert failed for post ${post.id}:`, insertError.message)
+          }
+
+          console.log(`[Module Titles] Generated: "${headline.substring(0, 50)}..."`)
+
+        } catch (error) {
+          console.error(`[Module Titles] Failed for post ${post.id}:`, error instanceof Error ? error.message : 'Unknown')
+        }
+      }))
+
+      if (i + BATCH_SIZE < postsWithRatings.length) {
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      }
+    }
+
+    console.log(`[Module Titles] ✓ Generated titles for ${module.name}`)
+  }
+
+  /**
+   * Generate bodies for articles in a module
+   * Updates module_articles with content
+   */
+  async generateBodiesForModule(issueId: string, moduleId: string, offset: number = 0, limit: number = 3): Promise<void> {
+    const { ArticleModuleSelector } = await import('@/lib/article-modules')
+    const newsletterId = await this.getNewsletterIdFromissue(issueId)
+
+    const module = await ArticleModuleSelector.getModule(moduleId)
+    if (!module) {
+      console.log(`[Module Bodies] Module ${moduleId} not found`)
+      return
+    }
+
+    // Get prompts for this module
+    const { prompts } = await ArticleModuleSelector.getModulePrompts(moduleId)
+    const bodyPrompt = prompts.find(p => p.prompt_type === 'article_body')
+
+    // Get articles with titles but empty content
+    const { data: articles } = await supabaseAdmin
+      .from('module_articles')
+      .select('*, rss_posts(*)')
+      .eq('issue_id', issueId)
+      .eq('article_module_id', moduleId)
+      .eq('content', '')
+      .not('headline', 'is', null)
+      .order('post_id', { ascending: true })
+      .limit(limit)
+
+    if (!articles || articles.length === 0) {
+      console.log(`[Module Bodies] No articles awaiting body generation for ${module.name}`)
+      return
+    }
+
+    console.log(`[Module Bodies] Generating ${articles.length} bodies for ${module.name}...`)
+
+    const BATCH_SIZE = 2
+    for (let i = 0; i < articles.length; i += BATCH_SIZE) {
+      const batch = articles.slice(i, i + BATCH_SIZE)
+
+      await Promise.all(batch.map(async (article: any) => {
+        try {
+          const post = article.rss_posts
+          if (!post) {
+            console.error(`[Module Bodies] No RSS post for article ${article.id}`)
+            return
+          }
+
+          const fullText = post.full_article_text || post.content || post.description || ''
+          const postData = {
+            title: post.title,
+            description: post.description || '',
+            content: fullText,
+            source_url: post.source_url || ''
+          }
+
+          // Generate body using module-specific prompt or default
+          let bodyResult
+          if (bodyPrompt?.ai_prompt) {
+            // Use custom module prompt - interpolate variables into prompt
+            const customPrompt = bodyPrompt.ai_prompt
+              .replace('{{title}}', postData.title)
+              .replace('{{headline}}', article.headline)
+              .replace('{{description}}', postData.description)
+              .replace('{{content}}', postData.content.substring(0, 5000))
+              .replace('{{source_url}}', postData.source_url)
+            const rawResult = await callOpenAI(
+              customPrompt,
+              bodyPrompt.max_tokens || 500,
+              bodyPrompt.temperature || 0.7
+            )
+            // Parse result to get content and word_count
+            if (typeof rawResult === 'string') {
+              bodyResult = { content: rawResult.trim(), word_count: rawResult.split(/\s+/).length }
+            } else if (rawResult.content) {
+              bodyResult = rawResult
+            } else {
+              bodyResult = { content: rawResult.raw || '', word_count: (rawResult.raw || '').split(/\s+/).length }
+            }
+          } else {
+            bodyResult = await AI_CALL.primaryArticleBody(postData, newsletterId, article.headline, 500, 0.7)
+          }
+
+          if (!bodyResult.content || !bodyResult.word_count) {
+            console.error(`[Module Bodies] Invalid body response for article ${article.id}`)
+            return
+          }
+
+          await supabaseAdmin
+            .from('module_articles')
+            .update({
+              content: bodyResult.content,
+              word_count: bodyResult.word_count
+            })
+            .eq('id', article.id)
+
+          console.log(`[Module Bodies] Generated body for article ${article.id} (${bodyResult.word_count} words)`)
+
+        } catch (error) {
+          console.error(`[Module Bodies] Failed for article ${article.id}:`, error instanceof Error ? error.message : 'Unknown')
+        }
+      }))
+
+      if (i + BATCH_SIZE < articles.length) {
+        await new Promise(resolve => setTimeout(resolve, 3000))
+      }
+    }
+
+    console.log(`[Module Bodies] ✓ Generated bodies for ${module.name}`)
+  }
+
+  /**
+   * Fact-check articles for a module
+   */
+  async factCheckArticlesForModule(issueId: string, moduleId: string): Promise<void> {
+    const { ArticleModuleSelector } = await import('@/lib/article-modules')
+    const newsletterId = await this.getNewsletterIdFromissue(issueId)
+
+    const module = await ArticleModuleSelector.getModule(moduleId)
+    if (!module) {
+      console.log(`[Module Fact-Check] Module ${moduleId} not found`)
+      return
+    }
+
+    // Get articles with content but no fact-check
+    const { data: articles } = await supabaseAdmin
+      .from('module_articles')
+      .select('*, rss_posts(*)')
+      .eq('issue_id', issueId)
+      .eq('article_module_id', moduleId)
+      .neq('content', '')
+      .not('content', 'is', null)
+      .is('fact_check_score', null)
+
+    if (!articles || articles.length === 0) {
+      console.log(`[Module Fact-Check] No articles awaiting fact-check for ${module.name}`)
+      return
+    }
+
+    console.log(`[Module Fact-Check] Checking ${articles.length} articles for ${module.name}...`)
+
+    const BATCH_SIZE = 3
+    for (let i = 0; i < articles.length; i += BATCH_SIZE) {
+      const batch = articles.slice(i, i + BATCH_SIZE)
+
+      await Promise.all(batch.map(async (article: any) => {
+        try {
+          const post = article.rss_posts
+          if (!post) {
+            console.error(`[Module Fact-Check] No RSS post for article ${article.id}`)
+            return
+          }
+
+          const originalContent = post.content || post.description || ''
+          const factCheck = await this.factCheckContent(article.content, originalContent, newsletterId)
+
+          await supabaseAdmin
+            .from('module_articles')
+            .update({
+              fact_check_score: factCheck.score,
+              fact_check_details: factCheck.details
+            })
+            .eq('id', article.id)
+
+          console.log(`[Module Fact-Check] Article ${article.id}: Score ${factCheck.score}/10`)
+
+        } catch (error) {
+          console.error(`[Module Fact-Check] Failed for article ${article.id}:`, error instanceof Error ? error.message : 'Unknown')
+
+          await supabaseAdmin
+            .from('module_articles')
+            .update({
+              fact_check_score: 0,
+              fact_check_details: `Fact-check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+            })
+            .eq('id', article.id)
+        }
+      }))
+
+      if (i + BATCH_SIZE < articles.length) {
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      }
+    }
+
+    console.log(`[Module Fact-Check] ✓ Checked articles for ${module.name}`)
+  }
+
+  /**
+   * Select top articles for a module and mark them as active
+   */
+  async selectTopArticlesForModule(issueId: string, moduleId: string): Promise<{ selected: number }> {
+    const { ArticleModuleSelector } = await import('@/lib/article-modules')
+
+    const module = await ArticleModuleSelector.getModule(moduleId)
+    if (!module) {
+      console.log(`[Module Select] Module ${moduleId} not found`)
+      return { selected: 0 }
+    }
+
+    const limit = module.articles_count || 3
+    const result = await ArticleModuleSelector.activateTopArticles(issueId, moduleId, limit)
+
+    console.log(`[Module Select] Activated ${result.activated} articles for ${module.name}`)
+    return { selected: result.activated }
+  }
+
+  /**
+   * Get all active article modules for a publication
+   */
+  async getActiveArticleModules(publicationId: string): Promise<any[]> {
+    const { ArticleModuleSelector } = await import('@/lib/article-modules')
+    return ArticleModuleSelector.getActiveModules(publicationId)
+  }
 }

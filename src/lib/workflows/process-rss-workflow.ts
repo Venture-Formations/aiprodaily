@@ -2,23 +2,23 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { RSSProcessor } from '@/lib/rss-processor'
 import { ModuleAdSelector } from '@/lib/ad-modules'
 import { PollModuleSelector } from '@/lib/poll-modules'
+import { ArticleModuleSelector } from '@/lib/article-modules'
 
 /**
- * RSS Processing Workflow (REFACTORED)
+ * RSS Processing Workflow (DYNAMIC ARTICLE MODULES)
  * Each step gets its own 800-second timeout
  *
  * NEW STRUCTURE:
- * Step 1:  Setup (create issue, assign posts)
- * Step 2:  Deduplication (separate step with 180s timeout)
- * Step 3:  Generate 6 primary titles (fast)
- * Step 4:  Generate 3 primary bodies (batch 1)
- * Step 5:  Generate 3 primary bodies (batch 2)
- * Step 6:  Fact-check all 6 primary articles
- * Step 7:  Generate 6 secondary titles (fast)
- * Step 8:  Generate 3 secondary bodies (batch 1)
- * Step 9:  Generate 3 secondary bodies (batch 2)
- * Step 10: Fact-check all 6 secondary articles
- * Step 11: Finalize
+ * Step 1:  Setup (create issue, get article modules, assign posts)
+ * Step 2:  Deduplication (global, cross-module)
+ *
+ * For each active article module (sequentially):
+ *   Step N+0: Generate titles for module
+ *   Step N+1: Generate bodies batch 1 for module
+ *   Step N+2: Generate bodies batch 2 for module
+ *   Step N+3: Fact-check articles for module
+ *
+ * Step FINAL: Finalize (select top articles, generate welcome, ads, polls)
  */
 export async function processRSSWorkflow(input: {
   trigger: 'cron' | 'manual'
@@ -30,36 +30,35 @@ export async function processRSSWorkflow(input: {
 
   console.log(`[Workflow] Starting for newsletter: ${input.publication_id}`)
 
-  // STEP 1: Setup - Create issue, assign posts
-  issueId = await setupissue(input.publication_id)
+  // STEP 1: Setup - Create issue, get modules, assign posts
+  const setupResult = await setupIssue(input.publication_id)
+  issueId = setupResult.issueId
+  const moduleIds = setupResult.moduleIds
 
-  // STEP 2: Deduplication (separate step with longer timeout)
-  await deduplicateissue(issueId)
+  // STEP 2: Deduplication (global, cross-module)
+  await deduplicateIssue(issueId)
 
-  // PRIMARY SECTION
-  // STEP 3: Generate all 6 primary titles (fast, batched)
-  await generatePrimaryTitles(issueId)
+  // Process each article module sequentially
+  for (let i = 0; i < moduleIds.length; i++) {
+    const moduleId = moduleIds[i]
+    const moduleNum = i + 1
+    const totalModules = moduleIds.length
+    const stepOffset = 3 + (i * 4) // Steps 3, 7, 11, etc.
 
-  // STEP 4-5: Generate primary bodies in 2 batches (3 articles each)
-  await generatePrimaryBodiesBatch1(issueId)
-  await generatePrimaryBodiesBatch2(issueId)
+    // Generate titles for this module
+    await generateModuleTitles(issueId, moduleId, moduleNum, totalModules, stepOffset)
 
-  // STEP 6: Fact-check all primary articles
-  await factCheckPrimary(issueId)
+    // Generate bodies in 2 batches
+    await generateModuleBodiesBatch1(issueId, moduleId, moduleNum, totalModules, stepOffset + 1)
+    await generateModuleBodiesBatch2(issueId, moduleId, moduleNum, totalModules, stepOffset + 2)
 
-  // SECONDARY SECTION
-  // STEP 7: Generate all 6 secondary titles (fast, batched)
-  await generateSecondaryTitles(issueId)
+    // Fact-check articles for this module
+    await factCheckModule(issueId, moduleId, moduleNum, totalModules, stepOffset + 3)
+  }
 
-  // STEP 8-9: Generate secondary bodies in 2 batches (3 articles each)
-  await generateSecondaryBodiesBatch1(issueId)
-  await generateSecondaryBodiesBatch2(issueId)
-
-  // STEP 10: Fact-check all secondary articles
-  await factCheckSecondary(issueId)
-
-  // STEP 11: Finalize
-  await finalizeIssue(issueId)
+  // FINAL STEP: Finalize
+  const finalStepNum = 3 + (moduleIds.length * 4) + 1
+  await finalizeIssue(issueId, moduleIds, finalStepNum)
 
   console.log('=== WORKFLOW COMPLETE ===')
 
@@ -67,7 +66,7 @@ export async function processRSSWorkflow(input: {
 }
 
 // Step functions with retry logic
-async function setupissue(newsletterId: string) {
+async function setupIssue(newsletterId: string): Promise<{ issueId: string; moduleIds: string[] }> {
   "use step"
 
   let retryCount = 0
@@ -75,7 +74,7 @@ async function setupissue(newsletterId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 1/11] Setting up issue...')
+      console.log('[Workflow Step 1] Setting up issue...')
 
       const processor = new RSSProcessor()
 
@@ -90,7 +89,7 @@ async function setupissue(newsletterId: string) {
         throw new Error(`Newsletter not found: ${newsletterId}`)
       }
 
-      console.log(`[Workflow Step 1/11] Using newsletter: ${newsletter.name} (${newsletter.id})`)
+      console.log(`[Workflow Step 1] Using newsletter: ${newsletter.name} (${newsletter.id})`)
 
       // Calculate issue date (Central Time + 12 hours)
       const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
@@ -99,7 +98,7 @@ async function setupissue(newsletterId: string) {
       const issueDate = centralDate.toISOString().split('T')[0]
 
       // Create new issue with publication_id
-      const { data: newissue, error: createError } = await supabaseAdmin
+      const { data: newIssue, error: createError } = await supabaseAdmin
         .from('publication_issues')
         .insert([{
           date: issueDate,
@@ -109,127 +108,64 @@ async function setupissue(newsletterId: string) {
         .select('id')
         .single()
 
-      if (createError || !newissue) {
+      if (createError || !newIssue) {
         throw new Error('Failed to create issue')
       }
 
-      const id = newissue.id
-      console.log(`[Workflow Step 1/11] issue created: ${id} for ${issueDate}`)
+      const issueId = newIssue.id
+      console.log(`[Workflow Step 1] Issue created: ${issueId} for ${issueDate}`)
 
-      // Select AI apps and prompts
+      // Select AI apps and prompts (non-article modules)
       try {
         const { AppModuleSelector } = await import('@/lib/ai-app-modules')
         const { PromptModuleSelector } = await import('@/lib/prompt-modules')
 
-        console.log('[Workflow Step 1/11] Selecting AI apps...')
+        console.log('[Workflow Step 1] Selecting AI apps...')
 
         const issueDateTime = new Date(issueDate)
-        const moduleResults = await AppModuleSelector.selectAppsForIssue(id, newsletter.id, issueDateTime)
+        const moduleResults = await AppModuleSelector.selectAppsForIssue(issueId, newsletter.id, issueDateTime)
 
         const totalApps = moduleResults.reduce((sum, r) => sum + r.result.apps.length, 0)
-        console.log(`[Workflow Step 1/11] Selected ${totalApps} AI apps via ${moduleResults.length} modules`)
+        console.log(`[Workflow Step 1] Selected ${totalApps} AI apps via ${moduleResults.length} modules`)
 
-        console.log('[Workflow Step 1/11] Selecting prompts via modules...')
-        const promptResults = await PromptModuleSelector.selectPromptsForIssue(id, newsletter.id)
+        console.log('[Workflow Step 1] Selecting prompts via modules...')
+        const promptResults = await PromptModuleSelector.selectPromptsForIssue(issueId, newsletter.id)
         const promptsSelected = promptResults.filter(r => r.result.prompt !== null).length
-        console.log(`[Workflow Step 1/11] Selected ${promptsSelected} prompts via ${promptResults.length} modules`)
+        console.log(`[Workflow Step 1] Selected ${promptsSelected} prompts via ${promptResults.length} modules`)
       } catch (error) {
-        console.error('[Workflow Step 1/11] AI selection failed:', error)
-        console.error('[Workflow Step 1/11] Error details:', error instanceof Error ? error.message : String(error))
-        console.error('[Workflow Step 1/11] Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+        console.error('[Workflow Step 1] AI selection failed:', error)
+        console.error('[Workflow Step 1] Error details:', error instanceof Error ? error.message : String(error))
         // Continue workflow even if AI selection fails (non-critical)
       }
 
-      // Assign top 12 posts per section
-      const { data: primaryFeeds } = await supabaseAdmin
-        .from('rss_feeds')
-        .select('id')
-        .eq('active', true)
-        .eq('use_for_primary_section', true)
+      // Get active article modules
+      const articleModules = await ArticleModuleSelector.getActiveModules(newsletter.id)
+      const moduleIds = articleModules.map(m => m.id)
 
-      const { data: secondaryFeeds } = await supabaseAdmin
-        .from('rss_feeds')
-        .select('id')
-        .eq('active', true)
-        .eq('use_for_secondary_section', true)
+      console.log(`[Workflow Step 1] Found ${articleModules.length} active article modules`)
 
-      const primaryFeedIds = primaryFeeds?.map(f => f.id) || []
-      const secondaryFeedIds = secondaryFeeds?.map(f => f.id) || []
+      // Initialize article module selections
+      await ArticleModuleSelector.initializeSelectionsForIssue(issueId, newsletter.id)
 
-      // Get lookback window
-      const { data: lookbackSetting } = await supabaseAdmin
-        .from('publication_settings')
-        .select('value')
-        .eq('publication_id', newsletterId)
-        .eq('key', 'primary_article_lookback_hours')
-        .single()
-
-      const lookbackHours = lookbackSetting ? parseInt(lookbackSetting.value) : 72
-      const lookbackDate = new Date()
-      lookbackDate.setHours(lookbackDate.getHours() - lookbackHours)
-      const lookbackTimestamp = lookbackDate.toISOString()
-
-      // Get and assign top primary posts
-      const { data: allPrimaryPosts } = await supabaseAdmin
-        .from('rss_posts')
-        .select('id, post_ratings(total_score)')
-        .in('feed_id', primaryFeedIds)
-        .is('issue_id', null)
-        .gte('processed_at', lookbackTimestamp)
-        .not('post_ratings', 'is', null)
-
-      const topPrimary = allPrimaryPosts
-        ?.sort((a: any, b: any) => {
-          const scoreA = a.post_ratings?.[0]?.total_score || 0
-          const scoreB = b.post_ratings?.[0]?.total_score || 0
-          return scoreB - scoreA
-        })
-        .slice(0, 12) || []
-
-      // Get and assign top secondary posts
-      const { data: allSecondaryPosts } = await supabaseAdmin
-        .from('rss_posts')
-        .select('id, post_ratings(total_score)')
-        .in('feed_id', secondaryFeedIds)
-        .is('issue_id', null)
-        .gte('processed_at', lookbackTimestamp)
-        .not('post_ratings', 'is', null)
-
-      const topSecondary = allSecondaryPosts
-        ?.sort((a: any, b: any) => {
-          const scoreA = a.post_ratings?.[0]?.total_score || 0
-          const scoreB = b.post_ratings?.[0]?.total_score || 0
-          return scoreB - scoreA
-        })
-        .slice(0, 12) || []
-
-      // Assign to issue
-      if (topPrimary.length > 0) {
-        await supabaseAdmin
-          .from('rss_posts')
-          .update({ issue_id: id })
-          .in('id', topPrimary.map(p => p.id))
+      // Assign posts to each article module
+      let totalPostsAssigned = 0
+      for (const module of articleModules) {
+        const result = await processor.assignPostsToModule(issueId, module.id)
+        totalPostsAssigned += result.assigned
+        console.log(`[Workflow Step 1] Module "${module.name}": ${result.assigned} posts assigned`)
       }
 
-      if (topSecondary.length > 0) {
-        await supabaseAdmin
-          .from('rss_posts')
-          .update({ issue_id: id })
-          .in('id', topSecondary.map(p => p.id))
-      }
+      console.log(`[Workflow Step 1] ✓ Setup complete. Total posts assigned: ${totalPostsAssigned}`)
 
-      console.log(`[Workflow Step 1/11] Assigned ${topPrimary.length} primary, ${topSecondary.length} secondary posts`)
-      console.log('[Workflow Step 1/11] ✓ Setup complete')
-
-      return id
+      return { issueId, moduleIds }
 
     } catch (error) {
       retryCount++
       if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 1/11] Failed after ${maxRetries} retries`)
+        console.error(`[Workflow Step 1] Failed after ${maxRetries} retries`)
         throw error
       }
-      console.log(`[Workflow Step 1/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      console.log(`[Workflow Step 1] Error occurred, retrying (${retryCount}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
@@ -238,7 +174,7 @@ async function setupissue(newsletterId: string) {
 }
 
 // STEP 2: Deduplication (separate step with 180s timeout)
-async function deduplicateissue(issueId: string) {
+async function deduplicateIssue(issueId: string) {
   "use step"
 
   let retryCount = 0
@@ -246,30 +182,36 @@ async function deduplicateissue(issueId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 2/11] Running deduplication...')
+      console.log('[Workflow Step 2] Running deduplication...')
 
       const processor = new RSSProcessor()
       const dedupeResult = await processor.handleDuplicatesForissue(issueId)
 
-      console.log(`[Workflow Step 2/11] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicate posts found`)
-      console.log('[Workflow Step 2/11] ✓ Deduplication complete')
+      console.log(`[Workflow Step 2] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicate posts found`)
+      console.log('[Workflow Step 2] ✓ Deduplication complete')
 
       return
 
     } catch (error) {
       retryCount++
       if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 2/11] Failed after ${maxRetries} retries`)
+        console.error(`[Workflow Step 2] Failed after ${maxRetries} retries`)
         throw error
       }
-      console.log(`[Workflow Step 2/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      console.log(`[Workflow Step 2] Error occurred, retrying (${retryCount}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
 }
 
-// PRIMARY SECTION
-async function generatePrimaryTitles(issueId: string) {
+// MODULE STEPS: Generate titles for a module
+async function generateModuleTitles(
+  issueId: string,
+  moduleId: string,
+  moduleNum: number,
+  totalModules: number,
+  stepNum: number
+) {
   "use step"
 
   let retryCount = 0
@@ -277,32 +219,44 @@ async function generatePrimaryTitles(issueId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 3/11] Generating 6 primary titles...')
+      const module = await ArticleModuleSelector.getModule(moduleId)
+      const moduleName = module?.name || `Module ${moduleNum}`
+
+      console.log(`[Workflow Step ${stepNum}] Generating titles for ${moduleName} (${moduleNum}/${totalModules})...`)
+
       const processor = new RSSProcessor()
-      await processor.generateTitlesOnly(issueId, 'primary', 6)
+      await processor.generateTitlesForModule(issueId, moduleId)
 
       const { data: articles } = await supabaseAdmin
-        .from('articles')
+        .from('module_articles')
         .select('id, headline')
         .eq('issue_id', issueId)
+        .eq('article_module_id', moduleId)
         .not('headline', 'is', null)
 
-      console.log(`[Workflow Step 3/11] ✓ Generated ${articles?.length || 0} primary titles`)
+      console.log(`[Workflow Step ${stepNum}] ✓ Generated ${articles?.length || 0} titles for ${moduleName}`)
       return
 
     } catch (error) {
       retryCount++
       if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 3/11] Failed after ${maxRetries} retries`)
+        console.error(`[Workflow Step ${stepNum}] Failed after ${maxRetries} retries`)
         throw error
       }
-      console.log(`[Workflow Step 3/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      console.log(`[Workflow Step ${stepNum}] Error occurred, retrying (${retryCount}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
 }
 
-async function generatePrimaryBodiesBatch1(issueId: string) {
+// MODULE STEPS: Generate bodies batch 1 for a module
+async function generateModuleBodiesBatch1(
+  issueId: string,
+  moduleId: string,
+  moduleNum: number,
+  totalModules: number,
+  stepNum: number
+) {
   "use step"
 
   let retryCount = 0
@@ -310,32 +264,45 @@ async function generatePrimaryBodiesBatch1(issueId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 4/11] Generating 3 primary bodies (batch 1)...')
+      const module = await ArticleModuleSelector.getModule(moduleId)
+      const moduleName = module?.name || `Module ${moduleNum}`
+
+      console.log(`[Workflow Step ${stepNum}] Generating bodies batch 1 for ${moduleName}...`)
+
       const processor = new RSSProcessor()
-      await processor.generateBodiesOnly(issueId, 'primary', 0, 3)
+      await processor.generateBodiesForModule(issueId, moduleId, 0, 3)
 
       const { data: articles } = await supabaseAdmin
-        .from('articles')
+        .from('module_articles')
         .select('id, content')
         .eq('issue_id', issueId)
+        .eq('article_module_id', moduleId)
         .not('content', 'is', null)
+        .neq('content', '')
 
-      console.log(`[Workflow Step 4/11] ✓ Total bodies generated: ${articles?.length || 0}`)
+      console.log(`[Workflow Step ${stepNum}] ✓ Total bodies generated: ${articles?.length || 0}`)
       return
 
     } catch (error) {
       retryCount++
       if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 4/11] Failed after ${maxRetries} retries`)
+        console.error(`[Workflow Step ${stepNum}] Failed after ${maxRetries} retries`)
         throw error
       }
-      console.log(`[Workflow Step 4/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      console.log(`[Workflow Step ${stepNum}] Error occurred, retrying (${retryCount}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
 }
 
-async function generatePrimaryBodiesBatch2(issueId: string) {
+// MODULE STEPS: Generate bodies batch 2 for a module
+async function generateModuleBodiesBatch2(
+  issueId: string,
+  moduleId: string,
+  moduleNum: number,
+  totalModules: number,
+  stepNum: number
+) {
   "use step"
 
   let retryCount = 0
@@ -343,32 +310,45 @@ async function generatePrimaryBodiesBatch2(issueId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 5/11] Generating 3 more primary bodies (batch 2)...')
+      const module = await ArticleModuleSelector.getModule(moduleId)
+      const moduleName = module?.name || `Module ${moduleNum}`
+
+      console.log(`[Workflow Step ${stepNum}] Generating bodies batch 2 for ${moduleName}...`)
+
       const processor = new RSSProcessor()
-      await processor.generateBodiesOnly(issueId, 'primary', 3, 3)
+      await processor.generateBodiesForModule(issueId, moduleId, 3, 3)
 
       const { data: articles } = await supabaseAdmin
-        .from('articles')
+        .from('module_articles')
         .select('id, content')
         .eq('issue_id', issueId)
+        .eq('article_module_id', moduleId)
         .not('content', 'is', null)
+        .neq('content', '')
 
-      console.log(`[Workflow Step 5/11] ✓ Total primary bodies: ${articles?.length || 0}`)
+      console.log(`[Workflow Step ${stepNum}] ✓ Total bodies: ${articles?.length || 0}`)
       return
 
     } catch (error) {
       retryCount++
       if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 5/11] Failed after ${maxRetries} retries`)
+        console.error(`[Workflow Step ${stepNum}] Failed after ${maxRetries} retries`)
         throw error
       }
-      console.log(`[Workflow Step 5/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      console.log(`[Workflow Step ${stepNum}] Error occurred, retrying (${retryCount}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
 }
 
-async function factCheckPrimary(issueId: string) {
+// MODULE STEPS: Fact-check articles for a module
+async function factCheckModule(
+  issueId: string,
+  moduleId: string,
+  moduleNum: number,
+  totalModules: number,
+  stepNum: number
+) {
   "use step"
 
   let retryCount = 0
@@ -376,168 +356,39 @@ async function factCheckPrimary(issueId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 6/11] Fact-checking all primary articles...')
+      const module = await ArticleModuleSelector.getModule(moduleId)
+      const moduleName = module?.name || `Module ${moduleNum}`
+
+      console.log(`[Workflow Step ${stepNum}] Fact-checking articles for ${moduleName}...`)
+
       const processor = new RSSProcessor()
-      await processor.factCheckArticles(issueId, 'primary')
+      await processor.factCheckArticlesForModule(issueId, moduleId)
 
       const { data: articles } = await supabaseAdmin
-        .from('articles')
+        .from('module_articles')
         .select('id, fact_check_score')
         .eq('issue_id', issueId)
+        .eq('article_module_id', moduleId)
         .not('fact_check_score', 'is', null)
 
       const avgScore = (articles?.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) || 0) / (articles?.length || 1)
-      console.log(`[Workflow Step 6/11] ✓ Fact-checked ${articles?.length || 0} articles (avg score: ${avgScore.toFixed(1)}/10)`)
+      console.log(`[Workflow Step ${stepNum}] ✓ Fact-checked ${articles?.length || 0} articles (avg score: ${avgScore.toFixed(1)}/10)`)
       return
 
     } catch (error) {
       retryCount++
       if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 6/11] Failed after ${maxRetries} retries`)
+        console.error(`[Workflow Step ${stepNum}] Failed after ${maxRetries} retries`)
         throw error
       }
-      console.log(`[Workflow Step 6/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
-      await new Promise(resolve => setTimeout(resolve, 2000))
-    }
-  }
-}
-
-// SECONDARY SECTION
-async function generateSecondaryTitles(issueId: string) {
-  "use step"
-
-  let retryCount = 0
-  const maxRetries = 2
-
-  while (retryCount <= maxRetries) {
-    try {
-      console.log('[Workflow Step 7/11] Generating 6 secondary titles...')
-      const processor = new RSSProcessor()
-      await processor.generateTitlesOnly(issueId, 'secondary', 6)
-
-      const { data: articles } = await supabaseAdmin
-        .from('secondary_articles')
-        .select('id, headline')
-        .eq('issue_id', issueId)
-        .not('headline', 'is', null)
-
-      console.log(`[Workflow Step 7/11] ✓ Generated ${articles?.length || 0} secondary titles`)
-      return
-
-    } catch (error) {
-      retryCount++
-      if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 7/11] Failed after ${maxRetries} retries`)
-        throw error
-      }
-      console.log(`[Workflow Step 7/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
-      await new Promise(resolve => setTimeout(resolve, 2000))
-    }
-  }
-}
-
-async function generateSecondaryBodiesBatch1(issueId: string) {
-  "use step"
-
-  let retryCount = 0
-  const maxRetries = 2
-
-  while (retryCount <= maxRetries) {
-    try {
-      console.log('[Workflow Step 8/11] Generating 3 secondary bodies (batch 1)...')
-      const processor = new RSSProcessor()
-      await processor.generateBodiesOnly(issueId, 'secondary', 0, 3)
-
-      const { data: articles } = await supabaseAdmin
-        .from('secondary_articles')
-        .select('id, content')
-        .eq('issue_id', issueId)
-        .not('content', 'is', null)
-
-      console.log(`[Workflow Step 8/11] ✓ Total bodies generated: ${articles?.length || 0}`)
-      return
-
-    } catch (error) {
-      retryCount++
-      if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 8/11] Failed after ${maxRetries} retries`)
-        throw error
-      }
-      console.log(`[Workflow Step 8/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
-      await new Promise(resolve => setTimeout(resolve, 2000))
-    }
-  }
-}
-
-async function generateSecondaryBodiesBatch2(issueId: string) {
-  "use step"
-
-  let retryCount = 0
-  const maxRetries = 2
-
-  while (retryCount <= maxRetries) {
-    try {
-      console.log('[Workflow Step 9/11] Generating 3 more secondary bodies (batch 2)...')
-      const processor = new RSSProcessor()
-      await processor.generateBodiesOnly(issueId, 'secondary', 3, 3)
-
-      const { data: articles } = await supabaseAdmin
-        .from('secondary_articles')
-        .select('id, content')
-        .eq('issue_id', issueId)
-        .not('content', 'is', null)
-
-      console.log(`[Workflow Step 9/11] ✓ Total secondary bodies: ${articles?.length || 0}`)
-      return
-
-    } catch (error) {
-      retryCount++
-      if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 9/11] Failed after ${maxRetries} retries`)
-        throw error
-      }
-      console.log(`[Workflow Step 9/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
-      await new Promise(resolve => setTimeout(resolve, 2000))
-    }
-  }
-}
-
-async function factCheckSecondary(issueId: string) {
-  "use step"
-
-  let retryCount = 0
-  const maxRetries = 2
-
-  while (retryCount <= maxRetries) {
-    try {
-      console.log('[Workflow Step 10/11] Fact-checking all secondary articles...')
-      const processor = new RSSProcessor()
-      await processor.factCheckArticles(issueId, 'secondary')
-
-      const { data: articles } = await supabaseAdmin
-        .from('secondary_articles')
-        .select('id, fact_check_score')
-        .eq('issue_id', issueId)
-        .not('fact_check_score', 'is', null)
-
-      const avgScore = (articles?.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) || 0) / (articles?.length || 1)
-      console.log(`[Workflow Step 10/11] ✓ Fact-checked ${articles?.length || 0} articles (avg score: ${avgScore.toFixed(1)}/10)`)
-      return
-
-    } catch (error) {
-      retryCount++
-      if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 10/11] Failed after ${maxRetries} retries`)
-        throw error
-      }
-      console.log(`[Workflow Step 10/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      console.log(`[Workflow Step ${stepNum}] Error occurred, retrying (${retryCount}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
 }
 
 // FINALIZE
-async function finalizeIssue(issueId: string) {
+async function finalizeIssue(issueId: string, moduleIds: string[], stepNum: number) {
   "use step"
 
   let retryCount = 0
@@ -545,37 +396,65 @@ async function finalizeIssue(issueId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 11/11] Finalizing issue...')
+      console.log(`[Workflow Step ${stepNum}] Finalizing issue...`)
       const processor = new RSSProcessor()
 
-      // Auto-select top 3 per section
-      await processor.selectTopArticlesForissue(issueId)
+      // Auto-select top articles for each module
+      let totalSelected = 0
+      for (const moduleId of moduleIds) {
+        const result = await processor.selectTopArticlesForModule(issueId, moduleId)
+        totalSelected += result.selected
+      }
+      console.log(`[Workflow Step ${stepNum}] Selected ${totalSelected} total articles across ${moduleIds.length} modules`)
 
-      const { data: activeArticles } = await supabaseAdmin
-        .from('articles')
-        .select('id')
-        .eq('issue_id', issueId)
-        .eq('is_active', true)
+      // Get active article counts per module for logging
+      const moduleCounts: string[] = []
+      for (const moduleId of moduleIds) {
+        const { data: activeArticles } = await supabaseAdmin
+          .from('module_articles')
+          .select('id')
+          .eq('issue_id', issueId)
+          .eq('article_module_id', moduleId)
+          .eq('is_active', true)
 
-      const { data: activeSecondary } = await supabaseAdmin
-        .from('secondary_articles')
-        .select('id')
-        .eq('issue_id', issueId)
-        .eq('is_active', true)
-
-      console.log(`Selected ${activeArticles?.length || 0} primary, ${activeSecondary?.length || 0} secondary`)
+        const module = await ArticleModuleSelector.getModule(moduleId)
+        moduleCounts.push(`${module?.name || 'Unknown'}: ${activeArticles?.length || 0}`)
+      }
+      console.log(`[Workflow Step ${stepNum}] Active articles: ${moduleCounts.join(', ')}`)
 
       // Generate welcome section
       await processor.generateWelcomeSection(issueId)
 
-      // Subject line (generated in selectTopArticlesForissue)
+      // Generate subject line based on top articles from first module
+      if (moduleIds.length > 0) {
+        const { data: topArticles } = await supabaseAdmin
+          .from('module_articles')
+          .select('headline')
+          .eq('issue_id', issueId)
+          .eq('article_module_id', moduleIds[0])
+          .eq('is_active', true)
+          .order('rank', { ascending: true })
+          .limit(3)
+
+        if (topArticles && topArticles.length > 0) {
+          // Generate subject line using the existing function that works with issue ID
+          const { generateSubjectLine } = await import('@/lib/subject-line-generator')
+          const result = await generateSubjectLine(issueId)
+
+          if (result.success && result.subject_line) {
+            // Subject line is already saved by the generateSubjectLine function
+            console.log(`[Workflow Step ${stepNum}] Subject line generated based on top article`)
+          }
+        }
+      }
+
       const { data: issue } = await supabaseAdmin
         .from('publication_issues')
         .select('subject_line')
         .eq('id', issueId)
         .single()
 
-      console.log(`Subject line: "${issue?.subject_line?.substring(0, 50) || 'Not found'}..."`)
+      console.log(`[Workflow Step ${stepNum}] Subject line: "${issue?.subject_line?.substring(0, 50) || 'Not found'}..."`)
 
       // Select ads for all ad modules (includes "Presented By")
       try {
@@ -597,11 +476,11 @@ async function finalizeIssue(issueId: string) {
           const manualCount = moduleSelections.filter(s => s.result.reason === 'Manual selection required').length
 
           if (moduleSelections.length > 0) {
-            console.log(`[Workflow Step 11/11] Ad modules: ${selectedCount} selected, ${manualCount} manual pending`)
+            console.log(`[Workflow Step ${stepNum}] Ad modules: ${selectedCount} selected, ${manualCount} manual pending`)
           }
         }
       } catch (moduleAdError) {
-        console.log('[Workflow Step 11/11] Ad module selection failed (non-critical):', moduleAdError)
+        console.log(`[Workflow Step ${stepNum}] Ad module selection failed (non-critical):`, moduleAdError)
         // Don't fail workflow if ad module selection fails
       }
 
@@ -615,10 +494,10 @@ async function finalizeIssue(issueId: string) {
 
         if (issueData) {
           await PollModuleSelector.initializeSelectionsForIssue(issueId, issueData.publication_id)
-          console.log(`[Workflow Step 11/11] Poll module selections initialized (manual selection required)`)
+          console.log(`[Workflow Step ${stepNum}] Poll module selections initialized (manual selection required)`)
         }
       } catch (pollModuleError) {
-        console.log('[Workflow Step 11/11] Poll module initialization failed (non-critical):', pollModuleError)
+        console.log(`[Workflow Step ${stepNum}] Poll module initialization failed (non-critical):`, pollModuleError)
         // Don't fail workflow if poll module initialization fails
       }
 
@@ -628,18 +507,18 @@ async function finalizeIssue(issueId: string) {
         .update({ status: 'draft' })
         .eq('id', issueId)
 
-      // Stage 1 unassignment
+      // Stage 1 unassignment - unassign posts that didn't get articles
       const unassignResult = await processor.unassignUnusedPosts(issueId)
-      console.log(`[Workflow Step 11/11] ✓ Finalized. Unassigned ${unassignResult.unassigned} unused posts`)
+      console.log(`[Workflow Step ${stepNum}] ✓ Finalized. Unassigned ${unassignResult.unassigned} unused posts`)
       return
 
     } catch (error) {
       retryCount++
       if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 11/11] Failed after ${maxRetries} retries`)
+        console.error(`[Workflow Step ${stepNum}] Failed after ${maxRetries} retries`)
         throw error
       }
-      console.log(`[Workflow Step 11/11] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      console.log(`[Workflow Step ${stepNum}] Error occurred, retrying (${retryCount}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
