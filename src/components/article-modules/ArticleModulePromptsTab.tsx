@@ -425,17 +425,82 @@ export default function ArticleModulePromptsTab({
       setError('Please select an RSS post to test with')
       return
     }
+
+    // Get the selected post data
+    const post = rssPosts.find(p => p.id === selectedRssPost)
+    if (!post) {
+      setError('Selected RSS post not found')
+      return
+    }
+
+    // Determine which prompt to use
+    let promptJson: any = null
+    let provider: 'openai' | 'claude' = 'openai'
+
+    // Check if this is a criterion prompt
+    if (promptKey.startsWith('criterion_')) {
+      const criterionId = promptKey.replace('criterion_', '')
+      const criterion = criteria.find(c => c.id === criterionId)
+      if (!criterion) {
+        setError('Criterion not found')
+        return
+      }
+      // Use custom prompt if editing, otherwise use criterion's prompt
+      const promptStr = editingPrompt?.key === promptKey ? editingPrompt.value : criterion.ai_prompt
+      if (!promptStr) {
+        setError('No prompt configured for this criterion')
+        return
+      }
+      try {
+        promptJson = JSON.parse(promptStr)
+        provider = detectProviderFromPrompt(promptStr)
+      } catch {
+        setError('Invalid JSON in prompt configuration')
+        return
+      }
+    }
+    // Check if this is an article prompt
+    else if (promptKey.startsWith('prompt_')) {
+      const promptId = promptKey.replace('prompt_', '')
+      const prompt = prompts.find(p => p.id === promptId)
+      if (!prompt) {
+        setError('Prompt not found')
+        return
+      }
+      const promptStr = editingPrompt?.key === promptKey ? editingPrompt.value : prompt.ai_prompt
+      if (!promptStr) {
+        setError('No prompt configured')
+        return
+      }
+      try {
+        promptJson = JSON.parse(promptStr)
+        provider = detectProviderFromPrompt(promptStr)
+      } catch {
+        setError('Invalid JSON in prompt configuration')
+        return
+      }
+    }
+
+    if (!promptJson) {
+      setError('Could not determine prompt to test')
+      return
+    }
+
     setTestingPrompt(true)
     setTestResult(null)
     try {
-      const res = await fetch('/api/debug/ai/test-prompt', {
+      const res = await fetch('/api/ai/test-prompt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt_key: promptKey,
-          post_id: selectedRssPost,
-          publication_id: publicationId,
-          custom_prompt: editingPrompt?.value
+          provider,
+          promptJson,
+          post: {
+            title: post.title,
+            description: post.description,
+            full_article_text: post.full_article_text,
+            source_url: post.source_url
+          }
         })
       })
       const data = await res.json()
