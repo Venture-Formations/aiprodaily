@@ -64,6 +64,16 @@ export default function ArticleModulePromptsTab({
   const [localAiImagePrompt, setLocalAiImagePrompt] = useState(aiImagePrompt || '')
   const [editingAiImagePrompt, setEditingAiImagePrompt] = useState(false)
 
+  // Global prompts state (shared across all article sections)
+  const [globalPrompts, setGlobalPrompts] = useState<{
+    deduplication: string | null
+    factChecker: string | null
+  }>({ deduplication: null, factChecker: null })
+  const [loadingGlobalPrompts, setLoadingGlobalPrompts] = useState(true)
+  const [expandedGlobalPrompt, setExpandedGlobalPrompt] = useState<string | null>(null)
+  const [editingGlobalPrompt, setEditingGlobalPrompt] = useState<{key: string, value: string} | null>(null)
+  const [savingGlobalPrompt, setSavingGlobalPrompt] = useState<string | null>(null)
+
   // Fetch RSS posts for testing
   const fetchRssPosts = useCallback(async () => {
     setLoadingRssPosts(true)
@@ -82,6 +92,26 @@ export default function ArticleModulePromptsTab({
       setLoadingRssPosts(false)
     }
   }, [publicationId, moduleId])
+
+  // Fetch global prompts from publication_settings
+  const fetchGlobalPrompts = useCallback(async () => {
+    setLoadingGlobalPrompts(true)
+    try {
+      const res = await fetch(`/api/publications/${publicationId}/settings?keys=ai_prompt_topic_deduper,ai_prompt_fact_checker`)
+      if (res.ok) {
+        const data = await res.json()
+        const settings = data.settings || {}
+        setGlobalPrompts({
+          deduplication: settings.ai_prompt_topic_deduper || null,
+          factChecker: settings.ai_prompt_fact_checker || null
+        })
+      }
+    } catch (err) {
+      console.error('Failed to fetch global prompts:', err)
+    } finally {
+      setLoadingGlobalPrompts(false)
+    }
+  }, [publicationId])
 
   // Fetch latest data
   const fetchData = useCallback(async () => {
@@ -112,7 +142,8 @@ export default function ArticleModulePromptsTab({
       fetchData()
     }
     fetchRssPosts()
-  }, [fetchData, fetchRssPosts, initialCriteria.length, initialPrompts.length])
+    fetchGlobalPrompts()
+  }, [fetchData, fetchRssPosts, fetchGlobalPrompts, initialCriteria.length, initialPrompts.length])
 
   // Handlers for criteria
   const handleAddCriterion = async () => {
@@ -292,6 +323,96 @@ export default function ArticleModulePromptsTab({
       setMessage('Save as default functionality requires Publication Settings integration')
     } finally {
       setSaving(null)
+    }
+  }
+
+  // Handle global prompt edit
+  const handleEditGlobalPrompt = (key: string, value: string) => {
+    setEditingGlobalPrompt({ key, value })
+  }
+
+  const handleCancelGlobalPrompt = () => {
+    setEditingGlobalPrompt(null)
+  }
+
+  // Save global prompt to publication_settings
+  const handleSaveGlobalPrompt = async (promptKey: 'ai_prompt_topic_deduper' | 'ai_prompt_fact_checker') => {
+    if (!editingGlobalPrompt) return
+    setSavingGlobalPrompt(promptKey)
+    try {
+      const res = await fetch('/api/settings/ai-prompts', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: promptKey,
+          value: editingGlobalPrompt.value
+        })
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to update global prompt')
+      }
+      // Update local state
+      setGlobalPrompts(prev => ({
+        ...prev,
+        [promptKey === 'ai_prompt_topic_deduper' ? 'deduplication' : 'factChecker']: editingGlobalPrompt.value
+      }))
+      setEditingGlobalPrompt(null)
+      setMessage('Global prompt saved successfully. Changes apply to all article sections.')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setSavingGlobalPrompt(null)
+    }
+  }
+
+  // Reset global prompt to default
+  const handleResetGlobalPromptToDefault = async (promptKey: 'ai_prompt_topic_deduper' | 'ai_prompt_fact_checker') => {
+    setSavingGlobalPrompt(promptKey)
+    try {
+      const res = await fetch('/api/settings/ai-prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: promptKey,
+          action: 'reset_to_default'
+        })
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to reset prompt')
+      }
+      // Refetch global prompts to get updated values
+      await fetchGlobalPrompts()
+      setMessage('Global prompt reset to default')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setSavingGlobalPrompt(null)
+    }
+  }
+
+  // Save global prompt as default
+  const handleSaveGlobalPromptAsDefault = async (promptKey: 'ai_prompt_topic_deduper' | 'ai_prompt_fact_checker') => {
+    setSavingGlobalPrompt(promptKey)
+    try {
+      const res = await fetch('/api/settings/ai-prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: promptKey,
+          action: 'save_as_default'
+        })
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to save as default')
+      }
+      setMessage('Global prompt saved as your custom default')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setSavingGlobalPrompt(null)
     }
   }
 
@@ -751,20 +872,74 @@ export default function ArticleModulePromptsTab({
         </div>
       </div>
 
-      {/* Global Prompts Warning */}
-      <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-        <div className="flex gap-3">
-          <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <div>
-            <h5 className="text-sm font-medium text-amber-800">Global Prompts</h5>
-            <p className="text-xs text-amber-700 mt-1">
-              Deduplication and Fact Checker prompts are shared across all article sections.
-              To edit these, go to Publication Settings.
-            </p>
+      {/* Global Prompts */}
+      <div className="bg-white border border-gray-200 rounded-lg">
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div>
+              <h4 className="text-sm font-medium text-gray-900">Global Prompts</h4>
+              <p className="text-xs text-amber-700 mt-0.5">
+                These prompts are shared across all article sections. Changes here will apply to the entire publication.
+              </p>
+            </div>
           </div>
         </div>
+
+        {loadingGlobalPrompts ? (
+          <div className="p-8 flex items-center justify-center">
+            <svg className="animate-spin h-5 w-5 text-emerald-600" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-200">
+            {/* Deduplication Prompt */}
+            <GlobalPromptCard
+              promptKey="ai_prompt_topic_deduper"
+              label="Deduplication Prompt"
+              description="Identifies and removes duplicate/similar articles across RSS feeds"
+              value={globalPrompts.deduplication}
+              isExpanded={expandedGlobalPrompt === 'ai_prompt_topic_deduper'}
+              isEditing={editingGlobalPrompt?.key === 'ai_prompt_topic_deduper'}
+              editingValue={editingGlobalPrompt?.key === 'ai_prompt_topic_deduper' ? editingGlobalPrompt.value : null}
+              isSaving={savingGlobalPrompt === 'ai_prompt_topic_deduper'}
+              prettyPrint={prettyPrint}
+              onToggleExpand={() => setExpandedGlobalPrompt(expandedGlobalPrompt === 'ai_prompt_topic_deduper' ? null : 'ai_prompt_topic_deduper')}
+              onEdit={() => handleEditGlobalPrompt('ai_prompt_topic_deduper', globalPrompts.deduplication || '')}
+              onEditChange={(value) => setEditingGlobalPrompt({ key: 'ai_prompt_topic_deduper', value })}
+              onCancel={handleCancelGlobalPrompt}
+              onSave={() => handleSaveGlobalPrompt('ai_prompt_topic_deduper')}
+              onResetToDefault={() => handleResetGlobalPromptToDefault('ai_prompt_topic_deduper')}
+              onSaveAsDefault={() => handleSaveGlobalPromptAsDefault('ai_prompt_topic_deduper')}
+              setPrettyPrint={setPrettyPrint}
+            />
+
+            {/* Fact Checker Prompt */}
+            <GlobalPromptCard
+              promptKey="ai_prompt_fact_checker"
+              label="Fact Checker Prompt"
+              description="Verifies factual accuracy and identifies potential issues in generated content"
+              value={globalPrompts.factChecker}
+              isExpanded={expandedGlobalPrompt === 'ai_prompt_fact_checker'}
+              isEditing={editingGlobalPrompt?.key === 'ai_prompt_fact_checker'}
+              editingValue={editingGlobalPrompt?.key === 'ai_prompt_fact_checker' ? editingGlobalPrompt.value : null}
+              isSaving={savingGlobalPrompt === 'ai_prompt_fact_checker'}
+              prettyPrint={prettyPrint}
+              onToggleExpand={() => setExpandedGlobalPrompt(expandedGlobalPrompt === 'ai_prompt_fact_checker' ? null : 'ai_prompt_fact_checker')}
+              onEdit={() => handleEditGlobalPrompt('ai_prompt_fact_checker', globalPrompts.factChecker || '')}
+              onEditChange={(value) => setEditingGlobalPrompt({ key: 'ai_prompt_fact_checker', value })}
+              onCancel={handleCancelGlobalPrompt}
+              onSave={() => handleSaveGlobalPrompt('ai_prompt_fact_checker')}
+              onResetToDefault={() => handleResetGlobalPromptToDefault('ai_prompt_fact_checker')}
+              onSaveAsDefault={() => handleSaveGlobalPromptAsDefault('ai_prompt_fact_checker')}
+              setPrettyPrint={setPrettyPrint}
+            />
+          </div>
+        )}
       </div>
     </div>
   )
@@ -1097,6 +1272,193 @@ function AIImagePromptModal({
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Global Prompt Card Component (for deduplication and fact checker)
+function GlobalPromptCard({
+  promptKey,
+  label,
+  description,
+  value,
+  isExpanded,
+  isEditing,
+  editingValue,
+  isSaving,
+  prettyPrint,
+  onToggleExpand,
+  onEdit,
+  onEditChange,
+  onCancel,
+  onSave,
+  onResetToDefault,
+  onSaveAsDefault,
+  setPrettyPrint
+}: {
+  promptKey: string
+  label: string
+  description: string
+  value: string | null
+  isExpanded: boolean
+  isEditing: boolean
+  editingValue: string | null
+  isSaving: boolean
+  prettyPrint: boolean
+  onToggleExpand: () => void
+  onEdit: () => void
+  onEditChange: (value: string) => void
+  onCancel: () => void
+  onSave: () => void
+  onResetToDefault: () => void
+  onSaveAsDefault: () => void
+  setPrettyPrint: (value: boolean) => void
+}) {
+  // Helper to format JSON for display
+  const formatJSON = (val: string | null, pretty: boolean): string => {
+    if (!val) return ''
+    try {
+      const parsed = JSON.parse(val)
+      return pretty ? JSON.stringify(parsed, null, 2) : JSON.stringify(parsed)
+    } catch {
+      return val
+    }
+  }
+
+  // Detect provider from prompt JSON
+  const detectProvider = (promptJson: string | null): 'claude' | 'openai' => {
+    if (!promptJson) return 'openai'
+    const lower = promptJson.toLowerCase()
+    if (lower.includes('claude') || lower.includes('anthropic')) return 'claude'
+    return 'openai'
+  }
+
+  return (
+    <div className="p-4">
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex-1">
+          <div className="flex items-center space-x-2">
+            <h4 className="text-sm font-medium text-gray-900">{label}</h4>
+            {value && (
+              <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                detectProvider(value) === 'claude'
+                  ? 'bg-purple-100 text-purple-800'
+                  : 'bg-blue-100 text-blue-800'
+              }`}>
+                {detectProvider(value) === 'claude' ? 'Claude' : 'OpenAI'}
+              </span>
+            )}
+            <span className="px-2 py-0.5 text-xs font-medium rounded bg-amber-100 text-amber-800">
+              Global
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">{description}</p>
+        </div>
+        <button
+          onClick={onToggleExpand}
+          className="ml-4 text-emerald-600 hover:text-emerald-800 text-sm font-medium"
+        >
+          {isExpanded ? 'Collapse' : 'View/Edit Prompt'}
+        </button>
+      </div>
+
+      {isExpanded && (
+        <div className="mt-4">
+          {/* Warning banner */}
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex gap-2">
+              <svg className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <p className="text-xs text-amber-700">
+                Changes to this prompt will affect all article sections in this publication.
+              </p>
+            </div>
+          </div>
+
+          <div className="mb-2 flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-700">
+              Prompt Content
+            </label>
+            <span className="text-xs text-gray-500">
+              {isEditing
+                ? editingValue?.length || 0
+                : (value?.length || 0)} characters
+            </span>
+          </div>
+          {isEditing ? (
+            <>
+              <textarea
+                value={editingValue || ''}
+                onChange={(e) => onEditChange(e.target.value)}
+                rows={15}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <div className="mt-3 flex items-center justify-end">
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={onCancel}
+                    disabled={isSaving}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={onSave}
+                    disabled={isSaving}
+                    className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {isSaving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="mb-2 flex items-center">
+                <label className="flex items-center text-sm text-gray-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={prettyPrint}
+                    onChange={(e) => setPrettyPrint(e.target.checked)}
+                    className="mr-2 h-4 w-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                  />
+                  Pretty-print
+                </label>
+              </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
+                {value ? formatJSON(value, prettyPrint) : 'No prompt configured'}
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={onResetToDefault}
+                    disabled={isSaving}
+                    className="px-4 py-2 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50"
+                  >
+                    Reset to Default
+                  </button>
+                  <button
+                    onClick={onSaveAsDefault}
+                    disabled={isSaving}
+                    className="px-4 py-2 text-sm font-medium text-green-700 bg-white border border-green-300 rounded-md hover:bg-green-50 disabled:opacity-50"
+                  >
+                    Save as Default
+                  </button>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={onEdit}
+                    className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700"
+                  >
+                    Edit Prompt
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
