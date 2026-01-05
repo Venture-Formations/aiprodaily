@@ -64,6 +64,28 @@ export async function DELETE(
       deletionErrors.secondary_articles = { message: secondaryArticlesError.message, code: secondaryArticlesError.code }
     }
 
+    // 2c. Delete module articles (new article modules system)
+    const { error: moduleArticlesError } = await supabaseAdmin
+      .from('module_articles')
+      .delete()
+      .eq('issue_id', issueId)
+
+    if (moduleArticlesError) {
+      console.error('Error deleting module articles:', moduleArticlesError)
+      deletionErrors.module_articles = { message: moduleArticlesError.message, code: moduleArticlesError.code }
+    }
+
+    // 2d. Delete issue article module selections
+    const { error: issueArticleModulesError } = await supabaseAdmin
+      .from('issue_article_modules')
+      .delete()
+      .eq('issue_id', issueId)
+
+    if (issueArticleModulesError) {
+      console.error('Error deleting issue article modules:', issueArticleModulesError)
+      deletionErrors.issue_article_modules = { message: issueArticleModulesError.message, code: issueArticleModulesError.code }
+    }
+
     // 3. Unassign RSS posts (set issueId to null instead of deleting)
     const { error: postsError } = await supabaseAdmin
       .from('rss_posts')

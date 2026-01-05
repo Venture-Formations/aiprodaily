@@ -4,6 +4,22 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { authOptions } from '@/lib/auth'
 import { PromptSelector } from '@/lib/prompt-selector'
 import { AppModuleSelector } from '@/lib/ai-app-modules'
+import { ArticleModuleSelector } from '@/lib/article-modules'
+
+// Helper function to initialize article module selections for a new issue
+async function initializeArticleModuleSelection(issueId: string, publicationId: string) {
+  try {
+    console.log(`Initializing article module selections for issue ${issueId}`)
+
+    // Use ArticleModuleSelector to initialize empty selections for all active article modules
+    // Articles will be populated when the workflow runs
+    await ArticleModuleSelector.initializeSelectionsForIssue(issueId, publicationId)
+
+    console.log('Article module selections initialized')
+  } catch (error) {
+    console.error('Error initializing article module selections:', error)
+  }
+}
 
 // Helper function to initialize AI app selection for a new issue
 async function initializeAIAppSelection(issueId: string, publicationId: string) {
@@ -193,7 +209,8 @@ export async function POST(request: NextRequest) {
     // Run all initializations in parallel for better performance
     await Promise.all([
       initializeAIAppSelection(issue.id, newsletter.id),
-      initializePromptSelection(issue.id)
+      initializePromptSelection(issue.id),
+      initializeArticleModuleSelection(issue.id, newsletter.id)
     ])
 
     console.log('issue content initialization completed')
