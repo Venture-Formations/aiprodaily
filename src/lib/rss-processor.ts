@@ -563,6 +563,13 @@ export class RSSProcessor {
       return { fetched: 0, scored: 0 }
     }
 
+    // Debug: Log feeds and their article_module_id values
+    console.log(`[Ingest] Fetched ${allFeeds.length} active feeds:`, allFeeds.map(f => ({
+      name: f.name,
+      id: f.id,
+      article_module_id: f.article_module_id || 'NULL'
+    })))
+
     // Process each feed
     for (const feed of allFeeds) {
       try {
@@ -647,6 +654,9 @@ export class RSSProcessor {
         }
 
         if (blockImages) imageUrl = null
+
+        // Debug: Log the feed article_module_id being used
+        console.log(`[Ingest] Inserting post from feed ${feed.name} (${feed.id}), article_module_id: ${feed.article_module_id || 'NULL'}`)
 
         // Insert new post (issueId = null)
         const { data: newPost, error: insertError } = await supabaseAdmin

@@ -207,6 +207,7 @@ export interface RssFeed {
   active: boolean
   use_for_primary_section: boolean
   use_for_secondary_section: boolean
+  article_module_id: string | null
   last_processed: string | null
   last_error: string | null
   processing_errors: number
@@ -221,6 +222,7 @@ export interface RssPost {
   id: string
   feed_id: string
   issue_id: string
+  article_module_id: string | null
   external_id: string
   title: string
   description: string | null
