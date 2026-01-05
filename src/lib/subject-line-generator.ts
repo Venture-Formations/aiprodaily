@@ -145,7 +145,7 @@ export async function generateSubjectLine(issueId: string, userEmail?: string): 
                 subject_line: subjectLine,
                 character_count: subjectLine.length,
                 top_article_headline: topArticle.headline,
-                top_article_score: topArticle.rss_post?.post_rating?.[0]?.total_score || 0,
+                top_article_score: topArticle.rss_post?.[0]?.post_rating?.[0]?.total_score || 0,
                 trigger: 'article_change'
               }
             }])
@@ -163,7 +163,7 @@ export async function generateSubjectLine(issueId: string, userEmail?: string): 
       subject_line: subjectLine,
       character_count: subjectLine.length,
       top_article_used: topArticle.headline,
-      top_article_score: topArticle.rss_post?.post_rating?.[0]?.total_score || 0
+      top_article_score: topArticle.rss_post?.[0]?.post_rating?.[0]?.total_score || 0
     }
 
   } catch (error) {
