@@ -6,7 +6,7 @@ import { start } from 'workflow/api'
 import { createIssueWorkflow } from '@/lib/workflows/create-issue-workflow'
 
 /**
- * Create issue with Full Workflow
+ * Create issue with Full Workflow (ARTICLE MODULES VERSION)
  *
  * Creates a issue for a specific date and triggers the full RSS workflow
  * Returns after issue is created so UI can redirect immediately
@@ -111,90 +111,82 @@ export async function POST(request: NextRequest) {
       // Non-critical - issue can proceed without ad
     }
 
-    // Step 5: Assign top 12 posts per section (using dynamic import)
-    const { RSSProcessor } = await import('@/lib/rss-processor')
-    const processor = new RSSProcessor()
+    // Step 5: Initialize article module selections and assign posts
+    const { ArticleModuleSelector } = await import('@/lib/article-modules')
 
-    const { data: primaryFeeds } = await supabaseAdmin
-      .from('rss_feeds')
-      .select('id')
-      .eq('active', true)
-      .eq('use_for_primary_section', true)
+    // Get active article modules for this publication
+    const activeModules = await ArticleModuleSelector.getActiveModules(newsletterUuid)
+    console.log(`[Create issue] Found ${activeModules.length} active article modules`)
 
-    const { data: secondaryFeeds } = await supabaseAdmin
-      .from('rss_feeds')
-      .select('id')
-      .eq('active', true)
-      .eq('use_for_secondary_section', true)
+    // Initialize issue_article_modules entries
+    await ArticleModuleSelector.initializeSelectionsForIssue(issueId, newsletterUuid)
 
-    const primaryFeedIds = primaryFeeds?.map(f => f.id) || []
-    const secondaryFeedIds = secondaryFeeds?.map(f => f.id) || []
-
-    // Get lookback window
-    const { data: lookbackSetting } = await supabaseAdmin
-      .from('publication_settings')
-      .select('value')
-      .eq('publication_id', newsletterUuid)
-      .eq('key', 'primary_article_lookback_hours')
-      .maybeSingle()
-
-    const lookbackHours = lookbackSetting ? parseInt(lookbackSetting.value) : 72
+    // Get lookback window from first module (or default)
+    const defaultLookbackHours = activeModules[0]?.lookback_hours || 72
     const lookbackDate = new Date()
-    lookbackDate.setHours(lookbackDate.getHours() - lookbackHours)
+    lookbackDate.setHours(lookbackDate.getHours() - defaultLookbackHours)
     const lookbackTimestamp = lookbackDate.toISOString()
 
-    // Get and assign top primary posts
-    const { data: allPrimaryPosts } = await supabaseAdmin
-      .from('rss_posts')
-      .select('id, post_ratings(total_score)')
-      .in('feed_id', primaryFeedIds)
-      .is('issue_id', null)
-      .gte('processed_at', lookbackTimestamp)
-      .not('post_ratings', 'is', null)
+    // For each module, get feeds and assign top posts
+    let totalAssigned = 0
+    for (const module of activeModules) {
+      const lookbackHours = module.lookback_hours || 72
+      const moduleLookbackDate = new Date()
+      moduleLookbackDate.setHours(moduleLookbackDate.getHours() - lookbackHours)
+      const moduleLookbackTimestamp = moduleLookbackDate.toISOString()
 
-    const topPrimary = allPrimaryPosts
-      ?.sort((a: any, b: any) => {
-        const scoreA = a.post_ratings?.[0]?.total_score || 0
-        const scoreB = b.post_ratings?.[0]?.total_score || 0
-        return scoreB - scoreA
-      })
-      .slice(0, 12) || []
+      // Get feeds assigned to this module
+      const { data: moduleFeeds } = await supabaseAdmin
+        .from('rss_feeds')
+        .select('id')
+        .eq('active', true)
+        .eq('article_module_id', module.id)
 
-    // Get and assign top secondary posts
-    const { data: allSecondaryPosts } = await supabaseAdmin
-      .from('rss_posts')
-      .select('id, post_ratings(total_score)')
-      .in('feed_id', secondaryFeedIds)
-      .is('issue_id', null)
-      .gte('processed_at', lookbackTimestamp)
-      .not('post_ratings', 'is', null)
+      const feedIds = moduleFeeds?.map(f => f.id) || []
 
-    const topSecondary = allSecondaryPosts
-      ?.sort((a: any, b: any) => {
-        const scoreA = a.post_ratings?.[0]?.total_score || 0
-        const scoreB = b.post_ratings?.[0]?.total_score || 0
-        return scoreB - scoreA
-      })
-      .slice(0, 12) || []
+      if (feedIds.length === 0) {
+        console.log(`[Create issue] Module "${module.name}": No feeds assigned`)
+        continue
+      }
 
-    // Assign to issue
-    if (topPrimary.length > 0) {
-      await supabaseAdmin
+      // Get top posts for this module by score
+      const { data: modulePosts } = await supabaseAdmin
         .from('rss_posts')
-        .update({ issue_id: issueId })
-        .in('id', topPrimary.map(p => p.id))
+        .select('id, post_ratings(total_score)')
+        .in('feed_id', feedIds)
+        .is('issue_id', null)
+        .gte('processed_at', moduleLookbackTimestamp)
+        .not('post_ratings', 'is', null)
+
+      // Sort by score and take top 12
+      const topPosts = modulePosts
+        ?.sort((a: any, b: any) => {
+          const scoreA = a.post_ratings?.[0]?.total_score || 0
+          const scoreB = b.post_ratings?.[0]?.total_score || 0
+          return scoreB - scoreA
+        })
+        .slice(0, 12) || []
+
+      // Assign posts to issue with article_module_id
+      if (topPosts.length > 0) {
+        await supabaseAdmin
+          .from('rss_posts')
+          .update({
+            issue_id: issueId,
+            article_module_id: module.id
+          })
+          .in('id', topPosts.map(p => p.id))
+
+        totalAssigned += topPosts.length
+        console.log(`[Create issue] Module "${module.name}": Assigned ${topPosts.length} posts`)
+      } else {
+        console.log(`[Create issue] Module "${module.name}": No eligible posts found`)
+      }
     }
 
-    if (topSecondary.length > 0) {
-      await supabaseAdmin
-        .from('rss_posts')
-        .update({ issue_id: issueId })
-        .in('id', topSecondary.map(p => p.id))
-    }
+    console.log(`[Create issue] Total posts assigned: ${totalAssigned}`)
 
-    console.log(`[Create issue] Assigned ${topPrimary.length} primary, ${topSecondary.length} secondary posts`)
-
-    // Step 6: Start the article generation workflow (deduplication now happens in workflow Step 2)
+    // Step 6: Start the article generation workflow
     console.log('[Create issue] Starting article generation workflow...')
     try {
       await start(createIssueWorkflow, [{

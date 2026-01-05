@@ -1,70 +1,75 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { RSSProcessor } from '@/lib/rss-processor'
+import { ArticleModuleSelector } from '@/lib/article-modules'
 
 /**
- * Create issue Workflow - Article Generation Steps
+ * Create Issue Workflow - ARTICLE MODULES VERSION
  * Runs after issue setup (AI selection, post assignment)
  *
- * Steps:
- * 1. Deduplication (with extended timeout)
- * 2. Generate 6 primary titles
- * 3. Generate 3 primary bodies (batch 1)
- * 4. Generate 3 primary bodies (batch 2)
- * 5. Fact-check primary articles
- * 6. Generate 6 secondary titles
- * 7. Generate 3 secondary bodies (batch 1)
- * 8. Generate 3 secondary bodies (batch 2)
- * 9. Fact-check secondary articles
- * 10. Finalize (select top 3, generate welcome, set draft)
+ * Dynamic steps based on active article modules:
+ * Step 1:  Deduplication (global, cross-module)
  *
- * Note: Each step includes OIDC error handling and idempotency checks
- * to gracefully handle Vercel workflow token refresh failures
+ * For each active article module (sequentially):
+ *   Step N+0: Assign posts and generate titles
+ *   Step N+1: Generate bodies batch 1
+ *   Step N+2: Generate bodies batch 2
+ *   Step N+3: Fact-check articles
+ *
+ * Final: Select top articles, generate welcome, set draft
  */
 
-/**
- * Helper to detect if an error is an OIDC token error
- */
-function isOidcError(error: any): boolean {
-  const errorMsg = error?.message || String(error)
-  return errorMsg.includes('VercelOidcTokenError') ||
-         errorMsg.includes('Failed to refresh OIDC token') ||
-         errorMsg.includes('Unable to find root directory')
-}
 export async function createIssueWorkflow(input: {
   issue_id: string
   publication_id: string
 }) {
   "use workflow"
 
-  const { issue_id } = input
+  const { issue_id, publication_id } = input
 
-  console.log(`[Create issue Workflow] Starting for issue: ${issue_id}`)
+  console.log(`[Create Issue Workflow] Starting for issue: ${issue_id}`)
 
   // STEP 1: Deduplication
-  await deduplicateissue(issue_id)
+  await deduplicateIssue(issue_id)
 
-  // PRIMARY SECTION
-  await generatePrimaryTitles(issue_id)
-  await generatePrimaryBodiesBatch1(issue_id)
-  await generatePrimaryBodiesBatch2(issue_id)
-  await factCheckPrimary(issue_id)
+  // STEP 2: Get active article modules
+  const moduleIds = await getActiveModuleIds(publication_id)
 
-  // SECONDARY SECTION
-  await generateSecondaryTitles(issue_id)
-  await generateSecondaryBodiesBatch1(issue_id)
-  await generateSecondaryBodiesBatch2(issue_id)
-  await factCheckSecondary(issue_id)
+  if (moduleIds.length === 0) {
+    console.log('[Create Issue Workflow] No active article modules found')
+    return { issue_id, success: true }
+  }
 
-  // FINALIZE
-  await finalizeIssue(issue_id)
+  console.log(`[Create Issue Workflow] Found ${moduleIds.length} active article modules`)
 
-  console.log('[Create issue Workflow] ✓ Complete')
+  // Process each module sequentially
+  for (let i = 0; i < moduleIds.length; i++) {
+    const moduleId = moduleIds[i]
+    const moduleNum = i + 1
+    const totalModules = moduleIds.length
+    const stepOffset = 3 + (i * 4) // Start at 3 since we have dedup and getModules
+
+    // Generate titles for this module (also assigns posts)
+    await generateModuleTitles(issue_id, moduleId, moduleNum, totalModules, stepOffset)
+
+    // Generate bodies in 2 batches
+    await generateModuleBodiesBatch1(issue_id, moduleId, moduleNum, totalModules, stepOffset + 1)
+    await generateModuleBodiesBatch2(issue_id, moduleId, moduleNum, totalModules, stepOffset + 2)
+
+    // Fact-check articles for this module
+    await factCheckModule(issue_id, moduleId, moduleNum, totalModules, stepOffset + 3)
+  }
+
+  // Final step
+  const finalStepNum = 3 + (moduleIds.length * 4) + 1
+  await finalizeIssue(issue_id, moduleIds, finalStepNum)
+
+  console.log('[Create Issue Workflow] ✓ Complete')
 
   return { issue_id, success: true }
 }
 
-// Step 1: Deduplication (with extended timeout for AI semantic analysis)
-async function deduplicateissue(issueId: string) {
+// Step 1: Deduplication
+async function deduplicateIssue(issueId: string) {
   "use step"
 
   let retryCount = 0
@@ -72,372 +77,347 @@ async function deduplicateissue(issueId: string) {
 
   while (retryCount <= maxRetries) {
     try {
-      console.log('[Workflow Step 1/10] Running deduplication...')
+      console.log('[Workflow Step 1] Running deduplication...')
 
       const processor = new RSSProcessor()
       const dedupeResult = await processor.handleDuplicatesForissue(issueId)
 
-      console.log(`[Workflow Step 1/10] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicate posts found`)
-      console.log('[Workflow Step 1/10] ✓ Deduplication complete')
+      console.log(`[Workflow Step 1] Deduplication: ${dedupeResult.groups} groups, ${dedupeResult.duplicates} duplicate posts found`)
+      console.log('[Workflow Step 1] ✓ Deduplication complete')
 
       return
 
     } catch (error) {
       retryCount++
       if (retryCount > maxRetries) {
-        console.error(`[Workflow Step 1/10] Failed after ${maxRetries} retries`)
+        console.error(`[Workflow Step 1] Failed after ${maxRetries} retries`)
         throw error
       }
-      console.log(`[Workflow Step 1/10] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      console.log(`[Workflow Step 1] Error occurred, retrying (${retryCount}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
 }
 
-// Step 1: Generate Primary Titles
-async function generatePrimaryTitles(issueId: string) {
+// Step 2: Get active article module IDs
+async function getActiveModuleIds(publicationId: string): Promise<string[]> {
   "use step"
 
-  let workCompleted = false
+  console.log('[Workflow Step 2] Getting active article modules...')
 
-  try {
-    // Idempotency check: skip if already done
-    const { data: existing } = await supabaseAdmin
-      .from('articles')
-      .select('id')
-      .eq('issue_id', issueId)
-      .not('headline', 'is', null)
+  const modules = await ArticleModuleSelector.getActiveModules(publicationId)
+  const moduleIds = modules.map(m => m.id)
 
-    if (existing && existing.length >= 6) {
-      console.log(`[Workflow Step 2/10] ✓ Already have ${existing.length} primary titles (skip)`)
+  console.log(`[Workflow Step 2] Found ${moduleIds.length} active article modules`)
+
+  return moduleIds
+}
+
+// Module step: Generate titles (and assign posts)
+async function generateModuleTitles(
+  issueId: string,
+  moduleId: string,
+  moduleNum: number,
+  totalModules: number,
+  stepNum: number
+) {
+  "use step"
+
+  let retryCount = 0
+  const maxRetries = 2
+
+  while (retryCount <= maxRetries) {
+    try {
+      const module = await ArticleModuleSelector.getModule(moduleId)
+      const moduleName = module?.name || `Module ${moduleNum}`
+
+      console.log(`[Workflow Step ${stepNum}] Generating titles for ${moduleName} (${moduleNum}/${totalModules})...`)
+
+      const processor = new RSSProcessor()
+
+      // Assign posts to this module first
+      const assignResult = await processor.assignPostsToModule(issueId, moduleId)
+      console.log(`[Workflow Step ${stepNum}] Assigned ${assignResult.assigned} posts to ${moduleName}`)
+
+      // Generate titles
+      await processor.generateTitlesForModule(issueId, moduleId)
+
+      const { data: articles } = await supabaseAdmin
+        .from('module_articles')
+        .select('id, headline')
+        .eq('issue_id', issueId)
+        .eq('article_module_id', moduleId)
+        .not('headline', 'is', null)
+
+      console.log(`[Workflow Step ${stepNum}] ✓ Generated ${articles?.length || 0} titles for ${moduleName}`)
       return
+
+    } catch (error) {
+      retryCount++
+      if (retryCount > maxRetries) {
+        console.error(`[Workflow Step ${stepNum}] Failed after ${maxRetries} retries`)
+        throw error
+      }
+      console.log(`[Workflow Step ${stepNum}] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
     }
-
-    console.log('[Workflow Step 2/10] Generating 6 primary titles...')
-    const processor = new RSSProcessor()
-    await processor.generateTitlesOnly(issueId, 'primary', 6)
-
-    // Mark work as complete before querying results
-    workCompleted = true
-
-    const { data: articles } = await supabaseAdmin
-      .from('articles')
-      .select('id, headline')
-      .eq('issue_id', issueId)
-      .not('headline', 'is', null)
-
-    console.log(`[Workflow Step 2/10] ✓ Generated ${articles?.length || 0} primary titles`)
-  } catch (error: any) {
-    // If OIDC error but work completed, log and continue
-    if (workCompleted && isOidcError(error)) {
-      console.log('[Workflow Step 2/10] ⚠️ OIDC token error after completion - continuing')
-      return
-    }
-    // Otherwise, this is a real error - rethrow
-    throw error
   }
 }
 
-// Step 2: Generate Primary Bodies Batch 1
-async function generatePrimaryBodiesBatch1(issueId: string) {
+// Module step: Generate bodies batch 1
+async function generateModuleBodiesBatch1(
+  issueId: string,
+  moduleId: string,
+  moduleNum: number,
+  totalModules: number,
+  stepNum: number
+) {
   "use step"
 
-  let workCompleted = false
+  let retryCount = 0
+  const maxRetries = 2
 
-  try {
-    // Idempotency check: count existing bodies for first 3 articles
-    // Note: Must check for non-empty content, not just non-null (empty string '' is used as placeholder)
-    const { data: existing, count } = await supabaseAdmin
-      .from('articles')
-      .select('id, content', { count: 'exact' })
-      .eq('issue_id', issueId)
-      .neq('content', '')
-      .not('content', 'is', null)
-      .range(0, 2) // First 3 articles (0-indexed)
+  while (retryCount <= maxRetries) {
+    try {
+      const module = await ArticleModuleSelector.getModule(moduleId)
+      const moduleName = module?.name || `Module ${moduleNum}`
 
-    if (count && count >= 3) {
-      console.log('[Workflow Step 3/10] ✓ First 3 primary bodies already generated (skip)')
+      console.log(`[Workflow Step ${stepNum}] Generating bodies batch 1 for ${moduleName}...`)
+
+      const processor = new RSSProcessor()
+      await processor.generateBodiesForModule(issueId, moduleId, 0, 3)
+
+      const { data: articles } = await supabaseAdmin
+        .from('module_articles')
+        .select('id')
+        .eq('issue_id', issueId)
+        .eq('article_module_id', moduleId)
+        .not('content', 'is', null)
+        .neq('content', '')
+
+      console.log(`[Workflow Step ${stepNum}] ✓ ${moduleName} has ${articles?.length || 0} articles with bodies`)
       return
+
+    } catch (error) {
+      retryCount++
+      if (retryCount > maxRetries) {
+        console.error(`[Workflow Step ${stepNum}] Failed after ${maxRetries} retries`)
+        throw error
+      }
+      console.log(`[Workflow Step ${stepNum}] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
     }
-
-    console.log('[Workflow Step 3/10] Generating 3 primary bodies (batch 1)...')
-    const processor = new RSSProcessor()
-    await processor.generateBodiesOnly(issueId, 'primary', 0, 3)
-
-    // Mark work as complete
-    workCompleted = true
-
-    const { data: articles } = await supabaseAdmin
-      .from('articles')
-      .select('id, content')
-      .eq('issue_id', issueId)
-      .not('content', 'is', null)
-
-    console.log(`[Workflow Step 3/10] ✓ Total bodies generated: ${articles?.length || 0}`)
-  } catch (error: any) {
-    // If OIDC error but work completed, log and continue
-    if (workCompleted && isOidcError(error)) {
-      console.log('[Workflow Step 3/10] ⚠️ OIDC token error after completion - continuing')
-      return
-    }
-    throw error
   }
 }
 
-// Step 3: Generate Primary Bodies Batch 2
-async function generatePrimaryBodiesBatch2(issueId: string) {
+// Module step: Generate bodies batch 2
+async function generateModuleBodiesBatch2(
+  issueId: string,
+  moduleId: string,
+  moduleNum: number,
+  totalModules: number,
+  stepNum: number
+) {
   "use step"
 
-  let workCompleted = false
+  let retryCount = 0
+  const maxRetries = 2
 
-  try {
-    // Idempotency check: count total bodies
-    // Note: Must check for non-empty content, not just non-null (empty string '' is used as placeholder)
-    const { count } = await supabaseAdmin
-      .from('articles')
-      .select('id', { count: 'exact' })
-      .eq('issue_id', issueId)
-      .neq('content', '')
-      .not('content', 'is', null)
+  while (retryCount <= maxRetries) {
+    try {
+      const module = await ArticleModuleSelector.getModule(moduleId)
+      const moduleName = module?.name || `Module ${moduleNum}`
 
-    if (count && count >= 6) {
-      console.log('[Workflow Step 4/10] ✓ All 6 primary bodies already generated (skip)')
+      console.log(`[Workflow Step ${stepNum}] Generating bodies batch 2 for ${moduleName}...`)
+
+      const processor = new RSSProcessor()
+      await processor.generateBodiesForModule(issueId, moduleId, 3, 3)
+
+      const { data: articles } = await supabaseAdmin
+        .from('module_articles')
+        .select('id')
+        .eq('issue_id', issueId)
+        .eq('article_module_id', moduleId)
+        .not('content', 'is', null)
+        .neq('content', '')
+
+      console.log(`[Workflow Step ${stepNum}] ✓ ${moduleName} total bodies: ${articles?.length || 0}`)
       return
+
+    } catch (error) {
+      retryCount++
+      if (retryCount > maxRetries) {
+        console.error(`[Workflow Step ${stepNum}] Failed after ${maxRetries} retries`)
+        throw error
+      }
+      console.log(`[Workflow Step ${stepNum}] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
     }
-
-    console.log('[Workflow Step 4/10] Generating 3 more primary bodies (batch 2)...')
-    const processor = new RSSProcessor()
-    await processor.generateBodiesOnly(issueId, 'primary', 3, 3)
-
-    // Mark work as complete
-    workCompleted = true
-
-    const { data: articles } = await supabaseAdmin
-      .from('articles')
-      .select('id, content')
-      .eq('issue_id', issueId)
-      .not('content', 'is', null)
-
-    console.log(`[Workflow Step 4/10] ✓ Total primary bodies: ${articles?.length || 0}`)
-  } catch (error: any) {
-    if (workCompleted && isOidcError(error)) {
-      console.log('[Workflow Step 4/10] ⚠️ OIDC token error after completion - continuing')
-      return
-    }
-    throw error
   }
 }
 
-// Step 4: Fact-check Primary Articles
-async function factCheckPrimary(issueId: string) {
+// Module step: Fact-check articles
+async function factCheckModule(
+  issueId: string,
+  moduleId: string,
+  moduleNum: number,
+  totalModules: number,
+  stepNum: number
+) {
   "use step"
 
-  console.log('[Workflow Step 5/10] Fact-checking all primary articles...')
-  const processor = new RSSProcessor()
-  await processor.factCheckArticles(issueId, 'primary')
+  let retryCount = 0
+  const maxRetries = 2
 
-  const { data: articles } = await supabaseAdmin
-    .from('articles')
-    .select('id, fact_check_score')
-    .eq('issue_id', issueId)
-    .not('fact_check_score', 'is', null)
+  while (retryCount <= maxRetries) {
+    try {
+      const module = await ArticleModuleSelector.getModule(moduleId)
+      const moduleName = module?.name || `Module ${moduleNum}`
 
-  const avgScore = (articles?.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) || 0) / (articles?.length || 1)
-  console.log(`[Workflow Step 5/10] ✓ Fact-checked ${articles?.length || 0} articles (avg score: ${avgScore.toFixed(1)}/10)`)
-}
+      console.log(`[Workflow Step ${stepNum}] Fact-checking ${moduleName}...`)
 
-// Step 5: Generate Secondary Titles
-async function generateSecondaryTitles(issueId: string) {
-  "use step"
+      const processor = new RSSProcessor()
+      await processor.factCheckArticlesForModule(issueId, moduleId)
 
-  let workCompleted = false
+      const { data: articles } = await supabaseAdmin
+        .from('module_articles')
+        .select('id, fact_check_score')
+        .eq('issue_id', issueId)
+        .eq('article_module_id', moduleId)
+        .not('fact_check_score', 'is', null)
 
-  try {
-    // Idempotency check: skip if already done
-    const { data: existing } = await supabaseAdmin
-      .from('secondary_articles')
-      .select('id')
-      .eq('issue_id', issueId)
-      .not('headline', 'is', null)
+      const avgScore = articles && articles.length > 0
+        ? articles.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) / articles.length
+        : 0
 
-    if (existing && existing.length >= 6) {
-      console.log(`[Workflow Step 6/10] ✓ Already have ${existing.length} secondary titles (skip)`)
+      console.log(`[Workflow Step ${stepNum}] ✓ Fact-checked ${articles?.length || 0} articles (avg: ${avgScore.toFixed(1)}/10)`)
       return
+
+    } catch (error) {
+      retryCount++
+      if (retryCount > maxRetries) {
+        console.error(`[Workflow Step ${stepNum}] Failed after ${maxRetries} retries`)
+        throw error
+      }
+      console.log(`[Workflow Step ${stepNum}] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
     }
-
-    console.log('[Workflow Step 6/10] Generating 6 secondary titles...')
-    const processor = new RSSProcessor()
-    await processor.generateTitlesOnly(issueId, 'secondary', 6)
-
-    // Mark work as complete
-    workCompleted = true
-
-    const { data: articles } = await supabaseAdmin
-      .from('secondary_articles')
-      .select('id, headline')
-      .eq('issue_id', issueId)
-      .not('headline', 'is', null)
-
-    console.log(`[Workflow Step 6/10] ✓ Generated ${articles?.length || 0} secondary titles`)
-  } catch (error: any) {
-    if (workCompleted && isOidcError(error)) {
-      console.log('[Workflow Step 6/10] ⚠️ OIDC token error after completion - continuing')
-      return
-    }
-    throw error
   }
 }
 
-// Step 6: Generate Secondary Bodies Batch 1
-async function generateSecondaryBodiesBatch1(issueId: string) {
+// Final step: Select top articles, generate welcome, set draft
+async function finalizeIssue(issueId: string, moduleIds: string[], stepNum: number) {
   "use step"
 
-  let workCompleted = false
+  let retryCount = 0
+  const maxRetries = 2
 
-  try {
-    // Idempotency check: count existing secondary bodies for first 3 articles
-    // Note: Must check for non-empty content, not just non-null (empty string '' is used as placeholder)
-    const { count } = await supabaseAdmin
-      .from('secondary_articles')
-      .select('id', { count: 'exact' })
-      .eq('issue_id', issueId)
-      .neq('content', '')
-      .not('content', 'is', null)
-      .range(0, 2) // First 3 articles
+  while (retryCount <= maxRetries) {
+    try {
+      console.log(`[Workflow Step ${stepNum}] Finalizing issue...`)
 
-    if (count && count >= 3) {
-      console.log('[Workflow Step 7/10] ✓ First 3 secondary bodies already generated (skip)')
+      const processor = new RSSProcessor()
+
+      // Select top articles for each module and update issue_article_modules
+      let totalSelected = 0
+      for (const moduleId of moduleIds) {
+        const module = await ArticleModuleSelector.getModule(moduleId)
+        const articlesCount = module?.articles_count || 3
+
+        // Get top articles by score
+        const { data: topArticles } = await supabaseAdmin
+          .from('module_articles')
+          .select('id, post_id, rss_post:rss_posts(post_ratings(total_score))')
+          .eq('issue_id', issueId)
+          .eq('article_module_id', moduleId)
+          .not('content', 'is', null)
+          .not('headline', 'is', null)
+
+        // Sort by score and take top N
+        const sorted = (topArticles || [])
+          .sort((a: any, b: any) => {
+            const scoreA = a.rss_post?.post_ratings?.[0]?.total_score || 0
+            const scoreB = b.rss_post?.post_ratings?.[0]?.total_score || 0
+            return scoreB - scoreA
+          })
+          .slice(0, articlesCount)
+
+        // Mark selected articles as active
+        const selectedIds = sorted.map(a => a.id)
+
+        if (selectedIds.length > 0) {
+          // Set is_active and rank
+          for (let i = 0; i < selectedIds.length; i++) {
+            await supabaseAdmin
+              .from('module_articles')
+              .update({ is_active: true, rank: i + 1 })
+              .eq('id', selectedIds[i])
+          }
+
+          // Update issue_article_modules
+          await supabaseAdmin
+            .from('issue_article_modules')
+            .update({ article_ids: selectedIds })
+            .eq('issue_id', issueId)
+            .eq('article_module_id', moduleId)
+
+          totalSelected += selectedIds.length
+        }
+
+        console.log(`[Workflow Step ${stepNum}] Selected ${selectedIds.length} articles for ${module?.name}`)
+      }
+
+      // Generate welcome section
+      await processor.generateWelcomeSection(issueId)
+
+      // Generate subject line
+      if (moduleIds.length > 0) {
+        const { data: topArticles } = await supabaseAdmin
+          .from('module_articles')
+          .select('headline')
+          .eq('issue_id', issueId)
+          .eq('article_module_id', moduleIds[0])
+          .eq('is_active', true)
+          .order('rank', { ascending: true })
+          .limit(3)
+
+        if (topArticles && topArticles.length > 0) {
+          const { generateSubjectLine } = await import('@/lib/subject-line-generator')
+          const result = await generateSubjectLine(issueId)
+
+          if (result.success && result.subject_line) {
+            console.log(`[Workflow Step ${stepNum}] Subject line generated`)
+          }
+        }
+      }
+
+      const { data: issue } = await supabaseAdmin
+        .from('publication_issues')
+        .select('subject_line')
+        .eq('id', issueId)
+        .single()
+
+      console.log(`[Workflow Step ${stepNum}] Subject line: "${issue?.subject_line?.substring(0, 50) || 'Not found'}..."`)
+
+      // Set status to draft
+      await supabaseAdmin
+        .from('publication_issues')
+        .update({ status: 'draft' })
+        .eq('id', issueId)
+
+      // Unassign unused posts
+      const unassignResult = await processor.unassignUnusedPosts(issueId)
+      console.log(`[Workflow Step ${stepNum}] ✓ Finalized. Unassigned ${unassignResult.unassigned} unused posts`)
       return
+
+    } catch (error) {
+      retryCount++
+      if (retryCount > maxRetries) {
+        console.error(`[Workflow Step ${stepNum}] Failed after ${maxRetries} retries`)
+        throw error
+      }
+      console.log(`[Workflow Step ${stepNum}] Error occurred, retrying (${retryCount}/${maxRetries})...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
     }
-
-    console.log('[Workflow Step 7/10] Generating 3 secondary bodies (batch 1)...')
-    const processor = new RSSProcessor()
-    await processor.generateBodiesOnly(issueId, 'secondary', 0, 3)
-
-    // Mark work as complete
-    workCompleted = true
-
-    const { data: articles } = await supabaseAdmin
-      .from('secondary_articles')
-      .select('id, content')
-      .eq('issue_id', issueId)
-      .not('content', 'is', null)
-
-    console.log(`[Workflow Step 7/10] ✓ Total bodies generated: ${articles?.length || 0}`)
-  } catch (error: any) {
-    if (workCompleted && isOidcError(error)) {
-      console.log('[Workflow Step 7/10] ⚠️ OIDC token error after completion - continuing')
-      return
-    }
-    throw error
   }
-}
-
-// Step 7: Generate Secondary Bodies Batch 2
-async function generateSecondaryBodiesBatch2(issueId: string) {
-  "use step"
-
-  let workCompleted = false
-
-  try {
-    // Idempotency check: count total secondary bodies
-    // Note: Must check for non-empty content, not just non-null (empty string '' is used as placeholder)
-    const { count } = await supabaseAdmin
-      .from('secondary_articles')
-      .select('id', { count: 'exact' })
-      .eq('issue_id', issueId)
-      .neq('content', '')
-      .not('content', 'is', null)
-
-    if (count && count >= 6) {
-      console.log('[Workflow Step 8/10] ✓ All 6 secondary bodies already generated (skip)')
-      return
-    }
-
-    console.log('[Workflow Step 8/10] Generating 3 more secondary bodies (batch 2)...')
-    const processor = new RSSProcessor()
-    await processor.generateBodiesOnly(issueId, 'secondary', 3, 3)
-
-    // Mark work as complete
-    workCompleted = true
-
-    const { data: articles } = await supabaseAdmin
-      .from('secondary_articles')
-      .select('id, content')
-      .eq('issue_id', issueId)
-      .not('content', 'is', null)
-
-    console.log(`[Workflow Step 8/10] ✓ Total secondary bodies: ${articles?.length || 0}`)
-  } catch (error: any) {
-    if (workCompleted && isOidcError(error)) {
-      console.log('[Workflow Step 8/10] ⚠️ OIDC token error after completion - continuing')
-      return
-    }
-    throw error
-  }
-}
-
-// Step 8: Fact-check Secondary Articles
-async function factCheckSecondary(issueId: string) {
-  "use step"
-
-  console.log('[Workflow Step 9/10] Fact-checking all secondary articles...')
-  const processor = new RSSProcessor()
-  await processor.factCheckArticles(issueId, 'secondary')
-
-  const { data: articles } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('id, fact_check_score')
-    .eq('issue_id', issueId)
-    .not('fact_check_score', 'is', null)
-
-  const avgScore = (articles?.reduce((sum, a) => sum + (a.fact_check_score || 0), 0) || 0) / (articles?.length || 1)
-  console.log(`[Workflow Step 9/10] ✓ Fact-checked ${articles?.length || 0} articles (avg score: ${avgScore.toFixed(1)}/10)`)
-}
-
-// Step 9: Finalize Issue
-async function finalizeIssue(issueId: string) {
-  "use step"
-
-  console.log('[Workflow Step 10/10] Finalizing issue...')
-  const processor = new RSSProcessor()
-
-  // Auto-select top 3 per section
-  await processor.selectTopArticlesForissue(issueId)
-
-  const { data: activeArticles } = await supabaseAdmin
-    .from('articles')
-    .select('id')
-    .eq('issue_id', issueId)
-    .eq('is_active', true)
-
-  const { data: activeSecondary } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('id')
-    .eq('issue_id', issueId)
-    .eq('is_active', true)
-
-  console.log(`Selected ${activeArticles?.length || 0} primary, ${activeSecondary?.length || 0} secondary`)
-
-  // Generate welcome section
-  await processor.generateWelcomeSection(issueId)
-
-  // Subject line (generated in selectTopArticlesForissue)
-  const { data: issue } = await supabaseAdmin
-    .from('publication_issues')
-    .select('subject_line')
-    .eq('id', issueId)
-    .single()
-
-  console.log(`Subject line: "${issue?.subject_line?.substring(0, 50) || 'Not found'}..."`)
-
-  // Set status to draft
-  await supabaseAdmin
-    .from('publication_issues')
-    .update({ status: 'draft' })
-    .eq('id', issueId)
-
-  // Stage 1 unassignment
-  const unassignResult = await processor.unassignUnusedPosts(issueId)
-  console.log(`[Workflow Step 10/10] ✓ Finalized. Unassigned ${unassignResult.unassigned} unused posts`)
 }
