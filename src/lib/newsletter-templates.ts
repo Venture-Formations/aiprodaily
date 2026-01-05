@@ -415,6 +415,7 @@ export async function generateWelcomeSection(
 }
 
 // ==================== PRIMARY ARTICLES SECTION ====================
+// @deprecated Use generateArticleModuleSection instead - this function is for backward compatibility only
 
 export async function generatePrimaryArticlesSection(articles: any[], issueDate: string, issueId: string | undefined, sectionName: string, publication_id?: string, mailerliteIssueId?: string): Promise<string> {
   if (!articles || articles.length === 0) {
@@ -468,8 +469,10 @@ export async function generatePrimaryArticlesSection(articles: any[], issueDate:
 }
 
 // ==================== SECONDARY ARTICLES SECTION ====================
+// @deprecated Use generateArticleModuleSection instead - this function queries legacy secondary_articles table
 
 export async function generateSecondaryArticlesSection(issue: any, sectionName: string): Promise<string> {
+  console.warn('[DEPRECATED] generateSecondaryArticlesSection called - use article modules instead')
   // Fetch secondary articles for this issue
   const { data: secondaryArticles } = await supabaseAdmin
     .from('secondary_articles')
@@ -1719,12 +1722,12 @@ export async function generateFullNewsletterHtml(
   try {
     console.log('Generating full newsletter HTML for issue:', issue?.id, isReview ? '(review)' : '(final)')
 
-    // Filter active articles and sort by rank (custom order)
-    const activeArticles = (issue.articles || [])
+    // Filter active module_articles and sort by rank (custom order) for logging
+    const activeArticles = (issue.module_articles || [])
       .filter((article: any) => article.is_active)
       .sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999))
 
-    console.log('Active articles to render:', activeArticles.length)
+    console.log('Active module articles to render:', activeArticles.length)
     console.log('Article order:', activeArticles.map((a: any) => `${a.headline} (rank: ${a.rank})`).join(', '))
 
     // Fetch newsletter sections order (exclude legacy article section types - now handled by article_modules)

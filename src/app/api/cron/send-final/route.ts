@@ -13,65 +13,34 @@ import { ModuleAdSelector } from '@/lib/ad-modules'
 async function logFinalArticlePositions(issueId: string) {
   console.log('=== LOGGING ARTICLE POSITIONS FOR FINAL SEND ===')
 
-  // PRIMARY ARTICLES - Query fresh data to capture manual changes
-  const { data: primaryArticles, error: primaryError } = await supabaseAdmin
-    .from('articles')
-    .select('id, headline, rank, is_active')
+  // MODULE ARTICLES - Query fresh data grouped by module
+  const { data: moduleArticles, error: moduleError } = await supabaseAdmin
+    .from('module_articles')
+    .select('id, headline, rank, is_active, article_module_id, article_module:article_modules(name)')
     .eq('issue_id', issueId)
     .eq('is_active', true)
     .order('rank', { ascending: true, nullsFirst: false })
-    .limit(3)
 
-  if (primaryError) {
-    console.error('Failed to fetch primary articles:', primaryError)
+  if (moduleError) {
+    console.error('Failed to fetch module articles:', moduleError)
   }
 
-  const finalActiveArticles = primaryArticles || []
-  console.log('Final active primary articles:', finalActiveArticles.map((a: any) => `ID: ${a.id}, Rank: ${a.rank}, Headline: ${a.headline}`))
+  const finalActiveArticles = moduleArticles || []
+  console.log('Final active module articles:', finalActiveArticles.map((a: any) =>
+    `ID: ${a.id}, Module: ${a.article_module?.name}, Rank: ${a.rank}, Headline: ${a.headline}`))
 
-  // Update final positions for primary articles
+  // Update final positions for module articles
   for (let i = 0; i < finalActiveArticles.length; i++) {
     const position = i + 1
     const { error: updateError } = await supabaseAdmin
-      .from('articles')
+      .from('module_articles')
       .update({ final_position: position })
       .eq('id', finalActiveArticles[i].id)
 
     if (updateError) {
-      console.error(`Failed to update final position for primary article ${finalActiveArticles[i].id}:`, updateError)
+      console.error(`Failed to update final position for article ${finalActiveArticles[i].id}:`, updateError)
     } else {
-      console.log(`✓ Primary article position ${position}: ${finalActiveArticles[i].headline}`)
-    }
-  }
-
-  // SECONDARY ARTICLES - Query fresh data
-  const { data: secondaryArticles, error: secondaryError } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('id, headline, rank, is_active')
-    .eq('issue_id', issueId)
-    .eq('is_active', true)
-    .order('rank', { ascending: true, nullsFirst: false })
-    .limit(3)
-
-  if (secondaryError) {
-    console.error('Failed to fetch secondary articles:', secondaryError)
-  }
-
-  const finalActiveSecondaryArticles = secondaryArticles || []
-  console.log('Final active secondary articles:', finalActiveSecondaryArticles.map((a: any) => `ID: ${a.id}, Rank: ${a.rank}, Headline: ${a.headline}`))
-
-  // Update final positions for secondary articles
-  for (let i = 0; i < finalActiveSecondaryArticles.length; i++) {
-    const position = i + 1
-    const { error: updateError } = await supabaseAdmin
-      .from('secondary_articles')
-      .update({ final_position: position })
-      .eq('id', finalActiveSecondaryArticles[i].id)
-
-    if (updateError) {
-      console.error(`Failed to update final position for secondary article ${finalActiveSecondaryArticles[i].id}:`, updateError)
-    } else {
-      console.log(`✓ Secondary article position ${position}: ${finalActiveSecondaryArticles[i].headline}`)
+      console.log(`✓ Article position ${position}: ${finalActiveArticles[i].headline}`)
     }
   }
 
@@ -153,23 +122,14 @@ async function capturePollForIssue(issueId: string, publicationId: string) {
 async function unassignUnusedArticlePosts(issueId: string) {
   console.log('=== STAGE 2: UNASSIGNING UNUSED ARTICLE POSTS ===')
 
-  // Find posts with articles that don't have final_position set (not selected for send)
-  const { data: unusedPrimaryPosts } = await supabaseAdmin
-    .from('articles')
+  // Find posts with module_articles that don't have final_position set (not selected for send)
+  const { data: unusedModuleArticles } = await supabaseAdmin
+    .from('module_articles')
     .select('post_id')
     .eq('issue_id', issueId)
     .is('final_position', null) // Articles generated but NOT in final send
 
-  const { data: unusedSecondaryPosts } = await supabaseAdmin
-    .from('secondary_articles')
-    .select('post_id')
-    .eq('issue_id', issueId)
-    .is('final_position', null)
-
-  const unusedPostIds = [
-    ...(unusedPrimaryPosts?.map(a => a.post_id) || []),
-    ...(unusedSecondaryPosts?.map(a => a.post_id) || [])
-  ].filter(Boolean) // Remove null values
+  const unusedPostIds = (unusedModuleArticles?.map(a => a.post_id) || []).filter(Boolean)
 
   if (unusedPostIds.length === 0) {
     console.log('[Stage 2] All generated articles were used in final send')
@@ -276,19 +236,13 @@ export async function POST(request: NextRequest) {
       .from('publication_issues')
       .select(`
         *,
-        articles:articles(
+        module_articles:module_articles(
           *,
           rss_post:rss_posts(
             *,
             rss_feed:rss_feeds(*)
-          )
-        ),
-        secondary_articles:secondary_articles(
-          *,
-          rss_post:rss_posts(
-            *,
-            rss_feed:rss_feeds(*)
-          )
+          ),
+          article_module:article_modules(name, display_order)
         ),
         manual_articles:manual_articles(*)
       `)
@@ -310,8 +264,8 @@ export async function POST(request: NextRequest) {
 
     console.log(`Found issue: ${issue.id} (date: ${issue.date}, status: ${issue.status})`)
 
-    // Check if we have any active articles
-    const activeArticles = issue.articles.filter((article: any) => article.is_active)
+    // Check if we have any active module articles
+    const activeArticles = (issue.module_articles || []).filter((article: any) => article.is_active)
     if (activeArticles.length === 0) {
       console.log('issue has no active articles, skipping send')
       return NextResponse.json({
@@ -578,19 +532,13 @@ export async function GET(request: NextRequest) {
       .from('publication_issues')
       .select(`
         *,
-        articles:articles(
+        module_articles:module_articles(
           *,
           rss_post:rss_posts(
             *,
             rss_feed:rss_feeds(*)
-          )
-        ),
-        secondary_articles:secondary_articles(
-          *,
-          rss_post:rss_posts(
-            *,
-            rss_feed:rss_feeds(*)
-          )
+          ),
+          article_module:article_modules(name, display_order)
         ),
         manual_articles:manual_articles(*)
       `)
@@ -612,8 +560,8 @@ export async function GET(request: NextRequest) {
 
     console.log(`Found issue: ${issue.id} (date: ${issue.date}, status: ${issue.status})`)
 
-    // Check if we have any active articles
-    const activeArticles = issue.articles.filter((article: any) => article.is_active)
+    // Check if we have any active module articles
+    const activeArticles = (issue.module_articles || []).filter((article: any) => article.is_active)
     if (activeArticles.length === 0) {
       console.log('issue has no active articles, skipping send')
       return NextResponse.json({

@@ -26,28 +26,28 @@ export async function autoRegenerateWelcome(
 
     const newsletterId = issue.publication_id
 
-    // Fetch ALL active PRIMARY articles for this issue
-    const { data: primaryArticles, error: primaryError } = await supabaseAdmin
-      .from('articles')
+    // Fetch ALL active module articles for this issue
+    const { data: moduleArticles, error: articlesError } = await supabaseAdmin
+      .from('module_articles')
       .select('headline, content')
       .eq('issue_id', issueId)
       .eq('is_active', true)
       .order('rank', { ascending: true })
 
-    if (primaryError) {
-      console.error('[WELCOME] Error fetching primary articles:', primaryError)
-      return { success: false, error: primaryError.message }
+    if (articlesError) {
+      console.error('[WELCOME] Error fetching module articles:', articlesError)
+      return { success: false, error: articlesError.message }
     }
 
-    if (!primaryArticles || primaryArticles.length === 0) {
-      console.log('[WELCOME] No primary articles found, skipping welcome regeneration')
-      return { success: false, error: 'No primary articles found' }
+    if (!moduleArticles || moduleArticles.length === 0) {
+      console.log('[WELCOME] No active articles found, skipping welcome regeneration')
+      return { success: false, error: 'No active articles found' }
     }
 
-    console.log(`[WELCOME] Generating welcome from ${primaryArticles.length} primary articles`)
+    console.log(`[WELCOME] Generating welcome from ${moduleArticles.length} active articles`)
 
     // Generate welcome text using AI_CALL (handles prompt + provider + call)
-    const result = await AI_CALL.welcomeSection(primaryArticles, newsletterId)
+    const result = await AI_CALL.welcomeSection(moduleArticles, newsletterId)
 
     // Extract intro, tagline, and summary from the result
     let welcomeIntro = ''
@@ -101,7 +101,7 @@ export async function autoRegenerateWelcome(
             issue_id: issueId,
             action: 'welcome_auto_regenerated',
             details: {
-              primary_article_count: primaryArticles.length,
+              article_count: moduleArticles.length,
               welcome_intro_length: welcomeIntro.length,
               welcome_tagline_length: welcomeTagline.length,
               welcome_summary_length: welcomeSummary.length

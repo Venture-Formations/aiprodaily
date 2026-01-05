@@ -71,17 +71,18 @@ export async function POST(request: NextRequest) {
       }, { status: 404 })
     }
 
-    // Find tomorrow's issue with articles
+    // Find tomorrow's issue with module articles
     const { data: issue, error: issueError } = await supabaseAdmin
       .from('publication_issues')
       .select(`
         *,
-        articles:articles(
+        module_articles:module_articles(
           *,
           rss_post:rss_posts(
             *,
             rss_feed:rss_feeds(*)
-          )
+          ),
+          article_module:article_modules(name, display_order)
         ),
         manual_articles:manual_articles(*)
       `)
@@ -100,8 +101,8 @@ export async function POST(request: NextRequest) {
 
     console.log('Found issue:', issue.id, 'Status:', issue.status)
 
-    // Check if issue has active articles
-    const activeArticles = issue.articles.filter((article: any) => article.is_active)
+    // Check if issue has active module articles
+    const activeArticles = (issue.module_articles || []).filter((article: any) => article.is_active)
     if (activeArticles.length === 0) {
       return NextResponse.json({
         success: false,
@@ -256,17 +257,18 @@ export async function GET(request: NextRequest) {
       }, { status: 404 })
     }
 
-    // Find tomorrow's issue with articles
+    // Find tomorrow's issue with module articles
     const { data: issue, error: issueError } = await supabaseAdmin
       .from('publication_issues')
       .select(`
         *,
-        articles:articles(
+        module_articles:module_articles(
           *,
           rss_post:rss_posts(
             *,
             rss_feed:rss_feeds(*)
-          )
+          ),
+          article_module:article_modules(name, display_order)
         ),
         manual_articles:manual_articles(*)
       `)
@@ -285,8 +287,8 @@ export async function GET(request: NextRequest) {
 
     console.log('Found issue:', issue.id, 'Status:', issue.status)
 
-    // Check if issue has active articles
-    const activeArticles = issue.articles.filter((article: any) => article.is_active)
+    // Check if issue has active module articles
+    const activeArticles = (issue.module_articles || []).filter((article: any) => article.is_active)
     if (activeArticles.length === 0) {
       return NextResponse.json({
         success: false,

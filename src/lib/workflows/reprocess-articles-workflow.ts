@@ -9,6 +9,7 @@ import { ArticleModuleSelector } from '@/lib/article-modules'
  * Steps:
  * 1. Cleanup (delete module_articles, unassign posts, set processing status)
  * 2. Deduplication (global, cross-module)
+ * 3. Get active article modules
  *
  * For each active article module (sequentially):
  *   Step N+0: Assign posts and generate titles
@@ -35,18 +36,22 @@ export async function reprocessArticlesWorkflow(input: {
   // STEP 2: Deduplication
   await deduplicateIssue(issue_id)
 
-  // Get active article modules
-  const modules = await ArticleModuleSelector.getActiveModules(publication_id)
-  const moduleIds = modules.map(m => m.id)
+  // STEP 3: Get active article modules (must be in a step to use supabaseAdmin)
+  const moduleIds = await getActiveModuleIds(publication_id)
 
-  console.log(`[Reprocess Workflow] Found ${modules.length} active article modules`)
+  if (moduleIds.length === 0) {
+    console.log('[Reprocess Workflow] No active article modules found')
+    return { issue_id, success: true }
+  }
+
+  console.log(`[Reprocess Workflow] Found ${moduleIds.length} active article modules`)
 
   // Process each module sequentially
   for (let i = 0; i < moduleIds.length; i++) {
     const moduleId = moduleIds[i]
     const moduleNum = i + 1
     const totalModules = moduleIds.length
-    const stepOffset = 3 + (i * 4)
+    const stepOffset = 4 + (i * 4) // Start at 4 since we added a step
 
     // Generate titles for this module
     await generateModuleTitles(issue_id, moduleId, moduleNum, totalModules, stepOffset)
@@ -60,12 +65,26 @@ export async function reprocessArticlesWorkflow(input: {
   }
 
   // Final step
-  const finalStepNum = 3 + (moduleIds.length * 4) + 1
+  const finalStepNum = 4 + (moduleIds.length * 4) + 1
   await finalizeIssue(issue_id, moduleIds, finalStepNum)
 
   console.log('[Reprocess Workflow] Complete')
 
   return { issue_id, success: true }
+}
+
+// Step 3: Get active article module IDs
+async function getActiveModuleIds(publicationId: string): Promise<string[]> {
+  "use step"
+
+  console.log('[Reprocess Step 3] Getting active article modules...')
+
+  const modules = await ArticleModuleSelector.getActiveModules(publicationId)
+  const moduleIds = modules.map(m => m.id)
+
+  console.log(`[Reprocess Step 3] Found ${moduleIds.length} active article modules`)
+
+  return moduleIds
 }
 
 // Step 1: Cleanup
