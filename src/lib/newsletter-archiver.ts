@@ -388,6 +388,64 @@ export class NewsletterArchiver {
         }))
       }
 
+      // Article Modules section (dynamic article sections - replaces legacy primary/secondary)
+      const { data: articleModules } = await supabaseAdmin
+        .from('article_modules')
+        .select('id, name, display_order, block_order, is_active')
+        .eq('publication_id', issue.publication_id)
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+
+      if (articleModules && articleModules.length > 0) {
+        const articleModulesWithArticles = []
+
+        for (const module of articleModules) {
+          // Fetch active articles for this module and issue
+          const { data: moduleArticles } = await supabaseAdmin
+            .from('module_articles')
+            .select(`
+              id,
+              headline,
+              content,
+              word_count,
+              rank,
+              ai_image_url,
+              rss_post:rss_posts(
+                title,
+                source_url,
+                image_url,
+                publication_date
+              )
+            `)
+            .eq('issue_id', issueId)
+            .eq('article_module_id', module.id)
+            .eq('is_active', true)
+            .order('rank', { ascending: true })
+
+          if (moduleArticles && moduleArticles.length > 0) {
+            articleModulesWithArticles.push({
+              module_id: module.id,
+              module_name: module.name,
+              display_order: module.display_order,
+              block_order: module.block_order,
+              articles: moduleArticles.map((article: any) => ({
+                id: article.id,
+                headline: article.headline,
+                content: article.content,
+                word_count: article.word_count,
+                rank: article.rank,
+                ai_image_url: article.ai_image_url,
+                rss_post: Array.isArray(article.rss_post) ? article.rss_post[0] : article.rss_post
+              }))
+            })
+          }
+        }
+
+        if (articleModulesWithArticles.length > 0) {
+          sections.article_modules = articleModulesWithArticles
+        }
+      }
+
       // Newsletter sections configuration snapshot (for section ordering)
       const { data: newsletterSections } = await supabaseAdmin
         .from('newsletter_sections')
@@ -423,6 +481,8 @@ export class NewsletterArchiver {
         ad_modules_count: adModuleSelections?.length || 0,
         has_poll_modules: !!pollModuleSelections && pollModuleSelections.length > 0,
         poll_modules_count: pollModuleSelections?.length || 0,
+        has_article_modules: !!sections.article_modules && Array.isArray(sections.article_modules) && sections.article_modules.length > 0,
+        article_modules_count: sections.article_modules?.length || 0,
         archived_at: new Date().toISOString()
       }
 

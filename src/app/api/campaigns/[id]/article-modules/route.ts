@@ -42,6 +42,22 @@ export async function GET(
     // Get all active article modules for the publication
     const modules = await ArticleModuleSelector.getActiveModules(issue.publication_id)
 
+    // Get criteria config for each module
+    const modulesWithCriteria = await Promise.all(
+      (modules || []).map(async (module) => {
+        const { criteria } = await ArticleModuleSelector.getModuleCriteria(module.id)
+        return {
+          ...module,
+          criteria: criteria.map(c => ({
+            id: c.id,
+            name: c.name,
+            weight: c.weight,
+            criteria_number: c.criteria_number
+          }))
+        }
+      })
+    )
+
     // Get publication settings for preview styling
     const { data: pubSettings } = await supabaseAdmin
       .from('publication_settings')
@@ -51,7 +67,7 @@ export async function GET(
 
     return NextResponse.json({
       selections: selections || [],
-      modules: modules || [],
+      modules: modulesWithCriteria || [],
       styles: {
         primaryColor: pubSettings?.primary_color || '#667eea',
         secondaryColor: pubSettings?.secondary_color || '#764ba2',
@@ -129,6 +145,191 @@ export async function POST(
     console.error('[ArticleModules] Error swapping articles:', error)
     return NextResponse.json(
       { error: 'Failed to swap articles', details: error.message },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * PUT /api/campaigns/[id]/article-modules - Toggle article selection, skip article, or reorder
+ * Body: { action: 'toggle' | 'skip' | 'reorder', moduleId, articleId?, articleIds?, currentState? }
+ */
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { id: issueId } = await params
+    const body = await request.json()
+    const { action, moduleId, articleId, articleIds, currentState } = body
+
+    if (!moduleId) {
+      return NextResponse.json({ error: 'moduleId is required' }, { status: 400 })
+    }
+
+    // Verify issue exists and is editable
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
+      .select('status')
+      .eq('id', issueId)
+      .single()
+
+    if (issueError || !issue) {
+      return NextResponse.json({ error: 'Issue not found' }, { status: 404 })
+    }
+
+    if (issue.status === 'sent') {
+      return NextResponse.json({ error: 'Cannot modify articles for sent issues' }, { status: 400 })
+    }
+
+    // Get module for articles_count limit
+    const module = await ArticleModuleSelector.getModule(moduleId)
+    if (!module) {
+      return NextResponse.json({ error: 'Module not found' }, { status: 404 })
+    }
+
+    if (action === 'toggle') {
+      if (!articleId) {
+        return NextResponse.json({ error: 'articleId is required for toggle action' }, { status: 400 })
+      }
+
+      // Get current active articles count
+      const { data: activeArticles } = await supabaseAdmin
+        .from('module_articles')
+        .select('id')
+        .eq('issue_id', issueId)
+        .eq('article_module_id', moduleId)
+        .eq('is_active', true)
+
+      const activeCount = activeArticles?.length || 0
+
+      if (currentState) {
+        // Deactivating - update rank of remaining articles
+        await supabaseAdmin
+          .from('module_articles')
+          .update({ is_active: false, rank: null })
+          .eq('id', articleId)
+
+        // Renumber remaining active articles
+        const { data: remaining } = await supabaseAdmin
+          .from('module_articles')
+          .select('id')
+          .eq('issue_id', issueId)
+          .eq('article_module_id', moduleId)
+          .eq('is_active', true)
+          .order('rank', { ascending: true })
+
+        for (let i = 0; i < (remaining?.length || 0); i++) {
+          await supabaseAdmin
+            .from('module_articles')
+            .update({ rank: i + 1 })
+            .eq('id', remaining![i].id)
+        }
+      } else {
+        // Activating - check limit
+        if (activeCount >= module.articles_count) {
+          return NextResponse.json({
+            error: `Maximum ${module.articles_count} articles allowed for this section`
+          }, { status: 400 })
+        }
+
+        // Add to end with next rank
+        await supabaseAdmin
+          .from('module_articles')
+          .update({ is_active: true, rank: activeCount + 1 })
+          .eq('id', articleId)
+      }
+
+      // Update issue_article_modules
+      const { data: updatedActive } = await supabaseAdmin
+        .from('module_articles')
+        .select('id')
+        .eq('issue_id', issueId)
+        .eq('article_module_id', moduleId)
+        .eq('is_active', true)
+        .order('rank', { ascending: true })
+
+      await ArticleModuleSelector.updateArticleSelections(
+        issueId,
+        moduleId,
+        (updatedActive || []).map(a => a.id)
+      )
+
+    } else if (action === 'skip') {
+      if (!articleId) {
+        return NextResponse.json({ error: 'articleId is required for skip action' }, { status: 400 })
+      }
+
+      // Mark as skipped and deactivate
+      await supabaseAdmin
+        .from('module_articles')
+        .update({ skipped: true, is_active: false, rank: null })
+        .eq('id', articleId)
+
+      // Renumber remaining active articles
+      const { data: remaining } = await supabaseAdmin
+        .from('module_articles')
+        .select('id')
+        .eq('issue_id', issueId)
+        .eq('article_module_id', moduleId)
+        .eq('is_active', true)
+        .order('rank', { ascending: true })
+
+      for (let i = 0; i < (remaining?.length || 0); i++) {
+        await supabaseAdmin
+          .from('module_articles')
+          .update({ rank: i + 1 })
+          .eq('id', remaining![i].id)
+      }
+
+      // Update issue_article_modules
+      await ArticleModuleSelector.updateArticleSelections(
+        issueId,
+        moduleId,
+        (remaining || []).map(a => a.id)
+      )
+
+    } else if (action === 'reorder') {
+      if (!articleIds || !Array.isArray(articleIds)) {
+        return NextResponse.json({ error: 'articleIds array is required for reorder action' }, { status: 400 })
+      }
+
+      // Update ranks based on new order
+      for (let i = 0; i < articleIds.length; i++) {
+        await supabaseAdmin
+          .from('module_articles')
+          .update({ rank: i + 1 })
+          .eq('id', articleIds[i])
+          .eq('issue_id', issueId)
+          .eq('article_module_id', moduleId)
+      }
+
+      // Update issue_article_modules
+      await ArticleModuleSelector.updateArticleSelections(issueId, moduleId, articleIds)
+
+    } else {
+      return NextResponse.json({ error: 'Invalid action. Must be toggle, skip, or reorder' }, { status: 400 })
+    }
+
+    // Return updated selections
+    const selections = await ArticleModuleSelector.getIssueArticleSelections(issueId)
+    const allArticles = await ArticleModuleSelector.getAllArticlesForModule(issueId, moduleId)
+
+    return NextResponse.json({
+      success: true,
+      selections,
+      allArticles
+    })
+
+  } catch (error: any) {
+    console.error('[ArticleModules] Error in article operation:', error)
+    return NextResponse.json(
+      { error: 'Failed to perform article operation', details: error.message },
       { status: 500 }
     )
   }

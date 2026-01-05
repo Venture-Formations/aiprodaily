@@ -113,6 +113,7 @@ export default async function NewsletterPage({ params }: PageProps) {
   const pollModules = newsletter.sections?.poll_modules || []
   const aiAppModules = newsletter.sections?.ai_app_modules || []
   const promptModules = newsletter.sections?.prompt_modules || []
+  const articleModules = newsletter.sections?.article_modules || []
   const legacyPrompt = newsletter.sections?.prompt // Legacy single prompt
 
   // Section IDs for stable matching
@@ -135,17 +136,29 @@ export default async function NewsletterPage({ params }: PageProps) {
     | { type: 'poll_module'; data: any; display_order: number }
     | { type: 'ai_app_module'; data: any; display_order: number }
     | { type: 'prompt_module'; data: any; display_order: number }
+    | { type: 'article_module'; data: any; display_order: number }
     | { type: 'legacy_ai_apps'; data: any; display_order: number }
     | { type: 'legacy_prompt'; data: any; display_order: number }
 
   // Check if any modules have actual content (not just empty module entries)
   const hasValidAiAppModules = aiAppModules.some((m: any) => m.apps && m.apps.length > 0)
   const hasValidPromptModules = promptModules.some((m: any) => m.prompt)
+  const hasValidArticleModules = articleModules.some((m: any) => m.articles && m.articles.length > 0)
 
   const allRenderItems: RenderItem[] = [
-    // Newsletter sections (excluding Advertisement, AI Applications, and Prompt Ideas which are handled by modules/legacy)
+    // Newsletter sections (excluding Advertisement, AI Applications, Prompt Ideas, and article sections which are handled by modules/legacy)
+    // Also exclude primary_articles and secondary_articles if we have valid article modules
     ...(newsletterSectionsConfig || [])
-      .filter((s: any) => s.id !== SECTION_IDS.ADVERTISEMENT && s.id !== SECTION_IDS.AI_APPLICATIONS && s.id !== SECTION_IDS.PROMPT_IDEAS)
+      .filter((s: any) => {
+        if (s.id === SECTION_IDS.ADVERTISEMENT || s.id === SECTION_IDS.AI_APPLICATIONS || s.id === SECTION_IDS.PROMPT_IDEAS) {
+          return false
+        }
+        // Exclude legacy article sections if we have article modules with content
+        if (hasValidArticleModules && (s.section_type === 'primary_articles' || s.section_type === 'secondary_articles')) {
+          return false
+        }
+        return true
+      })
       .map((s: any) => ({ type: 'section' as const, data: s, display_order: s.display_order ?? 999 })),
     // Ad modules
     ...adModules.map((m: any) => ({ type: 'ad_module' as const, data: m, display_order: m.display_order ?? 999 })),
@@ -170,7 +183,11 @@ export default async function NewsletterPage({ params }: PageProps) {
       type: 'legacy_prompt' as const,
       data: legacyPrompt,
       display_order: getDisplayOrder(SECTION_IDS.PROMPT_IDEAS)
-    }] : [])
+    }] : []),
+    // Article modules (new dynamic article sections)
+    ...articleModules
+      .filter((m: any) => m.articles && m.articles.length > 0)
+      .map((m: any) => ({ type: 'article_module' as const, data: m, display_order: m.display_order ?? 999 }))
   ].sort((a, b) => a.display_order - b.display_order)
 
   // Process advertorial body to make last sentence or arrow CTA a hyperlink (like email template)
@@ -712,6 +729,88 @@ export default async function NewsletterPage({ params }: PageProps) {
                             return null
                         }
                       })}
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
+            // Render Article Modules (new dynamic article sections)
+            if (item.type === 'article_module') {
+              const articleModule = item.data
+              const moduleArticles = articleModule.articles
+              if (!moduleArticles || moduleArticles.length === 0) return null
+
+              const blockOrder: string[] = articleModule.block_order || ['title', 'body']
+
+              return (
+                <div key={`article-module-${articleModule.module_name}`} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                  <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{articleModule.module_name}</h2>
+                  <div className="p-6 sm:p-8">
+                    <div className="space-y-8">
+                      {moduleArticles.map((article: any, index: number) => (
+                        <article key={article.id} className="border-b border-slate-200 last:border-0 pb-8 last:pb-0">
+                          <div className="flex items-start gap-4">
+                            <div className="flex-shrink-0 w-8 h-8 bg-slate-800 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                              {index + 1}
+                            </div>
+                            <div className="flex-1">
+                              {blockOrder.map((blockType: string) => {
+                                switch (blockType) {
+                                  case 'source_image':
+                                    return article.rss_post?.image_url ? (
+                                      <div key="source_image" className="mb-4">
+                                        <img
+                                          src={article.rss_post.image_url}
+                                          alt={article.headline}
+                                          className="w-full max-w-md rounded-lg"
+                                        />
+                                      </div>
+                                    ) : null
+                                  case 'ai_image':
+                                    return article.ai_image_url ? (
+                                      <div key="ai_image" className="mb-4">
+                                        <img
+                                          src={article.ai_image_url}
+                                          alt={article.headline}
+                                          className="w-full max-w-md rounded-lg"
+                                        />
+                                      </div>
+                                    ) : null
+                                  case 'title':
+                                    return (
+                                      <h3 key="title" className="text-xl sm:text-2xl font-bold text-slate-900 mb-3">
+                                        {article.headline}
+                                      </h3>
+                                    )
+                                  case 'body':
+                                    return (
+                                      <div key="body" className="text-slate-900/80 leading-relaxed mb-4 whitespace-pre-wrap">
+                                        {article.content}
+                                      </div>
+                                    )
+                                  default:
+                                    return null
+                                }
+                              })}
+
+                              {article.rss_post?.source_url && (
+                                <a
+                                  href={article.rss_post.source_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:text-blue-500 text-sm font-medium inline-flex items-center gap-1"
+                                >
+                                  Read full story
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                  </svg>
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </article>
+                      ))}
                     </div>
                   </div>
                 </div>
