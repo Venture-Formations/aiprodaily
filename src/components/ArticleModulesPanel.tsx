@@ -282,10 +282,17 @@ export default function ArticleModulesPanel({ issueId, issueStatus }: ArticleMod
                 </div>
                 <div className="flex items-center space-x-3">
                   {isExpanded ? (
-                    <span className="text-sm text-blue-600">Collapse</span>
+                    <span className="text-sm text-gray-500">Click to collapse</span>
                   ) : (
-                    <span className="text-sm text-blue-600">
-                      {selectedCount > 0 ? `${selectedCount} article${selectedCount !== 1 ? 's' : ''} selected` : 'No articles'}
+                    <span className={`text-sm font-medium ${
+                      selectedCount === 0
+                        ? 'text-red-600'
+                        : selectedCount >= module.articles_count
+                          ? 'text-green-600'
+                          : 'text-yellow-600'
+                    }`}>
+                      {selectedCount}/{module.articles_count} selected
+                      {totalArticles > 0 && ` • ${totalArticles} total articles`}
                     </span>
                   )}
                   <svg
@@ -305,7 +312,13 @@ export default function ArticleModulesPanel({ issueId, issueStatus }: ArticleMod
                   {/* Instructions */}
                   <div className="flex items-center justify-between py-3 text-sm text-gray-600">
                     <span>Check articles to select them for the issue. Drag to reorder selected articles.</span>
-                    <span className="text-blue-600 font-medium">
+                    <span className={`font-medium ${
+                      selectedCount === 0
+                        ? 'text-red-600'
+                        : selectedCount >= module.articles_count
+                          ? 'text-green-600'
+                          : 'text-yellow-600'
+                    }`}>
                       {selectedCount}/{module.articles_count} selected {totalArticles > 0 && `• ${totalArticles} total articles`}
                     </span>
                   </div>

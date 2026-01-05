@@ -302,7 +302,17 @@ export class ArticleModuleSelector {
           .from('module_articles')
           .select(`
             *,
-            rss_post:rss_posts(*)
+            rss_post:rss_posts(
+              *,
+              post_ratings(
+                total_score,
+                criteria_1_score, criteria_1_reason, criteria_1_weight,
+                criteria_2_score, criteria_2_reason, criteria_2_weight,
+                criteria_3_score, criteria_3_reason, criteria_3_weight,
+                criteria_4_score, criteria_4_reason, criteria_4_weight,
+                criteria_5_score, criteria_5_reason, criteria_5_weight
+              )
+            )
           `)
           .eq('issue_id', issueId)
           .eq('article_module_id', selection.article_module_id)
@@ -333,7 +343,14 @@ export class ArticleModuleSelector {
         *,
         rss_post:rss_posts(
           *,
-          post_ratings(total_score)
+          post_ratings(
+            total_score,
+            criteria_1_score, criteria_1_reason, criteria_1_weight,
+            criteria_2_score, criteria_2_reason, criteria_2_weight,
+            criteria_3_score, criteria_3_reason, criteria_3_weight,
+            criteria_4_score, criteria_4_reason, criteria_4_weight,
+            criteria_5_score, criteria_5_reason, criteria_5_weight
+          )
         )
       `)
       .eq('issue_id', issueId)
