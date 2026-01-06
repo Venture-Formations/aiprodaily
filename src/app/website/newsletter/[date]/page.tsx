@@ -107,13 +107,14 @@ export default async function NewsletterPage({ params }: PageProps) {
   const aiApps = newsletter.sections?.ai_apps || []
   const poll = newsletter.sections?.poll
   const roadWork = newsletter.sections?.road_work
-  const welcome = newsletter.sections?.welcome
+  const welcome = newsletter.sections?.welcome // Legacy - deprecated in favor of text_box_modules
   const advertorial = newsletter.sections?.advertorial
   const adModules = newsletter.sections?.ad_modules || []
   const pollModules = newsletter.sections?.poll_modules || []
   const aiAppModules = newsletter.sections?.ai_app_modules || []
   const promptModules = newsletter.sections?.prompt_modules || []
   const articleModules = newsletter.sections?.article_modules || []
+  const textBoxModules = newsletter.sections?.text_box_modules || []
   const legacyPrompt = newsletter.sections?.prompt // Legacy single prompt
 
   // Section IDs for stable matching
@@ -137,6 +138,7 @@ export default async function NewsletterPage({ params }: PageProps) {
     | { type: 'ai_app_module'; data: any; display_order: number }
     | { type: 'prompt_module'; data: any; display_order: number }
     | { type: 'article_module'; data: any; display_order: number }
+    | { type: 'text_box_module'; data: any; display_order: number }
     | { type: 'legacy_ai_apps'; data: any; display_order: number }
     | { type: 'legacy_prompt'; data: any; display_order: number }
 
@@ -187,7 +189,11 @@ export default async function NewsletterPage({ params }: PageProps) {
     // Article modules (new dynamic article sections)
     ...articleModules
       .filter((m: any) => m.articles && m.articles.length > 0)
-      .map((m: any) => ({ type: 'article_module' as const, data: m, display_order: m.display_order ?? 999 }))
+      .map((m: any) => ({ type: 'article_module' as const, data: m, display_order: m.display_order ?? 999 })),
+    // Text box modules (replaces legacy welcome section)
+    ...textBoxModules
+      .filter((m: any) => m.blocks && m.blocks.length > 0)
+      .map((m: any) => ({ type: 'text_box_module' as const, data: m, display_order: m.display_order ?? 999 }))
   ].sort((a, b) => a.display_order - b.display_order)
 
   // Process advertorial body to make last sentence or arrow CTA a hyperlink (like email template)
@@ -347,8 +353,9 @@ export default async function NewsletterPage({ params }: PageProps) {
             if (item.type === 'section') {
               const section = item.data
 
-              // Welcome Section
-              if (section.section_type === 'welcome' && welcome && (welcome.intro || welcome.tagline || welcome.summary)) {
+              // Welcome Section (legacy - only render if no text_box_modules)
+              const hasTextBoxModules = textBoxModules && textBoxModules.length > 0
+              if (section.section_type === 'welcome' && !hasTextBoxModules && welcome && (welcome.intro || welcome.tagline || welcome.summary)) {
                 return (
                   <div key={section.id} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6 ring-1 ring-slate-200">
                     <div className="p-6 sm:p-8">
@@ -811,6 +818,73 @@ export default async function NewsletterPage({ params }: PageProps) {
                           </div>
                         </article>
                       ))}
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
+            // Render Text Box Module (replaces legacy welcome section)
+            if (item.type === 'text_box_module') {
+              const textBoxModule = item.data
+              const blocks = textBoxModule.blocks || []
+              if (blocks.length === 0) return null
+
+              // Text size styling
+              const getTextSizeClass = (size: string) => {
+                switch (size) {
+                  case 'small': return 'text-sm'
+                  case 'large': return 'text-xl font-semibold'
+                  default: return 'text-base'
+                }
+              }
+
+              return (
+                <div key={`text-box-module-${textBoxModule.module_id}`} className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+                  {textBoxModule.show_name && (
+                    <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">{textBoxModule.module_name}</h2>
+                  )}
+                  <div className="p-6 sm:p-8">
+                    <div className="space-y-4">
+                      {blocks.map((block: any, index: number) => {
+                        // Get content based on block type
+                        let content = ''
+                        if (block.block_type === 'static_text') {
+                          content = block.static_content || ''
+                        } else if (block.block_type === 'ai_prompt') {
+                          content = block.generated_content || ''
+                        }
+
+                        // Clean merge tags for website display
+                        if (content) {
+                          content = cleanMergeTags(content)
+                        }
+
+                        // Render based on block type
+                        if (block.block_type === 'image') {
+                          const imageUrl = block.static_image_url || block.generated_image_url
+                          if (!imageUrl) return null
+                          return (
+                            <div key={block.id || index} className="text-center">
+                              <img
+                                src={imageUrl}
+                                alt=""
+                                className="max-w-full h-auto rounded-lg mx-auto"
+                              />
+                            </div>
+                          )
+                        }
+
+                        // Text content (static or AI-generated)
+                        if (!content) return null
+                        return (
+                          <div
+                            key={block.id || index}
+                            className={`${getTextSizeClass(block.text_size)} text-slate-900/80 leading-relaxed`}
+                            dangerouslySetInnerHTML={{ __html: content }}
+                          />
+                        )
+                      })}
                     </div>
                   </div>
                 </div>

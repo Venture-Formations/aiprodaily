@@ -1864,13 +1864,9 @@ export async function generateFullNewsletterHtml(
     const header = await generateNewsletterHeader(formattedDate, issue.date, mailerliteId, issue.publication_id)
     const footer = await generateNewsletterFooter(issue.date, mailerliteId, issue.publication_id)
 
-    // Generate welcome section (if it exists)
-    const welcomeHtml = await generateWelcomeSection(
-      issue.welcome_intro || null,
-      issue.welcome_tagline || null,
-      issue.welcome_summary || null,
-      issue.publication_id
-    )
+    // Note: Welcome section content is now handled by Text Box Modules
+    // The legacy welcome section fields (welcome_intro, welcome_tagline, welcome_summary) are deprecated
+    // Text box modules appear in the correct position based on their display_order in the unified sections list
 
     // Review banner for review emails
     const reviewBanner = isReview ? `
@@ -1978,8 +1974,9 @@ export async function generateFullNewsletterHtml(
       }
     }
 
-    // Combine all sections (review banner first if applicable, then header, welcome, sections, footer)
-    const html = reviewBanner + header + welcomeHtml + sectionsHtml + footer
+    // Combine all sections (review banner first if applicable, then header, sections, footer)
+    // Note: Welcome content is now part of sectionsHtml via Text Box Modules
+    const html = reviewBanner + header + sectionsHtml + footer
 
     console.log('Full newsletter HTML generated, length:', html.length)
     return html

@@ -84,19 +84,9 @@ export class NewsletterArchiver {
       // 3. Fetch additional sections data
       const sections: Record<string, any> = {}
 
-      // Welcome section
-      if (issue && (issue.welcome_intro || issue.welcome_tagline || issue.welcome_summary)) {
-        // Prepend personalized greeting to intro for email
-        const greeting = `Hey, {$name|default('Accounting Pro')}!`
-        const intro = issue.welcome_intro || ''
-        const fullIntro = intro.trim() ? `${greeting} ${intro.trim()}` : greeting
-
-        sections.welcome = {
-          intro: greeting,
-          tagline: issue.welcome_tagline || '',
-          summary: issue.welcome_summary || ''
-        }
-      }
+      // Note: Welcome section content is now handled by Text Box Modules
+      // Legacy welcome fields (welcome_intro, welcome_tagline, welcome_summary) are deprecated
+      // Text box modules are archived below
 
       // Road Work section
       const { data: roadWork } = await supabaseAdmin
@@ -446,6 +436,73 @@ export class NewsletterArchiver {
         }
       }
 
+      // Text Box Modules section (replaces legacy welcome section)
+      const { data: textBoxModules } = await supabaseAdmin
+        .from('text_box_modules')
+        .select('id, name, display_order, show_name, is_active')
+        .eq('publication_id', issue.publication_id)
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+
+      if (textBoxModules && textBoxModules.length > 0) {
+        const textBoxModulesWithContent = []
+
+        for (const module of textBoxModules) {
+          // Fetch blocks for this module
+          const { data: blocks } = await supabaseAdmin
+            .from('text_box_blocks')
+            .select('id, block_type, display_order, is_active, static_content, text_size, ai_prompt_json, generation_timing, image_type, static_image_url, ai_image_prompt')
+            .eq('text_box_module_id', module.id)
+            .eq('is_active', true)
+            .order('display_order', { ascending: true })
+
+          // Fetch issue blocks (generated content) for this issue
+          const { data: issueBlocks } = await supabaseAdmin
+            .from('issue_text_box_blocks')
+            .select('text_box_block_id, generated_content, generated_image_url, override_content, override_image_url, generation_status')
+            .eq('issue_id', issueId)
+
+          const issueBlocksMap = new Map(
+            (issueBlocks || []).map(ib => [ib.text_box_block_id, ib])
+          )
+
+          if (blocks && blocks.length > 0) {
+            textBoxModulesWithContent.push({
+              module_id: module.id,
+              module_name: module.name,
+              display_order: module.display_order,
+              show_name: module.show_name,
+              blocks: blocks.map((block: any) => {
+                const issueBlock = issueBlocksMap.get(block.id)
+                return {
+                  id: block.id,
+                  block_type: block.block_type,
+                  display_order: block.display_order,
+                  // Static text
+                  static_content: block.static_content,
+                  text_size: block.text_size,
+                  // AI prompt
+                  ai_prompt_json: block.ai_prompt_json,
+                  generation_timing: block.generation_timing,
+                  generated_content: issueBlock?.override_content || issueBlock?.generated_content,
+                  // Image
+                  image_type: block.image_type,
+                  static_image_url: block.static_image_url,
+                  generated_image_url: issueBlock?.override_image_url || issueBlock?.generated_image_url,
+                  ai_image_prompt: block.ai_image_prompt,
+                  // Status
+                  generation_status: issueBlock?.generation_status
+                }
+              })
+            })
+          }
+        }
+
+        if (textBoxModulesWithContent.length > 0) {
+          sections.text_box_modules = textBoxModulesWithContent
+        }
+      }
+
       // Newsletter sections configuration snapshot (for section ordering)
       const { data: newsletterSections } = await supabaseAdmin
         .from('newsletter_sections')
@@ -467,7 +524,8 @@ export class NewsletterArchiver {
       const metadata = {
         total_articles: articles?.length || 0,
         total_secondary_articles: secondaryArticles?.length || 0,
-        has_welcome: !!(issue?.welcome_intro || issue?.welcome_tagline || issue?.welcome_summary),
+        has_text_box_modules: !!sections.text_box_modules && Array.isArray(sections.text_box_modules) && sections.text_box_modules.length > 0,
+        text_box_modules_count: sections.text_box_modules?.length || 0,
         has_road_work: !!roadWork,
         has_ai_apps: !!sections.ai_apps && Array.isArray(sections.ai_apps) && sections.ai_apps.length > 0,
         has_ai_app_modules: !!sections.ai_app_modules && Array.isArray(sections.ai_app_modules) && sections.ai_app_modules.length > 0,

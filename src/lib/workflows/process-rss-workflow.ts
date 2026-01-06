@@ -441,10 +441,8 @@ async function finalizeIssue(issueId: string, moduleIds: string[], stepNum: numb
       }
       console.log(`[Workflow Step ${stepNum}] Active articles: ${moduleCounts.join(', ')}`)
 
-      // Generate welcome section (legacy - will be replaced by text box modules)
-      await processor.generateWelcomeSection(issueId)
-
       // Generate text box module blocks with "after_articles" timing (full newsletter context)
+      // This replaces the legacy welcome section - text box modules now handle welcome content
       try {
         const { TextBoxGenerator } = await import('@/lib/text-box-modules')
 
