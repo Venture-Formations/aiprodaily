@@ -31,12 +31,55 @@ export default function TextBoxModulesPanel({ issueId, issueStatus }: TextBoxMod
     fetchTextBoxModules()
   }, [issueId])
 
+  // Auto-expand modules that have AI-generated content
+  useEffect(() => {
+    if (selections.length > 0) {
+      const autoExpand: Record<string, boolean> = {}
+      selections.forEach(selection => {
+        // Auto-expand if module has AI prompt blocks with content
+        const hasAIContent = selection.blocks.some(block => {
+          if (block.block_type === 'ai_prompt' && block.is_active) {
+            const issueBlock = selection.issueBlocks.find(ib => ib.text_box_block_id === block.id)
+            return issueBlock?.generated_content || issueBlock?.override_content
+          }
+          return false
+        })
+        if (hasAIContent) {
+          autoExpand[selection.module.id] = true
+        }
+      })
+      // Only update if there are modules to expand and they're not already set
+      if (Object.keys(autoExpand).length > 0) {
+        setExpanded(prev => {
+          const hasExisting = Object.keys(prev).length > 0
+          return hasExisting ? prev : autoExpand
+        })
+      }
+    }
+  }, [selections])
+
   const fetchTextBoxModules = async () => {
     try {
       const response = await fetch(`/api/campaigns/${issueId}/text-box-modules`)
       if (response.ok) {
         const data = await response.json()
+        console.log('[TextBoxModulesPanel] Fetched data:', {
+          modulesCount: data.modules?.length,
+          modules: data.modules?.map((s: any) => ({
+            name: s.module?.name,
+            blocksCount: s.blocks?.length,
+            issueBlocksCount: s.issueBlocks?.length,
+            aiPromptBlocks: s.blocks?.filter((b: any) => b.block_type === 'ai_prompt').map((b: any) => ({
+              id: b.id,
+              is_active: b.is_active,
+              issueBlock: s.issueBlocks?.find((ib: any) => ib.text_box_block_id === b.id)
+            }))
+          }))
+        })
         setSelections(data.modules || [])
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('[TextBoxModulesPanel] API error:', response.status, errorData)
       }
     } catch (error) {
       console.error('Failed to fetch text box modules:', error)

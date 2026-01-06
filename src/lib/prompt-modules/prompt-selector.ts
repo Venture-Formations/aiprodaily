@@ -28,6 +28,8 @@ export class PromptModuleSelector {
       .eq('prompt_module_id', moduleId)
       .eq('is_active', true)
 
+    console.log(`[PromptSelector] Module ${moduleId}: ${modulePrompts?.length || 0} module-specific prompts found`)
+
     let query = supabaseAdmin
       .from('prompt_ideas')
       .select('*')
@@ -36,9 +38,11 @@ export class PromptModuleSelector {
 
     if (modulePrompts && modulePrompts.length > 0) {
       // Use module-specific prompts
+      console.log('[PromptSelector] Using module-specific prompts')
       query = query.eq('prompt_module_id', moduleId)
     } else {
       // Use prompts without module assignment (available to all modules)
+      console.log('[PromptSelector] Using prompts with null module_id')
       query = query.is('prompt_module_id', null)
     }
 
@@ -48,6 +52,8 @@ export class PromptModuleSelector {
       console.error('[PromptSelector] Error fetching prompts:', error)
       return []
     }
+
+    console.log(`[PromptSelector] Found ${data.length} eligible prompts for publication ${publicationId}`)
 
     return data as PromptIdea[]
   }
