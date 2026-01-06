@@ -590,6 +590,86 @@ export class TextBoxGenerator {
   }
 
   /**
+   * Auto-regenerate all AI prompt blocks for an issue
+   * Called when articles are reordered or updated (replaces legacy autoRegenerateWelcome)
+   */
+  static async autoRegenerateBlocks(
+    issueId: string,
+    triggeredBy?: string
+  ): Promise<{ success: boolean; regenerated: number; error?: string }> {
+    console.log(`[TextBoxGenerator] Auto-regenerating blocks for issue ${issueId} (triggered by: ${triggeredBy || 'unknown'})`)
+
+    try {
+      // Get all AI prompt blocks that have after_articles timing (since they reference article content)
+      const { data: issueBlocks } = await supabaseAdmin
+        .from('issue_text_box_blocks')
+        .select(`
+          id,
+          text_box_block_id,
+          text_box_block:text_box_blocks(
+            id,
+            block_type,
+            generation_timing,
+            ai_prompt_json
+          )
+        `)
+        .eq('issue_id', issueId)
+
+      if (!issueBlocks || issueBlocks.length === 0) {
+        console.log('[TextBoxGenerator] No text box blocks found for issue')
+        return { success: true, regenerated: 0 }
+      }
+
+      // Filter to only AI prompt blocks with after_articles timing
+      const blocksToRegenerate = issueBlocks.filter(ib => {
+        const block = ib.text_box_block as any
+        return block?.block_type === 'ai_prompt' &&
+               block?.generation_timing === 'after_articles' &&
+               block?.ai_prompt_json
+      })
+
+      if (blocksToRegenerate.length === 0) {
+        console.log('[TextBoxGenerator] No AI prompt blocks need regeneration')
+        return { success: true, regenerated: 0 }
+      }
+
+      // Build placeholder data
+      const placeholderData = await this.buildPlaceholderData(issueId, 'after_articles')
+
+      let regenerated = 0
+      for (const issueBlock of blocksToRegenerate) {
+        const block = issueBlock.text_box_block as any
+        const result = await this.generateBlockContent(block, issueId, placeholderData)
+
+        if (result.success && result.content) {
+          await supabaseAdmin
+            .from('issue_text_box_blocks')
+            .update({
+              generated_content: result.content,
+              generation_status: 'completed',
+              generation_error: null,
+              generated_at: new Date().toISOString()
+            })
+            .eq('id', issueBlock.id)
+
+          regenerated++
+        }
+      }
+
+      console.log(`[TextBoxGenerator] Auto-regenerated ${regenerated} blocks`)
+      return { success: true, regenerated }
+
+    } catch (error) {
+      console.error('[TextBoxGenerator] Auto-regeneration error:', error)
+      return {
+        success: false,
+        regenerated: 0,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
+    }
+  }
+
+  /**
    * Test a prompt with placeholder injection using last sent issue data
    */
   static async testPrompt(

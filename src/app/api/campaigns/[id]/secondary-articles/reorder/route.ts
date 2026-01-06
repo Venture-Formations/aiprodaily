@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authOptions } from '@/lib/auth'
-import { autoRegenerateWelcome } from '@/lib/welcome-section-generator'
 
 export async function POST(
   request: NextRequest,
@@ -73,16 +72,18 @@ export async function POST(
       // Don't fail the request if logging fails
     }
 
-    // Auto-regenerate welcome section (fire and forget - don't wait)
-    console.log('Auto-regenerating welcome section after secondary articles reorder...')
-    autoRegenerateWelcome(issueId, session.user?.email || undefined).then(result => {
-      if (result.success) {
-        console.log('Welcome section auto-regenerated successfully after secondary reorder')
-      } else {
-        console.error('Failed to auto-regenerate welcome after secondary reorder:', result.error)
-      }
-    }).catch(error => {
-      console.error('Welcome regeneration error after secondary reorder:', error)
+    // Auto-regenerate text box blocks (fire and forget - don't wait)
+    console.log('Auto-regenerating text box blocks after secondary articles reorder...')
+    import('@/lib/text-box-modules').then(({ TextBoxGenerator }) => {
+      TextBoxGenerator.autoRegenerateBlocks(issueId, session.user?.email || undefined).then(result => {
+        if (result.success) {
+          console.log(`Text box blocks auto-regenerated successfully (${result.regenerated} blocks)`)
+        } else {
+          console.error('Failed to auto-regenerate text box blocks:', result.error)
+        }
+      }).catch(error => {
+        console.error('Text box regeneration error:', error)
+      })
     })
 
     return NextResponse.json({

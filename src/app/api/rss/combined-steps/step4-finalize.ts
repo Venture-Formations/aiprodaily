@@ -1,18 +1,32 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { SlackNotificationService } from '@/lib/slack'
-import { RSSProcessor } from '@/lib/rss-processor'
 
 /**
  * Combined Step 4: Finalize
- * - Generate welcome section
+ * - Generate text box modules (replaces legacy welcome section)
  * - Update issue status to draft
  * - Send completion notifications
  */
 export async function executeStep4(issueId: string) {
 
-  // Generate welcome section (after articles are ready)
-  const processor = new RSSProcessor()
-  await processor.generateWelcomeSection(issueId)
+  // Get publication_id for the issue
+  const { data: issueData } = await supabaseAdmin
+    .from('publication_issues')
+    .select('publication_id')
+    .eq('id', issueId)
+    .single()
+
+  // Generate text box modules (replaces legacy welcome section)
+  if (issueData?.publication_id) {
+    try {
+      const { TextBoxModuleSelector, TextBoxGenerator } = await import('@/lib/text-box-modules')
+      await TextBoxModuleSelector.initializeForIssue(issueId, issueData.publication_id)
+      await TextBoxGenerator.generateBlocksWithTiming(issueId, 'after_articles')
+      console.log('[Step 4/4] Text box modules generated')
+    } catch (error) {
+      console.log('[Step 4/4] Text box generation skipped:', error)
+    }
+  }
 
   // Update issue status
   await supabaseAdmin

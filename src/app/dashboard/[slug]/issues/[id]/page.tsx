@@ -34,101 +34,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 
 // Section Components
-function WelcomeSection({ issue, onRegenerate }: { issue: any; onRegenerate?: () => void }) {
-  const [regenerating, setRegenerating] = useState(false)
-
-  if (!issue) {
-    return (
-      <div className="text-center py-8 text-gray-500">
-        No issue data available
-      </div>
-    )
-  }
-
-  const hasContent = issue.welcome_intro || issue.welcome_tagline || issue.welcome_summary
-
-  const handleRegenerate = async () => {
-    if (!issue?.id) return
-
-    setRegenerating(true)
-    try {
-      const response = await fetch(`/api/campaigns/${issue.id}/regenerate-welcome`, {
-        method: 'POST'
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to regenerate welcome section')
-      }
-
-      // Refresh issue data
-      if (onRegenerate) {
-        onRegenerate()
-      }
-    } catch (error) {
-      console.error('Error regenerating welcome:', error)
-      alert('Failed to regenerate welcome section')
-    } finally {
-      setRegenerating(false)
-    }
-  }
-
-  if (!hasContent) {
-    return (
-      <div className="p-6">
-        <div className="text-center py-8 text-gray-500">
-          Welcome section has not been generated yet.
-          <br />
-          <span className="text-sm text-gray-400">
-            This will be automatically generated during RSS processing.
-          </span>
-        </div>
-        <div className="text-center mt-4">
-          <button
-            onClick={handleRegenerate}
-            disabled={regenerating}
-            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium"
-          >
-            {regenerating ? 'Generating...' : 'Generate Welcome Section'}
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="p-6">
-      <div className="border border-gray-200 rounded-lg bg-white shadow-sm p-6 space-y-3">
-        {issue.welcome_intro && (
-          <div className="text-gray-700">
-            {issue.welcome_intro}
-          </div>
-        )}
-        {issue.welcome_tagline && (
-          <div className="text-gray-700 font-bold">
-            {issue.welcome_tagline}
-          </div>
-        )}
-        {issue.welcome_summary && (
-          <div className="text-gray-700">
-            {issue.welcome_summary}
-          </div>
-        )}
-      </div>
-      <div className="text-center mt-4">
-        <button
-          onClick={handleRegenerate}
-          disabled={regenerating}
-          className="bg-gray-200 hover:bg-gray-300 disabled:opacity-50 text-gray-800 px-4 py-2 rounded text-sm font-medium"
-        >
-          {regenerating ? 'Regenerating...' : 'Regenerate Welcome Section'}
-        </button>
-        <p className="text-xs text-gray-500 mt-2">
-          Regenerate to reflect current article selection
-        </p>
-      </div>
-    </div>
-  )
-}
+// Note: WelcomeSection component removed - now handled by TextBoxModulesPanel
 
 function PromptIdeasSection({ issue }: { issue: any }) {
   const [prompt, setPrompt] = useState<any>(null)
@@ -614,19 +520,8 @@ function NewsletterSectionComponent({
     // and handled by AIAppModulesPanel instead
 
     // Legacy name-based matching for other sections
+    // Note: 'Welcome' case removed - now handled by TextBoxModulesPanel
     switch (section.name) {
-      case 'Welcome':
-        return <WelcomeSection issue={issue} onRegenerate={() => {
-          // Refresh issue data after regenerating
-          if (issue?.id) {
-            fetch(`/api/campaigns/${issue.id}`)
-              .then(res => res.json())
-              .then(data => {
-                // Update issue state with fresh data
-                window.location.reload() // Simple solution - reload the page
-              })
-          }
-        }} />
       case 'Poll':
         return <PollSection issue={issue} />
       case 'Breaking News':
@@ -2464,8 +2359,9 @@ export default function issueDetailPage() {
         {/* Dynamic Newsletter Sections */}
         {/* Note: Advertisement section (c0bc7173-de47-41b2-a260-77f55525ee3d) is excluded - handled by AdModulesPanel */}
         {/* Note: AI Applications section (853f8d0b-bc76-473a-bfc6-421418266222) is excluded - handled by AIAppModulesPanel */}
+        {/* Note: Welcome section (section_type='welcome') is excluded - handled by TextBoxModulesPanel */}
         {newsletterSections
-          .filter(section => section.is_active && section.id !== primaryArticlesSection?.id && section.id !== secondaryArticlesSection?.id && section.id !== 'c0bc7173-de47-41b2-a260-77f55525ee3d' && section.id !== '853f8d0b-bc76-473a-bfc6-421418266222')
+          .filter(section => section.is_active && section.id !== primaryArticlesSection?.id && section.id !== secondaryArticlesSection?.id && section.id !== 'c0bc7173-de47-41b2-a260-77f55525ee3d' && section.id !== '853f8d0b-bc76-473a-bfc6-421418266222' && section.section_type !== 'welcome')
           .map(section => (
             <NewsletterSectionComponent
               key={section.id}

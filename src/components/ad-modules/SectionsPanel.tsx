@@ -369,10 +369,11 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     '853f8d0b-bc76-473a-bfc6-421418266222'  // AI Applications - handled by AIAppModulesPanel
   ]
 
-  // Section types that are now handled by article_modules (exclude from sections list)
+  // Section types that are now handled by other modules (exclude from sections list)
   const EXCLUDED_SECTION_TYPES = [
     'primary_articles',   // Now handled by article_modules
-    'secondary_articles'  // Now handled by article_modules
+    'secondary_articles', // Now handled by article_modules
+    'welcome'             // Now handled by text_box_modules
   ]
 
   // Combine and sort all items by display_order

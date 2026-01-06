@@ -973,10 +973,17 @@ export class RSSProcessor {
         .eq('is_active', true)
       console.log(`[Step 6/10] ✓ Selected ${activeArticles?.length || 0} primary, ${activeSecondary?.length || 0} secondary`)
 
-      // STEP 7: Generate welcome section
-      console.log('[Step 7/10] Generating welcome section...')
-      await this.generateWelcomeSection(issueId)
-      console.log('[Step 7/10] ✓ Welcome section generated')
+      // STEP 7: Initialize and generate text box modules (replaces legacy welcome section)
+      console.log('[Step 7/10] Generating text box modules...')
+      try {
+        const publicationId = await this.getNewsletterIdFromissue(issueId)
+        const { TextBoxModuleSelector, TextBoxGenerator } = await import('@/lib/text-box-modules')
+        await TextBoxModuleSelector.initializeForIssue(issueId, publicationId)
+        await TextBoxGenerator.generateBlocksWithTiming(issueId, 'after_articles')
+        console.log('[Step 7/10] ✓ Text box modules generated')
+      } catch (textBoxError) {
+        console.log('[Step 7/10] ✓ Text box generation skipped:', textBoxError)
+      }
 
       // STEP 8: Subject line is already generated in selectTopArticlesForCampaign
       const { data: issue } = await supabaseAdmin
@@ -1271,8 +1278,15 @@ export class RSSProcessor {
       await this.processPostsWithAI(issueId, 'primary')
       await this.processPostsWithAI(issueId, 'secondary')
 
-      // Generate welcome section after all articles are processed
-      await this.generateWelcomeSection(issueId)
+      // Initialize and generate text box modules (replaces legacy welcome section)
+      try {
+        const publicationId = await this.getNewsletterIdFromissue(issueId)
+        const { TextBoxModuleSelector, TextBoxGenerator } = await import('@/lib/text-box-modules')
+        await TextBoxModuleSelector.initializeForIssue(issueId, publicationId)
+        await TextBoxGenerator.generateBlocksWithTiming(issueId, 'after_articles')
+      } catch (textBoxError) {
+        console.log('[Legacy Processing] Text box generation skipped:', textBoxError)
+      }
 
       // issue remains in 'draft' status for MailerLite cron to process
       // Status will be updated to 'in_review' by create-issue cron after MailerLite send

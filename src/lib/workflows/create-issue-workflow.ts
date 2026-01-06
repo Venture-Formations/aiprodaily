@@ -367,8 +367,24 @@ async function finalizeIssue(issueId: string, moduleIds: string[], stepNum: numb
         console.log(`[Workflow Step ${stepNum}] Selected ${selectedIds.length} articles for ${module?.name}`)
       }
 
-      // Generate welcome section
-      await processor.generateWelcomeSection(issueId)
+      // Initialize and generate text box modules (replaces legacy welcome section)
+      try {
+        // Get publication_id from issue
+        const { data: issueData } = await supabaseAdmin
+          .from('publication_issues')
+          .select('publication_id')
+          .eq('id', issueId)
+          .single()
+
+        if (issueData?.publication_id) {
+          const { TextBoxModuleSelector, TextBoxGenerator } = await import('@/lib/text-box-modules')
+          await TextBoxModuleSelector.initializeForIssue(issueId, issueData.publication_id)
+          await TextBoxGenerator.generateBlocksWithTiming(issueId, 'after_articles')
+          console.log(`[Workflow Step ${stepNum}] Text box modules initialized and generated`)
+        }
+      } catch (textBoxError) {
+        console.log(`[Workflow Step ${stepNum}] Text box generation skipped:`, textBoxError)
+      }
 
       // Generate subject line
       if (moduleIds.length > 0) {

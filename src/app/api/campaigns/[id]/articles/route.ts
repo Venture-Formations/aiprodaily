@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authOptions } from '@/lib/auth'
-import { autoRegenerateWelcome } from '@/lib/welcome-section-generator'
 
 interface RouteParams {
   params: Promise<{
@@ -63,16 +62,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    // Auto-regenerate welcome section (fire and forget - don't wait)
-    console.log('[API] Auto-regenerating welcome section after article updates...')
-    autoRegenerateWelcome(id, session.user?.email || undefined).then(result => {
-      if (result.success) {
-        console.log('[API] Welcome section auto-regenerated successfully')
-      } else {
-        console.error('[API] Failed to auto-regenerate welcome:', result.error)
-      }
-    }).catch(error => {
-      console.error('[API] Welcome regeneration error:', error)
+    // Auto-regenerate text box blocks (fire and forget - don't wait)
+    console.log('[API] Auto-regenerating text box blocks after article updates...')
+    import('@/lib/text-box-modules').then(({ TextBoxGenerator }) => {
+      TextBoxGenerator.autoRegenerateBlocks(id, session.user?.email || undefined).then(result => {
+        if (result.success) {
+          console.log(`[API] Text box blocks auto-regenerated successfully (${result.regenerated} blocks)`)
+        } else {
+          console.error('[API] Failed to auto-regenerate text box blocks:', result.error)
+        }
+      }).catch(error => {
+        console.error('[API] Text box regeneration error:', error)
+      })
     })
 
     return NextResponse.json({ success: true, updated: article_updates.length })
