@@ -14,6 +14,44 @@ import type {
   GenerationTiming
 } from '@/types/database'
 
+/**
+ * Extract text content from various AI response formats
+ * Handles common patterns like {summary: "..."}, {content: "..."}, etc.
+ */
+function extractTextFromResponse(result: any): string {
+  // If already a string, use it directly
+  if (typeof result === 'string') {
+    return result.trim()
+  }
+
+  // If not an object, stringify it
+  if (!result || typeof result !== 'object') {
+    return result ? String(result) : ''
+  }
+
+  // Check common field names for text content
+  const textFields = ['summary', 'content', 'text', 'raw', 'response', 'output', 'result', 'message', 'body']
+  for (const field of textFields) {
+    if (result[field] && typeof result[field] === 'string') {
+      return result[field].trim()
+    }
+  }
+
+  // If object has only one key with a string value, use that
+  const keys = Object.keys(result)
+  if (keys.length === 1 && typeof result[keys[0]] === 'string') {
+    return result[keys[0]].trim()
+  }
+
+  // If object has only one key with object value that contains text, recurse
+  if (keys.length === 1 && typeof result[keys[0]] === 'object') {
+    return extractTextFromResponse(result[keys[0]])
+  }
+
+  // Fallback: stringify the whole object
+  return JSON.stringify(result)
+}
+
 export class TextBoxGenerator {
   /**
    * Build placeholder data for AI content generation
@@ -331,13 +369,8 @@ export class TextBoxGenerator {
         provider
       )
 
-      // Extract content from result
-      let content = ''
-      if (typeof result === 'string') {
-        content = result.trim()
-      } else if (result && typeof result === 'object') {
-        content = result.content || result.text || result.raw || JSON.stringify(result)
-      }
+      // Extract content from result using helper
+      const content = extractTextFromResponse(result)
 
       if (!content) {
         return { success: false, error: 'Empty response from AI' }
@@ -577,12 +610,8 @@ export class TextBoxGenerator {
         'openai'
       )
 
-      let content = ''
-      if (typeof result === 'string') {
-        content = result
-      } else if (result && typeof result === 'object') {
-        content = result.content || result.text || result.raw || JSON.stringify(result)
-      }
+      // Extract content using helper
+      const content = extractTextFromResponse(result)
 
       return {
         success: true,
