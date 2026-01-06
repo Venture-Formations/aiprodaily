@@ -24,7 +24,8 @@ import PollModuleSettings from '../poll-modules/PollModuleSettings'
 import { AIAppModuleSettings } from '../ai-app-modules'
 import PromptModuleSettings from '../prompt-modules/PromptModuleSettings'
 import { ArticleModuleSettings } from '../article-modules'
-import type { NewsletterSection, AdModule, PollModule, AIAppModule, PromptModule, ArticleModule } from '@/types/database'
+import { TextBoxModuleSettings } from '../text-box-modules'
+import type { NewsletterSection, AdModule, PollModule, AIAppModule, PromptModule, ArticleModule, TextBoxModule } from '@/types/database'
 
 interface SectionsPanelProps {
   publicationId?: string // Optional - will be fetched from URL if not provided
@@ -37,6 +38,7 @@ type SectionItem =
   | { type: 'ai_app_module'; data: AIAppModule }
   | { type: 'prompt_module'; data: PromptModule }
   | { type: 'article_module'; data: ArticleModule }
+  | { type: 'text_box_module'; data: TextBoxModule }
 
 function SortableSectionItem({
   item,
@@ -61,7 +63,9 @@ function SortableSectionItem({
           ? `ai-app-module-${item.data.id}`
           : item.type === 'article_module'
             ? `article-module-${item.data.id}`
-            : `prompt-module-${item.data.id}`
+            : item.type === 'text_box_module'
+              ? `text-box-module-${item.data.id}`
+              : `prompt-module-${item.data.id}`
   const name = item.data.name
   const isActive = item.data.is_active
   const isAdModule = item.type === 'ad_module'
@@ -69,6 +73,7 @@ function SortableSectionItem({
   const isAIAppModule = item.type === 'ai_app_module'
   const isPromptModule = item.type === 'prompt_module'
   const isArticleModule = item.type === 'article_module'
+  const isTextBoxModule = item.type === 'text_box_module'
 
   const {
     attributes,
@@ -137,6 +142,11 @@ function SortableSectionItem({
           {isArticleModule && (
             <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">
               Articles
+            </span>
+          )}
+          {isTextBoxModule && (
+            <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-cyan-100 text-cyan-700 rounded-full">
+              Text Box
             </span>
           )}
         </div>
@@ -232,13 +242,14 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
   const [aiAppModules, setAIAppModules] = useState<AIAppModule[]>([])
   const [promptModules, setPromptModules] = useState<PromptModule[]>([])
   const [articleModules, setArticleModules] = useState<ArticleModule[]>([])
+  const [textBoxModules, setTextBoxModules] = useState<TextBoxModule[]>([])
   const [selectedItem, setSelectedItem] = useState<SectionItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [cooldownDays, setCooldownDays] = useState(7)
   const [showAddModal, setShowAddModal] = useState(false)
   const [newModuleName, setNewModuleName] = useState('')
-  const [newSectionType, setNewSectionType] = useState<'ad' | 'poll' | 'ai_app' | 'prompt' | 'article' | 'standard'>('ad')
+  const [newSectionType, setNewSectionType] = useState<'ad' | 'poll' | 'ai_app' | 'prompt' | 'article' | 'text_box' | 'standard'>('ad')
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -332,6 +343,13 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
         setArticleModules(articleModulesData.modules || [])
       }
 
+      // Fetch text box modules
+      const textBoxModulesRes = await fetch(`/api/text-box-modules?publication_id=${publicationId}`)
+      if (textBoxModulesRes.ok) {
+        const textBoxModulesData = await textBoxModulesRes.json()
+        setTextBoxModules(textBoxModulesData.modules || [])
+      }
+
       // Fetch cooldown setting
       const settingsRes = await fetch(`/api/settings/publication?key=ad_company_cooldown_days`)
       if (settingsRes.ok) {
@@ -366,7 +384,8 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     ...pollModules.map(m => ({ type: 'poll_module' as const, data: m })),
     ...aiAppModules.map(m => ({ type: 'ai_app_module' as const, data: m })),
     ...promptModules.map(m => ({ type: 'prompt_module' as const, data: m })),
-    ...articleModules.map(m => ({ type: 'article_module' as const, data: m }))
+    ...articleModules.map(m => ({ type: 'article_module' as const, data: m })),
+    ...textBoxModules.map(m => ({ type: 'text_box_module' as const, data: m }))
   ].sort((a, b) => {
     const orderA = a.data.display_order ?? 999
     const orderB = b.data.display_order ?? 999
@@ -384,7 +403,9 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
             ? `ai-app-module-${item.data.id}`
             : item.type === 'article_module'
               ? `article-module-${item.data.id}`
-              : `prompt-module-${item.data.id}`
+              : item.type === 'text_box_module'
+                ? `text-box-module-${item.data.id}`
+                : `prompt-module-${item.data.id}`
   )
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -404,6 +425,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     const newAIAppModules: AIAppModule[] = []
     const newPromptModules: PromptModule[] = []
     const newArticleModules: ArticleModule[] = []
+    const newTextBoxModules: TextBoxModule[] = []
 
     reorderedItems.forEach((item, idx) => {
       const newOrder = idx + 1
@@ -417,6 +439,8 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
         newAIAppModules.push({ ...item.data, display_order: newOrder })
       } else if (item.type === 'article_module') {
         newArticleModules.push({ ...item.data, display_order: newOrder })
+      } else if (item.type === 'text_box_module') {
+        newTextBoxModules.push({ ...item.data, display_order: newOrder })
       } else {
         newPromptModules.push({ ...item.data, display_order: newOrder })
       }
@@ -428,6 +452,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     setAIAppModules(newAIAppModules)
     setPromptModules(newPromptModules)
     setArticleModules(newArticleModules)
+    setTextBoxModules(newTextBoxModules)
 
     // Save to server
     setSaving(true)
@@ -497,6 +522,17 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           })
         })
       }
+
+      // Update text box modules order
+      if (newTextBoxModules.length > 0) {
+        await fetch('/api/text-box-modules', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            modules: newTextBoxModules.map(m => ({ id: m.id, display_order: m.display_order }))
+          })
+        })
+      }
     } catch (error) {
       console.error('Failed to save order:', error)
       // Revert on error
@@ -560,6 +596,16 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           body: JSON.stringify({ is_active: newActive })
         })
         setArticleModules(prev => prev.map(m =>
+          m.id === item.data.id ? { ...m, is_active: newActive } : m
+        ))
+      } else if (item.type === 'text_box_module') {
+        // Text Box module
+        await fetch(`/api/text-box-modules/${item.data.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_active: newActive })
+        })
+        setTextBoxModules(prev => prev.map(m =>
           m.id === item.data.id ? { ...m, is_active: newActive } : m
         ))
       } else {
@@ -672,6 +718,22 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           const data = await res.json()
           setArticleModules(prev => [...prev, data.module])
           setSelectedItem({ type: 'article_module', data: data.module })
+        }
+      } else if (newSectionType === 'text_box') {
+        // Create text box module
+        const res = await fetch('/api/text-box-modules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            publication_id: publicationId,
+            name: newModuleName.trim()
+          })
+        })
+
+        if (res.ok) {
+          const data = await res.json()
+          setTextBoxModules(prev => [...prev, data.module])
+          setSelectedItem({ type: 'text_box_module', data: data.module })
         }
       } else {
         // Create standard section
@@ -902,6 +964,46 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     }
   }
 
+  const handleUpdateTextBoxModule = async (updates: Partial<TextBoxModule>) => {
+    if (!selectedItem || selectedItem.type !== 'text_box_module') {
+      throw new Error('No text box module selected')
+    }
+
+    const moduleId = selectedItem.data.id
+    console.log('[SectionsPanel] Updating text box module:', moduleId, updates)
+
+    const res = await fetch(`/api/text-box-modules/${moduleId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      console.log('[SectionsPanel] Text box module updated successfully:', data.module)
+      setTextBoxModules(prev => prev.map(m => m.id === moduleId ? data.module : m))
+      setSelectedItem({ type: 'text_box_module', data: data.module })
+    } else {
+      const errorData = await res.json().catch(() => ({}))
+      console.error('[SectionsPanel] Failed to update text box module:', res.status, errorData)
+      throw new Error(errorData.error || `Failed to update text box module (${res.status})`)
+    }
+  }
+
+  const handleDeleteTextBoxModule = async () => {
+    if (!selectedItem || selectedItem.type !== 'text_box_module') return
+
+    const moduleId = selectedItem.data.id
+    const res = await fetch(`/api/text-box-modules/${moduleId}`, {
+      method: 'DELETE'
+    })
+
+    if (res.ok) {
+      setTextBoxModules(prev => prev.filter(m => m.id !== moduleId))
+      setSelectedItem(null)
+    }
+  }
+
   const handleCooldownChange = async (days: number) => {
     try {
       await fetch('/api/settings/publication', {
@@ -1051,6 +1153,15 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
             />
           ) : selectedItem.type === 'article_module' ? (
             <div className="text-gray-500">Loading publication...</div>
+          ) : selectedItem.type === 'text_box_module' && publicationId ? (
+            <TextBoxModuleSettings
+              module={selectedItem.data}
+              publicationId={publicationId}
+              onUpdate={handleUpdateTextBoxModule}
+              onDelete={handleDeleteTextBoxModule}
+            />
+          ) : selectedItem.type === 'text_box_module' ? (
+            <div className="text-gray-500">Loading publication...</div>
           ) : (
             <SectionSettings
               section={selectedItem.data}
@@ -1140,6 +1251,18 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
                 </button>
                 <button
                   type="button"
+                  onClick={() => setNewSectionType('text_box')}
+                  className={`px-3 py-3 rounded-lg border-2 transition-colors ${
+                    newSectionType === 'text_box'
+                      ? 'border-cyan-500 bg-cyan-50 text-cyan-700'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                  }`}
+                >
+                  <div className="font-medium text-sm">Text Box</div>
+                  <div className="text-xs mt-1 opacity-75">Text & images</div>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setNewSectionType('standard')}
                   className={`px-3 py-3 rounded-lg border-2 transition-colors ${
                     newSectionType === 'standard'
@@ -1171,7 +1294,9 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
                           ? "e.g., Prompt of the Day"
                           : newSectionType === 'article'
                             ? "e.g., Top Stories"
-                            : "e.g., Featured Content"
+                            : newSectionType === 'text_box'
+                              ? "e.g., Welcome Section"
+                              : "e.g., Featured Content"
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 autoFocus

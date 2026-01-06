@@ -147,6 +147,25 @@ async function setupIssue(newsletterId: string): Promise<{ issueId: string; modu
       // Initialize article module selections
       await ArticleModuleSelector.initializeSelectionsForIssue(issueId, newsletter.id)
 
+      // Initialize text box modules and generate "before_articles" timing blocks
+      try {
+        const { TextBoxModuleSelector, TextBoxGenerator } = await import('@/lib/text-box-modules')
+
+        const textBoxResult = await TextBoxModuleSelector.initializeForIssue(issueId, newsletter.id)
+        if (textBoxResult.modulesInitialized > 0) {
+          console.log(`[Workflow Step 1] Initialized ${textBoxResult.modulesInitialized} text box modules`)
+
+          // Generate "before_articles" timing blocks (only basic metadata available)
+          const earlyGenResult = await TextBoxGenerator.generateBlocksWithTiming(issueId, 'before_articles')
+          if (earlyGenResult.generated > 0) {
+            console.log(`[Workflow Step 1] Generated ${earlyGenResult.generated} early text box blocks`)
+          }
+        }
+      } catch (textBoxError) {
+        console.log('[Workflow Step 1] Text box module initialization failed (non-critical):', textBoxError)
+        // Don't fail workflow if text box module initialization fails
+      }
+
       // Assign posts to each article module
       let totalPostsAssigned = 0
       for (const module of articleModules) {
@@ -422,8 +441,24 @@ async function finalizeIssue(issueId: string, moduleIds: string[], stepNum: numb
       }
       console.log(`[Workflow Step ${stepNum}] Active articles: ${moduleCounts.join(', ')}`)
 
-      // Generate welcome section
+      // Generate welcome section (legacy - will be replaced by text box modules)
       await processor.generateWelcomeSection(issueId)
+
+      // Generate text box module blocks with "after_articles" timing (full newsletter context)
+      try {
+        const { TextBoxGenerator } = await import('@/lib/text-box-modules')
+
+        const textBoxGenResult = await TextBoxGenerator.generateBlocksWithTiming(issueId, 'after_articles')
+        if (textBoxGenResult.generated > 0) {
+          console.log(`[Workflow Step ${stepNum}] Generated ${textBoxGenResult.generated} text box blocks (after_articles timing)`)
+        }
+        if (textBoxGenResult.failed > 0) {
+          console.log(`[Workflow Step ${stepNum}] ${textBoxGenResult.failed} text box blocks failed to generate`)
+        }
+      } catch (textBoxError) {
+        console.log(`[Workflow Step ${stepNum}] Text box generation failed (non-critical):`, textBoxError)
+        // Don't fail workflow if text box generation fails
+      }
 
       // Generate subject line based on top articles from first module
       if (moduleIds.length > 0) {

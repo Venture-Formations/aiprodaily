@@ -1531,3 +1531,125 @@ export interface IssueArticleModuleWithDetails extends IssueArticleModule {
   article_module: ArticleModule
   articles?: ModuleArticleWithPost[]
 }
+
+// ===========================================
+// Text Box Module System Types
+// ===========================================
+
+export type TextBoxBlockType = 'static_text' | 'ai_prompt' | 'image'
+export type TextSize = 'small' | 'medium' | 'large'
+export type GenerationTiming = 'before_articles' | 'after_articles'
+export type ImageType = 'static' | 'ai_generated'
+export type TextBoxGenerationStatus = 'pending' | 'generating' | 'completed' | 'failed' | 'manual'
+
+export interface TextBoxModule {
+  id: string
+  publication_id: string
+  name: string
+  display_order: number
+  is_active: boolean
+  show_name: boolean  // Whether to show section header in newsletter
+  config: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface TextBoxBlock {
+  id: string
+  text_box_module_id: string
+  block_type: TextBoxBlockType
+  display_order: number
+
+  // Static Text Block fields
+  static_content: string | null  // Rich HTML content from Quill editor
+  text_size: TextSize
+
+  // AI Prompt Block fields
+  ai_prompt_json: Record<string, unknown> | null  // Full AI prompt configuration (model, messages, etc.)
+  generation_timing: GenerationTiming
+
+  // Image Block fields
+  image_type: ImageType | null
+  static_image_url: string | null  // URL for static uploaded images
+  ai_image_prompt: string | null  // Prompt for AI image generation
+
+  // Common fields
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface IssueTextBoxModule {
+  id: string
+  issue_id: string
+  text_box_module_id: string
+  selected_at: string
+  used_at: string | null  // Set when newsletter is sent
+  created_at: string
+  updated_at: string
+  // Joined relations
+  text_box_module?: TextBoxModule
+}
+
+export interface IssueTextBoxBlock {
+  id: string
+  issue_id: string
+  text_box_block_id: string
+
+  // Generated content (for AI blocks)
+  generated_content: string | null  // AI-generated text content
+  generated_image_url: string | null  // AI-generated image URL
+
+  // Manual override content (user can override AI content)
+  override_content: string | null
+  override_image_url: string | null
+
+  // Status tracking
+  generation_status: TextBoxGenerationStatus
+  generation_error: string | null
+  generated_at: string | null
+
+  created_at: string
+  updated_at: string
+  // Joined relations
+  text_box_block?: TextBoxBlock
+}
+
+// Extended types with joins
+export interface TextBoxModuleWithBlocks extends TextBoxModule {
+  blocks: TextBoxBlock[]
+}
+
+export interface IssueTextBoxModuleWithDetails extends IssueTextBoxModule {
+  text_box_module: TextBoxModule
+  blocks: TextBoxBlock[]
+  issue_blocks: IssueTextBoxBlock[]
+}
+
+// Placeholder data for AI content generation
+export interface TextBoxPlaceholderData {
+  // Basic metadata (available at before_articles timing)
+  issue_date: string
+  publication_name: string
+  subscriber_name: string  // MailerLite merge field: {$name}
+
+  // Full context (available at after_articles timing)
+  articles?: Array<{
+    headline: string
+    content: string
+    rank: number
+  }>
+  ai_apps?: Array<{
+    name: string
+    tagline: string | null
+    description: string
+  }>
+  poll?: {
+    question: string
+    options: string[]
+  }
+  ads?: Array<{
+    title: string | null
+    body: string | null
+  }>
+}

@@ -1,0 +1,1 @@
+export { TextBoxModuleSettings } from './TextBoxModuleSettings'

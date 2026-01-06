@@ -1564,6 +1564,52 @@ export async function generatePromptIdeasSection(issue: any): Promise<string> {
   }
 }
 
+// ==================== TEXT BOX MODULES SECTION ====================
+
+/**
+ * Generate a single text box module section
+ * Uses the new modular text box system with block rendering
+ */
+export async function generateTextBoxModuleSection(
+  issue: { id: string; publication_id: string; status?: string },
+  moduleId: string
+): Promise<string> {
+  try {
+    const { TextBoxModuleSelector, TextBoxModuleRenderer } = await import('./text-box-modules')
+
+    // Get all text box selections for this issue
+    const selections = await TextBoxModuleSelector.getIssueSelections(issue.id)
+
+    // Find the selection for this specific module (match by module.id)
+    const selection = selections.find(s => s.module?.id === moduleId)
+
+    if (!selection || !selection.module) {
+      console.log(`[TextBoxModules] No selection/module found for module ${moduleId} in issue ${issue.id}`)
+      return ''
+    }
+
+    // Build issue blocks map (blockId -> IssueTextBoxBlock)
+    const issueBlocksMap = new Map<string, any>()
+    for (const issueBlock of selection.issueBlocks || []) {
+      issueBlocksMap.set(issueBlock.text_box_block_id, issueBlock)
+    }
+
+    // Render the text box module
+    const result = await TextBoxModuleRenderer.renderModule(
+      selection.module,
+      selection.blocks || [],
+      issueBlocksMap,
+      issue.publication_id,
+      { issueId: issue.id }
+    )
+
+    return result.html
+  } catch (error) {
+    console.error('[TextBoxModules] Error generating text box module section:', error)
+    return ''
+  }
+}
+
 // ==================== ROAD WORK ====================
 // Feature not needed in this newsletter
 
@@ -1775,11 +1821,23 @@ export async function generateFullNewsletterHtml(
       .eq('is_active', true)
       .order('display_order', { ascending: true })
 
+    // Fetch text box modules for this publication
+    const { data: textBoxModules } = await supabaseAdmin
+      .from('text_box_modules')
+      .select(`
+        *,
+        blocks:text_box_blocks(*)
+      `)
+      .eq('publication_id', issue.publication_id)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+
     console.log('Active newsletter sections:', sections?.map(s => `${s.name} (order: ${s.display_order})`).join(', '))
     console.log('Active ad modules:', adModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
     console.log('Active poll modules:', pollModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
     console.log('Active prompt modules:', promptModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
     console.log('Active article modules:', articleModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
+    console.log('Active text box modules:', textBoxModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
 
     // Format date using local date parsing
     const formatDate = (dateString: string) => {
@@ -1834,20 +1892,22 @@ export async function generateFullNewsletterHtml(
       PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b'
     }
 
-    // Merge newsletter sections, ad modules, poll modules, prompt modules, and article modules into a single sorted list
+    // Merge newsletter sections, ad modules, poll modules, prompt modules, article modules, and text box modules into a single sorted list
     type SectionItem =
       | { type: 'section'; data: any }
       | { type: 'ad_module'; data: any }
       | { type: 'poll_module'; data: any }
       | { type: 'prompt_module'; data: any }
       | { type: 'article_module'; data: any }
+      | { type: 'text_box_module'; data: any }
 
     const allItems: SectionItem[] = [
       ...(sections || []).map(s => ({ type: 'section' as const, data: s })),
       ...(adModules || []).map(m => ({ type: 'ad_module' as const, data: m })),
       ...(pollModules || []).map(m => ({ type: 'poll_module' as const, data: m })),
       ...(promptModules || []).map(m => ({ type: 'prompt_module' as const, data: m })),
-      ...(articleModules || []).map(m => ({ type: 'article_module' as const, data: m }))
+      ...(articleModules || []).map(m => ({ type: 'article_module' as const, data: m })),
+      ...(textBoxModules || []).map(m => ({ type: 'text_box_module' as const, data: m }))
     ].sort((a, b) => (a.data.display_order || 999) - (b.data.display_order || 999))
 
     console.log('Combined section order:', allItems.map(item =>
@@ -1880,6 +1940,12 @@ export async function generateFullNewsletterHtml(
         const articleModuleHtml = await generateArticleModuleSection(issue, item.data.id)
         if (articleModuleHtml) {
           sectionsHtml += articleModuleHtml
+        }
+      } else if (item.type === 'text_box_module') {
+        // Generate single text box module section
+        const textBoxModuleHtml = await generateTextBoxModuleSection(issue, item.data.id)
+        if (textBoxModuleHtml) {
+          sectionsHtml += textBoxModuleHtml
         }
       } else {
         const section = item.data

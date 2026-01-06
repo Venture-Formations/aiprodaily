@@ -9,6 +9,7 @@ import PollModulesPanel from '@/components/PollModulesPanel'
 import AIAppModulesPanel from '@/components/AIAppModulesPanel'
 import PromptModulesPanel from '@/components/PromptModulesPanel'
 import ArticleModulesPanel from '@/components/ArticleModulesPanel'
+import TextBoxModulesPanel from '@/components/TextBoxModulesPanel'
 import type { issueWithArticles, ArticleWithPost, issueEvent, Event, NewsletterSection } from '@/types/database'
 import {
   DndContext,
@@ -2494,6 +2495,9 @@ export default function issueDetailPage() {
 
         {/* Dynamic Prompt Sections */}
         {issue && <PromptModulesPanel issueId={issue.id} issueStatus={issue.status} />}
+
+        {/* Text Box Sections */}
+        {issue && <TextBoxModulesPanel issueId={issue.id} issueStatus={issue.status} />}
 
         {/* Preview Modal */}
         {showPreview && (
