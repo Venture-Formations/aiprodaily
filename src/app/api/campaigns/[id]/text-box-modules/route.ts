@@ -17,7 +17,30 @@ export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { id: issueId } = await context.params
 
-    const selections = await TextBoxModuleSelector.getIssueSelections(issueId)
+    // Get issue to find publication_id
+    const { data: issue, error: issueError } = await supabaseAdmin
+      .from('publication_issues')
+      .select('publication_id')
+      .eq('id', issueId)
+      .single()
+
+    if (issueError || !issue) {
+      return NextResponse.json(
+        { error: 'Issue not found' },
+        { status: 404 }
+      )
+    }
+
+    // Check if modules have been initialized for this issue
+    let selections = await TextBoxModuleSelector.getIssueSelections(issueId)
+
+    // If no selections exist, auto-initialize the text box modules
+    if (selections.length === 0) {
+      console.log('[IssueTextBoxModules] No selections found, auto-initializing for issue:', issueId)
+      await TextBoxModuleSelector.initializeForIssue(issueId, issue.publication_id)
+      // Fetch again after initialization
+      selections = await TextBoxModuleSelector.getIssueSelections(issueId)
+    }
 
     return NextResponse.json({
       success: true,

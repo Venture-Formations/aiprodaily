@@ -5,6 +5,23 @@ import dynamic from 'next/dynamic'
 import ReactCrop, { Crop, PixelCrop } from 'react-image-crop'
 import 'react-image-crop/dist/ReactCrop.css'
 import 'react-quill-new/dist/quill.snow.css'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { getCroppedImage } from '@/utils/imageCrop'
 import type { TextBoxModule, TextBoxBlock } from '@/types/database'
 
@@ -41,6 +58,166 @@ function detectProviderFromPrompt(promptJson: any): 'claude' | 'openai' {
   const str = JSON.stringify(promptJson).toLowerCase()
   if (str.includes('claude') || str.includes('anthropic')) return 'claude'
   return 'openai'
+}
+
+// Sortable block item component
+interface SortableBlockItemProps {
+  block: TextBoxBlock
+  isActive: boolean
+  isExpanded: boolean
+  isEditing: boolean
+  saving: boolean
+  onToggleExpand: () => void
+  onToggleActive: () => void
+  onDelete: () => void
+  onStartEdit: () => void
+  getBlockTypeBadge: (blockType: string) => React.ReactNode
+  detectProviderFromPrompt: (promptJson: any) => 'claude' | 'openai'
+  children: React.ReactNode
+}
+
+function SortableBlockItem({
+  block,
+  isActive,
+  isExpanded,
+  saving,
+  onToggleExpand,
+  onToggleActive,
+  onDelete,
+  onStartEdit,
+  getBlockTypeBadge,
+  detectProviderFromPrompt,
+  children
+}: SortableBlockItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: block.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`border rounded-lg overflow-hidden ${
+        isDragging ? 'shadow-lg' : ''
+      } ${isActive ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50'}`}
+    >
+      {/* Block Header - Collapsed View */}
+      <div
+        className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50"
+        onClick={onToggleExpand}
+      >
+        <div className="flex items-center gap-3">
+          {/* Drag Handle */}
+          <button
+            {...attributes}
+            {...listeners}
+            className="text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing p-1"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+            </svg>
+          </button>
+
+          <div className="flex items-center gap-2">
+            <span className={`text-sm font-medium ${!isActive ? 'text-gray-400' : ''}`}>
+              {block.block_type === 'static_text' && 'Static Text'}
+              {block.block_type === 'ai_prompt' && 'AI Prompt'}
+              {block.block_type === 'image' && 'Image'}
+            </span>
+            {getBlockTypeBadge(block.block_type)}
+            {/* AI Provider Badge for ai_prompt blocks */}
+            {block.block_type === 'ai_prompt' && block.ai_prompt_json && (
+              <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                detectProviderFromPrompt(block.ai_prompt_json) === 'claude'
+                  ? 'bg-purple-100 text-purple-800'
+                  : 'bg-blue-100 text-blue-800'
+              }`}>
+                {detectProviderFromPrompt(block.ai_prompt_json) === 'claude' ? 'Claude' : 'OpenAI'}
+              </span>
+            )}
+            {/* Text size badge for static_text */}
+            {block.block_type === 'static_text' && block.text_size && (
+              <span className="text-xs text-gray-400">
+                ({block.text_size})
+              </span>
+            )}
+            {/* Timing badge for ai_prompt */}
+            {block.block_type === 'ai_prompt' && (
+              <span className="text-xs text-gray-400">
+                ({block.generation_timing === 'before_articles' ? 'Before' : 'After'} articles)
+              </span>
+            )}
+            {/* Image type badge */}
+            {block.block_type === 'image' && (
+              <span className="text-xs text-gray-400">
+                ({block.image_type === 'ai_generated' ? 'AI Generated' : 'Static'})
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* View/Edit button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onStartEdit()
+            }}
+            className="text-sm text-cyan-600 hover:text-cyan-700 font-medium"
+          >
+            View/Edit
+          </button>
+
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleActive() }}
+            disabled={saving}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              isActive ? 'bg-cyan-600' : 'bg-gray-200'
+            } ${saving ? 'opacity-50' : ''}`}
+          >
+            <span
+              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                isActive ? 'translate-x-5' : 'translate-x-1'
+              }`}
+            />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete() }}
+            disabled={saving}
+            className="text-gray-400 hover:text-red-500 p-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+          <svg
+            className={`w-5 h-5 text-gray-400 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Expanded Content (passed as children) */}
+      {children}
+    </div>
+  )
 }
 
 export function TextBoxModuleSettings({
@@ -81,6 +258,14 @@ export function TextBoxModuleSettings({
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '5:4' | 'free'>('16:9')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   // Helper to get numeric aspect ratio
   const getAspectRatioValue = (ratio: '16:9' | '5:4' | 'free'): number | undefined => {
@@ -206,18 +391,17 @@ export function TextBoxModuleSettings({
     }
   }
 
-  const handleMoveBlock = async (blockId: string, direction: 'up' | 'down') => {
-    const index = blocks.findIndex(b => b.id === blockId)
-    if (index === -1) return
-    if (direction === 'up' && index === 0) return
-    if (direction === 'down' && index === blocks.length - 1) return
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
 
-    const newIndex = direction === 'up' ? index - 1 : index + 1
-    const newBlocks = [...blocks]
-    const [moved] = newBlocks.splice(index, 1)
-    newBlocks.splice(newIndex, 0, moved)
+    if (!over || active.id === over.id) return
 
-    // Update display_order for all blocks
+    const oldIndex = blocks.findIndex(b => b.id === active.id)
+    const newIndex = blocks.findIndex(b => b.id === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) return
+
+    const newBlocks = arrayMove(blocks, oldIndex, newIndex)
     const updatedBlocks = newBlocks.map((b, i) => ({ ...b, display_order: i }))
     setBlocks(updatedBlocks)
 
@@ -454,6 +638,187 @@ export function TextBoxModuleSettings({
     }
   }
 
+  // Render expanded content for a block
+  const renderBlockExpandedContent = (block: TextBoxBlock) => (
+    <div className="border-t border-gray-200 p-4 bg-gray-50">
+      {/* ===== STATIC TEXT BLOCK ===== */}
+      {block.block_type === 'static_text' && (
+        <div>
+          {editingBlock === block.id ? (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Text Size</label>
+                <select
+                  value={editTextSize}
+                  onChange={(e) => setEditTextSize(e.target.value as any)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                >
+                  <option value="small">Small (14px)</option>
+                  <option value="medium">Medium (16px)</option>
+                  <option value="large">Large (20px, semibold)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Content</label>
+                <div className="border border-gray-300 rounded-lg overflow-hidden">
+                  <ReactQuill
+                    theme="snow"
+                    value={editContent}
+                    onChange={setEditContent}
+                    modules={quillModules}
+                    formats={quillFormats}
+                    placeholder="Enter your text content..."
+                    className="bg-white"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button onClick={handleCancelEdit} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                <button onClick={() => handleSaveBlock(block)} disabled={saving} className="px-4 py-2 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50">{saving ? 'Saving...' : 'Save Changes'}</button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="mb-2 text-xs text-gray-500">Size: {getTextSizeLabel(block.text_size || 'medium')}</div>
+              {block.static_content ? (
+                <div className="text-sm text-gray-700 prose prose-sm max-w-none bg-white p-3 rounded-lg border border-gray-200" dangerouslySetInnerHTML={{ __html: block.static_content }} />
+              ) : (
+                <p className="text-sm text-gray-400 italic bg-white p-3 rounded-lg border border-gray-200">No content yet</p>
+              )}
+              <button onClick={() => handleStartEdit(block)} className="mt-3 px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700">Edit Content</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===== AI PROMPT BLOCK ===== */}
+      {block.block_type === 'ai_prompt' && (
+        <div>
+          {editingBlock === block.id ? (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">AI Prompt</label>
+                <textarea
+                  value={editPrompt}
+                  onChange={(e) => setEditPrompt(e.target.value)}
+                  placeholder="Enter the AI prompt to generate content..."
+                  className="w-full h-40 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm font-mono"
+                />
+                <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="text-xs font-medium text-gray-700 mb-2">Available Placeholders:</div>
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <p><strong>Basic:</strong> {'{{issue_date}}'}, {'{{publication_name}}'}</p>
+                    <p><strong>Section Articles:</strong> {'{{section_1_all_articles}}'}, {'{{section_2_all_articles}}'}</p>
+                    <p><strong>Individual:</strong> {'{{section_1_article_1_headline}}'}, {'{{section_1_article_1_content}}'}</p>
+                    <p><strong>Other:</strong> {'{{ai_app_1_name}}'}, {'{{poll_question}}'}, {'{{ad_1_title}}'}</p>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Generation Timing</label>
+                <select value={editTiming} onChange={(e) => setEditTiming(e.target.value as any)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm">
+                  <option value="before_articles">Before Articles (basic context only)</option>
+                  <option value="after_articles">After Articles (full newsletter context)</option>
+                </select>
+              </div>
+              {testResult && (
+                <div className={`p-4 rounded-lg border ${testResult.error ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+                  {testResult.error ? <div className="text-sm text-red-700">{testResult.error}</div> : (
+                    <div className="space-y-3">
+                      <div><div className="text-xs font-medium text-gray-600 mb-1">Injected Prompt:</div><div className="bg-white p-2 rounded border border-gray-200 text-xs font-mono max-h-32 overflow-y-auto whitespace-pre-wrap">{testResult.injectedPrompt}</div></div>
+                      <div><div className="text-xs font-medium text-gray-600 mb-1">AI Response:</div><div className="bg-white p-2 rounded border border-gray-200 text-sm max-h-48 overflow-y-auto whitespace-pre-wrap">{testResult.result}</div></div>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="flex justify-between items-center pt-2">
+                <button onClick={handleTestPrompt} disabled={testingPrompt || !editPrompt.trim()} className="px-4 py-2 text-sm font-medium text-purple-700 bg-white border border-purple-300 rounded-lg hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed">{testingPrompt ? 'Testing...' : 'Test Prompt'}</button>
+                <div className="flex gap-2">
+                  <button onClick={handleCancelEdit} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                  <button onClick={() => handleSaveBlock(block)} disabled={saving} className="px-4 py-2 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50">{saving ? 'Saving...' : 'Save Changes'}</button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="mb-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm font-medium text-gray-700">Prompt Content</span>
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded ${detectProviderFromPrompt(block.ai_prompt_json) === 'claude' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>{detectProviderFromPrompt(block.ai_prompt_json) === 'claude' ? 'Claude' : 'OpenAI'}</span>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-gray-200 font-mono text-xs whitespace-pre-wrap max-h-48 overflow-y-auto">{(block.ai_prompt_json as any)?.prompt || (block.ai_prompt_json as any)?.messages?.[0]?.content || <span className="italic text-gray-400">No prompt configured</span>}</div>
+              </div>
+              <div className="text-xs text-gray-500 mb-3">Timing: {block.generation_timing === 'before_articles' ? 'Before Articles' : 'After Articles'}</div>
+              <button onClick={() => handleStartEdit(block)} className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700">Edit Prompt</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===== IMAGE BLOCK ===== */}
+      {block.block_type === 'image' && (
+        <div>
+          {editingBlock === block.id ? (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Image Type</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name={`imageType-${block.id}`} checked={editImageType === 'static'} onChange={() => setEditImageType('static')} className="text-cyan-600" />
+                    <span className="text-sm text-gray-700">Static Upload</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name={`imageType-${block.id}`} checked={editImageType === 'ai_generated'} onChange={() => setEditImageType('ai_generated')} className="text-cyan-600" />
+                    <span className="text-sm text-gray-700">AI Generated</span>
+                  </label>
+                </div>
+              </div>
+              {editImageType === 'static' && (
+                <div>
+                  {block.static_image_url && !selectedImage && <div className="mb-3"><label className="block text-sm font-medium text-gray-700 mb-2">Current Image</label><img src={block.static_image_url} alt="Current" className="max-w-md h-auto rounded border border-gray-200" /></div>}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Aspect Ratio</label>
+                    <div className="flex gap-2">
+                      {(['16:9', '5:4', 'free'] as const).map((ratio) => (
+                        <button key={ratio} type="button" onClick={() => handleAspectRatioChange(ratio)} className={`px-4 py-2 text-sm rounded-lg border transition-colors ${aspectRatio === ratio ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400 hover:bg-gray-50'}`}>{ratio === 'free' ? 'Free' : ratio}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div><label className="block text-sm font-medium text-gray-700 mb-2">{block.static_image_url ? 'Replace Image' : 'Upload Image'}</label><input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" /></div>
+                  {selectedImage && (
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Crop Image {aspectRatio !== 'free' ? `(${aspectRatio})` : '(Free)'}</label>
+                      <ReactCrop crop={crop} onChange={(c) => setCrop(c)} onComplete={(c) => setCompletedCrop(c)} aspect={getAspectRatioValue(aspectRatio)}><img ref={imgRef} src={selectedImage} alt="Crop preview" style={{ maxWidth: '100%' }} /></ReactCrop>
+                      <button type="button" onClick={() => { setSelectedImage(null); setCrop(undefined); setCompletedCrop(undefined); if (fileInputRef.current) fileInputRef.current.value = '' }} className="mt-2 px-3 py-1 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200">Cancel Image Selection</button>
+                    </div>
+                  )}
+                </div>
+              )}
+              {editImageType === 'ai_generated' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">AI Image Prompt</label>
+                  <textarea value={editAiImagePrompt} onChange={(e) => setEditAiImagePrompt(e.target.value)} placeholder="Describe the image to generate..." className="w-full h-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm" />
+                </div>
+              )}
+              <div className="flex justify-end gap-2 pt-2">
+                <button onClick={handleCancelEdit} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                <button onClick={() => handleSaveBlock(block)} disabled={saving || uploadingImage} className="px-4 py-2 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50">{uploadingImage ? 'Uploading...' : saving ? 'Saving...' : 'Save Changes'}</button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="text-sm text-gray-500 mb-2">Type: {block.image_type === 'ai_generated' ? 'AI Generated' : 'Static Upload'}</div>
+              {block.static_image_url && <img src={block.static_image_url} alt="Block image" className="max-w-md rounded border border-gray-200 mb-3" />}
+              {block.image_type === 'ai_generated' && block.ai_image_prompt && <div className="mb-3"><div className="text-xs font-medium text-gray-600 mb-1">AI Prompt:</div><div className="bg-white p-2 rounded border border-gray-200 text-sm text-gray-700">{block.ai_image_prompt}</div></div>}
+              {!block.static_image_url && !block.ai_image_prompt && <p className="text-sm text-gray-400 italic mb-3">No image configured</p>}
+              <button onClick={() => handleStartEdit(block)} className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700">Edit Image</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -578,536 +943,43 @@ export function TextBoxModuleSettings({
               <p className="mb-4">No blocks yet. Add your first block to get started.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {blocks.map((block, index) => (
-                <div
-                  key={block.id}
-                  className={`border rounded-lg overflow-hidden ${
-                    block.is_active ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50'
-                  }`}
-                >
-                  {/* Block Header - Collapsed View */}
-                  <div
-                    className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50"
-                    onClick={() => setExpandedBlock(expandedBlock === block.id ? null : block.id)}
-                  >
-                    <div className="flex items-center gap-3">
-                      {/* Move Buttons */}
-                      <div className="flex flex-col gap-0.5">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleMoveBlock(block.id, 'up') }}
-                          disabled={index === 0 || saving}
-                          className={`p-0.5 rounded ${index === 0 ? 'text-gray-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleMoveBlock(block.id, 'down') }}
-                          disabled={index === blocks.length - 1 || saving}
-                          className={`p-0.5 rounded ${index === blocks.length - 1 ? 'text-gray-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className={`text-sm font-medium ${!block.is_active ? 'text-gray-400' : ''}`}>
-                          {block.block_type === 'static_text' && 'Static Text'}
-                          {block.block_type === 'ai_prompt' && 'AI Prompt'}
-                          {block.block_type === 'image' && 'Image'}
-                        </span>
-                        {getBlockTypeBadge(block.block_type)}
-                        {/* AI Provider Badge for ai_prompt blocks */}
-                        {block.block_type === 'ai_prompt' && block.ai_prompt_json && (
-                          <span className={`px-2 py-0.5 text-xs font-medium rounded ${
-                            detectProviderFromPrompt(block.ai_prompt_json) === 'claude'
-                              ? 'bg-purple-100 text-purple-800'
-                              : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {detectProviderFromPrompt(block.ai_prompt_json) === 'claude' ? 'Claude' : 'OpenAI'}
-                          </span>
-                        )}
-                        {/* Text size badge for static_text */}
-                        {block.block_type === 'static_text' && block.text_size && (
-                          <span className="text-xs text-gray-400">
-                            ({block.text_size})
-                          </span>
-                        )}
-                        {/* Timing badge for ai_prompt */}
-                        {block.block_type === 'ai_prompt' && (
-                          <span className="text-xs text-gray-400">
-                            ({block.generation_timing === 'before_articles' ? 'Before' : 'After'} articles)
-                          </span>
-                        )}
-                        {/* Image type badge */}
-                        {block.block_type === 'image' && (
-                          <span className="text-xs text-gray-400">
-                            ({block.image_type === 'ai_generated' ? 'AI Generated' : 'Static'})
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {/* View/Edit button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setExpandedBlock(block.id)
-                          if (editingBlock !== block.id) {
-                            handleStartEdit(block)
-                          }
-                        }}
-                        className="text-sm text-cyan-600 hover:text-cyan-700 font-medium"
-                      >
-                        View/Edit
-                      </button>
-
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleToggleBlockActive(block) }}
-                        disabled={saving}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                          block.is_active ? 'bg-cyan-600' : 'bg-gray-200'
-                        } ${saving ? 'opacity-50' : ''}`}
-                      >
-                        <span
-                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                            block.is_active ? 'translate-x-5' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteBlock(block.id) }}
-                        disabled={saving}
-                        className="text-gray-400 hover:text-red-500 p-1"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                      <svg
-                        className={`w-5 h-5 text-gray-400 transform transition-transform ${expandedBlock === block.id ? 'rotate-180' : ''}`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                  </div>
-
-                  {/* Block Content - Expanded View */}
-                  {expandedBlock === block.id && (
-                    <div className="border-t border-gray-200 p-4 bg-gray-50">
-                      {/* ===== STATIC TEXT BLOCK ===== */}
-                      {block.block_type === 'static_text' && (
-                        <div>
-                          {editingBlock === block.id ? (
-                            <div className="space-y-4">
-                              {/* Text Size Selector */}
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Text Size
-                                </label>
-                                <select
-                                  value={editTextSize}
-                                  onChange={(e) => setEditTextSize(e.target.value as any)}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-                                >
-                                  <option value="small">Small (14px)</option>
-                                  <option value="medium">Medium (16px)</option>
-                                  <option value="large">Large (20px, semibold)</option>
-                                </select>
-                              </div>
-
-                              {/* Rich Text Editor */}
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Content
-                                </label>
-                                <div className="border border-gray-300 rounded-lg overflow-hidden">
-                                  <ReactQuill
-                                    theme="snow"
-                                    value={editContent}
-                                    onChange={setEditContent}
-                                    modules={quillModules}
-                                    formats={quillFormats}
-                                    placeholder="Enter your text content..."
-                                    className="bg-white"
-                                  />
-                                </div>
-                              </div>
-
-                              <div className="flex justify-end gap-2 pt-2">
-                                <button
-                                  onClick={handleCancelEdit}
-                                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  onClick={() => handleSaveBlock(block)}
-                                  disabled={saving}
-                                  className="px-4 py-2 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50"
-                                >
-                                  {saving ? 'Saving...' : 'Save Changes'}
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div>
-                              <div className="mb-2 text-xs text-gray-500">
-                                Size: {getTextSizeLabel(block.text_size || 'medium')}
-                              </div>
-                              {block.static_content ? (
-                                <div
-                                  className="text-sm text-gray-700 prose prose-sm max-w-none bg-white p-3 rounded-lg border border-gray-200"
-                                  dangerouslySetInnerHTML={{ __html: block.static_content }}
-                                />
-                              ) : (
-                                <p className="text-sm text-gray-400 italic bg-white p-3 rounded-lg border border-gray-200">
-                                  No content yet
-                                </p>
-                              )}
-                              <button
-                                onClick={() => handleStartEdit(block)}
-                                className="mt-3 px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700"
-                              >
-                                Edit Content
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* ===== AI PROMPT BLOCK (ArticleModulePromptsTab pattern) ===== */}
-                      {block.block_type === 'ai_prompt' && (
-                        <div>
-                          {editingBlock === block.id ? (
-                            <div className="space-y-4">
-                              {/* Prompt textarea */}
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  AI Prompt
-                                </label>
-                                <textarea
-                                  value={editPrompt}
-                                  onChange={(e) => setEditPrompt(e.target.value)}
-                                  placeholder="Enter the AI prompt to generate content. Use placeholders like {{issue_date}}, {{section_1_all_articles}}, etc."
-                                  className="w-full h-40 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm font-mono"
-                                />
-                                <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                  <div className="text-xs font-medium text-gray-700 mb-2">Available Placeholders:</div>
-                                  <div className="text-xs text-gray-600 space-y-1">
-                                    <p><strong>Basic:</strong> {'{{issue_date}}'}, {'{{publication_name}}'}</p>
-                                    <p><strong>Section Articles:</strong> {'{{section_1_all_articles}}'}, {'{{section_2_all_articles}}'}</p>
-                                    <p><strong>Individual Articles:</strong> {'{{section_1_article_1_headline}}'}, {'{{section_1_article_1_content}}'}, {'{{section_2_article_1_headline}}'}, etc.</p>
-                                    <p><strong>Section Names:</strong> {'{{section_1_name}}'}, {'{{section_2_name}}'}</p>
-                                    <p><strong>Other:</strong> {'{{ai_app_1_name}}'}, {'{{poll_question}}'}, {'{{ad_1_title}}'}</p>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Generation Timing */}
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Generation Timing
-                                </label>
-                                <select
-                                  value={editTiming}
-                                  onChange={(e) => setEditTiming(e.target.value as any)}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-                                >
-                                  <option value="before_articles">Before Articles (basic context only)</option>
-                                  <option value="after_articles">After Articles (full newsletter context)</option>
-                                </select>
-                                <p className="mt-1 text-xs text-gray-500">
-                                  "After articles" has access to article content, AI apps, polls, and ads for richer content generation.
-                                </p>
-                              </div>
-
-                              {/* Test Result Display */}
-                              {testResult && (
-                                <div className={`p-4 rounded-lg border ${testResult.error ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
-                                  {testResult.error ? (
-                                    <div className="text-sm text-red-700">{testResult.error}</div>
-                                  ) : (
-                                    <div className="space-y-3">
-                                      <div>
-                                        <div className="text-xs font-medium text-gray-600 mb-1">Injected Prompt:</div>
-                                        <div className="bg-white p-2 rounded border border-gray-200 text-xs font-mono max-h-32 overflow-y-auto whitespace-pre-wrap">
-                                          {testResult.injectedPrompt}
-                                        </div>
-                                      </div>
-                                      <div>
-                                        <div className="text-xs font-medium text-gray-600 mb-1">AI Response:</div>
-                                        <div className="bg-white p-2 rounded border border-gray-200 text-sm max-h-48 overflow-y-auto whitespace-pre-wrap">
-                                          {testResult.result}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              <div className="flex justify-between items-center pt-2">
-                                <button
-                                  onClick={handleTestPrompt}
-                                  disabled={testingPrompt || !editPrompt.trim()}
-                                  className="px-4 py-2 text-sm font-medium text-purple-700 bg-white border border-purple-300 rounded-lg hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  {testingPrompt ? 'Testing...' : 'Test Prompt'}
-                                </button>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={handleCancelEdit}
-                                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                                  >
-                                    Cancel
-                                  </button>
-                                  <button
-                                    onClick={() => handleSaveBlock(block)}
-                                    disabled={saving}
-                                    className="px-4 py-2 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50"
-                                  >
-                                    {saving ? 'Saving...' : 'Save Changes'}
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <div>
-                              <div className="mb-3">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span className="text-sm font-medium text-gray-700">Prompt Content</span>
-                                  <span className={`px-2 py-0.5 text-xs font-medium rounded ${
-                                    detectProviderFromPrompt(block.ai_prompt_json) === 'claude'
-                                      ? 'bg-purple-100 text-purple-800'
-                                      : 'bg-blue-100 text-blue-800'
-                                  }`}>
-                                    {detectProviderFromPrompt(block.ai_prompt_json) === 'claude' ? 'Claude' : 'OpenAI'}
-                                  </span>
-                                </div>
-                                <div className="bg-white p-3 rounded-lg border border-gray-200 font-mono text-xs whitespace-pre-wrap max-h-48 overflow-y-auto">
-                                  {(block.ai_prompt_json as any)?.prompt ||
-                                   (block.ai_prompt_json as any)?.messages?.[0]?.content ||
-                                   <span className="italic text-gray-400">No prompt configured</span>}
-                                </div>
-                              </div>
-                              <div className="text-xs text-gray-500 mb-3">
-                                Timing: {block.generation_timing === 'before_articles' ? 'Before Articles' : 'After Articles'}
-                              </div>
-                              <button
-                                onClick={() => handleStartEdit(block)}
-                                className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700"
-                              >
-                                Edit Prompt
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* ===== IMAGE BLOCK ===== */}
-                      {block.block_type === 'image' && (
-                        <div>
-                          {editingBlock === block.id ? (
-                            <div className="space-y-4">
-                              {/* Image Type Toggle */}
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Image Type
-                                </label>
-                                <div className="flex gap-4">
-                                  <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                      type="radio"
-                                      name={`imageType-${block.id}`}
-                                      checked={editImageType === 'static'}
-                                      onChange={() => setEditImageType('static')}
-                                      className="text-cyan-600"
-                                    />
-                                    <span className="text-sm text-gray-700">Static Upload</span>
-                                  </label>
-                                  <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                      type="radio"
-                                      name={`imageType-${block.id}`}
-                                      checked={editImageType === 'ai_generated'}
-                                      onChange={() => setEditImageType('ai_generated')}
-                                      className="text-cyan-600"
-                                    />
-                                    <span className="text-sm text-gray-700">AI Generated</span>
-                                  </label>
-                                </div>
-                              </div>
-
-                              {/* Static Upload */}
-                              {editImageType === 'static' && (
-                                <div>
-                                  {/* Current image */}
-                                  {block.static_image_url && !selectedImage && (
-                                    <div className="mb-3">
-                                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Current Image
-                                      </label>
-                                      <img
-                                        src={block.static_image_url}
-                                        alt="Current"
-                                        className="max-w-md h-auto rounded border border-gray-200"
-                                      />
-                                    </div>
-                                  )}
-
-                                  {/* Aspect Ratio Selector */}
-                                  <div className="mb-4">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                      Aspect Ratio
-                                    </label>
-                                    <div className="flex gap-2">
-                                      {(['16:9', '5:4', 'free'] as const).map((ratio) => (
-                                        <button
-                                          key={ratio}
-                                          type="button"
-                                          onClick={() => handleAspectRatioChange(ratio)}
-                                          className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
-                                            aspectRatio === ratio
-                                              ? 'bg-cyan-600 text-white border-cyan-600'
-                                              : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400 hover:bg-gray-50'
-                                          }`}
-                                        >
-                                          {ratio === 'free' ? 'Free' : ratio}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  {/* Upload button */}
-                                  <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                      {block.static_image_url ? 'Replace Image' : 'Upload Image'}
-                                    </label>
-                                    <input
-                                      ref={fileInputRef}
-                                      type="file"
-                                      accept="image/*"
-                                      onChange={handleImageSelect}
-                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                                    />
-                                  </div>
-
-                                  {/* Crop Tool */}
-                                  {selectedImage && (
-                                    <div className="mt-4">
-                                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Crop Image {aspectRatio !== 'free' ? `(${aspectRatio})` : '(Free)'}
-                                      </label>
-                                      <ReactCrop
-                                        crop={crop}
-                                        onChange={(c) => setCrop(c)}
-                                        onComplete={(c) => setCompletedCrop(c)}
-                                        aspect={getAspectRatioValue(aspectRatio)}
-                                      >
-                                        <img
-                                          ref={imgRef}
-                                          src={selectedImage}
-                                          alt="Crop preview"
-                                          style={{ maxWidth: '100%' }}
-                                        />
-                                      </ReactCrop>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setSelectedImage(null)
-                                          setCrop(undefined)
-                                          setCompletedCrop(undefined)
-                                          if (fileInputRef.current) fileInputRef.current.value = ''
-                                        }}
-                                        className="mt-2 px-3 py-1 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
-                                      >
-                                        Cancel Image Selection
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* AI Generated */}
-                              {editImageType === 'ai_generated' && (
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    AI Image Prompt
-                                  </label>
-                                  <textarea
-                                    value={editAiImagePrompt}
-                                    onChange={(e) => setEditAiImagePrompt(e.target.value)}
-                                    placeholder="Describe the image to generate... Use placeholders like {{headline}} or {{title}}"
-                                    className="w-full h-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-                                  />
-                                  <p className="mt-1 text-xs text-gray-500">
-                                    Available placeholders: {'{{headline}}'}, {'{{content}}'}, {'{{title}}'}
-                                  </p>
-                                </div>
-                              )}
-
-                              <div className="flex justify-end gap-2 pt-2">
-                                <button
-                                  onClick={handleCancelEdit}
-                                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  onClick={() => handleSaveBlock(block)}
-                                  disabled={saving || uploadingImage}
-                                  className="px-4 py-2 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50"
-                                >
-                                  {uploadingImage ? 'Uploading...' : saving ? 'Saving...' : 'Save Changes'}
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div>
-                              <div className="text-sm text-gray-500 mb-2">
-                                Type: {block.image_type === 'ai_generated' ? 'AI Generated' : 'Static Upload'}
-                              </div>
-                              {block.static_image_url && (
-                                <img
-                                  src={block.static_image_url}
-                                  alt="Block image"
-                                  className="max-w-md rounded border border-gray-200 mb-3"
-                                />
-                              )}
-                              {block.image_type === 'ai_generated' && block.ai_image_prompt && (
-                                <div className="mb-3">
-                                  <div className="text-xs font-medium text-gray-600 mb-1">AI Prompt:</div>
-                                  <div className="bg-white p-2 rounded border border-gray-200 text-sm text-gray-700">
-                                    {block.ai_image_prompt}
-                                  </div>
-                                </div>
-                              )}
-                              {!block.static_image_url && !block.ai_image_prompt && (
-                                <p className="text-sm text-gray-400 italic mb-3">No image configured</p>
-                              )}
-                              <button
-                                onClick={() => handleStartEdit(block)}
-                                className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700"
-                              >
-                                Edit Image
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={blocks.map(b => b.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-3">
+                  {blocks.map((block) => (
+                    <SortableBlockItem
+                      key={block.id}
+                      block={block}
+                      isActive={block.is_active}
+                      isExpanded={expandedBlock === block.id}
+                      isEditing={editingBlock === block.id}
+                      saving={saving}
+                      onToggleExpand={() => setExpandedBlock(expandedBlock === block.id ? null : block.id)}
+                      onToggleActive={() => handleToggleBlockActive(block)}
+                      onDelete={() => handleDeleteBlock(block.id)}
+                      onStartEdit={() => {
+                        setExpandedBlock(block.id)
+                        if (editingBlock !== block.id) {
+                          handleStartEdit(block)
+                        }
+                      }}
+                      getBlockTypeBadge={getBlockTypeBadge}
+                      detectProviderFromPrompt={detectProviderFromPrompt}
+                    >
+                      {/* Expanded content rendered as children */}
+                      {expandedBlock === block.id && renderBlockExpandedContent(block)}
+                    </SortableBlockItem>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </SortableContext>
+            </DndContext>
           )}
 
           {/* Add Block Buttons */}
