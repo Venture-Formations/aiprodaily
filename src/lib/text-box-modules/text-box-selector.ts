@@ -170,31 +170,47 @@ export class TextBoxModuleSelector {
       return []
     }
 
+    console.log(`[TextBoxSelector] Found ${issueModules.length} issue_text_box_modules for issue ${issueId}`)
+
     // Get issue blocks for all modules
     const { data: issueBlocks } = await supabaseAdmin
       .from('issue_text_box_blocks')
       .select('*')
       .eq('issue_id', issueId)
 
+    console.log(`[TextBoxSelector] Found ${issueBlocks?.length || 0} issue_text_box_blocks for issue ${issueId}`)
+
     const issueBlocksMap = new Map<string, IssueTextBoxBlock>()
     for (const ib of issueBlocks || []) {
       issueBlocksMap.set(ib.text_box_block_id, ib as IssueTextBoxBlock)
     }
 
-    return issueModules.map(im => {
+    const results = issueModules.map(im => {
       const module = im.text_box_module as any
       const blocks = (module?.blocks || []).sort((a: TextBoxBlock, b: TextBoxBlock) =>
         a.display_order - b.display_order
       )
 
+      const mappedIssueBlocks = blocks.map((b: TextBoxBlock) =>
+        issueBlocksMap.get(b.id) || null
+      ).filter(Boolean) as IssueTextBoxBlock[]
+
+      // Debug: Check for AI prompt blocks with content
+      const aiPromptBlocks = blocks.filter((b: any) => b.block_type === 'ai_prompt')
+      for (const block of aiPromptBlocks) {
+        const issueBlock = issueBlocksMap.get(block.id)
+        console.log(`[TextBoxSelector] AI prompt block ${block.id}: issueBlock found=${!!issueBlock}, status=${issueBlock?.generation_status}, hasContent=${!!issueBlock?.generated_content}`)
+      }
+
       return {
         module: module as TextBoxModule,
         blocks: blocks as TextBoxBlock[],
-        issueBlocks: blocks.map((b: TextBoxBlock) =>
-          issueBlocksMap.get(b.id) || null
-        ).filter(Boolean) as IssueTextBoxBlock[]
+        issueBlocks: mappedIssueBlocks
       }
     }).filter(item => item.module)
+
+    console.log(`[TextBoxSelector] Returning ${results.length} modules with selections`)
+    return results
   }
 
   /**
