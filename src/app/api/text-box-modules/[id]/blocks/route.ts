@@ -41,21 +41,21 @@ export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { id: moduleId } = await context.params
     const body = await request.json()
-    const {
-      blockType,
-      displayOrder,
-      isActive,
-      // Static text fields
-      staticContent,
-      textSize,
-      // AI prompt fields
-      aiPromptJson,
-      generationTiming,
-      // Image fields
-      imageType,
-      staticImageUrl,
-      aiImagePrompt
-    } = body
+
+    // Accept both camelCase and snake_case parameter names
+    const blockType = body.blockType || body.block_type
+    const displayOrder = body.displayOrder ?? body.display_order
+    const isActive = body.isActive ?? body.is_active
+    // Static text fields
+    const staticContent = body.staticContent || body.static_content
+    const textSize = body.textSize || body.text_size
+    // AI prompt fields
+    const aiPromptJson = body.aiPromptJson || body.ai_prompt_json
+    const generationTiming = body.generationTiming || body.generation_timing
+    // Image fields
+    const imageType = body.imageType || body.image_type
+    const staticImageUrl = body.staticImageUrl || body.static_image_url
+    const aiImagePrompt = body.aiImagePrompt || body.ai_image_prompt
 
     if (!blockType) {
       return NextResponse.json(
