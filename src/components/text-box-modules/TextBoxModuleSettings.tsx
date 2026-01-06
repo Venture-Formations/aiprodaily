@@ -23,6 +23,11 @@ export function TextBoxModuleSettings({
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<'general' | 'blocks'>('general')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [expandedBlock, setExpandedBlock] = useState<string | null>(null)
+  const [editingBlock, setEditingBlock] = useState<string | null>(null)
+  const [editContent, setEditContent] = useState('')
+  const [editPrompt, setEditPrompt] = useState('')
+  const [editTiming, setEditTiming] = useState<'before_articles' | 'after_articles'>('after_articles')
 
   useEffect(() => {
     setLocalName(module.name)
@@ -91,6 +96,16 @@ export function TextBoxModuleSettings({
       if (res.ok) {
         const data = await res.json()
         setBlocks(prev => [...prev, data.block])
+        // Auto-expand newly added block for editing
+        setExpandedBlock(data.block.id)
+        if (blockType === 'static_text') {
+          setEditingBlock(data.block.id)
+          setEditContent('')
+        } else if (blockType === 'ai_prompt') {
+          setEditingBlock(data.block.id)
+          setEditPrompt('')
+          setEditTiming('after_articles')
+        }
       }
     } catch (error) {
       console.error('Failed to add block:', error)
@@ -107,6 +122,8 @@ export function TextBoxModuleSettings({
       })
       if (res.ok) {
         setBlocks(prev => prev.filter(b => b.id !== blockId))
+        if (expandedBlock === blockId) setExpandedBlock(null)
+        if (editingBlock === blockId) setEditingBlock(null)
       }
     } catch (error) {
       console.error('Failed to delete block:', error)
@@ -121,7 +138,7 @@ export function TextBoxModuleSettings({
       const res = await fetch(`/api/text-box-modules/${module.id}/blocks/${block.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !block.is_active })
+        body: JSON.stringify({ is_active: !block.is_active })
       })
       if (res.ok) {
         const data = await res.json()
@@ -131,6 +148,104 @@ export function TextBoxModuleSettings({
       console.error('Failed to toggle block:', error)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleMoveBlock = async (blockId: string, direction: 'up' | 'down') => {
+    const index = blocks.findIndex(b => b.id === blockId)
+    if (index === -1) return
+    if (direction === 'up' && index === 0) return
+    if (direction === 'down' && index === blocks.length - 1) return
+
+    const newIndex = direction === 'up' ? index - 1 : index + 1
+    const newBlocks = [...blocks]
+    const [moved] = newBlocks.splice(index, 1)
+    newBlocks.splice(newIndex, 0, moved)
+
+    // Update display_order for all blocks
+    const updatedBlocks = newBlocks.map((b, i) => ({ ...b, display_order: i }))
+    setBlocks(updatedBlocks)
+
+    // Save to server
+    setSaving(true)
+    try {
+      await fetch(`/api/text-box-modules/${module.id}/blocks`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order: updatedBlocks.map(b => ({ id: b.id, display_order: b.display_order }))
+        })
+      })
+    } catch (error) {
+      console.error('Failed to reorder blocks:', error)
+      fetchBlocks() // Revert on error
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleStartEdit = (block: TextBoxBlock) => {
+    setEditingBlock(block.id)
+    if (block.block_type === 'static_text') {
+      setEditContent(block.static_content || '')
+    } else if (block.block_type === 'ai_prompt') {
+      const promptJson = block.ai_prompt_json as any
+      setEditPrompt(promptJson?.prompt || promptJson?.messages?.[0]?.content || '')
+      setEditTiming(block.generation_timing || 'after_articles')
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditingBlock(null)
+    setEditContent('')
+    setEditPrompt('')
+  }
+
+  const handleSaveBlock = async (block: TextBoxBlock) => {
+    setSaving(true)
+    try {
+      const updateData: Record<string, any> = {}
+
+      if (block.block_type === 'static_text') {
+        updateData.static_content = editContent
+      } else if (block.block_type === 'ai_prompt') {
+        updateData.ai_prompt_json = {
+          prompt: editPrompt,
+          model: 'gpt-4o-mini',
+          max_tokens: 500,
+          temperature: 0.7
+        }
+        updateData.generation_timing = editTiming
+      }
+
+      const res = await fetch(`/api/text-box-modules/${module.id}/blocks/${block.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData)
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setBlocks(prev => prev.map(b => b.id === block.id ? data.block : b))
+        setEditingBlock(null)
+      }
+    } catch (error) {
+      console.error('Failed to save block:', error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const getBlockTypeBadge = (blockType: string) => {
+    switch (blockType) {
+      case 'static_text':
+        return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Static</span>
+      case 'ai_prompt':
+        return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">AI Generated</span>
+      case 'image':
+        return <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">Image</span>
+      default:
+        return null
     }
   }
 
@@ -201,7 +316,7 @@ export function TextBoxModuleSettings({
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            Blocks
+            Blocks ({blocks.length})
           </button>
         </nav>
       </div>
@@ -258,61 +373,228 @@ export function TextBoxModuleSettings({
               <p className="mb-4">No blocks yet. Add your first block to get started.</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {blocks.map((block) => (
+            <div className="space-y-3">
+              {blocks.map((block, index) => (
                 <div
                   key={block.id}
-                  className={`flex items-center justify-between p-3 rounded-lg border ${
-                    block.is_active ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-100'
+                  className={`border rounded-lg overflow-hidden ${
+                    block.is_active ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <span className={`text-sm font-medium ${!block.is_active ? 'text-gray-400' : ''}`}>
-                      {block.block_type === 'static_text' && 'Static Text'}
-                      {block.block_type === 'ai_prompt' && 'AI Prompt'}
-                      {block.block_type === 'image' && 'Image'}
-                    </span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      block.block_type === 'static_text'
-                        ? 'bg-gray-100 text-gray-600'
-                        : block.block_type === 'ai_prompt'
-                          ? 'bg-amber-100 text-amber-700'
-                          : 'bg-green-100 text-green-700'
-                    }`}>
-                      {block.block_type === 'static_text' && 'Static'}
-                      {block.block_type === 'ai_prompt' && 'AI Generated'}
-                      {block.block_type === 'image' && (block.image_type === 'ai_generated' ? 'AI Image' : 'Static')}
-                    </span>
-                    {block.block_type === 'ai_prompt' && (
-                      <span className="text-xs text-gray-400">
-                        ({block.generation_timing === 'before_articles' ? 'Before' : 'After'} articles)
+                  {/* Block Header */}
+                  <div
+                    className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50"
+                    onClick={() => setExpandedBlock(expandedBlock === block.id ? null : block.id)}
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Move Buttons */}
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleMoveBlock(block.id, 'up') }}
+                          disabled={index === 0 || saving}
+                          className={`p-0.5 rounded ${index === 0 ? 'text-gray-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleMoveBlock(block.id, 'down') }}
+                          disabled={index === blocks.length - 1 || saving}
+                          className={`p-0.5 rounded ${index === blocks.length - 1 ? 'text-gray-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      <span className={`text-sm font-medium ${!block.is_active ? 'text-gray-400' : ''}`}>
+                        {block.block_type === 'static_text' && 'Static Text'}
+                        {block.block_type === 'ai_prompt' && 'AI Prompt'}
+                        {block.block_type === 'image' && 'Image'}
                       </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleToggleBlockActive(block)}
-                      disabled={saving}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                        block.is_active ? 'bg-cyan-600' : 'bg-gray-200'
-                      } ${saving ? 'opacity-50' : ''}`}
-                    >
-                      <span
-                        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                          block.is_active ? 'translate-x-5' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteBlock(block.id)}
-                      disabled={saving}
-                      className="text-gray-400 hover:text-red-500 p-1"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      {getBlockTypeBadge(block.block_type)}
+                      {block.block_type === 'ai_prompt' && (
+                        <span className="text-xs text-gray-400">
+                          ({block.generation_timing === 'before_articles' ? 'Before' : 'After'} articles)
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleToggleBlockActive(block) }}
+                        disabled={saving}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                          block.is_active ? 'bg-cyan-600' : 'bg-gray-200'
+                        } ${saving ? 'opacity-50' : ''}`}
+                      >
+                        <span
+                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                            block.is_active ? 'translate-x-5' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteBlock(block.id) }}
+                        disabled={saving}
+                        className="text-gray-400 hover:text-red-500 p-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                      <svg
+                        className={`w-5 h-5 text-gray-400 transform transition-transform ${expandedBlock === block.id ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
-                    </button>
+                    </div>
                   </div>
+
+                  {/* Block Content (Expanded) */}
+                  {expandedBlock === block.id && (
+                    <div className="border-t border-gray-200 p-4 bg-gray-50">
+                      {/* Static Text Block */}
+                      {block.block_type === 'static_text' && (
+                        <div>
+                          {editingBlock === block.id ? (
+                            <div className="space-y-3">
+                              <textarea
+                                value={editContent}
+                                onChange={(e) => setEditContent(e.target.value)}
+                                placeholder="Enter your static text content here... (HTML supported)"
+                                className="w-full h-40 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                              />
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={handleCancelEdit}
+                                  className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  onClick={() => handleSaveBlock(block)}
+                                  disabled={saving}
+                                  className="px-4 py-1.5 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
+                                >
+                                  {saving ? 'Saving...' : 'Save'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              {block.static_content ? (
+                                <div
+                                  className="text-sm text-gray-700 prose prose-sm max-w-none"
+                                  dangerouslySetInnerHTML={{ __html: block.static_content }}
+                                />
+                              ) : (
+                                <p className="text-sm text-gray-400 italic">No content yet</p>
+                              )}
+                              <button
+                                onClick={() => handleStartEdit(block)}
+                                className="mt-3 text-sm text-cyan-600 hover:text-cyan-700"
+                              >
+                                Edit Content
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* AI Prompt Block */}
+                      {block.block_type === 'ai_prompt' && (
+                        <div>
+                          {editingBlock === block.id ? (
+                            <div className="space-y-3">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  AI Prompt
+                                </label>
+                                <textarea
+                                  value={editPrompt}
+                                  onChange={(e) => setEditPrompt(e.target.value)}
+                                  placeholder="Enter the AI prompt to generate content..."
+                                  className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Generation Timing
+                                </label>
+                                <select
+                                  value={editTiming}
+                                  onChange={(e) => setEditTiming(e.target.value as any)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                                >
+                                  <option value="before_articles">Before Articles (basic context only)</option>
+                                  <option value="after_articles">After Articles (full newsletter context)</option>
+                                </select>
+                                <p className="mt-1 text-xs text-gray-500">
+                                  "After articles" has access to article headlines, AI apps, polls, and ads for richer content generation.
+                                </p>
+                              </div>
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={handleCancelEdit}
+                                  className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  onClick={() => handleSaveBlock(block)}
+                                  disabled={saving}
+                                  className="px-4 py-1.5 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
+                                >
+                                  {saving ? 'Saving...' : 'Save'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="text-sm text-gray-700">
+                                <strong>Prompt:</strong>
+                                <p className="mt-1 p-2 bg-white rounded border text-gray-600">
+                                  {(block.ai_prompt_json as any)?.prompt ||
+                                   (block.ai_prompt_json as any)?.messages?.[0]?.content ||
+                                   <span className="italic text-gray-400">No prompt configured</span>}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => handleStartEdit(block)}
+                                className="mt-3 text-sm text-cyan-600 hover:text-cyan-700"
+                              >
+                                Edit Prompt
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Image Block */}
+                      {block.block_type === 'image' && (
+                        <div>
+                          <p className="text-sm text-gray-500">
+                            Image type: {block.image_type === 'ai_generated' ? 'AI Generated' : 'Static'}
+                          </p>
+                          {block.static_image_url && (
+                            <img
+                              src={block.static_image_url}
+                              alt="Block image"
+                              className="mt-2 max-w-xs rounded"
+                            />
+                          )}
+                          <p className="mt-2 text-xs text-gray-400">
+                            Image editing coming soon. For now, delete and recreate to change.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -323,21 +605,21 @@ export function TextBoxModuleSettings({
             <button
               onClick={() => handleAddBlock('static_text')}
               disabled={saving}
-              className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 hover:border-gray-400 text-gray-700 transition-colors"
             >
               + Static Text
             </button>
             <button
               onClick={() => handleAddBlock('ai_prompt')}
               disabled={saving}
-              className="flex-1 px-3 py-2 text-sm border border-amber-200 rounded-lg hover:bg-amber-50 text-amber-700 transition-colors"
+              className="flex-1 px-3 py-2 text-sm border border-amber-200 rounded-lg hover:bg-amber-50 hover:border-amber-300 text-amber-700 transition-colors"
             >
               + AI Prompt
             </button>
             <button
               onClick={() => handleAddBlock('image')}
               disabled={saving}
-              className="flex-1 px-3 py-2 text-sm border border-green-200 rounded-lg hover:bg-green-50 text-green-700 transition-colors"
+              className="flex-1 px-3 py-2 text-sm border border-green-200 rounded-lg hover:bg-green-50 hover:border-green-300 text-green-700 transition-colors"
             >
               + Image
             </button>

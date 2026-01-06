@@ -51,25 +51,34 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const { id: moduleId, blockId } = await context.params
     const body = await request.json()
 
-    // Build update object
+    // Build update object - accept both camelCase and snake_case
     const updates: Record<string, any> = {}
 
     // Common fields
-    if (body.displayOrder !== undefined) updates.display_order = body.displayOrder
-    if (body.isActive !== undefined) updates.is_active = body.isActive
+    const displayOrder = body.displayOrder ?? body.display_order
+    const isActive = body.isActive ?? body.is_active
+    if (displayOrder !== undefined) updates.display_order = displayOrder
+    if (isActive !== undefined) updates.is_active = isActive
 
     // Static text fields
-    if (body.staticContent !== undefined) updates.static_content = body.staticContent
-    if (body.textSize !== undefined) updates.text_size = body.textSize
+    const staticContent = body.staticContent ?? body.static_content
+    const textSize = body.textSize ?? body.text_size
+    if (staticContent !== undefined) updates.static_content = staticContent
+    if (textSize !== undefined) updates.text_size = textSize
 
     // AI prompt fields
-    if (body.aiPromptJson !== undefined) updates.ai_prompt_json = body.aiPromptJson
-    if (body.generationTiming !== undefined) updates.generation_timing = body.generationTiming
+    const aiPromptJson = body.aiPromptJson ?? body.ai_prompt_json
+    const generationTiming = body.generationTiming ?? body.generation_timing
+    if (aiPromptJson !== undefined) updates.ai_prompt_json = aiPromptJson
+    if (generationTiming !== undefined) updates.generation_timing = generationTiming
 
     // Image fields
-    if (body.imageType !== undefined) updates.image_type = body.imageType
-    if (body.staticImageUrl !== undefined) updates.static_image_url = body.staticImageUrl
-    if (body.aiImagePrompt !== undefined) updates.ai_image_prompt = body.aiImagePrompt
+    const imageType = body.imageType ?? body.image_type
+    const staticImageUrl = body.staticImageUrl ?? body.static_image_url
+    const aiImagePrompt = body.aiImagePrompt ?? body.ai_image_prompt
+    if (imageType !== undefined) updates.image_type = imageType
+    if (staticImageUrl !== undefined) updates.static_image_url = staticImageUrl
+    if (aiImagePrompt !== undefined) updates.ai_image_prompt = aiImagePrompt
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
