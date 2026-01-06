@@ -76,8 +76,18 @@ export function TextBoxModuleSettings({
   const [crop, setCrop] = useState<Crop>()
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>()
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [aspectRatio, setAspectRatio] = useState<'16:9' | '5:4' | 'free'>('16:9')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
+
+  // Helper to get numeric aspect ratio
+  const getAspectRatioValue = (ratio: '16:9' | '5:4' | 'free'): number | undefined => {
+    switch (ratio) {
+      case '16:9': return 16 / 9
+      case '5:4': return 5 / 4
+      case 'free': return undefined
+    }
+  }
 
   useEffect(() => {
     setLocalName(module.name)
@@ -260,16 +270,57 @@ export function TextBoxModuleSettings({
       const reader = new FileReader()
       reader.onload = () => {
         setSelectedImage(reader.result as string)
-        // Set initial crop (16:9 aspect ratio)
+        // Set initial crop based on aspect ratio
+        const ratio = getAspectRatioValue(aspectRatio)
+        if (ratio) {
+          // Calculate height based on aspect ratio (width 80%)
+          const height = 80 / ratio
+          setCrop({
+            unit: '%',
+            x: 10,
+            y: Math.max(5, (100 - height) / 2),
+            width: 80,
+            height: Math.min(90, height)
+          })
+        } else {
+          // Free crop - default square-ish
+          setCrop({
+            unit: '%',
+            x: 10,
+            y: 10,
+            width: 80,
+            height: 80
+          })
+        }
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleAspectRatioChange = (newRatio: '16:9' | '5:4' | 'free') => {
+    setAspectRatio(newRatio)
+    // Reset crop when ratio changes
+    if (selectedImage) {
+      const ratio = getAspectRatioValue(newRatio)
+      if (ratio) {
+        const height = 80 / ratio
+        setCrop({
+          unit: '%',
+          x: 10,
+          y: Math.max(5, (100 - height) / 2),
+          width: 80,
+          height: Math.min(90, height)
+        })
+      } else {
         setCrop({
           unit: '%',
           x: 10,
           y: 10,
           width: 80,
-          height: 45
+          height: 80
         })
       }
-      reader.readAsDataURL(file)
+      setCompletedCrop(undefined)
     }
   }
 
@@ -841,6 +892,29 @@ export function TextBoxModuleSettings({
                                     </div>
                                   )}
 
+                                  {/* Aspect Ratio Selector */}
+                                  <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                      Aspect Ratio
+                                    </label>
+                                    <div className="flex gap-2">
+                                      {(['16:9', '5:4', 'free'] as const).map((ratio) => (
+                                        <button
+                                          key={ratio}
+                                          type="button"
+                                          onClick={() => handleAspectRatioChange(ratio)}
+                                          className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
+                                            aspectRatio === ratio
+                                              ? 'bg-cyan-600 text-white border-cyan-600'
+                                              : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                                          }`}
+                                        >
+                                          {ratio === 'free' ? 'Free' : ratio}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+
                                   {/* Upload button */}
                                   <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -853,22 +927,19 @@ export function TextBoxModuleSettings({
                                       onChange={handleImageSelect}
                                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                                     />
-                                    <p className="mt-1 text-xs text-gray-500">
-                                      Image will be cropped to 16:9 ratio
-                                    </p>
                                   </div>
 
                                   {/* Crop Tool */}
                                   {selectedImage && (
                                     <div className="mt-4">
                                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Crop Image (16:9 ratio)
+                                        Crop Image {aspectRatio !== 'free' ? `(${aspectRatio})` : '(Free)'}
                                       </label>
                                       <ReactCrop
                                         crop={crop}
                                         onChange={(c) => setCrop(c)}
                                         onComplete={(c) => setCompletedCrop(c)}
-                                        aspect={16 / 9}
+                                        aspect={getAspectRatioValue(aspectRatio)}
                                       >
                                         <img
                                           ref={imgRef}
