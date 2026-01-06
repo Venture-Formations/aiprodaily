@@ -251,32 +251,50 @@ export class Deduplicator {
       }
 
       const issueIds = recentCampaigns.map(c => c.id)
+      const allHistoricalPostIds: string[] = []
 
-      // Get ONLY articles from the specified section
+      // Check LEGACY tables (articles, secondary_articles)
       const tableName = section === 'primary' ? 'articles' : 'secondary_articles'
-      const { data: historicalArticles, error: articlesError } = await supabaseAdmin
+      const { data: legacyArticles, error: legacyError } = await supabaseAdmin
         .from(tableName)
         .select('id, post_id, headline')
         .in('issue_id', issueIds)
         .eq('is_active', true)
         .eq('skipped', false)
 
-      if (articlesError) {
-        console.error(`[DEDUP] Error fetching historical ${section} articles:`, articlesError)
+      if (!legacyError && legacyArticles) {
+        const legacyPostIds = legacyArticles.map(a => a.post_id).filter(Boolean)
+        allHistoricalPostIds.push(...legacyPostIds)
+        console.log(`[DEDUP] Found ${legacyPostIds.length} historical posts from legacy ${tableName} table`)
+      }
+
+      // Check NEW module_articles table (for module-based system)
+      const { data: moduleArticles, error: moduleError } = await supabaseAdmin
+        .from('module_articles')
+        .select('id, post_id, headline')
+        .in('issue_id', issueIds)
+        .eq('is_active', true)
+
+      if (!moduleError && moduleArticles) {
+        const modulePostIds = moduleArticles.map(a => a.post_id).filter(Boolean)
+        allHistoricalPostIds.push(...modulePostIds)
+        console.log(`[DEDUP] Found ${modulePostIds.length} historical posts from module_articles table`)
+      }
+
+      // Dedupe the post IDs
+      const uniquePostIds = Array.from(new Set(allHistoricalPostIds))
+
+      if (uniquePostIds.length === 0) {
+        console.log(`[DEDUP] No historical ${section} posts found in either table`)
         return []
       }
 
-      // Get the RSS posts for historical articles
-      const historicalPostIds = historicalArticles?.map(a => a.post_id).filter(Boolean) || []
-
-      if (historicalPostIds.length === 0) {
-        return []
-      }
+      console.log(`[DEDUP] Total unique historical ${section} post IDs: ${uniquePostIds.length}`)
 
       const { data: historicalPosts, error: postsError } = await supabaseAdmin
         .from('rss_posts')
         .select('*')
-        .in('id', historicalPostIds)
+        .in('id', uniquePostIds)
 
       if (postsError) {
         console.error(`[DEDUP] Error fetching historical ${section} posts:`, postsError)
