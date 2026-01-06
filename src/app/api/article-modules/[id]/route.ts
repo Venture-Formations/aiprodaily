@@ -83,6 +83,74 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     updates.updated_at = new Date().toISOString()
 
+    // If articles_count is being changed, we need to handle existing issues
+    const newArticlesCount = updates.articles_count
+    let adjustedIssueCount = 0
+
+    if (newArticlesCount !== undefined) {
+      // Find all non-sent issues with module_articles for this module
+      // that have more active articles than the new limit
+      const { data: issuesWithExcess } = await supabaseAdmin
+        .from('publication_issues')
+        .select('id')
+        .neq('status', 'sent')
+
+      if (issuesWithExcess && issuesWithExcess.length > 0) {
+        for (const issue of issuesWithExcess) {
+          // Get active articles for this module in this issue, ordered by rank (highest rank = lowest priority)
+          const { data: activeArticles } = await supabaseAdmin
+            .from('module_articles')
+            .select('id, rank')
+            .eq('issue_id', issue.id)
+            .eq('article_module_id', id)
+            .eq('is_active', true)
+            .order('rank', { ascending: false }) // Highest rank first (to deselect)
+
+          if (activeArticles && activeArticles.length > newArticlesCount) {
+            // Need to deselect excess articles (those with highest rank)
+            const excessCount = activeArticles.length - newArticlesCount
+            const articlesToDeselect = activeArticles.slice(0, excessCount)
+
+            for (const article of articlesToDeselect) {
+              await supabaseAdmin
+                .from('module_articles')
+                .update({ is_active: false, rank: null })
+                .eq('id', article.id)
+            }
+
+            // Renumber remaining active articles
+            const { data: remaining } = await supabaseAdmin
+              .from('module_articles')
+              .select('id')
+              .eq('issue_id', issue.id)
+              .eq('article_module_id', id)
+              .eq('is_active', true)
+              .order('rank', { ascending: true })
+
+            for (let i = 0; i < (remaining?.length || 0); i++) {
+              await supabaseAdmin
+                .from('module_articles')
+                .update({ rank: i + 1 })
+                .eq('id', remaining![i].id)
+            }
+
+            // Update issue_article_modules with new selection
+            await supabaseAdmin
+              .from('issue_article_modules')
+              .update({
+                article_ids: (remaining || []).map(a => a.id),
+                selected_at: new Date().toISOString()
+              })
+              .eq('issue_id', issue.id)
+              .eq('article_module_id', id)
+
+            adjustedIssueCount++
+            console.log(`[ArticleModules] Adjusted issue ${issue.id}: deselected ${excessCount} excess articles`)
+          }
+        }
+      }
+    }
+
     const { data: module, error } = await supabaseAdmin
       .from('article_modules')
       .update(updates)
@@ -100,11 +168,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       throw error
     }
 
-    console.log(`[ArticleModules] Updated module: ${module.name} (${module.id})`)
+    console.log(`[ArticleModules] Updated module: ${module.name} (${module.id})${adjustedIssueCount > 0 ? ` - adjusted ${adjustedIssueCount} issues` : ''}`)
 
     return NextResponse.json({
       success: true,
-      module
+      module,
+      adjustedIssues: adjustedIssueCount
     })
 
   } catch (error: any) {
