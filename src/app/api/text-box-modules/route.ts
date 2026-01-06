@@ -126,6 +126,8 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const { modules } = body
 
+    console.log('[TextBoxModules] PATCH called with:', JSON.stringify(modules))
+
     if (!modules || !Array.isArray(modules)) {
       return NextResponse.json(
         { error: 'modules array is required' },
@@ -134,7 +136,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Update each module's display_order
-    const updates = modules.map(async (m: { id: string; display_order: number }) => {
+    for (const m of modules as { id: string; display_order: number }[]) {
+      console.log(`[TextBoxModules] Updating module ${m.id} to display_order ${m.display_order}`)
       const { error } = await supabaseAdmin
         .from('text_box_modules')
         .update({ display_order: m.display_order, updated_at: new Date().toISOString() })
@@ -144,11 +147,9 @@ export async function PATCH(request: NextRequest) {
         console.error(`[TextBoxModules] Failed to update order for ${m.id}:`, error)
         throw error
       }
-    })
+    }
 
-    await Promise.all(updates)
-
-    console.log(`[TextBoxModules] Updated display_order for ${modules.length} modules`)
+    console.log(`[TextBoxModules] Successfully updated display_order for ${modules.length} modules`)
 
     return NextResponse.json({
       success: true,
