@@ -117,10 +117,13 @@ export class TextBoxModuleRenderer {
 
     const textStyles = TEXT_SIZE_STYLES[block.text_size || 'medium']
 
+    // Reset paragraph margins for consistent spacing
+    const normalizedContent = content.replace(/<p/g, '<p style="margin: 0 0 4px 0;"')
+
     return `
 <tr>
-  <td style="padding: 4px 10px; font-size: ${textStyles.fontSize}; font-weight: ${textStyles.fontWeight}; line-height: ${textStyles.lineHeight};">
-    ${content}
+  <td style="padding: 0 10px; font-size: ${textStyles.fontSize}; font-weight: ${textStyles.fontWeight}; line-height: ${textStyles.lineHeight};">
+    ${normalizedContent}
   </td>
 </tr>`
   }
@@ -157,12 +160,13 @@ export class TextBoxModuleRenderer {
       return ''
     }
 
-    // Convert line breaks to HTML
-    const formattedContent = content.replace(/\n/g, '<br>')
+    // Convert line breaks to HTML and normalize paragraph margins
+    let formattedContent = content.replace(/\n/g, '<br>')
+    formattedContent = formattedContent.replace(/<p/g, '<p style="margin: 0 0 4px 0;"')
 
     return `
 <tr>
-  <td style="padding: 4px 10px; font-size: 16px; line-height: 26px;">
+  <td style="padding: 0 10px; font-size: 16px; line-height: 26px;">
     ${formattedContent}
   </td>
 </tr>`
@@ -291,10 +295,12 @@ export class TextBoxModuleRenderer {
       if (block.type === 'static_text' || block.type === 'ai_prompt') {
         if (block.content) {
           const textStyles = TEXT_SIZE_STYLES[block.textSize || 'medium']
-          const formattedContent = block.content.replace(/\n/g, '<br>')
+          // Normalize paragraph margins for consistent spacing
+          let formattedContent = block.content.replace(/\n/g, '<br>')
+          formattedContent = formattedContent.replace(/<p/g, '<p style="margin: 0 0 4px 0;"')
           blocksHtml += `
 <tr>
-  <td style="padding: 4px 10px; font-size: ${textStyles.fontSize}; font-weight: ${textStyles.fontWeight}; line-height: ${textStyles.lineHeight};">
+  <td style="padding: 0 10px; font-size: ${textStyles.fontSize}; font-weight: ${textStyles.fontWeight}; line-height: ${textStyles.lineHeight};">
     ${formattedContent}
   </td>
 </tr>`
