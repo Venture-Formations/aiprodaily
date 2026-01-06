@@ -1904,7 +1904,7 @@ export async function generateFullNewsletterHtml(
       ...(promptModules || []).map(m => ({ type: 'prompt_module' as const, data: m })),
       ...(articleModules || []).map(m => ({ type: 'article_module' as const, data: m })),
       ...(textBoxModules || []).map(m => ({ type: 'text_box_module' as const, data: m }))
-    ].sort((a, b) => (a.data.display_order || 999) - (b.data.display_order || 999))
+    ].sort((a, b) => (a.data.display_order ?? 999) - (b.data.display_order ?? 999))
 
     console.log('Combined section order:', allItems.map(item =>
       `${item.data.name} (${item.type}, order: ${item.data.display_order})`

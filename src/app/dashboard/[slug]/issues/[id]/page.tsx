@@ -732,7 +732,7 @@ function EventsManager({
   const getSelectedEventsForDate = (date: string) => {
     return issueEvents
       .filter(ce => ce.event_date === date && ce.is_selected)
-      .sort((a, b) => (a.display_order || 999) - (b.display_order || 999))
+      .sort((a, b) => (a.display_order ?? 999) - (b.display_order ?? 999))
   }
 
   const getFeaturedEventForDate = (date: string) => {

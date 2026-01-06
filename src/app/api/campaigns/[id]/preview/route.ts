@@ -94,7 +94,7 @@ export async function GET(
     // Filter to only selected events and group by date
     const eventsData = (issue.issue_events || [])
       .filter((ce: any) => ce.is_selected && ce.event)
-      .sort((a: any, b: any) => (a.display_order || 999) - (b.display_order || 999))
+      .sort((a: any, b: any) => (a.display_order ?? 999) - (b.display_order ?? 999))
     console.log('Selected events after filter:', eventsData.length)
 
     console.log('Generating HTML newsletter using shared template')

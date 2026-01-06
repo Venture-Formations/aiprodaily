@@ -808,7 +808,7 @@ export class SendGridService {
       ...(sections || []).map(s => ({ type: 'section' as const, data: s })),
       ...(adModules || []).map(m => ({ type: 'ad_module' as const, data: m })),
       ...(pollModules || []).map(m => ({ type: 'poll_module' as const, data: m }))
-    ].sort((a, b) => (a.data.display_order || 999) - (b.data.display_order || 999))
+    ].sort((a, b) => (a.data.display_order ?? 999) - (b.data.display_order ?? 999))
 
     console.log('[SendGrid] Combined section order:', allItems.map(item =>
       `${item.data.name} (${item.type}, order: ${item.data.display_order})`

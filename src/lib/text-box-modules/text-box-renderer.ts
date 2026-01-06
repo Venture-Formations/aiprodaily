@@ -119,7 +119,7 @@ export class TextBoxModuleRenderer {
 
     return `
 <tr>
-  <td style="padding: 8px 10px; font-size: ${textStyles.fontSize}; font-weight: ${textStyles.fontWeight}; line-height: ${textStyles.lineHeight};">
+  <td style="padding: 0 10px; font-size: ${textStyles.fontSize}; font-weight: ${textStyles.fontWeight}; line-height: ${textStyles.lineHeight};">
     ${content}
   </td>
 </tr>`
@@ -162,7 +162,7 @@ export class TextBoxModuleRenderer {
 
     return `
 <tr>
-  <td style="padding: 8px 10px; font-size: 16px; line-height: 26px;">
+  <td style="padding: 0 10px; font-size: 16px; line-height: 26px;">
     ${formattedContent}
   </td>
 </tr>`
@@ -294,7 +294,7 @@ export class TextBoxModuleRenderer {
           const formattedContent = block.content.replace(/\n/g, '<br>')
           blocksHtml += `
 <tr>
-  <td style="padding: 8px 10px; font-size: ${textStyles.fontSize}; font-weight: ${textStyles.fontWeight}; line-height: ${textStyles.lineHeight};">
+  <td style="padding: 0 10px; font-size: ${textStyles.fontSize}; font-weight: ${textStyles.fontWeight}; line-height: ${textStyles.lineHeight};">
     ${formattedContent}
   </td>
 </tr>`
