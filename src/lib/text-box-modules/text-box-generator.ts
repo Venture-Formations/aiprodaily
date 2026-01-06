@@ -109,12 +109,15 @@ export class TextBoxGenerator {
 
     if (articleModules && articleModules.length > 0) {
       // Get all module articles for this issue
-      const { data: allModuleArticles } = await supabaseAdmin
+      console.log(`[TextBoxGenerator] Fetching articles for issue: ${issueId}`)
+      const { data: allModuleArticles, error: articlesError } = await supabaseAdmin
         .from('module_articles')
         .select('headline, content, rank, article_module_id')
         .eq('issue_id', issueId)
         .eq('is_active', true)
         .order('rank', { ascending: true })
+
+      console.log(`[TextBoxGenerator] Found ${allModuleArticles?.length || 0} articles for issue ${issueId}`, articlesError ? `Error: ${articlesError.message}` : '')
 
       if (allModuleArticles) {
         // Group articles by module

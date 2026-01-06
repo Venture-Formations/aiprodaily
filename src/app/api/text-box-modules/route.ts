@@ -116,3 +116,50 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+/**
+ * PATCH /api/text-box-modules - Bulk update display_order for multiple modules
+ * Body: { modules: [{ id: string, display_order: number }] }
+ */
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { modules } = body
+
+    if (!modules || !Array.isArray(modules)) {
+      return NextResponse.json(
+        { error: 'modules array is required' },
+        { status: 400 }
+      )
+    }
+
+    // Update each module's display_order
+    const updates = modules.map(async (m: { id: string; display_order: number }) => {
+      const { error } = await supabaseAdmin
+        .from('text_box_modules')
+        .update({ display_order: m.display_order, updated_at: new Date().toISOString() })
+        .eq('id', m.id)
+
+      if (error) {
+        console.error(`[TextBoxModules] Failed to update order for ${m.id}:`, error)
+        throw error
+      }
+    })
+
+    await Promise.all(updates)
+
+    console.log(`[TextBoxModules] Updated display_order for ${modules.length} modules`)
+
+    return NextResponse.json({
+      success: true,
+      updated: modules.length
+    })
+
+  } catch (error: any) {
+    console.error('[TextBoxModules] Failed to update order:', error)
+    return NextResponse.json(
+      { success: false, error: 'Failed to update module order', details: error.message },
+      { status: 500 }
+    )
+  }
+}
