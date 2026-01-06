@@ -1,13 +1,46 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import dynamic from 'next/dynamic'
+import ReactCrop, { Crop, PixelCrop } from 'react-image-crop'
+import 'react-image-crop/dist/ReactCrop.css'
+import 'react-quill-new/dist/quill.snow.css'
+import { getCroppedImage } from '@/utils/imageCrop'
 import type { TextBoxModule, TextBoxBlock } from '@/types/database'
+
+// Dynamically import ReactQuill to avoid SSR issues
+const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false })
 
 interface TextBoxModuleSettingsProps {
   module: TextBoxModule
   publicationId: string
   onUpdate: (updates: Partial<TextBoxModule>) => Promise<void>
   onDelete: () => Promise<void>
+}
+
+// Quill toolbar configuration
+const quillModules = {
+  toolbar: [
+    ['bold', 'italic', 'underline'],
+    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+    ['link'],
+    [{ 'color': [] }]
+  ],
+}
+
+const quillFormats = [
+  'bold', 'italic', 'underline',
+  'list',
+  'link',
+  'color'
+]
+
+// Helper to detect AI provider from prompt JSON
+function detectProviderFromPrompt(promptJson: any): 'claude' | 'openai' {
+  if (!promptJson) return 'openai'
+  const str = JSON.stringify(promptJson).toLowerCase()
+  if (str.includes('claude') || str.includes('anthropic')) return 'claude'
+  return 'openai'
 }
 
 export function TextBoxModuleSettings({
@@ -23,11 +56,28 @@ export function TextBoxModuleSettings({
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<'general' | 'blocks'>('general')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  // Block editing states
   const [expandedBlock, setExpandedBlock] = useState<string | null>(null)
   const [editingBlock, setEditingBlock] = useState<string | null>(null)
+
+  // Static text editing
   const [editContent, setEditContent] = useState('')
+  const [editTextSize, setEditTextSize] = useState<'small' | 'medium' | 'large'>('medium')
+
+  // AI prompt editing
   const [editPrompt, setEditPrompt] = useState('')
   const [editTiming, setEditTiming] = useState<'before_articles' | 'after_articles'>('after_articles')
+
+  // Image editing
+  const [editImageType, setEditImageType] = useState<'static' | 'ai_generated'>('static')
+  const [editAiImagePrompt, setEditAiImagePrompt] = useState('')
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [crop, setCrop] = useState<Crop>()
+  const [completedCrop, setCompletedCrop] = useState<PixelCrop>()
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const imgRef = useRef<HTMLImageElement>(null)
 
   useEffect(() => {
     setLocalName(module.name)
@@ -98,14 +148,7 @@ export function TextBoxModuleSettings({
         setBlocks(prev => [...prev, data.block])
         // Auto-expand newly added block for editing
         setExpandedBlock(data.block.id)
-        if (blockType === 'static_text') {
-          setEditingBlock(data.block.id)
-          setEditContent('')
-        } else if (blockType === 'ai_prompt') {
-          setEditingBlock(data.block.id)
-          setEditPrompt('')
-          setEditTiming('after_articles')
-        }
+        handleStartEdit(data.block)
       }
     } catch (error) {
       console.error('Failed to add block:', error)
@@ -188,10 +231,17 @@ export function TextBoxModuleSettings({
     setEditingBlock(block.id)
     if (block.block_type === 'static_text') {
       setEditContent(block.static_content || '')
+      setEditTextSize((block.text_size as any) || 'medium')
     } else if (block.block_type === 'ai_prompt') {
       const promptJson = block.ai_prompt_json as any
       setEditPrompt(promptJson?.prompt || promptJson?.messages?.[0]?.content || '')
       setEditTiming(block.generation_timing || 'after_articles')
+    } else if (block.block_type === 'image') {
+      setEditImageType((block.image_type as any) || 'static')
+      setEditAiImagePrompt(block.ai_image_prompt || '')
+      setSelectedImage(null)
+      setCrop(undefined)
+      setCompletedCrop(undefined)
     }
   }
 
@@ -199,6 +249,28 @@ export function TextBoxModuleSettings({
     setEditingBlock(null)
     setEditContent('')
     setEditPrompt('')
+    setSelectedImage(null)
+    setCrop(undefined)
+    setCompletedCrop(undefined)
+  }
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader()
+      reader.onload = () => {
+        setSelectedImage(reader.result as string)
+        // Set initial crop (16:9 aspect ratio)
+        setCrop({
+          unit: '%',
+          x: 10,
+          y: 10,
+          width: 80,
+          height: 45
+        })
+      }
+      reader.readAsDataURL(file)
+    }
   }
 
   const handleSaveBlock = async (block: TextBoxBlock) => {
@@ -208,6 +280,7 @@ export function TextBoxModuleSettings({
 
       if (block.block_type === 'static_text') {
         updateData.static_content = editContent
+        updateData.text_size = editTextSize
       } else if (block.block_type === 'ai_prompt') {
         updateData.ai_prompt_json = {
           prompt: editPrompt,
@@ -216,6 +289,36 @@ export function TextBoxModuleSettings({
           temperature: 0.7
         }
         updateData.generation_timing = editTiming
+      } else if (block.block_type === 'image') {
+        updateData.image_type = editImageType
+
+        if (editImageType === 'ai_generated') {
+          updateData.ai_image_prompt = editAiImagePrompt
+        } else if (selectedImage && completedCrop && completedCrop.width > 0 && completedCrop.height > 0) {
+          // Upload cropped image
+          setUploadingImage(true)
+          try {
+            const croppedBlob = await getCroppedImage(imgRef.current, completedCrop)
+            if (croppedBlob) {
+              const imageFormData = new FormData()
+              imageFormData.append('image', croppedBlob, 'block-image.jpg')
+
+              const uploadRes = await fetch('/api/ads/upload-image', {
+                method: 'POST',
+                body: imageFormData
+              })
+
+              if (uploadRes.ok) {
+                const { url } = await uploadRes.json()
+                updateData.static_image_url = url
+              } else {
+                throw new Error('Failed to upload image')
+              }
+            }
+          } finally {
+            setUploadingImage(false)
+          }
+        }
       }
 
       const res = await fetch(`/api/text-box-modules/${module.id}/blocks/${block.id}`, {
@@ -228,9 +331,11 @@ export function TextBoxModuleSettings({
         const data = await res.json()
         setBlocks(prev => prev.map(b => b.id === block.id ? data.block : b))
         setEditingBlock(null)
+        setSelectedImage(null)
       }
     } catch (error) {
       console.error('Failed to save block:', error)
+      alert('Failed to save block. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -239,13 +344,22 @@ export function TextBoxModuleSettings({
   const getBlockTypeBadge = (blockType: string) => {
     switch (blockType) {
       case 'static_text':
-        return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Static</span>
+        return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Static Text</span>
       case 'ai_prompt':
-        return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">AI Generated</span>
+        return <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">AI Generated</span>
       case 'image':
         return <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">Image</span>
       default:
         return null
+    }
+  }
+
+  const getTextSizeLabel = (size: string) => {
+    switch (size) {
+      case 'small': return 'Small (14px)'
+      case 'medium': return 'Medium (16px)'
+      case 'large': return 'Large (20px, semibold)'
+      default: return 'Medium'
     }
   }
 
@@ -266,7 +380,7 @@ export function TextBoxModuleSettings({
               }
             }}
             disabled={saving}
-            className="w-full text-xl font-semibold text-gray-900 bg-transparent border-b-2 border-transparent hover:border-gray-200 focus:border-blue-500 focus:outline-none transition-colors px-1 py-1"
+            className="w-full text-xl font-semibold text-gray-900 bg-transparent border-b-2 border-transparent hover:border-gray-200 focus:border-cyan-500 focus:outline-none transition-colors px-1 py-1"
           />
           <span className="text-xs text-cyan-600 font-medium">Text Box Module</span>
         </div>
@@ -352,9 +466,9 @@ export function TextBoxModuleSettings({
             <div className="text-sm text-gray-500">
               <p className="mb-2">Text Box modules support multiple block types:</p>
               <ul className="list-disc list-inside space-y-1">
-                <li><strong>Static Text</strong> - Rich text content that stays the same</li>
+                <li><strong>Static Text</strong> - Rich text content with formatting (Bold, Italic, Underline)</li>
                 <li><strong>AI Prompt</strong> - Content generated by AI each issue</li>
-                <li><strong>Image</strong> - Static or AI-generated images</li>
+                <li><strong>Image</strong> - Static upload or AI-generated images</li>
               </ul>
             </div>
           </div>
@@ -381,7 +495,7 @@ export function TextBoxModuleSettings({
                     block.is_active ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50'
                   }`}
                 >
-                  {/* Block Header */}
+                  {/* Block Header - Collapsed View */}
                   <div
                     className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50"
                     onClick={() => setExpandedBlock(expandedBlock === block.id ? null : block.id)}
@@ -409,19 +523,59 @@ export function TextBoxModuleSettings({
                         </button>
                       </div>
 
-                      <span className={`text-sm font-medium ${!block.is_active ? 'text-gray-400' : ''}`}>
-                        {block.block_type === 'static_text' && 'Static Text'}
-                        {block.block_type === 'ai_prompt' && 'AI Prompt'}
-                        {block.block_type === 'image' && 'Image'}
-                      </span>
-                      {getBlockTypeBadge(block.block_type)}
-                      {block.block_type === 'ai_prompt' && (
-                        <span className="text-xs text-gray-400">
-                          ({block.generation_timing === 'before_articles' ? 'Before' : 'After'} articles)
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm font-medium ${!block.is_active ? 'text-gray-400' : ''}`}>
+                          {block.block_type === 'static_text' && 'Static Text'}
+                          {block.block_type === 'ai_prompt' && 'AI Prompt'}
+                          {block.block_type === 'image' && 'Image'}
                         </span>
-                      )}
+                        {getBlockTypeBadge(block.block_type)}
+                        {/* AI Provider Badge for ai_prompt blocks */}
+                        {block.block_type === 'ai_prompt' && block.ai_prompt_json && (
+                          <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                            detectProviderFromPrompt(block.ai_prompt_json) === 'claude'
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {detectProviderFromPrompt(block.ai_prompt_json) === 'claude' ? 'Claude' : 'OpenAI'}
+                          </span>
+                        )}
+                        {/* Text size badge for static_text */}
+                        {block.block_type === 'static_text' && block.text_size && (
+                          <span className="text-xs text-gray-400">
+                            ({block.text_size})
+                          </span>
+                        )}
+                        {/* Timing badge for ai_prompt */}
+                        {block.block_type === 'ai_prompt' && (
+                          <span className="text-xs text-gray-400">
+                            ({block.generation_timing === 'before_articles' ? 'Before' : 'After'} articles)
+                          </span>
+                        )}
+                        {/* Image type badge */}
+                        {block.block_type === 'image' && (
+                          <span className="text-xs text-gray-400">
+                            ({block.image_type === 'ai_generated' ? 'AI Generated' : 'Static'})
+                          </span>
+                        )}
+                      </div>
                     </div>
+
                     <div className="flex items-center gap-2">
+                      {/* View/Edit button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setExpandedBlock(block.id)
+                          if (editingBlock !== block.id) {
+                            handleStartEdit(block)
+                          }
+                        }}
+                        className="text-sm text-cyan-600 hover:text-cyan-700 font-medium"
+                      >
+                        View/Edit
+                      </button>
+
                       <button
                         onClick={(e) => { e.stopPropagation(); handleToggleBlockActive(block) }}
                         disabled={saving}
@@ -455,49 +609,82 @@ export function TextBoxModuleSettings({
                     </div>
                   </div>
 
-                  {/* Block Content (Expanded) */}
+                  {/* Block Content - Expanded View */}
                   {expandedBlock === block.id && (
                     <div className="border-t border-gray-200 p-4 bg-gray-50">
-                      {/* Static Text Block */}
+                      {/* ===== STATIC TEXT BLOCK ===== */}
                       {block.block_type === 'static_text' && (
                         <div>
                           {editingBlock === block.id ? (
-                            <div className="space-y-3">
-                              <textarea
-                                value={editContent}
-                                onChange={(e) => setEditContent(e.target.value)}
-                                placeholder="Enter your static text content here... (HTML supported)"
-                                className="w-full h-40 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-                              />
-                              <div className="flex justify-end gap-2">
+                            <div className="space-y-4">
+                              {/* Text Size Selector */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Text Size
+                                </label>
+                                <select
+                                  value={editTextSize}
+                                  onChange={(e) => setEditTextSize(e.target.value as any)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                                >
+                                  <option value="small">Small (14px)</option>
+                                  <option value="medium">Medium (16px)</option>
+                                  <option value="large">Large (20px, semibold)</option>
+                                </select>
+                              </div>
+
+                              {/* Rich Text Editor */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Content
+                                </label>
+                                <div className="border border-gray-300 rounded-lg overflow-hidden">
+                                  <ReactQuill
+                                    theme="snow"
+                                    value={editContent}
+                                    onChange={setEditContent}
+                                    modules={quillModules}
+                                    formats={quillFormats}
+                                    placeholder="Enter your text content..."
+                                    className="bg-white"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="flex justify-end gap-2 pt-2">
                                 <button
                                   onClick={handleCancelEdit}
-                                  className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
+                                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
                                 >
                                   Cancel
                                 </button>
                                 <button
                                   onClick={() => handleSaveBlock(block)}
                                   disabled={saving}
-                                  className="px-4 py-1.5 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
+                                  className="px-4 py-2 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50"
                                 >
-                                  {saving ? 'Saving...' : 'Save'}
+                                  {saving ? 'Saving...' : 'Save Changes'}
                                 </button>
                               </div>
                             </div>
                           ) : (
                             <div>
+                              <div className="mb-2 text-xs text-gray-500">
+                                Size: {getTextSizeLabel(block.text_size || 'medium')}
+                              </div>
                               {block.static_content ? (
                                 <div
-                                  className="text-sm text-gray-700 prose prose-sm max-w-none"
+                                  className="text-sm text-gray-700 prose prose-sm max-w-none bg-white p-3 rounded-lg border border-gray-200"
                                   dangerouslySetInnerHTML={{ __html: block.static_content }}
                                 />
                               ) : (
-                                <p className="text-sm text-gray-400 italic">No content yet</p>
+                                <p className="text-sm text-gray-400 italic bg-white p-3 rounded-lg border border-gray-200">
+                                  No content yet
+                                </p>
                               )}
                               <button
                                 onClick={() => handleStartEdit(block)}
-                                className="mt-3 text-sm text-cyan-600 hover:text-cyan-700"
+                                className="mt-3 px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700"
                               >
                                 Edit Content
                               </button>
@@ -506,24 +693,31 @@ export function TextBoxModuleSettings({
                         </div>
                       )}
 
-                      {/* AI Prompt Block */}
+                      {/* ===== AI PROMPT BLOCK (ArticleModulePromptsTab pattern) ===== */}
                       {block.block_type === 'ai_prompt' && (
                         <div>
                           {editingBlock === block.id ? (
-                            <div className="space-y-3">
+                            <div className="space-y-4">
+                              {/* Prompt textarea */}
                               <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
                                   AI Prompt
                                 </label>
                                 <textarea
                                   value={editPrompt}
                                   onChange={(e) => setEditPrompt(e.target.value)}
-                                  placeholder="Enter the AI prompt to generate content..."
-                                  className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                                  placeholder="Enter the AI prompt to generate content. Use placeholders like {{issue_date}}, {{publication_name}}, {{article_1_headline}}, etc."
+                                  className="w-full h-40 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm font-mono"
                                 />
+                                <p className="mt-1 text-xs text-gray-500">
+                                  Available placeholders: {'{{issue_date}}'}, {'{{publication_name}}'}, {'{{subscriber_name}}'},
+                                  {'{{article_1_headline}}'}, {'{{article_2_headline}}'}, {'{{ai_app_1_name}}'}, {'{{poll_question}}'}
+                                </p>
                               </div>
+
+                              {/* Generation Timing */}
                               <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
                                   Generation Timing
                                 </label>
                                 <select
@@ -538,35 +732,56 @@ export function TextBoxModuleSettings({
                                   "After articles" has access to article headlines, AI apps, polls, and ads for richer content generation.
                                 </p>
                               </div>
-                              <div className="flex justify-end gap-2">
+
+                              <div className="flex justify-between items-center pt-2">
                                 <button
-                                  onClick={handleCancelEdit}
-                                  className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
+                                  className="px-4 py-2 text-sm font-medium text-purple-700 bg-white border border-purple-300 rounded-lg hover:bg-purple-50"
+                                  onClick={() => alert('Test Prompt feature coming soon!')}
                                 >
-                                  Cancel
+                                  Test Prompt
                                 </button>
-                                <button
-                                  onClick={() => handleSaveBlock(block)}
-                                  disabled={saving}
-                                  className="px-4 py-1.5 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
-                                >
-                                  {saving ? 'Saving...' : 'Save'}
-                                </button>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={handleCancelEdit}
+                                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    onClick={() => handleSaveBlock(block)}
+                                    disabled={saving}
+                                    className="px-4 py-2 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50"
+                                  >
+                                    {saving ? 'Saving...' : 'Save Changes'}
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           ) : (
                             <div>
-                              <div className="text-sm text-gray-700">
-                                <strong>Prompt:</strong>
-                                <p className="mt-1 p-2 bg-white rounded border text-gray-600">
+                              <div className="mb-3">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-sm font-medium text-gray-700">Prompt Content</span>
+                                  <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                                    detectProviderFromPrompt(block.ai_prompt_json) === 'claude'
+                                      ? 'bg-purple-100 text-purple-800'
+                                      : 'bg-blue-100 text-blue-800'
+                                  }`}>
+                                    {detectProviderFromPrompt(block.ai_prompt_json) === 'claude' ? 'Claude' : 'OpenAI'}
+                                  </span>
+                                </div>
+                                <div className="bg-white p-3 rounded-lg border border-gray-200 font-mono text-xs whitespace-pre-wrap max-h-48 overflow-y-auto">
                                   {(block.ai_prompt_json as any)?.prompt ||
                                    (block.ai_prompt_json as any)?.messages?.[0]?.content ||
                                    <span className="italic text-gray-400">No prompt configured</span>}
-                                </p>
+                                </div>
+                              </div>
+                              <div className="text-xs text-gray-500 mb-3">
+                                Timing: {block.generation_timing === 'before_articles' ? 'Before Articles' : 'After Articles'}
                               </div>
                               <button
                                 onClick={() => handleStartEdit(block)}
-                                className="mt-3 text-sm text-cyan-600 hover:text-cyan-700"
+                                className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700"
                               >
                                 Edit Prompt
                               </button>
@@ -575,22 +790,175 @@ export function TextBoxModuleSettings({
                         </div>
                       )}
 
-                      {/* Image Block */}
+                      {/* ===== IMAGE BLOCK ===== */}
                       {block.block_type === 'image' && (
                         <div>
-                          <p className="text-sm text-gray-500">
-                            Image type: {block.image_type === 'ai_generated' ? 'AI Generated' : 'Static'}
-                          </p>
-                          {block.static_image_url && (
-                            <img
-                              src={block.static_image_url}
-                              alt="Block image"
-                              className="mt-2 max-w-xs rounded"
-                            />
+                          {editingBlock === block.id ? (
+                            <div className="space-y-4">
+                              {/* Image Type Toggle */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Image Type
+                                </label>
+                                <div className="flex gap-4">
+                                  <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                      type="radio"
+                                      name={`imageType-${block.id}`}
+                                      checked={editImageType === 'static'}
+                                      onChange={() => setEditImageType('static')}
+                                      className="text-cyan-600"
+                                    />
+                                    <span className="text-sm text-gray-700">Static Upload</span>
+                                  </label>
+                                  <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                      type="radio"
+                                      name={`imageType-${block.id}`}
+                                      checked={editImageType === 'ai_generated'}
+                                      onChange={() => setEditImageType('ai_generated')}
+                                      className="text-cyan-600"
+                                    />
+                                    <span className="text-sm text-gray-700">AI Generated</span>
+                                  </label>
+                                </div>
+                              </div>
+
+                              {/* Static Upload */}
+                              {editImageType === 'static' && (
+                                <div>
+                                  {/* Current image */}
+                                  {block.static_image_url && !selectedImage && (
+                                    <div className="mb-3">
+                                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Current Image
+                                      </label>
+                                      <img
+                                        src={block.static_image_url}
+                                        alt="Current"
+                                        className="max-w-md h-auto rounded border border-gray-200"
+                                      />
+                                    </div>
+                                  )}
+
+                                  {/* Upload button */}
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                      {block.static_image_url ? 'Replace Image' : 'Upload Image'}
+                                    </label>
+                                    <input
+                                      ref={fileInputRef}
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={handleImageSelect}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                    />
+                                    <p className="mt-1 text-xs text-gray-500">
+                                      Image will be cropped to 16:9 ratio
+                                    </p>
+                                  </div>
+
+                                  {/* Crop Tool */}
+                                  {selectedImage && (
+                                    <div className="mt-4">
+                                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Crop Image (16:9 ratio)
+                                      </label>
+                                      <ReactCrop
+                                        crop={crop}
+                                        onChange={(c) => setCrop(c)}
+                                        onComplete={(c) => setCompletedCrop(c)}
+                                        aspect={16 / 9}
+                                      >
+                                        <img
+                                          ref={imgRef}
+                                          src={selectedImage}
+                                          alt="Crop preview"
+                                          style={{ maxWidth: '100%' }}
+                                        />
+                                      </ReactCrop>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedImage(null)
+                                          setCrop(undefined)
+                                          setCompletedCrop(undefined)
+                                          if (fileInputRef.current) fileInputRef.current.value = ''
+                                        }}
+                                        className="mt-2 px-3 py-1 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
+                                      >
+                                        Cancel Image Selection
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* AI Generated */}
+                              {editImageType === 'ai_generated' && (
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    AI Image Prompt
+                                  </label>
+                                  <textarea
+                                    value={editAiImagePrompt}
+                                    onChange={(e) => setEditAiImagePrompt(e.target.value)}
+                                    placeholder="Describe the image to generate... Use placeholders like {{headline}} or {{title}}"
+                                    className="w-full h-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                                  />
+                                  <p className="mt-1 text-xs text-gray-500">
+                                    Available placeholders: {'{{headline}}'}, {'{{content}}'}, {'{{title}}'}
+                                  </p>
+                                </div>
+                              )}
+
+                              <div className="flex justify-end gap-2 pt-2">
+                                <button
+                                  onClick={handleCancelEdit}
+                                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  onClick={() => handleSaveBlock(block)}
+                                  disabled={saving || uploadingImage}
+                                  className="px-4 py-2 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50"
+                                >
+                                  {uploadingImage ? 'Uploading...' : saving ? 'Saving...' : 'Save Changes'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="text-sm text-gray-500 mb-2">
+                                Type: {block.image_type === 'ai_generated' ? 'AI Generated' : 'Static Upload'}
+                              </div>
+                              {block.static_image_url && (
+                                <img
+                                  src={block.static_image_url}
+                                  alt="Block image"
+                                  className="max-w-md rounded border border-gray-200 mb-3"
+                                />
+                              )}
+                              {block.image_type === 'ai_generated' && block.ai_image_prompt && (
+                                <div className="mb-3">
+                                  <div className="text-xs font-medium text-gray-600 mb-1">AI Prompt:</div>
+                                  <div className="bg-white p-2 rounded border border-gray-200 text-sm text-gray-700">
+                                    {block.ai_image_prompt}
+                                  </div>
+                                </div>
+                              )}
+                              {!block.static_image_url && !block.ai_image_prompt && (
+                                <p className="text-sm text-gray-400 italic mb-3">No image configured</p>
+                              )}
+                              <button
+                                onClick={() => handleStartEdit(block)}
+                                className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700"
+                              >
+                                Edit Image
+                              </button>
+                            </div>
                           )}
-                          <p className="mt-2 text-xs text-gray-400">
-                            Image editing coming soon. For now, delete and recreate to change.
-                          </p>
                         </div>
                       )}
                     </div>
@@ -605,21 +973,21 @@ export function TextBoxModuleSettings({
             <button
               onClick={() => handleAddBlock('static_text')}
               disabled={saving}
-              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 hover:border-gray-400 text-gray-700 transition-colors"
+              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 hover:border-gray-400 text-gray-700 transition-colors disabled:opacity-50"
             >
               + Static Text
             </button>
             <button
               onClick={() => handleAddBlock('ai_prompt')}
               disabled={saving}
-              className="flex-1 px-3 py-2 text-sm border border-amber-200 rounded-lg hover:bg-amber-50 hover:border-amber-300 text-amber-700 transition-colors"
+              className="flex-1 px-3 py-2 text-sm border border-purple-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 text-purple-700 transition-colors disabled:opacity-50"
             >
               + AI Prompt
             </button>
             <button
               onClick={() => handleAddBlock('image')}
               disabled={saving}
-              className="flex-1 px-3 py-2 text-sm border border-green-200 rounded-lg hover:bg-green-50 hover:border-green-300 text-green-700 transition-colors"
+              className="flex-1 px-3 py-2 text-sm border border-green-200 rounded-lg hover:bg-green-50 hover:border-green-300 text-green-700 transition-colors disabled:opacity-50"
             >
               + Image
             </button>
@@ -661,6 +1029,21 @@ export function TextBoxModuleSettings({
           </button>
         )}
       </div>
+
+      {/* Quill editor styles */}
+      <style jsx global>{`
+        .ql-container {
+          min-height: 150px;
+          font-family: inherit;
+        }
+        .ql-editor {
+          min-height: 150px;
+        }
+        .ql-editor.ql-blank::before {
+          color: #9CA3AF;
+          font-style: normal;
+        }
+      `}</style>
     </div>
   )
 }
