@@ -1631,9 +1631,20 @@ export interface TextBoxPlaceholderData {
   // Basic metadata (available at before_articles timing)
   issue_date: string
   publication_name: string
-  subscriber_name: string  // MailerLite merge field: {$name}
 
   // Full context (available at after_articles timing)
+  // Section-based articles (grouped by article module)
+  section_articles?: {
+    [sectionKey: string]: {
+      name: string
+      articles: Array<{
+        headline: string
+        content: string
+        rank: number
+      }>
+    }
+  }
+  // Legacy flat articles array (for backwards compatibility)
   articles?: Array<{
     headline: string
     content: string

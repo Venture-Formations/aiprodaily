@@ -29,6 +29,7 @@ export class TextBoxGenerator {
       .select(`
         id,
         date,
+        publication_id,
         publication:publications(name)
       `)
       .eq('id', issueId)
@@ -38,8 +39,7 @@ export class TextBoxGenerator {
       console.error('[TextBoxGenerator] Error fetching issue:', issueError)
       return {
         issue_date: new Date().toISOString().split('T')[0],
-        publication_name: 'Newsletter',
-        subscriber_name: '{$name}'
+        publication_name: 'Newsletter'
       }
     }
 
@@ -48,8 +48,7 @@ export class TextBoxGenerator {
     // Basic data available at both timings
     const data: TextBoxPlaceholderData = {
       issue_date: issue.date || new Date().toISOString().split('T')[0],
-      publication_name: publication?.name || 'Newsletter',
-      subscriber_name: '{$name}' // MailerLite merge field - stays as template
+      publication_name: publication?.name || 'Newsletter'
     }
 
     // Early timing: only basic metadata
@@ -58,20 +57,71 @@ export class TextBoxGenerator {
     }
 
     // After articles timing: fetch full newsletter context
-    // Get active module articles
-    const { data: moduleArticles } = await supabaseAdmin
-      .from('module_articles')
-      .select('headline, content, rank')
-      .eq('issue_id', issueId)
-      .eq('is_active', true)
-      .order('rank', { ascending: true })
 
-    if (moduleArticles && moduleArticles.length > 0) {
-      data.articles = moduleArticles.map(a => ({
-        headline: a.headline || '',
-        content: a.content || '',
-        rank: a.rank || 0
-      }))
+    // Get article modules for this publication (ordered by display_order)
+    const { data: articleModules } = await supabaseAdmin
+      .from('article_modules')
+      .select('id, name, display_order')
+      .eq('publication_id', issue.publication_id)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+
+    // Initialize section_articles map
+    data.section_articles = {}
+
+    if (articleModules && articleModules.length > 0) {
+      // Get all module articles for this issue
+      const { data: allModuleArticles } = await supabaseAdmin
+        .from('module_articles')
+        .select('headline, content, rank, article_module_id')
+        .eq('issue_id', issueId)
+        .eq('is_active', true)
+        .order('rank', { ascending: true })
+
+      if (allModuleArticles) {
+        // Group articles by module
+        for (let i = 0; i < articleModules.length; i++) {
+          const module = articleModules[i]
+          const sectionNum = i + 1
+          const sectionKey = `section_${sectionNum}`
+
+          const sectionArticles = allModuleArticles
+            .filter(a => a.article_module_id === module.id)
+            .map(a => ({
+              headline: a.headline || '',
+              content: a.content || '',
+              rank: a.rank || 0
+            }))
+
+          data.section_articles[sectionKey] = {
+            name: module.name,
+            articles: sectionArticles
+          }
+        }
+
+        // Also maintain backwards compatibility with flat articles array
+        data.articles = allModuleArticles.map(a => ({
+          headline: a.headline || '',
+          content: a.content || '',
+          rank: a.rank || 0
+        }))
+      }
+    } else {
+      // Fallback: Get active module articles without section grouping
+      const { data: moduleArticles } = await supabaseAdmin
+        .from('module_articles')
+        .select('headline, content, rank')
+        .eq('issue_id', issueId)
+        .eq('is_active', true)
+        .order('rank', { ascending: true })
+
+      if (moduleArticles && moduleArticles.length > 0) {
+        data.articles = moduleArticles.map(a => ({
+          headline: a.headline || '',
+          content: a.content || '',
+          rank: a.rank || 0
+        }))
+      }
     }
 
     // Get selected AI apps
@@ -155,9 +205,46 @@ export class TextBoxGenerator {
     // Basic placeholders
     result = result.replace(/\{\{issue_date\}\}/g, data.issue_date)
     result = result.replace(/\{\{publication_name\}\}/g, data.publication_name)
-    result = result.replace(/\{\{subscriber_name\}\}/g, data.subscriber_name)
 
-    // Article placeholders ({{article_1_headline}}, {{article_1_content}}, etc.)
+    // Section-based article placeholders ({{section_1_article_1_headline}}, {{section_2_article_1_content}}, etc.)
+    if (data.section_articles) {
+      for (const [sectionKey, sectionData] of Object.entries(data.section_articles)) {
+        // Extract section number from key (e.g., "section_1" -> "1")
+        const sectionMatch = sectionKey.match(/section_(\d+)/)
+        if (!sectionMatch) continue
+        const sectionNum = sectionMatch[1]
+
+        // Replace section name placeholder
+        result = result.replace(
+          new RegExp(`\\{\\{section_${sectionNum}_name\\}\\}`, 'g'),
+          sectionData.name || ''
+        )
+
+        // Replace individual article placeholders
+        for (let i = 0; i < sectionData.articles.length; i++) {
+          const articleNum = i + 1
+          result = result.replace(
+            new RegExp(`\\{\\{section_${sectionNum}_article_${articleNum}_headline\\}\\}`, 'g'),
+            sectionData.articles[i].headline || ''
+          )
+          result = result.replace(
+            new RegExp(`\\{\\{section_${sectionNum}_article_${articleNum}_content\\}\\}`, 'g'),
+            sectionData.articles[i].content || ''
+          )
+        }
+
+        // Replace "all articles" placeholder for this section (concatenates all headlines + content)
+        const allArticlesText = sectionData.articles
+          .map((a, idx) => `Article ${idx + 1}: ${a.headline}\n${a.content}`)
+          .join('\n\n')
+        result = result.replace(
+          new RegExp(`\\{\\{section_${sectionNum}_all_articles\\}\\}`, 'g'),
+          allArticlesText
+        )
+      }
+    }
+
+    // Legacy flat article placeholders ({{article_1_headline}}, {{article_1_content}}, etc.)
     if (data.articles) {
       for (let i = 0; i < data.articles.length; i++) {
         const num = i + 1

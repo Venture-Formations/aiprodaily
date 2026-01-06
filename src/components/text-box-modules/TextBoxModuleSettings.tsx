@@ -68,6 +68,8 @@ export function TextBoxModuleSettings({
   // AI prompt editing
   const [editPrompt, setEditPrompt] = useState('')
   const [editTiming, setEditTiming] = useState<'before_articles' | 'after_articles'>('after_articles')
+  const [testingPrompt, setTestingPrompt] = useState(false)
+  const [testResult, setTestResult] = useState<{ result?: string; injectedPrompt?: string; error?: string } | null>(null)
 
   // Image editing
   const [editImageType, setEditImageType] = useState<'static' | 'ai_generated'>('static')
@@ -262,6 +264,44 @@ export function TextBoxModuleSettings({
     setSelectedImage(null)
     setCrop(undefined)
     setCompletedCrop(undefined)
+    setTestResult(null)
+  }
+
+  const handleTestPrompt = async () => {
+    if (!editPrompt.trim()) {
+      setTestResult({ error: 'Please enter a prompt to test' })
+      return
+    }
+
+    setTestingPrompt(true)
+    setTestResult(null)
+
+    try {
+      const res = await fetch('/api/text-box-modules/test-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          publicationId,
+          prompt: editPrompt,
+          timing: editTiming
+        })
+      })
+
+      const data = await res.json()
+
+      if (data.success) {
+        setTestResult({
+          result: data.result,
+          injectedPrompt: data.injectedPrompt
+        })
+      } else {
+        setTestResult({ error: data.error || 'Test failed' })
+      }
+    } catch (error) {
+      setTestResult({ error: 'Failed to test prompt. Please try again.' })
+    } finally {
+      setTestingPrompt(false)
+    }
   }
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -757,13 +797,19 @@ export function TextBoxModuleSettings({
                                 <textarea
                                   value={editPrompt}
                                   onChange={(e) => setEditPrompt(e.target.value)}
-                                  placeholder="Enter the AI prompt to generate content. Use placeholders like {{issue_date}}, {{publication_name}}, {{article_1_headline}}, etc."
+                                  placeholder="Enter the AI prompt to generate content. Use placeholders like {{issue_date}}, {{section_1_all_articles}}, etc."
                                   className="w-full h-40 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm font-mono"
                                 />
-                                <p className="mt-1 text-xs text-gray-500">
-                                  Available placeholders: {'{{issue_date}}'}, {'{{publication_name}}'}, {'{{subscriber_name}}'},
-                                  {'{{article_1_headline}}'}, {'{{article_2_headline}}'}, {'{{ai_app_1_name}}'}, {'{{poll_question}}'}
-                                </p>
+                                <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                  <div className="text-xs font-medium text-gray-700 mb-2">Available Placeholders:</div>
+                                  <div className="text-xs text-gray-600 space-y-1">
+                                    <p><strong>Basic:</strong> {'{{issue_date}}'}, {'{{publication_name}}'}</p>
+                                    <p><strong>Section Articles:</strong> {'{{section_1_all_articles}}'}, {'{{section_2_all_articles}}'}</p>
+                                    <p><strong>Individual Articles:</strong> {'{{section_1_article_1_headline}}'}, {'{{section_1_article_1_content}}'}, {'{{section_2_article_1_headline}}'}, etc.</p>
+                                    <p><strong>Section Names:</strong> {'{{section_1_name}}'}, {'{{section_2_name}}'}</p>
+                                    <p><strong>Other:</strong> {'{{ai_app_1_name}}'}, {'{{poll_question}}'}, {'{{ad_1_title}}'}</p>
+                                  </div>
+                                </div>
                               </div>
 
                               {/* Generation Timing */}
@@ -780,16 +826,41 @@ export function TextBoxModuleSettings({
                                   <option value="after_articles">After Articles (full newsletter context)</option>
                                 </select>
                                 <p className="mt-1 text-xs text-gray-500">
-                                  "After articles" has access to article headlines, AI apps, polls, and ads for richer content generation.
+                                  "After articles" has access to article content, AI apps, polls, and ads for richer content generation.
                                 </p>
                               </div>
 
+                              {/* Test Result Display */}
+                              {testResult && (
+                                <div className={`p-4 rounded-lg border ${testResult.error ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+                                  {testResult.error ? (
+                                    <div className="text-sm text-red-700">{testResult.error}</div>
+                                  ) : (
+                                    <div className="space-y-3">
+                                      <div>
+                                        <div className="text-xs font-medium text-gray-600 mb-1">Injected Prompt:</div>
+                                        <div className="bg-white p-2 rounded border border-gray-200 text-xs font-mono max-h-32 overflow-y-auto whitespace-pre-wrap">
+                                          {testResult.injectedPrompt}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <div className="text-xs font-medium text-gray-600 mb-1">AI Response:</div>
+                                        <div className="bg-white p-2 rounded border border-gray-200 text-sm max-h-48 overflow-y-auto whitespace-pre-wrap">
+                                          {testResult.result}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
                               <div className="flex justify-between items-center pt-2">
                                 <button
-                                  className="px-4 py-2 text-sm font-medium text-purple-700 bg-white border border-purple-300 rounded-lg hover:bg-purple-50"
-                                  onClick={() => alert('Test Prompt feature coming soon!')}
+                                  onClick={handleTestPrompt}
+                                  disabled={testingPrompt || !editPrompt.trim()}
+                                  className="px-4 py-2 text-sm font-medium text-purple-700 bg-white border border-purple-300 rounded-lg hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                  Test Prompt
+                                  {testingPrompt ? 'Testing...' : 'Test Prompt'}
                                 </button>
                                 <div className="flex gap-2">
                                   <button
