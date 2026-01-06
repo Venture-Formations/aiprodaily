@@ -519,6 +519,8 @@ export class TextBoxGenerator {
     issueId: string,
     blockId: string
   ): Promise<{ success: boolean; content?: string; imageUrl?: string; error?: string }> {
+    console.log(`[TextBoxGenerator] regenerateBlock called with issueId: ${issueId}, blockId: ${blockId}`)
+
     // Get block and issue block info
     const { data: block } = await supabaseAdmin
       .from('text_box_blocks')
@@ -543,7 +545,18 @@ export class TextBoxGenerator {
 
     // Build placeholder data based on block timing
     const timing = (block as TextBoxBlock).generation_timing || 'after_articles'
+    console.log(`[TextBoxGenerator] Building placeholder data for issue ${issueId} with timing: ${timing}`)
     const placeholderData = await this.buildPlaceholderData(issueId, timing)
+
+    // Log the articles being used
+    const articleCount = placeholderData.articles?.length || 0
+    const sectionCount = Object.keys(placeholderData.section_articles || {}).length
+    console.log(`[TextBoxGenerator] Placeholder data for issue ${issueId}: ${articleCount} articles, ${sectionCount} sections`)
+    if (placeholderData.section_articles) {
+      for (const [key, section] of Object.entries(placeholderData.section_articles)) {
+        console.log(`[TextBoxGenerator] ${key}: ${section.articles.length} articles - ${section.articles.map(a => a.headline?.substring(0, 50)).join(', ')}`)
+      }
+    }
 
     if (block.block_type === 'ai_prompt') {
       const result = await this.generateBlockContent(block as TextBoxBlock, issueId, placeholderData)
