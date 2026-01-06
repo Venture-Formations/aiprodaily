@@ -42,6 +42,31 @@ export async function GET(request: NextRequest, context: RouteContext) {
       selections = await TextBoxModuleSelector.getIssueSelections(issueId)
     }
 
+    // Auto-fix: Update any static image blocks that incorrectly have 'pending' status
+    for (const selection of selections) {
+      for (const block of selection.blocks) {
+        const issueBlock = selection.issueBlocks.find(ib => ib.text_box_block_id === block.id)
+        if (
+          block.block_type === 'image' &&
+          block.image_type === 'static' &&
+          issueBlock &&
+          issueBlock.generation_status === 'pending'
+        ) {
+          console.log(`[IssueTextBoxModules] Auto-fixing static image block ${block.id} status from pending to completed`)
+          await supabaseAdmin
+            .from('issue_text_box_blocks')
+            .update({
+              generation_status: 'completed',
+              generated_image_url: block.static_image_url
+            })
+            .eq('id', issueBlock.id)
+          // Update the local object too
+          issueBlock.generation_status = 'completed'
+          issueBlock.generated_image_url = block.static_image_url
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       modules: selections
