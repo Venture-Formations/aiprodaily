@@ -68,7 +68,7 @@ export class TextBoxGenerator {
         id,
         date,
         publication_id,
-        publication:publications(name)
+        publication:publications!publication_issues_publication_id_fkey(name)
       `)
       .eq('id', issueId)
       .single()
