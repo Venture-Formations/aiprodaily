@@ -112,7 +112,14 @@ export class TextBoxModuleSelector {
         // Create issue block records for each block
         for (const block of module.blocks) {
           // Determine initial status based on block type
-          const initialStatus = block.block_type === 'static_text' ? 'completed' : 'pending'
+          // - static_text: completed (content is fixed)
+          // - image with static type: completed (URL is fixed)
+          // - ai_prompt: pending (needs AI generation)
+          // - image with ai_generated type: pending (needs AI generation)
+          const isStaticContent =
+            block.block_type === 'static_text' ||
+            (block.block_type === 'image' && block.image_type === 'static')
+          const initialStatus = isStaticContent ? 'completed' : 'pending'
 
           await supabaseAdmin
             .from('issue_text_box_blocks')
@@ -121,7 +128,9 @@ export class TextBoxModuleSelector {
               text_box_block_id: block.id,
               generation_status: initialStatus,
               // Static text blocks get their content immediately
-              generated_content: block.block_type === 'static_text' ? block.static_content : null
+              generated_content: block.block_type === 'static_text' ? block.static_content : null,
+              // Static image blocks get their URL immediately
+              generated_image_url: block.block_type === 'image' && block.image_type === 'static' ? block.static_image_url : null
             })
 
           blocksInitialized++
