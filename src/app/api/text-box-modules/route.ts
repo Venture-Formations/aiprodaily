@@ -7,7 +7,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const publicationId = searchParams.get('publicationId')
+    const publicationId = searchParams.get('publicationId') || searchParams.get('publication_id')
 
     if (!publicationId) {
       return NextResponse.json(
@@ -55,7 +55,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { publicationId, name, showName, displayOrder, isActive, config } = body
+    const { name, showName, displayOrder, isActive, config } = body
+    // Accept both camelCase and snake_case for publication ID
+    const publicationId = body.publicationId || body.publication_id
 
     if (!publicationId) {
       return NextResponse.json(
