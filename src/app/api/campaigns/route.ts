@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authOptions } from '@/lib/auth'
-import { PromptSelector } from '@/lib/prompt-selector'
 import { AppModuleSelector } from '@/lib/ai-app-modules'
 import { ArticleModuleSelector } from '@/lib/article-modules'
 
@@ -40,33 +39,33 @@ async function initializeAIAppSelection(issueId: string, publicationId: string) 
   }
 }
 
-// Helper function to initialize prompt ideas selection for a new issue
-async function initializePromptSelection(issueId: string) {
+// Helper function to initialize prompt module selection for a new issue
+async function initializePromptSelection(issueId: string, publicationId: string) {
   try {
-    console.log(`Initializing prompt ideas selection for issue ${issueId}`)
+    console.log(`Initializing prompt module selection for issue ${issueId}`)
 
-    // Use PromptSelector to select ONE prompt with proper rotation logic
-    const selectedPrompt = await PromptSelector.selectPromptForissue(issueId)
+    // Use PromptModuleSelector to select prompts via the new module system
+    const { PromptModuleSelector } = await import('@/lib/prompt-modules')
+    const promptResults = await PromptModuleSelector.selectPromptsForIssue(issueId, publicationId)
 
-    if (selectedPrompt) {
-      console.log(`Successfully selected prompt: ${selectedPrompt.title}`)
-
-      // Also update issue_prompt_modules with the selected prompt (for new module UI)
-      const { error: updateError } = await supabaseAdmin
-        .from('issue_prompt_modules')
-        .update({ prompt_id: selectedPrompt.id })
-        .eq('issue_id', issueId)
-
-      if (updateError) {
-        console.error('Error syncing prompt to issue_prompt_modules:', updateError)
-      } else {
-        console.log('Synced prompt selection to issue_prompt_modules')
-      }
-    } else {
-      console.log('No prompts available for selection')
-    }
+    const promptsSelected = promptResults.filter(r => r.result.prompt !== null).length
+    console.log(`Selected ${promptsSelected} prompts via ${promptResults.length} modules`)
   } catch (error) {
     console.error('Error initializing prompt selection:', error)
+  }
+}
+
+// Helper function to initialize text box modules for a new issue
+async function initializeTextBoxModules(issueId: string, publicationId: string) {
+  try {
+    console.log(`Initializing text box modules for issue ${issueId}`)
+
+    const { TextBoxModuleSelector } = await import('@/lib/text-box-modules')
+    await TextBoxModuleSelector.initializeForIssue(issueId, publicationId)
+
+    console.log('Text box modules initialized')
+  } catch (error) {
+    console.error('Error initializing text box modules:', error)
   }
 }
 
@@ -221,8 +220,9 @@ export async function POST(request: NextRequest) {
     // Run all initializations in parallel for better performance
     await Promise.all([
       initializeAIAppSelection(issue.id, newsletter.id),
-      initializePromptSelection(issue.id),
-      initializeArticleModuleSelection(issue.id, newsletter.id)
+      initializePromptSelection(issue.id, newsletter.id),
+      initializeArticleModuleSelection(issue.id, newsletter.id),
+      initializeTextBoxModules(issue.id, newsletter.id)
     ])
 
     console.log('issue content initialization completed')
