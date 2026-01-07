@@ -98,7 +98,8 @@
       "Bash(fi)",
       "Bash(if [ -f .env.local ])",
       "Bash(then grep SUPABASE .env.local)",
-      "Bash(else echo \".env.local not found\")"
+      "Bash(else echo \".env.local not found\")",
+      "Bash(timeout 180 bash -c 'while true; do RESULT=$\\(curl -s \"\"https://api.vercel.com/v6/deployments/dpl_4qndEGxC3PxK3HhfYg3WgRR9gqP6\"\" -H \"\"Authorization: Bearer $VERCEL_TOKEN\"\" 2>/dev/null | grep -o \"\"\\\\\"\"readyState\\\\\"\":\\\\\"\"[^\\\\\"\"]*\\\\\"\"\"\" | head -1\\); echo \"\"Status: $RESULT\"\"; if echo \"\"$RESULT\"\" | grep -q \"\"READY\"\"; then echo \"\"Deployment ready!\"\"; break; fi; if echo \"\"$RESULT\"\" | grep -q \"\"ERROR\"\"; then echo \"\"Deployment failed!\"\"; break; fi; sleep 15; done')"
     ],
     "deny": [],
     "ask": []

@@ -109,19 +109,52 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Fetch all issue_ai_app_selections for these apps
-    const { data: issueSelections, error: selectionsError } = await supabaseAdmin
+    // Fetch all issue_ai_app_selections for these apps (legacy selection system)
+    const { data: legacySelections, error: legacySelectionsError } = await supabaseAdmin
       .from('issue_ai_app_selections')
       .select('id, issue_id, app_id')
       .in('app_id', apps.map(app => app.id))
 
-    if (selectionsError) {
-      console.error('[AI Apps Analytics] Error fetching issue selections:', selectionsError)
-      return NextResponse.json({ error: selectionsError.message }, { status: 500 })
+    if (legacySelectionsError) {
+      console.error('[AI Apps Analytics] Error fetching legacy selections:', legacySelectionsError)
+      return NextResponse.json({ error: legacySelectionsError.message }, { status: 500 })
     }
 
+    // Fetch issue_ai_app_modules for new module system (selections stored as JSONB array)
+    const { data: moduleSelections, error: moduleSelectionsError } = await supabaseAdmin
+      .from('issue_ai_app_modules')
+      .select('id, issue_id, ai_app_module_id, app_ids')
+
+    if (moduleSelectionsError) {
+      console.error('[AI Apps Analytics] Error fetching module selections:', moduleSelectionsError)
+      return NextResponse.json({ error: moduleSelectionsError.message }, { status: 500 })
+    }
+
+    // Convert module selections to flat format (one entry per app_id)
+    const appIdSet = new Set(apps.map(app => app.id))
+    const moduleSelectionsFlat = (moduleSelections || []).flatMap((sel: any) => {
+      const appIds = sel.app_ids || []
+      // Only include app_ids that are in our filtered apps list
+      return appIds
+        .filter((appId: string) => appIdSet.has(appId))
+        .map((appId: string) => ({
+          id: `${sel.id}_${appId}`, // Create unique ID
+          issue_id: sel.issue_id,
+          app_id: appId,
+          ai_app_module_id: sel.ai_app_module_id
+        }))
+    })
+
+    console.log(`[AI Apps Analytics] Found ${legacySelections?.length || 0} legacy selections, ${moduleSelectionsFlat.length} module selections`)
+
+    // Combine both selection sources
+    const issueSelections = [
+      ...(legacySelections || []),
+      ...moduleSelectionsFlat
+    ]
+
     // Fetch campaigns for these issues
-    const issueIds = Array.from(new Set((issueSelections || []).map((sel: any) => sel.issue_id)))
+    const issueIds = Array.from(new Set(issueSelections.map((sel: any) => sel.issue_id)))
 
     const { data: campaigns, error: campaignsError } = await supabaseAdmin
       .from('publication_issues')
