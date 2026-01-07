@@ -190,10 +190,59 @@ export async function GET(request: NextRequest) {
 
     console.log('[API] Found secondary articles:', secondaryArticles?.length || 0);
 
-    // Get all post IDs
+    // Fetch module articles (from the new article modules system)
+    let moduleArticlesQuery = supabase
+      .from('module_articles')
+      .select(`
+        id,
+        post_id,
+        issue_id,
+        article_module_id,
+        headline,
+        content,
+        rank,
+        fact_check_score,
+        word_count,
+        created_at
+      `);
+
+    if (issueIds.length > 0) {
+      moduleArticlesQuery = moduleArticlesQuery.in('issue_id', issueIds);
+    }
+
+    const { data: moduleArticles, error: moduleArticlesError } = await moduleArticlesQuery;
+
+    if (moduleArticlesError) {
+      console.error('[API] Module articles error:', moduleArticlesError.message);
+      throw moduleArticlesError;
+    }
+
+    console.log('[API] Found module articles:', moduleArticles?.length || 0);
+
+    // Fetch article modules for module name lookup
+    const moduleIds = (moduleArticles || [])
+      .map(a => a.article_module_id)
+      .filter((id, index, self) => id && self.indexOf(id) === index);
+
+    let articleModulesMap = new Map<string, string>();
+    if (moduleIds.length > 0) {
+      const { data: articleModules } = await supabase
+        .from('article_modules')
+        .select('id, name')
+        .in('id', moduleIds);
+
+      if (articleModules) {
+        articleModules.forEach(m => articleModulesMap.set(m.id, m.name));
+      }
+    }
+
+    console.log('[API] Article modules map size:', articleModulesMap.size);
+
+    // Get all post IDs (including from module articles)
     const rawPostIds = [
       ...(primaryArticles || []).map(a => a.post_id),
-      ...(secondaryArticles || []).map(a => a.post_id)
+      ...(secondaryArticles || []).map(a => a.post_id),
+      ...(moduleArticles || []).map(a => a.post_id)
     ];
 
     // Debug: Log raw post IDs before filtering
@@ -393,14 +442,15 @@ export async function GET(request: NextRequest) {
     console.log('[API] Clicks map size:', clicksMap.size);
 
     // Transform and combine articles
-    const transformArticle = (article: any, isPrimary: boolean) => {
+    // feedTypeOverride: optional string to override feed type (for module articles)
+    const transformArticle = (article: any, feedTypeOverride?: string) => {
       const post = postMap.get(article.post_id);
       const issue = issueMap.get(article.issue_id);
       const feed = post ? feedMap.get(post.feed_id) : null;
       const rating = ratingsMap.get(article.post_id);
 
-      // Log if data is missing
-      if (!post) {
+      // Log if data is missing (only log once per run for performance)
+      if (!post && article.post_id) {
         console.log('[API] Missing post for article:', article.id, 'post_id:', article.post_id);
       }
       if (!issue) {
@@ -411,8 +461,11 @@ export async function GET(request: NextRequest) {
       if (post && !feed) {
         console.log('[API] Missing feed for post:', post.id, 'feed_id:', post.feed_id);
       }
-      if (!rating) {
-        console.log('[API] Missing rating for article:', article.id, 'post_id:', article.post_id);
+
+      // Determine feed type - use override if provided, else derive from feed settings
+      let feedType = feedTypeOverride || 'Unknown';
+      if (!feedTypeOverride && feed) {
+        feedType = feed.use_for_primary_section ? 'Primary' : (feed.use_for_secondary_section ? 'Secondary' : 'Unknown');
       }
 
       return {
@@ -424,7 +477,7 @@ export async function GET(request: NextRequest) {
         author: post?.author || '',
         sourceUrl: post?.source_url || '',
         imageUrl: post?.image_url || '',
-        feedType: isPrimary ? 'Primary' : 'Secondary',
+        feedType,
         feedName: feed?.name || 'Unknown',
 
         criteria1Score: rating?.criteria_1_score || null,
@@ -501,8 +554,13 @@ export async function GET(request: NextRequest) {
     };
 
     const allArticles = [
-      ...(primaryArticles || []).map(a => transformArticle(a, true)),
-      ...(secondaryArticles || []).map(a => transformArticle(a, false))
+      ...(primaryArticles || []).map(a => transformArticle(a, 'Primary')),
+      ...(secondaryArticles || []).map(a => transformArticle(a, 'Secondary')),
+      ...(moduleArticles || []).map(a => {
+        // Get module name for feed type display
+        const moduleName = a.article_module_id ? articleModulesMap.get(a.article_module_id) : null;
+        return transformArticle(a, moduleName || 'Module');
+      })
     ];
 
     // Sort by issue date (most recent first), then by final position
@@ -526,6 +584,8 @@ export async function GET(request: NextRequest) {
           issuesCount: issues?.length || 0,
           primaryArticlesCount: primaryArticles?.length || 0,
           secondaryArticlesCount: secondaryArticles?.length || 0,
+          moduleArticlesCount: moduleArticles?.length || 0,
+          articleModulesCount: articleModulesMap.size,
           postIdsCount: allPostIds.length,
           postIdsSample: allPostIds.slice(0, 5),
           rssPostsCount: rssPosts?.length || 0,
