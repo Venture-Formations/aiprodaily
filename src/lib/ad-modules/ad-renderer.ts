@@ -1,4 +1,4 @@
-import { wrapTrackingUrl } from '../url-tracking'
+import { wrapTrackingUrl, type LinkType } from '../url-tracking'
 import { getBusinessSettings } from '../publication-settings'
 import { renderBlock } from '../blocks'
 import type { BlockType, BlockStyleOptions, BlockData } from '../blocks'
@@ -115,7 +115,7 @@ export class AdModuleRenderer {
       bodyFont: settings.body_font
     }
 
-    // Generate tracked URL for links
+    // Generate tracked URL for links (type='ad' triggers clicked_ad field update)
     const baseUrl = ad.button_url || '#'
     const trackedUrl = baseUrl !== '#' && context.issueDate
       ? wrapTrackingUrl(
@@ -123,7 +123,8 @@ export class AdModuleRenderer {
           module.name,
           context.issueDate,
           context.mailerliteIssueId,
-          context.issueId
+          context.issueId,
+          'ad'
         )
       : baseUrl
 

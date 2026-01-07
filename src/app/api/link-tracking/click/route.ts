@@ -13,10 +13,27 @@ function normalizeUrl(url: string): string {
 }
 
 /**
+ * Valid link types that trigger field updates
+ */
+type LinkType = 'ad' | 'ai_app'
+
+/**
  * Determines if the click should trigger an email provider field update
  * Returns the field name to update, or null if no update needed
+ *
+ * @param section - The newsletter section name (for legacy pattern matching)
+ * @param linkType - Optional explicit link type from URL parameter
  */
-function getFieldForSection(section: string): string | null {
+function getFieldForClick(section: string, linkType?: string): string | null {
+  // If explicit link type is provided, use it directly
+  if (linkType === 'ad') {
+    return 'clicked_ad'
+  }
+  if (linkType === 'ai_app') {
+    return 'clicked_ai_app'
+  }
+
+  // Fall back to section name pattern matching for legacy links
   const sectionLower = section.toLowerCase()
 
   // Advertorial clicks -> clicked_ad field
@@ -133,6 +150,7 @@ async function queueFieldUpdate(
  * - issue_id: Database issue ID (optional)
  * - email: Subscriber email (required)
  * - subscriber_id: Subscriber ID (optional)
+ * - type: Link type for field updates ('ad' | 'ai_app') (optional)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -145,6 +163,7 @@ export async function GET(request: NextRequest) {
     const issueId = searchParams.get('issue_id')
     const email = searchParams.get('email')
     const subscriberId = searchParams.get('subscriber_id')
+    const linkType = searchParams.get('type') // 'ad' or 'ai_app' for field updates
 
     // Validate required parameters
     if (!url || !section || !date || !email) {
@@ -215,7 +234,7 @@ export async function GET(request: NextRequest) {
     console.log('Link click tracked successfully:', data.id)
 
     // Check if this click should queue an email provider field update
-    const fieldToUpdate = getFieldForSection(section)
+    const fieldToUpdate = getFieldForClick(section, linkType || undefined)
     if (fieldToUpdate && issueId) {
       // Look up publication_id from the issue
       const { data: issueData } = await supabaseAdmin

@@ -3,7 +3,7 @@
  * Renders AI app modules with configurable block order
  */
 
-import { wrapTrackingUrl } from '../url-tracking'
+import { wrapTrackingUrl, type LinkType } from '../url-tracking'
 import { getBusinessSettings } from '../publication-settings'
 import type {
   AIAppModule,
@@ -227,14 +227,15 @@ export class AppModuleRenderer {
     apps.forEach((app, index) => {
       const baseUrl = app.app_url || '#'
 
-      // Generate tracked URL for links
+      // Generate tracked URL for links (type='ai_app' triggers clicked_ai_app field update)
       const trackedUrl = baseUrl !== '#' && context.issueDate
         ? wrapTrackingUrl(
             baseUrl,
             module.name,
             context.issueDate,
             context.mailerliteIssueId,
-            context.issueId
+            context.issueId,
+            'ai_app'
           )
         : baseUrl
 

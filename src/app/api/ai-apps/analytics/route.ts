@@ -146,7 +146,25 @@ export async function GET(request: NextRequest) {
       campaign: campaignMap.get(selection.issue_id)
     }))
 
-    // Fetch ALL link clicks for AI Apps section in date range
+    // Get all AI app module names for this publication (for link_section matching)
+    const { data: aiAppModules } = await supabaseAdmin
+      .from('ai_app_modules')
+      .select('name')
+      .eq('publication_id', publicationId)
+
+    // Build list of section names to look for (legacy + all module names)
+    const aiAppSectionNames = ['AI Apps', 'AI Applications'] // Legacy names
+    if (aiAppModules) {
+      for (const module of aiAppModules) {
+        if (module.name && !aiAppSectionNames.includes(module.name)) {
+          aiAppSectionNames.push(module.name)
+        }
+      }
+    }
+
+    console.log(`[AI Apps Analytics] Looking for link sections: ${aiAppSectionNames.join(', ')}`)
+
+    // Fetch ALL link clicks for AI Apps sections in date range
     // Fetch in batches to avoid pagination limits
     let allLinkClicks: any[] = []
     let hasMore = true
@@ -156,8 +174,8 @@ export async function GET(request: NextRequest) {
     while (hasMore) {
       const { data: linkClicksBatch, error: clicksError } = await supabaseAdmin
         .from('link_clicks')
-        .select('id, link_url, subscriber_email, issue_date, issue_id, clicked_at')
-        .eq('link_section', 'AI Apps')
+        .select('id, link_url, subscriber_email, issue_date, issue_id, clicked_at, link_section')
+        .in('link_section', aiAppSectionNames)
         .gte('issue_date', startDateStr)
         .lte('issue_date', endDateStr)
         .range(offset, offset + batchSize - 1)
@@ -179,7 +197,7 @@ export async function GET(request: NextRequest) {
 
     const linkClicks = allLinkClicks
 
-    console.log(`[AI Apps Analytics] Found ${linkClicks?.length || 0} link clicks with section='AI Apps'`)
+    console.log(`[AI Apps Analytics] Found ${linkClicks?.length || 0} link clicks for AI app sections`)
 
     // Fetch issues in date range for recipient counts (for CTR calculation)
     const { data: issuesRaw, error: issuesError } = await supabaseAdmin
