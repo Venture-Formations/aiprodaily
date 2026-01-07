@@ -140,7 +140,7 @@ function SortableSectionItem({
             </span>
           )}
           {isArticleModule && (
-            <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">
+            <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">
               Articles
             </span>
           )}
@@ -1243,7 +1243,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
                   onClick={() => setNewSectionType('article')}
                   className={`px-3 py-3 rounded-lg border-2 transition-colors ${
                     newSectionType === 'article'
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                      ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
                       : 'border-gray-200 hover:border-gray-300 text-gray-600'
                   }`}
                 >
