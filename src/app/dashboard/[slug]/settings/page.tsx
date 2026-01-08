@@ -2844,18 +2844,22 @@ function EmailSettings() {
 
         {expandedSubjectLine && (
           <div className="p-6">
-            <div className="mb-2 flex items-center justify-between">
-              <label className="block text-sm font-medium text-gray-700">
-                Prompt Content
-              </label>
-              <span className="text-xs text-gray-500">
-                {editingSubjectLine
-                  ? subjectLinePrompt.length
-                  : subjectLinePromptOriginal.length} characters
-              </span>
-            </div>
+            {!subjectLinePromptOriginal ? (
+              <div className="text-gray-500 italic">Loading prompt...</div>
+            ) : (
+              <>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Prompt Content
+                  </label>
+                  <span className="text-xs text-gray-500">
+                    {editingSubjectLine
+                      ? subjectLinePrompt.length
+                      : subjectLinePromptOriginal.length} characters
+                  </span>
+                </div>
 
-            {editingSubjectLine ? (
+                {editingSubjectLine ? (
               <>
                 <textarea
                   value={subjectLinePrompt}
@@ -2924,6 +2928,8 @@ function EmailSettings() {
                     </button>
                   </div>
                 </div>
+              </>
+            )}
               </>
             )}
           </div>
