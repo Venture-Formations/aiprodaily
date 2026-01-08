@@ -1314,6 +1314,7 @@ export default function issueDetailPage() {
   const [maxTopArticles, setMaxTopArticles] = useState(3)
   const [maxBottomArticles, setMaxBottomArticles] = useState(3)
   const [maxSecondaryArticles, setMaxSecondaryArticles] = useState(3)
+  const [totalMaxArticles, setTotalMaxArticles] = useState(6) // Sum of all article modules' articles_count
   const [sectionExpandedStates, setSectionExpandedStates] = useState<{ [key: string]: boolean }>({})
 
   // Drag and drop sensors with activation constraints for better mobile experience
@@ -1377,6 +1378,13 @@ export default function issueDetailPage() {
 
     return () => clearInterval(pollInterval)
   }, [issue?.status, issue?.id])
+
+  // Fetch article modules sum when publication_id is available
+  useEffect(() => {
+    if (issue?.publication_id) {
+      fetchArticleModulesSum(issue.publication_id)
+    }
+  }, [issue?.publication_id])
 
   const fetchissue = async (id: string) => {
     try {
@@ -1500,6 +1508,25 @@ export default function issueDetailPage() {
       console.error('Failed to fetch newsletter sections:', error)
     } finally {
       setLoadingSections(false)
+    }
+  }
+
+  // Fetch article modules to calculate total max articles
+  const fetchArticleModulesSum = async (publicationId: string) => {
+    try {
+      const response = await fetch(`/api/article-modules?publication_id=${publicationId}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.modules && Array.isArray(data.modules)) {
+          // Sum up articles_count from all active modules
+          const sum = data.modules
+            .filter((m: any) => m.is_active)
+            .reduce((total: number, m: any) => total + (m.articles_count || 3), 0)
+          setTotalMaxArticles(sum > 0 ? sum : 6)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch article modules sum:', error)
     }
   }
 
@@ -2225,7 +2252,7 @@ export default function issueDetailPage() {
                   {formatStatus(issue.status)}
                 </span>
                 <span className="text-sm text-gray-500">
-                  {issue.articles.filter(a => a.is_active && !a.skipped).length}/{maxTopArticles} selected
+                  {issue.articles.filter(a => a.is_active && !a.skipped).length}/{totalMaxArticles} selected
                 </span>
               </div>
             </div>
