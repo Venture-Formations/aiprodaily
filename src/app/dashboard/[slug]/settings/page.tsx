@@ -45,7 +45,6 @@ export default function SettingsPage() {
                 { id: 'business', name: 'Publication Settings' },
                 { id: 'newsletter', name: 'Sections' },
                 { id: 'email', name: 'Email' },
-                { id: 'ai-prompts', name: 'AI Prompts' },
                 { id: 'rss', name: 'RSS Feeds' },
                 { id: 'blocked-domains', name: 'Blocked Domains' },
                 { id: 'notifications', name: 'Notifications' },
@@ -73,7 +72,6 @@ export default function SettingsPage() {
           {activeTab === 'business' && <BusinessSettings />}
           {activeTab === 'newsletter' && <NewsletterSettings />}
           {activeTab === 'email' && <EmailSettings />}
-          {activeTab === 'ai-prompts' && <AIPromptsSettings />}
           {activeTab === 'rss' && <RSSFeeds />}
           {activeTab === 'blocked-domains' && <BlockedDomainsSettings />}
           {activeTab === 'notifications' && <Notifications />}
@@ -1333,11 +1331,19 @@ function EmailSettings() {
   const [savingDedupSettings, setSavingDedupSettings] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
 
+  // Subject Line Prompt state
+  const pathname = usePathname()
+  const newsletterSlug = pathname ? pathname.match(/^\/dashboard\/([^\/]+)/)?.[1] : null
+  const [subjectLinePrompt, setSubjectLinePrompt] = useState<string>('')
+  const [editingSubjectLine, setEditingSubjectLine] = useState(false)
+  const [savingSubjectLine, setSavingSubjectLine] = useState(false)
+
   useEffect(() => {
     loadSettings()
     loadMaxArticles()
     loadLookbackHours()
     loadDedupSettings()
+    loadSubjectLinePrompt()
   }, [])
 
   const loadSettings = async () => {
@@ -1576,6 +1582,54 @@ function EmailSettings() {
       console.error('Save error:', error)
     } finally {
       setSavingDedupSettings(false)
+    }
+  }
+
+  // Subject Line Prompt functions
+  const loadSubjectLinePrompt = async () => {
+    if (!newsletterSlug) return
+    try {
+      const response = await fetch(`/api/settings/prompts?publication_id=${newsletterSlug}`)
+      if (response.ok) {
+        const data = await response.json()
+        const subjectPrompt = data.prompts?.find((p: any) => p.key === 'ai_prompt_subject_line')
+        if (subjectPrompt) {
+          setSubjectLinePrompt(typeof subjectPrompt.value === 'string' ? subjectPrompt.value : JSON.stringify(subjectPrompt.value, null, 2))
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load subject line prompt:', error)
+    }
+  }
+
+  const saveSubjectLinePrompt = async () => {
+    if (!newsletterSlug) return
+    setSavingSubjectLine(true)
+    setMessage('')
+
+    try {
+      const response = await fetch('/api/settings/prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: 'ai_prompt_subject_line',
+          value: subjectLinePrompt,
+          newsletterSlug
+        })
+      })
+
+      if (response.ok) {
+        setMessage('Subject line prompt saved successfully!')
+        setEditingSubjectLine(false)
+        setTimeout(() => setMessage(''), 3000)
+      } else {
+        throw new Error('Failed to save prompt')
+      }
+    } catch (error) {
+      setMessage('Failed to save subject line prompt. Please try again.')
+      console.error('Save error:', error)
+    } finally {
+      setSavingSubjectLine(false)
     }
   }
 
@@ -2574,163 +2628,125 @@ function EmailSettings() {
         </div>
       )}
 
-      {/* Article Limit Settings */}
+      {/* Deduplication Settings */}
       <div className="bg-white shadow rounded-lg p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Article Limit Settings</h3>
-        <p className="text-sm text-gray-600 mb-6">
-          Configure the maximum number of articles that can be selected for the Primary Articles and Secondary Articles sections in each newsletter issue.
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Deduplication Settings</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          Configure how the system detects and prevents duplicate articles from appearing in your newsletters. The system uses a 4-stage detection process: historical checking, exact content matching, title similarity, and AI semantic analysis.
         </p>
 
         <div className="space-y-4">
           <div className="flex items-center gap-4">
-            <label className="font-medium text-gray-700 w-56">Max Articles in Primary Section:</label>
+            <label className="font-medium text-gray-700 w-56">Historical Lookback Days:</label>
             <input
               type="number"
               min="1"
-              max="10"
-              value={maxTopArticles}
-              onChange={(e) => setMaxTopArticles(parseInt(e.target.value) || 1)}
-              className="w-20 px-3 py-2 border border-gray-300 rounded-md"
-              disabled={savingMaxArticles}
+              max="14"
+              value={dedupLookbackDays}
+              onChange={(e) => setDedupLookbackDays(parseInt(e.target.value) || 1)}
+              className="w-24 px-3 py-2 border border-gray-300 rounded-md"
+              disabled={savingDedupSettings}
             />
-            <span className="text-sm text-gray-500">(1-10)</span>
+            <span className="text-sm text-gray-500">(1-14 days)</span>
           </div>
 
           <div className="flex items-center gap-4">
-            <label className="font-medium text-gray-700 w-56">Max Articles in Secondary Section:</label>
+            <label className="font-medium text-gray-700 w-56">Strictness Threshold:</label>
             <input
               type="number"
-              min="1"
-              max="10"
-              value={maxBottomArticles}
-              onChange={(e) => setMaxBottomArticles(parseInt(e.target.value) || 1)}
-              className="w-20 px-3 py-2 border border-gray-300 rounded-md"
-              disabled={savingMaxArticles}
+              min="0.5"
+              max="1.0"
+              step="0.05"
+              value={dedupStrictnessThreshold}
+              onChange={(e) => setDedupStrictnessThreshold(parseFloat(e.target.value) || 0.8)}
+              className="w-24 px-3 py-2 border border-gray-300 rounded-md"
+              disabled={savingDedupSettings}
             />
-            <span className="text-sm text-gray-500">(1-10)</span>
+            <span className="text-sm text-gray-500">(0.5-1.0, lower = stricter)</span>
           </div>
 
           <button
-            onClick={saveMaxArticles}
-            disabled={savingMaxArticles}
+            onClick={saveDedupSettings}
+            disabled={savingDedupSettings}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-300"
           >
-            {savingMaxArticles ? 'Saving...' : 'Save Article Limits'}
+            {savingDedupSettings ? 'Saving...' : 'Save Deduplication Settings'}
           </button>
         </div>
 
         <div className="mt-4 bg-blue-50 p-4 rounded-lg">
-
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <h4 className="font-medium text-gray-900 mb-4">Article Lookback Time Window</h4>
-            <p className="text-sm text-gray-600 mb-4">
-              The system will ALWAYS search the past X hours for the highest-rated unused articles. This ensures you get the best content available, not just today's articles. Articles already used in sent newsletters are automatically excluded.
-            </p>
-
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <label className="font-medium text-gray-700 w-56">Primary RSS Lookback Hours:</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="168"
-                  value={primaryLookbackHours}
-                  onChange={(e) => setPrimaryLookbackHours(parseInt(e.target.value) || 1)}
-                  className="w-24 px-3 py-2 border border-gray-300 rounded-md"
-                  disabled={savingLookbackHours}
-                />
-                <span className="text-sm text-gray-500">(1-168 hours / 1 week)</span>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <label className="font-medium text-gray-700 w-56">Secondary RSS Lookback Hours:</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="168"
-                  value={secondaryLookbackHours}
-                  onChange={(e) => setSecondaryLookbackHours(parseInt(e.target.value) || 1)}
-                  className="w-24 px-3 py-2 border border-gray-300 rounded-md"
-                  disabled={savingLookbackHours}
-                />
-                <span className="text-sm text-gray-500">(1-168 hours / 1 week)</span>
-              </div>
-
-              <button
-                onClick={saveLookbackHours}
-                disabled={savingLookbackHours}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-300"
-              >
-                {savingLookbackHours ? 'Saving...' : 'Save Lookback Hours'}
-              </button>
-            </div>
-
-            <div className="mt-4 bg-blue-50 p-4 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>Current configuration:</strong> Primary: {primaryLookbackHours} hours ({(primaryLookbackHours/24).toFixed(1)} days), Secondary: {secondaryLookbackHours} hours ({(secondaryLookbackHours/24).toFixed(1)} days)
-              </p>
-              <p className="text-xs text-blue-700 mt-2">
-                The system selects the top-rated articles from all available content in the lookback window, ensuring quality over recency. Already-sent articles are excluded.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <h4 className="font-medium text-gray-900 mb-4">Deduplication Settings</h4>
-            <p className="text-sm text-gray-600 mb-4">
-              Configure how the system detects and prevents duplicate articles from appearing in your newsletters. The system uses a 4-stage detection process: historical checking, exact content matching, title similarity, and AI semantic analysis.
-            </p>
-
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <label className="font-medium text-gray-700 w-56">Historical Lookback Days:</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="14"
-                  value={dedupLookbackDays}
-                  onChange={(e) => setDedupLookbackDays(parseInt(e.target.value) || 1)}
-                  className="w-24 px-3 py-2 border border-gray-300 rounded-md"
-                  disabled={savingDedupSettings}
-                />
-                <span className="text-sm text-gray-500">(1-14 days)</span>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <label className="font-medium text-gray-700 w-56">Strictness Threshold:</label>
-                <input
-                  type="number"
-                  min="0.5"
-                  max="1.0"
-                  step="0.05"
-                  value={dedupStrictnessThreshold}
-                  onChange={(e) => setDedupStrictnessThreshold(parseFloat(e.target.value) || 0.8)}
-                  className="w-24 px-3 py-2 border border-gray-300 rounded-md"
-                  disabled={savingDedupSettings}
-                />
-                <span className="text-sm text-gray-500">(0.5-1.0, lower = stricter)</span>
-              </div>
-
-              <button
-                onClick={saveDedupSettings}
-                disabled={savingDedupSettings}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-300"
-              >
-                {savingDedupSettings ? 'Saving...' : 'Save Deduplication Settings'}
-              </button>
-            </div>
-
-            <div className="mt-4 bg-blue-50 p-4 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>Current configuration:</strong> Checking {dedupLookbackDays} days of past newsletters with {Math.round(dedupStrictnessThreshold * 100)}% similarity threshold
-              </p>
-              <p className="text-xs text-blue-700 mt-2">
-                <strong>How it works:</strong> Stage 1 checks against articles used in the last {dedupLookbackDays} sent newsletters. Stages 2-4 check exact content matches (100% similarity), title similarity (&gt;{Math.round(dedupStrictnessThreshold * 100)}%), and AI semantic analysis (&gt;{Math.round(dedupStrictnessThreshold * 100)}%) within the current issue's articles.
-              </p>
-            </div>
-          </div>
-          </div>
+          <p className="text-sm text-blue-800">
+            <strong>Current configuration:</strong> Checking {dedupLookbackDays} days of past newsletters with {Math.round(dedupStrictnessThreshold * 100)}% similarity threshold
+          </p>
+          <p className="text-xs text-blue-700 mt-2">
+            <strong>How it works:</strong> Stage 1 checks against articles used in the last {dedupLookbackDays} sent newsletters. Stages 2-4 check exact content matches (100% similarity), title similarity (&gt;{Math.round(dedupStrictnessThreshold * 100)}%), and AI semantic analysis (&gt;{Math.round(dedupStrictnessThreshold * 100)}%) within the current issue's articles.
+          </p>
+        </div>
       </div>
+
+      {/* Subject Line AI Prompt */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Subject Line AI Prompt</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          Configure the AI prompt used to generate engaging subject lines for your newsletters.
+        </p>
+
+        {editingSubjectLine ? (
+          <div className="space-y-4">
+            <textarea
+              value={subjectLinePrompt}
+              onChange={(e) => setSubjectLinePrompt(e.target.value)}
+              rows={12}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Enter the AI prompt for generating subject lines..."
+            />
+            <div className="flex items-center justify-end space-x-3">
+              <button
+                onClick={() => setEditingSubjectLine(false)}
+                disabled={savingSubjectLine}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveSubjectLinePrompt}
+                disabled={savingSubjectLine}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {savingSubjectLine ? 'Saving...' : 'Save Prompt'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {subjectLinePrompt ? (
+              <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-64 overflow-y-auto">
+                {subjectLinePrompt}
+              </div>
+            ) : (
+              <p className="text-gray-500 italic">No subject line prompt configured.</p>
+            )}
+            <button
+              onClick={() => setEditingSubjectLine(true)}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+            >
+              {subjectLinePrompt ? 'Edit Prompt' : 'Add Prompt'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Testing Playground Button */}
+      {newsletterSlug && (
+        <div className="flex justify-center">
+          <Link
+            href={`/dashboard/${newsletterSlug}/settings/AIPromptTesting`}
+            className="px-6 py-3 text-base font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors duration-200 shadow-md hover:shadow-lg"
+          >
+            AI Testing Playground
+          </Link>
+        </div>
+      )}
     </div>
   )
 }

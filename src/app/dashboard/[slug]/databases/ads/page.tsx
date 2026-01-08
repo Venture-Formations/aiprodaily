@@ -110,7 +110,7 @@ export default function AdsManagementPage() {
       if (activeStatusTab === 'active') {
         params.set('status', 'active')
       } else if (activeStatusTab === 'inactive') {
-        params.set('status', 'rejected,completed')
+        params.set('status', 'rejected,completed,approved')
       } else if (activeStatusTab === 'review') {
         params.set('status', 'pending_review')
       }

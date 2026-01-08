@@ -79,13 +79,7 @@ export class AppModuleRenderer {
     switch (blockType) {
       case 'title': {
         const emoji = getAppEmoji(app)
-        return `
-          <div style="font-weight: bold; font-size: 16px; line-height: 24px;">
-            <strong>${index + 1}.</strong> ${emoji}
-            <a href="${trackingUrl}" style="color: ${styles.secondaryColor || styles.primaryColor}; text-decoration: underline; font-weight: bold;">
-              ${app.app_name}
-            </a>
-          </div>`
+        return `<strong>${index + 1}.</strong> ${emoji} <a href="${trackingUrl}" style="color: ${styles.secondaryColor || styles.primaryColor}; text-decoration: underline; font-weight: bold;">${app.app_name}</a>`
       }
 
       case 'logo': {
@@ -119,10 +113,7 @@ export class AppModuleRenderer {
       }
 
       case 'description': {
-        return `
-          <div style="font-family: ${styles.bodyFont}; font-size: 16px; line-height: 24px; color: #333;">
-            ${app.description || 'AI-powered application'}
-          </div>`
+        return ` ${app.description || 'AI-powered application'}`
       }
 
       case 'button': {
@@ -157,7 +148,7 @@ export class AppModuleRenderer {
     }
 
     return `
-      <div style="padding: 12px 0; border-bottom: 1px solid #e0e0e0; font-family: ${styles.bodyFont};">
+      <div style="padding: 12px 0; border-bottom: 1px solid #e0e0e0; font-family: ${styles.bodyFont}; font-size: 16px; line-height: 24px; color: #333;">
         ${blocksHtml}
       </div>`
   }
@@ -361,13 +352,7 @@ export class AppModuleRenderer {
             else if (category.includes('payroll')) emoji = '💰'
             else if (category.includes('finance')) emoji = '📈'
 
-            blocksHtml += `
-              <div style="font-weight: bold; font-size: 16px;">
-                <strong>${index + 1}.</strong> ${emoji}
-                <a href="${linkUrl}" style="color: ${styles.secondaryColor || styles.primaryColor}; text-decoration: underline;">
-                  ${app.app_name}
-                </a>
-              </div>`
+            blocksHtml += `<strong>${index + 1}.</strong> ${emoji} <a href="${linkUrl}" style="color: ${styles.secondaryColor || styles.primaryColor}; text-decoration: underline; font-weight: bold;">${app.app_name}</a>`
             break
           }
           case 'logo':
@@ -397,10 +382,7 @@ export class AppModuleRenderer {
             }
             break
           case 'description':
-            blocksHtml += `
-              <div style="font-size: 16px; line-height: 24px;">
-                ${app.description || 'AI-powered application'}
-              </div>`
+            blocksHtml += ` ${app.description || 'AI-powered application'}`
             break
           case 'button':
             blocksHtml += `
@@ -415,7 +397,7 @@ export class AppModuleRenderer {
       }
 
       appsHtml += `
-        <div style="padding: 12px 0; border-bottom: 1px solid #e0e0e0; font-family: ${styles.bodyFont};">
+        <div style="padding: 12px 0; border-bottom: 1px solid #e0e0e0; font-family: ${styles.bodyFont}; font-size: 16px; line-height: 24px; color: #333;">
           ${blocksHtml}
         </div>`
     })
