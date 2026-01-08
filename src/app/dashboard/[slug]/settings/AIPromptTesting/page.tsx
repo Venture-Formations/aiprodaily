@@ -6,7 +6,14 @@ import { useSession } from 'next-auth/react'
 import Layout from '@/components/Layout'
 
 type Provider = 'openai' | 'claude'
-type PromptType = 'primary-title' | 'primary-body' | 'secondary-title' | 'secondary-body' | 'post-scorer' | 'subject-line' | 'custom'
+type PromptType = string // Dynamic: 'module-{id}-title', 'module-{id}-body', 'post-scorer', 'subject-line', 'custom'
+
+interface ArticleModule {
+  id: string
+  name: string
+  display_order: number
+  is_active: boolean
+}
 
 interface RSSPost {
   id: string
@@ -73,9 +80,13 @@ export default function AIPromptTestingPage() {
 
   // Form state
   const [provider, setProvider] = useState<Provider>('openai')
-  const [promptType, setPromptType] = useState<PromptType>('primary-title')
+  const [promptType, setPromptType] = useState<PromptType>('')
   const [prompt, setPrompt] = useState('')
   const [selectedPostId, setSelectedPostId] = useState<string>('')
+
+  // Article modules state
+  const [articleModules, setArticleModules] = useState<ArticleModule[]>([])
+  const [loadingModules, setLoadingModules] = useState(true)
 
   // Data state
   const [recentPosts, setRecentPosts] = useState<RSSPost[]>([])
@@ -95,16 +106,48 @@ export default function AIPromptTestingPage() {
   const [isModified, setIsModified] = useState(false)
 
 
-  // Helper function to determine section from prompt type
-  const getSection = (type: PromptType): 'primary' | 'secondary' | 'all' => {
-    if (type === 'primary-title' || type === 'primary-body' || type === 'subject-line') return 'primary'
-    if (type === 'secondary-title' || type === 'secondary-body') return 'secondary'
-    return 'all' // For post-scorer, custom
+  // Helper function to extract module ID from prompt type
+  const getModuleIdFromPromptType = (type: PromptType): string | null => {
+    const match = type.match(/^module-(.+)-(title|body)$/)
+    return match ? match[1] : null
   }
+
+  // Helper function to get prompt category (title or body) from prompt type
+  const getPromptCategory = (type: PromptType): 'title' | 'body' | 'other' => {
+    if (type.endsWith('-title')) return 'title'
+    if (type.endsWith('-body')) return 'body'
+    return 'other'
+  }
+
+  // Fetch article modules on mount
+  useEffect(() => {
+    async function loadArticleModules() {
+      try {
+        setLoadingModules(true)
+        const res = await fetch(`/api/article-modules?publication_id=${slug}`)
+        const data = await res.json()
+        if (data.success && data.modules) {
+          const activeModules = data.modules.filter((m: ArticleModule) => m.is_active)
+          setArticleModules(activeModules)
+          // Set default prompt type to first module's title if available
+          if (activeModules.length > 0 && !promptType) {
+            setPromptType(`module-${activeModules[0].id}-title`)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load article modules:', error)
+      } finally {
+        setLoadingModules(false)
+      }
+    }
+    if (slug) {
+      loadArticleModules()
+    }
+  }, [slug])
 
   // Load posts from sent issues when authenticated or when prompt type changes
   useEffect(() => {
-    if (status === 'authenticated') {
+    if (status === 'authenticated' && promptType) {
       loadRecentPosts()
     }
   }, [slug, status, promptType])
@@ -126,9 +169,16 @@ export default function AIPromptTestingPage() {
   async function loadRecentPosts() {
     setLoadingPosts(true)
     try {
-      const section = getSection(promptType)
-      console.log('[Frontend] Fetching posts from sent issues for newsletter:', slug, 'section:', section)
-      const res = await fetch(`/api/rss/recent-posts?publication_id=${slug}&limit=50&section=${section}&source=sent&days=7`)
+      const moduleId = getModuleIdFromPromptType(promptType)
+      console.log('[Frontend] Fetching posts from sent issues for newsletter:', slug, 'module_id:', moduleId)
+
+      // Build URL with module_id filter if available
+      let url = `/api/rss/recent-posts?publication_id=${slug}&limit=50&source=sent&days=7`
+      if (moduleId) {
+        url += `&module_id=${moduleId}`
+      }
+
+      const res = await fetch(url)
       const data = await res.json()
 
       console.log('[Frontend] Response status:', res.status, 'data:', data)
@@ -503,26 +553,28 @@ export default function AIPromptTestingPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Prompt Type
               </label>
-              <select
-                value={promptType}
-                onChange={(e) => setPromptType(e.target.value as PromptType)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                aria-label="Prompt Type"
-              >
-                <optgroup label="Primary Section">
-                  <option value="primary-title">Primary Article Title</option>
-                  <option value="primary-body">Primary Article Body</option>
-                </optgroup>
-                <optgroup label="Secondary Section">
-                  <option value="secondary-title">Secondary Article Title</option>
-                  <option value="secondary-body">Secondary Article Body</option>
-                </optgroup>
-                <optgroup label="Other">
-                  <option value="post-scorer">Post Scorer/Evaluator</option>
-                  <option value="subject-line">Subject Line Generator</option>
-                  <option value="custom">Custom/Freeform</option>
-                </optgroup>
-              </select>
+              {loadingModules ? (
+                <div className="text-gray-500 text-sm">Loading article modules...</div>
+              ) : (
+                <select
+                  value={promptType}
+                  onChange={(e) => setPromptType(e.target.value as PromptType)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  aria-label="Prompt Type"
+                >
+                  {articleModules.map((module) => (
+                    <optgroup key={module.id} label={module.name}>
+                      <option value={`module-${module.id}-title`}>{module.name} - Article Title</option>
+                      <option value={`module-${module.id}-body`}>{module.name} - Article Body</option>
+                    </optgroup>
+                  ))}
+                  <optgroup label="Other">
+                    <option value="post-scorer">Post Scorer/Evaluator</option>
+                    <option value="subject-line">Subject Line Generator</option>
+                    <option value="custom">Custom/Freeform</option>
+                  </optgroup>
+                </select>
+              )}
             </div>
 
             {/* RSS Post Selector */}

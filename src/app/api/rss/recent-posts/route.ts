@@ -17,11 +17,12 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const newsletterId = searchParams.get('publication_id')
     const limit = parseInt(searchParams.get('limit') || '50')
-    const section = searchParams.get('section') || 'all' // 'primary', 'secondary', or 'all'
+    const moduleId = searchParams.get('module_id') // Filter by specific article module (new module system)
+    const section = searchParams.get('section') || 'all' // Legacy: 'primary', 'secondary', or 'all'
     const source = searchParams.get('source') || 'recent' // 'recent' or 'sent'
     const days = parseInt(searchParams.get('days') || '5')
 
-    console.log('[API] Fetching posts for newsletter slug:', newsletterId, 'limit:', limit, 'section:', section, 'source:', source)
+    console.log('[API] Fetching posts for newsletter slug:', newsletterId, 'limit:', limit, 'module_id:', moduleId, 'section:', section, 'source:', source)
 
     if (!newsletterId) {
       return NextResponse.json(
@@ -53,20 +54,17 @@ export async function GET(request: NextRequest) {
       cutoffDate.setDate(cutoffDate.getDate() - days)
       const cutoffDateStr = cutoffDate.toISOString().split('T')[0]
 
-      console.log('[API] Fetching posts from sent issues since:', cutoffDateStr)
+      console.log('[API] Fetching posts from sent issues since:', cutoffDateStr, 'module_id:', moduleId)
 
-      // Determine which article table to query based on section
-      const articleTable = section === 'secondary' ? 'secondary_articles' : 'articles'
-
-      // Build query to get posts used in sent issues
-      // Join articles -> rss_posts (via post_id) and articles -> publication_issues (via issue_id)
-      const { data: usedPosts, error: usedPostsError } = await supabaseAdmin
-        .from(articleTable)
+      // Build query to get posts used in sent issues from module_articles
+      let query = supabaseAdmin
+        .from('module_articles')
         .select(`
           post_id,
           issue_id,
           headline,
           final_position,
+          article_module_id,
           rss_posts (
             id,
             title,
@@ -85,7 +83,13 @@ export async function GET(request: NextRequest) {
         .eq('is_active', true)
         .not('final_position', 'is', null)
         .not('post_id', 'is', null)
-        .limit(200)
+
+      // Filter by module_id if provided
+      if (moduleId) {
+        query = query.eq('article_module_id', moduleId)
+      }
+
+      const { data: usedPosts, error: usedPostsError } = await query.limit(200)
 
       if (usedPostsError) {
         console.error('[API] Error fetching posts from sent issues:', usedPostsError)
