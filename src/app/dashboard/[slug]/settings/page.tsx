@@ -1335,16 +1335,25 @@ function EmailSettings() {
   const pathname = usePathname()
   const newsletterSlug = pathname ? pathname.match(/^\/dashboard\/([^\/]+)/)?.[1] : null
   const [subjectLinePrompt, setSubjectLinePrompt] = useState<string>('')
+  const [subjectLinePromptOriginal, setSubjectLinePromptOriginal] = useState<string>('')
   const [editingSubjectLine, setEditingSubjectLine] = useState(false)
+  const [expandedSubjectLine, setExpandedSubjectLine] = useState(false)
   const [savingSubjectLine, setSavingSubjectLine] = useState(false)
+  const [prettyPrintSubjectLine, setPrettyPrintSubjectLine] = useState(true)
 
   useEffect(() => {
     loadSettings()
     loadMaxArticles()
     loadLookbackHours()
     loadDedupSettings()
-    loadSubjectLinePrompt()
   }, [])
+
+  // Load subject line prompt when newsletter slug is available
+  useEffect(() => {
+    if (newsletterSlug) {
+      loadSubjectLinePrompt()
+    }
+  }, [newsletterSlug])
 
   const loadSettings = async () => {
     try {
@@ -1585,6 +1594,46 @@ function EmailSettings() {
     }
   }
 
+  // Subject Line Prompt helper functions
+  const detectProviderFromPrompt = (value: any): 'openai' | 'claude' => {
+    try {
+      const parsed = typeof value === 'string' ? JSON.parse(value) : value
+      const model = (parsed?.model || '').toLowerCase()
+      if (model.includes('claude') || model.includes('sonnet') || model.includes('opus') || model.includes('haiku')) {
+        return 'claude'
+      }
+    } catch (e) {
+      // Not valid JSON, default to openai
+    }
+    return 'openai'
+  }
+
+  const formatJSONForDisplay = (value: any, prettyPrint: boolean): string => {
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value)
+        const jsonStr = prettyPrint ? JSON.stringify(parsed, null, 2) : JSON.stringify(parsed)
+        if (prettyPrint) {
+          return jsonStr.replace(/\\n/g, '\n')
+        }
+        return jsonStr
+      } catch (e) {
+        if (prettyPrint) {
+          return value.replace(/\\n/g, '\n')
+        }
+        return value
+      }
+    }
+    if (typeof value === 'object' && value !== null) {
+      const jsonStr = prettyPrint ? JSON.stringify(value, null, 2) : JSON.stringify(value)
+      if (prettyPrint) {
+        return jsonStr.replace(/\\n/g, '\n')
+      }
+      return jsonStr
+    }
+    return String(value)
+  }
+
   // Subject Line Prompt functions
   const loadSubjectLinePrompt = async () => {
     if (!newsletterSlug) return
@@ -1594,12 +1643,32 @@ function EmailSettings() {
         const data = await response.json()
         const subjectPrompt = data.prompts?.find((p: any) => p.key === 'ai_prompt_subject_line')
         if (subjectPrompt) {
-          setSubjectLinePrompt(typeof subjectPrompt.value === 'string' ? subjectPrompt.value : JSON.stringify(subjectPrompt.value, null, 2))
+          const promptValue = typeof subjectPrompt.value === 'string' ? subjectPrompt.value : JSON.stringify(subjectPrompt.value, null, 2)
+          setSubjectLinePrompt(promptValue)
+          setSubjectLinePromptOriginal(promptValue)
         }
       }
     } catch (error) {
       console.error('Failed to load subject line prompt:', error)
     }
+  }
+
+  const handleEditSubjectLine = () => {
+    let valueStr: string
+    try {
+      const parsed = JSON.parse(subjectLinePromptOriginal)
+      valueStr = JSON.stringify(parsed, null, 2)
+    } catch (e) {
+      valueStr = subjectLinePromptOriginal
+    }
+    setSubjectLinePrompt(valueStr)
+    setEditingSubjectLine(true)
+    setExpandedSubjectLine(true)
+  }
+
+  const handleCancelSubjectLine = () => {
+    setSubjectLinePrompt(subjectLinePromptOriginal)
+    setEditingSubjectLine(false)
   }
 
   const saveSubjectLinePrompt = async () => {
@@ -1608,18 +1677,18 @@ function EmailSettings() {
     setMessage('')
 
     try {
-      const response = await fetch('/api/settings/prompts', {
-        method: 'POST',
+      const response = await fetch('/api/settings/ai-prompts', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           key: 'ai_prompt_subject_line',
-          value: subjectLinePrompt,
-          newsletterSlug
+          value: subjectLinePrompt
         })
       })
 
       if (response.ok) {
         setMessage('Subject line prompt saved successfully!')
+        setSubjectLinePromptOriginal(subjectLinePrompt)
         setEditingSubjectLine(false)
         setTimeout(() => setMessage(''), 3000)
       } else {
@@ -1628,6 +1697,72 @@ function EmailSettings() {
     } catch (error) {
       setMessage('Failed to save subject line prompt. Please try again.')
       console.error('Save error:', error)
+    } finally {
+      setSavingSubjectLine(false)
+    }
+  }
+
+  const handleResetSubjectLine = async () => {
+    if (!confirm('Are you sure you want to reset this prompt to its default value? This cannot be undone.')) {
+      return
+    }
+
+    setSavingSubjectLine(true)
+    setMessage('')
+
+    try {
+      const response = await fetch('/api/settings/ai-prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'ai_prompt_subject_line' })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const msg = data.used_custom_default
+          ? 'Prompt reset to your custom default!'
+          : 'Prompt reset to original code default!'
+        setMessage(msg)
+        await loadSubjectLinePrompt()
+        setTimeout(() => setMessage(''), 3000)
+      } else {
+        throw new Error('Failed to reset prompt')
+      }
+    } catch (error) {
+      setMessage('Error: Failed to reset prompt')
+      setTimeout(() => setMessage(''), 5000)
+    } finally {
+      setSavingSubjectLine(false)
+    }
+  }
+
+  const handleSaveAsDefaultSubjectLine = async () => {
+    if (!confirm('Save this as the default prompt for all new publications?')) {
+      return
+    }
+
+    setSavingSubjectLine(true)
+    setMessage('')
+
+    try {
+      const response = await fetch('/api/settings/ai-prompts', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: 'ai_prompt_subject_line',
+          value: subjectLinePromptOriginal
+        })
+      })
+
+      if (response.ok) {
+        setMessage('Saved as default successfully!')
+        setTimeout(() => setMessage(''), 3000)
+      } else {
+        throw new Error('Failed to save as default')
+      }
+    } catch (error) {
+      setMessage('Error: Failed to save as default')
+      setTimeout(() => setMessage(''), 5000)
     } finally {
       setSavingSubjectLine(false)
     }
@@ -2685,53 +2820,119 @@ function EmailSettings() {
       </div>
 
       {/* Subject Line AI Prompt */}
-      <div className="bg-white shadow rounded-lg p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Subject Line AI Prompt</h3>
-        <p className="text-sm text-gray-600 mb-4">
-          Configure the AI prompt used to generate engaging subject lines for your newsletters.
-        </p>
-
-        {editingSubjectLine ? (
-          <div className="space-y-4">
-            <textarea
-              value={subjectLinePrompt}
-              onChange={(e) => setSubjectLinePrompt(e.target.value)}
-              rows={12}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter the AI prompt for generating subject lines..."
-            />
-            <div className="flex items-center justify-end space-x-3">
-              <button
-                onClick={() => setEditingSubjectLine(false)}
-                disabled={savingSubjectLine}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveSubjectLinePrompt}
-                disabled={savingSubjectLine}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
-              >
-                {savingSubjectLine ? 'Saving...' : 'Save Prompt'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {subjectLinePrompt ? (
-              <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-64 overflow-y-auto">
-                {subjectLinePrompt}
+      <div className="bg-white shadow rounded-lg">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-medium text-gray-900">Subject Line Generator</h3>
+                {subjectLinePromptOriginal && (
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                    detectProviderFromPrompt(editingSubjectLine ? subjectLinePrompt : subjectLinePromptOriginal) === 'claude'
+                      ? 'bg-purple-100 text-purple-800'
+                      : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    {detectProviderFromPrompt(editingSubjectLine ? subjectLinePrompt : subjectLinePromptOriginal) === 'claude' ? 'Claude' : 'OpenAI'}
+                  </span>
+                )}
               </div>
-            ) : (
-              <p className="text-gray-500 italic">No subject line prompt configured.</p>
-            )}
+              <p className="text-sm text-gray-600 mt-1">
+                Configure the AI prompt used to generate engaging subject lines for your newsletters.
+              </p>
+            </div>
             <button
-              onClick={() => setEditingSubjectLine(true)}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              onClick={() => setExpandedSubjectLine(!expandedSubjectLine)}
+              className="ml-4 text-blue-600 hover:text-blue-800 text-sm font-medium"
             >
-              {subjectLinePrompt ? 'Edit Prompt' : 'Add Prompt'}
+              {expandedSubjectLine ? 'Collapse' : 'View/Edit'}
             </button>
+          </div>
+        </div>
+
+        {expandedSubjectLine && (
+          <div className="p-6">
+            <div className="mb-2 flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">
+                Prompt Content
+              </label>
+              <span className="text-xs text-gray-500">
+                {editingSubjectLine
+                  ? subjectLinePrompt.length
+                  : subjectLinePromptOriginal.length} characters
+              </span>
+            </div>
+
+            {editingSubjectLine ? (
+              <>
+                <textarea
+                  value={subjectLinePrompt}
+                  onChange={(e) => setSubjectLinePrompt(e.target.value)}
+                  rows={15}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <div className="mt-3 flex items-center justify-end">
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={handleCancelSubjectLine}
+                      disabled={savingSubjectLine}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveSubjectLinePrompt}
+                      disabled={savingSubjectLine}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {savingSubjectLine ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="mb-2 flex items-center">
+                  <label className="flex items-center text-sm text-gray-600 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={prettyPrintSubjectLine}
+                      onChange={(e) => setPrettyPrintSubjectLine(e.target.checked)}
+                      className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    Pretty-print
+                  </label>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
+                  {formatJSONForDisplay(subjectLinePromptOriginal, prettyPrintSubjectLine)}
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={handleResetSubjectLine}
+                      disabled={savingSubjectLine}
+                      className="px-4 py-2 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50"
+                    >
+                      {savingSubjectLine ? 'Resetting...' : 'Reset to Default'}
+                    </button>
+                    <button
+                      onClick={handleSaveAsDefaultSubjectLine}
+                      disabled={savingSubjectLine}
+                      className="px-4 py-2 text-sm font-medium text-green-700 bg-white border border-green-300 rounded-md hover:bg-green-50 disabled:opacity-50"
+                    >
+                      {savingSubjectLine ? 'Saving...' : 'Save as Default'}
+                    </button>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={handleEditSubjectLine}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                    >
+                      Edit Prompt
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
