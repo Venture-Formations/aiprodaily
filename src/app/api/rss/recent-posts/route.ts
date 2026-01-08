@@ -56,7 +56,8 @@ export async function GET(request: NextRequest) {
 
       console.log('[API] Fetching posts from sent issues since:', cutoffDateStr, 'module_id:', moduleId)
 
-      // Build query to get posts used in sent issues from module_articles
+      // Build query to get posts used in issues from module_articles
+      // Include any posts that have been processed (have headlines), not just sent ones
       let query = supabaseAdmin
         .from('module_articles')
         .select(`
@@ -80,9 +81,8 @@ export async function GET(request: NextRequest) {
             publication_id
           )
         `)
-        .eq('is_active', true)
-        .not('final_position', 'is', null)
         .not('post_id', 'is', null)
+        .not('headline', 'is', null)
 
       // Filter by module_id if provided
       if (moduleId) {
@@ -126,10 +126,10 @@ export async function GET(request: NextRequest) {
           publication_id: string
         } | null
 
-        // Filter: must match publication, be sent, and be within date range
+        // Filter: must match publication and be within date range
+        // Include draft/processing/sent issues so we have sample posts for testing
         if (!issue) continue
         if (issue.publication_id !== newsletter.id) continue
-        if (issue.status !== 'sent') continue
         if (issue.date < cutoffDateStr) continue
 
         if (rssPost && !postsMap.has(rssPost.id)) {

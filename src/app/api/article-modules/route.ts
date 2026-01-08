@@ -71,17 +71,39 @@ const DEFAULT_BODY_PROMPT = JSON.stringify({
 
 /**
  * GET /api/article-modules - List article modules for a publication
- * Query params: publication_id (required)
+ * Query params: publication_id (required) - can be UUID or slug
  */
 export async function GET(request: NextRequest) {
   try {
-    const publicationId = request.nextUrl.searchParams.get('publication_id')
+    const publicationIdOrSlug = request.nextUrl.searchParams.get('publication_id')
 
-    if (!publicationId) {
+    if (!publicationIdOrSlug) {
       return NextResponse.json(
         { error: 'publication_id is required' },
         { status: 400 }
       )
+    }
+
+    // Check if it's a UUID or slug
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(publicationIdOrSlug)
+
+    let publicationId = publicationIdOrSlug
+
+    // If it's a slug, look up the UUID
+    if (!isUUID) {
+      const { data: publication, error: pubError } = await supabaseAdmin
+        .from('publications')
+        .select('id')
+        .eq('slug', publicationIdOrSlug)
+        .single()
+
+      if (pubError || !publication) {
+        return NextResponse.json(
+          { error: 'Publication not found', details: pubError?.message },
+          { status: 404 }
+        )
+      }
+      publicationId = publication.id
     }
 
     const { data: modules, error } = await supabaseAdmin
