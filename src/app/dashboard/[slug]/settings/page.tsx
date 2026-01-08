@@ -1346,14 +1346,8 @@ function EmailSettings() {
     loadMaxArticles()
     loadLookbackHours()
     loadDedupSettings()
+    loadSubjectLinePrompt()
   }, [])
-
-  // Load subject line prompt when newsletter slug is available
-  useEffect(() => {
-    if (newsletterSlug) {
-      loadSubjectLinePrompt()
-    }
-  }, [newsletterSlug])
 
   const loadSettings = async () => {
     try {
@@ -1636,9 +1630,8 @@ function EmailSettings() {
 
   // Subject Line Prompt functions
   const loadSubjectLinePrompt = async () => {
-    if (!newsletterSlug) return
     try {
-      const response = await fetch(`/api/settings/prompts?publication_id=${newsletterSlug}`)
+      const response = await fetch('/api/settings/ai-prompts')
       if (response.ok) {
         const data = await response.json()
         const subjectPrompt = data.prompts?.find((p: any) => p.key === 'ai_prompt_subject_line')
