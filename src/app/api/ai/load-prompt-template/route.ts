@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { AI_PROMPTS } from '@/lib/openai'
+import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +19,43 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required field: promptType' },
         { status: 400 }
       )
+    }
+
+    // Check if this is a module-based prompt type (e.g., "module-{uuid}-title" or "module-{uuid}-body")
+    const moduleMatch = promptType.match(/^module-(.+)-(title|body)$/)
+
+    if (moduleMatch) {
+      // Handle module-based prompts from article_module_prompts table
+      const moduleId = moduleMatch[1]
+      const promptCategory = moduleMatch[2] // 'title' or 'body'
+      const modulePromptType = promptCategory === 'title' ? 'article_title' : 'article_body'
+
+      const { data: modulePrompt, error: moduleError } = await supabaseAdmin
+        .from('article_module_prompts')
+        .select('ai_prompt')
+        .eq('article_module_id', moduleId)
+        .eq('prompt_type', modulePromptType)
+        .maybeSingle()
+
+      if (moduleError) {
+        console.error('[API] Error loading module prompt template:', moduleError)
+        return NextResponse.json(
+          { error: 'Failed to load module prompt', details: moduleError.message },
+          { status: 500 }
+        )
+      }
+
+      if (!modulePrompt) {
+        return NextResponse.json({
+          success: true,
+          prompt: '' // Return empty if no prompt found
+        })
+      }
+
+      return NextResponse.json({
+        success: true,
+        prompt: modulePrompt.ai_prompt
+      })
     }
 
     let templatePrompt = ''
