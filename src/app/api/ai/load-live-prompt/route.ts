@@ -28,7 +28,54 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Map playground prompt types to database keys
+    // Check if this is a module-based prompt type (e.g., "module-{uuid}-title" or "module-{uuid}-body")
+    const moduleMatch = prompt_type.match(/^module-(.+)-(title|body)$/)
+
+    if (moduleMatch) {
+      // Handle module-based prompts from article_module_prompts table
+      const moduleId = moduleMatch[1]
+      const promptCategory = moduleMatch[2] // 'title' or 'body'
+      const modulePromptType = promptCategory === 'title' ? 'article_title' : 'article_body'
+
+      const { data: modulePrompt, error: moduleError } = await supabaseAdmin
+        .from('article_module_prompts')
+        .select('ai_prompt, ai_model, ai_provider')
+        .eq('article_module_id', moduleId)
+        .eq('prompt_type', modulePromptType)
+        .maybeSingle()
+
+      if (moduleError) {
+        console.error('[API] Error loading module prompt:', moduleError)
+        return NextResponse.json(
+          { error: 'Failed to load module prompt', details: moduleError.message },
+          { status: 500 }
+        )
+      }
+
+      if (!modulePrompt) {
+        return NextResponse.json({
+          success: true,
+          data: null,
+          message: 'No prompt found for this module'
+        })
+      }
+
+      const promptProvider = modulePrompt.ai_provider || 'openai'
+      const providerMatches = promptProvider === provider
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          key: `module_${moduleId}_${promptCategory}`,
+          prompt: modulePrompt.ai_prompt,
+          ai_provider: promptProvider,
+          ai_model: modulePrompt.ai_model,
+          provider_matches: providerMatches
+        }
+      })
+    }
+
+    // Map legacy playground prompt types to database keys
     const promptKeyMap: Record<string, string | null> = {
       'primary-title': 'ai_prompt_primary_article_title',
       'primary-body': 'ai_prompt_primary_article_body',
