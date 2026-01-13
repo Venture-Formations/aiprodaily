@@ -639,14 +639,30 @@ export default function AdsManagementPage() {
                     </div>
                     <div>
                       <span className="font-medium">Analytics:</span>
-                      <a
-                        href={`/ads/${ad.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline truncate block"
-                      >
-                        View Analytics
-                      </a>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={`/ads/${ad.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline truncate"
+                        >
+                          View Analytics
+                        </a>
+                        <button
+                          onClick={() => {
+                            const url = `${window.location.origin}/ads/${ad.id}`
+                            navigator.clipboard.writeText(url)
+                            alert('Analytics URL copied!')
+                          }}
+                          className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                          title="Copy analytics URL"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -736,14 +752,30 @@ export default function AdsManagementPage() {
                     </div>
                     <div>
                       <span className="font-medium">Analytics:</span>
-                      <a
-                        href={`/ads/${ad.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline truncate block"
-                      >
-                        View Analytics
-                      </a>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={`/ads/${ad.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline truncate"
+                        >
+                          View Analytics
+                        </a>
+                        <button
+                          onClick={() => {
+                            const url = `${window.location.origin}/ads/${ad.id}`
+                            navigator.clipboard.writeText(url)
+                            alert('Analytics URL copied!')
+                          }}
+                          className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                          title="Copy analytics URL"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -840,14 +872,30 @@ export default function AdsManagementPage() {
                     </div>
                     <div>
                       <span className="font-medium">Analytics:</span>
-                      <a
-                        href={`/ads/${ad.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline truncate block"
-                      >
-                        View Analytics
-                      </a>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={`/ads/${ad.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline truncate"
+                        >
+                          View Analytics
+                        </a>
+                        <button
+                          onClick={() => {
+                            const url = `${window.location.origin}/ads/${ad.id}`
+                            navigator.clipboard.writeText(url)
+                            alert('Analytics URL copied!')
+                          }}
+                          className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                          title="Copy analytics URL"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
