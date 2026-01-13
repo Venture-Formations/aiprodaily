@@ -1796,24 +1796,31 @@ function EditAdModal({ ad, onClose, onSuccess, publicationId }: { ad: AdWithRela
                   <option value="single">Single (One-time)</option>
                 </select>
               </div>
-              {formData.frequency === 'weekly' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Weeks Purchased
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={formData.times_paid || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, times_paid: parseInt(e.target.value) || 0 }))}
-                    placeholder="e.g., 8"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Used: {ad.times_used || 0} of {formData.times_paid || 0} weeks
-                  </p>
-                </div>
-              )}
+              {formData.frequency === 'weekly' && (() => {
+                const timesUsed = ad.times_used || 0
+                const remaining = Math.max(0, formData.times_paid - timesUsed)
+                return (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Weeks Remaining
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={remaining}
+                      onChange={(e) => {
+                        const newRemaining = parseInt(e.target.value) || 0
+                        setFormData(prev => ({ ...prev, times_paid: timesUsed + newRemaining }))
+                      }}
+                      placeholder="e.g., 8"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Already used: {timesUsed} times • Total purchased: {formData.times_paid}
+                    </p>
+                  </div>
+                )
+              })()}
             </div>
           )}
 
