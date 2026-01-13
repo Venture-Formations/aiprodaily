@@ -620,7 +620,7 @@ export default function AdsManagementPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4 pt-4 border-t text-sm">
+                  <div className="grid grid-cols-4 gap-4 pt-4 border-t text-sm">
                     <div>
                       <span className="font-medium">Company:</span>
                       <p className="text-gray-600 truncate" title={ad.advertiser?.company_name || ad.company_name || ''}>
@@ -636,6 +636,17 @@ export default function AdsManagementPage() {
                       <p className="text-gray-600">
                         {ad.last_used_date ? new Date(ad.last_used_date).toLocaleDateString() : 'Never'}
                       </p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Analytics:</span>
+                      <a
+                        href={`/ads/${ad.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline truncate block"
+                      >
+                        View Analytics
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -708,7 +719,7 @@ export default function AdsManagementPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4 pt-4 border-t text-sm">
+                  <div className="grid grid-cols-4 gap-4 pt-4 border-t text-sm">
                     <div>
                       <span className="font-medium">Company:</span>
                       <p className="text-gray-600 truncate" title={ad.advertiser?.company_name || ad.company_name || ''}>
@@ -722,6 +733,17 @@ export default function AdsManagementPage() {
                     <div>
                       <span className="font-medium">Has Image:</span>
                       <p className="text-gray-600">{ad.image_url ? 'Yes' : 'No'}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Analytics:</span>
+                      <a
+                        href={`/ads/${ad.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline truncate block"
+                      >
+                        View Analytics
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -799,7 +821,7 @@ export default function AdsManagementPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4 pt-4 border-t text-sm">
+                  <div className="grid grid-cols-4 gap-4 pt-4 border-t text-sm">
                     <div>
                       <span className="font-medium">Company:</span>
                       <p className="text-gray-600 truncate" title={ad.advertiser?.company_name || ad.company_name || ''}>
@@ -815,6 +837,17 @@ export default function AdsManagementPage() {
                       <p className="text-gray-600">
                         {ad.last_used_date ? new Date(ad.last_used_date).toLocaleDateString() : 'Never'}
                       </p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Analytics:</span>
+                      <a
+                        href={`/ads/${ad.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline truncate block"
+                      >
+                        View Analytics
+                      </a>
                     </div>
                   </div>
                 </div>
