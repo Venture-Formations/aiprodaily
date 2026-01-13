@@ -225,6 +225,19 @@ export default async function AdDetailPage({ params }: PageProps) {
                   {ad.ad_type === 'main_sponsor' ? 'Main Sponsor' : ad.ad_type || 'Newsletter'}
                 </p>
               </div>
+              {ad.frequency === 'weekly' && ad.paid === true && ad.times_paid && ad.times_paid > 0 && (
+                <div>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Weeks Remaining</label>
+                  <p className="text-gray-900 mt-1">
+                    {Math.max(0, ad.times_paid - (ad.times_used || 0))} of {ad.times_paid}
+                    {Math.max(0, ad.times_paid - (ad.times_used || 0)) <= 2 && Math.max(0, ad.times_paid - (ad.times_used || 0)) > 0 && (
+                      <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-medium">
+                        Low
+                      </span>
+                    )}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

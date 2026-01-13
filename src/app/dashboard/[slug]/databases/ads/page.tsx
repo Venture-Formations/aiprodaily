@@ -341,6 +341,35 @@ export default function AdsManagementPage() {
     }
   }
 
+  const handleExtendWeeks = async (adId: string) => {
+    const weeks = prompt('How many weeks to add?', '4')
+    if (!weeks) return
+    const weeksNum = parseInt(weeks)
+    if (isNaN(weeksNum) || weeksNum <= 0) {
+      alert('Please enter a valid number of weeks')
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/ads/${adId}/extend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ weeks: weeksNum })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        alert(`Added ${weeksNum} weeks! New total: ${data.new_times_paid} weeks${data.reactivated ? ' (Ad reactivated)' : ''}`)
+        fetchAds()
+      } else {
+        throw new Error('Failed to extend weeks')
+      }
+    } catch (error) {
+      console.error('Extend error:', error)
+      alert('Failed to extend weeks')
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     const styles = {
       pending_payment: 'bg-yellow-100 text-yellow-800',
@@ -665,6 +694,38 @@ export default function AdsManagementPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Remaining weeks for paid weekly ads */}
+                  {ad.frequency === 'weekly' && ad.paid === true && ad.times_paid && ad.times_paid > 0 && (() => {
+                    const remaining = Math.max(0, ad.times_paid - (ad.times_used || 0))
+                    const isLow = remaining <= 2 && remaining > 0
+                    return (
+                      <div className="mt-3 pt-3 border-t border-dashed border-gray-200 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">Weeks Remaining:</span>
+                          <span className={`text-sm ${isLow ? 'text-amber-600 font-semibold' : 'text-gray-600'}`}>
+                            {remaining} / {ad.times_paid}
+                          </span>
+                          {isLow && (
+                            <span className="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-medium">
+                              Low
+                            </span>
+                          )}
+                          {remaining === 0 && (
+                            <span className="text-xs bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-medium">
+                              Exhausted
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleExtendWeeks(ad.id)}
+                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                        >
+                          + Add weeks
+                        </button>
+                      </div>
+                    )
+                  })()}
                 </div>
               )})
             )}
@@ -1298,7 +1359,9 @@ function EditAdModal({ ad, onClose, onSuccess, publicationId }: { ad: AdWithRela
     title: ad.title,
     body: ad.body,
     button_url: ad.button_url,
-    status: ad.status
+    status: ad.status,
+    frequency: ad.frequency || 'single',
+    times_paid: ad.times_paid || 0
   })
   const [submitting, setSubmitting] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
@@ -1688,6 +1751,42 @@ function EditAdModal({ ad, onClose, onSuccess, publicationId }: { ad: AdWithRela
                 }`}
               />
             </button>
+          </div>
+
+          {/* Frequency and Weeks Purchased (for paid weekly ads) */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Frequency
+              </label>
+              <select
+                value={formData.frequency}
+                onChange={(e) => setFormData(prev => ({ ...prev, frequency: e.target.value as 'single' | 'weekly' | 'monthly' }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              >
+                <option value="single">Single (One-time)</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
+            {formData.frequency === 'weekly' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Weeks Purchased
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.times_paid || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, times_paid: parseInt(e.target.value) || 0 }))}
+                  placeholder="0 = unlimited"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Set to 0 for unlimited/non-paid ads. Used: {ad.times_used || 0} times
+                </p>
+              </div>
+            )}
           </div>
 
           {/* URL */}

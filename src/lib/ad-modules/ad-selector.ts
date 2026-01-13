@@ -13,6 +13,17 @@ interface AdSelectionResult {
   reason: string
 }
 
+/**
+ * Helper function to get the start of a week (Sunday)
+ */
+function getWeekStart(date: Date): Date {
+  const d = new Date(date)
+  const day = d.getDay() // 0 = Sunday
+  d.setDate(d.getDate() - day)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
 export class ModuleAdSelector {
   /**
    * Get the global company cooldown days setting
@@ -110,6 +121,39 @@ export class ModuleAdSelector {
       if (ad.advertiser && !ad.advertiser.is_active) {
         return false
       }
+
+      // PAID ADS ONLY: Additional checks for sponsored ads with weekly limits
+      // paid=true identifies sponsored ads that have weekly limits
+      const isPaidWeeklyAd = ad.paid === true && ad.frequency === 'weekly' && ad.times_paid && ad.times_paid > 0
+
+      if (isPaidWeeklyAd) {
+        // Check if ad has remaining uses
+        const remaining = ad.times_paid - (ad.times_used || 0)
+        if (remaining <= 0) {
+          return false
+        }
+
+        // Check if ad already ran this week (Sun-Sat)
+        if (ad.last_used_date) {
+          const lastUsed = new Date(ad.last_used_date)
+          const issueWeekStart = getWeekStart(issueDate)
+          const lastUsedWeekStart = getWeekStart(lastUsed)
+
+          // If last used is in same week, skip this ad
+          if (issueWeekStart.getTime() === lastUsedWeekStart.getTime()) {
+            return false
+          }
+
+          // Cannot run on same day of week as last time
+          const lastDayOfWeek = lastUsed.getDay() // 0=Sun, 6=Sat
+          const issueDayOfWeek = issueDate.getDay()
+
+          if (lastDayOfWeek === issueDayOfWeek) {
+            return false
+          }
+        }
+      }
+      // Non-paid ads (paid=false) have no additional restrictions
 
       return true
     })
@@ -332,8 +376,12 @@ export class ModuleAdSelector {
         ad_module:ad_modules(id, selection_mode, next_position),
         advertisement:advertisements(
           id,
+          title,
           advertiser_id,
           times_used,
+          times_paid,
+          paid,
+          frequency,
           display_order,
           ad_module_id,
           advertiser:advertisers(id, times_used)
@@ -358,14 +406,26 @@ export class ModuleAdSelector {
       const adModule = selection.ad_module as any
 
       // Update ad in advertisements table
+      const newTimesUsed = (ad.times_used || 0) + 1
       await supabaseAdmin
         .from('advertisements')
         .update({
-          times_used: (ad.times_used || 0) + 1,
+          times_used: newTimesUsed,
           last_used_date: issueDateStr,
           updated_at: new Date().toISOString()
         })
         .eq('id', ad.id)
+
+      // PAID ADS: Check if weekly ad is exhausted and mark as completed
+      if (ad.paid === true && ad.frequency === 'weekly' && ad.times_paid && ad.times_paid > 0) {
+        if (newTimesUsed >= ad.times_paid) {
+          await supabaseAdmin
+            .from('advertisements')
+            .update({ status: 'completed' })
+            .eq('id', ad.id)
+          console.log(`[AdSelector] Paid ad "${ad.title}" exhausted (${newTimesUsed}/${ad.times_paid}), set to completed`)
+        }
+      }
 
       // Update advertiser (if linked)
       if (advertiser) {

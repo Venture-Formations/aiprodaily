@@ -114,6 +114,22 @@ export function AdCard({ ad }: AdCardProps) {
             <span className="px-2 py-0.5 bg-gray-100 rounded text-xs">
               {ad.ad_type === 'main_sponsor' ? 'Main Sponsor' : ad.ad_type || 'Newsletter'}
             </span>
+            {/* Remaining weeks for paid weekly ads */}
+            {ad.frequency === 'weekly' && ad.paid === true && ad.times_paid && ad.times_paid > 0 && (() => {
+              const remaining = Math.max(0, ad.times_paid - (ad.times_used || 0))
+              const isLow = remaining <= 2 && remaining > 0
+              return (
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                  remaining === 0
+                    ? 'bg-red-100 text-red-800'
+                    : isLow
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-blue-100 text-blue-800'
+                }`}>
+                  {remaining}/{ad.times_paid} weeks
+                </span>
+              )
+            })()}
           </div>
 
           {/* Rejection reason */}
