@@ -265,37 +265,38 @@ export default async function AdAnalyticsPage({ params }: PageProps) {
             </h1>
           </div>
           <div className="p-6">
-            <div className="flex gap-6">
-              {/* Ad Content */}
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">{ad.title}</h2>
-                <div
-                  className="prose prose-sm max-w-none text-gray-700 mb-4"
-                  dangerouslySetInnerHTML={{ __html: ad.body }}
+            {/* Title */}
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">{ad.title}</h2>
+
+            {/* Image - between title and body for better mobile layout */}
+            {ad.image_url && (
+              <div className="mb-4">
+                <img
+                  src={ad.image_url}
+                  alt={ad.title}
+                  className="w-full max-w-md h-auto rounded-lg border border-gray-200"
                 />
-                {showButton && ad.button_url && (
-                  <a
-                    href={ad.button_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    {ad.button_text || 'Learn More'}
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                )}
               </div>
-              {/* Ad Image */}
-              {ad.image_url && (
-                <div className="flex-shrink-0">
-                  <img
-                    src={ad.image_url}
-                    alt={ad.title}
-                    className="w-72 h-auto rounded-lg border border-gray-200"
-                  />
-                </div>
-              )}
-            </div>
+            )}
+
+            {/* Body */}
+            <div
+              className="prose prose-sm max-w-none text-gray-700 mb-4"
+              dangerouslySetInnerHTML={{ __html: ad.body }}
+            />
+
+            {/* Button */}
+            {showButton && ad.button_url && (
+              <a
+                href={ad.button_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                {ad.button_text || 'Learn More'}
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            )}
           </div>
         </div>
 
