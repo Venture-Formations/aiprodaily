@@ -1360,7 +1360,8 @@ function EditAdModal({ ad, onClose, onSuccess, publicationId }: { ad: AdWithRela
     body: ad.body,
     button_url: ad.button_url,
     status: ad.status,
-    frequency: ad.frequency || 'single',
+    paid: ad.paid || false,
+    frequency: ad.frequency || 'weekly',
     times_paid: ad.times_paid || 0
   })
   const [submitting, setSubmitting] = useState(false)
@@ -1753,41 +1754,68 @@ function EditAdModal({ ad, onClose, onSuccess, publicationId }: { ad: AdWithRela
             </button>
           </div>
 
-          {/* Frequency and Weeks Purchased (for paid weekly ads) */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Sponsored Ad Toggle */}
+          <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Frequency
+                Sponsored Ad
               </label>
-              <select
-                value={formData.frequency}
-                onChange={(e) => setFormData(prev => ({ ...prev, frequency: e.target.value as 'single' | 'weekly' | 'monthly' }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              >
-                <option value="single">Single (One-time)</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-              </select>
+              <p className="text-xs text-gray-600">
+                {formData.paid ? 'This is a paid/sponsored ad with scheduling limits' : 'Standard ad without weekly limits'}
+              </p>
             </div>
-            {formData.frequency === 'weekly' && (
+            <button
+              type="button"
+              onClick={() => setFormData(prev => ({ ...prev, paid: !prev.paid }))}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                formData.paid ? 'bg-blue-600' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  formData.paid ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Frequency and Weeks Purchased (only for sponsored/paid ads) */}
+          {formData.paid && (
+            <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50/50 rounded-lg border border-blue-100">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Weeks Purchased
+                  Frequency
                 </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.times_paid || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, times_paid: parseInt(e.target.value) || 0 }))}
-                  placeholder="0 = unlimited"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Set to 0 for unlimited/non-paid ads. Used: {ad.times_used || 0} times
-                </p>
+                <select
+                  value={formData.frequency}
+                  onChange={(e) => setFormData(prev => ({ ...prev, frequency: e.target.value as 'single' | 'weekly' | 'monthly' }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
+                >
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="single">Single (One-time)</option>
+                </select>
               </div>
-            )}
-          </div>
+              {formData.frequency === 'weekly' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Weeks Purchased
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData.times_paid || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, times_paid: parseInt(e.target.value) || 0 }))}
+                    placeholder="e.g., 8"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Used: {ad.times_used || 0} of {formData.times_paid || 0} weeks
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* URL */}
           <div>
