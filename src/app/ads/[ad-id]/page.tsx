@@ -40,15 +40,31 @@ export default async function AdAnalyticsPage({ params }: PageProps) {
     notFound()
   }
 
-  // Fetch the advertisement
+  // Fetch the advertisement with its ad module
   const { data: ad, error: adError } = await supabaseAdmin
     .from('advertisements')
-    .select('id, title, body, image_url, button_text, button_url, status, company_name, publication_id, times_used, created_at')
+    .select('id, title, body, image_url, button_text, button_url, status, company_name, publication_id, times_used, created_at, ad_module_id')
     .eq('id', adId)
     .single()
 
   if (adError || !ad) {
     notFound()
+  }
+
+  // Check if the ad's module includes a button block
+  let showButton = true // Default to showing button for legacy ads
+  if (ad.ad_module_id) {
+    const { data: adModule } = await supabaseAdmin
+      .from('ad_modules')
+      .select('block_order')
+      .eq('id', ad.ad_module_id)
+      .single()
+
+    if (adModule?.block_order) {
+      // block_order is an array like ['title', 'image', 'body', 'button']
+      const blockOrder = Array.isArray(adModule.block_order) ? adModule.block_order : []
+      showButton = blockOrder.includes('button')
+    }
   }
 
   // Fetch issue associations from BOTH legacy and module tables
@@ -257,15 +273,17 @@ export default async function AdAnalyticsPage({ params }: PageProps) {
                   className="prose prose-sm max-w-none text-gray-700 mb-4"
                   dangerouslySetInnerHTML={{ __html: ad.body }}
                 />
-                <a
-                  href={ad.button_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  {ad.button_text || 'Learn More'}
-                  <ExternalLink className="w-4 h-4" />
-                </a>
+                {showButton && ad.button_url && (
+                  <a
+                    href={ad.button_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    {ad.button_text || 'Learn More'}
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
               </div>
               {/* Ad Image */}
               {ad.image_url && (
