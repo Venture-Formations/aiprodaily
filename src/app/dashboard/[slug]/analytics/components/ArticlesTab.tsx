@@ -11,7 +11,7 @@ interface Article {
   author: string
   sourceUrl: string
   imageUrl: string
-  feedType: 'Primary' | 'Secondary'
+  feedType: string
   feedName: string
   criteria1Score: number | null
   criteria1Weight: number
@@ -69,7 +69,7 @@ export default function ArticlesTab({ slug }: { slug: string }) {
   const [showColumnSelector, setShowColumnSelector] = useState(false)
 
   // Filter states
-  const [feedTypeFilter, setFeedTypeFilter] = useState<'all' | 'Primary' | 'Secondary'>('all')
+  const [feedTypeFilter, setFeedTypeFilter] = useState<string>('all')
   const [positionFilter, setPositionFilter] = useState<'all' | 'all_sent' | number>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [minScore, setMinScore] = useState<number | ''>('')
@@ -82,11 +82,14 @@ export default function ArticlesTab({ slug }: { slug: string }) {
   // Get unique positions for filter dropdown
   const uniquePositions = Array.from(new Set(articles.filter(a => a.finalPosition !== null).map(a => a.finalPosition as number))).sort((a, b) => a - b)
 
+  // Get unique feed types for filter dropdown (includes module names)
+  const uniqueFeedTypes = Array.from(new Set(articles.map(a => a.feedType))).filter(Boolean).sort()
+
   // Column visibility states
   const [columns, setColumns] = useState<Column[]>([
     { key: 'issueDate', label: 'Issue Date', enabled: true, exportable: true },
     { key: 'finalPosition', label: 'Position', enabled: true, exportable: true },
-    { key: 'feedType', label: 'Feed Type', enabled: true, exportable: true },
+    { key: 'feedType', label: 'Section', enabled: true, exportable: true },
     { key: 'feedName', label: 'Feed Name', enabled: false, exportable: true },
     { key: 'originalTitle', label: 'Original Title', enabled: true, exportable: true },
     { key: 'originalDescription', label: 'Original Description', enabled: false, exportable: true },
@@ -323,12 +326,15 @@ export default function ArticlesTab({ slug }: { slug: string }) {
       case 'createdAt':
         return formatDate(article[columnKey as keyof Article] as string)
       case 'feedType':
+        // Dynamic color based on section type
+        const getColorClass = (type: string) => {
+          if (type === 'Primary') return 'bg-blue-100 text-blue-800'
+          if (type === 'Secondary') return 'bg-purple-100 text-purple-800'
+          // Module sections get distinct colors
+          return 'bg-green-100 text-green-800'
+        }
         return (
-          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-            article.feedType === 'Primary'
-              ? 'bg-blue-100 text-blue-800'
-              : 'bg-purple-100 text-purple-800'
-          }`}>
+          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${getColorClass(article.feedType)}`}>
             {article.feedType}
           </span>
         )
@@ -417,16 +423,17 @@ export default function ArticlesTab({ slug }: { slug: string }) {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Feed Type
+              Section
             </label>
             <select
               value={feedTypeFilter}
-              onChange={(e) => setFeedTypeFilter(e.target.value as any)}
+              onChange={(e) => setFeedTypeFilter(e.target.value)}
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
             >
-              <option value="all">All</option>
-              <option value="Primary">Primary</option>
-              <option value="Secondary">Secondary</option>
+              <option value="all">All Sections</option>
+              {uniqueFeedTypes.map(feedType => (
+                <option key={feedType} value={feedType}>{feedType}</option>
+              ))}
             </select>
           </div>
 
@@ -556,8 +563,8 @@ export default function ArticlesTab({ slug }: { slug: string }) {
 
       {/* Articles Table */}
       <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="overflow-x-auto max-w-full">
+          <table className="min-w-full divide-y divide-gray-200 table-fixed">
             <thead className="bg-gray-50">
               <tr>
                 {enabledColumns.map(col => (
@@ -595,11 +602,11 @@ export default function ArticlesTab({ slug }: { slug: string }) {
                   <>
                     <tr key={article.id} className="hover:bg-gray-50">
                       {enabledColumns.map(col => (
-                        <td key={col.key} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td key={col.key} className="px-6 py-4 text-sm text-gray-900 max-w-xs break-words">
                           {renderCellContent(article, col.key)}
                         </td>
                       ))}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <td className="px-6 py-4 text-sm font-medium whitespace-nowrap">
                         <button
                           onClick={() => toggleRow(article.id)}
                           className="text-brand-primary hover:text-blue-700"
@@ -613,7 +620,7 @@ export default function ArticlesTab({ slug }: { slug: string }) {
                     {expandedRow === article.id && (
                       <tr>
                         <td colSpan={enabledColumns.length + 1} className="px-6 py-4 bg-gray-50">
-                          <div className="space-y-4 max-w-full overflow-hidden">
+                          <div className="space-y-4 max-w-4xl overflow-hidden">
                             {/* Original Content Section */}
                             <div>
                               <h3 className="text-sm font-semibold text-gray-900 mb-2">Original RSS Content</h3>
@@ -642,13 +649,13 @@ export default function ArticlesTab({ slug }: { slug: string }) {
                                   </a>
                                 </div>
                               </div>
-                              <div className="mt-2">
+                              <div className="mt-2 overflow-hidden">
                                 <span className="font-medium text-gray-700">Description:</span>
-                                <p className="mt-1 text-gray-600 break-words">{article.originalDescription}</p>
+                                <p className="mt-1 text-gray-600 break-words [word-break:break-word]">{article.originalDescription}</p>
                               </div>
-                              <div className="mt-2">
+                              <div className="mt-2 overflow-hidden">
                                 <span className="font-medium text-gray-700">Full Article Text:</span>
-                                <p className="mt-1 text-gray-600 max-h-40 overflow-y-auto break-words whitespace-pre-wrap">
+                                <p className="mt-1 text-gray-600 max-h-40 overflow-y-auto break-words whitespace-pre-wrap [word-break:break-word]">
                                   {article.originalFullText || 'Not available'}
                                 </p>
                               </div>
@@ -737,10 +744,10 @@ export default function ArticlesTab({ slug }: { slug: string }) {
                                   <span className="font-medium text-gray-700">Headline:</span>
                                   <p className="mt-1 text-gray-900 break-words">{article.headline}</p>
                                 </div>
-                                <div>
+                                <div className="overflow-hidden">
                                   <span className="font-medium text-gray-700">Content:</span>
                                   <div
-                                    className="mt-1 text-gray-600 prose prose-sm max-w-none break-words overflow-hidden"
+                                    className="mt-1 text-gray-600 prose prose-sm max-w-prose break-words overflow-hidden [word-break:break-word]"
                                     dangerouslySetInnerHTML={{ __html: article.content }}
                                   />
                                 </div>
