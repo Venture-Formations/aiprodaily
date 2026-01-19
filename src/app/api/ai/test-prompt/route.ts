@@ -49,6 +49,24 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { provider, promptJson, post } = body
 
+    // Validate provider matches model
+    const modelName = (promptJson?.model || '').toLowerCase()
+    const isClaude = modelName.includes('claude')
+    const isOpenAI = modelName.includes('gpt') || modelName.includes('o1') || modelName.includes('o3')
+
+    if (isClaude && provider === 'openai') {
+      return NextResponse.json(
+        { error: `Model "${promptJson.model}" is a Claude model. Please select "Claude" as the provider.` },
+        { status: 400 }
+      )
+    }
+    if (isOpenAI && provider === 'claude') {
+      return NextResponse.json(
+        { error: `Model "${promptJson.model}" is an OpenAI model. Please select "OpenAI" as the provider.` },
+        { status: 400 }
+      )
+    }
+
     // Inject post data into the entire JSON request
     const processedJson = injectPostData(promptJson, post)
 
