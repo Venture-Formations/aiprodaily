@@ -8,7 +8,7 @@ type Preference = 'daily' | 'weekly' | 'unsubscribe'
 const PREFERENCE_OPTIONS: { value: Preference; label: string }[] = [
   {
     value: 'daily',
-    label: 'Receive Daily Emails'
+    label: 'Receive Daily Email'
   },
   {
     value: 'weekly',
