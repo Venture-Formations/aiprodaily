@@ -1630,7 +1630,7 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
       .select('key, value')
       .eq('publication_id', publication_id)
       .in('key', [
-        'primary_color', 'newsletter_name', 'business_name',
+        'primary_color', 'newsletter_name', 'business_name', 'website_url',
         'facebook_enabled', 'facebook_url',
         'twitter_enabled', 'twitter_url',
         'linkedin_enabled', 'linkedin_url',
@@ -1652,7 +1652,7 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
       .from('app_settings')
       .select('key, value')
       .in('key', [
-        'primary_color', 'newsletter_name', 'business_name',
+        'primary_color', 'newsletter_name', 'business_name', 'website_url',
         'facebook_enabled', 'facebook_url',
         'twitter_enabled', 'twitter_url',
         'linkedin_enabled', 'linkedin_url',
@@ -1667,6 +1667,7 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
   const primaryColor = settingsMap.primary_color || '#1877F2'
   const newsletterName = settingsMap.newsletter_name || 'St. Cloud Scoop'
   const businessName = settingsMap.business_name || 'Venture Formations LLC'
+  const websiteUrl = settingsMap.website_url || 'https://www.aiaccountingdaily.com'
   const currentYear = new Date().getFullYear()
 
   // Build social media icons array (only include if enabled and URL exists)
@@ -1737,7 +1738,7 @@ ${socialMediaSection}
     <td style="font-family: Arial, sans-serif; font-size: 12px; color: #777; text-align: center; padding: 20px 10px; border-top: 1px solid #ccc; background-color: #ffffff;">
       <p style="margin: 0;text-align: center;">You're receiving this email because you subscribed to <strong>${newsletterName}</strong>.</p>
       <p style="margin: 5px 0 0;text-align: center;">
-        <a href="{$unsubscribe}" style='text-decoration: underline;'>Unsubscribe</a>
+        <a href="${websiteUrl}/unsubscribe?email={$email}" style='text-decoration: underline;'>Manage Preferences</a>
       </p>
       <p style="margin: 5px;text-align: center;">©${currentYear} ${businessName}, all rights reserved</p>
     </td>

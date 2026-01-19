@@ -521,6 +521,64 @@ export class SendGridService {
   }
 
   /**
+   * Search for contacts by email addresses
+   */
+  async searchContactsByEmail(emails: string[]): Promise<{ result: Record<string, { contact: { id: string; email: string } }> } | null> {
+    try {
+      console.log(`[SendGrid] Searching for contacts by email: ${emails.join(', ')}`)
+
+      const [response, body] = await sgClient.request({
+        method: 'POST',
+        url: '/v3/marketing/contacts/search/emails',
+        body: { emails }
+      })
+
+      if (response.statusCode !== 200) {
+        console.error('[SendGrid] Failed to search contacts:', response.statusCode, body)
+        return null
+      }
+
+      return body as { result: Record<string, { contact: { id: string; email: string } }> }
+
+    } catch (error) {
+      console.error('[SendGrid] Error searching contacts:', error)
+      return null
+    }
+  }
+
+  /**
+   * Remove a contact from a list
+   */
+  async removeContactFromList(contactId: string, listId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log(`[SendGrid] Removing contact ${contactId} from list ${listId}`)
+
+      const [response, body] = await sgClient.request({
+        method: 'DELETE',
+        url: `/v3/marketing/lists/${listId}/contacts`,
+        qs: { contact_ids: contactId }
+      })
+
+      // 202 = accepted for processing, 404 = contact not in list (both are OK)
+      if (response.statusCode !== 202 && response.statusCode !== 200 && response.statusCode !== 404) {
+        console.error('[SendGrid] Failed to remove contact from list:', response.statusCode, body)
+        return { success: false, error: `API error: ${response.statusCode}` }
+      }
+
+      console.log('[SendGrid] Contact removed from list successfully')
+      return { success: true }
+
+    } catch (error: any) {
+      // 404 means contact not in list, which is fine
+      if (error.code === 404) {
+        return { success: true }
+      }
+      console.error('[SendGrid] Error removing contact from list:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  }
+
+  /**
    * Send a transactional email
    */
   async sendTransactionalEmail(
