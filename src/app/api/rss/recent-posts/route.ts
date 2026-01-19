@@ -126,10 +126,11 @@ export async function GET(request: NextRequest) {
           publication_id: string
         } | null
 
-        // Filter: must match publication and be within date range
-        // Include draft/processing/sent issues so we have sample posts for testing
+        // Filter: must match publication, be 'sent' status, and be within date range
+        // Only include posts from final sent newsletters for accurate testing
         if (!issue) continue
         if (issue.publication_id !== newsletter.id) continue
+        if (issue.status !== 'sent') continue
         if (issue.date < cutoffDateStr) continue
 
         if (rssPost && !postsMap.has(rssPost.id)) {

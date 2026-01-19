@@ -438,6 +438,9 @@ export default function AIPromptTestingPage() {
     setCurrentResponse(null)
 
     try {
+      // Extract module_id from prompt type (e.g., 'module-{id}-title' -> '{id}')
+      const moduleId = getModuleIdFromPromptType(promptType)
+
       const res = await fetch('/api/ai/test-prompt-multiple', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -446,6 +449,7 @@ export default function AIPromptTestingPage() {
           promptJson,
           publication_id: slug,
           prompt_type: promptType,
+          module_id: moduleId, // Pass module_id for module-specific post filtering
           limit: 10,
           offset
         })

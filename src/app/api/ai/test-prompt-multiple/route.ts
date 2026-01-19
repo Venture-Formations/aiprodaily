@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { provider, promptJson, publication_id, prompt_type, limit = 10, offset = 0 } = body
+    const { provider, promptJson, publication_id, prompt_type, module_id, limit = 10, offset = 0 } = body
 
     if (!provider || !promptJson || !publication_id || !prompt_type) {
       return NextResponse.json(
@@ -81,46 +81,83 @@ export async function POST(request: NextRequest) {
 
     const newsletterUuid = newsletter.id
 
-    // Get section based on prompt type
-    const section = getSection(prompt_type)
-
-    console.log('[AI Test Multiple] Fetching posts from sent issues for section:', section)
-
     // Calculate cutoff date (7 days ago)
     const cutoffDate = new Date()
     cutoffDate.setDate(cutoffDate.getDate() - 7)
     const cutoffDateStr = cutoffDate.toISOString().split('T')[0]
 
-    // Determine which article table to query based on section
-    const articleTable = section === 'secondary' ? 'secondary_articles' : 'articles'
+    let usedPosts: any[] | null = null
+    let usedPostsError: any = null
 
-    // Fetch posts that were actually used in sent issues
-    // Join articles -> rss_posts (via post_id) and articles -> publication_issues (via issue_id)
-    const { data: usedPosts, error: usedPostsError } = await supabaseAdmin
-      .from(articleTable)
-      .select(`
-        post_id,
-        issue_id,
-        headline,
-        rss_posts (
-          id,
-          title,
-          description,
-          full_article_text,
-          source_url,
-          publication_date
-        ),
-        publication_issues (
-          id,
-          date,
-          status,
-          publication_id
-        )
-      `)
-      .eq('is_active', true)
-      .not('final_position', 'is', null)
-      .not('post_id', 'is', null)
-      .limit(200)
+    // If module_id is provided, use module_articles table (new module system)
+    if (module_id) {
+      console.log('[AI Test Multiple] Fetching posts from sent issues for module_id:', module_id)
+
+      const result = await supabaseAdmin
+        .from('module_articles')
+        .select(`
+          post_id,
+          issue_id,
+          headline,
+          article_module_id,
+          rss_posts (
+            id,
+            title,
+            description,
+            full_article_text,
+            source_url,
+            publication_date
+          ),
+          publication_issues (
+            id,
+            date,
+            status,
+            publication_id
+          )
+        `)
+        .eq('article_module_id', module_id)
+        .not('post_id', 'is', null)
+        .not('headline', 'is', null)
+        .limit(200)
+
+      usedPosts = result.data
+      usedPostsError = result.error
+    } else {
+      // Legacy fallback: use articles/secondary_articles based on section
+      const section = getSection(prompt_type)
+      console.log('[AI Test Multiple] Fetching posts from sent issues for section:', section)
+
+      const articleTable = section === 'secondary' ? 'secondary_articles' : 'articles'
+
+      const result = await supabaseAdmin
+        .from(articleTable)
+        .select(`
+          post_id,
+          issue_id,
+          headline,
+          rss_posts (
+            id,
+            title,
+            description,
+            full_article_text,
+            source_url,
+            publication_date
+          ),
+          publication_issues (
+            id,
+            date,
+            status,
+            publication_id
+          )
+        `)
+        .eq('is_active', true)
+        .not('final_position', 'is', null)
+        .not('post_id', 'is', null)
+        .limit(200)
+
+      usedPosts = result.data
+      usedPostsError = result.error
+    }
 
     if (usedPostsError) {
       console.error('[AI Test Multiple] Error fetching posts from sent issues:', usedPostsError)
