@@ -5,21 +5,18 @@ import { useSearchParams } from "next/navigation"
 
 type Preference = 'daily' | 'weekly' | 'unsubscribe'
 
-const PREFERENCE_OPTIONS: { value: Preference; label: string; description: string }[] = [
+const PREFERENCE_OPTIONS: { value: Preference; label: string }[] = [
   {
     value: 'daily',
-    label: 'Keep receiving daily emails',
-    description: 'Continue receiving our newsletter every day'
+    label: 'Receive Daily Emails'
   },
   {
     value: 'weekly',
-    label: 'Switch to weekly digest',
-    description: 'Receive a weekly summary instead of daily emails'
+    label: 'Receive Weekly Email'
   },
   {
     value: 'unsubscribe',
-    label: 'Unsubscribe from all emails',
-    description: 'Stop receiving all newsletter emails'
+    label: 'Unsubscribe from All Emails'
   },
 ]
 
@@ -129,7 +126,7 @@ export function PreferenceForm() {
             {PREFERENCE_OPTIONS.map((option) => (
               <label
                 key={option.value}
-                className={`flex items-start p-4 rounded-lg cursor-pointer transition-all ${
+                className={`flex items-center p-4 rounded-lg cursor-pointer transition-all ${
                   preference === option.value
                     ? 'bg-blue-50 ring-2 ring-blue-600'
                     : 'bg-white ring-1 ring-slate-200 hover:ring-slate-300'
@@ -142,20 +139,13 @@ export function PreferenceForm() {
                   checked={preference === option.value}
                   onChange={(e) => setPreference(e.target.value as Preference)}
                   disabled={isSubmitting}
-                  className="mt-0.5 h-4 w-4 text-blue-600 border-slate-300 focus:ring-blue-600"
+                  className="h-4 w-4 text-blue-600 border-slate-300 focus:ring-blue-600"
                 />
-                <div className="ml-3">
-                  <span className={`block text-sm font-medium ${
-                    preference === option.value ? 'text-blue-900' : 'text-slate-900'
-                  }`}>
-                    {option.label}
-                  </span>
-                  <span className={`block text-sm ${
-                    preference === option.value ? 'text-blue-700' : 'text-slate-500'
-                  }`}>
-                    {option.description}
-                  </span>
-                </div>
+                <span className={`ml-3 text-sm font-medium ${
+                  preference === option.value ? 'text-blue-900' : 'text-slate-900'
+                }`}>
+                  {option.label}
+                </span>
               </label>
             ))}
           </div>
