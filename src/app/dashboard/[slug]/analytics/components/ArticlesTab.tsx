@@ -261,7 +261,15 @@ export default function ArticlesTab({ slug }: { slug: string }) {
   const formatDate = (dateStr: string) => {
     if (!dateStr) return 'N/A'
     try {
-      return new Date(dateStr).toLocaleDateString()
+      // Handle date-only strings (YYYY-MM-DD) to avoid timezone shift
+      // When JS parses "2026-01-19" it treats it as UTC midnight, which
+      // shifts to the previous day in US timezones
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        const [year, month, day] = dateStr.split('-')
+        return `${parseInt(month)}/${parseInt(day)}/${year}`
+      }
+      // For full timestamps, use UTC to avoid timezone issues
+      return new Date(dateStr).toLocaleDateString('en-US', { timeZone: 'UTC' })
     } catch {
       return dateStr
     }
