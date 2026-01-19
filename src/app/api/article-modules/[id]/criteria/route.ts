@@ -78,7 +78,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
         name: body.name,
         weight: body.weight ?? 0.2,
         ai_prompt: body.ai_prompt ?? null,
-        is_active: body.is_active ?? true
+        is_active: body.is_active ?? true,
+        enforce_minimum: body.enforce_minimum ?? false,
+        minimum_score: body.minimum_score ?? null
       })
       .select()
       .single()
@@ -132,6 +134,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         if (item.weight !== undefined) updates.weight = item.weight
         if (item.ai_prompt !== undefined) updates.ai_prompt = item.ai_prompt
         if (item.is_active !== undefined) updates.is_active = item.is_active
+        if (item.enforce_minimum !== undefined) updates.enforce_minimum = item.enforce_minimum
+        if (item.minimum_score !== undefined) updates.minimum_score = item.minimum_score
 
         if (Object.keys(updates).length > 0) {
           updates.updated_at = new Date().toISOString()
@@ -157,11 +161,23 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       )
     }
 
+    // Validate minimum_score if provided
+    if (body.minimum_score !== undefined && body.minimum_score !== null) {
+      if (body.minimum_score < 0 || body.minimum_score > 10) {
+        return NextResponse.json(
+          { error: 'minimum_score must be between 0 and 10' },
+          { status: 400 }
+        )
+      }
+    }
+
     const updates: Record<string, any> = {}
     if (body.name !== undefined) updates.name = body.name
     if (body.weight !== undefined) updates.weight = body.weight
     if (body.ai_prompt !== undefined) updates.ai_prompt = body.ai_prompt
     if (body.is_active !== undefined) updates.is_active = body.is_active
+    if (body.enforce_minimum !== undefined) updates.enforce_minimum = body.enforce_minimum
+    if (body.minimum_score !== undefined) updates.minimum_score = body.minimum_score
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(

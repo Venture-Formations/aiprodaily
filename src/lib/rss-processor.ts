@@ -3694,8 +3694,9 @@ export class RSSProcessor {
   /**
    * Assign top posts to a module based on its feeds
    * Gets highest-scored posts from the module's assigned feeds
+   * Filters out posts that don't meet minimum criteria scores (if configured)
    */
-  async assignPostsToModule(issueId: string, moduleId: string): Promise<{ assigned: number }> {
+  async assignPostsToModule(issueId: string, moduleId: string): Promise<{ assigned: number; filtered?: number }> {
     const { ArticleModuleSelector } = await import('@/lib/article-modules')
 
     const module = await ArticleModuleSelector.getModule(moduleId)
@@ -3710,6 +3711,25 @@ export class RSSProcessor {
       return { assigned: 0 }
     }
 
+    // Get criteria with minimum enforcement enabled
+    const { data: criteriaWithMinimums } = await supabaseAdmin
+      .from('article_module_criteria')
+      .select('criteria_number, minimum_score, name')
+      .eq('article_module_id', moduleId)
+      .eq('is_active', true)
+      .eq('enforce_minimum', true)
+      .not('minimum_score', 'is', null)
+
+    const minimumFilters = criteriaWithMinimums || []
+    const hasMinimumFilters = minimumFilters.length > 0
+
+    if (hasMinimumFilters) {
+      console.log(`[Module] Minimum score filters for ${module.name}:`)
+      minimumFilters.forEach(c => {
+        console.log(`  - Criteria ${c.criteria_number} (${c.name}): minimum ${c.minimum_score}`)
+      })
+    }
+
     // Get lookback window from module settings
     const lookbackHours = module.lookback_hours || 72
     const lookbackDate = new Date()
@@ -3721,9 +3741,20 @@ export class RSSProcessor {
     const postsToAssign = articlesNeeded * 4
 
     // Get top scored posts from module's feeds that aren't assigned yet
+    // Include individual criteria scores for minimum filtering
     const { data: topPosts } = await supabaseAdmin
       .from('rss_posts')
-      .select('id, post_ratings(total_score)')
+      .select(`
+        id,
+        post_ratings(
+          total_score,
+          criteria_1_score,
+          criteria_2_score,
+          criteria_3_score,
+          criteria_4_score,
+          criteria_5_score
+        )
+      `)
       .in('feed_id', feedIds)
       .is('issue_id', null)
       .gte('processed_at', lookbackTimestamp)
@@ -3734,8 +3765,47 @@ export class RSSProcessor {
       return { assigned: 0 }
     }
 
+    // Filter posts by minimum criteria scores (AND logic - all must pass)
+    let eligiblePosts = topPosts
+    let filteredCount = 0
+
+    if (hasMinimumFilters) {
+      const failedCriteriaDetails: Record<string, number> = {}
+
+      eligiblePosts = topPosts.filter((post: any) => {
+        const rating = post.post_ratings?.[0]
+        if (!rating) return false
+
+        // Check ALL minimum criteria (AND logic)
+        for (const filter of minimumFilters) {
+          const scoreKey = `criteria_${filter.criteria_number}_score`
+          const score = rating[scoreKey]
+
+          if (score === null || score === undefined || score < filter.minimum_score) {
+            filteredCount++
+            failedCriteriaDetails[filter.name] = (failedCriteriaDetails[filter.name] || 0) + 1
+            return false // Post fails this criterion
+          }
+        }
+        return true // Post passes all minimum criteria
+      })
+
+      if (filteredCount > 0) {
+        console.log(`[Module] Filtered ${filteredCount} posts that didn't meet minimum scores for ${module.name}:`)
+        Object.entries(failedCriteriaDetails).forEach(([name, count]) => {
+          console.log(`  - ${name}: ${count} failed`)
+        })
+        console.log(`[Module] ${eligiblePosts.length} posts remain eligible`)
+      }
+    }
+
+    if (eligiblePosts.length === 0) {
+      console.log(`[Module] No posts meet minimum criteria for module ${module.name}`)
+      return { assigned: 0, filtered: filteredCount }
+    }
+
     // Sort by score and take top N
-    const sortedPosts = topPosts
+    const sortedPosts = eligiblePosts
       .sort((a: any, b: any) => {
         const scoreA = a.post_ratings?.[0]?.total_score || 0
         const scoreB = b.post_ratings?.[0]?.total_score || 0
@@ -3751,11 +3821,11 @@ export class RSSProcessor {
           issue_id: issueId,
           article_module_id: moduleId
         })
-        .in('id', sortedPosts.map(p => p.id))
+        .in('id', sortedPosts.map((p: any) => p.id))
     }
 
-    console.log(`[Module] Assigned ${sortedPosts.length} posts to module ${module.name}`)
-    return { assigned: sortedPosts.length }
+    console.log(`[Module] Assigned ${sortedPosts.length} posts to module ${module.name}${filteredCount > 0 ? ` (${filteredCount} filtered by minimum scores)` : ''}`)
+    return { assigned: sortedPosts.length, filtered: filteredCount }
   }
 
   /**

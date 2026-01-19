@@ -404,12 +404,36 @@ export class ArticleModuleSelector {
   /**
    * Activate top N articles by score for a module
    * Called during workflow finalization
+   * Now includes minimum score filtering per criterion
    */
   static async activateTopArticles(
     issueId: string,
     moduleId: string,
     limit: number
-  ): Promise<{ success: boolean; activated: number }> {
+  ): Promise<{ success: boolean; activated: number; skipped_reason?: string }> {
+    // Get criteria with minimum enforcement enabled
+    const { data: criteriaWithMinimums, error: criteriaError } = await supabaseAdmin
+      .from('article_module_criteria')
+      .select('criteria_number, minimum_score, enforce_minimum, name')
+      .eq('article_module_id', moduleId)
+      .eq('is_active', true)
+      .eq('enforce_minimum', true)
+      .not('minimum_score', 'is', null)
+
+    if (criteriaError) {
+      console.error('[ArticleModuleSelector] Error fetching criteria minimums:', criteriaError)
+    }
+
+    const minimumFilters = criteriaWithMinimums || []
+    const hasMinimumFilters = minimumFilters.length > 0
+
+    if (hasMinimumFilters) {
+      console.log(`[ArticleModuleSelector] Minimum score filters active:`)
+      minimumFilters.forEach(c => {
+        console.log(`  - Criteria ${c.criteria_number} (${c.name}): minimum ${c.minimum_score}`)
+      })
+    }
+
     // Get all articles for this module/issue sorted by post rating
     const { data: articles, error } = await supabaseAdmin
       .from('module_articles')
@@ -437,23 +461,114 @@ export class ArticleModuleSelector {
       return { success: true, activated: 0 }
     }
 
-    // Get post ratings for sorting
+    // Get post ratings for sorting and filtering
     const postIds = articles.map(a => a.post_id).filter(Boolean)
     const { data: ratings } = await supabaseAdmin
       .from('post_ratings')
-      .select('post_id, total_score')
+      .select(`
+        post_id,
+        total_score,
+        criteria_1_score,
+        criteria_2_score,
+        criteria_3_score,
+        criteria_4_score,
+        criteria_5_score
+      `)
       .in('post_id', postIds)
 
-    // Create score map
-    const scoreMap = new Map<string, number>()
+    // Create rating map (includes all criteria scores)
+    const ratingMap = new Map<string, any>()
     ratings?.forEach(r => {
-      if (r.post_id) scoreMap.set(r.post_id, r.total_score || 0)
+      if (r.post_id) ratingMap.set(r.post_id, r)
     })
 
-    // Sort articles by score
-    const sortedArticles = [...articles].sort((a, b) => {
-      const scoreA = a.post_id ? (scoreMap.get(a.post_id) || 0) : 0
-      const scoreB = b.post_id ? (scoreMap.get(b.post_id) || 0) : 0
+    // Filter articles by minimum score criteria (AND logic - all must pass)
+    let eligibleArticles = articles
+    let failedMinimumCount = 0
+    const failedCriteriaDetails: Record<string, number> = {}
+
+    if (hasMinimumFilters) {
+      eligibleArticles = articles.filter(article => {
+        if (!article.post_id) return false
+
+        const rating = ratingMap.get(article.post_id)
+        if (!rating) return false
+
+        // Check ALL minimum criteria (AND logic)
+        for (const filter of minimumFilters) {
+          const scoreKey = `criteria_${filter.criteria_number}_score` as keyof typeof rating
+          const score = rating[scoreKey]
+
+          if (score === null || score === undefined || score < filter.minimum_score) {
+            failedMinimumCount++
+            failedCriteriaDetails[filter.name] = (failedCriteriaDetails[filter.name] || 0) + 1
+            return false // Article fails this criterion
+          }
+        }
+        return true // Article passes all minimum criteria
+      })
+
+      console.log(`[ArticleModuleSelector] After minimum filtering: ${eligibleArticles.length}/${articles.length} articles eligible`)
+
+      if (failedMinimumCount > 0) {
+        console.log(`[ArticleModuleSelector] ${failedMinimumCount} articles failed minimum criteria:`)
+        Object.entries(failedCriteriaDetails).forEach(([name, count]) => {
+          console.log(`  - ${name}: ${count} failed`)
+        })
+      }
+    }
+
+    // Handle case where NO articles meet minimum requirements
+    if (eligibleArticles.length === 0 && hasMinimumFilters) {
+      const module = await this.getModule(moduleId)
+      const moduleName = module?.name || 'Unknown'
+
+      const failedCriteriaList = Object.entries(failedCriteriaDetails)
+        .map(([name, count]) => `${name} (${count} failed)`)
+        .join(', ')
+
+      const warningMessage = `[WARNING] Section "${moduleName}" skipped: No articles met minimum score requirements. Failed criteria: ${failedCriteriaList}`
+
+      console.warn(warningMessage)
+
+      // Store warning in issue metrics for dashboard visibility
+      const { data: issue } = await supabaseAdmin
+        .from('publication_issues')
+        .select('metrics')
+        .eq('id', issueId)
+        .single()
+
+      const existingMetrics = (issue?.metrics as Record<string, any>) || {}
+      const warnings = existingMetrics.minimum_score_warnings || []
+      warnings.push({
+        module_id: moduleId,
+        module_name: moduleName,
+        timestamp: new Date().toISOString(),
+        total_articles: articles.length,
+        failed_criteria: failedCriteriaDetails
+      })
+
+      await supabaseAdmin
+        .from('publication_issues')
+        .update({
+          metrics: {
+            ...existingMetrics,
+            minimum_score_warnings: warnings
+          }
+        })
+        .eq('id', issueId)
+
+      return {
+        success: true,
+        activated: 0,
+        skipped_reason: `No articles met minimum score requirements: ${failedCriteriaList}`
+      }
+    }
+
+    // Sort eligible articles by total score
+    const sortedArticles = [...eligibleArticles].sort((a, b) => {
+      const scoreA = a.post_id ? (ratingMap.get(a.post_id)?.total_score || 0) : 0
+      const scoreB = b.post_id ? (ratingMap.get(b.post_id)?.total_score || 0) : 0
       return scoreB - scoreA
     })
 

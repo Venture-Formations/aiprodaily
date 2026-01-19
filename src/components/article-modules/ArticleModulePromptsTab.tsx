@@ -51,6 +51,7 @@ export default function ArticleModulePromptsTab({
   const [editingPrompt, setEditingPrompt] = useState<{key: string, value: string} | null>(null)
   const [editingWeight, setEditingWeight] = useState<{key: string, value: string} | null>(null)
   const [editingCriteriaName, setEditingCriteriaName] = useState<{id: string, value: string} | null>(null)
+  const [editingMinimum, setEditingMinimum] = useState<{id: string, value: string} | null>(null)
   const [prettyPrint, setPrettyPrint] = useState(true)
 
   // RSS Posts for testing
@@ -240,6 +241,64 @@ export default function ArticleModulePromptsTab({
       await fetchData()
       setEditingCriteriaName(null)
       setMessage('Name updated successfully')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  // Handle minimum score enforcement toggle
+  const handleToggleEnforceMinimum = async (criterion: ArticleModuleCriteria, checked: boolean) => {
+    setSaving(`enforce_${criterion.id}`)
+    try {
+      const res = await fetch(`/api/article-modules/${moduleId}/criteria`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          criteria_id: criterion.id,
+          enforce_minimum: checked,
+          // Set default minimum_score of 5 when enabling
+          minimum_score: checked ? (criterion.minimum_score ?? 5) : criterion.minimum_score
+        })
+      })
+      if (!res.ok) throw new Error('Failed to update enforcement')
+      await fetchData()
+      setMessage(checked ? 'Minimum score enforcement enabled' : 'Minimum score enforcement disabled')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  // Handle minimum score edit
+  const handleMinimumEdit = (criterion: ArticleModuleCriteria) => {
+    setEditingMinimum({ id: criterion.id, value: (criterion.minimum_score ?? 5).toString() })
+  }
+
+  const handleMinimumSave = async (criterion: ArticleModuleCriteria) => {
+    if (!editingMinimum) return
+    const value = parseInt(editingMinimum.value)
+    if (isNaN(value) || value < 0 || value > 10) {
+      setError('Minimum score must be between 0 and 10')
+      return
+    }
+
+    setSaving(`minimum_${criterion.id}`)
+    try {
+      const res = await fetch(`/api/article-modules/${moduleId}/criteria`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          criteria_id: criterion.id,
+          minimum_score: value
+        })
+      })
+      if (!res.ok) throw new Error('Failed to update minimum score')
+      await fetchData()
+      setEditingMinimum(null)
+      setMessage('Minimum score updated successfully')
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -716,6 +775,80 @@ export default function ArticleModulePromptsTab({
                         </>
                       )}
                     </div>
+
+                    {/* Minimum Score Enforcement */}
+                    <div className="mt-3 flex items-center space-x-3 pt-3 border-t border-gray-100">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id={`enforce-min-${criterion.id}`}
+                          checked={criterion.enforce_minimum || false}
+                          onChange={(e) => handleToggleEnforceMinimum(criterion, e.target.checked)}
+                          disabled={saving?.startsWith('enforce_') || isEditingWeight}
+                          className="h-4 w-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                        />
+                        <label
+                          htmlFor={`enforce-min-${criterion.id}`}
+                          className="ml-2 text-sm font-medium text-gray-700 cursor-pointer"
+                        >
+                          Enforce Minimum Score
+                        </label>
+                      </div>
+
+                      {criterion.enforce_minimum && (
+                        <>
+                          <span className="text-gray-400">|</span>
+                          {editingMinimum?.id === criterion.id ? (
+                            <>
+                              <input
+                                type="number"
+                                min="0"
+                                max="10"
+                                step="1"
+                                value={editingMinimum?.value || '5'}
+                                onChange={(e) => setEditingMinimum({ id: criterion.id, value: e.target.value })}
+                                className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                              />
+                              <button
+                                onClick={() => handleMinimumSave(criterion)}
+                                disabled={saving === `minimum_${criterion.id}`}
+                                className="text-xs px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                {saving === `minimum_${criterion.id}` ? 'Saving...' : 'Save'}
+                              </button>
+                              <button
+                                onClick={() => setEditingMinimum(null)}
+                                className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-sm text-gray-600">
+                                Minimum: <span className="font-semibold text-amber-600">{criterion.minimum_score ?? 5}</span>/10
+                              </span>
+                              <button
+                                onClick={() => handleMinimumEdit(criterion)}
+                                className="text-xs text-emerald-600 hover:text-emerald-800"
+                              >
+                                Edit
+                              </button>
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    {/* Warning about minimum score exclusion */}
+                    {criterion.enforce_minimum && (
+                      <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700">
+                        <svg className="w-3.5 h-3.5 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        Articles scoring below {criterion.minimum_score ?? 5} on this criterion will be excluded from the newsletter.
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={() => setExpandedPrompt(isExpanded ? null : promptKey)}
