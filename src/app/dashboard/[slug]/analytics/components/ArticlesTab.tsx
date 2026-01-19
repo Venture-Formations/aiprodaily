@@ -91,7 +91,7 @@ export default function ArticlesTab({ slug }: { slug: string }) {
   const [columns, setColumns] = useState<Column[]>([
     { key: 'issueDate', label: 'Issue Date', enabled: true, exportable: true, width: 'sm' },
     { key: 'finalPosition', label: 'Pos', enabled: true, exportable: true, width: 'xs' },
-    { key: 'feedType', label: 'Section', enabled: true, exportable: true, width: 'lg' },
+    { key: 'feedType', label: 'Section', enabled: true, exportable: true, width: 'md' },
     { key: 'feedName', label: 'Feed Name', enabled: false, exportable: true, width: 'md' },
     { key: 'originalTitle', label: 'Original Title', enabled: true, exportable: true, width: 'lg' },
     { key: 'originalDescription', label: 'Original Description', enabled: false, exportable: true, width: 'xl' },
