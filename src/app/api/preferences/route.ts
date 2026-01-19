@@ -24,7 +24,7 @@ type Preference = 'daily' | 'weekly' | 'unsubscribe'
 async function findMailerLiteSubscriber(email: string): Promise<{ id: string; groups: { id: string }[] } | null> {
   try {
     const response = await mailerliteClient.get('/subscribers', {
-      params: { 'filter[email]': email }
+      params: { filter: { email } }
     })
     const subscribers = response.data?.data || []
     if (subscribers.length > 0) {
