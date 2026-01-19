@@ -169,6 +169,73 @@ export default function IssuesAnalyticsTab({ slug }: Props) {
 
   const averages = calculateAverages()
 
+  const downloadCSV = () => {
+    if (issues.length === 0) return
+
+    // CSV headers
+    const headers = [
+      'Date',
+      'Subject Line',
+      'Sent',
+      'Delivered',
+      'Opens',
+      'Open Rate',
+      'Clicks',
+      'Click Rate',
+      'Bounces',
+      'Bounce Rate',
+      'Unsubscribes'
+    ]
+
+    // CSV rows
+    const rows = issues.map(issue => {
+      const metrics = issue.email_metrics
+      const sent = metrics?.sent_count || 0
+      const delivered = metrics?.delivered_count || 0
+      const opened = metrics?.opened_count || 0
+      const clicked = metrics?.clicked_count || 0
+      const bounced = metrics?.bounced_count || 0
+      const unsubscribed = metrics?.unsubscribed_count || 0
+
+      // Calculate rates
+      const denominator = delivered > 0 ? delivered : sent
+      const openRate = denominator > 0 ? ((opened / denominator) * 100).toFixed(2) : '0.00'
+      const clickRate = denominator > 0 ? ((clicked / denominator) * 100).toFixed(2) : '0.00'
+      const bounceRate = sent > 0 ? ((bounced / sent) * 100).toFixed(2) : '0.00'
+
+      return [
+        issue.date.split('T')[0],
+        `"${(issue.subject_line || '').replace(/"/g, '""')}"`, // Escape quotes in subject line
+        sent,
+        delivered,
+        opened,
+        `${openRate}%`,
+        clicked,
+        `${clickRate}%`,
+        bounced,
+        `${bounceRate}%`,
+        unsubscribed
+      ]
+    })
+
+    // Build CSV content
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n')
+
+    // Create and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `issue-performance-${slug}-${selectedTimeframe}days.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   return (
     <div>
       {/* Timeframe Selector */}
@@ -245,13 +312,26 @@ export default function IssuesAnalyticsTab({ slug }: Props) {
 
           {/* Issue Performance Table */}
           <div className="bg-white shadow rounded-lg">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-medium text-gray-900">
-                Issue Performance
-              </h2>
-              <p className="text-sm text-gray-600">
-                Detailed metrics for each sent newsletter
-              </p>
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-start">
+              <div>
+                <h2 className="text-lg font-medium text-gray-900">
+                  Issue Performance
+                </h2>
+                <p className="text-sm text-gray-600">
+                  Detailed metrics for each sent newsletter
+                </p>
+              </div>
+              {issues.length > 0 && (
+                <button
+                  onClick={downloadCSV}
+                  className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary"
+                >
+                  <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Export CSV
+                </button>
+              )}
             </div>
 
             {issues.length === 0 ? (
