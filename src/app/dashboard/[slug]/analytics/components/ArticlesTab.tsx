@@ -287,12 +287,6 @@ export default function ArticlesTab({ slug }: { slug: string }) {
     }
   }
 
-  const truncateText = (text: string, maxLength: number) => {
-    if (!text) return ''
-    if (text.length <= maxLength) return text
-    return text.slice(0, maxLength) + '...'
-  }
-
   const stripHtml = (html: string) => {
     const tmp = document.createElement('div')
     tmp.innerHTML = html
@@ -378,7 +372,7 @@ export default function ArticlesTab({ slug }: { slug: string }) {
         return num !== null ? num.toLocaleString() : 'N/A'
       case 'originalTitle':
       case 'headline':
-        return truncateText(article[columnKey as keyof Article] as string, 60)
+        return article[columnKey as keyof Article] as string || ''
       case 'sourceUrl':
       case 'imageUrl':
         const url = article[columnKey as keyof Article] as string
@@ -394,7 +388,7 @@ export default function ArticlesTab({ slug }: { slug: string }) {
           </a>
         ) : 'N/A'
       case 'content':
-        return truncateText(stripHtml(article.content), 60)
+        return stripHtml(article.content)
       case 'uniqueClickers':
       case 'totalClicks':
       case 'totalRecipients':
@@ -404,7 +398,7 @@ export default function ArticlesTab({ slug }: { slug: string }) {
         const ctrValue = article.ctr
         return ctrValue !== null ? `${ctrValue.toFixed(2)}%` : '-'
       default:
-        return truncateText(String(article[columnKey as keyof Article] || ''), 60)
+        return String(article[columnKey as keyof Article] || '')
     }
   }
 
