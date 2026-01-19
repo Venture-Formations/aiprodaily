@@ -91,7 +91,7 @@ export default function ArticlesTab({ slug }: { slug: string }) {
   const [columns, setColumns] = useState<Column[]>([
     { key: 'issueDate', label: 'Issue Date', enabled: true, exportable: true, width: 'sm' },
     { key: 'finalPosition', label: 'Pos', enabled: true, exportable: true, width: 'xs' },
-    { key: 'feedType', label: 'Section', enabled: true, exportable: true, width: 'sm' },
+    { key: 'feedType', label: 'Section', enabled: true, exportable: true, width: 'lg' },
     { key: 'feedName', label: 'Feed Name', enabled: false, exportable: true, width: 'md' },
     { key: 'originalTitle', label: 'Original Title', enabled: true, exportable: true, width: 'lg' },
     { key: 'originalDescription', label: 'Original Description', enabled: false, exportable: true, width: 'xl' },
@@ -348,7 +348,10 @@ export default function ArticlesTab({ slug }: { slug: string }) {
           return 'bg-green-100 text-green-800'
         }
         return (
-          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap ${getColorClass(article.feedType)}`}>
+          <span
+            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full max-w-full truncate ${getColorClass(article.feedType)}`}
+            title={article.feedType}
+          >
             {article.feedType}
           </span>
         )
