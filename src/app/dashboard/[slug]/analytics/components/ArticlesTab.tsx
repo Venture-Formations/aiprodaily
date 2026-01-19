@@ -58,6 +58,7 @@ interface Column {
   label: string
   enabled: boolean
   exportable: boolean
+  width?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' // Column width hint
 }
 
 export default function ArticlesTab({ slug }: { slug: string }) {
@@ -85,43 +86,44 @@ export default function ArticlesTab({ slug }: { slug: string }) {
   // Get unique feed types for filter dropdown (includes module names)
   const uniqueFeedTypes = Array.from(new Set(articles.map(a => a.feedType))).filter(Boolean).sort()
 
-  // Column visibility states
+  // Column visibility states with width hints:
+  // xs: ~50px (tiny numbers), sm: ~70px (small numbers/short), md: ~100px (medium), lg: ~180px (text), xl: ~280px (long text)
   const [columns, setColumns] = useState<Column[]>([
-    { key: 'issueDate', label: 'Issue Date', enabled: true, exportable: true },
-    { key: 'finalPosition', label: 'Position', enabled: true, exportable: true },
-    { key: 'feedType', label: 'Section', enabled: true, exportable: true },
-    { key: 'feedName', label: 'Feed Name', enabled: false, exportable: true },
-    { key: 'originalTitle', label: 'Original Title', enabled: true, exportable: true },
-    { key: 'originalDescription', label: 'Original Description', enabled: false, exportable: true },
-    { key: 'originalFullText', label: 'Original Full Text', enabled: false, exportable: true },
-    { key: 'publicationDate', label: 'Publication Date', enabled: false, exportable: true },
-    { key: 'author', label: 'Author', enabled: false, exportable: true },
-    { key: 'sourceUrl', label: 'Source URL', enabled: false, exportable: true },
-    { key: 'imageUrl', label: 'Image URL', enabled: false, exportable: true },
-    { key: 'criteria1Score', label: 'Criteria 1 Score', enabled: false, exportable: true },
-    { key: 'criteria1Weight', label: 'Criteria 1 Weight', enabled: false, exportable: true },
-    { key: 'criteria1Reasoning', label: 'Criteria 1 Reasoning', enabled: false, exportable: true },
-    { key: 'criteria2Score', label: 'Criteria 2 Score', enabled: false, exportable: true },
-    { key: 'criteria2Weight', label: 'Criteria 2 Weight', enabled: false, exportable: true },
-    { key: 'criteria2Reasoning', label: 'Criteria 2 Reasoning', enabled: false, exportable: true },
-    { key: 'criteria3Score', label: 'Criteria 3 Score', enabled: false, exportable: true },
-    { key: 'criteria3Weight', label: 'Criteria 3 Weight', enabled: false, exportable: true },
-    { key: 'criteria3Reasoning', label: 'Criteria 3 Reasoning', enabled: false, exportable: true },
-    { key: 'criteria4Score', label: 'Criteria 4 Score', enabled: false, exportable: true },
-    { key: 'criteria4Weight', label: 'Criteria 4 Weight', enabled: false, exportable: true },
-    { key: 'criteria4Reasoning', label: 'Criteria 4 Reasoning', enabled: false, exportable: true },
-    { key: 'criteria5Score', label: 'Criteria 5 Score', enabled: false, exportable: true },
-    { key: 'criteria5Weight', label: 'Criteria 5 Weight', enabled: false, exportable: true },
-    { key: 'criteria5Reasoning', label: 'Criteria 5 Reasoning', enabled: false, exportable: true },
-    { key: 'totalScore', label: 'Total Score', enabled: true, exportable: true },
-    { key: 'headline', label: 'Headline', enabled: true, exportable: true },
-    { key: 'content', label: 'Content', enabled: false, exportable: true },
-    { key: 'factCheckScore', label: 'Fact Check Score', enabled: false, exportable: true },
-    { key: 'wordCount', label: 'Word Count', enabled: true, exportable: true },
-    { key: 'uniqueClickers', label: 'Unique Clickers', enabled: true, exportable: true },
-    { key: 'totalClicks', label: 'Total Clicks', enabled: true, exportable: true },
-    { key: 'ctr', label: 'CTR %', enabled: true, exportable: true },
-    { key: 'totalRecipients', label: 'Recipients', enabled: false, exportable: true },
+    { key: 'issueDate', label: 'Issue Date', enabled: true, exportable: true, width: 'sm' },
+    { key: 'finalPosition', label: 'Pos', enabled: true, exportable: true, width: 'xs' },
+    { key: 'feedType', label: 'Section', enabled: true, exportable: true, width: 'sm' },
+    { key: 'feedName', label: 'Feed Name', enabled: false, exportable: true, width: 'md' },
+    { key: 'originalTitle', label: 'Original Title', enabled: true, exportable: true, width: 'lg' },
+    { key: 'originalDescription', label: 'Original Description', enabled: false, exportable: true, width: 'xl' },
+    { key: 'originalFullText', label: 'Original Full Text', enabled: false, exportable: true, width: 'xl' },
+    { key: 'publicationDate', label: 'Pub Date', enabled: false, exportable: true, width: 'sm' },
+    { key: 'author', label: 'Author', enabled: false, exportable: true, width: 'md' },
+    { key: 'sourceUrl', label: 'Source', enabled: false, exportable: true, width: 'xs' },
+    { key: 'imageUrl', label: 'Image', enabled: false, exportable: true, width: 'xs' },
+    { key: 'criteria1Score', label: 'C1', enabled: false, exportable: true, width: 'xs' },
+    { key: 'criteria1Weight', label: 'C1 Wt', enabled: false, exportable: true, width: 'xs' },
+    { key: 'criteria1Reasoning', label: 'C1 Reasoning', enabled: false, exportable: true, width: 'xl' },
+    { key: 'criteria2Score', label: 'C2', enabled: false, exportable: true, width: 'xs' },
+    { key: 'criteria2Weight', label: 'C2 Wt', enabled: false, exportable: true, width: 'xs' },
+    { key: 'criteria2Reasoning', label: 'C2 Reasoning', enabled: false, exportable: true, width: 'xl' },
+    { key: 'criteria3Score', label: 'C3', enabled: false, exportable: true, width: 'xs' },
+    { key: 'criteria3Weight', label: 'C3 Wt', enabled: false, exportable: true, width: 'xs' },
+    { key: 'criteria3Reasoning', label: 'C3 Reasoning', enabled: false, exportable: true, width: 'xl' },
+    { key: 'criteria4Score', label: 'C4', enabled: false, exportable: true, width: 'xs' },
+    { key: 'criteria4Weight', label: 'C4 Wt', enabled: false, exportable: true, width: 'xs' },
+    { key: 'criteria4Reasoning', label: 'C4 Reasoning', enabled: false, exportable: true, width: 'xl' },
+    { key: 'criteria5Score', label: 'C5', enabled: false, exportable: true, width: 'xs' },
+    { key: 'criteria5Weight', label: 'C5 Wt', enabled: false, exportable: true, width: 'xs' },
+    { key: 'criteria5Reasoning', label: 'C5 Reasoning', enabled: false, exportable: true, width: 'xl' },
+    { key: 'totalScore', label: 'Score', enabled: true, exportable: true, width: 'xs' },
+    { key: 'headline', label: 'Headline', enabled: true, exportable: true, width: 'lg' },
+    { key: 'content', label: 'Content', enabled: false, exportable: true, width: 'xl' },
+    { key: 'factCheckScore', label: 'Fact', enabled: false, exportable: true, width: 'xs' },
+    { key: 'wordCount', label: 'Words', enabled: true, exportable: true, width: 'xs' },
+    { key: 'uniqueClickers', label: 'Clickers', enabled: true, exportable: true, width: 'xs' },
+    { key: 'totalClicks', label: 'Clicks', enabled: true, exportable: true, width: 'xs' },
+    { key: 'ctr', label: 'CTR', enabled: true, exportable: true, width: 'xs' },
+    { key: 'totalRecipients', label: 'Sent', enabled: false, exportable: true, width: 'xs' },
   ])
 
   useEffect(() => {
@@ -262,6 +264,18 @@ export default function ArticlesTab({ slug }: { slug: string }) {
       return new Date(dateStr).toLocaleDateString()
     } catch {
       return dateStr
+    }
+  }
+
+  // Get CSS classes for column width
+  const getColumnWidthClass = (width?: 'xs' | 'sm' | 'md' | 'lg' | 'xl') => {
+    switch (width) {
+      case 'xs': return 'w-14 min-w-[3.5rem] max-w-[4rem]'    // ~56px for tiny numbers
+      case 'sm': return 'w-20 min-w-[5rem] max-w-[6rem]'      // ~80px for dates, short text
+      case 'md': return 'w-28 min-w-[7rem] max-w-[8rem]'      // ~112px for medium text
+      case 'lg': return 'w-44 min-w-[11rem] max-w-[14rem]'    // ~176px for titles
+      case 'xl': return 'w-64 min-w-[16rem] max-w-[20rem]'    // ~256px for long text
+      default: return 'w-24'
     }
   }
 
@@ -564,36 +578,34 @@ export default function ArticlesTab({ slug }: { slug: string }) {
       {/* Articles Table */}
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="overflow-x-auto max-w-full">
-          <table className="min-w-full divide-y divide-gray-200 table-fixed">
+          <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 {enabledColumns.map(col => (
                   <th
                     key={col.key}
                     onClick={() => handleSort(col.key)}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    className={`px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none ${getColumnWidthClass(col.width)}`}
                   >
                     <div className="flex items-center gap-1">
-                      {col.label}
-                      <span className="text-gray-400">
+                      <span className="truncate">{col.label}</span>
+                      <span className="text-gray-400 flex-shrink-0">
                         {sortColumn === col.key ? (
                           sortDirection === 'desc' ? '▼' : '▲'
-                        ) : (
-                          <span className="opacity-0 group-hover:opacity-50">▼</span>
-                        )}
+                        ) : null}
                       </span>
                     </div>
                   </th>
                 ))}
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
+                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredArticles.length === 0 ? (
                 <tr>
-                  <td colSpan={enabledColumns.length + 1} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={enabledColumns.length + 1} className="px-2 py-8 text-center text-gray-500">
                     No articles found
                   </td>
                 </tr>
@@ -602,11 +614,11 @@ export default function ArticlesTab({ slug }: { slug: string }) {
                   <>
                     <tr key={article.id} className="hover:bg-gray-50">
                       {enabledColumns.map(col => (
-                        <td key={col.key} className="px-6 py-4 text-sm text-gray-900 max-w-xs break-words">
+                        <td key={col.key} className={`px-2 py-2 text-sm text-gray-900 break-words ${getColumnWidthClass(col.width)}`}>
                           {renderCellContent(article, col.key)}
                         </td>
                       ))}
-                      <td className="px-6 py-4 text-sm font-medium whitespace-nowrap">
+                      <td className="px-2 py-2 text-sm font-medium whitespace-nowrap w-16">
                         <button
                           onClick={() => toggleRow(article.id)}
                           className="text-brand-primary hover:text-blue-700"
