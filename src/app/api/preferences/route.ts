@@ -23,18 +23,22 @@ type Preference = 'daily' | 'weekly' | 'unsubscribe'
  */
 async function findMailerLiteSubscriber(email: string): Promise<{ id: string; groups: { id: string }[] } | null> {
   try {
-    const response = await mailerliteClient.get('/subscribers', {
-      params: { filter: { email } }
-    })
-    const subscribers = response.data?.data || []
-    if (subscribers.length > 0) {
+    // Use direct lookup by email - MailerLite accepts email as identifier
+    const response = await mailerliteClient.get(`/subscribers/${encodeURIComponent(email)}`)
+    const subscriber = response.data?.data
+    if (subscriber) {
       return {
-        id: subscribers[0].id,
-        groups: subscribers[0].groups || []
+        id: subscriber.id,
+        groups: subscriber.groups || []
       }
     }
     return null
   } catch (error: any) {
+    // 404 means subscriber not found
+    if (error.response?.status === 404) {
+      console.log('[Preferences] Subscriber not found in MailerLite:', email)
+      return null
+    }
     console.error('[Preferences] Error finding MailerLite subscriber:', error.response?.data || error.message)
     return null
   }
