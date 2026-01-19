@@ -31,13 +31,6 @@ function injectPostData(obj: any, post: any): any {
   return obj
 }
 
-// Helper function to determine section from prompt type
-function getSection(promptType: string): 'primary' | 'secondary' | 'all' {
-  if (promptType === 'primary-title' || promptType === 'primary-body' || promptType === 'subject-line') return 'primary'
-  if (promptType === 'secondary-title' || promptType === 'secondary-body') return 'secondary'
-  return 'all'
-}
-
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -116,66 +109,40 @@ export async function POST(request: NextRequest) {
     let usedPosts: any[] | null = null
     let usedPostsError: any = null
 
-    // If module_id is provided, use module_articles table (new module system)
+    // Always use module_articles table for sent issues
+    // If module_id is provided, filter by it; otherwise get all posts from all modules
+    console.log('[AI Test Multiple] Fetching posts from sent issues', module_id ? `for module_id: ${module_id}` : '(all modules)')
+
+    let query = supabaseAdmin
+      .from('module_articles')
+      .select(`
+        post_id,
+        issue_id,
+        headline,
+        article_module_id,
+        rss_posts (
+          id,
+          title,
+          description,
+          full_article_text,
+          source_url,
+          publication_date
+        )
+      `)
+      .in('issue_id', sentIssueIds)
+      .not('post_id', 'is', null)
+      .not('headline', 'is', null)
+      .not('final_position', 'is', null) // Only posts actually included in sent email
+
+    // Filter by module_id if provided
     if (module_id) {
-      console.log('[AI Test Multiple] Fetching posts from sent issues for module_id:', module_id)
-
-      const result = await supabaseAdmin
-        .from('module_articles')
-        .select(`
-          post_id,
-          issue_id,
-          headline,
-          article_module_id,
-          rss_posts (
-            id,
-            title,
-            description,
-            full_article_text,
-            source_url,
-            publication_date
-          )
-        `)
-        .in('issue_id', sentIssueIds)
-        .eq('article_module_id', module_id)
-        .not('post_id', 'is', null)
-        .not('headline', 'is', null)
-        .not('final_position', 'is', null) // Only posts actually included in sent email
-        .limit(500)
-
-      usedPosts = result.data
-      usedPostsError = result.error
-    } else {
-      // Legacy fallback: use articles/secondary_articles based on section
-      const section = getSection(prompt_type)
-      console.log('[AI Test Multiple] Fetching posts from sent issues for section:', section)
-
-      const articleTable = section === 'secondary' ? 'secondary_articles' : 'articles'
-
-      const result = await supabaseAdmin
-        .from(articleTable)
-        .select(`
-          post_id,
-          issue_id,
-          headline,
-          rss_posts (
-            id,
-            title,
-            description,
-            full_article_text,
-            source_url,
-            publication_date
-          )
-        `)
-        .in('issue_id', sentIssueIds)
-        .eq('is_active', true)
-        .not('final_position', 'is', null)
-        .not('post_id', 'is', null)
-        .limit(500)
-
-      usedPosts = result.data
-      usedPostsError = result.error
+      query = query.eq('article_module_id', module_id)
     }
+
+    const result = await query.limit(500)
+
+    usedPosts = result.data
+    usedPostsError = result.error
 
     if (usedPostsError) {
       console.error('[AI Test Multiple] Error fetching posts from sent issues:', usedPostsError)
