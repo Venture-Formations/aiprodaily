@@ -86,6 +86,33 @@ export async function POST(request: NextRequest) {
     cutoffDate.setDate(cutoffDate.getDate() - 7)
     const cutoffDateStr = cutoffDate.toISOString().split('T')[0]
 
+    // First get the issue IDs that match our criteria (sent, within date range, for this publication)
+    const { data: sentIssues, error: issuesError } = await supabaseAdmin
+      .from('publication_issues')
+      .select('id')
+      .eq('publication_id', newsletterUuid)
+      .eq('status', 'sent')
+      .gte('date', cutoffDateStr)
+      .order('date', { ascending: false })
+
+    if (issuesError) {
+      console.error('[AI Test Multiple] Error fetching sent issues:', issuesError)
+      return NextResponse.json(
+        { error: 'Failed to fetch sent issues', details: issuesError.message },
+        { status: 500 }
+      )
+    }
+
+    const sentIssueIds = sentIssues?.map(i => i.id) || []
+    console.log('[AI Test Multiple] Found', sentIssueIds.length, 'sent issues in date range')
+
+    if (sentIssueIds.length === 0) {
+      return NextResponse.json(
+        { error: 'No sent issues found in the last 7 days' },
+        { status: 404 }
+      )
+    }
+
     let usedPosts: any[] | null = null
     let usedPostsError: any = null
 
@@ -107,18 +134,13 @@ export async function POST(request: NextRequest) {
             full_article_text,
             source_url,
             publication_date
-          ),
-          publication_issues (
-            id,
-            date,
-            status,
-            publication_id
           )
         `)
+        .in('issue_id', sentIssueIds)
         .eq('article_module_id', module_id)
         .not('post_id', 'is', null)
         .not('headline', 'is', null)
-        .limit(200)
+        .limit(500)
 
       usedPosts = result.data
       usedPostsError = result.error
@@ -142,18 +164,13 @@ export async function POST(request: NextRequest) {
             full_article_text,
             source_url,
             publication_date
-          ),
-          publication_issues (
-            id,
-            date,
-            status,
-            publication_id
           )
         `)
+        .in('issue_id', sentIssueIds)
         .eq('is_active', true)
         .not('final_position', 'is', null)
         .not('post_id', 'is', null)
-        .limit(200)
+        .limit(500)
 
       usedPosts = result.data
       usedPostsError = result.error
@@ -167,7 +184,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Extract and deduplicate the RSS posts, filtering by publication_id, status, and date
+    console.log('[AI Test Multiple] Found', usedPosts?.length || 0, 'article records')
+
+    // Extract and deduplicate the RSS posts (already filtered by issue_id at database level)
     const postsMap = new Map<string, {
       id: string
       title: string
@@ -186,17 +205,6 @@ export async function POST(request: NextRequest) {
         source_url: string | null
         publication_date: string | null
       } | null
-      const issue = article.publication_issues as unknown as {
-        date: string
-        status: string
-        publication_id: string
-      } | null
-
-      // Filter: must match publication, be sent, and be within date range
-      if (!issue) continue
-      if (issue.publication_id !== newsletterUuid) continue
-      if (issue.status !== 'sent') continue
-      if (issue.date < cutoffDateStr) continue
 
       if (rssPost && !postsMap.has(rssPost.id)) {
         postsMap.set(rssPost.id, rssPost)

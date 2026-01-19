@@ -56,8 +56,38 @@ export async function GET(request: NextRequest) {
 
       console.log('[API] Fetching posts from sent issues since:', cutoffDateStr, 'module_id:', moduleId)
 
-      // Build query to get posts used in issues from module_articles
-      // Include any posts that have been processed (have headlines), not just sent ones
+      // First get the issue IDs that match our criteria (sent, within date range, for this publication)
+      const { data: sentIssues, error: issuesError } = await supabaseAdmin
+        .from('publication_issues')
+        .select('id')
+        .eq('publication_id', newsletter.id)
+        .eq('status', 'sent')
+        .gte('date', cutoffDateStr)
+        .order('date', { ascending: false })
+
+      if (issuesError) {
+        console.error('[API] Error fetching sent issues:', issuesError)
+        return NextResponse.json(
+          { error: 'Failed to fetch sent issues', details: issuesError.message },
+          { status: 500 }
+        )
+      }
+
+      const sentIssueIds = sentIssues?.map(i => i.id) || []
+      console.log('[API] Found', sentIssueIds.length, 'sent issues in date range')
+
+      if (sentIssueIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          posts: [],
+          count: 0,
+          source: 'sent',
+          days,
+          message: 'No sent issues found in date range'
+        })
+      }
+
+      // Now query module_articles for these specific issues
       let query = supabaseAdmin
         .from('module_articles')
         .select(`
@@ -73,14 +103,9 @@ export async function GET(request: NextRequest) {
             full_article_text,
             source_url,
             publication_date
-          ),
-          publication_issues (
-            id,
-            date,
-            status,
-            publication_id
           )
         `)
+        .in('issue_id', sentIssueIds)
         .not('post_id', 'is', null)
         .not('headline', 'is', null)
 
@@ -89,7 +114,7 @@ export async function GET(request: NextRequest) {
         query = query.eq('article_module_id', moduleId)
       }
 
-      const { data: usedPosts, error: usedPostsError } = await query.limit(200)
+      const { data: usedPosts, error: usedPostsError } = await query.limit(500)
 
       if (usedPostsError) {
         console.error('[API] Error fetching posts from sent issues:', usedPostsError)
@@ -99,7 +124,20 @@ export async function GET(request: NextRequest) {
         )
       }
 
-      // Extract and deduplicate the RSS posts, filtering by publication_id, status, and date
+      console.log('[API] Found', usedPosts?.length || 0, 'module_articles records')
+
+      // Get issue dates for display
+      const issuesById = new Map<string, string>()
+      const { data: issueDetails } = await supabaseAdmin
+        .from('publication_issues')
+        .select('id, date')
+        .in('id', sentIssueIds)
+
+      for (const issue of issueDetails || []) {
+        issuesById.set(issue.id, issue.date)
+      }
+
+      // Extract and deduplicate the RSS posts
       const postsMap = new Map<string, {
         id: string
         title: string
@@ -120,23 +158,13 @@ export async function GET(request: NextRequest) {
           source_url: string | null
           publication_date: string | null
         } | null
-        const issue = article.publication_issues as unknown as {
-          date: string
-          status: string
-          publication_id: string
-        } | null
 
-        // Filter: must match publication, be 'sent' status, and be within date range
-        // Only include posts from final sent newsletters for accurate testing
-        if (!issue) continue
-        if (issue.publication_id !== newsletter.id) continue
-        if (issue.status !== 'sent') continue
-        if (issue.date < cutoffDateStr) continue
+        if (!rssPost) continue
 
-        if (rssPost && !postsMap.has(rssPost.id)) {
+        if (!postsMap.has(rssPost.id)) {
           postsMap.set(rssPost.id, {
             ...rssPost,
-            used_in_issue_date: issue.date,
+            used_in_issue_date: issuesById.get(article.issue_id) || '',
             generated_headline: article.headline
           })
         }
