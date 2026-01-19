@@ -140,6 +140,7 @@ export async function POST(request: NextRequest) {
         .eq('article_module_id', module_id)
         .not('post_id', 'is', null)
         .not('headline', 'is', null)
+        .not('final_position', 'is', null) // Only posts actually included in sent email
         .limit(500)
 
       usedPosts = result.data

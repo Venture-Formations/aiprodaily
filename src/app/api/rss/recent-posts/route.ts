@@ -108,6 +108,7 @@ export async function GET(request: NextRequest) {
         .in('issue_id', sentIssueIds)
         .not('post_id', 'is', null)
         .not('headline', 'is', null)
+        .not('final_position', 'is', null) // Only posts that were actually included in the sent email
 
       // Filter by module_id if provided
       if (moduleId) {
