@@ -2639,7 +2639,9 @@ export const AI_CALL = {
 
   subjectLineGenerator: async (top_article: { headline: string; content: string }, newsletterId: string, maxTokens = 100, temperature = 0.8) => {
     // Use callAIWithPrompt to load complete config from database
+    // Pass both title and headline for prompt compatibility
     return callAIWithPrompt('ai_prompt_subject_line', newsletterId, {
+      title: top_article.headline,
       headline: top_article.headline,
       content: top_article.content
     })
