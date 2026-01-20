@@ -1685,10 +1685,13 @@ function EmailSettings() {
         setEditingSubjectLine(false)
         setTimeout(() => setMessage(''), 3000)
       } else {
-        throw new Error('Failed to save prompt')
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Save failed:', response.status, errorData)
+        throw new Error(errorData.error || `Failed to save prompt (${response.status})`)
       }
     } catch (error) {
-      setMessage('Failed to save subject line prompt. Please try again.')
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      setMessage(`Failed to save: ${errorMsg}`)
       console.error('Save error:', error)
     } finally {
       setSavingSubjectLine(false)
@@ -1739,11 +1742,11 @@ function EmailSettings() {
 
     try {
       const response = await fetch('/api/settings/ai-prompts', {
-        method: 'PUT',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           key: 'ai_prompt_subject_line',
-          value: subjectLinePromptOriginal
+          action: 'save_as_default'
         })
       })
 

@@ -156,32 +156,31 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    // Validate that value is valid JSON (no structural requirements)
-    let parsedValue: any
+    // Accept both plain text prompts and JSON prompts
+    let storedValue: string
     if (typeof value === 'string') {
+      // Try to parse as JSON, but accept plain text if it fails
       try {
-        parsedValue = JSON.parse(value)
-      } catch (parseError) {
-        return NextResponse.json(
-          {
-            error: 'Invalid JSON format. Prompt must be valid JSON.',
-            details: parseError instanceof Error ? parseError.message : 'Parse failed'
-          },
-          { status: 400 }
-        )
+        JSON.parse(value)
+        // It's valid JSON, store as-is
+        storedValue = value
+      } catch {
+        // Not JSON - store as plain text (this is valid for text-based prompts)
+        storedValue = value
       }
     } else if (typeof value === 'object' && value !== null) {
-      parsedValue = value
+      // Convert object to JSON string
+      storedValue = JSON.stringify(value)
     } else {
       return NextResponse.json(
-        { error: 'Invalid format. Expected valid JSON object or string.' },
+        { error: 'Invalid format. Expected string or object.' },
         { status: 400 }
       )
     }
 
-    // Build update object - store as JSON string for consistency
+    // Build update object
     const updateData: any = {
-      value: typeof value === 'string' ? value : JSON.stringify(parsedValue),
+      value: storedValue,
       updated_at: new Date().toISOString()
     }
 
