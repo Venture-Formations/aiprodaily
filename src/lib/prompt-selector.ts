@@ -19,11 +19,24 @@ export class PromptSelector {
         return existing.prompt
       }
 
-      // Get all active prompts
+      // Get publication_id from the issue
+      const { data: issue } = await supabaseAdmin
+        .from('publication_issues')
+        .select('publication_id')
+        .eq('id', issueId)
+        .single()
+
+      if (!issue?.publication_id) {
+        console.log('Could not find publication_id for issue:', issueId)
+        return null
+      }
+
+      // Get all active prompts for this publication
       const { data: allPrompts } = await supabaseAdmin
         .from('prompt_ideas')
         .select('id')
         .eq('is_active', true)
+        .eq('publication_id', issue.publication_id)
 
       if (!allPrompts || allPrompts.length === 0) {
         console.log('No active prompts available')
