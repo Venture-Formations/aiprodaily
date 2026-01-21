@@ -20,6 +20,10 @@ export async function GET(
       )
     }
 
+    // Get IP address from request headers
+    const forwardedFor = request.headers.get('x-forwarded-for')
+    const ipAddress = forwardedFor ? forwardedFor.split(',')[0].trim() : request.headers.get('x-real-ip')
+
     // Get the poll to determine publication_id and validate option
     const { data: poll, error: pollError } = await supabaseAdmin
       .from('polls')
@@ -50,7 +54,8 @@ export async function GET(
         publication_id: poll.publication_id,
         subscriber_email: email,
         selected_option: option,
-        issue_id: issueId || null
+        issue_id: issueId || null,
+        ip_address: ipAddress || null
       }, {
         onConflict: 'poll_id,subscriber_email'
       })
@@ -94,7 +99,7 @@ export async function GET(
       // Don't fail the whole request if SendGrid sync fails
     }
 
-    console.log(`[Polls] Response recorded: ${email} voted "${option}" on poll ${id}`)
+    console.log(`[Polls] Response recorded: ${email} voted "${option}" on poll ${id} from IP ${ipAddress || 'unknown'}`)
 
     // Redirect to thank you page
     return NextResponse.redirect(

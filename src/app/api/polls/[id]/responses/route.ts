@@ -33,7 +33,7 @@ export async function GET(
     // Get all responses for this poll
     const { data: responses, error } = await supabaseAdmin
       .from('poll_responses')
-      .select('id, poll_id, publication_id, issue_id, subscriber_email, selected_option, responded_at')
+      .select('id, poll_id, publication_id, issue_id, subscriber_email, selected_option, responded_at, ip_address')
       .eq('poll_id', id)
       .eq('publication_id', publicationId)
       .order('responded_at', { ascending: false })
@@ -107,6 +107,10 @@ export async function POST(
       )
     }
 
+    // Get IP address from request headers
+    const forwardedFor = request.headers.get('x-forwarded-for')
+    const ipAddress = forwardedFor ? forwardedFor.split(',')[0].trim() : request.headers.get('x-real-ip')
+
     // Use upsert to handle duplicate responses (update instead of error)
     const { data: response, error } = await supabaseAdmin
       .from('poll_responses')
@@ -115,11 +119,12 @@ export async function POST(
         publication_id: poll.publication_id,
         subscriber_email,
         selected_option,
-        issue_id: issue_id || null
+        issue_id: issue_id || null,
+        ip_address: ipAddress || null
       }, {
         onConflict: 'poll_id,subscriber_email'
       })
-      .select('id, poll_id, publication_id, issue_id, subscriber_email, selected_option, responded_at')
+      .select('id, poll_id, publication_id, issue_id, subscriber_email, selected_option, responded_at, ip_address')
       .single()
 
     if (error) {
