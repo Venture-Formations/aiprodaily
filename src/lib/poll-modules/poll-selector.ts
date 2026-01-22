@@ -11,7 +11,8 @@ import type { PollModule, Poll, IssuePollModule, PollSnapshot } from '@/types/da
 export class PollModuleSelector {
   /**
    * Initialize selections for all active poll modules
-   * Defaults to the last used poll for each module (if any)
+   * Uses the current active poll for the publication
+   * Falls back to last used poll only if it's still active
    * Called during issue creation workflow
    */
   static async initializeSelectionsForIssue(
@@ -42,33 +43,51 @@ export class PollModuleSelector {
       return
     }
 
-    // For each module, find the last used poll and default to it
-    for (const module of modules) {
-      // Find the most recent selection for this module that had a poll
-      const { data: lastSelection } = await supabaseAdmin
-        .from('issue_poll_modules')
-        .select('poll_id')
-        .eq('poll_module_id', module.id)
-        .not('poll_id', 'is', null)
-        .order('selected_at', { ascending: false })
-        .limit(1)
-        .single()
+    // Get the current active poll for this publication
+    const { data: activePoll } = await supabaseAdmin
+      .from('polls')
+      .select('id')
+      .eq('publication_id', publicationId)
+      .eq('is_active', true)
+      .limit(1)
+      .single()
 
-      const lastPollId = lastSelection?.poll_id || null
+    const activePollId = activePoll?.id || null
+
+    // For each module, use the current active poll (or fall back to last used if still active)
+    for (const module of modules) {
+      let selectedPollId = activePollId
+
+      // If no active poll, check if the last used poll is still valid
+      if (!selectedPollId) {
+        const { data: lastSelection } = await supabaseAdmin
+          .from('issue_poll_modules')
+          .select('poll_id, poll:polls!inner(is_active)')
+          .eq('poll_module_id', module.id)
+          .not('poll_id', 'is', null)
+          .order('selected_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        // Only use last poll if it's still active
+        if (lastSelection?.poll && (lastSelection.poll as any).is_active) {
+          selectedPollId = lastSelection.poll_id
+        }
+      }
 
       const { error: insertError } = await supabaseAdmin
         .from('issue_poll_modules')
         .insert({
           issue_id: issueId,
           poll_module_id: module.id,
-          poll_id: lastPollId,  // Default to last used poll
-          selected_at: lastPollId ? new Date().toISOString() : null
+          poll_id: selectedPollId,
+          selected_at: selectedPollId ? new Date().toISOString() : null
         })
 
       if (insertError) {
         console.error('[PollSelector] Error creating selection:', insertError)
-      } else if (lastPollId) {
-        console.log(`[PollSelector] Defaulted module ${module.name} to last used poll: ${lastPollId}`)
+      } else if (selectedPollId) {
+        console.log(`[PollSelector] Selected active poll ${selectedPollId} for module ${module.name}`)
       }
     }
 
@@ -239,6 +258,12 @@ export class PollModuleSelector {
       if (!selection.poll_id || !selection.poll) continue
 
       const poll = selection.poll as Poll
+
+      // Skip inactive polls - they may have been deactivated after issue creation
+      if (!poll.is_active) {
+        console.warn(`[PollSelector] Skipping inactive poll ${poll.id} for issue ${issueId}`)
+        continue
+      }
 
       // Create snapshot
       const snapshot: PollSnapshot = {
