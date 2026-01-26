@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 import { supabaseAdmin } from '@/lib/supabase'
+import { TextBoxGenerator } from '@/lib/text-box-modules/text-box-generator'
+import type { TextBoxPlaceholderData } from '@/types/database'
 
 export const maxDuration = 600 // 10 minutes for processing multiple articles
 
@@ -31,6 +33,24 @@ function injectPostData(obj: any, post: any): any {
   return obj
 }
 
+// Helper function to inject newsletter context placeholders into JSON recursively
+function injectNewsletterContext(obj: any, data: TextBoxPlaceholderData): any {
+  if (typeof obj === 'string') {
+    return TextBoxGenerator.injectPlaceholders(obj, data)
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => injectNewsletterContext(item, data))
+  }
+  if (typeof obj === 'object' && obj !== null) {
+    const result: any = {}
+    for (const key in obj) {
+      result[key] = injectNewsletterContext(obj[key], data)
+    }
+    return result
+  }
+  return obj
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -39,7 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { provider, promptJson, publication_id, prompt_type, module_id, limit = 10, offset = 0 } = body
+    const { provider, promptJson, publication_id, prompt_type, module_id, limit = 10, offset = 0, isCustomFreeform } = body
 
     if (!provider || !promptJson || !publication_id || !prompt_type) {
       return NextResponse.json(
@@ -73,6 +93,19 @@ export async function POST(request: NextRequest) {
     }
 
     const newsletterUuid = newsletter.id
+
+    // For Custom/Freeform, test against multiple sent issues instead of RSS posts
+    if (isCustomFreeform) {
+      return handleCustomFreeformMultiple(
+        openai,
+        anthropic,
+        provider,
+        promptJson,
+        newsletterUuid,
+        limit,
+        offset
+      )
+    }
 
     // Calculate cutoff date (7 days ago)
     const cutoffDate = new Date()
@@ -341,4 +374,173 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+/**
+ * Handle Custom/Freeform multiple testing - tests against multiple sent issues
+ * instead of multiple RSS posts
+ */
+async function handleCustomFreeformMultiple(
+  openai: OpenAI,
+  anthropic: Anthropic,
+  provider: string,
+  promptJson: any,
+  publicationId: string,
+  limit: number,
+  offset: number
+) {
+  // Get sent issues (no date limit - get all sent issues, ordered by most recent)
+  const { data: sentIssues, error: issuesError } = await supabaseAdmin
+    .from('publication_issues')
+    .select('id, date, final_sent_at')
+    .eq('publication_id', publicationId)
+    .eq('status', 'sent')
+    .order('final_sent_at', { ascending: false })
+    .range(offset, offset + limit - 1)
+
+  if (issuesError) {
+    console.error('[AI Test Multiple Custom] Error fetching sent issues:', issuesError)
+    return NextResponse.json(
+      { error: 'Failed to fetch sent issues', details: issuesError.message },
+      { status: 500 }
+    )
+  }
+
+  if (!sentIssues || sentIssues.length === 0) {
+    return NextResponse.json(
+      { error: `No sent issues found (offset: ${offset}, limit: ${limit})` },
+      { status: 404 }
+    )
+  }
+
+  console.log(`[AI Test Multiple Custom] Testing ${sentIssues.length} issues (offset: ${offset})`)
+
+  // Process each issue
+  const startTime = Date.now()
+  const responses: any[] = []
+  const fullApiResponses: any[] = []
+  let totalTokens = 0
+  let apiRequestForFirstIssue: any = null
+
+  for (let i = 0; i < sentIssues.length; i++) {
+    const issue = sentIssues[i]
+
+    try {
+      // Build placeholder data for this issue (full context)
+      const placeholderData = await TextBoxGenerator.buildPlaceholderData(issue.id, 'after_articles')
+
+      // Inject newsletter context placeholders
+      const processedJson = injectNewsletterContext(promptJson, placeholderData)
+
+      // Store API request for the first issue only
+      if (i === 0) {
+        apiRequestForFirstIssue = processedJson
+      }
+
+      let response: any
+      let tokensUsed = 0
+      let fullApiResponse: any = null
+
+      if (provider === 'openai') {
+        const apiRequest = { ...processedJson }
+
+        if (apiRequest.messages) {
+          apiRequest.input = apiRequest.messages
+          delete apiRequest.messages
+        }
+
+        const completion = await (openai as any).responses.create(apiRequest)
+        fullApiResponse = completion
+
+        // Extract response (same logic as regular multiple test)
+        const outputArray = completion.output?.[0]?.content
+        const jsonSchemaItem = outputArray?.find((c: any) => c.type === "json_schema")
+        const textItem = outputArray?.find((c: any) => c.type === "text")
+
+        let foundJson: any = null
+        if (outputArray && Array.isArray(outputArray)) {
+          for (const item of outputArray) {
+            if (item.json !== undefined) {
+              foundJson = item.json
+              break
+            }
+            if (item.input_json !== undefined) {
+              foundJson = item.input_json
+              break
+            }
+          }
+        }
+
+        let rawResponse =
+          foundJson ??
+          jsonSchemaItem?.json ??
+          jsonSchemaItem?.input_json ??
+          completion.output?.[0]?.content?.[0]?.json ??
+          completion.output?.[0]?.content?.[0]?.input_json ??
+          textItem?.text ??
+          completion.output?.[0]?.content?.[0]?.text ??
+          completion.output_text ??
+          completion.choices?.[0]?.message?.content ??
+          'No response'
+
+        if (typeof rawResponse === 'string' && rawResponse !== 'No response') {
+          try {
+            response = JSON.parse(rawResponse)
+          } catch {
+            response = rawResponse
+          }
+        } else if (rawResponse !== 'No response') {
+          response = rawResponse
+        } else {
+          response = 'No response'
+        }
+
+        tokensUsed = completion.usage?.total_tokens || 0
+      } else if (provider === 'claude') {
+        const completion = await anthropic.messages.create(processedJson)
+        fullApiResponse = completion
+
+        const textContent = completion.content.find(c => c.type === 'text')
+        response = textContent && 'text' in textContent ? textContent.text : 'No response'
+        tokensUsed = (completion.usage?.input_tokens || 0) + (completion.usage?.output_tokens || 0)
+      } else {
+        response = 'Invalid provider'
+      }
+
+      responses.push(response)
+      fullApiResponses.push(fullApiResponse)
+      totalTokens += tokensUsed
+
+      // Add a small delay between requests to avoid rate limits
+      if (i < sentIssues.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+    } catch (error) {
+      console.error(`[AI Test Multiple Custom] Error processing issue ${i + 1}:`, error)
+      responses.push(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      fullApiResponses.push(null)
+    }
+  }
+
+  const totalDuration = Date.now() - startTime
+
+  console.log(`[AI Test Multiple Custom] Complete: ${responses.length} responses in ${totalDuration}ms`)
+
+  return NextResponse.json({
+    success: true,
+    responses,
+    fullApiResponses,
+    totalTokensUsed: totalTokens,
+    totalDuration,
+    provider,
+    model: promptJson.model || 'unknown',
+    apiRequest: apiRequestForFirstIssue,
+    // For Custom/Freeform, return issue info instead of posts
+    sourceIssues: sentIssues.map(issue => ({
+      id: issue.id,
+      date: issue.date,
+      sent_at: issue.final_sent_at
+    })),
+    isCustomFreeform: true
+  })
 }

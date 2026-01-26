@@ -47,6 +47,12 @@ interface TestResult {
     source_url: string | null
     publication_date: string | null
   }>
+  sourceIssues?: Array<{ // Source issues used for Custom/Freeform multiple tests
+    id: string
+    date: string
+    sent_at: string
+  }>
+  isCustomFreeform?: boolean // Whether this was a Custom/Freeform test
 }
 
 interface SavedPrompt {
@@ -453,7 +459,8 @@ export default function AIPromptTestingPage() {
           prompt_type: promptType,
           module_id: moduleId, // Pass module_id for module-specific post filtering
           limit: 10,
-          offset
+          offset,
+          isCustomFreeform: promptType === 'custom'
         })
       })
 
@@ -481,7 +488,9 @@ export default function AIPromptTestingPage() {
           isMultiple: true,
           responses: responsesText,
           fullApiResponses: data.fullApiResponses, // Include full API responses for debugging
-          sourcePosts: data.sourcePosts // Include source posts
+          sourcePosts: data.sourcePosts, // Include source posts
+          sourceIssues: data.sourceIssues, // Include source issues for Custom/Freeform
+          isCustomFreeform: data.isCustomFreeform // Track if this was a Custom/Freeform test
         }
 
         setCurrentResponse(result)
@@ -862,7 +871,9 @@ export default function AIPromptTestingPage() {
                 disabled={testing || !prompt.trim()}
                 className="mt-2 w-full py-3 px-4 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
               >
-                {testing ? 'Testing...' : 'Test Prompt for Multiple (Articles 1-10)'}
+                {testing ? 'Testing...' : promptType === 'custom'
+                  ? 'Test Prompt for Multiple (Issues 1-10)'
+                  : 'Test Prompt for Multiple (Articles 1-10)'}
               </button>
 
               <button
@@ -870,7 +881,9 @@ export default function AIPromptTestingPage() {
                 disabled={testing || !prompt.trim()}
                 className="mt-2 w-full py-3 px-4 bg-teal-600 text-white font-medium rounded-lg hover:bg-teal-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
               >
-                {testing ? 'Testing...' : 'Test Prompt for Multiple (Articles 11-20)'}
+                {testing ? 'Testing...' : promptType === 'custom'
+                  ? 'Test Prompt for Multiple (Issues 11-20)'
+                  : 'Test Prompt for Multiple (Articles 11-20)'}
               </button>
             </div>
 
@@ -988,8 +1001,42 @@ export default function AIPromptTestingPage() {
                 )}
               </div>
 
+              {/* Source Issues Section (for Custom/Freeform multiple tests) */}
+              {currentResponse.isMultiple && currentResponse.isCustomFreeform && currentResponse.sourceIssues && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setShowSourcePosts(!showSourcePosts)}
+                    className="w-full px-4 py-3 bg-purple-50 hover:bg-purple-100 flex items-center justify-between text-left"
+                  >
+                    <span className="font-medium text-purple-900">
+                      {showSourcePosts ? '▼' : '▶'} Source Issues Used ({currentResponse.sourceIssues.length} issues)
+                    </span>
+                    <span className="text-sm text-purple-600">
+                      {showSourcePosts ? 'Click to collapse' : 'Click to expand'}
+                    </span>
+                  </button>
+                  {showSourcePosts && (
+                    <div className="p-4 bg-white">
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {currentResponse.sourceIssues.map((issue, index) => (
+                          <div key={issue.id} className="border border-gray-200 rounded-lg p-3 flex items-center justify-between">
+                            <div>
+                              <span className="font-medium text-gray-900">Issue {index + 1}</span>
+                              <span className="text-gray-500 ml-2">({issue.date})</span>
+                            </div>
+                            <span className="text-xs text-gray-400">
+                              Sent: {new Date(issue.sent_at).toLocaleString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Source Posts Section (for multiple article tests) */}
-              {currentResponse.isMultiple && currentResponse.sourcePosts && (
+              {currentResponse.isMultiple && !currentResponse.isCustomFreeform && currentResponse.sourcePosts && (
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
                   <button
                     onClick={() => setShowSourcePosts(!showSourcePosts)}
@@ -1059,7 +1106,11 @@ export default function AIPromptTestingPage() {
               <div className="border border-gray-200 rounded-lg overflow-hidden">
                 <div className="px-4 py-3 bg-blue-50 border-b border-blue-100">
                   <h4 className="font-medium text-blue-900">
-                    {currentResponse.isMultiple ? 'AI Responses (10 Articles)' : 'AI Response'}
+                    {currentResponse.isMultiple
+                      ? currentResponse.isCustomFreeform
+                        ? `AI Responses (${currentResponse.sourceIssues?.length || 10} Issues)`
+                        : `AI Responses (${currentResponse.sourcePosts?.length || 10} Articles)`
+                      : 'AI Response'}
                   </h4>
                 </div>
                 <div className="p-4 bg-white">
@@ -1068,7 +1119,14 @@ export default function AIPromptTestingPage() {
                       {currentResponse.responses.map((response, index) => (
                         <div key={index} className="border border-gray-200 rounded-lg p-4">
                           <div className="flex items-center justify-between mb-2">
-                            <h5 className="font-medium text-gray-900">Article {index + 1}</h5>
+                            <h5 className="font-medium text-gray-900">
+                              {currentResponse.isCustomFreeform ? 'Issue' : 'Article'} {index + 1}
+                              {currentResponse.isCustomFreeform && currentResponse.sourceIssues?.[index] && (
+                                <span className="text-gray-500 font-normal ml-2">
+                                  ({currentResponse.sourceIssues[index].date})
+                                </span>
+                              )}
+                            </h5>
                           </div>
                           <div className="bg-gray-50 rounded p-3 whitespace-pre-wrap text-sm">
                             {typeof response === 'object'
