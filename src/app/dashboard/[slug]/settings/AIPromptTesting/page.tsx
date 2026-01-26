@@ -373,7 +373,9 @@ export default function AIPromptTestingPage() {
         body: JSON.stringify({
           provider,
           promptJson,
-          post: selectedPost // Include post data for placeholder injection
+          post: selectedPost, // Include post data for placeholder injection
+          publication_id: slug,
+          isCustomFreeform: promptType === 'custom'
         })
       })
 
@@ -640,7 +642,10 @@ export default function AIPromptTestingPage() {
               {/* Placeholders */}
               <div className="mb-6">
                 <h3 className="text-sm font-medium text-gray-700 mb-3">Available Placeholders</h3>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm">
+
+                {/* RSS Post Placeholders - always shown */}
+                <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm mb-3">
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">RSS Post Data</div>
                   <div className="font-mono">
                     <span className="text-blue-600">{'{{title}}'}</span>
                     <span className="text-gray-600 ml-2">- Article title from RSS feed</span>
@@ -662,8 +667,69 @@ export default function AIPromptTestingPage() {
                     <span className="text-gray-600 ml-2">- Article source URL</span>
                   </div>
                 </div>
+
+                {/* Newsletter Context Placeholders - only for Custom/Freeform */}
+                {promptType === 'custom' && (
+                  <div className="bg-purple-50 rounded-lg p-4 space-y-3 text-sm border border-purple-200">
+                    <div className="text-xs font-semibold text-purple-600 uppercase tracking-wide mb-2">
+                      Newsletter Context (from last sent issue)
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-gray-600 mb-1">Basic:</div>
+                      <div className="font-mono text-xs space-y-1 ml-2">
+                        <div><span className="text-purple-600">{'{{issue_date}}'}</span> <span className="text-gray-500">- Issue date</span></div>
+                        <div><span className="text-purple-600">{'{{publication_name}}'}</span> <span className="text-gray-500">- Newsletter name</span></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-gray-600 mb-1">Section Articles:</div>
+                      <div className="font-mono text-xs space-y-1 ml-2">
+                        <div><span className="text-purple-600">{'{{section_1_name}}'}</span> <span className="text-gray-500">- Section name</span></div>
+                        <div><span className="text-purple-600">{'{{section_1_all_articles}}'}</span> <span className="text-gray-500">- All articles in section</span></div>
+                        <div><span className="text-purple-600">{'{{section_2_all_articles}}'}</span> <span className="text-gray-500">- Section 2, etc.</span></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-gray-600 mb-1">Individual Articles:</div>
+                      <div className="font-mono text-xs space-y-1 ml-2">
+                        <div><span className="text-purple-600">{'{{section_1_article_1_headline}}'}</span></div>
+                        <div><span className="text-purple-600">{'{{section_1_article_1_content}}'}</span></div>
+                        <div className="text-gray-500 text-xs">Pattern: section_N_article_M_headline/content</div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-gray-600 mb-1">AI Apps:</div>
+                      <div className="font-mono text-xs space-y-1 ml-2">
+                        <div><span className="text-purple-600">{'{{ai_app_1_name}}'}</span>, <span className="text-purple-600">{'{{ai_app_1_tagline}}'}</span>, <span className="text-purple-600">{'{{ai_app_1_description}}'}</span></div>
+                        <div className="text-gray-500 text-xs">Pattern: ai_app_N_name/tagline/description</div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-gray-600 mb-1">Poll:</div>
+                      <div className="font-mono text-xs space-y-1 ml-2">
+                        <div><span className="text-purple-600">{'{{poll_question}}'}</span>, <span className="text-purple-600">{'{{poll_options}}'}</span></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-gray-600 mb-1">Ads:</div>
+                      <div className="font-mono text-xs space-y-1 ml-2">
+                        <div><span className="text-purple-600">{'{{ad_1_title}}'}</span>, <span className="text-purple-600">{'{{ad_1_body}}'}</span></div>
+                        <div className="text-gray-500 text-xs">Pattern: ad_N_title/body</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <p className="text-xs text-gray-500 mt-3">
-                  Use these placeholders in your prompt content. They will be replaced with actual post data when testing.
+                  {promptType === 'custom'
+                    ? 'Custom/Freeform supports both RSS post placeholders and newsletter context placeholders from the most recent sent issue.'
+                    : 'Use these placeholders in your prompt content. They will be replaced with actual post data when testing.'}
                 </p>
               </div>
 

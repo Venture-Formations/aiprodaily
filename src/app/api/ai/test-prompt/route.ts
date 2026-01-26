@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
+import { TextBoxGenerator } from '@/lib/text-box-modules/text-box-generator'
+import type { TextBoxPlaceholderData } from '@/types/database'
 
 // Initialize AI clients
 const openai = new OpenAI({
@@ -39,6 +41,24 @@ function injectPostData(obj: any, post: any): any {
   return obj
 }
 
+// Helper function to inject newsletter context placeholders into JSON recursively
+function injectNewsletterContext(obj: any, data: TextBoxPlaceholderData): any {
+  if (typeof obj === 'string') {
+    return TextBoxGenerator.injectPlaceholders(obj, data)
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => injectNewsletterContext(item, data))
+  }
+  if (typeof obj === 'object' && obj !== null) {
+    const result: any = {}
+    for (const key in obj) {
+      result[key] = injectNewsletterContext(obj[key], data)
+    }
+    return result
+  }
+  return obj
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -47,7 +67,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { provider, promptJson, post } = body
+    const { provider, promptJson, post, publication_id, isCustomFreeform } = body
 
     // Validate provider matches model
     const modelName = (promptJson?.model || '').toLowerCase()
@@ -67,8 +87,38 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Inject post data into the entire JSON request
-    const processedJson = injectPostData(promptJson, post)
+    // Start with the prompt JSON
+    let processedJson = promptJson
+
+    // For Custom/Freeform, inject newsletter context placeholders from most recent sent issue
+    if (isCustomFreeform && publication_id) {
+      const { supabaseAdmin } = await import('@/lib/supabase')
+
+      // Get most recent sent issue
+      const { data: lastIssue } = await supabaseAdmin
+        .from('publication_issues')
+        .select('id')
+        .eq('publication_id', publication_id)
+        .eq('status', 'sent')
+        .order('final_sent_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (lastIssue) {
+        // Build placeholder data from the last sent issue (always use after_articles for full context)
+        const placeholderData = await TextBoxGenerator.buildPlaceholderData(lastIssue.id, 'after_articles')
+
+        // Inject newsletter context placeholders first
+        processedJson = injectNewsletterContext(processedJson, placeholderData)
+
+        console.log('[TEST-PROMPT] Injected newsletter context from issue:', lastIssue.id)
+      } else {
+        console.log('[TEST-PROMPT] No sent issues found for publication:', publication_id)
+      }
+    }
+
+    // Inject post data (RSS post placeholders) into the JSON request
+    processedJson = injectPostData(processedJson, post)
 
     const startTime = Date.now()
     let response: string
