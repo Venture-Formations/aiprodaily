@@ -55,6 +55,15 @@ export async function PATCH(
       return NextResponse.json({ error: 'URL cannot be empty' }, { status: 400 })
     }
 
+    // Normalize URL: ensure https:// prefix
+    if (body.button_url) {
+      let normalizedUrl = body.button_url.trim()
+      if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
+        normalizedUrl = 'https://' + normalizedUrl
+      }
+      body.button_url = normalizedUrl
+    }
+
     // First verify the ad exists and get current values
     const { data: existingAd, error: fetchError } = await supabaseAdmin
       .from('advertisements')

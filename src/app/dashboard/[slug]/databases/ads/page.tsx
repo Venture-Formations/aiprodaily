@@ -1015,7 +1015,7 @@ function AddAdModal({ onClose, onSuccess, publicationId, selectedSection, sectio
   const [formData, setFormData] = useState({
     title: '',
     body: '',
-    button_url: 'https://'
+    button_url: ''
   })
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [crop, setCrop] = useState<Crop>()

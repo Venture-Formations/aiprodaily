@@ -85,6 +85,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    // Normalize URL: ensure https:// prefix
+    let normalizedUrl = button_url.trim()
+    if (normalizedUrl && !normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
+      normalizedUrl = 'https://' + normalizedUrl
+    }
+
     // Get the first active newsletter for publication_id
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
       .from('publications')
@@ -176,7 +182,7 @@ export async function POST(request: NextRequest) {
         body: adBody,
         word_count,
         button_text: button_text || '',
-        button_url,
+        button_url: normalizedUrl,
         frequency: frequency || 'single', // Default to 'single' if not provided
         times_paid: times_paid || 1, // Default to 1 if not provided
         times_used: 0,
