@@ -1569,6 +1569,7 @@ export interface TextBoxBlock {
   // AI Prompt Block fields
   ai_prompt_json: Record<string, unknown> | null  // Full AI prompt configuration (model, messages, etc.)
   generation_timing: GenerationTiming
+  is_bold: boolean  // When true, renders AI prompt content in bold
 
   // Image Block fields
   image_type: ImageType | null

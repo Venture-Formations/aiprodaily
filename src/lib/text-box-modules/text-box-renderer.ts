@@ -164,6 +164,11 @@ export class TextBoxModuleRenderer {
     let formattedContent = content.replace(/\n/g, '<br>')
     formattedContent = formattedContent.replace(/<p/g, '<p style="margin: 0 0 4px 0;"')
 
+    // Apply bold styling if is_bold is true
+    if (block.is_bold) {
+      formattedContent = `<strong>${formattedContent}</strong>`
+    }
+
     return `
 <tr>
   <td style="padding: 0 10px; font-size: 16px; line-height: 26px;">
@@ -286,6 +291,7 @@ export class TextBoxModuleRenderer {
       content?: string
       imageUrl?: string
       textSize?: TextSize
+      isBold?: boolean
     }>,
     styles: { primaryColor: string; headingFont: string; bodyFont: string }
   ): string {
@@ -298,6 +304,10 @@ export class TextBoxModuleRenderer {
           // Normalize paragraph margins for consistent spacing
           let formattedContent = block.content.replace(/\n/g, '<br>')
           formattedContent = formattedContent.replace(/<p/g, '<p style="margin: 0 0 4px 0;"')
+          // Apply bold styling for AI prompt blocks with is_bold
+          if (block.type === 'ai_prompt' && block.isBold) {
+            formattedContent = `<strong>${formattedContent}</strong>`
+          }
           blocksHtml += `
 <tr>
   <td style="padding: 0 10px; font-size: ${textStyles.fontSize}; font-weight: ${textStyles.fontWeight}; line-height: ${textStyles.lineHeight};">

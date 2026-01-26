@@ -69,8 +69,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     // AI prompt fields
     const aiPromptJson = body.aiPromptJson ?? body.ai_prompt_json
     const generationTiming = body.generationTiming ?? body.generation_timing
+    const isBold = body.isBold ?? body.is_bold
     if (aiPromptJson !== undefined) updates.ai_prompt_json = aiPromptJson
     if (generationTiming !== undefined) updates.generation_timing = generationTiming
+    if (isBold !== undefined) updates.is_bold = isBold
 
     // Image fields
     const imageType = body.imageType ?? body.image_type

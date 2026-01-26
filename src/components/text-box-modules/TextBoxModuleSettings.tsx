@@ -245,6 +245,7 @@ export function TextBoxModuleSettings({
   // AI prompt editing
   const [editPrompt, setEditPrompt] = useState('')
   const [editTiming, setEditTiming] = useState<'before_articles' | 'after_articles'>('after_articles')
+  const [editIsBold, setEditIsBold] = useState(false)
   const [testingPrompt, setTestingPrompt] = useState(false)
   const [testResult, setTestResult] = useState<{ result?: string; injectedPrompt?: string; error?: string } | null>(null)
 
@@ -432,6 +433,7 @@ export function TextBoxModuleSettings({
       const promptJson = block.ai_prompt_json as any
       setEditPrompt(promptJson?.prompt || promptJson?.messages?.[0]?.content || '')
       setEditTiming(block.generation_timing || 'after_articles')
+      setEditIsBold(block.is_bold || false)
     } else if (block.block_type === 'image') {
       setEditImageType((block.image_type as any) || 'static')
       setEditAiImagePrompt(block.ai_image_prompt || '')
@@ -445,6 +447,7 @@ export function TextBoxModuleSettings({
     setEditingBlock(null)
     setEditContent('')
     setEditPrompt('')
+    setEditIsBold(false)
     setSelectedImage(null)
     setCrop(undefined)
     setCompletedCrop(undefined)
@@ -564,6 +567,7 @@ export function TextBoxModuleSettings({
           temperature: 0.7
         }
         updateData.generation_timing = editTiming
+        updateData.is_bold = editIsBold
       } else if (block.block_type === 'image') {
         updateData.image_type = editImageType
 
@@ -721,6 +725,19 @@ export function TextBoxModuleSettings({
                   <option value="after_articles">After Articles (full newsletter context)</option>
                 </select>
               </div>
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                <input
+                  type="checkbox"
+                  id={`bold-${editingBlock}`}
+                  checked={editIsBold}
+                  onChange={(e) => setEditIsBold(e.target.checked)}
+                  className="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-gray-300 rounded"
+                />
+                <label htmlFor={`bold-${editingBlock}`} className="text-sm text-gray-700">
+                  <span className="font-medium">Make content bold</span>
+                  <span className="text-gray-500 ml-1">- Renders the entire AI-generated content in bold</span>
+                </label>
+              </div>
               {testResult && (
                 <div className={`p-4 rounded-lg border ${testResult.error ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
                   {testResult.error ? <div className="text-sm text-red-700">{testResult.error}</div> : (
@@ -748,7 +765,12 @@ export function TextBoxModuleSettings({
                 </div>
                 <div className="bg-white p-3 rounded-lg border border-gray-200 font-mono text-xs whitespace-pre-wrap max-h-48 overflow-y-auto">{(block.ai_prompt_json as any)?.prompt || (block.ai_prompt_json as any)?.messages?.[0]?.content || <span className="italic text-gray-400">No prompt configured</span>}</div>
               </div>
-              <div className="text-xs text-gray-500 mb-3">Timing: {block.generation_timing === 'before_articles' ? 'Before Articles' : 'After Articles'}</div>
+              <div className="flex items-center gap-3 text-xs text-gray-500 mb-3">
+                <span>Timing: {block.generation_timing === 'before_articles' ? 'Before Articles' : 'After Articles'}</span>
+                {block.is_bold && (
+                  <span className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded font-medium">Bold</span>
+                )}
+              </div>
               <button onClick={() => handleStartEdit(block)} className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-700">Edit Prompt</button>
             </div>
           )}
