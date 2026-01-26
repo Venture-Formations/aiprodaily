@@ -643,7 +643,11 @@ export default function AIPromptTestingPage() {
                 <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm">
                   <div className="font-mono">
                     <span className="text-blue-600">{'{{title}}'}</span>
-                    <span className="text-gray-600 ml-2">- Article title/headline</span>
+                    <span className="text-gray-600 ml-2">- Article title from RSS feed</span>
+                  </div>
+                  <div className="font-mono">
+                    <span className="text-blue-600">{'{{headline}}'}</span>
+                    <span className="text-gray-600 ml-2">- Same as title (alias)</span>
                   </div>
                   <div className="font-mono">
                     <span className="text-blue-600">{'{{description}}'}</span>
@@ -651,7 +655,7 @@ export default function AIPromptTestingPage() {
                   </div>
                   <div className="font-mono">
                     <span className="text-blue-600">{'{{content}}'}</span>
-                    <span className="text-gray-600 ml-2">- Full article text</span>
+                    <span className="text-gray-600 ml-2">- Full article text (scraped)</span>
                   </div>
                   <div className="font-mono">
                     <span className="text-blue-600">{'{{url}}'}</span>
