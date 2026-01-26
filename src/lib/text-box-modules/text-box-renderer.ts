@@ -122,7 +122,7 @@ export class TextBoxModuleRenderer {
 
     return `
 <tr>
-  <td style="padding: 0 10px; font-size: ${textStyles.fontSize}; font-weight: ${textStyles.fontWeight}; line-height: ${textStyles.lineHeight};">
+  <td style="padding: 12px 10px; font-size: ${textStyles.fontSize}; font-weight: ${textStyles.fontWeight}; line-height: ${textStyles.lineHeight};">
     ${normalizedContent}
   </td>
 </tr>`
@@ -171,7 +171,7 @@ export class TextBoxModuleRenderer {
 
     return `
 <tr>
-  <td style="padding: 0 10px; font-size: 16px; line-height: 26px;">
+  <td style="padding: 12px 10px; font-size: 16px; line-height: 26px;">
     ${formattedContent}
   </td>
 </tr>`
@@ -211,7 +211,7 @@ export class TextBoxModuleRenderer {
 
     return `
 <tr>
-  <td align="center" style="padding: 10px;">
+  <td align="center" style="padding: 16px 10px;">
     <img src="${imageUrl}" alt="" style="max-width: 100%; height: auto; border-radius: 8px; display: block;" />
   </td>
 </tr>`
@@ -310,7 +310,7 @@ export class TextBoxModuleRenderer {
           }
           blocksHtml += `
 <tr>
-  <td style="padding: 0 10px; font-size: ${textStyles.fontSize}; font-weight: ${textStyles.fontWeight}; line-height: ${textStyles.lineHeight};">
+  <td style="padding: 12px 10px; font-size: ${textStyles.fontSize}; font-weight: ${textStyles.fontWeight}; line-height: ${textStyles.lineHeight};">
     ${formattedContent}
   </td>
 </tr>`
@@ -318,7 +318,7 @@ export class TextBoxModuleRenderer {
       } else if (block.type === 'image' && block.imageUrl) {
         blocksHtml += `
 <tr>
-  <td align="center" style="padding: 10px;">
+  <td align="center" style="padding: 16px 10px;">
     <img src="${block.imageUrl}" alt="" style="max-width: 100%; height: auto; border-radius: 8px; display: block;" />
   </td>
 </tr>`

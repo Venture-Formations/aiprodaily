@@ -251,7 +251,7 @@ export default function TextBoxModulesPanel({ issueId, issueStatus }: TextBoxMod
 
               {/* Expanded Content */}
               {isExpanded && (
-                <div className="mt-4 space-y-6">
+                <div className="mt-4 space-y-4">
                   {activeBlocks.map(block => {
                     const issueBlock = issueBlocks.find(ib => ib.text_box_block_id === block.id)
                     const content = getBlockContent(block, issueBlock)
