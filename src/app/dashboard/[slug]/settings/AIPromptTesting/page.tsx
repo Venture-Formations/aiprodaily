@@ -582,14 +582,15 @@ export default function AIPromptTestingPage() {
             </div>
 
             {/* RSS Post Selector */}
-            {promptType !== 'custom' && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Sample RSS Post
-                </label>
-                <p className="text-xs text-gray-500 mb-3">
-                  Posts from sent newsletters (last 7 days)
-                </p>
+            <div className="bg-white rounded-lg shadow p-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sample RSS Post
+              </label>
+              <p className="text-xs text-gray-500 mb-3">
+                {promptType === 'custom'
+                  ? 'Posts from sent newsletters (last 7 days) - Optional for freeform testing'
+                  : 'Posts from sent newsletters (last 7 days)'}
+              </p>
                 {status === 'loading' ? (
                   <p className="text-gray-500 text-sm">Authenticating...</p>
                 ) : loadingPosts ? (
@@ -631,7 +632,6 @@ export default function AIPromptTestingPage() {
                   </>
                 )}
               </div>
-            )}
 
             {/* Reference Guide */}
             <div className="bg-white rounded-lg shadow p-6">
@@ -789,7 +789,7 @@ export default function AIPromptTestingPage() {
 
               <button
                 onClick={handleTestMultiple}
-                disabled={testing || !prompt.trim() || promptType === 'custom'}
+                disabled={testing || !prompt.trim()}
                 className="mt-2 w-full py-3 px-4 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
               >
                 {testing ? 'Testing...' : 'Test Prompt for Multiple (Articles 1-10)'}
@@ -797,16 +797,11 @@ export default function AIPromptTestingPage() {
 
               <button
                 onClick={handleTestMultipleSecondBatch}
-                disabled={testing || !prompt.trim() || promptType === 'custom'}
+                disabled={testing || !prompt.trim()}
                 className="mt-2 w-full py-3 px-4 bg-teal-600 text-white font-medium rounded-lg hover:bg-teal-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
               >
                 {testing ? 'Testing...' : 'Test Prompt for Multiple (Articles 11-20)'}
               </button>
-              {promptType === 'custom' && (
-                <p className="text-xs text-gray-500 mt-2 text-center">
-                  Multiple article testing is only available for Primary/Secondary prompt types
-                </p>
-              )}
             </div>
 
             {/* Response */}
