@@ -191,31 +191,50 @@ export async function GET(request: NextRequest) {
     console.log('[API] Found secondary articles:', secondaryArticles?.length || 0);
 
     // Fetch module articles (from the new article modules system)
-    let moduleArticlesQuery = supabase
-      .from('module_articles')
-      .select(`
-        id,
-        post_id,
-        issue_id,
-        article_module_id,
-        headline,
-        content,
-        rank,
-        fact_check_score,
-        word_count,
-        created_at
-      `);
+    // Use pagination to handle more than 1000 module articles (Supabase default limit)
+    let allModuleArticles: any[] = [];
+    let moduleArticlesOffset = 0;
+    const moduleArticlesBatchSize = 1000;
+    let hasMoreModuleArticles = true;
 
-    if (issueIds.length > 0) {
-      moduleArticlesQuery = moduleArticlesQuery.in('issue_id', issueIds);
+    while (hasMoreModuleArticles) {
+      let moduleArticlesQuery = supabase
+        .from('module_articles')
+        .select(`
+          id,
+          post_id,
+          issue_id,
+          article_module_id,
+          headline,
+          content,
+          rank,
+          fact_check_score,
+          word_count,
+          created_at
+        `)
+        .range(moduleArticlesOffset, moduleArticlesOffset + moduleArticlesBatchSize - 1);
+
+      if (issueIds.length > 0) {
+        moduleArticlesQuery = moduleArticlesQuery.in('issue_id', issueIds);
+      }
+
+      const { data: moduleArticlesBatch, error: moduleArticlesError } = await moduleArticlesQuery;
+
+      if (moduleArticlesError) {
+        console.error('[API] Module articles fetch error:', moduleArticlesError.message);
+        break;
+      }
+
+      if (!moduleArticlesBatch || moduleArticlesBatch.length === 0) {
+        hasMoreModuleArticles = false;
+      } else {
+        allModuleArticles = allModuleArticles.concat(moduleArticlesBatch);
+        moduleArticlesOffset += moduleArticlesBatchSize;
+        hasMoreModuleArticles = moduleArticlesBatch.length === moduleArticlesBatchSize;
+      }
     }
 
-    const { data: moduleArticles, error: moduleArticlesError } = await moduleArticlesQuery;
-
-    if (moduleArticlesError) {
-      console.error('[API] Module articles error:', moduleArticlesError.message);
-      throw moduleArticlesError;
-    }
+    const moduleArticles = allModuleArticles;
 
     console.log('[API] Found module articles:', moduleArticles?.length || 0);
 
