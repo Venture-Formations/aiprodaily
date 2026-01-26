@@ -1810,12 +1810,12 @@ function parseJSONResponse(content: string) {
     const objectMatch = content.match(/\{[\s\S]*\}/)
     const arrayMatch = content.match(/\[[\s\S]*\]/)
 
-    if (arrayMatch) {
-      // Prefer array match for prompts that expect arrays (like Wordle)
-      return JSON.parse(arrayMatch[0])
-    } else if (objectMatch) {
-      // Use object match for other prompts
+    if (objectMatch) {
+      // Prefer object match to preserve full response structure (e.g., {"bullet_hooks":[],"summary":""})
       return JSON.parse(objectMatch[0])
+    } else if (arrayMatch) {
+      // Use array match only if no object wraps it
+      return JSON.parse(arrayMatch[0])
     } else {
       // Try parsing the entire content
       return JSON.parse(content.trim())
@@ -2066,12 +2066,12 @@ export async function callWithStructuredPrompt(
         console.warn('[AI] Array match failed:', matchError)
       }
 
-      // Match test endpoint logic exactly - check both match and [0] exists
+      // Prefer object match to preserve full response structure (e.g., {"bullet_hooks":[],"summary":""})
       let parsed: any
-      if (arrayMatch && Array.isArray(arrayMatch) && arrayMatch[0]) {
-        parsed = JSON.parse(arrayMatch[0])
-      } else if (objectMatch && Array.isArray(objectMatch) && objectMatch[0]) {
+      if (objectMatch && Array.isArray(objectMatch) && objectMatch[0]) {
         parsed = JSON.parse(objectMatch[0])
+      } else if (arrayMatch && Array.isArray(arrayMatch) && arrayMatch[0]) {
+        parsed = JSON.parse(arrayMatch[0])
       } else {
         parsed = JSON.parse(cleanedContent.trim())
       }
@@ -2296,10 +2296,11 @@ export async function callOpenAIStructured(options: OpenAICallOptions) {
           console.warn('[AI] Array match failed in callOpenAI:', matchError)
         }
 
-        if (arrayMatch && Array.isArray(arrayMatch) && arrayMatch[0]) {
-          return JSON.parse(arrayMatch[0])
-        } else if (objectMatch && Array.isArray(objectMatch) && objectMatch[0]) {
+        if (objectMatch && Array.isArray(objectMatch) && objectMatch[0]) {
+          // Prefer object match to preserve full response structure
           return JSON.parse(objectMatch[0])
+        } else if (arrayMatch && Array.isArray(arrayMatch) && arrayMatch[0]) {
+          return JSON.parse(arrayMatch[0])
         } else {
           return JSON.parse(cleanedContent.trim())
         }
@@ -2312,8 +2313,8 @@ export async function callOpenAIStructured(options: OpenAICallOptions) {
       throw error
     }
   } catch (error) {
-    const errorMsg = error instanceof Error 
-      ? error.message 
+    const errorMsg = error instanceof Error
+      ? error.message
       : typeof error === 'object' && error !== null
         ? JSON.stringify(error, null, 2)
         : String(error)
@@ -2453,12 +2454,12 @@ export async function callOpenAI(prompt: string, maxTokens = 1000, temperature =
           console.warn('[AI] Array match failed in callWithStructuredPrompt:', matchError)
         }
 
-        if (arrayMatch && Array.isArray(arrayMatch) && arrayMatch[0]) {
-          // Prefer array match for prompts that expect arrays (like road work)
-          return JSON.parse(arrayMatch[0])
-        } else if (objectMatch && Array.isArray(objectMatch) && objectMatch[0]) {
-          // Use object match for other prompts
+        if (objectMatch && Array.isArray(objectMatch) && objectMatch[0]) {
+          // Prefer object match to preserve full response structure (e.g., {"bullet_hooks":[],"summary":""})
           return JSON.parse(objectMatch[0])
+        } else if (arrayMatch && Array.isArray(arrayMatch) && arrayMatch[0]) {
+          // Use array match only if no object wraps it
+          return JSON.parse(arrayMatch[0])
         } else {
           // Try parsing the entire content
           return JSON.parse(cleanedContent.trim())
@@ -2553,10 +2554,11 @@ export async function callAI(prompt: string, maxTokens = 1000, temperature = 0.3
           console.warn('[AI] Array match failed in callAI (Claude):', matchError)
         }
 
-        if (arrayMatch && Array.isArray(arrayMatch) && arrayMatch[0]) {
-          return JSON.parse(arrayMatch[0])
-        } else if (objectMatch && Array.isArray(objectMatch) && objectMatch[0]) {
+        if (objectMatch && Array.isArray(objectMatch) && objectMatch[0]) {
+          // Prefer object match to preserve full response structure
           return JSON.parse(objectMatch[0])
+        } else if (arrayMatch && Array.isArray(arrayMatch) && arrayMatch[0]) {
+          return JSON.parse(arrayMatch[0])
         } else {
           return JSON.parse(cleanedContent.trim())
         }
@@ -2565,8 +2567,8 @@ export async function callAI(prompt: string, maxTokens = 1000, temperature = 0.3
         return { raw: content }
       }
     } catch (error) {
-      const errorMsg = error instanceof Error 
-        ? error.message 
+      const errorMsg = error instanceof Error
+        ? error.message
         : typeof error === 'object' && error !== null
           ? JSON.stringify(error, null, 2)
           : String(error)
