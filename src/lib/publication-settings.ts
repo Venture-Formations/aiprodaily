@@ -473,6 +473,39 @@ export async function getScheduleSettings(publicationId: string): Promise<{
   }
 }
 
+/**
+ * Get Facebook posting settings for a publication
+ */
+export async function getFacebookSettings(publicationId: string): Promise<{
+  enabled: boolean
+  pageId: string
+  pageAccessToken: string
+  postTime: string
+  adModuleId: string
+  lastPostDate: string
+  lastPostId: string
+}> {
+  const settings = await getPublicationSettings(publicationId, [
+    'facebook_enabled',
+    'facebook_page_id',
+    'facebook_page_access_token',
+    'facebook_post_time',
+    'facebook_ad_module_id',
+    'facebook_last_post_date',
+    'facebook_last_post_id',
+  ])
+
+  return {
+    enabled: settings.facebook_enabled === 'true',
+    pageId: settings.facebook_page_id || '',
+    pageAccessToken: settings.facebook_page_access_token || '',
+    postTime: settings.facebook_post_time || '10:00',
+    adModuleId: settings.facebook_ad_module_id || '',
+    lastPostDate: settings.facebook_last_post_date || '',
+    lastPostId: settings.facebook_last_post_id || '',
+  }
+}
+
 // ==================== MIGRATION HELPER ====================
 
 /**

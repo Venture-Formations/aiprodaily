@@ -43,6 +43,10 @@
     {
       "path": "/api/cron/monitor-workflows",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/post-to-facebook",
+      "schedule": "*/5 * * * *"
     }
   ],
   "functions": {
@@ -122,6 +126,9 @@
       "maxDuration": 800
     },
     "app/api/cron/process-mailerlite-updates/route.ts": {
+      "maxDuration": 120
+    },
+    "app/api/cron/post-to-facebook/route.ts": {
       "maxDuration": 120
     }
   }
