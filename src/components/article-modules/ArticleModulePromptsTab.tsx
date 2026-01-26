@@ -878,6 +878,10 @@ export default function ArticleModulePromptsTab({
                           rows={15}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
+                        <p className="mt-2 text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                          <span className="font-medium">Expected Response:</span>{' '}
+                          <code className="bg-amber-100 px-1 rounded">{'{ "score": <0-10>, "reason": "<explanation>" }'}</code>
+                        </p>
                         <div className="mt-3 flex items-center justify-between">
                           <button
                             onClick={() => handleTestPrompt(promptKey)}
@@ -1234,6 +1238,14 @@ function ArticlePromptCard({
                 rows={15}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
+              <p className="mt-2 text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                <span className="font-medium">Expected Response:</span>{' '}
+                <code className="bg-amber-100 px-1 rounded">
+                  {label.toLowerCase().includes('title')
+                    ? 'Plain text OR { "headline": "<text>" }'
+                    : '{ "content": "<text>", "word_count": <integer> }'}
+                </code>
+              </p>
               <div className="mt-3 flex items-center justify-between">
                 <button
                   onClick={onTestPrompt}
@@ -1595,6 +1607,14 @@ function GlobalPromptCard({
                 rows={15}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
+              <p className="mt-2 text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                <span className="font-medium">Expected Response:</span>{' '}
+                <code className="bg-amber-100 px-1 rounded">
+                  {promptKey.includes('deduper')
+                    ? '{ "groups": [...], "unique_articles": [<indices>] }'
+                    : '{ "score": <3-30>, "details": "<text>", "passed": <boolean> }'}
+                </code>
+              </p>
               <div className="mt-3 flex items-center justify-end">
                 <div className="flex items-center space-x-3">
                   <button

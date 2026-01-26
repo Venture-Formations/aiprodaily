@@ -17,8 +17,10 @@ import type {
 /**
  * Extract text content from various AI response formats
  * Handles common patterns like {summary: "..."}, {content: "..."}, etc.
+ * @param result - The AI response object or string
+ * @param responseField - Optional specific field name to extract (case-sensitive)
  */
-function extractTextFromResponse(result: any): string {
+function extractTextFromResponse(result: any, responseField?: string): string {
   // If already a string, use it directly
   if (typeof result === 'string') {
     return result.trim()
@@ -29,7 +31,13 @@ function extractTextFromResponse(result: any): string {
     return result ? String(result) : ''
   }
 
-  // Check common field names for text content
+  // If a specific response field is configured, use it (case-sensitive)
+  if (responseField && result[responseField] !== undefined) {
+    const value = result[responseField]
+    return typeof value === 'string' ? value.trim() : JSON.stringify(value)
+  }
+
+  // Check common field names for text content (lowercase)
   const textFields = ['summary', 'content', 'text', 'raw', 'response', 'output', 'result', 'message', 'body']
   for (const field of textFields) {
     if (result[field] && typeof result[field] === 'string') {
@@ -45,7 +53,7 @@ function extractTextFromResponse(result: any): string {
 
   // If object has only one key with object value that contains text, recurse
   if (keys.length === 1 && typeof result[keys[0]] === 'object') {
-    return extractTextFromResponse(result[keys[0]])
+    return extractTextFromResponse(result[keys[0]], responseField)
   }
 
   // Fallback: stringify the whole object
@@ -345,6 +353,7 @@ export class TextBoxGenerator {
         temperature?: number
         max_tokens?: number
         system_prompt?: string
+        response_field?: string
       }
 
       if (!promptConfig.prompt) {
@@ -372,8 +381,8 @@ export class TextBoxGenerator {
         provider
       )
 
-      // Extract content from result using helper
-      const content = extractTextFromResponse(result)
+      // Extract content from result using helper, with optional response_field
+      const content = extractTextFromResponse(result, promptConfig.response_field)
 
       if (!content) {
         return { success: false, error: 'Empty response from AI' }

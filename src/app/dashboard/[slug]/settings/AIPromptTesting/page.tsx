@@ -125,6 +125,26 @@ export default function AIPromptTestingPage() {
     return 'other'
   }
 
+  // Helper function to get expected response hint based on prompt type
+  const getExpectedResponseHint = (type: PromptType): string | null => {
+    if (type.endsWith('-title')) {
+      return 'Expects: Plain text OR { "headline": "<text>" }'
+    }
+    if (type.endsWith('-body')) {
+      return 'Expects: { "content": "<text>", "word_count": <integer> }'
+    }
+    if (type === 'post-scorer') {
+      return 'Expects: { "score": <0-10>, "reason": "<explanation>" }'
+    }
+    if (type === 'subject-line') {
+      return 'Expects: Plain text (max 40 characters)'
+    }
+    if (type === 'custom') {
+      return 'Expects: User-defined response format'
+    }
+    return null
+  }
+
   // Fetch article modules on mount
   useEffect(() => {
     async function loadArticleModules() {
@@ -844,6 +864,14 @@ export default function AIPromptTestingPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-xs bg-gray-50"
                 placeholder='Enter complete JSON API request here...'
               />
+
+              {/* Expected Response Hint */}
+              {getExpectedResponseHint(promptType) && (
+                <p className="mt-2 text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                  <span className="font-medium">Expected Response:</span>{' '}
+                  <code className="bg-amber-100 px-1 rounded">{getExpectedResponseHint(promptType)?.replace('Expects: ', '')}</code>
+                </p>
+              )}
 
               {/* Reset to Live Prompt Button - Only show when provider matches */}
               {livePrompt && livePromptProviderMatches && isModified && (
