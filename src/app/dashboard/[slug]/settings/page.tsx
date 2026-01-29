@@ -6664,6 +6664,14 @@ function PollSettings() {
     added_by: string | null
     created_at: string
   }[]>([])
+  const [suggestions, setSuggestions] = useState<{
+    ip_address: string
+    total_votes: number
+    unique_emails: number
+    time_span_seconds: number
+    reason: string
+    suspicion_level: 'high' | 'medium'
+  }[]>([])
   const [publicationId, setPublicationId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [newIp, setNewIp] = useState('')
@@ -6691,11 +6699,20 @@ function PollSettings() {
 
       setPublicationId(pubId)
 
-      // Fetch excluded IPs
-      const ipsRes = await fetch(`/api/polls/excluded-ips?publication_id=${pubId}`)
+      // Fetch excluded IPs and suggestions in parallel
+      const [ipsRes, suggestionsRes] = await Promise.all([
+        fetch(`/api/polls/excluded-ips?publication_id=${pubId}`),
+        fetch(`/api/polls/excluded-ips/suggestions?publication_id=${pubId}`)
+      ])
+
       if (ipsRes.ok) {
         const ipsData = await ipsRes.json()
         setExcludedIps(ipsData.ips || [])
+      }
+
+      if (suggestionsRes.ok) {
+        const suggestionsData = await suggestionsRes.json()
+        setSuggestions(suggestionsData.suggestions || [])
       }
     } catch (error) {
       console.error('Error fetching poll settings:', error)
@@ -6770,6 +6787,47 @@ function PollSettings() {
     } catch (error) {
       showMessage('Failed to remove IP', 'error')
     }
+  }
+
+  const handleExcludeSuggestion = async (ipAddress: string, reason: string) => {
+    if (!publicationId) return
+
+    try {
+      const res = await fetch('/api/polls/excluded-ips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          publication_id: publicationId,
+          ip_address: ipAddress,
+          reason: reason
+        })
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        showMessage(`IP "${ipAddress}" excluded from analytics`, 'success')
+        // Remove from suggestions and add to excluded
+        setSuggestions(prev => prev.filter(s => s.ip_address !== ipAddress))
+        setExcludedIps(data.ips || [])
+      } else {
+        showMessage(data.error || 'Failed to exclude IP', 'error')
+      }
+    } catch (error) {
+      showMessage('Failed to exclude IP', 'error')
+    }
+  }
+
+  const handleDismissSuggestion = (ipAddress: string) => {
+    // Just remove from local state (doesn't persist - will reappear on refresh)
+    setSuggestions(prev => prev.filter(s => s.ip_address !== ipAddress))
+    showMessage(`Suggestion dismissed`, 'success')
+  }
+
+  const getSuspicionBadgeColor = (level: 'high' | 'medium') => {
+    return level === 'high'
+      ? 'bg-red-100 text-red-800'
+      : 'bg-yellow-100 text-yellow-800'
   }
 
   if (loading) {
@@ -6874,6 +6932,65 @@ function PollSettings() {
         )}
       </div>
 
+      {/* Suggested IPs Section */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Suggested IPs to Exclude</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          These IPs show suspicious patterns like multiple different email addresses voting within seconds -
+          typically indicating email security scanners (Barracuda, Mimecast, etc.) or bots.
+        </p>
+
+        {suggestions.length === 0 ? (
+          <p className="text-gray-500 text-sm italic">No suspicious IPs detected - your poll data looks clean!</p>
+        ) : (
+          <div className="border rounded-lg overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP Address</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Votes</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Emails</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Suspicion</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {suggestions.map((suggestion) => (
+                  <tr key={suggestion.ip_address}>
+                    <td className="px-4 py-3 text-sm font-mono">{suggestion.ip_address}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{suggestion.total_votes}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{suggestion.unique_emails}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getSuspicionBadgeColor(suggestion.suspicion_level)}`}>
+                        {suggestion.suspicion_level}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500 max-w-xs" title={suggestion.reason}>
+                      {suggestion.reason}
+                    </td>
+                    <td className="px-4 py-3 text-right space-x-2">
+                      <button
+                        onClick={() => handleExcludeSuggestion(suggestion.ip_address, suggestion.reason)}
+                        className="text-red-600 hover:text-red-800 text-sm font-medium"
+                      >
+                        Exclude
+                      </button>
+                      <button
+                        onClick={() => handleDismissSuggestion(suggestion.ip_address)}
+                        className="text-gray-600 hover:text-gray-800 text-sm font-medium"
+                      >
+                        Dismiss
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Help Section */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h4 className="font-semibold text-blue-900 mb-2">How IP Exclusion Works:</h4>
@@ -6882,6 +6999,7 @@ function PollSettings() {
           <li><strong>Useful for:</strong> Filtering out spam clickers, auto-clickers, bots, or internal test votes.</li>
           <li><strong>Per-publication:</strong> Each publication has its own exclusion list.</li>
           <li><strong>Auditable:</strong> You can always see which IPs voted by checking the poll responses directly.</li>
+          <li><strong>Suggestions:</strong> IPs with multiple emails voting within seconds are flagged as likely email security scanners.</li>
         </ul>
       </div>
     </div>
