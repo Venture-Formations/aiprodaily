@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
+import { getKnownIPRange, getKnownRangesByOrganization, KnownIPRange } from '@/lib/known-ip-ranges'
 
 /**
  * GET - Get suggested IPs to exclude based on suspicious patterns
@@ -185,11 +186,17 @@ export async function GET(request: NextRequest) {
       .map(stats => {
         const timeSpanSeconds = (stats.last_seen.getTime() - stats.first_seen.getTime()) / 1000
 
+        // Check if this IP belongs to a known email scanner
+        const knownRange = getKnownIPRange(stats.ip_address)
+
         // Determine suspicion reason
         let reason = ''
         let suspicion_level: 'high' | 'medium' = 'medium'
 
-        if (timeSpanSeconds < 60 && stats.unique_emails.size >= 2) {
+        if (knownRange) {
+          reason = `Known ${knownRange.organization} ${knownRange.type === 'email_scanner' ? 'email scanner' : knownRange.type} (${knownRange.description || knownRange.cidr})`
+          suspicion_level = 'high'
+        } else if (timeSpanSeconds < 60 && stats.unique_emails.size >= 2) {
           reason = `${stats.unique_emails.size} different emails in ${Math.round(timeSpanSeconds)} seconds - likely email security scanner`
           suspicion_level = 'high'
         } else if (timeSpanSeconds < 300 && stats.unique_emails.size >= 2) {
@@ -210,7 +217,13 @@ export async function GET(request: NextRequest) {
           reason,
           suspicion_level,
           first_seen: stats.first_seen.toISOString(),
-          last_seen: stats.last_seen.toISOString()
+          last_seen: stats.last_seen.toISOString(),
+          known_scanner: knownRange ? {
+            organization: knownRange.organization,
+            type: knownRange.type,
+            description: knownRange.description,
+            recommended_cidr: knownRange.cidr
+          } : null
         }
       })
       .sort((a, b) => {
@@ -221,9 +234,37 @@ export async function GET(request: NextRequest) {
         return a.time_span_seconds - b.time_span_seconds
       })
 
+    // Build summary of detected known scanners with recommended ranges
+    const detectedScanners: Record<string, {
+      organization: string
+      type: string
+      ip_count: number
+      total_activity: number
+      recommended_ranges: string[]
+    }> = {}
+
+    for (const suggestion of suggestions) {
+      if (suggestion.known_scanner) {
+        const org = suggestion.known_scanner.organization
+        if (!detectedScanners[org]) {
+          const ranges = getKnownRangesByOrganization(org)
+          detectedScanners[org] = {
+            organization: org,
+            type: suggestion.known_scanner.type,
+            ip_count: 0,
+            total_activity: 0,
+            recommended_ranges: Array.from(new Set(ranges.map(r => r.cidr)))
+          }
+        }
+        detectedScanners[org].ip_count++
+        detectedScanners[org].total_activity += suggestion.total_activity
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      suggestions
+      suggestions,
+      detected_scanners: Object.values(detectedScanners).sort((a, b) => b.total_activity - a.total_activity)
     })
 
   } catch (error) {

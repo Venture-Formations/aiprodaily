@@ -6676,6 +6676,19 @@ function IPExclusionSettings() {
     time_span_seconds: number
     reason: string
     suspicion_level: 'high' | 'medium'
+    known_scanner: {
+      organization: string
+      type: string
+      description: string
+      recommended_cidr: string
+    } | null
+  }[]>([])
+  const [detectedScanners, setDetectedScanners] = useState<{
+    organization: string
+    type: string
+    ip_count: number
+    total_activity: number
+    recommended_ranges: string[]
   }[]>([])
   const [publicationId, setPublicationId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -6719,6 +6732,7 @@ function IPExclusionSettings() {
       if (suggestionsRes.ok) {
         const suggestionsData = await suggestionsRes.json()
         setSuggestions(suggestionsData.suggestions || [])
+        setDetectedScanners(suggestionsData.detected_scanners || [])
       }
     } catch (error) {
       console.error('Error fetching IP exclusion settings:', error)
@@ -6828,6 +6842,43 @@ function IPExclusionSettings() {
     // Just remove from local state (doesn't persist - will reappear on refresh)
     setSuggestions(prev => prev.filter(s => s.ip_address !== ipAddress))
     showMessage(`Suggestion dismissed`, 'success')
+  }
+
+  const handleExcludeKnownScanner = async (scanner: typeof detectedScanners[0]) => {
+    if (!publicationId) return
+
+    // Exclude each recommended range
+    let successCount = 0
+    for (const cidr of scanner.recommended_ranges) {
+      try {
+        const res = await fetch('/api/excluded-ips', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            publication_id: publicationId,
+            ip_address: cidr,
+            reason: `${scanner.organization} email scanner`
+          })
+        })
+
+        if (res.ok) {
+          successCount++
+          const data = await res.json()
+          setExcludedIps(data.ips || [])
+        }
+      } catch (error) {
+        console.error(`Failed to exclude ${cidr}:`, error)
+      }
+    }
+
+    if (successCount > 0) {
+      showMessage(`Excluded ${successCount} ${scanner.organization} IP range(s)`, 'success')
+      // Remove matching suggestions
+      setSuggestions(prev => prev.filter(s => s.known_scanner?.organization !== scanner.organization))
+      setDetectedScanners(prev => prev.filter(s => s.organization !== scanner.organization))
+    } else {
+      showMessage('Failed to exclude ranges', 'error')
+    }
   }
 
   const getSuspicionBadgeColor = (level: 'high' | 'medium') => {
@@ -6958,6 +7009,52 @@ function IPExclusionSettings() {
         )}
       </div>
 
+      {/* Detected Known Scanners Section */}
+      {detectedScanners.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-orange-900 mb-2">
+            Detected Email Security Scanners
+          </h3>
+          <p className="text-sm text-orange-800 mb-4">
+            We detected activity from known email security services. These services scan links in emails
+            before delivery, creating false clicks. Click "Exclude All Ranges" to block all their IP ranges.
+          </p>
+
+          <div className="space-y-3">
+            {detectedScanners.map((scanner) => (
+              <div
+                key={scanner.organization}
+                className="bg-white rounded-lg border border-orange-200 p-4 flex items-center justify-between"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-gray-900">{scanner.organization}</span>
+                    <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-orange-100 text-orange-800">
+                      {scanner.type === 'email_scanner' ? 'Email Scanner' : scanner.type}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {scanner.ip_count} IP{scanner.ip_count !== 1 ? 's' : ''} detected •
+                    {' '}{scanner.total_activity} total activities •
+                    {' '}{scanner.recommended_ranges.length} range{scanner.recommended_ranges.length !== 1 ? 's' : ''} to exclude
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1 font-mono">
+                    Ranges: {scanner.recommended_ranges.slice(0, 3).join(', ')}
+                    {scanner.recommended_ranges.length > 3 && ` +${scanner.recommended_ranges.length - 3} more`}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleExcludeKnownScanner(scanner)}
+                  className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded text-sm font-medium whitespace-nowrap"
+                >
+                  Exclude All Ranges
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Suggested IPs Section */}
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Suggested IPs to Exclude</h3>
@@ -6983,8 +7080,15 @@ function IPExclusionSettings() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {suggestions.map((suggestion) => (
-                  <tr key={suggestion.ip_address}>
-                    <td className="px-4 py-3 text-sm font-mono">{suggestion.ip_address}</td>
+                  <tr key={suggestion.ip_address} className={suggestion.known_scanner ? 'bg-orange-50' : ''}>
+                    <td className="px-4 py-3 text-sm">
+                      <div className="font-mono">{suggestion.ip_address}</div>
+                      {suggestion.known_scanner && (
+                        <span className="inline-flex mt-1 px-2 py-0.5 text-xs font-medium rounded-full bg-orange-100 text-orange-800">
+                          {suggestion.known_scanner.organization}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-600" title={`${suggestion.poll_votes} poll votes, ${suggestion.link_clicks} link clicks`}>
                       {suggestion.total_activity}
                     </td>
@@ -7005,10 +7109,14 @@ function IPExclusionSettings() {
                         See Emails
                       </button>
                       <button
-                        onClick={() => handleExcludeSuggestion(suggestion.ip_address, suggestion.reason)}
+                        onClick={() => handleExcludeSuggestion(
+                          suggestion.known_scanner?.recommended_cidr || suggestion.ip_address,
+                          suggestion.reason
+                        )}
                         className="text-red-600 hover:text-red-800 text-sm font-medium"
+                        title={suggestion.known_scanner ? `Exclude range ${suggestion.known_scanner.recommended_cidr}` : 'Exclude this IP'}
                       >
-                        Exclude
+                        {suggestion.known_scanner ? 'Exclude Range' : 'Exclude'}
                       </button>
                       <button
                         onClick={() => handleDismissSuggestion(suggestion.ip_address)}
