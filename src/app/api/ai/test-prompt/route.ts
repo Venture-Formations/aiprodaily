@@ -103,6 +103,8 @@ export async function POST(request: NextRequest) {
 
     // Start with the prompt JSON
     let processedJson = promptJson
+    console.log('[TEST-PROMPT] Initial promptJson keys:', Object.keys(promptJson))
+    console.log('[TEST-PROMPT] Initial has messages:', !!promptJson.messages)
 
     // Auto-detect Text Box format (has "prompt" field but no "messages"/"input")
     // and convert to full API request format
@@ -220,6 +222,10 @@ export async function POST(request: NextRequest) {
       tokensUsed = completion.usage?.total_tokens
     } else if (provider === 'claude') {
       // Claude API call - send the exact JSON
+      console.log('[TEST-PROMPT] Claude request - processedJson keys:', Object.keys(processedJson))
+      console.log('[TEST-PROMPT] Claude request - has messages:', !!processedJson.messages)
+      console.log('[TEST-PROMPT] Claude request - messages length:', processedJson.messages?.length)
+
       const completion = await anthropic.messages.create(processedJson)
 
       // Store the full API response for debugging
