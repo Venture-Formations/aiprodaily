@@ -12,13 +12,26 @@ export const maxDuration = 600 // 10 minutes for processing multiple articles
 // Helper function to inject post data into JSON recursively
 function injectPostData(obj: any, post: any): any {
   if (typeof obj === 'string') {
-    if (!post) return obj
-    return obj
-      .replace(/\{\{title\}\}/g, post.title || '')
-      .replace(/\{\{description\}\}/g, post.description || 'No description available')
-      .replace(/\{\{content\}\}/g, post.full_article_text || 'No content available')
-      .replace(/\{\{headline\}\}/g, post.title || '')
-      .replace(/\{\{url\}\}/g, post.source_url || '')
+    let result = obj
+    if (post) {
+      result = result
+        .replace(/\{\{title\}\}/g, post.title || '')
+        .replace(/\{\{description\}\}/g, post.description || 'No description available')
+        .replace(/\{\{content\}\}/g, post.full_article_text || 'No content available')
+        .replace(/\{\{headline\}\}/g, post.title || '')
+        .replace(/\{\{url\}\}/g, post.source_url || '')
+    }
+    // Replace random integer placeholders: {{random_X-Y}}
+    result = result.replace(/\{\{random_(\d+)-(\d+)\}\}/g, (match: string, minStr: string, maxStr: string) => {
+      const min = parseInt(minStr, 10)
+      const max = parseInt(maxStr, 10)
+      if (isNaN(min) || isNaN(max) || min > max) {
+        console.warn(`[TEST-PROMPT-MULTIPLE] Invalid random placeholder: ${match}`)
+        return match // Return unchanged if invalid
+      }
+      return String(Math.floor(Math.random() * (max - min + 1)) + min)
+    })
+    return result
   }
   if (Array.isArray(obj)) {
     return obj.map(item => injectPostData(item, post))

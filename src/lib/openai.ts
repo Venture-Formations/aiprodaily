@@ -1890,10 +1890,22 @@ export async function callWithStructuredPrompt(
   // Replace placeholders recursively in the entire object
   function replacePlaceholders(obj: any): any {
     if (typeof obj === 'string') {
-      return Object.entries(placeholders).reduce(
+      // First replace named placeholders
+      let result = Object.entries(placeholders).reduce(
         (str, [key, value]) => str.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value),
         obj
       )
+      // Then replace random integer placeholders: {{random_X-Y}}
+      result = result.replace(/\{\{random_(\d+)-(\d+)\}\}/g, (match, minStr, maxStr) => {
+        const min = parseInt(minStr, 10)
+        const max = parseInt(maxStr, 10)
+        if (isNaN(min) || isNaN(max) || min > max) {
+          console.warn(`[AI] Invalid random placeholder: ${match}`)
+          return match // Return unchanged if invalid
+        }
+        return String(Math.floor(Math.random() * (max - min + 1)) + min)
+      })
+      return result
     }
     if (Array.isArray(obj)) {
       return obj.map(item => replacePlaceholders(item))

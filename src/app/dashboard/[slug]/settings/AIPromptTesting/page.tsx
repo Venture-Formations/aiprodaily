@@ -697,6 +697,18 @@ export default function AIPromptTestingPage() {
                   </div>
                 </div>
 
+                {/* Dynamic Placeholders */}
+                <div className="bg-green-50 rounded-lg p-4 space-y-2 text-sm mb-3">
+                  <div className="text-xs font-semibold text-green-600 uppercase tracking-wide mb-2">Dynamic Values</div>
+                  <div className="font-mono">
+                    <span className="text-green-600">{'{{random_X-Y}}'}</span>
+                    <span className="text-gray-600 ml-2">- Random integer from X to Y</span>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-2">
+                    Examples: <code className="bg-white px-1 rounded">{'{{random_1-8}}'}</code> → 1-8, <code className="bg-white px-1 rounded">{'{{random_10-25}}'}</code> → 10-25
+                  </div>
+                </div>
+
                 {/* Newsletter Context Placeholders - only for Custom/Freeform */}
                 {promptType === 'custom' && (
                   <div className="bg-purple-50 rounded-lg p-4 space-y-3 text-sm border border-purple-200">
