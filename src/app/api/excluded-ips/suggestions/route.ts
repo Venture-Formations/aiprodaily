@@ -44,27 +44,62 @@ export async function GET(request: NextRequest) {
       cidr_prefix: e.cidr_prefix
     }))
 
-    // Fetch poll responses with IP
-    const { data: pollData, error: pollError } = await supabaseAdmin
-      .from('poll_responses')
-      .select('ip_address, subscriber_email, responded_at')
-      .eq('publication_id', publicationId)
-      .not('ip_address', 'is', null)
+    // Fetch poll responses with IP (with pagination to handle >1000 rows)
+    const BATCH_SIZE = 1000
+    let pollData: any[] = []
+    let pollOffset = 0
+    let pollHasMore = true
 
-    if (pollError) {
-      console.error('[IP Exclusion] Error fetching poll responses:', pollError)
+    while (pollHasMore) {
+      const { data: batch, error: pollError } = await supabaseAdmin
+        .from('poll_responses')
+        .select('ip_address, subscriber_email, responded_at')
+        .eq('publication_id', publicationId)
+        .not('ip_address', 'is', null)
+        .range(pollOffset, pollOffset + BATCH_SIZE - 1)
+
+      if (pollError) {
+        console.error('[IP Exclusion] Error fetching poll responses:', pollError)
+        break
+      }
+
+      if (batch && batch.length > 0) {
+        pollData = pollData.concat(batch)
+        pollOffset += BATCH_SIZE
+        pollHasMore = batch.length === BATCH_SIZE
+      } else {
+        pollHasMore = false
+      }
     }
 
-    // Fetch link clicks with IP
-    const { data: clickData, error: clickError } = await supabaseAdmin
-      .from('link_clicks')
-      .select('ip_address, subscriber_email, clicked_at')
-      .eq('publication_id', publicationId)
-      .not('ip_address', 'is', null)
+    // Fetch link clicks with IP (with pagination to handle >1000 rows)
+    let clickData: any[] = []
+    let clickOffset = 0
+    let clickHasMore = true
 
-    if (clickError) {
-      console.error('[IP Exclusion] Error fetching link clicks:', clickError)
+    while (clickHasMore) {
+      const { data: batch, error: clickError } = await supabaseAdmin
+        .from('link_clicks')
+        .select('ip_address, subscriber_email, clicked_at')
+        .eq('publication_id', publicationId)
+        .not('ip_address', 'is', null)
+        .range(clickOffset, clickOffset + BATCH_SIZE - 1)
+
+      if (clickError) {
+        console.error('[IP Exclusion] Error fetching link clicks:', clickError)
+        break
+      }
+
+      if (batch && batch.length > 0) {
+        clickData = clickData.concat(batch)
+        clickOffset += BATCH_SIZE
+        clickHasMore = batch.length === BATCH_SIZE
+      } else {
+        clickHasMore = false
+      }
     }
+
+    console.log(`[IP Exclusion] Fetched ${pollData.length} poll responses and ${clickData.length} link clicks for suggestions`)
 
     // Process data to find suspicious patterns
     const ipStats: Record<string, {

@@ -52,96 +52,150 @@ export async function GET(
 
     const emailMap: Record<string, EmailEntry> = {}
 
+    const BATCH_SIZE = 1000
+
     // Fetch poll responses
     if (source === 'all' || source === 'polls') {
-      let query = supabaseAdmin
-        .from('poll_responses')
-        .select('subscriber_email, ip_address, responded_at')
-        .eq('publication_id', publicationId)
-        .not('ip_address', 'is', null)
+      let pollData: any[] = []
 
-      // For single IP, we can filter in the query
+      // For single IP, filter in query (efficient)
       if (!isRange) {
-        query = query.eq('ip_address', decodedIp)
+        const { data, error: pollError } = await supabaseAdmin
+          .from('poll_responses')
+          .select('subscriber_email, ip_address, responded_at')
+          .eq('publication_id', publicationId)
+          .eq('ip_address', decodedIp)
+
+        if (pollError) {
+          console.error('[IP Exclusion] Error fetching poll responses:', pollError)
+        } else {
+          pollData = data || []
+        }
+      } else {
+        // For CIDR ranges, need to fetch all and filter in JS (with pagination)
+        let offset = 0
+        let hasMore = true
+
+        while (hasMore) {
+          const { data: batch, error: pollError } = await supabaseAdmin
+            .from('poll_responses')
+            .select('subscriber_email, ip_address, responded_at')
+            .eq('publication_id', publicationId)
+            .not('ip_address', 'is', null)
+            .range(offset, offset + BATCH_SIZE - 1)
+
+          if (pollError) {
+            console.error('[IP Exclusion] Error fetching poll responses:', pollError)
+            break
+          }
+
+          if (batch && batch.length > 0) {
+            pollData = pollData.concat(batch)
+            offset += BATCH_SIZE
+            hasMore = batch.length === BATCH_SIZE
+          } else {
+            hasMore = false
+          }
+        }
       }
 
-      const { data: pollData, error: pollError } = await query
+      for (const row of pollData) {
+        // For CIDR ranges, filter in JavaScript
+        if (isRange && cidrParsed) {
+          if (!ipMatchesCIDR(row.ip_address, cidrParsed.ip, cidrParsed.prefix)) {
+            continue
+          }
+        }
 
-      if (pollError) {
-        console.error('[IP Exclusion] Error fetching poll responses:', pollError)
-      } else if (pollData) {
-        for (const row of pollData) {
-          // For CIDR ranges, filter in JavaScript
-          if (isRange && cidrParsed) {
-            if (!ipMatchesCIDR(row.ip_address, cidrParsed.ip, cidrParsed.prefix)) {
-              continue
-            }
+        const key = `${row.subscriber_email}|poll`
+        if (!emailMap[key]) {
+          emailMap[key] = {
+            email: row.subscriber_email,
+            source: 'poll',
+            count: 0,
+            first_seen: row.responded_at,
+            last_seen: row.responded_at
           }
-
-          const key = `${row.subscriber_email}|poll`
-          if (!emailMap[key]) {
-            emailMap[key] = {
-              email: row.subscriber_email,
-              source: 'poll',
-              count: 0,
-              first_seen: row.responded_at,
-              last_seen: row.responded_at
-            }
-          }
-          emailMap[key].count++
-          if (row.responded_at < emailMap[key].first_seen) {
-            emailMap[key].first_seen = row.responded_at
-          }
-          if (row.responded_at > emailMap[key].last_seen) {
-            emailMap[key].last_seen = row.responded_at
-          }
+        }
+        emailMap[key].count++
+        if (row.responded_at < emailMap[key].first_seen) {
+          emailMap[key].first_seen = row.responded_at
+        }
+        if (row.responded_at > emailMap[key].last_seen) {
+          emailMap[key].last_seen = row.responded_at
         }
       }
     }
 
     // Fetch link clicks
     if (source === 'all' || source === 'clicks') {
-      let query = supabaseAdmin
-        .from('link_clicks')
-        .select('subscriber_email, ip_address, clicked_at')
-        .eq('publication_id', publicationId)
-        .not('ip_address', 'is', null)
+      let clickData: any[] = []
 
-      // For single IP, we can filter in the query
+      // For single IP, filter in query (efficient)
       if (!isRange) {
-        query = query.eq('ip_address', decodedIp)
+        const { data, error: clickError } = await supabaseAdmin
+          .from('link_clicks')
+          .select('subscriber_email, ip_address, clicked_at')
+          .eq('publication_id', publicationId)
+          .eq('ip_address', decodedIp)
+
+        if (clickError) {
+          console.error('[IP Exclusion] Error fetching link clicks:', clickError)
+        } else {
+          clickData = data || []
+        }
+      } else {
+        // For CIDR ranges, need to fetch all and filter in JS (with pagination)
+        let offset = 0
+        let hasMore = true
+
+        while (hasMore) {
+          const { data: batch, error: clickError } = await supabaseAdmin
+            .from('link_clicks')
+            .select('subscriber_email, ip_address, clicked_at')
+            .eq('publication_id', publicationId)
+            .not('ip_address', 'is', null)
+            .range(offset, offset + BATCH_SIZE - 1)
+
+          if (clickError) {
+            console.error('[IP Exclusion] Error fetching link clicks:', clickError)
+            break
+          }
+
+          if (batch && batch.length > 0) {
+            clickData = clickData.concat(batch)
+            offset += BATCH_SIZE
+            hasMore = batch.length === BATCH_SIZE
+          } else {
+            hasMore = false
+          }
+        }
       }
 
-      const { data: clickData, error: clickError } = await query
+      for (const row of clickData) {
+        // For CIDR ranges, filter in JavaScript
+        if (isRange && cidrParsed) {
+          if (!ipMatchesCIDR(row.ip_address, cidrParsed.ip, cidrParsed.prefix)) {
+            continue
+          }
+        }
 
-      if (clickError) {
-        console.error('[IP Exclusion] Error fetching link clicks:', clickError)
-      } else if (clickData) {
-        for (const row of clickData) {
-          // For CIDR ranges, filter in JavaScript
-          if (isRange && cidrParsed) {
-            if (!ipMatchesCIDR(row.ip_address, cidrParsed.ip, cidrParsed.prefix)) {
-              continue
-            }
+        const key = `${row.subscriber_email}|link_click`
+        if (!emailMap[key]) {
+          emailMap[key] = {
+            email: row.subscriber_email,
+            source: 'link_click',
+            count: 0,
+            first_seen: row.clicked_at,
+            last_seen: row.clicked_at
           }
-
-          const key = `${row.subscriber_email}|link_click`
-          if (!emailMap[key]) {
-            emailMap[key] = {
-              email: row.subscriber_email,
-              source: 'link_click',
-              count: 0,
-              first_seen: row.clicked_at,
-              last_seen: row.clicked_at
-            }
-          }
-          emailMap[key].count++
-          if (row.clicked_at < emailMap[key].first_seen) {
-            emailMap[key].first_seen = row.clicked_at
-          }
-          if (row.clicked_at > emailMap[key].last_seen) {
-            emailMap[key].last_seen = row.clicked_at
-          }
+        }
+        emailMap[key].count++
+        if (row.clicked_at < emailMap[key].first_seen) {
+          emailMap[key].first_seen = row.clicked_at
+        }
+        if (row.clicked_at > emailMap[key].last_seen) {
+          emailMap[key].last_seen = row.clicked_at
         }
       }
     }
