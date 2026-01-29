@@ -366,7 +366,7 @@ export default function AIPromptTestingPage() {
 
   // Sanitize JSON string to fix common copy-paste issues
   function sanitizeJsonString(input: string): string {
-    return input
+    let result = input
       // Replace smart/curly quotes with straight quotes
       .replace(/[\u2018\u2019]/g, "'")
       .replace(/[\u201C\u201D]/g, '"')
@@ -376,6 +376,19 @@ export default function AIPromptTestingPage() {
       .replace(/[\u200B-\u200D\uFEFF]/g, '')
       // Remove other problematic control characters (except valid JSON escapes)
       .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+      .trim()
+
+    // Find the last closing brace and trim anything after it
+    const lastBrace = result.lastIndexOf('}')
+    if (lastBrace !== -1 && lastBrace < result.length - 1) {
+      const afterBrace = result.slice(lastBrace + 1).trim()
+      if (afterBrace.length > 0) {
+        console.log('[Testing Playground] Trimming content after JSON:', afterBrace.slice(0, 50))
+        result = result.slice(0, lastBrace + 1)
+      }
+    }
+
+    return result
   }
 
   async function handleTest() {
