@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
 
 // GET /api/polls/[id]/responses - Get responses for a poll with analytics
 export async function GET(
@@ -31,12 +32,16 @@ export async function GET(
     }
 
     // Get excluded IPs for this publication
-    const { data: excludedIps } = await supabaseAdmin
-      .from('poll_excluded_ips')
-      .select('ip_address')
+    const { data: excludedIpsData } = await supabaseAdmin
+      .from('excluded_ips')
+      .select('ip_address, is_range, cidr_prefix')
       .eq('publication_id', publicationId)
 
-    const excludedIpSet = new Set(excludedIps?.map(e => e.ip_address) || [])
+    const exclusions: IPExclusion[] = (excludedIpsData || []).map(e => ({
+      ip_address: e.ip_address,
+      is_range: e.is_range || false,
+      cidr_prefix: e.cidr_prefix
+    }))
 
     // Get all responses for this poll
     const { data: responsesRaw, error } = await supabaseAdmin
@@ -52,8 +57,9 @@ export async function GET(
     }
 
     // Filter out excluded IPs for analytics (but still return all responses for auditing)
+    // Supports both single IPs and CIDR ranges
     const filteredResponses = (responsesRaw || []).filter(r =>
-      !r.ip_address || !excludedIpSet.has(r.ip_address)
+      !isIPExcluded(r.ip_address, exclusions)
     )
 
     // Calculate analytics from filtered responses

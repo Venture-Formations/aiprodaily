@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
 
 /**
  * Link Click Analytics Endpoint
  * Provides aggregated click tracking data for the analytics dashboard
  *
  * Query Parameters:
+ * - newsletter_slug: Required - Filter by publication (multi-tenant isolation)
  * - days: Number of days to look back (default: 30)
  */
 export async function GET(request: NextRequest) {
@@ -19,7 +21,43 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
+    const newsletterSlug = searchParams.get('newsletter_slug')
     const days = parseInt(searchParams.get('days') || '30')
+
+    // Get publication_id from slug (REQUIRED for multi-tenant isolation)
+    let publicationId: string | null = null
+
+    if (newsletterSlug) {
+      const { data: newsletter, error: newsletterError } = await supabaseAdmin
+        .from('publications')
+        .select('id')
+        .eq('slug', newsletterSlug)
+        .single()
+
+      if (newsletterError || !newsletter) {
+        console.error('[Link Analytics] Newsletter not found:', newsletterSlug)
+        return NextResponse.json(
+          { error: 'Newsletter not found' },
+          { status: 404 }
+        )
+      }
+      publicationId = newsletter.id
+    }
+
+    // Fetch excluded IPs for this publication (if we have a publication_id)
+    let exclusions: IPExclusion[] = []
+    if (publicationId) {
+      const { data: excludedIpsData } = await supabaseAdmin
+        .from('excluded_ips')
+        .select('ip_address, is_range, cidr_prefix')
+        .eq('publication_id', publicationId)
+
+      exclusions = (excludedIpsData || []).map(e => ({
+        ip_address: e.ip_address,
+        is_range: e.is_range || false,
+        cidr_prefix: e.cidr_prefix
+      }))
+    }
 
     // Calculate date range using local timezone
     const endDate = new Date()
@@ -30,7 +68,7 @@ export async function GET(request: NextRequest) {
     const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`
     const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
 
-    console.log(`Fetching link click analytics for last ${days} days (${startDateStr} to ${endDateStr})`)
+    console.log(`[Link Analytics] Fetching for ${newsletterSlug || 'all'}, date range: ${startDateStr} to ${endDateStr}`)
 
     // Fetch ALL link clicks within date range using pagination (Supabase has 1000 row limit per query)
     const BATCH_SIZE = 1000
@@ -39,13 +77,19 @@ export async function GET(request: NextRequest) {
     let hasMore = true
 
     while (hasMore) {
-      const { data: clicks, error } = await supabaseAdmin
+      let query = supabaseAdmin
         .from('link_clicks')
         .select('*')
         .gte('issue_date', startDateStr)
         .lte('issue_date', endDateStr)
         .order('clicked_at', { ascending: false })
-        .range(offset, offset + BATCH_SIZE - 1)
+
+      // Filter by publication_id if available
+      if (publicationId) {
+        query = query.eq('publication_id', publicationId)
+      }
+
+      const { data: clicks, error } = await query.range(offset, offset + BATCH_SIZE - 1)
 
       if (error) {
         console.error('Error fetching link clicks:', error)
@@ -61,9 +105,20 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log(`[Link Analytics] Fetched ${allClicks.length} total clicks`)
+    const totalFetched = allClicks.length
 
-    const clicks = allClicks
+    // Filter out excluded IPs from analytics (clicks are still recorded, just not counted)
+    // Supports both single IPs and CIDR ranges
+    const clicks = allClicks.filter(click =>
+      !isIPExcluded(click.ip_address, exclusions)
+    )
+    const excludedClickCount = totalFetched - clicks.length
+
+    if (excludedClickCount > 0) {
+      console.log(`[Link Analytics] Filtered ${excludedClickCount} clicks from ${exclusions.length} excluded IP(s)`)
+    }
+
+    console.log(`[Link Analytics] Fetched ${totalFetched} total clicks, ${clicks.length} after IP filtering`)
 
     // Calculate total clicks
     const totalClicks = clicks?.length || 0
@@ -147,7 +202,11 @@ export async function GET(request: NextRequest) {
         dateRange: {
           start: startDateStr,
           end: endDateStr
-        }
+        },
+        excluded_ips: publicationId ? {
+          count: exclusions.length,
+          filtered_clicks: excludedClickCount
+        } : null
       }
     })
 

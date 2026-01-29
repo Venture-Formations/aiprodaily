@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
 
 /**
  * Polls Analytics Endpoint
@@ -57,12 +58,16 @@ export async function GET(request: NextRequest) {
 
     // Fetch excluded IPs for this publication (for filtering analytics)
     const { data: excludedIpsData } = await supabaseAdmin
-      .from('poll_excluded_ips')
-      .select('ip_address')
+      .from('excluded_ips')
+      .select('ip_address, is_range, cidr_prefix')
       .eq('publication_id', publicationId)
 
-    const excludedIpSet = new Set(excludedIpsData?.map(e => e.ip_address) || [])
-    const excludedIpCount = excludedIpSet.size
+    const exclusions: IPExclusion[] = (excludedIpsData || []).map(e => ({
+      ip_address: e.ip_address,
+      is_range: e.is_range || false,
+      cidr_prefix: e.cidr_prefix
+    }))
+    const excludedIpCount = exclusions.length
 
     // Calculate date range using local timezone (NO UTC - per CLAUDE.md)
     let startDateStr: string
@@ -131,8 +136,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Filter out excluded IPs from analytics (votes are still recorded, just not counted)
+    // Supports both single IPs and CIDR ranges
     const responses = (responsesRaw || []).filter(r =>
-      !r.ip_address || !excludedIpSet.has(r.ip_address)
+      !isIPExcluded(r.ip_address, exclusions)
     )
     const excludedResponseCount = (responsesRaw?.length || 0) - responses.length
 

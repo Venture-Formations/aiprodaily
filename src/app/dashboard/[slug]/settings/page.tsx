@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Layout from '@/components/Layout'
+import EmailsByIPModal from '@/components/EmailsByIPModal'
 import type { NewsletterSection } from '@/types/database'
 import {
   DndContext,
@@ -47,7 +48,7 @@ export default function SettingsPage() {
                 { id: 'email', name: 'Email' },
                 { id: 'rss', name: 'RSS Feeds' },
                 { id: 'blocked-domains', name: 'Blocked Domains' },
-                { id: 'poll-settings', name: 'Poll Settings' },
+                { id: 'ip-exclusion', name: 'IP Exclusion' },
                 { id: 'notifications', name: 'Notifications' },
                 { id: 'facebook', name: 'Facebook' },
                 { id: 'users', name: 'Users' }
@@ -76,7 +77,7 @@ export default function SettingsPage() {
           {activeTab === 'email' && <EmailSettings />}
           {activeTab === 'rss' && <RSSFeeds />}
           {activeTab === 'blocked-domains' && <BlockedDomainsSettings />}
-          {activeTab === 'poll-settings' && <PollSettings />}
+          {activeTab === 'ip-exclusion' && <IPExclusionSettings />}
           {activeTab === 'notifications' && <Notifications />}
           {activeTab === 'facebook' && <FacebookSettings />}
           {activeTab === 'users' && <Users />}
@@ -6652,21 +6653,25 @@ function BlockedDomainsSettings() {
   )
 }
 
-// Poll Settings Component - Manage excluded IPs for poll analytics
-function PollSettings() {
+// IP Exclusion Settings Component - Manage excluded IPs for poll responses and link click analytics
+function IPExclusionSettings() {
   const pathname = usePathname()
   const slug = pathname?.split('/')[2] || ''
 
   const [excludedIps, setExcludedIps] = useState<{
     id: string
     ip_address: string
+    is_range: boolean
+    cidr_prefix: number | null
     reason: string | null
     added_by: string | null
     created_at: string
   }[]>([])
   const [suggestions, setSuggestions] = useState<{
     ip_address: string
-    total_votes: number
+    total_activity: number
+    poll_votes: number
+    link_clicks: number
     unique_emails: number
     time_span_seconds: number
     reason: string
@@ -6678,6 +6683,7 @@ function PollSettings() {
   const [newReason, setNewReason] = useState('')
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
+  const [emailModalIp, setEmailModalIp] = useState<string | null>(null)
 
   const fetchData = async () => {
     try {
@@ -6701,8 +6707,8 @@ function PollSettings() {
 
       // Fetch excluded IPs and suggestions in parallel
       const [ipsRes, suggestionsRes] = await Promise.all([
-        fetch(`/api/polls/excluded-ips?publication_id=${pubId}`),
-        fetch(`/api/polls/excluded-ips/suggestions?publication_id=${pubId}`)
+        fetch(`/api/excluded-ips?publication_id=${pubId}`),
+        fetch(`/api/excluded-ips/suggestions?publication_id=${pubId}`)
       ])
 
       if (ipsRes.ok) {
@@ -6715,8 +6721,8 @@ function PollSettings() {
         setSuggestions(suggestionsData.suggestions || [])
       }
     } catch (error) {
-      console.error('Error fetching poll settings:', error)
-      showMessage('Failed to load poll settings', 'error')
+      console.error('Error fetching IP exclusion settings:', error)
+      showMessage('Failed to load IP exclusion settings', 'error')
     } finally {
       setLoading(false)
     }
@@ -6738,7 +6744,7 @@ function PollSettings() {
     if (!newIp.trim() || !publicationId) return
 
     try {
-      const res = await fetch('/api/polls/excluded-ips', {
+      const res = await fetch('/api/excluded-ips', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -6767,7 +6773,7 @@ function PollSettings() {
     if (!publicationId) return
 
     try {
-      const res = await fetch('/api/polls/excluded-ips', {
+      const res = await fetch('/api/excluded-ips', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -6793,7 +6799,7 @@ function PollSettings() {
     if (!publicationId) return
 
     try {
-      const res = await fetch('/api/polls/excluded-ips', {
+      const res = await fetch('/api/excluded-ips', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -6862,8 +6868,8 @@ function PollSettings() {
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Excluded IP Addresses</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Votes from these IP addresses will still be recorded, but will be excluded from poll analytics and results.
-          Use this to filter out spam clickers, bots, or internal testing.
+          Activity from these IP addresses will still be recorded, but will be excluded from both poll analytics and link click analytics.
+          Use this to filter out spam clickers, bots, or internal testing. You can exclude individual IPs or CIDR ranges.
         </p>
 
         {/* Add IP Form */}
@@ -6874,7 +6880,7 @@ function PollSettings() {
               value={newIp}
               onChange={(e) => setNewIp(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleAddIp()}
-              placeholder="Enter IP address (e.g., 192.168.1.1)"
+              placeholder="Enter IP or CIDR range (e.g., 192.168.1.1 or 192.168.1.0/24)"
               className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm font-mono"
             />
             <button
@@ -6903,6 +6909,7 @@ function PollSettings() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP Address</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Added</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -6911,12 +6918,31 @@ function PollSettings() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {excludedIps.map((ip) => (
                   <tr key={ip.id}>
-                    <td className="px-4 py-3 text-sm font-mono">{ip.ip_address}</td>
+                    <td className="px-4 py-3 text-sm font-mono">
+                      {ip.is_range ? `${ip.ip_address}/${ip.cidr_prefix}` : ip.ip_address}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {ip.is_range ? (
+                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                          Range
+                        </span>
+                      ) : (
+                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                          Single
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{ip.reason || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-500">
                       {new Date(ip.created_at).toLocaleDateString()}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right space-x-2">
+                      <button
+                        onClick={() => setEmailModalIp(ip.is_range ? `${ip.ip_address}/${ip.cidr_prefix}` : ip.ip_address)}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      >
+                        See Emails
+                      </button>
                       <button
                         onClick={() => handleRemoveIp(ip.ip_address)}
                         className="text-red-600 hover:text-red-800 text-sm font-medium"
@@ -6936,19 +6962,19 @@ function PollSettings() {
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Suggested IPs to Exclude</h3>
         <p className="text-sm text-gray-600 mb-4">
-          These IPs show suspicious patterns like multiple different email addresses voting within seconds -
+          These IPs show suspicious patterns like multiple different email addresses interacting within seconds -
           typically indicating email security scanners (Barracuda, Mimecast, etc.) or bots.
         </p>
 
         {suggestions.length === 0 ? (
-          <p className="text-gray-500 text-sm italic">No suspicious IPs detected - your poll data looks clean!</p>
+          <p className="text-gray-500 text-sm italic">No suspicious IPs detected - your data looks clean!</p>
         ) : (
           <div className="border rounded-lg overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP Address</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Votes</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Activity</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Emails</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Suspicion</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
@@ -6959,7 +6985,9 @@ function PollSettings() {
                 {suggestions.map((suggestion) => (
                   <tr key={suggestion.ip_address}>
                     <td className="px-4 py-3 text-sm font-mono">{suggestion.ip_address}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{suggestion.total_votes}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600" title={`${suggestion.poll_votes} poll votes, ${suggestion.link_clicks} link clicks`}>
+                      {suggestion.total_activity}
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{suggestion.unique_emails}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getSuspicionBadgeColor(suggestion.suspicion_level)}`}>
@@ -6970,6 +6998,12 @@ function PollSettings() {
                       {suggestion.reason}
                     </td>
                     <td className="px-4 py-3 text-right space-x-2">
+                      <button
+                        onClick={() => setEmailModalIp(suggestion.ip_address)}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      >
+                        See Emails
+                      </button>
                       <button
                         onClick={() => handleExcludeSuggestion(suggestion.ip_address, suggestion.reason)}
                         className="text-red-600 hover:text-red-800 text-sm font-medium"
@@ -6995,13 +7029,25 @@ function PollSettings() {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h4 className="font-semibold text-blue-900 mb-2">How IP Exclusion Works:</h4>
         <ul className="text-sm text-blue-800 space-y-1">
-          <li><strong>Votes are still recorded:</strong> Excluded IPs can still vote, but their responses won't be counted in analytics.</li>
-          <li><strong>Useful for:</strong> Filtering out spam clickers, auto-clickers, bots, or internal test votes.</li>
+          <li><strong>Activity is still recorded:</strong> Excluded IPs can still vote and click links, but their activity won't be counted in analytics.</li>
+          <li><strong>Applies to:</strong> Both poll response analytics and link click analytics.</li>
+          <li><strong>CIDR ranges:</strong> Use CIDR notation (e.g., 192.168.1.0/24) to exclude entire IP ranges.</li>
+          <li><strong>Useful for:</strong> Filtering out spam clickers, auto-clickers, bots, or internal testing.</li>
           <li><strong>Per-publication:</strong> Each publication has its own exclusion list.</li>
-          <li><strong>Auditable:</strong> You can always see which IPs voted by checking the poll responses directly.</li>
-          <li><strong>Suggestions:</strong> IPs with multiple emails voting within seconds are flagged as likely email security scanners.</li>
+          <li><strong>Auditable:</strong> Click "See Emails" to view all email addresses associated with an IP.</li>
+          <li><strong>Suggestions:</strong> IPs with multiple emails interacting within seconds are flagged as likely email security scanners.</li>
         </ul>
       </div>
+
+      {/* Email Modal */}
+      {emailModalIp && publicationId && (
+        <EmailsByIPModal
+          isOpen={!!emailModalIp}
+          onClose={() => setEmailModalIp(null)}
+          ipAddress={emailModalIp}
+          publicationId={publicationId}
+        />
+      )}
     </div>
   )
 }
