@@ -455,6 +455,9 @@ export default function AIPromptTestingPage() {
     console.log('[TEST] Original prompt length:', prompt.length)
     console.log('[TEST] Sanitized prompt length:', sanitizedPrompt.length)
     console.log('[TEST] First 500 chars of sanitized:', sanitizedPrompt.substring(0, 500))
+    console.log('[TEST] Last 200 chars of sanitized:', sanitizedPrompt.substring(sanitizedPrompt.length - 200))
+    console.log('[TEST] Chars around position 5800-5850:', sanitizedPrompt.substring(5800, 5850))
+    console.log('[TEST] FULL SANITIZED JSON:', sanitizedPrompt)
     let promptJson
     try {
       promptJson = JSON.parse(sanitizedPrompt)
