@@ -111,6 +111,16 @@ export default function AIPromptTestingPage() {
   const [livePromptProviderMatches, setLivePromptProviderMatches] = useState(false)
   const [isModified, setIsModified] = useState(false)
 
+  // JSON Builder mode (for Custom/Freeform - avoids JSON string parsing)
+  const [useJsonBuilder, setUseJsonBuilder] = useState(false)
+  const [builderModel, setBuilderModel] = useState('gpt-4o')
+  const [builderSystem, setBuilderSystem] = useState('')
+  const [builderUser, setBuilderUser] = useState('')
+  const [builderMaxTokens, setBuilderMaxTokens] = useState(1000)
+  const [builderTemperature, setBuilderTemperature] = useState(0.7)
+  const [builderThinking, setBuilderThinking] = useState(false)
+  const [builderThinkingBudget, setBuilderThinkingBudget] = useState(1500)
+
 
   // Helper function to extract module ID from prompt type
   const getModuleIdFromPromptType = (type: PromptType): string | null => {
@@ -390,20 +400,66 @@ export default function AIPromptTestingPage() {
   }
 
   async function handleTest() {
-    if (!prompt.trim()) {
-      alert('Please enter a prompt')
-      return
-    }
+    let promptJson: any
 
-    // Sanitize and validate JSON
-    const sanitizedPrompt = sanitizeJsonString(prompt)
-    let promptJson
-    try {
-      promptJson = JSON.parse(sanitizedPrompt)
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
-      alert(`Invalid JSON format: ${errorMsg}\n\nCommon issues:\n- Curly quotes (" ") instead of straight quotes (" ")\n- Missing commas between properties\n- Trailing commas after last property`)
-      return
+    // Use JSON Builder mode or raw JSON mode
+    if (useJsonBuilder && promptType === 'custom') {
+      // Build JSON object directly - no string parsing needed!
+      if (!builderUser.trim()) {
+        alert('Please enter a user message')
+        return
+      }
+
+      const isClaude = builderModel.toLowerCase().includes('claude')
+
+      if (isClaude) {
+        // Claude API format
+        promptJson = {
+          model: builderModel,
+          max_tokens: builderMaxTokens,
+          ...(builderSystem && { system: builderSystem }),
+          ...(builderThinking && {
+            thinking: {
+              type: 'enabled',
+              budget_tokens: builderThinkingBudget
+            }
+          }),
+          temperature: builderTemperature,
+          messages: [
+            { role: 'user', content: builderUser }
+          ]
+        }
+      } else {
+        // OpenAI API format
+        const messages: Array<{ role: string; content: string }> = []
+        if (builderSystem) {
+          messages.push({ role: 'system', content: builderSystem })
+        }
+        messages.push({ role: 'user', content: builderUser })
+
+        promptJson = {
+          model: builderModel,
+          messages,
+          max_output_tokens: builderMaxTokens,
+          temperature: builderTemperature
+        }
+      }
+    } else {
+      // Raw JSON mode
+      if (!prompt.trim()) {
+        alert('Please enter a prompt')
+        return
+      }
+
+      // Sanitize and validate JSON
+      const sanitizedPrompt = sanitizeJsonString(prompt)
+      try {
+        promptJson = JSON.parse(sanitizedPrompt)
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+        alert(`Invalid JSON format: ${errorMsg}\n\nCommon issues:\n- Curly quotes (" ") instead of straight quotes (" ")\n- Missing commas between properties\n- Trailing commas after last property`)
+        return
+      }
     }
 
     // Get the selected post for placeholder injection
@@ -413,8 +469,10 @@ export default function AIPromptTestingPage() {
       return
     }
 
-    // Save the prompt for this combination
-    savePrompt(prompt)
+    // Save the prompt for this combination (only for raw JSON mode)
+    if (!useJsonBuilder) {
+      savePrompt(prompt)
+    }
 
     setTesting(true)
     setCurrentResponse(null)
@@ -872,9 +930,22 @@ export default function AIPromptTestingPage() {
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-sm font-medium text-gray-700">
-                  API Request JSON
+                  {useJsonBuilder && promptType === 'custom' ? 'Prompt Builder' : 'API Request JSON'}
                 </label>
                 <div className="flex items-center gap-3">
+                  {/* JSON Builder Toggle - Only for Custom/Freeform */}
+                  {promptType === 'custom' && (
+                    <button
+                      onClick={() => setUseJsonBuilder(!useJsonBuilder)}
+                      className={`text-xs px-3 py-1 rounded-full font-medium transition-colors ${
+                        useJsonBuilder
+                          ? 'bg-purple-100 text-purple-700 border border-purple-300'
+                          : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
+                      }`}
+                    >
+                      {useJsonBuilder ? '✓ Builder Mode' : 'Use Builder Mode'}
+                    </button>
+                  )}
                   {/* Live Prompt Status Indicator - Only show when provider matches */}
                   {livePrompt && livePromptProviderMatches && !isModified && (
                     <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded flex items-center gap-1">
@@ -892,24 +963,133 @@ export default function AIPromptTestingPage() {
                       Modified from live
                     </span>
                   )}
-                  {savedPromptInfo && (
+                  {savedPromptInfo && !useJsonBuilder && (
                     <span className="text-xs text-green-600">
                       ✓ Saved {new Date(savedPromptInfo.updated_at).toLocaleDateString()}
                     </span>
                   )}
                 </div>
               </div>
-              <p className="text-xs text-gray-600 mb-3">
-                Enter the complete JSON API request. Model and parameters are included in the JSON.
-                Use placeholders like {'{'}{'{'} title {'}'}{'}'}  or {'{'}{'{'} content {'}'}{'}'} for post data.
-              </p>
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                rows={20}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-xs bg-gray-50"
-                placeholder='Enter complete JSON API request here...'
-              />
+
+              {/* JSON Builder Mode */}
+              {useJsonBuilder && promptType === 'custom' ? (
+                <div className="space-y-4">
+                  <p className="text-xs text-purple-600 bg-purple-50 p-2 rounded border border-purple-200">
+                    Builder Mode: Paste content directly without JSON escaping. The JSON is built automatically.
+                  </p>
+
+                  {/* Model Selection */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Model</label>
+                    <select
+                      value={builderModel}
+                      onChange={(e) => setBuilderModel(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+                    >
+                      <optgroup label="OpenAI">
+                        {OPENAI_MODELS.map(m => <option key={m} value={m}>{m}</option>)}
+                      </optgroup>
+                      <optgroup label="Claude">
+                        {CLAUDE_MODELS.map(m => <option key={m} value={m}>{m}</option>)}
+                        <option value="claude-opus-4-5-20251101">claude-opus-4-5-20251101</option>
+                      </optgroup>
+                    </select>
+                  </div>
+
+                  {/* Claude Extended Thinking */}
+                  {builderModel.toLowerCase().includes('claude') && (
+                    <div className="flex items-center gap-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={builderThinking}
+                          onChange={(e) => setBuilderThinking(e.target.checked)}
+                          className="rounded border-purple-300 text-purple-600 focus:ring-purple-500"
+                        />
+                        Enable Extended Thinking
+                      </label>
+                      {builderThinking && (
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-gray-600">Budget:</label>
+                          <input
+                            type="number"
+                            value={builderThinkingBudget}
+                            onChange={(e) => setBuilderThinkingBudget(parseInt(e.target.value) || 1500)}
+                            className="w-24 px-2 py-1 border border-purple-300 rounded text-sm"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Parameters */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Max Tokens</label>
+                      <input
+                        type="number"
+                        value={builderMaxTokens}
+                        onChange={(e) => setBuilderMaxTokens(parseInt(e.target.value) || 1000)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Temperature</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="2"
+                        value={builderTemperature}
+                        onChange={(e) => setBuilderTemperature(parseFloat(e.target.value) || 0.7)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* System Prompt */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      System Prompt <span className="text-gray-400">(optional)</span>
+                    </label>
+                    <textarea
+                      value={builderSystem}
+                      onChange={(e) => setBuilderSystem(e.target.value)}
+                      rows={8}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+                      placeholder="Enter your system prompt here... No JSON escaping needed!"
+                    />
+                  </div>
+
+                  {/* User Message */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      User Message <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={builderUser}
+                      onChange={(e) => setBuilderUser(e.target.value)}
+                      rows={4}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+                      placeholder="Enter your user message here..."
+                    />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-600 mb-3">
+                    Enter the complete JSON API request. Model and parameters are included in the JSON.
+                    Use placeholders like {'{'}{'{'} title {'}'}{'}'}  or {'{'}{'{'} content {'}'}{'}'} for post data.
+                  </p>
+                  <textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    rows={20}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-xs bg-gray-50"
+                    placeholder='Enter complete JSON API request here...'
+                  />
+                </>
+              )}
 
               {/* Expected Response Hint */}
               {getExpectedResponseHint(promptType) && (
@@ -934,7 +1114,7 @@ export default function AIPromptTestingPage() {
 
               <button
                 onClick={handleTest}
-                disabled={testing || !prompt.trim()}
+                disabled={testing || (useJsonBuilder && promptType === 'custom' ? !builderUser.trim() : !prompt.trim())}
                 className="mt-4 w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
               >
                 {testing ? 'Testing...' : 'Test Prompt'}
