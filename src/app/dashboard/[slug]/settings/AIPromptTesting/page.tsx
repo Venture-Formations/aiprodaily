@@ -375,7 +375,8 @@ export default function AIPromptTestingPage() {
     try {
       promptJson = JSON.parse(prompt)
     } catch (error) {
-      alert('Invalid JSON format. Please enter a valid JSON API request.')
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      alert(`Invalid JSON format: ${errorMsg}\n\nCommon issues:\n- Curly quotes (" ") instead of straight quotes (" ")\n- Missing commas between properties\n- Trailing commas after last property`)
       return
     }
 
@@ -449,7 +450,8 @@ export default function AIPromptTestingPage() {
     try {
       promptJson = JSON.parse(prompt)
     } catch (error) {
-      alert('Invalid JSON format. Please enter a valid JSON API request.')
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      alert(`Invalid JSON format: ${errorMsg}\n\nCommon issues:\n- Curly quotes (" ") instead of straight quotes (" ")\n- Missing commas between properties\n- Trailing commas after last property`)
       return
     }
 
