@@ -688,6 +688,10 @@ export default function AIPromptTestingPage() {
                     <span className="text-gray-600 ml-2">- Article description/summary</span>
                   </div>
                   <div className="font-mono">
+                    <span className="text-blue-600">{'{{summary}}'}</span>
+                    <span className="text-gray-600 ml-2">- Same as description (alias)</span>
+                  </div>
+                  <div className="font-mono">
                     <span className="text-blue-600">{'{{content}}'}</span>
                     <span className="text-gray-600 ml-2">- Full article text (scraped)</span>
                   </div>

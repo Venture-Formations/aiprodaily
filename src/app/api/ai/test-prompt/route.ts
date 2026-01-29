@@ -25,6 +25,7 @@ function injectPostData(obj: any, post: any): any {
       result = result
         .replace(/\{\{title\}\}/g, post.title || '')
         .replace(/\{\{description\}\}/g, post.description || 'No description available')
+        .replace(/\{\{summary\}\}/g, post.description || 'No summary available')
         .replace(/\{\{content\}\}/g, post.full_article_text || 'No content available')
         .replace(/\{\{headline\}\}/g, post.title || '')
         .replace(/\{\{url\}\}/g, post.source_url || '')
