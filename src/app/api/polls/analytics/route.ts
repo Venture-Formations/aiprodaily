@@ -159,6 +159,8 @@ export async function GET(request: NextRequest) {
       console.error('[Poll Analytics] Error fetching issues:', issuesError)
     }
 
+    console.log(`[Poll Analytics] Found ${issuesRaw?.length || 0} issues with polls in date range`)
+
     // Transform email_metrics from array to single object (Supabase returns it as array)
     const issues = (issuesRaw || []).map((issue: any) => ({
       ...issue,
@@ -166,6 +168,17 @@ export async function GET(request: NextRequest) {
         ? issue.email_metrics[0]
         : null
     }))
+
+    // Debug: Log issues with their poll_ids and metrics
+    if (issues.length > 0) {
+      console.log(`[Poll Analytics] Issues with polls:`, issues.map(i => ({
+        id: i.id,
+        date: i.date,
+        poll_id: i.poll_id,
+        has_metrics: !!i.email_metrics,
+        sent_count: i.email_metrics?.sent_count
+      })))
+    }
 
     // Build analytics for each poll
     const pollAnalytics = polls.map(poll => {
@@ -200,8 +213,12 @@ export async function GET(request: NextRequest) {
       let responseRate: number | null = null
       let totalRecipients = 0
 
+      // Debug: Log matching issues for this poll
+      console.log(`[Poll Analytics] Poll ${poll.id} (${poll.title}): ${pollIssues.length} matching issues, ${uniqueRespondents} unique respondents`)
+
       if (pollIssues.length > 0) {
         pollIssues.forEach(issue => {
+          console.log(`[Poll Analytics]   Issue ${issue.id}: sent_count=${issue.email_metrics?.sent_count || 'null'}`)
           if (issue.email_metrics?.sent_count) {
             totalRecipients += issue.email_metrics.sent_count
           }
@@ -211,6 +228,8 @@ export async function GET(request: NextRequest) {
           responseRate = Math.round((uniqueRespondents / totalRecipients) * 100)
         }
       }
+
+      console.log(`[Poll Analytics]   Final: totalRecipients=${totalRecipients}, responseRate=${responseRate}`)
 
       // Group by issue for per-issue breakdown
       const byIssue: Record<string, any> = {}
