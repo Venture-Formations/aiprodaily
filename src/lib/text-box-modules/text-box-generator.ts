@@ -6,7 +6,7 @@
  */
 
 import { supabaseAdmin } from '../supabase'
-import { callAI, openai } from '../openai'
+import { callAI, callWithStructuredPrompt, openai } from '../openai'
 import { TextBoxModuleSelector } from './text-box-selector'
 import type {
   TextBoxBlock,
@@ -357,43 +357,101 @@ export class TextBoxGenerator {
     }
 
     try {
-      const promptConfig = block.ai_prompt_json as {
-        prompt?: string
-        model?: string
-        provider?: string
-        temperature?: number
-        max_tokens?: number
-        system_prompt?: string
-        response_field?: string
+      const promptConfig = block.ai_prompt_json as any
+
+      // Detect format: Full API format has "messages" or "input", simple format has "prompt"
+      const isFullApiFormat = promptConfig.messages || promptConfig.input
+      const isSimpleFormat = promptConfig.prompt && !isFullApiFormat
+
+      if (!isFullApiFormat && !isSimpleFormat) {
+        return { success: false, error: 'Invalid prompt format: must have "messages"/"input" (full API) or "prompt" (simple)' }
       }
 
-      if (!promptConfig.prompt) {
-        return { success: false, error: 'No prompt text configured' }
+      // Determine provider from model name or explicit provider field
+      const modelName = (promptConfig.model || '').toLowerCase()
+      const isClaude = modelName.includes('claude') || promptConfig.provider === 'anthropic' || promptConfig.provider === 'claude'
+      const provider: 'openai' | 'claude' = isClaude ? 'claude' : 'openai'
+
+      let content: string
+
+      if (isFullApiFormat) {
+        // Full API format - use callWithStructuredPrompt (same as Testing Playground)
+        console.log('[TextBoxGenerator] Using full API format with callWithStructuredPrompt')
+
+        // Build placeholders object from data for injection
+        const placeholders: Record<string, string> = {
+          issue_date: data.issue_date,
+          publication_name: data.publication_name,
+        }
+
+        // Add section articles placeholders
+        if (data.section_articles) {
+          for (const [sectionKey, sectionData] of Object.entries(data.section_articles)) {
+            const sectionMatch = sectionKey.match(/section_(\d+)/)
+            if (!sectionMatch) continue
+            const sectionNum = sectionMatch[1]
+
+            placeholders[`section_${sectionNum}_name`] = sectionData.name || ''
+
+            const allArticlesText = sectionData.articles
+              .map((a, idx) => `Article ${idx + 1}: ${a.headline}\n${a.content}`)
+              .join('\n\n')
+            placeholders[`section_${sectionNum}_all_articles`] = allArticlesText
+
+            for (let i = 0; i < sectionData.articles.length; i++) {
+              placeholders[`section_${sectionNum}_article_${i + 1}_headline`] = sectionData.articles[i].headline || ''
+              placeholders[`section_${sectionNum}_article_${i + 1}_content`] = sectionData.articles[i].content || ''
+            }
+          }
+        }
+
+        // Add AI apps placeholders
+        if (data.ai_apps) {
+          for (let i = 0; i < data.ai_apps.length; i++) {
+            placeholders[`ai_app_${i + 1}_name`] = data.ai_apps[i].name
+            placeholders[`ai_app_${i + 1}_tagline`] = data.ai_apps[i].tagline || ''
+            placeholders[`ai_app_${i + 1}_description`] = data.ai_apps[i].description
+          }
+        }
+
+        // Add poll placeholders
+        if (data.poll) {
+          placeholders['poll_question'] = data.poll.question
+          placeholders['poll_options'] = data.poll.options.join(', ')
+        }
+
+        // Add ad placeholders
+        if (data.ads) {
+          for (let i = 0; i < data.ads.length; i++) {
+            placeholders[`ad_${i + 1}_title`] = data.ads[i].title || ''
+            placeholders[`ad_${i + 1}_body`] = data.ads[i].body || ''
+          }
+        }
+
+        const result = await callWithStructuredPrompt(promptConfig, placeholders, provider)
+        content = extractTextFromResponse(result, promptConfig.response_field)
+
+      } else {
+        // Simple format - use callAI (legacy behavior)
+        console.log('[TextBoxGenerator] Using simple format with callAI')
+
+        // Inject placeholders into the prompt
+        const injectedPrompt = this.injectPlaceholders(promptConfig.prompt, data)
+
+        // Build full prompt with system prompt if provided
+        const fullPrompt = promptConfig.system_prompt
+          ? `${promptConfig.system_prompt}\n\n${injectedPrompt}`
+          : injectedPrompt
+
+        const result = await callAI(
+          fullPrompt,
+          promptConfig.max_tokens || 500,
+          promptConfig.temperature || 0.7,
+          provider
+        )
+
+        content = extractTextFromResponse(result, promptConfig.response_field)
       }
-
-      // Inject placeholders into the prompt
-      const injectedPrompt = this.injectPlaceholders(promptConfig.prompt, data)
-
-      // Build full prompt with system prompt if provided
-      const fullPrompt = promptConfig.system_prompt
-        ? `${promptConfig.system_prompt}\n\n${injectedPrompt}`
-        : injectedPrompt
-
-      // Determine provider (default to openai)
-      const provider = promptConfig.provider === 'anthropic' || promptConfig.provider === 'claude'
-        ? 'claude'
-        : 'openai'
-
-      // Call AI with the prompt using existing callAI function
-      const result = await callAI(
-        fullPrompt,
-        promptConfig.max_tokens || 500,
-        promptConfig.temperature || 0.7,
-        provider
-      )
-
-      // Extract content from result using helper, with optional response_field
-      const content = extractTextFromResponse(result, promptConfig.response_field)
 
       if (!content) {
         return { success: false, error: 'Empty response from AI' }
