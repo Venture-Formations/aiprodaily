@@ -431,11 +431,16 @@ export function TextBoxModuleSettings({
       setEditContent(block.static_content || '')
       setEditTextSize((block.text_size as any) || 'medium')
     } else if (block.block_type === 'ai_prompt') {
-      const promptJson = block.ai_prompt_json as any
-      setEditPrompt(promptJson?.prompt || promptJson?.messages?.[0]?.content || '')
+      // Show full JSON for editing - no wrapping, direct control
+      const promptJson = block.ai_prompt_json
+      if (promptJson) {
+        setEditPrompt(JSON.stringify(promptJson, null, 2))
+      } else {
+        setEditPrompt('')
+      }
       setEditTiming(block.generation_timing || 'after_articles')
       setEditIsBold(block.is_bold || false)
-      setEditResponseField(promptJson?.response_field || '')
+      setEditResponseField((promptJson as any)?.response_field || '')
     } else if (block.block_type === 'image') {
       setEditImageType((block.image_type as any) || 'static')
       setEditAiImagePrompt(block.ai_image_prompt || '')
@@ -563,13 +568,22 @@ export function TextBoxModuleSettings({
         updateData.static_content = editContent
         updateData.text_size = editTextSize
       } else if (block.block_type === 'ai_prompt') {
-        updateData.ai_prompt_json = {
-          prompt: editPrompt,
-          model: 'gpt-4o-mini',
-          max_tokens: 500,
-          temperature: 0.7,
-          ...(editResponseField.trim() && { response_field: editResponseField.trim() })
+        // Parse full JSON directly - no wrapping, user has full control
+        let parsedJson
+        try {
+          parsedJson = JSON.parse(editPrompt)
+        } catch (e) {
+          alert('Invalid JSON format. Please check your prompt syntax.')
+          setSaving(false)
+          return
         }
+
+        // Add response_field if specified separately
+        if (editResponseField.trim()) {
+          parsedJson.response_field = editResponseField.trim()
+        }
+
+        updateData.ai_prompt_json = parsedJson
         updateData.generation_timing = editTiming
         updateData.is_bold = editIsBold
       } else if (block.block_type === 'image') {
@@ -705,13 +719,19 @@ export function TextBoxModuleSettings({
           {editingBlock === block.id ? (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">AI Prompt</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">AI Prompt (Full JSON)</label>
                 <textarea
                   value={editPrompt}
                   onChange={(e) => setEditPrompt(e.target.value)}
-                  placeholder="Enter the AI prompt to generate content..."
-                  className="w-full h-40 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm font-mono"
+                  placeholder='{"model": "gpt-4o", "messages": [{"role": "user", "content": "Your prompt here"}]}'
+                  className="w-full h-64 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm font-mono"
                 />
+                <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="text-xs font-medium text-blue-800 mb-1">Full JSON Format Required</div>
+                  <div className="text-xs text-blue-700">
+                    Paste your complete API request JSON with model, messages/system, etc. Test in the AI Prompt Testing playground first.
+                  </div>
+                </div>
                 <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
                   <div className="text-xs font-medium text-gray-700 mb-2">Available Placeholders:</div>
                   <div className="text-xs text-gray-600 space-y-1">
@@ -779,10 +799,10 @@ export function TextBoxModuleSettings({
             <div>
               <div className="mb-3">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm font-medium text-gray-700">Prompt Content</span>
+                  <span className="text-sm font-medium text-gray-700">Full JSON Prompt</span>
                   <span className={`px-2 py-0.5 text-xs font-medium rounded ${detectProviderFromPrompt(block.ai_prompt_json) === 'claude' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>{detectProviderFromPrompt(block.ai_prompt_json) === 'claude' ? 'Claude' : 'OpenAI'}</span>
                 </div>
-                <div className="bg-white p-3 rounded-lg border border-gray-200 font-mono text-xs whitespace-pre-wrap max-h-48 overflow-y-auto">{(block.ai_prompt_json as any)?.prompt || (block.ai_prompt_json as any)?.messages?.[0]?.content || <span className="italic text-gray-400">No prompt configured</span>}</div>
+                <div className="bg-white p-3 rounded-lg border border-gray-200 font-mono text-xs whitespace-pre-wrap max-h-48 overflow-y-auto">{block.ai_prompt_json ? JSON.stringify(block.ai_prompt_json, null, 2) : <span className="italic text-gray-400">No prompt configured</span>}</div>
               </div>
               <div className="flex items-center flex-wrap gap-3 text-xs text-gray-500 mb-3">
                 <span>Timing: {block.generation_timing === 'before_articles' ? 'Before Articles' : 'After Articles'}</span>
