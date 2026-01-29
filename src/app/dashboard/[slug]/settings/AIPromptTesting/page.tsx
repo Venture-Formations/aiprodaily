@@ -819,10 +819,11 @@ export default function AIPromptTestingPage() {
               <div className="border-t pt-4">
                 <h3 className="text-sm font-medium text-gray-700 mb-3">Important</h3>
                 <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-gray-700">
-                  <p className="font-medium mb-2">Enter complete JSON API request:</p>
+                  <p className="font-medium mb-2">Accepts two JSON formats:</p>
                   <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li>Include all parameters you need (model, messages, temperature, max_output_tokens, response_format, etc.)</li>
-                    <li>Use placeholders like <code className="bg-white px-1 rounded">{'{{title}}'}</code>, <code className="bg-white px-1 rounded">{'{{description}}'}</code>, <code className="bg-white px-1 rounded">{'{{content}}'}</code></li>
+                    <li><strong>Full API Request:</strong> Include model, messages, temperature, max_output_tokens, etc.</li>
+                    <li><strong>Text Box Format:</strong> <code className="bg-white px-1 rounded">{'{"prompt": "...", "model": "gpt-4o", "max_tokens": 500}'}</code></li>
+                    <li>Use placeholders like <code className="bg-white px-1 rounded">{'{{title}}'}</code>, <code className="bg-white px-1 rounded">{'{{description}}'}</code>, <code className="bg-white px-1 rounded">{'{{content}}'}</code>, <code className="bg-white px-1 rounded">{'{{random_X-Y}}'}</code></li>
                     <li>JSON is sent to API exactly as-is (only placeholders replaced)</li>
                     <li>For OpenAI: Use <code className="bg-white px-1 rounded">max_output_tokens</code> (not max_tokens)</li>
                     <li>For GPT-5: You can include reasoning parameters like <code className="bg-white px-1 rounded">{'{"reasoning": {"effort": "low", "budget_tokens": 150}}'}</code></li>

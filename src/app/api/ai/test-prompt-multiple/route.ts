@@ -81,6 +81,37 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Auto-detect Text Box format (has "prompt" field but no "messages"/"input")
+    // and convert to full API request format
+    let normalizedPromptJson = promptJson
+    if (promptJson.prompt && !promptJson.messages && !promptJson.input) {
+      console.log('[AI Test Multiple] Detected Text Box format, converting to API request format')
+
+      const textBoxConfig = promptJson as {
+        prompt: string
+        model?: string
+        provider?: string
+        system_prompt?: string
+        max_tokens?: number
+        temperature?: number
+      }
+
+      // Build messages array
+      const messages: Array<{ role: string; content: string }> = []
+      if (textBoxConfig.system_prompt) {
+        messages.push({ role: 'system', content: textBoxConfig.system_prompt })
+      }
+      messages.push({ role: 'user', content: textBoxConfig.prompt })
+
+      // Convert to full API request format
+      normalizedPromptJson = {
+        model: textBoxConfig.model || 'gpt-4o',
+        messages,
+        max_tokens: textBoxConfig.max_tokens || 500,
+        temperature: textBoxConfig.temperature ?? 0.7
+      }
+    }
+
     // Initialize clients inside the function to avoid build-time issues
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
@@ -113,7 +144,7 @@ export async function POST(request: NextRequest) {
         openai,
         anthropic,
         provider,
-        promptJson,
+        normalizedPromptJson,
         newsletterUuid,
         limit,
         offset
@@ -248,7 +279,7 @@ export async function POST(request: NextRequest) {
       const post = posts[i]
 
       // Inject post data into the JSON request
-      const processedJson = injectPostData(promptJson, post)
+      const processedJson = injectPostData(normalizedPromptJson, post)
 
       // Store API request for the first post only
       if (i === 0) {
@@ -366,7 +397,7 @@ export async function POST(request: NextRequest) {
       totalTokensUsed: totalTokens,
       totalDuration,
       provider,
-      model: promptJson.model || 'unknown',
+      model: normalizedPromptJson.model || 'unknown',
       apiRequest: apiRequestForFirstPost, // Only first article's API request
       sourcePosts: posts.map(post => ({
         id: post.id,

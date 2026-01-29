@@ -103,6 +103,36 @@ export async function POST(request: NextRequest) {
     // Start with the prompt JSON
     let processedJson = promptJson
 
+    // Auto-detect Text Box format (has "prompt" field but no "messages"/"input")
+    // and convert to full API request format
+    if (promptJson.prompt && !promptJson.messages && !promptJson.input) {
+      console.log('[TEST-PROMPT] Detected Text Box format, converting to API request format')
+
+      const textBoxConfig = promptJson as {
+        prompt: string
+        model?: string
+        provider?: string
+        system_prompt?: string
+        max_tokens?: number
+        temperature?: number
+      }
+
+      // Build messages array
+      const messages: Array<{ role: string; content: string }> = []
+      if (textBoxConfig.system_prompt) {
+        messages.push({ role: 'system', content: textBoxConfig.system_prompt })
+      }
+      messages.push({ role: 'user', content: textBoxConfig.prompt })
+
+      // Convert to full API request format
+      processedJson = {
+        model: textBoxConfig.model || 'gpt-4o',
+        messages,
+        max_tokens: textBoxConfig.max_tokens || 500,
+        temperature: textBoxConfig.temperature ?? 0.7
+      }
+    }
+
     // For Custom/Freeform, inject newsletter context placeholders from most recent sent issue
     if (isCustomFreeform && publication_id) {
       const { supabaseAdmin } = await import('@/lib/supabase')
