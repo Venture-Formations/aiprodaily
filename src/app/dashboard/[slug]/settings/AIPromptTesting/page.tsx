@@ -366,9 +366,7 @@ export default function AIPromptTestingPage() {
 
   // Sanitize JSON string to fix common copy-paste issues
   function sanitizeJsonString(input: string): string {
-    // Only do basic character replacements, don't try to extract JSON
-    // The JSON.parse will handle validation
-    return input
+    let result = input
       // Replace smart/curly quotes with straight quotes
       .replace(/[\u2018\u2019]/g, "'")
       .replace(/[\u201C\u201D]/g, '"')
@@ -379,6 +377,16 @@ export default function AIPromptTestingPage() {
       // Remove other problematic control characters (except valid JSON escapes)
       .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
       .trim()
+
+    // Find first { and last } and extract just that portion
+    const firstBrace = result.indexOf('{')
+    const lastBrace = result.lastIndexOf('}')
+
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      result = result.slice(firstBrace, lastBrace + 1)
+    }
+
+    return result
   }
 
   async function handleTest() {
