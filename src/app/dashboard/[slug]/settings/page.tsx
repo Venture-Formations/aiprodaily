@@ -47,6 +47,7 @@ export default function SettingsPage() {
                 { id: 'email', name: 'Email' },
                 { id: 'rss', name: 'RSS Feeds' },
                 { id: 'blocked-domains', name: 'Blocked Domains' },
+                { id: 'poll-settings', name: 'Poll Settings' },
                 { id: 'notifications', name: 'Notifications' },
                 { id: 'facebook', name: 'Facebook' },
                 { id: 'users', name: 'Users' }
@@ -75,6 +76,7 @@ export default function SettingsPage() {
           {activeTab === 'email' && <EmailSettings />}
           {activeTab === 'rss' && <RSSFeeds />}
           {activeTab === 'blocked-domains' && <BlockedDomainsSettings />}
+          {activeTab === 'poll-settings' && <PollSettings />}
           {activeTab === 'notifications' && <Notifications />}
           {activeTab === 'facebook' && <FacebookSettings />}
           {activeTab === 'users' && <Users />}
@@ -6644,6 +6646,242 @@ function BlockedDomainsSettings() {
           <li><strong>Suggested domains:</strong> Domains that have had extraction failures (HTTP 403, paywall, login required, etc.) are shown as suggestions.</li>
           <li><strong>Block vs Ignore:</strong> "Block" adds the domain to your blocked list. "Ignore" dismisses the suggestion without blocking.</li>
           <li><strong>Domain matching:</strong> Blocking "example.com" also blocks "www.example.com" and "news.example.com".</li>
+        </ul>
+      </div>
+    </div>
+  )
+}
+
+// Poll Settings Component - Manage excluded IPs for poll analytics
+function PollSettings() {
+  const pathname = usePathname()
+  const slug = pathname?.split('/')[2] || ''
+
+  const [excludedIps, setExcludedIps] = useState<{
+    id: string
+    ip_address: string
+    reason: string | null
+    added_by: string | null
+    created_at: string
+  }[]>([])
+  const [publicationId, setPublicationId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [newIp, setNewIp] = useState('')
+  const [newReason, setNewReason] = useState('')
+  const [message, setMessage] = useState('')
+  const [messageType, setMessageType] = useState<'success' | 'error'>('success')
+
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+
+      // First get publication ID from slug
+      const pubRes = await fetch(`/api/newsletters?slug=${slug}`)
+      if (!pubRes.ok) {
+        showMessage('Failed to load publication', 'error')
+        return
+      }
+      const pubData = await pubRes.json()
+      const pubId = pubData.newsletters?.[0]?.id
+
+      if (!pubId) {
+        showMessage('Publication not found', 'error')
+        return
+      }
+
+      setPublicationId(pubId)
+
+      // Fetch excluded IPs
+      const ipsRes = await fetch(`/api/polls/excluded-ips?publication_id=${pubId}`)
+      if (ipsRes.ok) {
+        const ipsData = await ipsRes.json()
+        setExcludedIps(ipsData.ips || [])
+      }
+    } catch (error) {
+      console.error('Error fetching poll settings:', error)
+      showMessage('Failed to load poll settings', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (slug) {
+      fetchData()
+    }
+  }, [slug])
+
+  const showMessage = (msg: string, type: 'success' | 'error') => {
+    setMessage(msg)
+    setMessageType(type)
+    setTimeout(() => setMessage(''), 3000)
+  }
+
+  const handleAddIp = async () => {
+    if (!newIp.trim() || !publicationId) return
+
+    try {
+      const res = await fetch('/api/polls/excluded-ips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          publication_id: publicationId,
+          ip_address: newIp.trim(),
+          reason: newReason.trim() || null
+        })
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        showMessage(data.message || 'IP excluded successfully', 'success')
+        setNewIp('')
+        setNewReason('')
+        setExcludedIps(data.ips || [])
+      } else {
+        showMessage(data.error || 'Failed to exclude IP', 'error')
+      }
+    } catch (error) {
+      showMessage('Failed to exclude IP', 'error')
+    }
+  }
+
+  const handleRemoveIp = async (ipAddress: string) => {
+    if (!publicationId) return
+
+    try {
+      const res = await fetch('/api/polls/excluded-ips', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          publication_id: publicationId,
+          ip_address: ipAddress
+        })
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        showMessage(data.message || 'IP removed from exclusion list', 'success')
+        setExcludedIps(data.ips || [])
+      } else {
+        showMessage(data.error || 'Failed to remove IP', 'error')
+      }
+    } catch (error) {
+      showMessage('Failed to remove IP', 'error')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="animate-pulse">
+          <div className="h-6 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-3/4 mb-6"></div>
+          <div className="space-y-3">
+            <div className="h-10 bg-gray-200 rounded"></div>
+            <div className="h-10 bg-gray-200 rounded"></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Message Display */}
+      {message && (
+        <div className={`p-4 rounded-md ${
+          messageType === 'success'
+            ? 'bg-green-50 border border-green-200 text-green-800'
+            : 'bg-red-50 border border-red-200 text-red-800'
+        }`}>
+          {message}
+        </div>
+      )}
+
+      {/* Excluded IPs Section */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Excluded IP Addresses</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          Votes from these IP addresses will still be recorded, but will be excluded from poll analytics and results.
+          Use this to filter out spam clickers, bots, or internal testing.
+        </p>
+
+        {/* Add IP Form */}
+        <div className="space-y-3 mb-4">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newIp}
+              onChange={(e) => setNewIp(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleAddIp()}
+              placeholder="Enter IP address (e.g., 192.168.1.1)"
+              className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm font-mono"
+            />
+            <button
+              onClick={handleAddIp}
+              disabled={!newIp.trim()}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-medium whitespace-nowrap"
+            >
+              Add IP
+            </button>
+          </div>
+          <input
+            type="text"
+            value={newReason}
+            onChange={(e) => setNewReason(e.target.value)}
+            placeholder="Reason (optional, e.g., 'spam clicker', 'internal testing')"
+            className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+          />
+        </div>
+
+        {/* Excluded IPs List */}
+        {excludedIps.length === 0 ? (
+          <p className="text-gray-500 text-sm italic">No excluded IP addresses</p>
+        ) : (
+          <div className="border rounded-lg overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP Address</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Added</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {excludedIps.map((ip) => (
+                  <tr key={ip.id}>
+                    <td className="px-4 py-3 text-sm font-mono">{ip.ip_address}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{ip.reason || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {new Date(ip.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => handleRemoveIp(ip.ip_address)}
+                        className="text-red-600 hover:text-red-800 text-sm font-medium"
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Help Section */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h4 className="font-semibold text-blue-900 mb-2">How IP Exclusion Works:</h4>
+        <ul className="text-sm text-blue-800 space-y-1">
+          <li><strong>Votes are still recorded:</strong> Excluded IPs can still vote, but their responses won't be counted in analytics.</li>
+          <li><strong>Useful for:</strong> Filtering out spam clickers, auto-clickers, bots, or internal test votes.</li>
+          <li><strong>Per-publication:</strong> Each publication has its own exclusion list.</li>
+          <li><strong>Auditable:</strong> You can always see which IPs voted by checking the poll responses directly.</li>
         </ul>
       </div>
     </div>

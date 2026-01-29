@@ -55,6 +55,15 @@ export async function GET(request: NextRequest) {
 
     const publicationId = newsletter.id
 
+    // Fetch excluded IPs for this publication (for filtering analytics)
+    const { data: excludedIpsData } = await supabaseAdmin
+      .from('poll_excluded_ips')
+      .select('ip_address')
+      .eq('publication_id', publicationId)
+
+    const excludedIpSet = new Set(excludedIpsData?.map(e => e.ip_address) || [])
+    const excludedIpCount = excludedIpSet.size
+
     // Calculate date range using local timezone (NO UTC - per CLAUDE.md)
     let startDateStr: string
     let endDateStr: string
@@ -101,7 +110,7 @@ export async function GET(request: NextRequest) {
     // Fetch all responses for these polls within date range
     let responsesQuery = supabaseAdmin
       .from('poll_responses')
-      .select('id, poll_id, issue_id, subscriber_email, selected_option, responded_at')
+      .select('id, poll_id, issue_id, subscriber_email, selected_option, responded_at, ip_address')
       .eq('publication_id', publicationId)
       .gte('responded_at', startDateStr)
       .lte('responded_at', endDateStr + 'T23:59:59')
@@ -114,11 +123,21 @@ export async function GET(request: NextRequest) {
       responsesQuery = responsesQuery.eq('issue_id', issueId)
     }
 
-    const { data: responses, error: responsesError } = await responsesQuery
+    const { data: responsesRaw, error: responsesError } = await responsesQuery
 
     if (responsesError) {
       console.error('[Poll Analytics] Error fetching responses:', responsesError)
       return NextResponse.json({ error: responsesError.message }, { status: 500 })
+    }
+
+    // Filter out excluded IPs from analytics (votes are still recorded, just not counted)
+    const responses = (responsesRaw || []).filter(r =>
+      !r.ip_address || !excludedIpSet.has(r.ip_address)
+    )
+    const excludedResponseCount = (responsesRaw?.length || 0) - responses.length
+
+    if (excludedResponseCount > 0) {
+      console.log(`[Poll Analytics] Filtered ${excludedResponseCount} responses from ${excludedIpCount} excluded IP(s)`)
     }
 
     // Fetch issues in date range to calculate response rates
@@ -269,6 +288,10 @@ export async function GET(request: NextRequest) {
       date_range: {
         start: startDateStr,
         end: endDateStr
+      },
+      excluded_ips: {
+        count: excludedIpCount,
+        filtered_responses: excludedResponseCount
       },
       polls: pollAnalytics
     })

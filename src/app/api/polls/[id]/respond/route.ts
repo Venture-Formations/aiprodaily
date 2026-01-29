@@ -47,6 +47,12 @@ export async function GET(
     }
 
     // Record the poll response (upsert to handle duplicate responses)
+    // With issue-level uniqueness: same poll + same issue = overwrite, different issues = separate responses
+    // onConflict depends on whether issue_id is provided (partial unique indexes)
+    const conflictColumns = issueId
+      ? 'poll_id,subscriber_email,issue_id'  // For responses with issue_id
+      : 'poll_id,subscriber_email'           // For responses without issue_id (legacy)
+
     const { error: responseError } = await supabaseAdmin
       .from('poll_responses')
       .upsert({
@@ -57,7 +63,7 @@ export async function GET(
         issue_id: issueId || null,
         ip_address: ipAddress || null
       }, {
-        onConflict: 'poll_id,subscriber_email'
+        onConflict: conflictColumns
       })
 
     if (responseError) {

@@ -112,6 +112,12 @@ export async function POST(
     const ipAddress = forwardedFor ? forwardedFor.split(',')[0].trim() : request.headers.get('x-real-ip')
 
     // Use upsert to handle duplicate responses (update instead of error)
+    // With issue-level uniqueness: same poll + same issue = overwrite, different issues = separate responses
+    // onConflict depends on whether issue_id is provided (partial unique indexes)
+    const conflictColumns = issue_id
+      ? 'poll_id,subscriber_email,issue_id'  // For responses with issue_id
+      : 'poll_id,subscriber_email'           // For responses without issue_id (legacy)
+
     const { data: response, error } = await supabaseAdmin
       .from('poll_responses')
       .upsert({
@@ -122,7 +128,7 @@ export async function POST(
         issue_id: issue_id || null,
         ip_address: ipAddress || null
       }, {
-        onConflict: 'poll_id,subscriber_email'
+        onConflict: conflictColumns
       })
       .select('id, poll_id, publication_id, issue_id, subscriber_email, selected_option, responded_at, ip_address')
       .single()
