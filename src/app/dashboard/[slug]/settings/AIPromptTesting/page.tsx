@@ -364,16 +364,31 @@ export default function AIPromptTestingPage() {
     }
   }
 
+  // Sanitize JSON string to fix common copy-paste issues
+  function sanitizeJsonString(input: string): string {
+    return input
+      // Replace smart/curly quotes with straight quotes
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/[\u201C\u201D]/g, '"')
+      // Replace non-breaking spaces with regular spaces
+      .replace(/\u00A0/g, ' ')
+      // Remove zero-width characters
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      // Remove other problematic control characters (except valid JSON escapes)
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+  }
+
   async function handleTest() {
     if (!prompt.trim()) {
       alert('Please enter a prompt')
       return
     }
 
-    // Validate JSON
+    // Sanitize and validate JSON
+    const sanitizedPrompt = sanitizeJsonString(prompt)
     let promptJson
     try {
-      promptJson = JSON.parse(prompt)
+      promptJson = JSON.parse(sanitizedPrompt)
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error'
       alert(`Invalid JSON format: ${errorMsg}\n\nCommon issues:\n- Curly quotes (" ") instead of straight quotes (" ")\n- Missing commas between properties\n- Trailing commas after last property`)
@@ -445,10 +460,11 @@ export default function AIPromptTestingPage() {
       return
     }
 
-    // Validate JSON
+    // Sanitize and validate JSON
+    const sanitizedPrompt = sanitizeJsonString(prompt)
     let promptJson
     try {
-      promptJson = JSON.parse(prompt)
+      promptJson = JSON.parse(sanitizedPrompt)
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error'
       alert(`Invalid JSON format: ${errorMsg}\n\nCommon issues:\n- Curly quotes (" ") instead of straight quotes (" ")\n- Missing commas between properties\n- Trailing commas after last property`)
