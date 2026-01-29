@@ -378,14 +378,48 @@ export default function AIPromptTestingPage() {
       .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
       .trim()
 
-    // Find the last closing brace and trim anything after it
-    const lastBrace = result.lastIndexOf('}')
-    if (lastBrace !== -1 && lastBrace < result.length - 1) {
-      const afterBrace = result.slice(lastBrace + 1).trim()
-      if (afterBrace.length > 0) {
-        console.log('[Testing Playground] Trimming content after JSON:', afterBrace.slice(0, 50))
-        result = result.slice(0, lastBrace + 1)
+    // Find the JSON object boundaries (first { to matching })
+    const firstBrace = result.indexOf('{')
+    if (firstBrace === -1) return result
+
+    // Count braces to find the matching closing brace
+    let depth = 0
+    let inString = false
+    let escapeNext = false
+    let lastBrace = -1
+
+    for (let i = firstBrace; i < result.length; i++) {
+      const char = result[i]
+
+      if (escapeNext) {
+        escapeNext = false
+        continue
       }
+
+      if (char === '\\' && inString) {
+        escapeNext = true
+        continue
+      }
+
+      if (char === '"' && !escapeNext) {
+        inString = !inString
+        continue
+      }
+
+      if (!inString) {
+        if (char === '{') depth++
+        else if (char === '}') {
+          depth--
+          if (depth === 0) {
+            lastBrace = i
+            break
+          }
+        }
+      }
+    }
+
+    if (lastBrace !== -1) {
+      result = result.slice(firstBrace, lastBrace + 1)
     }
 
     return result
