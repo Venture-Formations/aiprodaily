@@ -365,6 +365,7 @@ export default function AIPromptTestingPage() {
   }
 
   // Sanitize JSON string to fix common copy-paste issues
+  // The key issue: JSON strings cannot contain actual newlines/control chars - they must be escaped
   function sanitizeJsonString(input: string): string {
     let result = input
       // Replace smart/curly quotes with straight quotes
@@ -374,8 +375,6 @@ export default function AIPromptTestingPage() {
       .replace(/\u00A0/g, ' ')
       // Remove zero-width characters
       .replace(/[\u200B-\u200D\uFEFF]/g, '')
-      // Remove other problematic control characters (except valid JSON escapes)
-      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
       .trim()
 
     // Find first { and last } and extract just that portion
@@ -386,7 +385,52 @@ export default function AIPromptTestingPage() {
       result = result.slice(firstBrace, lastBrace + 1)
     }
 
-    return result
+    // Now fix unescaped control characters inside JSON string values
+    // JSON strings cannot contain actual newlines (0x0A), carriage returns (0x0D), or tabs (0x09)
+    // They must be escaped as \n, \r, \t respectively
+    let fixed = ''
+    let inString = false
+    let i = 0
+
+    while (i < result.length) {
+      const char = result[i]
+
+      // Handle escape sequences inside strings - skip the next character
+      if (char === '\\' && inString && i + 1 < result.length) {
+        fixed += char + result[i + 1]
+        i += 2
+        continue
+      }
+
+      // Track string boundaries
+      if (char === '"') {
+        inString = !inString
+        fixed += char
+        i++
+        continue
+      }
+
+      // Inside a string, escape control characters
+      if (inString) {
+        const code = char.charCodeAt(0)
+        if (code === 0x0A) { // LF (newline)
+          fixed += '\\n'
+        } else if (code === 0x0D) { // CR (carriage return)
+          fixed += '\\r'
+        } else if (code === 0x09) { // Tab
+          fixed += '\\t'
+        } else if (code < 0x20 || code === 0x7F) { // Other control characters
+          fixed += '\\u' + code.toString(16).padStart(4, '0')
+        } else {
+          fixed += char
+        }
+      } else {
+        fixed += char
+      }
+      i++
+    }
+
+    return fixed
   }
 
   async function handleTest() {
