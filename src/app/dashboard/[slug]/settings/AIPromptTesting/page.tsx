@@ -395,10 +395,21 @@ export default function AIPromptTestingPage() {
     while (i < result.length) {
       const char = result[i]
 
-      // Handle escape sequences inside strings - skip the next character
+      // Handle escape sequences inside strings
       if (char === '\\' && inString && i + 1 < result.length) {
-        fixed += char + result[i + 1]
-        i += 2
+        const nextChar = result[i + 1]
+        const nextCode = nextChar.charCodeAt(0)
+        // Only preserve if next char is a valid JSON escape target (not a control char)
+        // Valid escapes: \" \\ \/ \b \f \n \r \t \uXXXX
+        if (nextCode >= 0x20 && nextCode !== 0x7F) {
+          fixed += char + nextChar
+          i += 2
+          continue
+        }
+        // If backslash is followed by a control char, just output the backslash
+        // and let the control char be handled in the next iteration
+        fixed += char
+        i++
         continue
       }
 
@@ -441,6 +452,9 @@ export default function AIPromptTestingPage() {
 
     // Sanitize and validate JSON
     const sanitizedPrompt = sanitizeJsonString(prompt)
+    console.log('[TEST] Original prompt length:', prompt.length)
+    console.log('[TEST] Sanitized prompt length:', sanitizedPrompt.length)
+    console.log('[TEST] First 500 chars of sanitized:', sanitizedPrompt.substring(0, 500))
     let promptJson
     try {
       promptJson = JSON.parse(sanitizedPrompt)
