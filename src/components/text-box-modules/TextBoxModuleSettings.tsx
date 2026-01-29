@@ -715,7 +715,7 @@ export function TextBoxModuleSettings({
                 <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
                   <div className="text-xs font-medium text-gray-700 mb-2">Available Placeholders:</div>
                   <div className="text-xs text-gray-600 space-y-1">
-                    <p><strong>Basic:</strong> {'{{issue_date}}'}, {'{{publication_name}}'}</p>
+                    <p><strong>Basic:</strong> {'{{issue_date}}'}, {'{{publication_name}}'}, {'{{random_X-Y}}'} <span className="text-gray-400">(random integer)</span></p>
                     <p><strong>Section Articles:</strong> {'{{section_1_all_articles}}'}, {'{{section_2_all_articles}}'}</p>
                     <p><strong>Individual:</strong> {'{{section_1_article_1_headline}}'}, {'{{section_1_article_1_content}}'}</p>
                     <p><strong>Other:</strong> {'{{ai_app_1_name}}'}, {'{{poll_question}}'}, {'{{ad_1_title}}'}</p>

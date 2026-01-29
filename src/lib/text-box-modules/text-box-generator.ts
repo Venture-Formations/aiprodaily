@@ -327,6 +327,17 @@ export class TextBoxGenerator {
       }
     }
 
+    // Random integer placeholders: {{random_X-Y}}
+    result = result.replace(/\{\{random_(\d+)-(\d+)\}\}/g, (match, minStr, maxStr) => {
+      const min = parseInt(minStr, 10)
+      const max = parseInt(maxStr, 10)
+      if (isNaN(min) || isNaN(max) || min > max) {
+        console.warn(`[TextBox] Invalid random placeholder: ${match}`)
+        return match
+      }
+      return String(Math.floor(Math.random() * (max - min + 1)) + min)
+    })
+
     // Clear any remaining unmatched placeholders
     result = result.replace(/\{\{[^}]+\}\}/g, '')
 
