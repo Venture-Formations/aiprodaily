@@ -30,8 +30,16 @@ export async function GET(
       return NextResponse.json({ error: 'Poll not found' }, { status: 404 })
     }
 
+    // Get excluded IPs for this publication
+    const { data: excludedIps } = await supabaseAdmin
+      .from('poll_excluded_ips')
+      .select('ip_address')
+      .eq('publication_id', publicationId)
+
+    const excludedIpSet = new Set(excludedIps?.map(e => e.ip_address) || [])
+
     // Get all responses for this poll
-    const { data: responses, error } = await supabaseAdmin
+    const { data: responsesRaw, error } = await supabaseAdmin
       .from('poll_responses')
       .select('id, poll_id, publication_id, issue_id, subscriber_email, selected_option, responded_at, ip_address')
       .eq('poll_id', id)
@@ -43,23 +51,29 @@ export async function GET(
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Calculate analytics
-    const totalResponses = responses?.length || 0
-    const uniqueRespondents = new Set(responses?.map(r => r.subscriber_email) || []).size
+    // Filter out excluded IPs for analytics (but still return all responses for auditing)
+    const filteredResponses = (responsesRaw || []).filter(r =>
+      !r.ip_address || !excludedIpSet.has(r.ip_address)
+    )
 
-    // Count responses by option
+    // Calculate analytics from filtered responses
+    const totalResponses = filteredResponses.length
+    const uniqueRespondents = new Set(filteredResponses.map(r => r.subscriber_email)).size
+
+    // Count responses by option (from filtered responses)
     const optionCounts: Record<string, number> = {}
-    responses?.forEach(response => {
+    filteredResponses.forEach(response => {
       const option = response.selected_option
       optionCounts[option] = (optionCounts[option] || 0) + 1
     })
 
     return NextResponse.json({
-      responses,
+      responses: responsesRaw, // Return all responses for auditing
       analytics: {
         total_responses: totalResponses,
         unique_respondents: uniqueRespondents,
-        option_counts: optionCounts
+        option_counts: optionCounts,
+        excluded_count: (responsesRaw?.length || 0) - totalResponses
       }
     })
   } catch (error) {
