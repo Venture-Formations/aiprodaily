@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
 
 /**
  * Ads Analytics Endpoint
@@ -52,6 +53,18 @@ export async function GET(request: NextRequest) {
     }
 
     const publicationId = newsletter.id
+
+    // Fetch excluded IPs for this publication
+    const { data: excludedIpsData } = await supabaseAdmin
+      .from('excluded_ips')
+      .select('ip_address, is_range, cidr_prefix')
+      .eq('publication_id', publicationId)
+
+    const exclusions: IPExclusion[] = (excludedIpsData || []).map(e => ({
+      ip_address: e.ip_address,
+      is_range: e.is_range || false,
+      cidr_prefix: e.cidr_prefix
+    }))
 
     // Calculate date range using local timezone (NO UTC - per CLAUDE.md)
     let startDateStr: string
@@ -186,7 +199,7 @@ export async function GET(request: NextRequest) {
     while (hasMore) {
       const { data: linkClicksBatch, error: clicksError } = await supabaseAdmin
         .from('link_clicks')
-        .select('id, link_url, subscriber_email, issue_date, issue_id, clicked_at, link_section')
+        .select('id, link_url, subscriber_email, issue_date, issue_id, clicked_at, link_section, ip_address')
         .in('link_section', adSectionNames)
         .gte('issue_date', startDateStr)
         .lte('issue_date', endDateStr)
@@ -207,9 +220,18 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const linkClicks = allLinkClicks
+    // Filter out excluded IPs from analytics
+    const totalFetched = allLinkClicks.length
+    const linkClicks = allLinkClicks.filter(click =>
+      !isIPExcluded(click.ip_address, exclusions)
+    )
+    const excludedClickCount = totalFetched - linkClicks.length
 
-    console.log(`[Ads Analytics] Found ${linkClicks?.length || 0} link clicks for ad sections`)
+    if (excludedClickCount > 0) {
+      console.log(`[Ads Analytics] Filtered ${excludedClickCount} clicks from ${exclusions.length} excluded IP(s)`)
+    }
+
+    console.log(`[Ads Analytics] Found ${totalFetched} total clicks, ${linkClicks.length} after IP filtering`)
 
     // Fetch issues in date range for recipient counts (for CTR calculation)
     const { data: issuesRaw, error: issuesError } = await supabaseAdmin
