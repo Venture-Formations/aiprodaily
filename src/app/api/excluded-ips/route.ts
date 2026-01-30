@@ -32,22 +32,37 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Fetch all excluded IPs - use explicit limit to avoid Supabase's 1000 row default
-    const { data: excludedIps, error } = await supabaseAdmin
-      .from('excluded_ips')
-      .select('id, ip_address, is_range, cidr_prefix, reason, added_by, created_at')
-      .eq('publication_id', publicationId)
-      .order('created_at', { ascending: false })
-      .limit(10000)
+    // Fetch all excluded IPs using pagination (Supabase limits to 1000 per query)
+    const BATCH_SIZE = 1000
+    let allExcludedIps: any[] = []
+    let offset = 0
+    let hasMore = true
 
-    if (error) {
-      console.error('[IP Exclusion] Error fetching excluded IPs:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    while (hasMore) {
+      const { data: batch, error } = await supabaseAdmin
+        .from('excluded_ips')
+        .select('id, ip_address, is_range, cidr_prefix, reason, added_by, created_at')
+        .eq('publication_id', publicationId)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + BATCH_SIZE - 1)
+
+      if (error) {
+        console.error('[IP Exclusion] Error fetching excluded IPs:', error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+
+      if (batch && batch.length > 0) {
+        allExcludedIps = allExcludedIps.concat(batch)
+        offset += BATCH_SIZE
+        hasMore = batch.length === BATCH_SIZE
+      } else {
+        hasMore = false
+      }
     }
 
     return NextResponse.json({
       success: true,
-      ips: excludedIps || []
+      ips: allExcludedIps
     })
 
   } catch (error) {
@@ -139,19 +154,34 @@ export async function POST(request: NextRequest) {
     const displayName = parsed.isRange ? `${parsed.ip}/${parsed.prefix}` : parsed.ip
     console.log(`[IP Exclusion] Added: ${displayName} (reason: ${reason || 'none'})`)
 
-    // Return updated list - use explicit limit to avoid Supabase's 1000 row default
-    const { data: excludedIps } = await supabaseAdmin
-      .from('excluded_ips')
-      .select('id, ip_address, is_range, cidr_prefix, reason, added_by, created_at')
-      .eq('publication_id', publication_id)
-      .order('created_at', { ascending: false })
-      .limit(10000)
+    // Return updated list using pagination
+    const BATCH_SIZE = 1000
+    let allExcludedIps: any[] = []
+    let offset = 0
+    let hasMore = true
+
+    while (hasMore) {
+      const { data: batch } = await supabaseAdmin
+        .from('excluded_ips')
+        .select('id, ip_address, is_range, cidr_prefix, reason, added_by, created_at')
+        .eq('publication_id', publication_id)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + BATCH_SIZE - 1)
+
+      if (batch && batch.length > 0) {
+        allExcludedIps = allExcludedIps.concat(batch)
+        offset += BATCH_SIZE
+        hasMore = batch.length === BATCH_SIZE
+      } else {
+        hasMore = false
+      }
+    }
 
     return NextResponse.json({
       success: true,
       message: `"${displayName}" excluded from analytics`,
       added: inserted,
-      ips: excludedIps || []
+      ips: allExcludedIps
     })
 
   } catch (error) {
@@ -210,18 +240,33 @@ export async function DELETE(request: NextRequest) {
 
     console.log(`[IP Exclusion] Removed: ${normalizedIP}`)
 
-    // Return updated list - use explicit limit to avoid Supabase's 1000 row default
-    const { data: excludedIps } = await supabaseAdmin
-      .from('excluded_ips')
-      .select('id, ip_address, is_range, cidr_prefix, reason, added_by, created_at')
-      .eq('publication_id', publication_id)
-      .order('created_at', { ascending: false })
-      .limit(10000)
+    // Return updated list using pagination
+    const BATCH_SIZE = 1000
+    let allExcludedIps: any[] = []
+    let offset = 0
+    let hasMore = true
+
+    while (hasMore) {
+      const { data: batch } = await supabaseAdmin
+        .from('excluded_ips')
+        .select('id, ip_address, is_range, cidr_prefix, reason, added_by, created_at')
+        .eq('publication_id', publication_id)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + BATCH_SIZE - 1)
+
+      if (batch && batch.length > 0) {
+        allExcludedIps = allExcludedIps.concat(batch)
+        offset += BATCH_SIZE
+        hasMore = batch.length === BATCH_SIZE
+      } else {
+        hasMore = false
+      }
+    }
 
     return NextResponse.json({
       success: true,
       message: `IP "${normalizedIP}" removed from exclusion list`,
-      ips: excludedIps || []
+      ips: allExcludedIps
     })
 
   } catch (error) {
