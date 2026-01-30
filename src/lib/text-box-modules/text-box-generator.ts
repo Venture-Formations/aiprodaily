@@ -6,7 +6,7 @@
  */
 
 import { supabaseAdmin } from '../supabase'
-import { callAI, callWithStructuredPrompt, openai } from '../openai'
+import { callWithStructuredPrompt, openai } from '../openai'
 import { TextBoxModuleSelector } from './text-box-selector'
 import type {
   TextBoxBlock,
@@ -61,6 +61,101 @@ function extractTextFromResponse(result: any, responseField?: string): string {
 }
 
 export class TextBoxGenerator {
+  /**
+   * Convert placeholder data into a flat Record for callWithStructuredPrompt
+   * Single source of truth for placeholder mapping - used by both generateBlockContent and testPrompt
+   */
+  private static buildPlaceholdersRecord(data: TextBoxPlaceholderData): Record<string, string> {
+    const placeholders: Record<string, string> = {
+      issue_date: data.issue_date,
+      publication_name: data.publication_name,
+    }
+
+    // Add section articles placeholders
+    if (data.section_articles) {
+      for (const [sectionKey, sectionData] of Object.entries(data.section_articles)) {
+        const sectionMatch = sectionKey.match(/section_(\d+)/)
+        if (!sectionMatch) continue
+        const sectionNum = sectionMatch[1]
+
+        placeholders[`section_${sectionNum}_name`] = sectionData.name || ''
+
+        const allArticlesText = sectionData.articles
+          .map((a, idx) => `Article ${idx + 1}: ${a.headline}\n${a.content}`)
+          .join('\n\n')
+        placeholders[`section_${sectionNum}_all_articles`] = allArticlesText
+
+        for (let i = 0; i < sectionData.articles.length; i++) {
+          placeholders[`section_${sectionNum}_article_${i + 1}_headline`] = sectionData.articles[i].headline || ''
+          placeholders[`section_${sectionNum}_article_${i + 1}_content`] = sectionData.articles[i].content || ''
+        }
+      }
+    }
+
+    // Add AI apps placeholders
+    if (data.ai_apps) {
+      for (let i = 0; i < data.ai_apps.length; i++) {
+        placeholders[`ai_app_${i + 1}_name`] = data.ai_apps[i].name
+        placeholders[`ai_app_${i + 1}_tagline`] = data.ai_apps[i].tagline || ''
+        placeholders[`ai_app_${i + 1}_description`] = data.ai_apps[i].description
+      }
+    }
+
+    // Add poll placeholders
+    if (data.poll) {
+      placeholders['poll_question'] = data.poll.question
+      placeholders['poll_options'] = data.poll.options.join(', ')
+    }
+
+    // Add ad placeholders
+    if (data.ads) {
+      for (let i = 0; i < data.ads.length; i++) {
+        placeholders[`ad_${i + 1}_title`] = data.ads[i].title || ''
+        placeholders[`ad_${i + 1}_body`] = data.ads[i].body || ''
+      }
+    }
+
+    return placeholders
+  }
+
+  /**
+   * Determine AI provider from prompt config
+   */
+  private static getProviderFromConfig(promptConfig: any): 'openai' | 'claude' {
+    const modelName = (promptConfig.model || '').toLowerCase()
+    const isClaude = modelName.includes('claude') || promptConfig.provider === 'anthropic' || promptConfig.provider === 'claude'
+    return isClaude ? 'claude' : 'openai'
+  }
+
+  /**
+   * Execute a prompt config with placeholders - core AI call logic
+   * Single source of truth for AI calls - used by both generateBlockContent and testPrompt
+   */
+  private static async executePromptConfig(
+    promptConfig: any,
+    placeholderData: TextBoxPlaceholderData
+  ): Promise<{ success: boolean; content?: string; error?: string }> {
+    // Validate prompt config structure
+    if (!promptConfig.messages && !promptConfig.input) {
+      return {
+        success: false,
+        error: 'Invalid prompt format: must have "messages" or "input" array'
+      }
+    }
+
+    const placeholders = this.buildPlaceholdersRecord(placeholderData)
+    const provider = this.getProviderFromConfig(promptConfig)
+
+    const result = await callWithStructuredPrompt(promptConfig, placeholders, provider)
+    const content = extractTextFromResponse(result, promptConfig.response_field)
+
+    if (!content) {
+      return { success: false, error: 'Empty response from AI' }
+    }
+
+    return { success: true, content }
+  }
+
   /**
    * Build placeholder data for AI content generation
    * Data available depends on timing (before_articles vs after_articles)
@@ -358,80 +453,7 @@ export class TextBoxGenerator {
 
     try {
       const promptConfig = block.ai_prompt_json as any
-
-      // Require full API format (must have "messages" or "input")
-      if (!promptConfig.messages && !promptConfig.input) {
-        return {
-          success: false,
-          error: 'Invalid prompt format: must use full API format with "messages" array. Example: {"model": "gpt-4o", "messages": [{"role": "user", "content": "..."}]}'
-        }
-      }
-
-      // Determine provider from model name or explicit provider field
-      const modelName = (promptConfig.model || '').toLowerCase()
-      const isClaude = modelName.includes('claude') || promptConfig.provider === 'anthropic' || promptConfig.provider === 'claude'
-      const provider: 'openai' | 'claude' = isClaude ? 'claude' : 'openai'
-
-      // Build placeholders object from data for injection
-      const placeholders: Record<string, string> = {
-        issue_date: data.issue_date,
-        publication_name: data.publication_name,
-      }
-
-      // Add section articles placeholders
-      if (data.section_articles) {
-        for (const [sectionKey, sectionData] of Object.entries(data.section_articles)) {
-          const sectionMatch = sectionKey.match(/section_(\d+)/)
-          if (!sectionMatch) continue
-          const sectionNum = sectionMatch[1]
-
-          placeholders[`section_${sectionNum}_name`] = sectionData.name || ''
-
-          const allArticlesText = sectionData.articles
-            .map((a, idx) => `Article ${idx + 1}: ${a.headline}\n${a.content}`)
-            .join('\n\n')
-          placeholders[`section_${sectionNum}_all_articles`] = allArticlesText
-
-          for (let i = 0; i < sectionData.articles.length; i++) {
-            placeholders[`section_${sectionNum}_article_${i + 1}_headline`] = sectionData.articles[i].headline || ''
-            placeholders[`section_${sectionNum}_article_${i + 1}_content`] = sectionData.articles[i].content || ''
-          }
-        }
-      }
-
-      // Add AI apps placeholders
-      if (data.ai_apps) {
-        for (let i = 0; i < data.ai_apps.length; i++) {
-          placeholders[`ai_app_${i + 1}_name`] = data.ai_apps[i].name
-          placeholders[`ai_app_${i + 1}_tagline`] = data.ai_apps[i].tagline || ''
-          placeholders[`ai_app_${i + 1}_description`] = data.ai_apps[i].description
-        }
-      }
-
-      // Add poll placeholders
-      if (data.poll) {
-        placeholders['poll_question'] = data.poll.question
-        placeholders['poll_options'] = data.poll.options.join(', ')
-      }
-
-      // Add ad placeholders
-      if (data.ads) {
-        for (let i = 0; i < data.ads.length; i++) {
-          placeholders[`ad_${i + 1}_title`] = data.ads[i].title || ''
-          placeholders[`ad_${i + 1}_body`] = data.ads[i].body || ''
-        }
-      }
-
-      // Use callWithStructuredPrompt (same as Testing Playground)
-      const result = await callWithStructuredPrompt(promptConfig, placeholders, provider)
-      const content = extractTextFromResponse(result, promptConfig.response_field)
-
-      if (!content) {
-        return { success: false, error: 'Empty response from AI' }
-      }
-
-      return { success: true, content }
-
+      return await this.executePromptConfig(promptConfig, data)
     } catch (error) {
       console.error('[TextBoxGenerator] Error generating content:', error)
       return {
@@ -721,13 +743,14 @@ export class TextBoxGenerator {
   }
 
   /**
-   * Test a prompt with placeholder injection using last sent issue data
+   * Test a prompt config using last sent issue data
+   * Uses the exact same code path as generateBlockContent() via executePromptConfig()
    */
   static async testPrompt(
     publicationId: string,
-    promptText: string,
+    promptConfig: any,
     timing: GenerationTiming = 'after_articles'
-  ): Promise<{ success: boolean; result?: string; injectedPrompt?: string; error?: string }> {
+  ): Promise<{ success: boolean; result?: string; error?: string }> {
     try {
       // Get last sent issue for testing
       const { data: lastIssue } = await supabaseAdmin
@@ -746,24 +769,13 @@ export class TextBoxGenerator {
       // Build placeholder data from last issue
       const placeholderData = await this.buildPlaceholderData(lastIssue.id, timing)
 
-      // Inject placeholders
-      const injectedPrompt = this.injectPlaceholders(promptText, placeholderData)
-
-      // Call AI with injected prompt
-      const result = await callAI(
-        injectedPrompt,
-        500,
-        0.7,
-        'openai'
-      )
-
-      // Extract content using helper
-      const content = extractTextFromResponse(result)
+      // Use the same executePromptConfig as generateBlockContent
+      const result = await this.executePromptConfig(promptConfig, placeholderData)
 
       return {
-        success: true,
-        result: content,
-        injectedPrompt
+        success: result.success,
+        result: result.content,
+        error: result.error
       }
 
     } catch (error) {

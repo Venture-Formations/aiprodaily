@@ -34,10 +34,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Get already excluded IPs to filter them out of suggestions
+    // Use explicit limit to avoid Supabase's 1000 row default
     const { data: excludedIpsData } = await supabaseAdmin
       .from('excluded_ips')
       .select('ip_address, is_range, cidr_prefix')
       .eq('publication_id', publicationId)
+      .limit(10000)
 
     const exclusions: IPExclusion[] = (excludedIpsData || []).map(e => ({
       ip_address: e.ip_address,

@@ -3,8 +3,9 @@ import { TextBoxGenerator } from '@/lib/text-box-modules'
 import type { GenerationTiming } from '@/types/database'
 
 /**
- * POST /api/text-box-modules/test-prompt - Test an AI prompt with placeholder injection
+ * POST /api/text-box-modules/test-prompt - Test an AI prompt config with placeholder injection
  * Uses data from the last sent issue
+ * Accepts prompt as JSON object or JSON string (will be parsed)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -25,6 +26,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Parse prompt if it's a string (JSON)
+    let promptConfig: any
+    if (typeof prompt === 'string') {
+      try {
+        promptConfig = JSON.parse(prompt)
+      } catch (parseError) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid JSON: ' + (parseError as Error).message },
+          { status: 400 }
+        )
+      }
+    } else {
+      promptConfig = prompt
+    }
+
     // Validate timing
     const validTimings: GenerationTiming[] = ['before_articles', 'after_articles']
     const selectedTiming: GenerationTiming = validTimings.includes(timing)
@@ -33,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     const result = await TextBoxGenerator.testPrompt(
       publicationId,
-      prompt,
+      promptConfig,
       selectedTiming
     )
 
@@ -47,7 +63,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       result: result.result,
-      injectedPrompt: result.injectedPrompt,
       timing: selectedTiming
     })
 
