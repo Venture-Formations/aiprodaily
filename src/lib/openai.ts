@@ -1923,6 +1923,15 @@ export async function callWithStructuredPrompt(
   // Replace all placeholders in the entire config
   const processedRequest = replacePlaceholders(apiRequest)
 
+  // Remove custom application fields that are not valid API parameters
+  // These fields are used by our application logic but should not be sent to the API
+  const customFields = ['response_field', 'provider', 'input'] // 'input' is handled separately below
+  for (const field of customFields) {
+    if (field in processedRequest) {
+      delete processedRequest[field]
+    }
+  }
+
   // Add timeout
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 180000) // 180s (3min) for GPT-5
