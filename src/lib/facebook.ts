@@ -177,12 +177,23 @@ export class FacebookService {
 
   /**
    * Strip HTML tags from content and decode HTML entities
+   * Preserves newline spacing from the original content
    */
   static stripHtml(html: string): string {
     if (!html) return ''
 
-    // Remove HTML tags
-    let text = html.replace(/<[^>]*>/g, '')
+    let text = html
+
+    // Convert block-level HTML elements to newlines before stripping
+    // Handle <br>, <br/>, <br />
+    text = text.replace(/<br\s*\/?>/gi, '\n')
+    // Handle closing block tags (add newline after)
+    text = text.replace(/<\/(p|div|h[1-6]|li|tr)>/gi, '\n')
+    // Handle opening block tags that should create spacing
+    text = text.replace(/<(p|div|h[1-6])(\s[^>]*)?>/gi, '\n')
+
+    // Remove remaining HTML tags
+    text = text.replace(/<[^>]*>/g, '')
 
     // Decode common HTML entities
     const entities: Record<string, string> = {
@@ -209,8 +220,15 @@ export class FacebookService {
     // Decode numeric HTML entities (&#123; format)
     text = text.replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
 
-    // Clean up whitespace
-    text = text.replace(/\s+/g, ' ').trim()
+    // Clean up whitespace while preserving newlines
+    // Replace multiple spaces/tabs (but not newlines) with single space
+    text = text.replace(/[^\S\n]+/g, ' ')
+    // Normalize multiple consecutive newlines to double newline (paragraph break)
+    text = text.replace(/\n{3,}/g, '\n\n')
+    // Remove spaces at the start/end of lines
+    text = text.replace(/^ +| +$/gm, '')
+    // Trim leading/trailing whitespace
+    text = text.trim()
 
     return text
   }
