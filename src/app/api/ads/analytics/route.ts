@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const newsletterSlug = searchParams.get('newsletter_slug')
     const adIdFilter = searchParams.get('ad_id')
+    const adModuleFilter = searchParams.get('ad_module') // Filter by ad section/module name
     const startDateParam = searchParams.get('start_date')
     const endDateParam = searchParams.get('end_date')
     const days = parseInt(searchParams.get('days') || '30')
@@ -125,20 +126,37 @@ export async function GET(request: NextRequest) {
       console.error('[Ads Analytics] Error fetching legacy issue advertisements:', legacyError)
     }
 
-    // New module-based table
+    // New module-based table - also fetch ad_module_id to track which section the ad was in
     const { data: moduleIssueAds, error: moduleError } = await supabaseAdmin
       .from('issue_module_ads')
-      .select('id, issue_id, advertisement_id, used_at')
+      .select('id, issue_id, advertisement_id, ad_module_id, used_at')
       .in('advertisement_id', adIds)
 
     if (moduleError) {
       console.error('[Ads Analytics] Error fetching module issue ads:', moduleError)
     }
 
-    // Combine both result sets
+    // Fetch all ad modules for this publication to build a name lookup
+    const { data: adModulesWithIds } = await supabaseAdmin
+      .from('ad_modules')
+      .select('id, name')
+      .eq('publication_id', publicationId)
+
+    // Build module ID -> name map
+    const moduleNameMap = new Map<string, string>()
+    if (adModulesWithIds) {
+      for (const m of adModulesWithIds) {
+        moduleNameMap.set(m.id, m.name)
+      }
+    }
+
+    // Combine both result sets, adding module_name for module-based ads
     const issueAds = [
-      ...(legacyIssueAds || []),
-      ...(moduleIssueAds || [])
+      ...(legacyIssueAds || []).map((ia: any) => ({ ...ia, ad_module_name: 'Advertorial' })),
+      ...(moduleIssueAds || []).map((ia: any) => ({
+        ...ia,
+        ad_module_name: moduleNameMap.get(ia.ad_module_id) || 'Unknown Section'
+      }))
     ]
 
     console.log(`[Ads Analytics] Found ${legacyIssueAds?.length || 0} legacy + ${moduleIssueAds?.length || 0} module associations`)
@@ -163,15 +181,19 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Ads Analytics] Found ${ads.length} ads, ${issueAds?.length || 0} issue_ads, ${campaigns?.length || 0} campaigns in range`)
 
-    // Filter issue_ads by campaigns in date range
+    // Filter issue_ads by campaigns in date range and optionally by ad module
     const filteredIssueAds = (issueAds || []).filter((issueAd: any) => {
-      return campaignMap.has(issueAd.issue_id)
+      // Must be in date range
+      if (!campaignMap.has(issueAd.issue_id)) return false
+      // Filter by ad module if specified
+      if (adModuleFilter && adModuleFilter !== 'all' && issueAd.ad_module_name !== adModuleFilter) return false
+      return true
     }).map((issueAd: any) => ({
       ...issueAd,
       campaign: campaignMap.get(issueAd.issue_id)
     }))
 
-    console.log(`[Ads Analytics] Filtered to ${filteredIssueAds.length} issue_ads in date range`)
+    console.log(`[Ads Analytics] Filtered to ${filteredIssueAds.length} issue_ads in date range${adModuleFilter && adModuleFilter !== 'all' ? ` (module: ${adModuleFilter})` : ''}`)
 
     // Get all ad module names for this publication (for link_section matching)
     const { data: adModules } = await supabaseAdmin
@@ -355,6 +377,7 @@ export async function GET(request: NextRequest) {
             clicksByIssue[click.issue_id] = {
               issue_id: click.issue_id,
               issue_date: issueData?.campaign?.date || click.issue_date,
+              ad_section: issueData?.ad_module_name || 'Unknown',
               clicks: [],
               total_clicks: 0,
               unique_clickers: new Set()
@@ -371,6 +394,7 @@ export async function GET(request: NextRequest) {
       const issueBreakdown = Object.values(clicksByIssue).map((issueData: any) => ({
         issue_id: issueData.issue_id,
         issue_date: issueData.issue_date,
+        ad_section: issueData.ad_section,
         total_clicks: issueData.total_clicks,
         unique_clickers: issueData.unique_clickers.size
       })).sort((a, b) => (b.issue_date || '').localeCompare(a.issue_date || ''))
@@ -391,6 +415,7 @@ export async function GET(request: NextRequest) {
           total_clicks: totalClicks,
           click_through_rate: clickThroughRate,
           total_recipients: totalRecipients > 0 ? totalRecipients : null,
+          ad_sections: Array.from(new Set(adIssues.map((ia: any) => ia.ad_module_name))),
           by_issue: issueBreakdown
         }
       }
@@ -401,12 +426,23 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Ads Analytics] Returned analytics for ${adAnalytics.length} ad(s)`)
 
+    // Build list of available ad modules for filter dropdown
+    const availableAdModules = ['Advertorial'] // Legacy section
+    if (adModulesWithIds) {
+      for (const m of adModulesWithIds) {
+        if (m.name && !availableAdModules.includes(m.name)) {
+          availableAdModules.push(m.name)
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       date_range: {
         start: startDateStr,
         end: endDateStr
       },
+      ad_modules: availableAdModules,
       ads: adAnalytics
     })
 

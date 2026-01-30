@@ -10,7 +10,9 @@ interface Props {
 export default function AdsAnalyticsTab({ slug, excludeIps = true }: Props) {
   const [loading, setLoading] = useState(true)
   const [ads, setAds] = useState<any[]>([])
+  const [adModules, setAdModules] = useState<string[]>([])
   const [selectedAdId, setSelectedAdId] = useState<string>('all')
+  const [selectedAdModule, setSelectedAdModule] = useState<string>('all')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [days, setDays] = useState('30')
@@ -18,7 +20,7 @@ export default function AdsAnalyticsTab({ slug, excludeIps = true }: Props) {
 
   useEffect(() => {
     fetchAdAnalytics()
-  }, [slug, selectedAdId, days, startDate, endDate, excludeIps])
+  }, [slug, selectedAdId, selectedAdModule, days, startDate, endDate, excludeIps])
 
   const fetchAdAnalytics = async () => {
     try {
@@ -27,6 +29,10 @@ export default function AdsAnalyticsTab({ slug, excludeIps = true }: Props) {
 
       if (selectedAdId !== 'all') {
         url += `&ad_id=${selectedAdId}`
+      }
+
+      if (selectedAdModule !== 'all') {
+        url += `&ad_module=${encodeURIComponent(selectedAdModule)}`
       }
 
       if (startDate && endDate) {
@@ -41,6 +47,7 @@ export default function AdsAnalyticsTab({ slug, excludeIps = true }: Props) {
       if (response.ok) {
         const data = await response.json()
         setAds(data.ads || [])
+        setAdModules(data.ad_modules || [])
         setDateRange(data.date_range || { start: '', end: '' })
       }
     } catch (error) {
@@ -62,7 +69,7 @@ export default function AdsAnalyticsTab({ slug, excludeIps = true }: Props) {
     <div>
       {/* Filters */}
       <div className="bg-white shadow rounded-lg p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Advertisement
@@ -76,6 +83,24 @@ export default function AdsAnalyticsTab({ slug, excludeIps = true }: Props) {
               {ads.map(ad => (
                 <option key={ad.ad_id} value={ad.ad_id}>
                   {ad.ad_title}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Ad Section
+            </label>
+            <select
+              value={selectedAdModule}
+              onChange={(e) => setSelectedAdModule(e.target.value)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+            >
+              <option value="all">All Sections</option>
+              {adModules.map(module => (
+                <option key={module} value={module}>
+                  {module}
                 </option>
               ))}
             </select>
@@ -161,6 +186,19 @@ export default function AdsAnalyticsTab({ slug, excludeIps = true }: Props) {
                       </span>
                       <span>Frequency: {ad.frequency}</span>
                       <span>Lifetime uses: {ad.lifetime_times_used}</span>
+                      {ad.metrics.ad_sections && ad.metrics.ad_sections.length > 0 && (
+                        <span className="flex items-center gap-1">
+                          Sections:
+                          {ad.metrics.ad_sections.map((section: string) => (
+                            <span
+                              key={section}
+                              className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                            >
+                              {section}
+                            </span>
+                          ))}
+                        </span>
+                      )}
                     </div>
                   </div>
                   {ad.button_url && (
@@ -244,6 +282,9 @@ export default function AdsAnalyticsTab({ slug, excludeIps = true }: Props) {
                               Issue Date
                             </th>
                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                              Ad Section
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                               Total Clicks
                             </th>
                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
@@ -255,6 +296,11 @@ export default function AdsAnalyticsTab({ slug, excludeIps = true }: Props) {
                           {ad.metrics.by_issue.map((issue: any) => (
                             <tr key={issue.issue_id}>
                               <td className="px-4 py-2 text-sm text-gray-900">{issue.issue_date}</td>
+                              <td className="px-4 py-2 text-sm">
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  {issue.ad_section || 'Unknown'}
+                                </span>
+                              </td>
                               <td className="px-4 py-2 text-sm text-gray-900">{issue.total_clicks}</td>
                               <td className="px-4 py-2 text-sm text-gray-900 font-semibold">
                                 {issue.unique_clickers}
