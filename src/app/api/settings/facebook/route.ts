@@ -257,40 +257,96 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (action === 'test-ad') {
-      // Send test post with actual ad content
+      // Send test post with actual ad content from the most recently sent issue
       const adModuleId = settingsMap.facebook_ad_module_id
 
       if (!adModuleId) {
         return NextResponse.json({ error: 'No ad module selected' }, { status: 400 })
       }
 
-      // Get the latest ad from the selected module
-      const { data: latestAd } = await supabaseAdmin
-        .from('advertisements')
-        .select('id, title, body, image_url, button_url')
-        .eq('ad_module_id', adModuleId)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
+      let adContent: {
+        title: string
+        body: string
+        imageUrl: string | null
+        buttonUrl: string | null
+        source: string
+      } | null = null
+
+      // Try to get the ad from the most recently sent issue
+      const { data: recentIssue } = await supabaseAdmin
+        .from('publication_issues')
+        .select('id, date')
+        .eq('publication_id', publicationId)
+        .eq('status', 'sent')
+        .order('date', { ascending: false })
         .limit(1)
         .single()
 
-      if (!latestAd) {
-        return NextResponse.json({ error: 'No active ads found in the selected module' }, { status: 400 })
+      if (recentIssue) {
+        const { data: issueAd } = await supabaseAdmin
+          .from('issue_module_ads')
+          .select(`
+            advertisement:advertisements(
+              id, title, body, image_url, button_url
+            )
+          `)
+          .eq('issue_id', recentIssue.id)
+          .eq('ad_module_id', adModuleId)
+          .limit(1)
+          .single()
+
+        if (issueAd?.advertisement) {
+          const ad = issueAd.advertisement as unknown as { id: string; title: string; body: string; image_url: string | null; button_url: string | null }
+          adContent = {
+            title: ad.title,
+            body: ad.body,
+            imageUrl: ad.image_url,
+            buttonUrl: ad.button_url,
+            source: `Issue ${recentIssue.date}`,
+          }
+        }
       }
 
-      const message = FacebookService.formatMessage(latestAd.body, latestAd.button_url)
+      // Fallback to latest active ad if no issue ad found
+      if (!adContent) {
+        const { data: latestAd } = await supabaseAdmin
+          .from('advertisements')
+          .select('id, title, body, image_url, button_url')
+          .eq('ad_module_id', adModuleId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (latestAd) {
+          adContent = {
+            title: latestAd.title,
+            body: latestAd.body,
+            imageUrl: latestAd.image_url,
+            buttonUrl: latestAd.button_url,
+            source: 'Latest active ad (no recent issue found)',
+          }
+        }
+      }
+
+      if (!adContent) {
+        return NextResponse.json({ error: 'No ads found in the selected module' }, { status: 400 })
+      }
+
+      const message = FacebookService.formatMessage(adContent.body, adContent.buttonUrl || undefined)
 
       const result = await fb.createPagePost({
         message,
-        imageUrl: latestAd.image_url || undefined,
-        linkUrl: latestAd.button_url || undefined,
+        imageUrl: adContent.imageUrl || undefined,
+        linkUrl: adContent.buttonUrl || undefined,
       })
 
       if (result.success) {
         return NextResponse.json({
           success: true,
           postId: result.postId,
-          adTitle: latestAd.title,
+          adTitle: adContent.title,
+          adSource: adContent.source,
           message: 'Test ad post created successfully',
         })
       } else {
