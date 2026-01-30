@@ -61,7 +61,12 @@ interface Column {
   width?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' // Column width hint
 }
 
-export default function ArticlesTab({ slug }: { slug: string }) {
+interface Props {
+  slug: string
+  excludeIps?: boolean
+}
+
+export default function ArticlesTab({ slug, excludeIps = true }: Props) {
   const [articles, setArticles] = useState<Article[]>([])
   const [filteredArticles, setFilteredArticles] = useState<Article[]>([])
   const [loading, setLoading] = useState(true)
@@ -128,7 +133,7 @@ export default function ArticlesTab({ slug }: { slug: string }) {
 
   useEffect(() => {
     fetchArticles()
-  }, [slug])
+  }, [slug, excludeIps])
 
   useEffect(() => {
     applyFiltersAndSort()
@@ -137,7 +142,7 @@ export default function ArticlesTab({ slug }: { slug: string }) {
   const fetchArticles = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/databases/articles?publication_id=${slug}`)
+      const response = await fetch(`/api/databases/articles?publication_id=${slug}&exclude_ips=${excludeIps}`)
       if (!response.ok) {
         throw new Error('Failed to fetch articles')
       }

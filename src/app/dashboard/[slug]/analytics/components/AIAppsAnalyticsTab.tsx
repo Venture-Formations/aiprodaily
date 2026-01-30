@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react'
 
 interface Props {
   slug: string
+  excludeIps?: boolean
 }
 
-export default function AIAppsAnalyticsTab({ slug }: Props) {
+export default function AIAppsAnalyticsTab({ slug, excludeIps = true }: Props) {
   const [loading, setLoading] = useState(true)
   const [apps, setApps] = useState<any[]>([])
   const [affiliateFilter, setAffiliateFilter] = useState('all')
@@ -19,7 +20,7 @@ export default function AIAppsAnalyticsTab({ slug }: Props) {
 
   useEffect(() => {
     fetchAIAppAnalytics()
-  }, [slug, affiliateFilter, categoryFilter, toolTypeFilter, days, startDate, endDate])
+  }, [slug, affiliateFilter, categoryFilter, toolTypeFilter, days, startDate, endDate, excludeIps])
 
   const fetchAIAppAnalytics = async () => {
     try {
@@ -41,6 +42,8 @@ export default function AIAppsAnalyticsTab({ slug }: Props) {
       } else {
         url += `&days=${days}`
       }
+
+      url += `&exclude_ips=${excludeIps}`
 
       const response = await fetch(url)
       if (response.ok) {

@@ -23,6 +23,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const newsletterSlug = searchParams.get('newsletter_slug')
     const days = parseInt(searchParams.get('days') || '30')
+    const excludeIpsParam = searchParams.get('exclude_ips')
+    const shouldExcludeIps = excludeIpsParam !== 'false' // Default to true
 
     // Get publication_id from slug (REQUIRED for multi-tenant isolation)
     let publicationId: string | null = null
@@ -108,17 +110,17 @@ export async function GET(request: NextRequest) {
     const totalFetched = allClicks.length
 
     // Filter out excluded IPs from analytics (clicks are still recorded, just not counted)
-    // Supports both single IPs and CIDR ranges
-    const clicks = allClicks.filter(click =>
-      !isIPExcluded(click.ip_address, exclusions)
-    )
-    const excludedClickCount = totalFetched - clicks.length
+    // Supports both single IPs and CIDR ranges (only if enabled)
+    const clicks = shouldExcludeIps
+      ? allClicks.filter(click => !isIPExcluded(click.ip_address, exclusions))
+      : allClicks
+    const excludedClickCount = shouldExcludeIps ? totalFetched - clicks.length : 0
 
     if (excludedClickCount > 0) {
       console.log(`[Link Analytics] Filtered ${excludedClickCount} clicks from ${exclusions.length} excluded IP(s)`)
     }
 
-    console.log(`[Link Analytics] Fetched ${totalFetched} total clicks, ${clicks.length} after IP filtering`)
+    console.log(`[Link Analytics] Fetched ${totalFetched} total clicks, ${clicks.length} after IP filtering (exclusion ${shouldExcludeIps ? 'enabled' : 'disabled'})`)
 
     // Calculate total clicks
     const totalClicks = clicks?.length || 0
@@ -203,8 +205,9 @@ export async function GET(request: NextRequest) {
           start: startDateStr,
           end: endDateStr
         },
-        excluded_ips: publicationId ? {
-          count: exclusions.length,
+        ip_exclusion: publicationId ? {
+          enabled: shouldExcludeIps,
+          exclusion_count: exclusions.length,
           filtered_clicks: excludedClickCount
         } : null
       }

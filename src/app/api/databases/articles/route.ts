@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { isIPExcluded, IPExclusion } from '@/lib/ip-utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,6 +9,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const newsletterSlug = searchParams.get('publication_id'); // Actually a slug, not UUID
+    const excludeIpsParam = searchParams.get('exclude_ips');
+    const shouldExcludeIps = excludeIpsParam !== 'false'; // Default to true
 
     if (!newsletterSlug) {
       return NextResponse.json(
@@ -33,6 +36,25 @@ export async function GET(request: NextRequest) {
 
     const newsletterId = newsletter.id;
     console.log('[API] Newsletter:', newsletterSlug, '→ UUID:', newsletterId);
+
+    // Fetch excluded IPs for this publication (for filtering click analytics)
+    let exclusions: IPExclusion[] = [];
+    if (shouldExcludeIps) {
+      const { data: excludedIpsData } = await supabase
+        .from('excluded_ips')
+        .select('ip_address, is_range, cidr_prefix')
+        .eq('publication_id', newsletterId);
+
+      exclusions = (excludedIpsData || []).map(e => ({
+        ip_address: e.ip_address,
+        is_range: e.is_range || false,
+        cidr_prefix: e.cidr_prefix
+      }));
+
+      if (exclusions.length > 0) {
+        console.log('[API] Loaded', exclusions.length, 'IP exclusions for click filtering');
+      }
+    }
 
     // Get scoring criteria settings (newsletter-specific)
     const { data: criteriaSettings } = await supabase
@@ -402,7 +424,7 @@ export async function GET(request: NextRequest) {
       while (hasMore) {
         const { data: clicksBatch, error: clicksError } = await supabase
           .from('link_clicks')
-          .select('id, link_url, subscriber_email, issue_id')
+          .select('id, link_url, subscriber_email, issue_id, ip_address')
           .in('issue_id', allIssueIdFormats)
           .range(offset, offset + batchSize - 1);
 
@@ -420,8 +442,18 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      linkClicks = allClicks;
-      console.log('[API] Found link clicks:', linkClicks.length);
+      // Filter out excluded IPs from analytics (only if enabled)
+      if (shouldExcludeIps && exclusions.length > 0) {
+        const totalFetched = allClicks.length;
+        linkClicks = allClicks.filter(click => !isIPExcluded(click.ip_address, exclusions));
+        const excludedCount = totalFetched - linkClicks.length;
+        if (excludedCount > 0) {
+          console.log('[API] Filtered', excludedCount, 'clicks from', exclusions.length, 'excluded IP(s)');
+        }
+      } else {
+        linkClicks = allClicks;
+      }
+      console.log('[API] Found link clicks:', linkClicks.length, '(IP exclusion', shouldExcludeIps ? 'enabled' : 'disabled', ')');
     }
 
     // Build a map of clicks by issue_id + normalized source_url for quick lookup

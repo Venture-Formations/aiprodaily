@@ -31,6 +31,8 @@ export async function GET(request: NextRequest) {
     const startDateParam = searchParams.get('start_date')
     const endDateParam = searchParams.get('end_date')
     const days = parseInt(searchParams.get('days') || '30')
+    const excludeIpsParam = searchParams.get('exclude_ips')
+    const shouldExcludeIps = excludeIpsParam !== 'false' // Default to true
 
     if (!newsletterSlug) {
       return NextResponse.json(
@@ -137,10 +139,11 @@ export async function GET(request: NextRequest) {
 
     // Filter out excluded IPs from analytics (votes are still recorded, just not counted)
     // Supports both single IPs and CIDR ranges
-    const responses = (responsesRaw || []).filter(r =>
-      !isIPExcluded(r.ip_address, exclusions)
-    )
-    const excludedResponseCount = (responsesRaw?.length || 0) - responses.length
+    // Only apply filtering if shouldExcludeIps is true
+    const responses = shouldExcludeIps
+      ? (responsesRaw || []).filter(r => !isIPExcluded(r.ip_address, exclusions))
+      : (responsesRaw || [])
+    const excludedResponseCount = shouldExcludeIps ? (responsesRaw?.length || 0) - responses.length : 0
 
     if (excludedResponseCount > 0) {
       console.log(`[Poll Analytics] Filtered ${excludedResponseCount} responses from ${excludedIpCount} excluded IP(s)`)
@@ -296,8 +299,9 @@ export async function GET(request: NextRequest) {
         start: startDateStr,
         end: endDateStr
       },
-      excluded_ips: {
-        count: excludedIpCount,
+      ip_exclusion: {
+        enabled: shouldExcludeIps,
+        exclusion_count: excludedIpCount,
         filtered_responses: excludedResponseCount
       },
       polls: pollAnalytics

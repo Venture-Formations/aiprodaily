@@ -29,6 +29,8 @@ export async function GET(request: NextRequest) {
     const startDateParam = searchParams.get('start_date')
     const endDateParam = searchParams.get('end_date')
     const days = parseInt(searchParams.get('days') || '30')
+    const excludeIpsParam = searchParams.get('exclude_ips')
+    const shouldExcludeIps = excludeIpsParam !== 'false' // Default to true
 
     if (!newsletterSlug) {
       return NextResponse.json(
@@ -220,18 +222,18 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Filter out excluded IPs from analytics
+    // Filter out excluded IPs from analytics (only if enabled)
     const totalFetched = allLinkClicks.length
-    const linkClicks = allLinkClicks.filter(click =>
-      !isIPExcluded(click.ip_address, exclusions)
-    )
-    const excludedClickCount = totalFetched - linkClicks.length
+    const linkClicks = shouldExcludeIps
+      ? allLinkClicks.filter(click => !isIPExcluded(click.ip_address, exclusions))
+      : allLinkClicks
+    const excludedClickCount = shouldExcludeIps ? totalFetched - linkClicks.length : 0
 
     if (excludedClickCount > 0) {
       console.log(`[Ads Analytics] Filtered ${excludedClickCount} clicks from ${exclusions.length} excluded IP(s)`)
     }
 
-    console.log(`[Ads Analytics] Found ${totalFetched} total clicks, ${linkClicks.length} after IP filtering`)
+    console.log(`[Ads Analytics] Found ${totalFetched} total clicks, ${linkClicks.length} after IP filtering (exclusion ${shouldExcludeIps ? 'enabled' : 'disabled'})`)
 
     // Fetch issues in date range for recipient counts (for CTR calculation)
     const { data: issuesRaw, error: issuesError } = await supabaseAdmin

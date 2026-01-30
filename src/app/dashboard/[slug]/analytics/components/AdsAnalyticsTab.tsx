@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react'
 
 interface Props {
   slug: string
+  excludeIps?: boolean
 }
 
-export default function AdsAnalyticsTab({ slug }: Props) {
+export default function AdsAnalyticsTab({ slug, excludeIps = true }: Props) {
   const [loading, setLoading] = useState(true)
   const [ads, setAds] = useState<any[]>([])
   const [selectedAdId, setSelectedAdId] = useState<string>('all')
@@ -17,7 +18,7 @@ export default function AdsAnalyticsTab({ slug }: Props) {
 
   useEffect(() => {
     fetchAdAnalytics()
-  }, [slug, selectedAdId, days, startDate, endDate])
+  }, [slug, selectedAdId, days, startDate, endDate, excludeIps])
 
   const fetchAdAnalytics = async () => {
     try {
@@ -33,6 +34,8 @@ export default function AdsAnalyticsTab({ slug }: Props) {
       } else {
         url += `&days=${days}`
       }
+
+      url += `&exclude_ips=${excludeIps}`
 
       const response = await fetch(url)
       if (response.ok) {

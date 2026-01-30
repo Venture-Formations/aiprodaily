@@ -11,6 +11,7 @@ import AdsAnalyticsTab from './components/AdsAnalyticsTab'
 export default function AnalyticsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params)
   const [activeTab, setActiveTab] = useState('issues')
+  const [excludeIps, setExcludeIps] = useState(true)
 
   const tabs = [
     { id: 'issues', name: 'Issues' },
@@ -25,12 +26,38 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
       <div className="px-4 py-6 sm:px-0">
         {/* Page Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Newsletter Analytics
-          </h1>
-          <p className="mt-1 text-sm text-gray-600">
-            View comprehensive analytics across all aspects of your newsletter
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Newsletter Analytics
+              </h1>
+              <p className="mt-1 text-sm text-gray-600">
+                View comprehensive analytics across all aspects of your newsletter
+              </p>
+            </div>
+            {/* Exclude IPs Toggle */}
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium text-gray-700">
+                Exclude IPs
+              </label>
+              <button
+                onClick={() => setExcludeIps(!excludeIps)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  excludeIps ? 'bg-blue-600' : 'bg-gray-200'
+                }`}
+                title={excludeIps ? 'IP exclusion enabled - bot/scanner clicks filtered out' : 'IP exclusion disabled - showing all clicks'}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    excludeIps ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <span className={`text-xs ${excludeIps ? 'text-blue-600' : 'text-gray-500'}`}>
+                {excludeIps ? 'On' : 'Off'}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Tab Navigation */}
@@ -55,11 +82,11 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
 
         {/* Tab Content */}
         <div className="mt-6">
-          {activeTab === 'issues' && <IssuesAnalyticsTab slug={slug} />}
-          {activeTab === 'articles' && <ArticlesTab slug={slug} />}
-          {activeTab === 'polls' && <PollsAnalyticsTab slug={slug} />}
-          {activeTab === 'ai-apps' && <AIAppsAnalyticsTab slug={slug} />}
-          {activeTab === 'ads' && <AdsAnalyticsTab slug={slug} />}
+          {activeTab === 'issues' && <IssuesAnalyticsTab slug={slug} excludeIps={excludeIps} />}
+          {activeTab === 'articles' && <ArticlesTab slug={slug} excludeIps={excludeIps} />}
+          {activeTab === 'polls' && <PollsAnalyticsTab slug={slug} excludeIps={excludeIps} />}
+          {activeTab === 'ai-apps' && <AIAppsAnalyticsTab slug={slug} excludeIps={excludeIps} />}
+          {activeTab === 'ads' && <AdsAnalyticsTab slug={slug} excludeIps={excludeIps} />}
         </div>
       </div>
     </Layout>

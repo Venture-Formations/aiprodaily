@@ -31,9 +31,10 @@ interface LinkClickAnalytics {
 
 interface Props {
   slug: string
+  excludeIps?: boolean
 }
 
-export default function IssuesAnalyticsTab({ slug }: Props) {
+export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
   const [issues, setIssues] = useState<IssueWithMetrics[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -47,7 +48,7 @@ export default function IssuesAnalyticsTab({ slug }: Props) {
     fetchAnalytics()
     fetchFeedbackAnalytics()
     fetchLinkClickAnalytics()
-  }, [selectedTimeframe, slug])
+  }, [selectedTimeframe, slug, excludeIps])
 
   const fetchAnalytics = async () => {
     try {
@@ -84,7 +85,7 @@ export default function IssuesAnalyticsTab({ slug }: Props) {
   const fetchLinkClickAnalytics = async () => {
     try {
       setLinkClickLoading(true)
-      const response = await fetch(`/api/link-tracking/analytics?days=${selectedTimeframe}`)
+      const response = await fetch(`/api/link-tracking/analytics?days=${selectedTimeframe}&exclude_ips=${excludeIps}`)
       if (response.ok) {
         const data = await response.json()
         setLinkClickAnalytics(data.analytics)
