@@ -6697,6 +6697,8 @@ function IPExclusionSettings() {
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
   const [emailModalIp, setEmailModalIp] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const PAGE_SIZE = 50
 
   const fetchData = async () => {
     try {
@@ -6775,6 +6777,7 @@ function IPExclusionSettings() {
         setNewIp('')
         setNewReason('')
         setExcludedIps(data.ips || [])
+        setCurrentPage(1) // Reset to first page to show the new entry
       } else {
         showMessage(data.error || 'Failed to exclude IP', 'error')
       }
@@ -6830,6 +6833,7 @@ function IPExclusionSettings() {
         // Remove from suggestions and add to excluded
         setSuggestions(prev => prev.filter(s => s.ip_address !== ipAddress))
         setExcludedIps(data.ips || [])
+        setCurrentPage(1) // Reset to first page to show the new entry
       } else {
         showMessage(data.error || 'Failed to exclude IP', 'error')
       }
@@ -6865,6 +6869,7 @@ function IPExclusionSettings() {
           successCount++
           const data = await res.json()
           setExcludedIps(data.ips || [])
+          setCurrentPage(1) // Reset to first page to show the new entry
         }
       } catch (error) {
         console.error(`Failed to exclude ${cidr}:`, error)
@@ -6955,57 +6960,118 @@ function IPExclusionSettings() {
         {excludedIps.length === 0 ? (
           <p className="text-gray-500 text-sm italic">No excluded IP addresses</p>
         ) : (
-          <div className="border rounded-lg overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP Address</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Added</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {excludedIps.map((ip) => (
-                  <tr key={ip.id}>
-                    <td className="px-4 py-3 text-sm font-mono">
-                      {ip.is_range ? `${ip.ip_address}/${ip.cidr_prefix}` : ip.ip_address}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {ip.is_range ? (
-                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
-                          Range
-                        </span>
-                      ) : (
-                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
-                          Single
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{ip.reason || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
-                      {new Date(ip.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-3 text-right space-x-2">
-                      <button
-                        onClick={() => setEmailModalIp(ip.is_range ? `${ip.ip_address}/${ip.cidr_prefix}` : ip.ip_address)}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                      >
-                        See Emails
-                      </button>
-                      <button
-                        onClick={() => handleRemoveIp(ip.ip_address)}
-                        className="text-red-600 hover:text-red-800 text-sm font-medium"
-                      >
-                        Remove
-                      </button>
-                    </td>
+          <>
+            {/* Summary and pagination info */}
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-gray-600">
+                Showing {Math.min((currentPage - 1) * PAGE_SIZE + 1, excludedIps.length)} - {Math.min(currentPage * PAGE_SIZE, excludedIps.length)} of {excludedIps.length} excluded IPs
+                {' '}({excludedIps.filter(ip => ip.is_range).length} ranges, {excludedIps.filter(ip => !ip.is_range).length} single IPs)
+              </p>
+            </div>
+            <div className="border rounded-lg overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP Address</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Added</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {excludedIps.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map((ip) => (
+                    <tr key={ip.id}>
+                      <td className="px-4 py-3 text-sm font-mono">
+                        {ip.is_range ? `${ip.ip_address}/${ip.cidr_prefix}` : ip.ip_address}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {ip.is_range ? (
+                          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                            Range
+                          </span>
+                        ) : (
+                          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                            Single
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{ip.reason || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {new Date(ip.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 text-right space-x-2">
+                        <button
+                          onClick={() => setEmailModalIp(ip.is_range ? `${ip.ip_address}/${ip.cidr_prefix}` : ip.ip_address)}
+                          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                        >
+                          See Emails
+                        </button>
+                        <button
+                          onClick={() => handleRemoveIp(ip.ip_address)}
+                          className="text-red-600 hover:text-red-800 text-sm font-medium"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* Pagination controls */}
+            {excludedIps.length > PAGE_SIZE && (
+              <div className="flex items-center justify-between mt-4">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className={`px-4 py-2 text-sm font-medium rounded-md ${
+                    currentPage === 1
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  Previous
+                </button>
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: Math.ceil(excludedIps.length / PAGE_SIZE) }, (_, i) => i + 1)
+                    .filter(page => {
+                      // Show first, last, current, and pages around current
+                      const totalPages = Math.ceil(excludedIps.length / PAGE_SIZE)
+                      return page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1
+                    })
+                    .map((page, index, arr) => (
+                      <span key={page} className="flex items-center">
+                        {index > 0 && arr[index - 1] !== page - 1 && (
+                          <span className="px-2 text-gray-400">...</span>
+                        )}
+                        <button
+                          onClick={() => setCurrentPage(page)}
+                          className={`w-8 h-8 rounded-md text-sm font-medium ${
+                            currentPage === page
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      </span>
+                    ))}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(Math.ceil(excludedIps.length / PAGE_SIZE), p + 1))}
+                  disabled={currentPage >= Math.ceil(excludedIps.length / PAGE_SIZE)}
+                  className={`px-4 py-2 text-sm font-medium rounded-md ${
+                    currentPage >= Math.ceil(excludedIps.length / PAGE_SIZE)
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 

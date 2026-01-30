@@ -32,11 +32,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Fetch all excluded IPs - use explicit limit to avoid Supabase's 1000 row default
     const { data: excludedIps, error } = await supabaseAdmin
       .from('excluded_ips')
       .select('id, ip_address, is_range, cidr_prefix, reason, added_by, created_at')
       .eq('publication_id', publicationId)
       .order('created_at', { ascending: false })
+      .limit(10000)
 
     if (error) {
       console.error('[IP Exclusion] Error fetching excluded IPs:', error)
@@ -137,12 +139,13 @@ export async function POST(request: NextRequest) {
     const displayName = parsed.isRange ? `${parsed.ip}/${parsed.prefix}` : parsed.ip
     console.log(`[IP Exclusion] Added: ${displayName} (reason: ${reason || 'none'})`)
 
-    // Return updated list
+    // Return updated list - use explicit limit to avoid Supabase's 1000 row default
     const { data: excludedIps } = await supabaseAdmin
       .from('excluded_ips')
       .select('id, ip_address, is_range, cidr_prefix, reason, added_by, created_at')
       .eq('publication_id', publication_id)
       .order('created_at', { ascending: false })
+      .limit(10000)
 
     return NextResponse.json({
       success: true,
@@ -207,12 +210,13 @@ export async function DELETE(request: NextRequest) {
 
     console.log(`[IP Exclusion] Removed: ${normalizedIP}`)
 
-    // Return updated list
+    // Return updated list - use explicit limit to avoid Supabase's 1000 row default
     const { data: excludedIps } = await supabaseAdmin
       .from('excluded_ips')
       .select('id, ip_address, is_range, cidr_prefix, reason, added_by, created_at')
       .eq('publication_id', publication_id)
       .order('created_at', { ascending: false })
+      .limit(10000)
 
     return NextResponse.json({
       success: true,
