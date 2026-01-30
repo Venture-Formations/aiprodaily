@@ -164,7 +164,44 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // If no issue-specific ad, get the latest active ad from the module
+        // If no issue-specific ad, try the most recently sent issue's ad
+        if (!adContent) {
+          const { data: recentSentIssue } = await supabaseAdmin
+            .from('publication_issues')
+            .select('id, date')
+            .eq('publication_id', publication.id)
+            .eq('status', 'sent')
+            .order('date', { ascending: false })
+            .limit(1)
+            .single()
+
+          if (recentSentIssue) {
+            const { data: recentIssueAd } = await supabaseAdmin
+              .from('issue_module_ads')
+              .select(`
+                advertisement:advertisements(
+                  id, title, body, image_url, button_url
+                )
+              `)
+              .eq('issue_id', recentSentIssue.id)
+              .eq('ad_module_id', fbSettings.adModuleId)
+              .limit(1)
+              .single()
+
+            if (recentIssueAd?.advertisement) {
+              const ad = recentIssueAd.advertisement as any
+              adContent = {
+                title: ad.title,
+                body: ad.body,
+                imageUrl: ad.image_url,
+                buttonUrl: ad.button_url,
+              }
+              console.log(`[Facebook] Using ad from recent issue ${recentSentIssue.date}: ${ad.title}`)
+            }
+          }
+        }
+
+        // Final fallback: latest active ad from the module
         if (!adContent) {
           const { data: latestAd } = await supabaseAdmin
             .from('advertisements')
