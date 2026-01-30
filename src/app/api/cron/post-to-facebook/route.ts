@@ -230,7 +230,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Format the message
-        const message = FacebookService.formatMessage(adContent.body, adContent.buttonUrl || undefined)
+        const message = FacebookService.formatMessage(adContent.body, adContent.buttonUrl || undefined, adContent.title)
 
         // Create Facebook service and post
         const fb = new FacebookService(fbSettings.pageId, fbSettings.pageAccessToken)

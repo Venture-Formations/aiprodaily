@@ -235,14 +235,20 @@ export class FacebookService {
 
   /**
    * Format ad content into a Facebook-friendly message
-   * Combines body text with CTA link
+   * Includes title as first line, body text, and CTA link
    */
-  static formatMessage(body: string, ctaUrl?: string): string {
+  static formatMessage(body: string, ctaUrl?: string, title?: string): string {
     // Strip HTML from body
     const cleanBody = FacebookService.stripHtml(body)
 
-    // Build message
-    let message = cleanBody
+    // Build message with title as first line
+    let message = ''
+    if (title) {
+      const cleanTitle = FacebookService.stripHtml(title)
+      message = `${cleanTitle}\n\n${cleanBody}`
+    } else {
+      message = cleanBody
+    }
 
     // Add CTA link if provided
     if (ctaUrl) {

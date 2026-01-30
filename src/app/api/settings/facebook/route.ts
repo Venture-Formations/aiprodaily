@@ -333,7 +333,7 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: 'No ads found in the selected module' }, { status: 400 })
       }
 
-      const message = FacebookService.formatMessage(adContent.body, adContent.buttonUrl || undefined)
+      const message = FacebookService.formatMessage(adContent.body, adContent.buttonUrl || undefined, adContent.title)
 
       const result = await fb.createPagePost({
         message,
