@@ -139,16 +139,23 @@ export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
     // Use sent_count as denominator when delivered_count is 0 or not available
     const denominator = totals.delivered > 0 ? totals.delivered : totals.sent
 
+    // When excludeIps is ON, use our own click tracking data for click rate
+    // When excludeIps is OFF, use MailerLite's click data
+    const clicksToUse = excludeIps && linkClickAnalytics
+      ? linkClickAnalytics.totalClicks
+      : totals.clicked
+
     return {
       avgOpenRate: denominator > 0 ? (totals.opened / denominator) * 100 : 0,
-      avgClickRate: denominator > 0 ? (totals.clicked / denominator) * 100 : 0,
+      avgClickRate: denominator > 0 ? (clicksToUse / denominator) * 100 : 0,
       avgBounceRate: totals.sent > 0 ? (totals.bounced / totals.sent) * 100 : 0,
       avgUnsubscribeRate: denominator > 0 ? (totals.unsubscribed / denominator) * 100 : 0,
       totalSent: totals.sent,
       totalDelivered: totals.delivered,
       totalOpened: totals.opened,
-      totalClicked: totals.clicked,
-      issueCount: issuesWithMetrics.length
+      totalClicked: clicksToUse,
+      issueCount: issuesWithMetrics.length,
+      usingOwnClickData: excludeIps && !!linkClickAnalytics
     }
   }
 
@@ -168,6 +175,27 @@ export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
     return `${(value * 100).toFixed(1)}%`
   }
 
+  // Calculate click rate for a specific issue
+  // When excludeIps is ON, use our own click tracking data
+  // When excludeIps is OFF, use MailerLite's click rate
+  const getIssueClickRate = (issue: IssueWithMetrics): number | null => {
+    const metrics = issue.email_metrics
+    if (!metrics) return null
+
+    if (excludeIps && linkClickAnalytics?.clicksByissue) {
+      // Use our own click data (already filtered by excluded IPs)
+      const ourClicks = linkClickAnalytics.clicksByissue[issue.id] || 0
+      const denominator = (metrics.delivered_count || 0) > 0
+        ? metrics.delivered_count
+        : metrics.sent_count
+      if (!denominator || denominator === 0) return null
+      return ourClicks / denominator
+    } else {
+      // Use MailerLite's click rate
+      return metrics.click_rate ?? null
+    }
+  }
+
   const averages = calculateAverages()
 
   const downloadCSV = () => {
@@ -185,7 +213,8 @@ export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
       'Click Rate',
       'Bounces',
       'Bounce Rate',
-      'Unsubscribes'
+      'Unsubscribes',
+      'Click Data Source'
     ]
 
     // CSV rows
@@ -194,13 +223,23 @@ export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
       const sent = metrics?.sent_count || 0
       const delivered = metrics?.delivered_count || 0
       const opened = metrics?.opened_count || 0
-      const clicked = metrics?.clicked_count || 0
       const bounced = metrics?.bounced_count || 0
       const unsubscribed = metrics?.unsubscribed_count || 0
 
-      // Calculate rates
+      // Calculate rates - use our own click data when excludeIps is ON
       const denominator = delivered > 0 ? delivered : sent
       const openRate = denominator > 0 ? ((opened / denominator) * 100).toFixed(2) : '0.00'
+
+      // Get clicks based on excludeIps setting
+      let clicked: number
+      let clickDataSource: string
+      if (excludeIps && linkClickAnalytics?.clicksByissue) {
+        clicked = linkClickAnalytics.clicksByissue[issue.id] || 0
+        clickDataSource = 'Internal (IP Filtered)'
+      } else {
+        clicked = metrics?.clicked_count || 0
+        clickDataSource = 'MailerLite'
+      }
       const clickRate = denominator > 0 ? ((clicked / denominator) * 100).toFixed(2) : '0.00'
       const bounceRate = sent > 0 ? ((bounced / sent) * 100).toFixed(2) : '0.00'
 
@@ -215,7 +254,8 @@ export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
         `${clickRate}%`,
         bounced,
         `${bounceRate}%`,
-        unsubscribed
+        unsubscribed,
+        clickDataSource
       ]
     })
 
@@ -289,6 +329,13 @@ export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
                 <div className="text-xs text-gray-500 mt-1">
                   {averages.totalClicked.toLocaleString()} total clicks
                 </div>
+                <div className="text-xs mt-1">
+                  {averages.usingOwnClickData ? (
+                    <span className="text-blue-600">Using filtered click data</span>
+                  ) : (
+                    <span className="text-gray-400">Using MailerLite data</span>
+                  )}
+                </div>
               </div>
               <div className="bg-white p-6 rounded-lg shadow">
                 <div className="text-2xl font-bold text-gray-600 mb-1">
@@ -358,6 +405,9 @@ export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Click Rate
+                        {excludeIps && linkClickAnalytics && (
+                          <span className="ml-1 text-blue-500 normal-case" title="Using internal tracking data with IP exclusions applied">*</span>
+                        )}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
@@ -389,11 +439,11 @@ export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           <span className={`font-medium ${
-                            (issue.email_metrics?.click_rate || 0) > 0.05 ? 'text-green-600' :
-                            (issue.email_metrics?.click_rate || 0) > 0.02 ? 'text-yellow-600' :
+                            (getIssueClickRate(issue) || 0) > 0.05 ? 'text-green-600' :
+                            (getIssueClickRate(issue) || 0) > 0.02 ? 'text-yellow-600' :
                             'text-red-600'
                           }`}>
-                            {formatPercentage(issue.email_metrics?.click_rate)}
+                            {formatPercentage(getIssueClickRate(issue))}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -414,6 +464,34 @@ export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* Updated at info */}
+            {issues.length > 0 && (
+              <div className="px-6 py-3 border-t border-gray-200 text-xs text-gray-500 flex justify-between items-center">
+                <div>
+                  {excludeIps && linkClickAnalytics && (
+                    <span>* Click rates use internal tracking data with IP exclusions applied</span>
+                  )}
+                </div>
+                <div>
+                  {(() => {
+                    const latestImport = issues
+                      .filter(c => c.email_metrics?.imported_at)
+                      .map(c => new Date(c.email_metrics!.imported_at))
+                      .sort((a, b) => b.getTime() - a.getTime())[0]
+
+                    if (!latestImport) return 'Metrics not yet imported'
+
+                    return `MailerLite metrics updated ${latestImport.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit'
+                    })}`
+                  })()}
+                </div>
               </div>
             )}
           </div>
