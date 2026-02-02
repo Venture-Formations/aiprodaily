@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
 
 const BATCH_SIZE = 100 // Process up to 100 updates per run
 const MAX_RETRIES = 3 // Max retry attempts before marking as failed
+const REAL_CLICK_FIELD = 'Real_Click' // MailerLite custom field name
 
 interface FieldUpdate {
   id: string
@@ -62,6 +64,194 @@ async function updateMailerLiteField(
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
     }
+  }
+}
+
+/**
+ * Sync Real_Click field status for all subscribers
+ * Only queues updates when state actually changes (new clickers or removed clickers)
+ */
+async function syncRealClickStatus(): Promise<{
+  checked: number
+  newClickers: number
+  removedClickers: number
+  errors: string[]
+}> {
+  const errors: string[] = []
+  let newClickers = 0
+  let removedClickers = 0
+
+  // Get all publications
+  const { data: publications, error: pubError } = await supabaseAdmin
+    .from('publications')
+    .select('id, slug')
+
+  if (pubError || !publications) {
+    errors.push(`Failed to fetch publications: ${pubError?.message}`)
+    return { checked: 0, newClickers: 0, removedClickers: 0, errors }
+  }
+
+  for (const publication of publications) {
+    try {
+      // Get excluded IPs for this publication
+      const { data: excludedIpsData } = await supabaseAdmin
+        .from('excluded_ips')
+        .select('ip_address, is_range, cidr_prefix')
+        .eq('publication_id', publication.id)
+
+      const exclusions: IPExclusion[] = (excludedIpsData || []).map(e => ({
+        ip_address: e.ip_address,
+        is_range: e.is_range || false,
+        cidr_prefix: e.cidr_prefix
+      }))
+
+      // Get ALL link clicks for this publication (paginated)
+      const FETCH_BATCH = 1000
+      let allClicks: { subscriber_email: string; ip_address: string }[] = []
+      let offset = 0
+      let hasMore = true
+
+      while (hasMore) {
+        const { data: clicks, error: clickError } = await supabaseAdmin
+          .from('link_clicks')
+          .select('subscriber_email, ip_address')
+          .eq('publication_id', publication.id)
+          .range(offset, offset + FETCH_BATCH - 1)
+
+        if (clickError) {
+          errors.push(`[${publication.slug}] Failed to fetch clicks: ${clickError.message}`)
+          break
+        }
+
+        if (clicks && clicks.length > 0) {
+          allClicks = allClicks.concat(clicks)
+          offset += FETCH_BATCH
+          hasMore = clicks.length === FETCH_BATCH
+        } else {
+          hasMore = false
+        }
+      }
+
+      // Filter to valid (non-excluded IP) clicks and get unique emails
+      const validClicks = allClicks.filter(c => !isIPExcluded(c.ip_address, exclusions))
+      const emailsWithValidClicks = new Set(validClicks.map(c => c.subscriber_email.toLowerCase()))
+
+      // Get current stored state
+      const { data: currentStatus } = await supabaseAdmin
+        .from('subscriber_real_click_status')
+        .select('subscriber_email, has_real_click')
+        .eq('publication_id', publication.id)
+
+      const currentStatusMap = new Map<string, boolean>()
+      for (const status of currentStatus || []) {
+        currentStatusMap.set(status.subscriber_email.toLowerCase(), status.has_real_click)
+      }
+
+      // Find changes
+      const toSetTrue: string[] = []
+      const toSetFalse: string[] = []
+
+      // Check for new clickers (have valid clicks but state is FALSE or missing)
+      for (const email of Array.from(emailsWithValidClicks)) {
+        const currentState = currentStatusMap.get(email)
+        if (currentState !== true) {
+          toSetTrue.push(email)
+        }
+      }
+
+      // Check for removed clickers (state is TRUE but no valid clicks)
+      for (const [email, hasClick] of Array.from(currentStatusMap.entries())) {
+        if (hasClick && !emailsWithValidClicks.has(email)) {
+          toSetFalse.push(email)
+        }
+      }
+
+      // Queue updates for new clickers
+      for (const email of toSetTrue) {
+        // Check if already queued
+        const { data: existing } = await supabaseAdmin
+          .from('mailerlite_field_updates')
+          .select('id')
+          .eq('subscriber_email', email)
+          .eq('field_name', REAL_CLICK_FIELD)
+          .eq('field_value', true)
+          .in('status', ['pending', 'processing'])
+          .limit(1)
+          .maybeSingle()
+
+        if (!existing) {
+          await supabaseAdmin
+            .from('mailerlite_field_updates')
+            .insert({
+              subscriber_email: email,
+              field_name: REAL_CLICK_FIELD,
+              field_value: true,
+              status: 'pending',
+              publication_id: publication.id
+            })
+          newClickers++
+        }
+
+        // Upsert local state
+        await supabaseAdmin
+          .from('subscriber_real_click_status')
+          .upsert({
+            publication_id: publication.id,
+            subscriber_email: email,
+            has_real_click: true,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'publication_id,subscriber_email' })
+      }
+
+      // Queue updates for removed clickers
+      for (const email of toSetFalse) {
+        // Check if already queued
+        const { data: existing } = await supabaseAdmin
+          .from('mailerlite_field_updates')
+          .select('id')
+          .eq('subscriber_email', email)
+          .eq('field_name', REAL_CLICK_FIELD)
+          .eq('field_value', false)
+          .in('status', ['pending', 'processing'])
+          .limit(1)
+          .maybeSingle()
+
+        if (!existing) {
+          await supabaseAdmin
+            .from('mailerlite_field_updates')
+            .insert({
+              subscriber_email: email,
+              field_name: REAL_CLICK_FIELD,
+              field_value: false,
+              status: 'pending',
+              publication_id: publication.id
+            })
+          removedClickers++
+        }
+
+        // Update local state
+        await supabaseAdmin
+          .from('subscriber_real_click_status')
+          .update({
+            has_real_click: false,
+            updated_at: new Date().toISOString()
+          })
+          .eq('publication_id', publication.id)
+          .eq('subscriber_email', email)
+      }
+
+      console.log(`[Real_Click Sync] ${publication.slug}: ${emailsWithValidClicks.size} valid clickers, ${toSetTrue.length} new, ${toSetFalse.length} removed`)
+
+    } catch (error) {
+      errors.push(`[${publication.slug}] Error: ${error instanceof Error ? error.message : 'Unknown'}`)
+    }
+  }
+
+  return {
+    checked: publications.length,
+    newClickers,
+    removedClickers,
+    errors
   }
 }
 
@@ -185,14 +375,34 @@ async function processMailerLiteUpdates() {
 export async function GET(request: NextRequest) {
   const searchParams = new URL(request.url).searchParams
   const secret = searchParams.get('secret')
+  const forceSync = searchParams.get('sync_real_click') === 'true'
 
   if (secret && secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
+    let realClickSyncResult = null
+
+    // Run Real_Click sync once daily (at 6 AM hour) or when forced
+    const currentHour = new Date().getHours()
+    const currentMinute = new Date().getMinutes()
+    // Run during the 6:00-6:05 window (cron runs every 5 mins)
+    const isDailySyncTime = currentHour === 6 && currentMinute < 5
+
+    if (forceSync || isDailySyncTime) {
+      console.log('[MailerLite Updates] Running Real_Click sync...')
+      realClickSyncResult = await syncRealClickStatus()
+      console.log(`[MailerLite Updates] Real_Click sync complete: ${realClickSyncResult.newClickers} new, ${realClickSyncResult.removedClickers} removed`)
+    }
+
+    // Always process the queue
     const result = await processMailerLiteUpdates()
-    return NextResponse.json(result)
+
+    return NextResponse.json({
+      ...result,
+      realClickSync: realClickSyncResult
+    })
   } catch (error) {
     console.error('[MailerLite Updates] Cron error:', error)
     return NextResponse.json({
