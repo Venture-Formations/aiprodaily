@@ -172,11 +172,22 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.unique_users - a.unique_users)
       .slice(0, 10)
 
-    // Calculate click-through rate by issue
+    // Calculate click-through rate by issue (total clicks and unique clickers)
     const clicksByissue: { [key: string]: number } = {}
+    const uniqueUsersByIssue: { [key: string]: Set<string> } = {}
     clicks?.forEach(click => {
       const issueId = click.issue_id || click.issue_date
       clicksByissue[issueId] = (clicksByissue[issueId] || 0) + 1
+      if (!uniqueUsersByIssue[issueId]) {
+        uniqueUsersByIssue[issueId] = new Set()
+      }
+      uniqueUsersByIssue[issueId].add(click.subscriber_email)
+    })
+
+    // Convert Sets to counts for JSON serialization
+    const uniqueClickersByIssue: { [key: string]: number } = {}
+    Object.keys(uniqueUsersByIssue).forEach(issueId => {
+      uniqueClickersByIssue[issueId] = uniqueUsersByIssue[issueId].size
     })
 
     // Get recent clicks for display
@@ -200,6 +211,7 @@ export async function GET(request: NextRequest) {
         dailyClicks,
         topUrls,
         clicksByissue,
+        uniqueClickersByIssue,
         recentClicks,
         dateRange: {
           start: startDateStr,

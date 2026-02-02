@@ -25,6 +25,7 @@ interface LinkClickAnalytics {
   dailyClicks: { [key: string]: number }
   topUrls: { url: string; section: string; clicks: number; unique_users: number }[]
   clicksByissue: { [key: string]: number }
+  uniqueClickersByIssue: { [key: string]: number }
   recentClicks: any[]
   dateRange: { start: string; end: string }
 }
@@ -139,21 +140,21 @@ export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
     // Use sent_count as denominator when delivered_count is 0 or not available
     const denominator = totals.delivered > 0 ? totals.delivered : totals.sent
 
-    // When excludeIps is ON, use our own click tracking data for click rate
+    // When excludeIps is ON, use our own click tracking data for click rate (unique clickers)
     // When excludeIps is OFF, use MailerLite's click data
-    const clicksToUse = excludeIps && linkClickAnalytics
-      ? linkClickAnalytics.totalClicks
+    const uniqueClickersToUse = excludeIps && linkClickAnalytics
+      ? linkClickAnalytics.uniqueUsers
       : totals.clicked
 
     return {
       avgOpenRate: denominator > 0 ? (totals.opened / denominator) * 100 : 0,
-      avgClickRate: denominator > 0 ? (clicksToUse / denominator) * 100 : 0,
+      avgClickRate: denominator > 0 ? (uniqueClickersToUse / denominator) * 100 : 0,
       avgBounceRate: totals.sent > 0 ? (totals.bounced / totals.sent) * 100 : 0,
       avgUnsubscribeRate: denominator > 0 ? (totals.unsubscribed / denominator) * 100 : 0,
       totalSent: totals.sent,
       totalDelivered: totals.delivered,
       totalOpened: totals.opened,
-      totalClicked: clicksToUse,
+      totalClicked: uniqueClickersToUse,
       issueCount: issuesWithMetrics.length,
       usingOwnClickData: excludeIps && !!linkClickAnalytics
     }
@@ -176,20 +177,20 @@ export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
   }
 
   // Calculate click rate for a specific issue
-  // When excludeIps is ON, use our own click tracking data
+  // When excludeIps is ON, use our own click tracking data (unique clickers)
   // When excludeIps is OFF, use MailerLite's click rate
   const getIssueClickRate = (issue: IssueWithMetrics): number | null => {
     const metrics = issue.email_metrics
     if (!metrics) return null
 
-    if (excludeIps && linkClickAnalytics?.clicksByissue) {
-      // Use our own click data (already filtered by excluded IPs)
-      const ourClicks = linkClickAnalytics.clicksByissue[issue.id] || 0
+    if (excludeIps && linkClickAnalytics?.uniqueClickersByIssue) {
+      // Use our unique clickers data (already filtered by excluded IPs)
+      const uniqueClickers = linkClickAnalytics.uniqueClickersByIssue[issue.id] || 0
       const denominator = (metrics.delivered_count || 0) > 0
         ? metrics.delivered_count
         : metrics.sent_count
       if (!denominator || denominator === 0) return null
-      return ourClicks / denominator
+      return uniqueClickers / denominator
     } else {
       // Use MailerLite's click rate
       return metrics.click_rate ?? null
@@ -209,7 +210,7 @@ export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
       'Delivered',
       'Opens',
       'Open Rate',
-      'Clicks',
+      'Unique Clickers',
       'Click Rate',
       'Bounces',
       'Bounce Rate',
@@ -226,21 +227,21 @@ export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
       const bounced = metrics?.bounced_count || 0
       const unsubscribed = metrics?.unsubscribed_count || 0
 
-      // Calculate rates - use our own click data when excludeIps is ON
+      // Calculate rates - use our own click data (unique clickers) when excludeIps is ON
       const denominator = delivered > 0 ? delivered : sent
       const openRate = denominator > 0 ? ((opened / denominator) * 100).toFixed(2) : '0.00'
 
-      // Get clicks based on excludeIps setting
-      let clicked: number
+      // Get unique clickers based on excludeIps setting
+      let uniqueClickers: number
       let clickDataSource: string
-      if (excludeIps && linkClickAnalytics?.clicksByissue) {
-        clicked = linkClickAnalytics.clicksByissue[issue.id] || 0
+      if (excludeIps && linkClickAnalytics?.uniqueClickersByIssue) {
+        uniqueClickers = linkClickAnalytics.uniqueClickersByIssue[issue.id] || 0
         clickDataSource = 'Internal (IP Filtered)'
       } else {
-        clicked = metrics?.clicked_count || 0
+        uniqueClickers = metrics?.clicked_count || 0
         clickDataSource = 'MailerLite'
       }
-      const clickRate = denominator > 0 ? ((clicked / denominator) * 100).toFixed(2) : '0.00'
+      const clickRate = denominator > 0 ? ((uniqueClickers / denominator) * 100).toFixed(2) : '0.00'
       const bounceRate = sent > 0 ? ((bounced / sent) * 100).toFixed(2) : '0.00'
 
       return [
@@ -250,7 +251,7 @@ export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
         delivered,
         opened,
         `${openRate}%`,
-        clicked,
+        uniqueClickers,
         `${clickRate}%`,
         bounced,
         `${bounceRate}%`,
@@ -327,11 +328,11 @@ export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
                 </div>
                 <div className="text-sm text-gray-600">Average Click Rate</div>
                 <div className="text-xs text-gray-500 mt-1">
-                  {averages.totalClicked.toLocaleString()} total clicks
+                  {averages.totalClicked.toLocaleString()} unique clickers
                 </div>
                 <div className="text-xs mt-1">
                   {averages.usingOwnClickData ? (
-                    <span className="text-blue-600">Using filtered click data</span>
+                    <span className="text-blue-600">Using filtered data</span>
                   ) : (
                     <span className="text-gray-400">Using MailerLite data</span>
                   )}
