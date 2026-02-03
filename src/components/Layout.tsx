@@ -61,21 +61,12 @@ export default function Layout({ children }: LayoutProps) {
     }
   }, [newsletterSlug])
 
-  // Fetch pending tools count
+  // Fetch pending tools count on load
   useEffect(() => {
-    const fetchPendingCount = async () => {
-      try {
-        const res = await fetch('/api/tools/pending-count')
-        const data = await res.json()
-        setPendingToolsCount(data.count || 0)
-      } catch (error) {
-        console.error('Error fetching pending tools count:', error)
-      }
-    }
-    fetchPendingCount()
-    // Refresh every 5 minutes
-    const interval = setInterval(fetchPendingCount, 5 * 60 * 1000)
-    return () => clearInterval(interval)
+    fetch('/api/tools/pending-count')
+      .then(res => res.json())
+      .then(data => setPendingToolsCount(data.count || 0))
+      .catch(() => {})
   }, [])
 
   const fetchNewsletter = async (slug: string) => {
