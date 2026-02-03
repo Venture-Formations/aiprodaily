@@ -212,7 +212,12 @@ export function ToolsGrid({ tools, categories }: ToolsGridProps) {
       {paginatedTools.length > 0 ? (
         <div className="flex flex-col gap-4">
           {paginatedTools.map((tool) => (
-            <ToolCard key={tool.id} tool={tool} />
+            <ToolCard
+              key={tool.id}
+              tool={tool}
+              referrerPage="/tools"
+              referrerType={searchQuery.trim() ? 'search_results' : 'directory_home'}
+            />
           ))}
         </div>
       ) : (

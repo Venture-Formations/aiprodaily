@@ -6,6 +6,7 @@ import type { DirectoryApp } from '@/lib/directory'
 
 interface CategoryToolsGridProps {
   tools: DirectoryApp[]
+  categorySlug: string
 }
 
 const ITEMS_PER_PAGE = 10
@@ -137,7 +138,7 @@ function calculateTotalPages(tools: DirectoryApp[]): number {
   return 1 + additionalPages
 }
 
-export function CategoryToolsGrid({ tools }: CategoryToolsGridProps) {
+export function CategoryToolsGrid({ tools, categorySlug }: CategoryToolsGridProps) {
   const [currentPage, setCurrentPage] = useState(1)
 
   const totalPages = useMemo(() => calculateTotalPages(tools), [tools])
@@ -191,7 +192,12 @@ export function CategoryToolsGrid({ tools }: CategoryToolsGridProps) {
       {/* Tools List */}
       <div className="flex flex-col gap-4">
         {paginatedTools.map((tool) => (
-          <ToolCard key={tool.id} tool={tool} />
+          <ToolCard
+            key={tool.id}
+            tool={tool}
+            referrerPage={`/tools/category/${categorySlug}`}
+            referrerType="category_page"
+          />
         ))}
       </div>
 

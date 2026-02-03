@@ -120,7 +120,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
             {/* Tools List */}
             {tools.length > 0 ? (
-              <CategoryToolsGrid tools={tools} />
+              <CategoryToolsGrid tools={tools} categorySlug={slug} />
             ) : (
               <div className="text-center py-12 bg-white rounded-2xl ring-1 ring-slate-900/5">
                 <div className="text-slate-400 mb-4">

@@ -1,8 +1,10 @@
-import Link from 'next/link'
 import type { DirectoryCategory } from '@/lib/directory'
+import { CategoryClickTracker } from './DirectoryClickTracker'
 
 interface CategoryCardProps {
   category: DirectoryCategory
+  referrerPage?: string
+  referrerType?: string
 }
 
 // Category icons mapping
@@ -16,11 +18,16 @@ const categoryIcons: Record<string, string> = {
   'Productivity': 'M13 10V3L4 14h7v7l9-11h-7z'
 }
 
-export function CategoryCard({ category }: CategoryCardProps) {
+export function CategoryCard({ category, referrerPage = '/tools', referrerType = 'directory_home' }: CategoryCardProps) {
   const iconPath = categoryIcons[category.name] || categoryIcons['Productivity']
 
   return (
-    <Link href={`/tools/category/${category.slug}`}>
+    <CategoryClickTracker
+      categorySlug={category.slug}
+      categoryName={category.name}
+      referrerPage={referrerPage}
+      referrerType={referrerType}
+    >
       <div className="group p-6 bg-white rounded-2xl shadow-sm ring-1 ring-slate-900/5 hover:shadow-lg hover:ring-blue-500/20 transition-all duration-200">
         <div className="flex items-center gap-4">
           {/* Icon */}
@@ -62,6 +69,6 @@ export function CategoryCard({ category }: CategoryCardProps) {
           </p>
         )}
       </div>
-    </Link>
+    </CategoryClickTracker>
   )
 }

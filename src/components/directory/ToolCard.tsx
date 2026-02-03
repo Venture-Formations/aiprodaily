@@ -1,9 +1,11 @@
-import Link from 'next/link'
 import Image from 'next/image'
 import type { DirectoryApp } from '@/lib/directory'
+import { ToolViewTracker } from './DirectoryClickTracker'
 
 interface ToolCardProps {
   tool: DirectoryApp
+  referrerPage?: string
+  referrerType?: string
 }
 
 // Generate a consistent color based on the tool name
@@ -26,14 +28,24 @@ function getColorFromName(name: string): string {
   return colors[Math.abs(hash) % colors.length]
 }
 
-export function ToolCard({ tool }: ToolCardProps) {
+export function ToolCard({ tool, referrerPage = '/tools', referrerType = 'directory_home' }: ToolCardProps) {
   // Use logo_image_url for the card, fall back to listing image
   const logoUrl = tool.logo_image_url || tool.tool_image_url || null
   const firstLetter = tool.tool_name.charAt(0).toUpperCase()
   const bgColor = getColorFromName(tool.tool_name)
 
+  // Get the primary category for tracking
+  const primaryCategory = tool.categories?.[0]
+
   return (
-    <Link href={`/tools/${tool.id}`}>
+    <ToolViewTracker
+      toolId={tool.id}
+      toolName={tool.tool_name}
+      categorySlug={primaryCategory?.slug}
+      categoryName={primaryCategory?.name}
+      referrerPage={referrerPage}
+      referrerType={referrerType}
+    >
       <div className={`group relative flex items-center gap-4 bg-white rounded-2xl shadow-sm ring-1 transition-all duration-200 overflow-hidden p-4 ${
         tool.is_featured ? 'ring-2 ring-blue-500' : 'ring-slate-900/5 hover:shadow-lg hover:ring-blue-500/20'
       }`}>
@@ -98,6 +110,6 @@ export function ToolCard({ tool }: ToolCardProps) {
           </span>
         )}
       </div>
-    </Link>
+    </ToolViewTracker>
   )
 }

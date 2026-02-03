@@ -165,6 +165,7 @@ export default async function ToolDetailPage({ params }: ToolDetailPageProps) {
                 <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
                   <ToolClickTracker
                     toolId={id}
+                    toolName={tool.tool_name}
                     websiteUrl={tool.website_url}
                     className="group inline-flex items-center justify-center rounded-full py-3 px-6 text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 active:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                   >
@@ -216,6 +217,7 @@ export default async function ToolDetailPage({ params }: ToolDetailPageProps) {
                   <dd>
                     <ToolClickTracker
                       toolId={id}
+                      toolName={tool.tool_name}
                       websiteUrl={tool.website_url}
                       className="text-blue-600 hover:text-blue-500 text-sm break-all transition-colors"
                     >
