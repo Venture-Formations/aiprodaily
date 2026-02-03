@@ -19,6 +19,7 @@ export default function Layout({ children }: LayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [newsletter, setNewsletter] = useState<Newsletter | null>(null)
   const [newsletterSlug, setNewsletterSlug] = useState<string | null>(null)
+  const [pendingToolsCount, setPendingToolsCount] = useState(0)
 
   useEffect(() => {
     // Check if we're in staging environment
@@ -59,6 +60,23 @@ export default function Layout({ children }: LayoutProps) {
       setNewsletter(null)
     }
   }, [newsletterSlug])
+
+  // Fetch pending tools count
+  useEffect(() => {
+    const fetchPendingCount = async () => {
+      try {
+        const res = await fetch('/api/tools/pending-count')
+        const data = await res.json()
+        setPendingToolsCount(data.count || 0)
+      } catch (error) {
+        console.error('Error fetching pending tools count:', error)
+      }
+    }
+    fetchPendingCount()
+    // Refresh every 5 minutes
+    const interval = setInterval(fetchPendingCount, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
 
   const fetchNewsletter = async (slug: string) => {
     try {
@@ -110,8 +128,13 @@ export default function Layout({ children }: LayoutProps) {
                     <Link href={settingsUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
                       Settings
                     </Link>
-                    <Link href={toolsAdminUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
+                    <Link href={toolsAdminUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium relative">
                       Tools
+                      {pendingToolsCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                          {pendingToolsCount > 9 ? '9+' : pendingToolsCount}
+                        </span>
+                      )}
                     </Link>
                   </nav>
                 )}
@@ -201,8 +224,13 @@ export default function Layout({ children }: LayoutProps) {
                   <Link href={settingsUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
                     Settings
                   </Link>
-                  <Link href={toolsAdminUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
+                  <Link href={toolsAdminUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium relative">
                     Tools
+                    {pendingToolsCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                        {pendingToolsCount > 9 ? '9+' : pendingToolsCount}
+                      </span>
+                    )}
                   </Link>
                 </nav>
               )}
