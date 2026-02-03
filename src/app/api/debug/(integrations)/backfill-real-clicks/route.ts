@@ -54,12 +54,18 @@ async function updateMailerLiteField(
  */
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('Authorization')
+  const searchParams = request.nextUrl.searchParams
+  const secret = searchParams.get('secret')
 
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  // Support both header auth and query param auth
+  const isAuthorized =
+    authHeader === `Bearer ${process.env.CRON_SECRET}` ||
+    secret === process.env.CRON_SECRET
+
+  if (!isAuthorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const searchParams = request.nextUrl.searchParams
   const dryRun = searchParams.get('dry_run') === 'true'
   const limit = parseInt(searchParams.get('limit') || '0', 10)
 
