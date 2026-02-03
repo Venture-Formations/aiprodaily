@@ -4,7 +4,7 @@ import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
 
 const BATCH_SIZE = 100 // Process up to 100 updates per run
 const MAX_RETRIES = 3 // Max retry attempts before marking as failed
-const REAL_CLICK_FIELD = 'Real_Click' // MailerLite custom field name
+const REAL_CLICK_FIELD = 'real_click' // MailerLite custom field key (lowercase)
 
 interface FieldUpdate {
   id: string
