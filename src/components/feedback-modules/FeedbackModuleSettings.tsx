@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
+import 'react-quill-new/dist/quill.snow.css'
 import {
   DndContext,
   closestCenter,
@@ -20,6 +22,26 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { TeamPhotoManager } from './TeamPhotoManager'
 import type { FeedbackModuleWithBlocks, FeedbackBlock, FeedbackVoteOption, FeedbackTeamMember } from '@/types/database'
+
+// Dynamically import ReactQuill to avoid SSR issues
+const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false })
+
+// Quill toolbar configuration (matches TextBoxModuleSettings)
+const quillModules = {
+  toolbar: [
+    ['bold', 'italic', 'underline'],
+    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+    ['link'],
+    [{ 'color': [] }]
+  ],
+}
+
+const quillFormats = [
+  'bold', 'italic', 'underline',
+  'list',
+  'link',
+  'color'
+]
 
 interface FeedbackModuleSettingsProps {
   module: FeedbackModuleWithBlocks
@@ -195,8 +217,7 @@ export function FeedbackModuleSettings({
 
   // Static text editing
   const [editStaticContent, setEditStaticContent] = useState('')
-  const [editIsItalic, setEditIsItalic] = useState(false)
-  const [editIsBold, setEditIsBold] = useState(false)
+  const [editTextSize, setEditTextSize] = useState<'small' | 'medium' | 'large'>('medium')
 
   // Vote options editing
   const [editVoteOptions, setEditVoteOptions] = useState<FeedbackVoteOption[]>([])
@@ -315,8 +336,7 @@ export function FeedbackModuleSettings({
       setEditTitleText(block.title_text || '')
     } else if (block.block_type === 'static_text') {
       setEditStaticContent(block.static_content || '')
-      setEditIsItalic(block.is_italic || false)
-      setEditIsBold(block.is_bold || false)
+      setEditTextSize((block.text_size as 'small' | 'medium' | 'large') || 'medium')
     } else if (block.block_type === 'vote_options') {
       setEditVoteOptions(block.vote_options || [])
     } else if (block.block_type === 'team_photos') {
@@ -328,8 +348,7 @@ export function FeedbackModuleSettings({
     setEditingBlock(null)
     setEditTitleText('')
     setEditStaticContent('')
-    setEditIsItalic(false)
-    setEditIsBold(false)
+    setEditTextSize('medium')
     setEditVoteOptions([])
     setEditTeamPhotos([])
   }
@@ -343,8 +362,7 @@ export function FeedbackModuleSettings({
         updateData.title_text = editTitleText
       } else if (block.block_type === 'static_text') {
         updateData.static_content = editStaticContent
-        updateData.is_italic = editIsItalic
-        updateData.is_bold = editIsBold
+        updateData.text_size = editTextSize
       } else if (block.block_type === 'vote_options') {
         updateData.vote_options = editVoteOptions
       } else if (block.block_type === 'team_photos') {
@@ -418,40 +436,32 @@ export function FeedbackModuleSettings({
         <div>
           {editingBlock === block.id ? (
             <div className="space-y-4">
+              {/* Text Size Dropdown */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Text Size</label>
+                <select
+                  value={editTextSize}
+                  onChange={(e) => setEditTextSize(e.target.value as 'small' | 'medium' | 'large')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm bg-white"
+                >
+                  <option value="small">Small (14px)</option>
+                  <option value="medium">Medium (16px)</option>
+                  <option value="large">Large (20px)</option>
+                </select>
+              </div>
+              {/* Rich Text Editor */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Content</label>
-                <textarea
-                  value={editStaticContent}
-                  onChange={(e) => setEditStaticContent(e.target.value)}
-                  placeholder="Enter your text content..."
-                  rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm resize-none"
-                />
-              </div>
-              <div className="flex flex-wrap items-center gap-4 p-3 bg-gray-100 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id={`bold-${block.id}`}
-                    checked={editIsBold}
-                    onChange={(e) => setEditIsBold(e.target.checked)}
-                    className="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-gray-300 rounded"
+                <div className="border border-gray-300 rounded-lg overflow-hidden bg-white">
+                  <ReactQuill
+                    theme="snow"
+                    value={editStaticContent}
+                    onChange={setEditStaticContent}
+                    modules={quillModules}
+                    formats={quillFormats}
+                    placeholder="Enter your text content..."
+                    className="feedback-quill-editor"
                   />
-                  <label htmlFor={`bold-${block.id}`} className="text-sm text-gray-700">
-                    <span className="font-bold">Bold</span>
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id={`italic-${block.id}`}
-                    checked={editIsItalic}
-                    onChange={(e) => setEditIsItalic(e.target.checked)}
-                    className="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor={`italic-${block.id}`} className="text-sm text-gray-700">
-                    <span className="italic">Italic</span>
-                  </label>
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-2">
@@ -462,11 +472,17 @@ export function FeedbackModuleSettings({
           ) : (
             <div>
               <div className="flex items-center gap-2 mb-2 text-xs text-gray-500">
-                {block.is_bold && <span className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded font-medium">Bold</span>}
-                {block.is_italic && <span className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded font-medium">Italic</span>}
+                {block.text_size && (
+                  <span className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded font-medium">
+                    {block.text_size === 'small' ? 'Small (14px)' : block.text_size === 'large' ? 'Large (20px)' : 'Medium (16px)'}
+                  </span>
+                )}
               </div>
               {block.static_content ? (
-                <div className={`text-sm text-gray-700 bg-white p-3 rounded-lg border border-gray-200 ${block.is_bold ? 'font-bold' : ''} ${block.is_italic ? 'italic' : ''}`}>{block.static_content}</div>
+                <div
+                  className="text-sm text-gray-700 bg-white p-3 rounded-lg border border-gray-200 prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ __html: block.static_content }}
+                />
               ) : (
                 <p className="text-sm text-gray-400 italic bg-white p-3 rounded-lg border border-gray-200">No content yet</p>
               )}
