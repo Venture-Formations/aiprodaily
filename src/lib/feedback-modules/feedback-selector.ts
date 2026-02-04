@@ -883,6 +883,44 @@ export class FeedbackModuleSelector {
   }
 
   /**
+   * Get total unread comment count (comments not read by any user)
+   * Used when no user session is available (e.g., staging)
+   */
+  static async getTotalUnreadCommentCount(publicationId: string): Promise<number> {
+    // Get all comment IDs for this publication
+    const { data: comments, error: commentsError } = await supabaseAdmin
+      .from('feedback_comments')
+      .select('id')
+      .eq('publication_id', publicationId)
+
+    if (commentsError || !comments) {
+      console.error('[FeedbackSelector] Error fetching comments for total unread count:', commentsError)
+      return 0
+    }
+
+    if (comments.length === 0) {
+      return 0
+    }
+
+    // Get all read statuses (any user)
+    const { data: readStatuses, error: readError } = await supabaseAdmin
+      .from('feedback_comment_read_status')
+      .select('comment_id')
+      .in('comment_id', comments.map(c => c.id))
+
+    if (readError) {
+      console.error('[FeedbackSelector] Error fetching read statuses:', readError)
+      return comments.length // Assume all unread if we can't get status
+    }
+
+    // Count comments that have no read status from any user
+    const readCommentIds = new Set(readStatuses?.map(r => r.comment_id) || [])
+    const unreadCount = comments.filter(c => !readCommentIds.has(c.id)).length
+
+    return unreadCount
+  }
+
+  /**
    * Get read status for comments (returns set of read comment IDs)
    */
   static async getReadCommentIds(

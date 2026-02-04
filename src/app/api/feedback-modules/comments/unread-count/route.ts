@@ -8,14 +8,6 @@ export const maxDuration = 30
 // GET /api/feedback-modules/comments/unread-count - Get unread comment count
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
     const searchParams = request.nextUrl.searchParams
     const publicationId = searchParams.get('publication_id')
 
@@ -26,10 +18,15 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const count = await FeedbackModuleSelector.getUnreadCommentCount(
-      publicationId,
-      session.user.id
-    )
+    // Try to get session for user-specific read tracking
+    const session = await getServerSession(authOptions)
+    const userId = session?.user?.id
+
+    // If user is logged in, get their specific unread count
+    // Otherwise, get total unread count (for staging/unauthenticated)
+    const count = userId
+      ? await FeedbackModuleSelector.getUnreadCommentCount(publicationId, userId)
+      : await FeedbackModuleSelector.getTotalUnreadCommentCount(publicationId)
 
     return NextResponse.json({
       success: true,
