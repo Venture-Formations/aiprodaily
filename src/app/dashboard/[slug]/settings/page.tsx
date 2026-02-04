@@ -26,7 +26,6 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { SectionsPanel } from '@/components/ad-modules'
-import { FeedbackModuleSettings } from '@/components/feedback-modules'
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('system')
@@ -452,13 +451,6 @@ function NewsletterSettings() {
         </div>
         <SectionsPanel />
       </div>
-
-      {/* Feedback Module Settings */}
-      {publicationId && (
-        <div className="bg-white shadow rounded-lg p-6">
-          <FeedbackModuleSettings publicationId={publicationId} />
-        </div>
-      )}
 
       {message && (
         <div className={`p-4 rounded-md ${

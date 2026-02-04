@@ -25,7 +25,8 @@ import { AIAppModuleSettings } from '../ai-app-modules'
 import PromptModuleSettings from '../prompt-modules/PromptModuleSettings'
 import { ArticleModuleSettings } from '../article-modules'
 import { TextBoxModuleSettings } from '../text-box-modules'
-import type { NewsletterSection, AdModule, PollModule, AIAppModule, PromptModule, ArticleModule, TextBoxModule } from '@/types/database'
+import { FeedbackModuleSettings } from '../feedback-modules'
+import type { NewsletterSection, AdModule, PollModule, AIAppModule, PromptModule, ArticleModule, TextBoxModule, FeedbackModule } from '@/types/database'
 
 interface SectionsPanelProps {
   publicationId?: string // Optional - will be fetched from URL if not provided
@@ -39,6 +40,7 @@ type SectionItem =
   | { type: 'prompt_module'; data: PromptModule }
   | { type: 'article_module'; data: ArticleModule }
   | { type: 'text_box_module'; data: TextBoxModule }
+  | { type: 'feedback_module'; data: FeedbackModule }
 
 function SortableSectionItem({
   item,
@@ -65,7 +67,9 @@ function SortableSectionItem({
             ? `article-module-${item.data.id}`
             : item.type === 'text_box_module'
               ? `text-box-module-${item.data.id}`
-              : `prompt-module-${item.data.id}`
+              : item.type === 'feedback_module'
+                ? `feedback-module-${item.data.id}`
+                : `prompt-module-${item.data.id}`
   const name = item.data.name
   const isActive = item.data.is_active
   const isAdModule = item.type === 'ad_module'
@@ -74,6 +78,7 @@ function SortableSectionItem({
   const isPromptModule = item.type === 'prompt_module'
   const isArticleModule = item.type === 'article_module'
   const isTextBoxModule = item.type === 'text_box_module'
+  const isFeedbackModule = item.type === 'feedback_module'
 
   const {
     attributes,
@@ -147,6 +152,11 @@ function SortableSectionItem({
           {isTextBoxModule && (
             <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-cyan-100 text-cyan-700 rounded-full">
               Text Box
+            </span>
+          )}
+          {isFeedbackModule && (
+            <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full">
+              Feedback
             </span>
           )}
         </div>
@@ -243,13 +253,14 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
   const [promptModules, setPromptModules] = useState<PromptModule[]>([])
   const [articleModules, setArticleModules] = useState<ArticleModule[]>([])
   const [textBoxModules, setTextBoxModules] = useState<TextBoxModule[]>([])
+  const [feedbackModules, setFeedbackModules] = useState<FeedbackModule[]>([])
   const [selectedItem, setSelectedItem] = useState<SectionItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [cooldownDays, setCooldownDays] = useState(7)
   const [showAddModal, setShowAddModal] = useState(false)
   const [newModuleName, setNewModuleName] = useState('')
-  const [newSectionType, setNewSectionType] = useState<'ad' | 'poll' | 'ai_app' | 'prompt' | 'article' | 'text_box' | 'standard'>('ad')
+  const [newSectionType, setNewSectionType] = useState<'ad' | 'poll' | 'ai_app' | 'prompt' | 'article' | 'text_box' | 'feedback' | 'standard'>('ad')
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -350,6 +361,18 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
         setTextBoxModules(textBoxModulesData.modules || [])
       }
 
+      // Fetch feedback modules (singleton - at most one per publication)
+      const feedbackModulesRes = await fetch(`/api/feedback-modules?publication_id=${publicationId}`)
+      if (feedbackModulesRes.ok) {
+        const feedbackModulesData = await feedbackModulesRes.json()
+        // Wrap single module in array if it exists
+        if (feedbackModulesData.module) {
+          setFeedbackModules([feedbackModulesData.module])
+        } else {
+          setFeedbackModules([])
+        }
+      }
+
       // Fetch cooldown setting
       const settingsRes = await fetch(`/api/settings/publication?key=ad_company_cooldown_days`)
       if (settingsRes.ok) {
@@ -386,7 +409,8 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     ...aiAppModules.map(m => ({ type: 'ai_app_module' as const, data: m })),
     ...promptModules.map(m => ({ type: 'prompt_module' as const, data: m })),
     ...articleModules.map(m => ({ type: 'article_module' as const, data: m })),
-    ...textBoxModules.map(m => ({ type: 'text_box_module' as const, data: m }))
+    ...textBoxModules.map(m => ({ type: 'text_box_module' as const, data: m })),
+    ...feedbackModules.map(m => ({ type: 'feedback_module' as const, data: m }))
   ].sort((a, b) => {
     const orderA = a.data.display_order ?? 999
     const orderB = b.data.display_order ?? 999
@@ -406,7 +430,9 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
               ? `article-module-${item.data.id}`
               : item.type === 'text_box_module'
                 ? `text-box-module-${item.data.id}`
-                : `prompt-module-${item.data.id}`
+                : item.type === 'feedback_module'
+                  ? `feedback-module-${item.data.id}`
+                  : `prompt-module-${item.data.id}`
   )
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -427,6 +453,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     const newPromptModules: PromptModule[] = []
     const newArticleModules: ArticleModule[] = []
     const newTextBoxModules: TextBoxModule[] = []
+    const newFeedbackModules: FeedbackModule[] = []
 
     reorderedItems.forEach((item, idx) => {
       const newOrder = idx + 1
@@ -442,6 +469,8 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
         newArticleModules.push({ ...item.data, display_order: newOrder })
       } else if (item.type === 'text_box_module') {
         newTextBoxModules.push({ ...item.data, display_order: newOrder })
+      } else if (item.type === 'feedback_module') {
+        newFeedbackModules.push({ ...item.data, display_order: newOrder })
       } else {
         newPromptModules.push({ ...item.data, display_order: newOrder })
       }
@@ -454,6 +483,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     setPromptModules(newPromptModules)
     setArticleModules(newArticleModules)
     setTextBoxModules(newTextBoxModules)
+    setFeedbackModules(newFeedbackModules)
 
     // Save to server
     setSaving(true)
@@ -534,6 +564,17 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           })
         })
       }
+
+      // Update feedback modules order
+      if (newFeedbackModules.length > 0) {
+        await fetch('/api/feedback-modules', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            modules: newFeedbackModules.map(m => ({ id: m.id, display_order: m.display_order }))
+          })
+        })
+      }
     } catch (error) {
       console.error('Failed to save order:', error)
       // Revert on error
@@ -607,6 +648,16 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           body: JSON.stringify({ is_active: newActive })
         })
         setTextBoxModules(prev => prev.map(m =>
+          m.id === item.data.id ? { ...m, is_active: newActive } : m
+        ))
+      } else if (item.type === 'feedback_module') {
+        // Feedback module
+        await fetch(`/api/feedback-modules`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: item.data.id, is_active: newActive })
+        })
+        setFeedbackModules(prev => prev.map(m =>
           m.id === item.data.id ? { ...m, is_active: newActive } : m
         ))
       } else {
@@ -735,6 +786,22 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           const data = await res.json()
           setTextBoxModules(prev => [...prev, data.module])
           setSelectedItem({ type: 'text_box_module', data: data.module })
+        }
+      } else if (newSectionType === 'feedback') {
+        // Create feedback module (singleton - POST creates or returns existing)
+        const res = await fetch('/api/feedback-modules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            publication_id: publicationId,
+            name: newModuleName.trim()
+          })
+        })
+
+        if (res.ok) {
+          const data = await res.json()
+          setFeedbackModules([data.module])
+          setSelectedItem({ type: 'feedback_module', data: data.module })
         }
       } else {
         // Create standard section
@@ -1005,6 +1072,46 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     }
   }
 
+  const handleUpdateFeedbackModule = async (updates: Partial<FeedbackModule>) => {
+    if (!selectedItem || selectedItem.type !== 'feedback_module') {
+      throw new Error('No feedback module selected')
+    }
+
+    const moduleId = selectedItem.data.id
+    console.log('[SectionsPanel] Updating feedback module:', moduleId, updates)
+
+    const res = await fetch(`/api/feedback-modules`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: moduleId, ...updates })
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      console.log('[SectionsPanel] Feedback module updated successfully:', data.module)
+      setFeedbackModules(prev => prev.map(m => m.id === moduleId ? data.module : m))
+      setSelectedItem({ type: 'feedback_module', data: data.module })
+    } else {
+      const errorData = await res.json().catch(() => ({}))
+      console.error('[SectionsPanel] Failed to update feedback module:', res.status, errorData)
+      throw new Error(errorData.error || `Failed to update feedback module (${res.status})`)
+    }
+  }
+
+  const handleDeleteFeedbackModule = async () => {
+    if (!selectedItem || selectedItem.type !== 'feedback_module') return
+
+    const moduleId = selectedItem.data.id
+    const res = await fetch(`/api/feedback-modules?id=${moduleId}`, {
+      method: 'DELETE'
+    })
+
+    if (res.ok) {
+      setFeedbackModules([])
+      setSelectedItem(null)
+    }
+  }
+
   const handleCooldownChange = async (days: number) => {
     try {
       await fetch('/api/settings/publication', {
@@ -1163,6 +1270,15 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
             />
           ) : selectedItem.type === 'text_box_module' ? (
             <div className="text-gray-500">Loading publication...</div>
+          ) : selectedItem.type === 'feedback_module' && publicationId ? (
+            <FeedbackModuleSettings
+              module={selectedItem.data}
+              publicationId={publicationId}
+              onUpdate={handleUpdateFeedbackModule}
+              onDelete={handleDeleteFeedbackModule}
+            />
+          ) : selectedItem.type === 'feedback_module' ? (
+            <div className="text-gray-500">Loading publication...</div>
           ) : (
             <SectionSettings
               section={selectedItem.data}
@@ -1264,6 +1380,21 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
                 </button>
                 <button
                   type="button"
+                  onClick={() => setNewSectionType('feedback')}
+                  disabled={feedbackModules.length > 0}
+                  className={`px-3 py-3 rounded-lg border-2 transition-colors ${
+                    newSectionType === 'feedback'
+                      ? 'border-yellow-500 bg-yellow-50 text-yellow-700'
+                      : feedbackModules.length > 0
+                        ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                  }`}
+                >
+                  <div className="font-medium text-sm">Feedback</div>
+                  <div className="text-xs mt-1 opacity-75">{feedbackModules.length > 0 ? 'Already exists' : 'Star ratings'}</div>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setNewSectionType('standard')}
                   className={`px-3 py-3 rounded-lg border-2 transition-colors ${
                     newSectionType === 'standard'
@@ -1297,7 +1428,9 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
                             ? "e.g., Top Stories"
                             : newSectionType === 'text_box'
                               ? "e.g., Welcome Section"
-                              : "e.g., Featured Content"
+                              : newSectionType === 'feedback'
+                                ? "e.g., Rate This Issue"
+                                : "e.g., Featured Content"
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 autoFocus

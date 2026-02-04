@@ -5,87 +5,51 @@ import { TeamPhotoManager } from './TeamPhotoManager'
 import type { FeedbackModule, FeedbackVoteOption, FeedbackTeamMember } from '@/types/database'
 
 interface FeedbackModuleSettingsProps {
+  module: FeedbackModule
   publicationId: string
+  onUpdate: (updates: Partial<FeedbackModule>) => Promise<void>
+  onDelete: () => Promise<void>
 }
 
-export function FeedbackModuleSettings({ publicationId }: FeedbackModuleSettingsProps) {
-  const [module, setModule] = useState<FeedbackModule | null>(null)
-  const [loading, setLoading] = useState(true)
+export function FeedbackModuleSettings({
+  module,
+  publicationId,
+  onUpdate,
+  onDelete
+}: FeedbackModuleSettingsProps) {
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle')
 
   // Form state
-  const [isActive, setIsActive] = useState(false)
-  const [titleText, setTitleText] = useState('')
-  const [bodyText, setBodyText] = useState('')
-  const [bodyIsItalic, setBodyIsItalic] = useState(false)
-  const [signOffText, setSignOffText] = useState('')
-  const [signOffIsItalic, setSignOffIsItalic] = useState(true)
-  const [voteOptions, setVoteOptions] = useState<FeedbackVoteOption[]>([])
-  const [teamPhotos, setTeamPhotos] = useState<FeedbackTeamMember[]>([])
+  const [name, setName] = useState(module.name)
+  const [titleText, setTitleText] = useState(module.title_text || '')
+  const [bodyText, setBodyText] = useState(module.body_text || '')
+  const [bodyIsItalic, setBodyIsItalic] = useState(module.body_is_italic || false)
+  const [signOffText, setSignOffText] = useState(module.sign_off_text || '')
+  const [signOffIsItalic, setSignOffIsItalic] = useState(module.sign_off_is_italic ?? true)
+  const [voteOptions, setVoteOptions] = useState<FeedbackVoteOption[]>(module.vote_options || [])
+  const [teamPhotos, setTeamPhotos] = useState<FeedbackTeamMember[]>(module.team_photos || [])
 
-  // Fetch or create module
+  // Update form state when module changes
   useEffect(() => {
-    fetchModule()
-  }, [publicationId])
-
-  const fetchModule = async () => {
-    try {
-      setLoading(true)
-      // First try to get existing module
-      let response = await fetch(`/api/feedback-modules?publication_id=${publicationId}`)
-      let data = await response.json()
-
-      if (!data.module) {
-        // Create module if it doesn't exist
-        response = await fetch('/api/feedback-modules', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ publication_id: publicationId })
-        })
-        data = await response.json()
-      }
-
-      if (data.module) {
-        setModule(data.module)
-        setIsActive(data.module.is_active)
-        setTitleText(data.module.title_text || '')
-        setBodyText(data.module.body_text || '')
-        setBodyIsItalic(data.module.body_is_italic || false)
-        setSignOffText(data.module.sign_off_text || '')
-        setSignOffIsItalic(data.module.sign_off_is_italic ?? true)
-        setVoteOptions(data.module.vote_options || [])
-        setTeamPhotos(data.module.team_photos || [])
-      }
-    } catch (error) {
-      console.error('Error fetching feedback module:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+    setName(module.name)
+    setTitleText(module.title_text || '')
+    setBodyText(module.body_text || '')
+    setBodyIsItalic(module.body_is_italic || false)
+    setSignOffText(module.sign_off_text || '')
+    setSignOffIsItalic(module.sign_off_is_italic ?? true)
+    setVoteOptions(module.vote_options || [])
+    setTeamPhotos(module.team_photos || [])
+  }, [module])
 
   const saveModule = async (updates: Partial<FeedbackModule>) => {
-    if (!module) return
-
     setSaving(true)
     setSaveStatus('idle')
 
     try {
-      const response = await fetch('/api/feedback-modules', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: module.id, ...updates })
-      })
-
-      const data = await response.json()
-
-      if (data.success && data.module) {
-        setModule(data.module)
-        setSaveStatus('saved')
-        setTimeout(() => setSaveStatus('idle'), 2000)
-      } else {
-        setSaveStatus('error')
-      }
+      await onUpdate(updates)
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 2000)
     } catch (error) {
       console.error('Error saving feedback module:', error)
       setSaveStatus('error')
@@ -94,26 +58,26 @@ export function FeedbackModuleSettings({ publicationId }: FeedbackModuleSettings
     }
   }
 
-  const handleToggleActive = () => {
-    const newValue = !isActive
-    setIsActive(newValue)
-    saveModule({ is_active: newValue })
+  const handleNameBlur = () => {
+    if (name.trim() && name !== module.name) {
+      saveModule({ name: name.trim() })
+    }
   }
 
   const handleTitleBlur = () => {
-    if (module && titleText !== module.title_text) {
+    if (titleText !== module.title_text) {
       saveModule({ title_text: titleText })
     }
   }
 
   const handleBodyBlur = () => {
-    if (module && (bodyText !== module.body_text || bodyIsItalic !== module.body_is_italic)) {
+    if (bodyText !== module.body_text || bodyIsItalic !== module.body_is_italic) {
       saveModule({ body_text: bodyText || null, body_is_italic: bodyIsItalic })
     }
   }
 
   const handleSignOffBlur = () => {
-    if (module && (signOffText !== module.sign_off_text || signOffIsItalic !== module.sign_off_is_italic)) {
+    if (signOffText !== module.sign_off_text || signOffIsItalic !== module.sign_off_is_italic) {
       saveModule({ sign_off_text: signOffText, sign_off_is_italic: signOffIsItalic })
     }
   }
@@ -129,7 +93,9 @@ export function FeedbackModuleSettings({ publicationId }: FeedbackModuleSettings
   }
 
   const addVoteOption = () => {
-    const newValue = Math.max(1, ...voteOptions.map(o => o.value)) + 1
+    const newValue = voteOptions.length > 0
+      ? Math.max(1, ...voteOptions.map(o => o.value)) + 1
+      : 1
     const newOptions = [
       ...voteOptions,
       { value: newValue, label: 'New Option', emoji: 'star' as const }
@@ -154,24 +120,30 @@ export function FeedbackModuleSettings({ publicationId }: FeedbackModuleSettings
     handleVoteOptionsChange(newOptions)
   }
 
-  if (loading) {
-    return (
-      <div className="p-4 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-600"></div>
-      </div>
-    )
+  const handleDelete = async () => {
+    if (confirm('Are you sure you want to delete this feedback module? This cannot be undone.')) {
+      await onDelete()
+    }
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">Feedback Module</h3>
-          <p className="text-sm text-gray-500">
-            Collect feedback from subscribers at the end of your newsletter
-          </p>
-        </div>
+    <div className="space-y-6">
+      {/* Header with name and save status */}
+      <div className="flex items-center justify-between">
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={handleNameBlur}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleNameBlur()
+              ;(e.target as HTMLInputElement).blur()
+            }
+          }}
+          disabled={saving}
+          className="text-xl font-semibold text-gray-900 bg-transparent border-b-2 border-transparent hover:border-gray-200 focus:border-blue-500 focus:outline-none transition-colors px-1 py-1"
+        />
         <div className="flex items-center gap-3">
           {saveStatus === 'saved' && (
             <span className="text-sm text-green-600 flex items-center gap-1">
@@ -184,28 +156,24 @@ export function FeedbackModuleSettings({ publicationId }: FeedbackModuleSettings
           {saveStatus === 'error' && (
             <span className="text-sm text-red-600">Error saving</span>
           )}
-          <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-sm text-gray-600">Active</span>
-            <button
-              type="button"
-              onClick={handleToggleActive}
-              disabled={saving}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                isActive ? 'bg-cyan-600' : 'bg-gray-200'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  isActive ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </label>
+          {saving && (
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600"></div>
+          )}
         </div>
       </div>
 
+      {/* Module Type Badge */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full">
+          Feedback Module
+        </span>
+        <span className="text-sm text-gray-500">
+          Collect ratings and feedback from subscribers
+        </span>
+      </div>
+
       {/* Title */}
-      <div className="mb-6">
+      <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Title
         </label>
@@ -214,13 +182,13 @@ export function FeedbackModuleSettings({ publicationId }: FeedbackModuleSettings
           value={titleText}
           onChange={(e) => setTitleText(e.target.value)}
           onBlur={handleTitleBlur}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
           placeholder="That's it for today!"
         />
       </div>
 
       {/* Body Text */}
-      <div className="mb-6">
+      <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Body Text
         </label>
@@ -229,7 +197,7 @@ export function FeedbackModuleSettings({ publicationId }: FeedbackModuleSettings
           onChange={(e) => setBodyText(e.target.value)}
           onBlur={handleBodyBlur}
           rows={3}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 resize-none"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 resize-none"
           placeholder="Before you go we'd love to know what you thought of today's newsletter..."
         />
         <label className="flex items-center gap-2 mt-2 cursor-pointer">
@@ -238,18 +206,16 @@ export function FeedbackModuleSettings({ publicationId }: FeedbackModuleSettings
             checked={bodyIsItalic}
             onChange={(e) => {
               setBodyIsItalic(e.target.checked)
-              if (module) {
-                saveModule({ body_text: bodyText || null, body_is_italic: e.target.checked })
-              }
+              saveModule({ body_text: bodyText || null, body_is_italic: e.target.checked })
             }}
-            className="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-gray-300 rounded"
+            className="h-4 w-4 text-yellow-600 focus:ring-yellow-500 border-gray-300 rounded"
           />
           <span className="text-sm text-gray-600">Italic</span>
         </label>
       </div>
 
       {/* Vote Options */}
-      <div className="mb-6">
+      <div>
         <div className="flex items-center justify-between mb-2">
           <label className="block text-sm font-medium text-gray-700">
             Vote Options
@@ -257,7 +223,7 @@ export function FeedbackModuleSettings({ publicationId }: FeedbackModuleSettings
           <button
             onClick={addVoteOption}
             disabled={voteOptions.length >= 5}
-            className="text-sm text-cyan-600 hover:text-cyan-700 disabled:text-gray-400"
+            className="text-sm text-yellow-600 hover:text-yellow-700 disabled:text-gray-400"
           >
             + Add Option
           </button>
@@ -266,7 +232,7 @@ export function FeedbackModuleSettings({ publicationId }: FeedbackModuleSettings
           {voteOptions.map((option, index) => (
             <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center gap-2 w-20">
-                <span className="text-amber-400 text-lg">{'★'.repeat(option.value)}</span>
+                <span className="text-amber-400 text-lg">{'★'.repeat(Math.min(option.value, 5))}</span>
               </div>
               <input
                 type="number"
@@ -274,13 +240,13 @@ export function FeedbackModuleSettings({ publicationId }: FeedbackModuleSettings
                 max="5"
                 value={option.value}
                 onChange={(e) => updateVoteOption(index, { value: parseInt(e.target.value) || 1 })}
-                className="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                className="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-yellow-500"
               />
               <input
                 type="text"
                 value={option.label}
                 onChange={(e) => updateVoteOption(index, { label: e.target.value })}
-                className="flex-1 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                className="flex-1 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-yellow-500"
                 placeholder="Option label"
               />
               <button
@@ -301,7 +267,7 @@ export function FeedbackModuleSettings({ publicationId }: FeedbackModuleSettings
       </div>
 
       {/* Sign-off Text */}
-      <div className="mb-6">
+      <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Sign-off Text
         </label>
@@ -310,7 +276,7 @@ export function FeedbackModuleSettings({ publicationId }: FeedbackModuleSettings
           value={signOffText}
           onChange={(e) => setSignOffText(e.target.value)}
           onBlur={handleSignOffBlur}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
           placeholder="See you tomorrow!"
         />
         <label className="flex items-center gap-2 mt-2 cursor-pointer">
@@ -319,18 +285,16 @@ export function FeedbackModuleSettings({ publicationId }: FeedbackModuleSettings
             checked={signOffIsItalic}
             onChange={(e) => {
               setSignOffIsItalic(e.target.checked)
-              if (module) {
-                saveModule({ sign_off_text: signOffText, sign_off_is_italic: e.target.checked })
-              }
+              saveModule({ sign_off_text: signOffText, sign_off_is_italic: e.target.checked })
             }}
-            className="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-gray-300 rounded"
+            className="h-4 w-4 text-yellow-600 focus:ring-yellow-500 border-gray-300 rounded"
           />
           <span className="text-sm text-gray-600">Italic</span>
         </label>
       </div>
 
       {/* Team Photos */}
-      <div className="mb-6">
+      <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Team Photos
         </label>
@@ -344,12 +308,23 @@ export function FeedbackModuleSettings({ publicationId }: FeedbackModuleSettings
         />
       </div>
 
-      {/* Preview Info */}
-      <div className="border-t border-gray-200 pt-4">
+      {/* Info */}
+      <div className="p-4 bg-gray-50 rounded-lg">
         <p className="text-sm text-gray-500">
-          The feedback module will appear at the bottom of your newsletter when active.
+          The feedback module appears at the bottom of your newsletter when active.
           Votes are tracked per issue with email and IP address.
         </p>
+      </div>
+
+      {/* Delete Button */}
+      <div className="pt-4 border-t border-gray-200">
+        <button
+          onClick={handleDelete}
+          disabled={saving}
+          className="px-4 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+        >
+          Delete Feedback Module
+        </button>
       </div>
     </div>
   )

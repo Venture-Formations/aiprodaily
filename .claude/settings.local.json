@@ -105,7 +105,9 @@
       "WebFetch(domain:ipinfo.io)",
       "Bash(npx supabase db execute:*)",
       "Bash(git status:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "mcp__mailerlite__list_fields",
+      "mcp__mailerlite__list_subscribers"
     ],
     "deny": [],
     "ask": []
