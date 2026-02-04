@@ -211,6 +211,7 @@ export function FeedbackModuleSettings({
   // Results page config (stored in module.config)
   const defaultResultsConfig = {
     confirmation_message: 'Your response has been recorded.',
+    results_header: 'Results',
     first_vote_message: "You're the first to vote!",
     feedback_label: 'Additional feedback',
     feedback_placeholder: 'Elaborate on your answer, or just leave some general feedback...',
@@ -898,6 +899,21 @@ export function FeedbackModuleSettings({
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
             />
             <p className="mt-1 text-xs text-gray-400">Shown after the checkmark icon</p>
+          </div>
+
+          {/* Results Header */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Results Header
+            </label>
+            <input
+              type="text"
+              value={resultsConfig.results_header}
+              onChange={(e) => handleResultsConfigChange('results_header', e.target.value)}
+              placeholder="Results"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+            />
+            <p className="mt-1 text-xs text-gray-400">Header text before vote count, e.g. &quot;Results (5 votes)&quot;</p>
           </div>
 
           {/* First Vote Message */}

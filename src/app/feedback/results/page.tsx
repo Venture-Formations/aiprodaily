@@ -19,6 +19,7 @@ interface FeedbackResults {
 
 interface ResultsPageConfig {
   confirmation_message?: string
+  results_header?: string
   first_vote_message?: string
   feedback_label?: string
   feedback_placeholder?: string
@@ -30,6 +31,7 @@ interface ResultsPageConfig {
 
 const defaultConfig: ResultsPageConfig = {
   confirmation_message: 'Your response has been recorded.',
+  results_header: 'Results',
   first_vote_message: "You're the first to vote!",
   feedback_label: 'Additional feedback',
   feedback_placeholder: 'Elaborate on your answer, or just leave some general feedback...',
@@ -164,7 +166,7 @@ function FeedbackResultsContent() {
         {results && results.breakdown.length > 0 && (
           <div className="border border-gray-200 rounded-lg p-4 mb-6">
             <h2 className="font-bold text-lg text-gray-900 mb-4">
-              {results.total_votes === 1 ? config.first_vote_message : `Results (${results.total_votes} votes)`}
+              {results.total_votes === 1 ? config.first_vote_message : `${config.results_header} (${results.total_votes} votes)`}
             </h2>
 
             <div className="space-y-3">
