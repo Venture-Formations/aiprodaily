@@ -5,8 +5,8 @@ import { FeedbackModuleSelector } from '@/lib/feedback-modules'
 
 export const maxDuration = 60
 
-// Fallback user ID for staging/unauthenticated access
-const STAGING_USER_ID = 'staging-user'
+// Fallback user ID for staging/unauthenticated access (must be valid UUID)
+const STAGING_USER_ID = '00000000-0000-0000-0000-000000000001'
 
 // GET /api/feedback-modules/analytics - Get feedback module analytics for dashboard
 export async function GET(request: NextRequest) {

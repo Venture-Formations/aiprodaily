@@ -5,8 +5,8 @@ import { FeedbackModuleSelector } from '@/lib/feedback-modules'
 
 export const maxDuration = 30
 
-// Fallback user ID for staging/unauthenticated access
-const STAGING_USER_ID = 'staging-user'
+// Fallback user ID for staging/unauthenticated access (must be valid UUID)
+const STAGING_USER_ID = '00000000-0000-0000-0000-000000000001'
 
 // POST /api/feedback-modules/comments/read - Mark comment(s) as read
 export async function POST(request: NextRequest) {
