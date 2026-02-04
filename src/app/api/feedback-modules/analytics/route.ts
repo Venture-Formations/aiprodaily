@@ -5,11 +5,15 @@ import { FeedbackModuleSelector } from '@/lib/feedback-modules'
 
 export const maxDuration = 60
 
+// Fallback user ID for staging/unauthenticated access
+const STAGING_USER_ID = 'staging-user'
+
 // GET /api/feedback-modules/analytics - Get feedback module analytics for dashboard
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    const userId = session?.user?.id
+    // Use session user ID or fallback to staging user
+    const userId = session?.user?.id || STAGING_USER_ID
 
     const searchParams = request.nextUrl.searchParams
     const publicationId = searchParams.get('publication_id')
@@ -49,14 +53,8 @@ export async function GET(request: NextRequest) {
       dateTo || undefined
     )
 
-    // Get recent comments with read status if user is logged in
-    let recentComments
-    if (userId) {
-      recentComments = await FeedbackModuleSelector.getRecentCommentsWithReadStatus(publicationId, userId, 20)
-    } else {
-      const comments = await FeedbackModuleSelector.getRecentComments(publicationId, 20)
-      recentComments = comments.map(c => ({ ...c, is_read: false }))
-    }
+    // Get recent comments with read status (works for both real users and staging)
+    const recentComments = await FeedbackModuleSelector.getRecentCommentsWithReadStatus(publicationId, userId, 20)
 
     // Calculate overall summary
     let totalVotes = 0
