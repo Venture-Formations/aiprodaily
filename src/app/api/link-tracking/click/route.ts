@@ -198,23 +198,36 @@ export async function GET(request: NextRequest) {
                       request.headers.get('x-real-ip') ||
                       null
 
+    // Look up publication_id from issue_id for multi-tenant filtering
+    let publicationId: string | null = null
+    if (issueId) {
+      const { data: issueData } = await supabaseAdmin
+        .from('publication_issues')
+        .select('publication_id')
+        .eq('id', issueId)
+        .single()
+      publicationId = issueData?.publication_id || null
+    }
+
     console.log('Tracking link click:', {
       url,
       section,
       date,
       issueId,
+      publicationId,
       email,
       subscriberId,
       userAgent,
       ipAddress
     })
 
-    // Insert click tracking record
+    // Insert click tracking record (including publication_id for multi-tenant filtering)
     const { data, error } = await supabaseAdmin
       .from('link_clicks')
       .insert({
         issue_date: date,
         issue_id: issueId,
+        publication_id: publicationId,
         subscriber_email: email,
         subscriber_id: subscriberId,
         link_url: url,
@@ -239,37 +252,29 @@ export async function GET(request: NextRequest) {
     // Check if this is a Partnerstack affiliate link (contains sid1= parameter)
     const isPartnerstackLink = url.includes('sid1=') || url.includes('?sid1') || url.includes('&sid1')
 
-    if ((fieldToUpdate || isPartnerstackLink) && issueId) {
-      // Look up publication_id from the issue
-      const { data: issueData } = await supabaseAdmin
-        .from('publication_issues')
-        .select('publication_id')
-        .eq('id', issueId)
-        .single()
+    if ((fieldToUpdate || isPartnerstackLink) && publicationId) {
+      // Queue the regular field update if applicable (fire and forget)
+      // Reuse publicationId already fetched above
+      if (fieldToUpdate) {
+        queueFieldUpdate(
+          email,
+          fieldToUpdate,
+          issueId,
+          data.id,
+          publicationId
+        ).catch(err => console.error('[Field Update Queue] Background error:', err))
+      }
 
-      if (issueData?.publication_id) {
-        // Queue the regular field update if applicable (fire and forget)
-        if (fieldToUpdate) {
-          queueFieldUpdate(
-            email,
-            fieldToUpdate,
-            issueId,
-            data.id,
-            issueData.publication_id
-          ).catch(err => console.error('[Field Update Queue] Background error:', err))
-        }
-
-        // Queue Partnerstack field update if this is a Partnerstack link
-        if (isPartnerstackLink) {
-          console.log(`[Field Update Queue] Detected Partnerstack link for ${email}`)
-          queueFieldUpdate(
-            email,
-            'click_partnerstack',
-            issueId,
-            data.id,
-            issueData.publication_id
-          ).catch(err => console.error('[Field Update Queue] Partnerstack background error:', err))
-        }
+      // Queue Partnerstack field update if this is a Partnerstack link
+      if (isPartnerstackLink) {
+        console.log(`[Field Update Queue] Detected Partnerstack link for ${email}`)
+        queueFieldUpdate(
+          email,
+          'click_partnerstack',
+          issueId,
+          data.id,
+          publicationId
+        ).catch(err => console.error('[Field Update Queue] Partnerstack background error:', err))
       }
     }
 
