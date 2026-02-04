@@ -3,15 +3,15 @@
  *
  * Renders feedback modules for newsletters with configurable blocks:
  * - Title
- * - Body text (with optional italic)
+ * - Static text (body, sign-off, etc.)
  * - Vote options (star ratings)
- * - Sign-off text (with optional italic)
  * - Team photos (circular)
  */
 
 import { getBusinessSettings } from '../publication-settings'
 import type { BlockStyleOptions } from '../blocks'
-import type { FeedbackModule, FeedbackBlockType, FeedbackVoteOption, FeedbackTeamMember } from '@/types/database'
+import type { FeedbackModuleWithBlocks, FeedbackBlock, FeedbackVoteOption, FeedbackTeamMember } from '@/types/database'
+import { FeedbackModuleSelector } from './feedback-selector'
 
 /**
  * Context for rendering (issue info for response URLs)
@@ -31,7 +31,7 @@ interface RenderResult {
 
 /**
  * Feedback Module Renderer
- * Renders feedback modules with configurable block order
+ * Renders feedback modules with configurable blocks
  */
 export class FeedbackModuleRenderer {
   /**
@@ -90,30 +90,38 @@ export class FeedbackModuleRenderer {
   /**
    * Render title block
    */
-  private static renderTitleBlock(title: string, styles: BlockStyleOptions): string {
-    return `<p style="margin:0 0 12px 0; font-weight:bold; font-size:22px; color:#1a1a1a; font-family:${styles.headingFont};">${title}</p>`
+  private static renderTitleBlock(block: FeedbackBlock, styles: BlockStyleOptions): string {
+    if (!block.title_text) return ''
+    return `<p style="margin:0 0 12px 0; font-weight:bold; font-size:22px; color:#1a1a1a; font-family:${styles.headingFont};">${block.title_text}</p>`
   }
 
   /**
-   * Render body text block
+   * Render static text block (for body, sign-off, etc.)
    */
-  private static renderBodyBlock(text: string, isItalic: boolean, styles: BlockStyleOptions): string {
-    const fontStyle = isItalic ? 'font-style:italic;' : ''
-    return `<p style="margin:0 0 16px 0; font-size:16px; line-height:1.6; color:#333333; ${fontStyle}">${text}</p>`
+  private static renderStaticTextBlock(block: FeedbackBlock, styles: BlockStyleOptions): string {
+    if (!block.static_content) return ''
+
+    let fontStyle = ''
+    if (block.is_italic) fontStyle += 'font-style:italic;'
+    if (block.is_bold) fontStyle += 'font-weight:bold;'
+
+    return `<p style="margin:0 0 16px 0; font-size:16px; line-height:1.6; color:#333333; ${fontStyle}">${block.static_content}</p>`
   }
 
   /**
    * Render vote options block with star ratings
    */
   private static renderVoteOptionsBlock(
-    options: FeedbackVoteOption[],
+    block: FeedbackBlock,
     moduleId: string,
     issueId: string,
     styles: BlockStyleOptions,
     baseUrl: string
   ): string {
+    if (!block.vote_options || block.vote_options.length === 0) return ''
+
     // Sort options by value descending (highest first)
-    const sortedOptions = [...options].sort((a, b) => b.value - a.value)
+    const sortedOptions = [...block.vote_options].sort((a, b) => b.value - a.value)
 
     const optionsHtml = sortedOptions.map((option, index) => {
       const isLast = index === sortedOptions.length - 1
@@ -141,22 +149,12 @@ export class FeedbackModuleRenderer {
   }
 
   /**
-   * Render sign-off text block
-   */
-  private static renderSignOffBlock(text: string, isItalic: boolean, styles: BlockStyleOptions): string {
-    const fontStyle = isItalic ? 'font-style:italic;' : ''
-    return `<p style="margin:0 0 12px 0; font-size:16px; line-height:1.5; color:#333333; ${fontStyle}">${text}</p>`
-  }
-
-  /**
    * Render team photos block with circular images
    */
-  private static renderTeamPhotosBlock(members: FeedbackTeamMember[], styles: BlockStyleOptions): string {
-    if (!members || members.length === 0) {
-      return ''
-    }
+  private static renderTeamPhotosBlock(block: FeedbackBlock, styles: BlockStyleOptions): string {
+    if (!block.team_photos || block.team_photos.length === 0) return ''
 
-    const photosHtml = members.map(member => `
+    const photosHtml = block.team_photos.map(member => `
       <td align="center" style="padding:4px 8px;">
         <img src="${member.image_url}" alt="${member.name}"
              style="width:60px; height:60px; border-radius:50%; object-fit:cover; border:2px solid #e5e7eb;" />
@@ -172,10 +170,36 @@ export class FeedbackModuleRenderer {
   }
 
   /**
-   * Render a feedback module with its blocks in the configured order
+   * Render a single block based on its type
+   */
+  private static renderBlock(
+    block: FeedbackBlock,
+    moduleId: string,
+    issueId: string,
+    styles: BlockStyleOptions,
+    baseUrl: string
+  ): string {
+    if (!block.is_enabled) return ''
+
+    switch (block.block_type) {
+      case 'title':
+        return this.renderTitleBlock(block, styles)
+      case 'static_text':
+        return this.renderStaticTextBlock(block, styles)
+      case 'vote_options':
+        return this.renderVoteOptionsBlock(block, moduleId, issueId, styles, baseUrl)
+      case 'team_photos':
+        return this.renderTeamPhotosBlock(block, styles)
+      default:
+        return ''
+    }
+  }
+
+  /**
+   * Render a feedback module with its blocks in order
    */
   static async renderFeedbackModule(
-    module: FeedbackModule,
+    module: FeedbackModuleWithBlocks,
     publicationId: string,
     context: RenderContext = {}
   ): Promise<RenderResult> {
@@ -197,34 +221,14 @@ export class FeedbackModuleRenderer {
       bodyFont: settings.body_font
     }
 
-    const blockOrder = module.block_order as FeedbackBlockType[]
-    let blocksHtml = ''
     const baseUrl = context.baseUrl || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.aiprodaily.com'
     const issueId = context.issueId || ''
 
-    for (const blockType of blockOrder) {
-      if (blockType === 'title' && module.title_text) {
-        blocksHtml += this.renderTitleBlock(module.title_text, styles)
-      }
-      else if (blockType === 'body' && module.body_text) {
-        blocksHtml += this.renderBodyBlock(module.body_text, module.body_is_italic, styles)
-      }
-      else if (blockType === 'vote_options' && module.vote_options && module.vote_options.length > 0) {
-        blocksHtml += this.renderVoteOptionsBlock(
-          module.vote_options as FeedbackVoteOption[],
-          module.id,
-          issueId,
-          styles,
-          baseUrl
-        )
-      }
-      else if (blockType === 'sign_off' && module.sign_off_text) {
-        blocksHtml += this.renderSignOffBlock(module.sign_off_text, module.sign_off_is_italic, styles)
-      }
-      else if (blockType === 'team_photos' && module.team_photos && module.team_photos.length > 0) {
-        blocksHtml += this.renderTeamPhotosBlock(module.team_photos as FeedbackTeamMember[], styles)
-      }
-    }
+    // Render blocks in order (blocks are already sorted by display_order)
+    const blocksHtml = module.blocks
+      .filter(block => block.is_enabled)
+      .map(block => this.renderBlock(block, module.id, issueId, styles, baseUrl))
+      .join('')
 
     // Wrap in section container (no header shown for feedback)
     const html = this.wrapInSection(module.name, blocksHtml, styles, false)
@@ -239,7 +243,7 @@ export class FeedbackModuleRenderer {
    * Render for preview (same as normal render)
    */
   static async renderForPreview(
-    module: FeedbackModule,
+    module: FeedbackModuleWithBlocks,
     publicationId: string
   ): Promise<string> {
     const result = await this.renderFeedbackModule(module, publicationId, {})
@@ -250,7 +254,7 @@ export class FeedbackModuleRenderer {
    * Render for archive (static HTML, no response links)
    */
   static async renderForArchive(
-    module: FeedbackModule,
+    module: FeedbackModuleWithBlocks,
     publicationId: string
   ): Promise<string> {
     // For archive, we render a static version without voting links
@@ -267,19 +271,20 @@ export class FeedbackModuleRenderer {
       bodyFont: settings.body_font
     }
 
-    const blockOrder = module.block_order as FeedbackBlockType[]
     let blocksHtml = ''
 
-    for (const blockType of blockOrder) {
-      if (blockType === 'title' && module.title_text) {
-        blocksHtml += this.renderTitleBlock(module.title_text, styles)
+    for (const block of module.blocks) {
+      if (!block.is_enabled) continue
+
+      if (block.block_type === 'title') {
+        blocksHtml += this.renderTitleBlock(block, styles)
       }
-      else if (blockType === 'body' && module.body_text) {
-        blocksHtml += this.renderBodyBlock(module.body_text, module.body_is_italic, styles)
+      else if (block.block_type === 'static_text') {
+        blocksHtml += this.renderStaticTextBlock(block, styles)
       }
-      else if (blockType === 'vote_options' && module.vote_options && module.vote_options.length > 0) {
+      else if (block.block_type === 'vote_options' && block.vote_options && block.vote_options.length > 0) {
         // Render static vote options (no links)
-        const sortedOptions = [...(module.vote_options as FeedbackVoteOption[])].sort((a, b) => b.value - a.value)
+        const sortedOptions = [...block.vote_options].sort((a, b) => b.value - a.value)
         const optionsHtml = sortedOptions.map((option, index) => {
           const isLast = index === sortedOptions.length - 1
           const paddingStyle = isLast ? 'padding:0;' : 'padding:0 0 8px 0;'
@@ -302,14 +307,23 @@ export class FeedbackModuleRenderer {
             ${optionsHtml}
           </table>`
       }
-      else if (blockType === 'sign_off' && module.sign_off_text) {
-        blocksHtml += this.renderSignOffBlock(module.sign_off_text, module.sign_off_is_italic, styles)
-      }
-      else if (blockType === 'team_photos' && module.team_photos && module.team_photos.length > 0) {
-        blocksHtml += this.renderTeamPhotosBlock(module.team_photos as FeedbackTeamMember[], styles)
+      else if (block.block_type === 'team_photos') {
+        blocksHtml += this.renderTeamPhotosBlock(block, styles)
       }
     }
 
     return this.wrapInSection(module.name, blocksHtml, styles, false)
+  }
+
+  /**
+   * Render by publication ID (fetches module with blocks)
+   */
+  static async renderByPublicationId(
+    publicationId: string,
+    context: RenderContext = {}
+  ): Promise<RenderResult | null> {
+    const module = await FeedbackModuleSelector.getFeedbackModuleWithBlocks(publicationId)
+    if (!module) return null
+    return this.renderFeedbackModule(module, publicationId, context)
   }
 }

@@ -20,6 +20,7 @@ export default function Layout({ children }: LayoutProps) {
   const [newsletter, setNewsletter] = useState<Newsletter | null>(null)
   const [newsletterSlug, setNewsletterSlug] = useState<string | null>(null)
   const [pendingToolsCount, setPendingToolsCount] = useState(0)
+  const [unreadFeedbackCount, setUnreadFeedbackCount] = useState(0)
 
   useEffect(() => {
     // Check if we're in staging environment
@@ -68,6 +69,18 @@ export default function Layout({ children }: LayoutProps) {
       .then(data => setPendingToolsCount(data.count || 0))
       .catch(() => {})
   }, [])
+
+  // Fetch unread feedback count when newsletter is loaded
+  useEffect(() => {
+    if (newsletter?.id) {
+      fetch(`/api/feedback-modules/comments/unread-count?publication_id=${newsletter.id}`)
+        .then(res => res.json())
+        .then(data => setUnreadFeedbackCount(data.count || 0))
+        .catch(() => {})
+    } else {
+      setUnreadFeedbackCount(0)
+    }
+  }, [newsletter?.id])
 
   const fetchNewsletter = async (slug: string) => {
     try {
@@ -120,8 +133,13 @@ export default function Layout({ children }: LayoutProps) {
                     <Link href={settingsUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
                       Settings
                     </Link>
-                    <Link href={feedbackUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
+                    <Link href={feedbackUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium relative">
                       Feedback
+                      {unreadFeedbackCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                          {unreadFeedbackCount > 9 ? '9+' : unreadFeedbackCount}
+                        </span>
+                      )}
                     </Link>
                     <Link href={toolsAdminUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium relative">
                       Tools
@@ -217,8 +235,13 @@ export default function Layout({ children }: LayoutProps) {
                   <Link href={databasesUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
                     Databases
                   </Link>
-                  <Link href={feedbackUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
+                  <Link href={feedbackUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium relative">
                     Feedback
+                    {unreadFeedbackCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                        {unreadFeedbackCount > 9 ? '9+' : unreadFeedbackCount}
+                      </span>
+                    )}
                   </Link>
                   <Link href={settingsUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
                     Settings

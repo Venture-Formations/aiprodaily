@@ -26,7 +26,7 @@ import PromptModuleSettings from '../prompt-modules/PromptModuleSettings'
 import { ArticleModuleSettings } from '../article-modules'
 import { TextBoxModuleSettings } from '../text-box-modules'
 import { FeedbackModuleSettings } from '../feedback-modules'
-import type { NewsletterSection, AdModule, PollModule, AIAppModule, PromptModule, ArticleModule, TextBoxModule, FeedbackModule } from '@/types/database'
+import type { NewsletterSection, AdModule, PollModule, AIAppModule, PromptModule, ArticleModule, TextBoxModule, FeedbackModuleWithBlocks, FeedbackBlock } from '@/types/database'
 
 interface SectionsPanelProps {
   publicationId?: string // Optional - will be fetched from URL if not provided
@@ -40,7 +40,7 @@ type SectionItem =
   | { type: 'prompt_module'; data: PromptModule }
   | { type: 'article_module'; data: ArticleModule }
   | { type: 'text_box_module'; data: TextBoxModule }
-  | { type: 'feedback_module'; data: FeedbackModule }
+  | { type: 'feedback_module'; data: FeedbackModuleWithBlocks }
 
 function SortableSectionItem({
   item,
@@ -253,7 +253,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
   const [promptModules, setPromptModules] = useState<PromptModule[]>([])
   const [articleModules, setArticleModules] = useState<ArticleModule[]>([])
   const [textBoxModules, setTextBoxModules] = useState<TextBoxModule[]>([])
-  const [feedbackModules, setFeedbackModules] = useState<FeedbackModule[]>([])
+  const [feedbackModules, setFeedbackModules] = useState<FeedbackModuleWithBlocks[]>([])
   const [selectedItem, setSelectedItem] = useState<SectionItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -453,7 +453,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     const newPromptModules: PromptModule[] = []
     const newArticleModules: ArticleModule[] = []
     const newTextBoxModules: TextBoxModule[] = []
-    const newFeedbackModules: FeedbackModule[] = []
+    const newFeedbackModules: FeedbackModuleWithBlocks[] = []
 
     reorderedItems.forEach((item, idx) => {
       const newOrder = idx + 1
@@ -1072,7 +1072,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     }
   }
 
-  const handleUpdateFeedbackModule = async (updates: Partial<FeedbackModule>) => {
+  const handleUpdateFeedbackModule = async (updates: Partial<FeedbackModuleWithBlocks>) => {
     if (!selectedItem || selectedItem.type !== 'feedback_module') {
       throw new Error('No feedback module selected')
     }
@@ -1095,6 +1095,86 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
       const errorData = await res.json().catch(() => ({}))
       console.error('[SectionsPanel] Failed to update feedback module:', res.status, errorData)
       throw new Error(errorData.error || `Failed to update feedback module (${res.status})`)
+    }
+  }
+
+  const handleUpdateFeedbackBlock = async (blockId: string, updates: Partial<FeedbackBlock>) => {
+    if (!selectedItem || selectedItem.type !== 'feedback_module') {
+      throw new Error('No feedback module selected')
+    }
+
+    console.log('[SectionsPanel] Updating feedback block:', blockId, updates)
+
+    const res = await fetch(`/api/feedback-modules/blocks/${blockId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      console.log('[SectionsPanel] Feedback block updated successfully:', data.block)
+      // Update the block in the module's blocks array
+      setFeedbackModules(prev => prev.map(m => {
+        if (m.id === selectedItem.data.id) {
+          return {
+            ...m,
+            blocks: m.blocks.map(b => b.id === blockId ? { ...b, ...updates } : b)
+          }
+        }
+        return m
+      }))
+      // Update selected item as well
+      setSelectedItem({
+        type: 'feedback_module',
+        data: {
+          ...selectedItem.data,
+          blocks: selectedItem.data.blocks.map(b => b.id === blockId ? { ...b, ...updates } : b)
+        }
+      })
+    } else {
+      const errorData = await res.json().catch(() => ({}))
+      console.error('[SectionsPanel] Failed to update feedback block:', res.status, errorData)
+      throw new Error(errorData.error || `Failed to update feedback block (${res.status})`)
+    }
+  }
+
+  const handleReorderFeedbackBlocks = async (blockIds: string[]) => {
+    if (!selectedItem || selectedItem.type !== 'feedback_module') {
+      throw new Error('No feedback module selected')
+    }
+
+    const moduleId = selectedItem.data.id
+    console.log('[SectionsPanel] Reordering feedback blocks:', moduleId, blockIds)
+
+    const res = await fetch(`/api/feedback-modules/blocks/reorder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ module_id: moduleId, block_ids: blockIds })
+    })
+
+    if (res.ok) {
+      console.log('[SectionsPanel] Feedback blocks reordered successfully')
+      // Update local state to reflect new order
+      const reorderedBlocks = blockIds.map((id, idx) => {
+        const block = selectedItem.data.blocks.find(b => b.id === id)
+        return block ? { ...block, display_order: idx } : null
+      }).filter(Boolean) as FeedbackBlock[]
+
+      setFeedbackModules(prev => prev.map(m => {
+        if (m.id === moduleId) {
+          return { ...m, blocks: reorderedBlocks }
+        }
+        return m
+      }))
+      setSelectedItem({
+        type: 'feedback_module',
+        data: { ...selectedItem.data, blocks: reorderedBlocks }
+      })
+    } else {
+      const errorData = await res.json().catch(() => ({}))
+      console.error('[SectionsPanel] Failed to reorder feedback blocks:', res.status, errorData)
+      throw new Error(errorData.error || `Failed to reorder feedback blocks (${res.status})`)
     }
   }
 
@@ -1275,6 +1355,8 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
               module={selectedItem.data}
               publicationId={publicationId}
               onUpdate={handleUpdateFeedbackModule}
+              onUpdateBlock={handleUpdateFeedbackBlock}
+              onReorderBlocks={handleReorderFeedbackBlocks}
               onDelete={handleDeleteFeedbackModule}
             />
           ) : selectedItem.type === 'feedback_module' ? (

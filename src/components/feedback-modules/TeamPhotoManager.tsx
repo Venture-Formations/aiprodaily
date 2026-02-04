@@ -7,9 +7,10 @@ interface TeamPhotoManagerProps {
   photos: FeedbackTeamMember[]
   onChange: (photos: FeedbackTeamMember[]) => void
   maxPhotos?: number
+  disabled?: boolean
 }
 
-export function TeamPhotoManager({ photos, onChange, maxPhotos = 10 }: TeamPhotoManagerProps) {
+export function TeamPhotoManager({ photos, onChange, maxPhotos = 10, disabled = false }: TeamPhotoManagerProps) {
   const [uploading, setUploading] = useState(false)
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)

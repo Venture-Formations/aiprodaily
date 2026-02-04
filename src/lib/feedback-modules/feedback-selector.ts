@@ -3,10 +3,11 @@
  *
  * Handles feedback module retrieval and vote/comment recording.
  * Feedback modules are singletons (one per publication).
+ * Now uses block-based architecture with feedback_blocks table.
  */
 
 import { supabaseAdmin } from '../supabase'
-import type { FeedbackModule, FeedbackVote, FeedbackComment, FeedbackVoteBreakdown, FeedbackIssueStats } from '@/types/database'
+import type { FeedbackModule, FeedbackModuleWithBlocks, FeedbackBlock, FeedbackVote, FeedbackComment, FeedbackVoteBreakdown, FeedbackIssueStats } from '@/types/database'
 
 export class FeedbackModuleSelector {
   /**
@@ -28,16 +29,120 @@ export class FeedbackModuleSelector {
   }
 
   /**
-   * Ensure feedback module exists for a publication (create if not exists)
+   * Get the feedback module with its blocks
    */
-  static async ensureFeedbackModule(publicationId: string): Promise<FeedbackModule> {
-    // Try to get existing module
-    const existing = await this.getFeedbackModule(publicationId)
+  static async getFeedbackModuleWithBlocks(publicationId: string): Promise<FeedbackModuleWithBlocks | null> {
+    const { data: module, error } = await supabaseAdmin
+      .from('feedback_modules')
+      .select(`
+        *,
+        blocks:feedback_blocks(*)
+      `)
+      .eq('publication_id', publicationId)
+      .single()
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('[FeedbackSelector] Error fetching module with blocks:', error)
+      return null
+    }
+
+    if (!module) return null
+
+    // Sort blocks by display_order
+    return {
+      ...module,
+      blocks: (module.blocks || []).sort((a: FeedbackBlock, b: FeedbackBlock) =>
+        a.display_order - b.display_order
+      )
+    } as FeedbackModuleWithBlocks
+  }
+
+  /**
+   * Get blocks for a feedback module
+   */
+  static async getBlocks(moduleId: string): Promise<FeedbackBlock[]> {
+    const { data: blocks, error } = await supabaseAdmin
+      .from('feedback_blocks')
+      .select('*')
+      .eq('feedback_module_id', moduleId)
+      .order('display_order', { ascending: true })
+
+    if (error) {
+      console.error('[FeedbackSelector] Error fetching blocks:', error)
+      return []
+    }
+
+    return blocks as FeedbackBlock[]
+  }
+
+  /**
+   * Update a feedback block
+   */
+  static async updateBlock(
+    blockId: string,
+    updates: Partial<Omit<FeedbackBlock, 'id' | 'feedback_module_id' | 'created_at' | 'updated_at'>>
+  ): Promise<{ success: boolean; block?: FeedbackBlock; error?: string }> {
+    const { data: block, error } = await supabaseAdmin
+      .from('feedback_blocks')
+      .update(updates)
+      .eq('id', blockId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[FeedbackSelector] Error updating block:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, block: block as FeedbackBlock }
+  }
+
+  /**
+   * Reorder blocks within a module
+   */
+  static async reorderBlocks(
+    moduleId: string,
+    blockIds: string[]
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Update each block's display_order
+      for (let i = 0; i < blockIds.length; i++) {
+        const { error } = await supabaseAdmin
+          .from('feedback_blocks')
+          .update({ display_order: i })
+          .eq('id', blockIds[i])
+          .eq('feedback_module_id', moduleId)
+
+        if (error) {
+          console.error('[FeedbackSelector] Error reordering block:', error)
+          return { success: false, error: error.message }
+        }
+      }
+
+      return { success: true }
+    } catch (error) {
+      console.error('[FeedbackSelector] Error reordering blocks:', error)
+      return { success: false, error: 'Failed to reorder blocks' }
+    }
+  }
+
+  /**
+   * Ensure feedback module exists for a publication (create if not exists)
+   * Also creates default blocks
+   */
+  static async ensureFeedbackModule(publicationId: string): Promise<FeedbackModuleWithBlocks> {
+    // Try to get existing module with blocks
+    const existing = await this.getFeedbackModuleWithBlocks(publicationId)
     if (existing) {
+      // If module exists but has no blocks, create default blocks
+      if (!existing.blocks || existing.blocks.length === 0) {
+        await this.createDefaultBlocks(existing.id)
+        return await this.getFeedbackModuleWithBlocks(publicationId) as FeedbackModuleWithBlocks
+      }
       return existing
     }
 
-    // Create new module with defaults
+    // Create new module
     const { data: module, error } = await supabaseAdmin
       .from('feedback_modules')
       .insert({
@@ -45,18 +150,6 @@ export class FeedbackModuleSelector {
         name: 'Feedback',
         display_order: 999,
         is_active: false, // Start inactive
-        block_order: ['title', 'body', 'vote_options', 'sign_off', 'team_photos'],
-        title_text: "That's it for today!",
-        body_text: null,
-        body_is_italic: false,
-        sign_off_text: 'See you tomorrow!',
-        sign_off_is_italic: true,
-        vote_options: [
-          { value: 5, label: 'Nailed it', emoji: 'star' },
-          { value: 3, label: 'Average', emoji: 'star' },
-          { value: 1, label: 'Fail', emoji: 'star' }
-        ],
-        team_photos: [],
         config: {}
       })
       .select()
@@ -67,8 +160,92 @@ export class FeedbackModuleSelector {
       throw new Error(`Failed to create feedback module: ${error.message}`)
     }
 
-    console.log(`[FeedbackSelector] Created feedback module for publication ${publicationId}`)
-    return module as FeedbackModule
+    // Create default blocks
+    await this.createDefaultBlocks(module.id)
+
+    console.log(`[FeedbackSelector] Created feedback module with blocks for publication ${publicationId}`)
+    return await this.getFeedbackModuleWithBlocks(publicationId) as FeedbackModuleWithBlocks
+  }
+
+  /**
+   * Create default blocks for a feedback module
+   */
+  static async createDefaultBlocks(moduleId: string): Promise<void> {
+    const defaultBlocks = [
+      {
+        feedback_module_id: moduleId,
+        block_type: 'title',
+        display_order: 0,
+        is_enabled: true,
+        title_text: "That's it for today!"
+      },
+      {
+        feedback_module_id: moduleId,
+        block_type: 'static_text',
+        display_order: 1,
+        is_enabled: false,
+        static_content: null,
+        is_italic: false,
+        is_bold: false,
+        text_size: 'medium',
+        label: 'Body'
+      },
+      {
+        feedback_module_id: moduleId,
+        block_type: 'vote_options',
+        display_order: 2,
+        is_enabled: true,
+        vote_options: [
+          { value: 5, label: 'Nailed it', emoji: 'star' },
+          { value: 3, label: 'Average', emoji: 'star' },
+          { value: 1, label: 'Fail', emoji: 'star' }
+        ]
+      },
+      {
+        feedback_module_id: moduleId,
+        block_type: 'static_text',
+        display_order: 3,
+        is_enabled: true,
+        static_content: 'See you tomorrow!',
+        is_italic: true,
+        is_bold: false,
+        text_size: 'medium',
+        label: 'Sign-off'
+      },
+      {
+        feedback_module_id: moduleId,
+        block_type: 'team_photos',
+        display_order: 4,
+        is_enabled: false,
+        team_photos: []
+      }
+    ]
+
+    const { error } = await supabaseAdmin
+      .from('feedback_blocks')
+      .insert(defaultBlocks)
+
+    if (error) {
+      console.error('[FeedbackSelector] Error creating default blocks:', error)
+    }
+  }
+
+  /**
+   * Delete a feedback module and its blocks
+   */
+  static async deleteModule(moduleId: string): Promise<{ success: boolean; error?: string }> {
+    // Blocks are deleted via CASCADE, just delete the module
+    const { error } = await supabaseAdmin
+      .from('feedback_modules')
+      .delete()
+      .eq('id', moduleId)
+
+    if (error) {
+      console.error('[FeedbackSelector] Error deleting module:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
   }
 
   /**
@@ -480,6 +657,190 @@ export class FeedbackModuleSelector {
     return (comments || []).map(c => ({
       ...c,
       vote: c.vote?.[0] || undefined
+    }))
+  }
+
+  /**
+   * Mark a comment as read for a user
+   */
+  static async markCommentAsRead(
+    commentId: string,
+    userId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const { error } = await supabaseAdmin
+      .from('feedback_comment_read_status')
+      .upsert({
+        comment_id: commentId,
+        user_id: userId,
+        read_at: new Date().toISOString()
+      }, {
+        onConflict: 'comment_id,user_id'
+      })
+
+    if (error) {
+      console.error('[FeedbackSelector] Error marking comment as read:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  }
+
+  /**
+   * Mark a comment as unread for a user
+   */
+  static async markCommentAsUnread(
+    commentId: string,
+    userId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const { error } = await supabaseAdmin
+      .from('feedback_comment_read_status')
+      .delete()
+      .eq('comment_id', commentId)
+      .eq('user_id', userId)
+
+    if (error) {
+      console.error('[FeedbackSelector] Error marking comment as unread:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  }
+
+  /**
+   * Mark all comments as read for a user in a publication
+   */
+  static async markAllCommentsAsRead(
+    publicationId: string,
+    userId: string
+  ): Promise<{ success: boolean; count: number; error?: string }> {
+    // Get all unread comments for this publication
+    const { data: comments, error: fetchError } = await supabaseAdmin
+      .from('feedback_comments')
+      .select('id')
+      .eq('publication_id', publicationId)
+
+    if (fetchError) {
+      console.error('[FeedbackSelector] Error fetching comments for mark all:', fetchError)
+      return { success: false, count: 0, error: fetchError.message }
+    }
+
+    if (!comments || comments.length === 0) {
+      return { success: true, count: 0 }
+    }
+
+    // Insert read status for all comments (using upsert to avoid duplicates)
+    const readStatuses = comments.map(c => ({
+      comment_id: c.id,
+      user_id: userId,
+      read_at: new Date().toISOString()
+    }))
+
+    const { error } = await supabaseAdmin
+      .from('feedback_comment_read_status')
+      .upsert(readStatuses, {
+        onConflict: 'comment_id,user_id'
+      })
+
+    if (error) {
+      console.error('[FeedbackSelector] Error marking all comments as read:', error)
+      return { success: false, count: 0, error: error.message }
+    }
+
+    return { success: true, count: comments.length }
+  }
+
+  /**
+   * Get unread comment count for a user in a publication
+   */
+  static async getUnreadCommentCount(
+    publicationId: string,
+    userId: string
+  ): Promise<number> {
+    // Get all comment IDs for this publication
+    const { data: comments, error: commentsError } = await supabaseAdmin
+      .from('feedback_comments')
+      .select('id')
+      .eq('publication_id', publicationId)
+
+    if (commentsError || !comments) {
+      console.error('[FeedbackSelector] Error fetching comments for unread count:', commentsError)
+      return 0
+    }
+
+    if (comments.length === 0) {
+      return 0
+    }
+
+    // Get read status for this user
+    const { data: readStatuses, error: readError } = await supabaseAdmin
+      .from('feedback_comment_read_status')
+      .select('comment_id')
+      .eq('user_id', userId)
+      .in('comment_id', comments.map(c => c.id))
+
+    if (readError) {
+      console.error('[FeedbackSelector] Error fetching read statuses:', readError)
+      return comments.length // Assume all unread if we can't get status
+    }
+
+    const readCommentIds = new Set(readStatuses?.map(r => r.comment_id) || [])
+    const unreadCount = comments.filter(c => !readCommentIds.has(c.id)).length
+
+    return unreadCount
+  }
+
+  /**
+   * Get read status for comments (returns set of read comment IDs)
+   */
+  static async getReadCommentIds(
+    publicationId: string,
+    userId: string
+  ): Promise<Set<string>> {
+    // Get all comment IDs for this publication
+    const { data: comments, error: commentsError } = await supabaseAdmin
+      .from('feedback_comments')
+      .select('id')
+      .eq('publication_id', publicationId)
+
+    if (commentsError || !comments || comments.length === 0) {
+      return new Set()
+    }
+
+    // Get read status for this user
+    const { data: readStatuses, error: readError } = await supabaseAdmin
+      .from('feedback_comment_read_status')
+      .select('comment_id')
+      .eq('user_id', userId)
+      .in('comment_id', comments.map(c => c.id))
+
+    if (readError || !readStatuses) {
+      return new Set()
+    }
+
+    return new Set(readStatuses.map(r => r.comment_id))
+  }
+
+  /**
+   * Get recent comments with read status for dashboard
+   */
+  static async getRecentCommentsWithReadStatus(
+    publicationId: string,
+    userId: string,
+    limit: number = 20
+  ): Promise<Array<FeedbackComment & { vote?: FeedbackVote; is_read: boolean }>> {
+    // Get comments
+    const comments = await this.getRecentComments(publicationId, limit)
+
+    if (comments.length === 0) {
+      return []
+    }
+
+    // Get read statuses
+    const readIds = await this.getReadCommentIds(publicationId, userId)
+
+    return comments.map(c => ({
+      ...c,
+      is_read: readIds.has(c.id)
     }))
   }
 }

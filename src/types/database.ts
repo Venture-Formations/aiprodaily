@@ -1672,7 +1672,7 @@ export interface TextBoxPlaceholderData {
 // ============================================
 // Feedback Module Types
 // ============================================
-export type FeedbackBlockType = 'title' | 'body' | 'vote_options' | 'sign_off' | 'team_photos'
+export type FeedbackBlockType = 'title' | 'static_text' | 'vote_options' | 'team_photos'
 
 export interface FeedbackVoteOption {
   value: number      // e.g., 5, 3, 1
@@ -1692,17 +1692,46 @@ export interface FeedbackModule {
   name: string
   display_order: number
   is_active: boolean
-  block_order: FeedbackBlockType[]
-  title_text: string
-  body_text: string | null
-  body_is_italic: boolean
-  sign_off_text: string
-  sign_off_is_italic: boolean
-  vote_options: FeedbackVoteOption[]
-  team_photos: FeedbackTeamMember[]
   config: Record<string, unknown>
   created_at: string
   updated_at: string
+  // Legacy fields (kept for backwards compatibility, may be null)
+  block_order?: FeedbackBlockType[]
+  title_text?: string
+  body_text?: string | null
+  body_is_italic?: boolean
+  sign_off_text?: string
+  sign_off_is_italic?: boolean
+  vote_options?: FeedbackVoteOption[]
+  team_photos?: FeedbackTeamMember[]
+}
+
+export interface FeedbackBlock {
+  id: string
+  feedback_module_id: string
+  block_type: FeedbackBlockType
+  display_order: number
+  is_enabled: boolean
+  // Title block fields
+  title_text: string | null
+  // Static text block fields (for body or sign-off)
+  static_content: string | null
+  is_italic: boolean
+  is_bold: boolean
+  text_size: 'small' | 'medium' | 'large'
+  label: string | null  // e.g., "Body" or "Sign-off" for UI display
+  // Vote options block fields
+  vote_options: FeedbackVoteOption[] | null
+  // Team photos block fields
+  team_photos: FeedbackTeamMember[] | null
+  // General config
+  config: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface FeedbackModuleWithBlocks extends FeedbackModule {
+  blocks: FeedbackBlock[]
 }
 
 export interface FeedbackVote {

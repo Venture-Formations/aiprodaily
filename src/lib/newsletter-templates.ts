@@ -1619,8 +1619,8 @@ export async function generateFeedbackModuleSection(
   try {
     const { FeedbackModuleSelector, FeedbackModuleRenderer } = await import('./feedback-modules')
 
-    // Get the feedback module
-    const module = await FeedbackModuleSelector.getFeedbackModule(issue.publication_id)
+    // Get the feedback module with blocks
+    const module = await FeedbackModuleSelector.getFeedbackModuleWithBlocks(issue.publication_id)
 
     if (!module || module.id !== moduleId) {
       console.log(`[FeedbackModules] No feedback module found for module ${moduleId} in publication ${issue.publication_id}`)

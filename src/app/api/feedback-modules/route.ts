@@ -3,7 +3,7 @@ import { FeedbackModuleSelector } from '@/lib/feedback-modules'
 
 export const maxDuration = 30
 
-// GET /api/feedback-modules?publication_id={id} - Get feedback module for publication
+// GET /api/feedback-modules?publication_id={id} - Get feedback module for publication (with blocks)
 export async function GET(request: NextRequest) {
   try {
     const publicationId = request.nextUrl.searchParams.get('publication_id')
@@ -15,7 +15,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const module = await FeedbackModuleSelector.getFeedbackModule(publicationId)
+    // Get module with blocks
+    const module = await FeedbackModuleSelector.getFeedbackModuleWithBlocks(publicationId)
 
     return NextResponse.json({
       success: true,
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/feedback-modules - Create or update feedback module
+// POST /api/feedback-modules - Create or update feedback module (returns with blocks)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -43,8 +44,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Ensure module exists
-    const module = await FeedbackModuleSelector.ensureFeedbackModule(publication_id)
+    // Ensure module exists (creates with default blocks if new)
+    let module = await FeedbackModuleSelector.ensureFeedbackModule(publication_id)
 
     // If updates provided, apply them
     if (Object.keys(updates).length > 0) {
@@ -55,10 +56,8 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         )
       }
-      return NextResponse.json({
-        success: true,
-        module: result.module
-      })
+      // Refetch with blocks
+      module = await FeedbackModuleSelector.getFeedbackModuleWithBlocks(publication_id) as any
     }
 
     return NextResponse.json({
@@ -74,7 +73,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH /api/feedback-modules - Update feedback module
+// PATCH /api/feedback-modules - Update feedback module (returns with blocks)
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
@@ -89,6 +88,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     let moduleId = id
+    let pubId = publication_id
 
     // If publication_id provided, get the module by publication
     if (!moduleId && publication_id) {
@@ -100,6 +100,15 @@ export async function PATCH(request: NextRequest) {
         )
       }
       moduleId = module.id
+      pubId = module.publication_id
+    }
+
+    // Get publication_id from existing module if not provided
+    if (!pubId) {
+      const existingModule = await FeedbackModuleSelector.getFeedbackModule(moduleId)
+      if (existingModule) {
+        pubId = existingModule.publication_id
+      }
     }
 
     const result = await FeedbackModuleSelector.updateModule(moduleId, updates)
@@ -111,9 +120,14 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
+    // Refetch with blocks for complete response
+    const moduleWithBlocks = pubId
+      ? await FeedbackModuleSelector.getFeedbackModuleWithBlocks(pubId)
+      : result.module
+
     return NextResponse.json({
       success: true,
-      module: result.module
+      module: moduleWithBlocks
     })
   } catch (error) {
     console.error('[FeedbackModules] Error in PATCH:', error)

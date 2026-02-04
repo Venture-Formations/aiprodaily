@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { FeedbackModuleSelector } from '@/lib/feedback-modules'
 
 export const maxDuration = 60
@@ -6,6 +8,9 @@ export const maxDuration = 60
 // GET /api/feedback-modules/analytics - Get feedback module analytics for dashboard
 export async function GET(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    const userId = session?.user?.id
+
     const searchParams = request.nextUrl.searchParams
     const publicationId = searchParams.get('publication_id')
     const dateFrom = searchParams.get('date_from')
@@ -31,6 +36,7 @@ export async function GET(request: NextRequest) {
           total_votes: 0,
           average_score: 0,
           total_comments: 0,
+          unread_comments: 0,
           issues_count: 0
         }
       })
@@ -43,8 +49,14 @@ export async function GET(request: NextRequest) {
       dateTo || undefined
     )
 
-    // Get recent comments
-    const recentComments = await FeedbackModuleSelector.getRecentComments(publicationId, 20)
+    // Get recent comments with read status if user is logged in
+    let recentComments
+    if (userId) {
+      recentComments = await FeedbackModuleSelector.getRecentCommentsWithReadStatus(publicationId, userId, 20)
+    } else {
+      const comments = await FeedbackModuleSelector.getRecentComments(publicationId, 20)
+      recentComments = comments.map(c => ({ ...c, is_read: false }))
+    }
 
     // Calculate overall summary
     let totalVotes = 0
@@ -59,6 +71,9 @@ export async function GET(request: NextRequest) {
 
     const overallAverage = totalVotes > 0 ? Math.round((totalScore / totalVotes) * 10) / 10 : 0
 
+    // Count unread comments
+    const unreadComments = recentComments.filter(c => !c.is_read).length
+
     return NextResponse.json({
       success: true,
       module,
@@ -66,6 +81,7 @@ export async function GET(request: NextRequest) {
         total_votes: totalVotes,
         average_score: overallAverage,
         total_comments: totalComments,
+        unread_comments: unreadComments,
         issues_count: stats.length
       },
       stats,
