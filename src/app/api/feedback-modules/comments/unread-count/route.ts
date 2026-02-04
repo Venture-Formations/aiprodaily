@@ -5,6 +5,9 @@ import { FeedbackModuleSelector } from '@/lib/feedback-modules'
 
 export const maxDuration = 30
 
+// Fallback user ID for staging/unauthenticated access
+const STAGING_USER_ID = 'staging-user'
+
 // GET /api/feedback-modules/comments/unread-count - Get unread comment count
 export async function GET(request: NextRequest) {
   try {
@@ -20,13 +23,11 @@ export async function GET(request: NextRequest) {
 
     // Try to get session for user-specific read tracking
     const session = await getServerSession(authOptions)
-    const userId = session?.user?.id
+    // Use session user ID or fallback to staging user
+    const userId = session?.user?.id || STAGING_USER_ID
 
-    // If user is logged in, get their specific unread count
-    // Otherwise, get total unread count (for staging/unauthenticated)
-    const count = userId
-      ? await FeedbackModuleSelector.getUnreadCommentCount(publicationId, userId)
-      : await FeedbackModuleSelector.getTotalUnreadCommentCount(publicationId)
+    // Get user-specific unread count (works for both real users and staging)
+    const count = await FeedbackModuleSelector.getUnreadCommentCount(publicationId, userId)
 
     return NextResponse.json({
       success: true,

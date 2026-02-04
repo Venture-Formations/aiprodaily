@@ -5,23 +5,15 @@ import { FeedbackModuleSelector } from '@/lib/feedback-modules'
 
 export const maxDuration = 30
 
+// Fallback user ID for staging/unauthenticated access
+const STAGING_USER_ID = 'staging-user'
+
 // POST /api/feedback-modules/comments/read - Mark comment(s) as read
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    const userId = session?.user?.id
-
-    // If no user session, return success but don't actually mark (for staging)
-    if (!userId) {
-      const body = await request.json()
-      const { comment_id, comment_ids } = body
-      const count = comment_ids?.length || (comment_id ? 1 : 0)
-      return NextResponse.json({
-        success: true,
-        count,
-        note: 'No user session - marking skipped'
-      })
-    }
+    // Use session user ID or fallback to staging user for unauthenticated access
+    const userId = session?.user?.id || STAGING_USER_ID
 
     const body = await request.json()
     const { comment_id, comment_ids, publication_id, mark_all } = body
@@ -76,15 +68,8 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    const userId = session?.user?.id
-
-    // If no user session, return success but don't actually unmark (for staging)
-    if (!userId) {
-      return NextResponse.json({
-        success: true,
-        note: 'No user session - unmarking skipped'
-      })
-    }
+    // Use session user ID or fallback to staging user for unauthenticated access
+    const userId = session?.user?.id || STAGING_USER_ID
 
     const searchParams = request.nextUrl.searchParams
     const commentId = searchParams.get('comment_id')
