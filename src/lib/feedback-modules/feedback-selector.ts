@@ -58,6 +58,24 @@ export class FeedbackModuleSelector {
   }
 
   /**
+   * Get a feedback module by its ID
+   */
+  static async getModuleById(moduleId: string): Promise<FeedbackModule | null> {
+    const { data: module, error } = await supabaseAdmin
+      .from('feedback_modules')
+      .select('*')
+      .eq('id', moduleId)
+      .single()
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('[FeedbackSelector] Error fetching module by ID:', error)
+      return null
+    }
+
+    return module
+  }
+
+  /**
    * Get blocks for a feedback module
    */
   static async getBlocks(moduleId: string): Promise<FeedbackBlock[]> {

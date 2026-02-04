@@ -21,15 +21,23 @@ export async function GET(
       )
     }
 
-    const results = await FeedbackModuleSelector.getIssueResults(
-      moduleId,
-      issueId,
-      email || undefined
-    )
+    // Get both results and module config
+    const [results, moduleData] = await Promise.all([
+      FeedbackModuleSelector.getIssueResults(
+        moduleId,
+        issueId,
+        email || undefined
+      ),
+      FeedbackModuleSelector.getModuleById(moduleId)
+    ])
+
+    // Extract results page config from module
+    const resultsPageConfig = moduleData?.config?.results_page || {}
 
     return NextResponse.json({
       success: true,
-      results
+      results,
+      config: resultsPageConfig
     })
   } catch (error) {
     console.error('[Feedback] Error in GET results:', error)

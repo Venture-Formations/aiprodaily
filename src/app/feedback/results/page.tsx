@@ -17,6 +17,28 @@ interface FeedbackResults {
   average_score: number
 }
 
+interface ResultsPageConfig {
+  confirmation_message?: string
+  first_vote_message?: string
+  feedback_label?: string
+  feedback_placeholder?: string
+  feedback_success_message?: string
+  continue_button_text?: string
+  submit_button_text?: string
+  footer_text?: string
+}
+
+const defaultConfig: ResultsPageConfig = {
+  confirmation_message: 'Your response has been recorded.',
+  first_vote_message: "You're the first to vote!",
+  feedback_label: 'Additional feedback',
+  feedback_placeholder: 'Elaborate on your answer, or just leave some general feedback...',
+  feedback_success_message: 'Thank you for your feedback!',
+  continue_button_text: 'Continue',
+  submit_button_text: 'Submit Feedback',
+  footer_text: 'You can close this window at any time.'
+}
+
 function generateStars(count: number): string {
   return '★'.repeat(count)
 }
@@ -30,6 +52,7 @@ function FeedbackResultsContent() {
   const userVoteValue = searchParams.get('vote')
 
   const [results, setResults] = useState<FeedbackResults | null>(null)
+  const [config, setConfig] = useState<ResultsPageConfig>(defaultConfig)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [feedback, setFeedback] = useState('')
@@ -48,6 +71,10 @@ function FeedbackResultsContent() {
       .then(data => {
         if (data.success) {
           setResults(data.results)
+          // Merge API config with defaults
+          if (data.config) {
+            setConfig({ ...defaultConfig, ...data.config })
+          }
         } else {
           setError(data.error || 'Failed to load results')
         }
@@ -130,14 +157,14 @@ function FeedbackResultsContent() {
           <svg className="mx-auto h-12 w-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <p className="mt-2 text-lg text-gray-700">Your response has been recorded.</p>
+          <p className="mt-2 text-lg text-gray-700">{config.confirmation_message}</p>
         </div>
 
         {/* Results Card */}
         {results && results.breakdown.length > 0 && (
           <div className="border border-gray-200 rounded-lg p-4 mb-6">
             <h2 className="font-bold text-lg text-gray-900 mb-4">
-              {results.total_votes === 1 ? "You're the first to vote!" : `Results (${results.total_votes} votes)`}
+              {results.total_votes === 1 ? config.first_vote_message : `Results (${results.total_votes} votes)`}
             </h2>
 
             <div className="space-y-3">
@@ -177,13 +204,13 @@ function FeedbackResultsContent() {
         {!submitted ? (
           <div className="mb-6">
             <label htmlFor="feedback" className="block text-sm font-medium text-gray-700 mb-2">
-              Additional feedback
+              {config.feedback_label}
             </label>
             <textarea
               id="feedback"
               rows={4}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 resize-none"
-              placeholder="Elaborate on your answer, or just leave some general feedback..."
+              placeholder={config.feedback_placeholder}
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
               disabled={submitting}
@@ -195,7 +222,7 @@ function FeedbackResultsContent() {
               <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
-              <span className="font-medium">Thank you for your feedback!</span>
+              <span className="font-medium">{config.feedback_success_message}</span>
             </div>
           </div>
         )}
@@ -206,11 +233,11 @@ function FeedbackResultsContent() {
           disabled={submitting}
           className="w-full py-3 px-4 bg-gray-900 text-white font-medium rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {submitting ? 'Submitting...' : submitted ? 'Close' : feedback.trim() ? 'Submit Feedback' : 'Continue'}
+          {submitting ? 'Submitting...' : submitted ? 'Close' : feedback.trim() ? config.submit_button_text : config.continue_button_text}
         </button>
 
         <p className="mt-4 text-center text-sm text-gray-500">
-          You can close this window at any time.
+          {config.footer_text}
         </p>
       </div>
     </div>

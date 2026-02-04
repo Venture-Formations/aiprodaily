@@ -205,8 +205,24 @@ export function FeedbackModuleSettings({
   const [showName, setShowName] = useState(module.show_name ?? true)
   const [blocks, setBlocks] = useState<FeedbackBlock[]>(module.blocks || [])
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState<'general' | 'blocks'>('general')
+  const [activeTab, setActiveTab] = useState<'general' | 'blocks' | 'results'>('general')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  // Results page config (stored in module.config)
+  const defaultResultsConfig = {
+    confirmation_message: 'Your response has been recorded.',
+    first_vote_message: "You're the first to vote!",
+    feedback_label: 'Additional feedback',
+    feedback_placeholder: 'Elaborate on your answer, or just leave some general feedback...',
+    feedback_success_message: 'Thank you for your feedback!',
+    continue_button_text: 'Continue',
+    submit_button_text: 'Submit Feedback',
+    footer_text: 'You can close this window at any time.'
+  }
+  const [resultsConfig, setResultsConfig] = useState({
+    ...defaultResultsConfig,
+    ...(module.config?.results_page as Record<string, string> || {})
+  })
 
   // Block editing states
   const [expandedBlock, setExpandedBlock] = useState<string | null>(null)
@@ -237,6 +253,10 @@ export function FeedbackModuleSettings({
     setLocalName(module.name)
     setShowName(module.show_name ?? true)
     setBlocks(module.blocks || [])
+    setResultsConfig({
+      ...defaultResultsConfig,
+      ...(module.config?.results_page as Record<string, string> || {})
+    })
   }, [module])
 
   const handleNameChange = async (newName: string) => {
@@ -256,6 +276,24 @@ export function FeedbackModuleSettings({
     setSaving(true)
     try {
       await onUpdate({ show_name: newValue })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleResultsConfigChange = (key: string, value: string) => {
+    setResultsConfig(prev => ({ ...prev, [key]: value }))
+  }
+
+  const handleSaveResultsConfig = async () => {
+    setSaving(true)
+    try {
+      await onUpdate({
+        config: {
+          ...module.config,
+          results_page: resultsConfig
+        }
+      })
     } finally {
       setSaving(false)
     }
@@ -712,6 +750,16 @@ export function FeedbackModuleSettings({
           >
             Blocks ({blocks.length})
           </button>
+          <button
+            onClick={() => setActiveTab('results')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'results'
+                ? 'border-cyan-500 text-cyan-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Results Page
+          </button>
         </nav>
       </div>
 
@@ -827,6 +875,144 @@ export function FeedbackModuleSettings({
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Results Page Tab */}
+      {activeTab === 'results' && (
+        <div className="space-y-6">
+          <p className="text-sm text-gray-500">
+            Customize the text shown on the results page that subscribers see after voting.
+          </p>
+
+          {/* Confirmation Message */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Confirmation Message
+            </label>
+            <input
+              type="text"
+              value={resultsConfig.confirmation_message}
+              onChange={(e) => handleResultsConfigChange('confirmation_message', e.target.value)}
+              placeholder="Your response has been recorded."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+            />
+            <p className="mt-1 text-xs text-gray-400">Shown after the checkmark icon</p>
+          </div>
+
+          {/* First Vote Message */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              First Vote Message
+            </label>
+            <input
+              type="text"
+              value={resultsConfig.first_vote_message}
+              onChange={(e) => handleResultsConfigChange('first_vote_message', e.target.value)}
+              placeholder="You're the first to vote!"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+            />
+            <p className="mt-1 text-xs text-gray-400">Shown when they&apos;re the first voter on an issue</p>
+          </div>
+
+          {/* Feedback Label */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Feedback Label
+            </label>
+            <input
+              type="text"
+              value={resultsConfig.feedback_label}
+              onChange={(e) => handleResultsConfigChange('feedback_label', e.target.value)}
+              placeholder="Additional feedback"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+            />
+            <p className="mt-1 text-xs text-gray-400">Label above the feedback textarea</p>
+          </div>
+
+          {/* Feedback Placeholder */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Feedback Placeholder
+            </label>
+            <input
+              type="text"
+              value={resultsConfig.feedback_placeholder}
+              onChange={(e) => handleResultsConfigChange('feedback_placeholder', e.target.value)}
+              placeholder="Elaborate on your answer..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+            />
+            <p className="mt-1 text-xs text-gray-400">Placeholder text inside the feedback textarea</p>
+          </div>
+
+          {/* Feedback Success Message */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Feedback Success Message
+            </label>
+            <input
+              type="text"
+              value={resultsConfig.feedback_success_message}
+              onChange={(e) => handleResultsConfigChange('feedback_success_message', e.target.value)}
+              placeholder="Thank you for your feedback!"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+            />
+            <p className="mt-1 text-xs text-gray-400">Shown after submitting additional feedback</p>
+          </div>
+
+          {/* Button Text */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Continue Button Text
+              </label>
+              <input
+                type="text"
+                value={resultsConfig.continue_button_text}
+                onChange={(e) => handleResultsConfigChange('continue_button_text', e.target.value)}
+                placeholder="Continue"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Submit Button Text
+              </label>
+              <input
+                type="text"
+                value={resultsConfig.submit_button_text}
+                onChange={(e) => handleResultsConfigChange('submit_button_text', e.target.value)}
+                placeholder="Submit Feedback"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Footer Text */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Footer Text
+            </label>
+            <input
+              type="text"
+              value={resultsConfig.footer_text}
+              onChange={(e) => handleResultsConfigChange('footer_text', e.target.value)}
+              placeholder="You can close this window at any time."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+            />
+            <p className="mt-1 text-xs text-gray-400">Shown at the bottom of the page</p>
+          </div>
+
+          {/* Save Button */}
+          <div className="pt-4 border-t">
+            <button
+              onClick={handleSaveResultsConfig}
+              disabled={saving}
+              className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50 text-sm font-medium"
+            >
+              {saving ? 'Saving...' : 'Save Results Page Settings'}
+            </button>
+          </div>
         </div>
       )}
 
