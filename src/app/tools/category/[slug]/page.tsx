@@ -20,8 +20,7 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
     return { title: 'Category Not Found' }
   }
 
-  const toolCount = tools.length >= 10 ? 10 : tools.length
-  const pageTitle = `${toolCount} Best AI ${category.name} Tools for Accounting`
+  const pageTitle = `${tools.length} Best AI ${category.name} Tools for Accountants`
 
   return {
     title: pageTitle,
@@ -46,8 +45,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   const allCategories = await getApprovedCategories()
 
   // Page title for display and SEO
-  const toolCount = tools.length >= 10 ? 10 : tools.length
-  const pageTitle = `${toolCount} Best AI ${category.name} Tools for Accounting`
+  const pageTitle = `${tools.length} Best AI ${category.name} Tools for Accountants`
 
   // JSON-LD structured data for CollectionPage
   const categoryPageSchema = {
@@ -78,6 +76,32 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     }
   }
 
+  // JSON-LD BreadcrumbList for navigation
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "AI Tools",
+        "item": "https://aiaccountingdaily.com/tools"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Categories",
+        "item": "https://aiaccountingdaily.com/tools/categories"
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": category.name,
+        "item": `https://aiaccountingdaily.com/tools/category/${slug}`
+      }
+    ]
+  }
+
   return (
     <section className="py-12">
       <Container>
@@ -85,11 +109,15 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(categoryPageSchema) }}
         />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        />
 
         {/* Breadcrumb */}
         <nav className="mb-8">
           <ol className="flex items-center space-x-2 text-sm text-slate-500">
-            <li><Link href="/tools" className="hover:text-blue-600 transition-colors">Tools</Link></li>
+            <li><Link href="/tools" className="hover:text-blue-600 transition-colors">AI Tools</Link></li>
             <li>/</li>
             <li><Link href="/tools/categories" className="hover:text-blue-600 transition-colors">Categories</Link></li>
             <li>/</li>

@@ -1,0 +1,49 @@
+# AI Accounting Daily
+
+> The leading AI tools directory and newsletter for accounting professionals.
+
+AI Accounting Daily curates the best AI tools, news, and resources for accountants, bookkeepers, tax professionals, and finance teams. We publish a daily newsletter and maintain a comprehensive directory of 200+ AI tools.
+
+## Main Sections
+
+### AI Tools Directory (/tools)
+Browse and discover AI tools for accounting professionals. Tools are organized by category and include detailed profiles with features, pricing, and reviews.
+
+- /tools - Main directory with all tools
+- /tools/category/accounting-bookkeeping - AI accounting and bookkeeping software
+- /tools/category/tax-compliance - AI tax preparation and compliance tools
+- /tools/category/payroll - AI payroll automation solutions
+- /tools/category/finance-analysis - AI financial planning and analysis tools
+- /tools/category/expense-management - AI expense tracking and management
+- /tools/category/client-management - AI-powered CRM for accounting firms
+- /tools/category/productivity - AI productivity tools for accountants
+- /tools/category/hr - AI human resources tools
+- /tools/category/banking-payments - AI banking and payment solutions
+- /tools/submit - Submit a new AI tool to the directory
+
+### Newsletter & News
+- /subscribe - Subscribe to the daily newsletter
+- /news - Browse all articles and past newsletters
+- /newsletter/[date] - View archived newsletter issues
+
+### Company
+- /contactus - Contact information
+- /privacypolicy - Privacy policy
+
+## About This Site
+
+AI Accounting Daily helps accounting professionals stay current with AI technology. The daily newsletter features curated AI news, tool recommendations, practical prompts, and industry insights.
+
+Tool vendors can submit their AI tools for inclusion in the directory at /tools/submit. Featured and sponsored placement options are available.
+
+## Content Types
+
+1. **AI Tools** - Detailed profiles of AI software for accounting, including descriptions, features, pricing, and category classifications.
+
+2. **Newsletter Issues** - Daily email newsletters covering AI news, tool spotlights, productivity tips, and industry analysis.
+
+3. **Articles** - In-depth guides, tutorials, and analysis of AI trends in accounting.
+
+## Contact
+
+For partnership inquiries, tool submissions, or advertising: /contactus

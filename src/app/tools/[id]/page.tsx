@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import type { Metadata } from 'next'
 import { currentUser } from '@clerk/nextjs/server'
 import { getToolById, getApprovedTools, incrementToolViews } from '@/lib/directory'
 import { supabaseAdmin } from '@/lib/supabase'
@@ -16,6 +17,29 @@ interface ToolDetailPageProps {
 }
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({ params }: ToolDetailPageProps): Promise<Metadata> {
+  const { id } = await params
+  const tool = await getToolById(id)
+
+  if (!tool || !tool.is_active) {
+    return { title: 'Tool Not Found' }
+  }
+
+  const categoryName = tool.categories[0]?.name || 'Productivity'
+  const pageTitle = `${tool.tool_name} — AI ${categoryName} Tool for Accountants | AI Accounting Daily`
+
+  return {
+    title: pageTitle,
+    description: tool.description || tool.tagline || `Learn about ${tool.tool_name}, an AI ${categoryName.toLowerCase()} tool for accounting professionals.`,
+    openGraph: {
+      title: pageTitle,
+      description: tool.description || tool.tagline || `Learn about ${tool.tool_name}, an AI ${categoryName.toLowerCase()} tool for accounting professionals.`,
+      url: `https://aiaccountingdaily.com/tools/${id}`,
+      ...(tool.logo_image_url && { images: [tool.logo_image_url] }),
+    },
+  }
+}
 
 export default async function ToolDetailPage({ params }: ToolDetailPageProps) {
   const { id } = await params
@@ -87,6 +111,32 @@ export default async function ToolDetailPage({ params }: ToolDetailPageProps) {
     }
   }
 
+  // JSON-LD BreadcrumbList for navigation
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "AI Tools",
+        "item": "https://aiaccountingdaily.com/tools"
+      },
+      ...(tool.categories[0] ? [{
+        "@type": "ListItem",
+        "position": 2,
+        "name": tool.categories[0].name,
+        "item": `https://aiaccountingdaily.com/tools/category/${tool.categories[0].slug}`
+      }] : []),
+      {
+        "@type": "ListItem",
+        "position": tool.categories[0] ? 3 : 2,
+        "name": tool.tool_name,
+        "item": `https://aiaccountingdaily.com/tools/${id}`
+      }
+    ]
+  }
+
   return (
     <section className="py-12">
       <Container>
@@ -94,11 +144,15 @@ export default async function ToolDetailPage({ params }: ToolDetailPageProps) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationSchema) }}
         />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        />
 
         {/* Breadcrumb */}
         <nav className="mb-8">
           <ol className="flex items-center space-x-2 text-sm text-slate-500">
-            <li><Link href="/tools" className="hover:text-blue-600 transition-colors">Tools</Link></li>
+            <li><Link href="/tools" className="hover:text-blue-600 transition-colors">AI Tools</Link></li>
             <li>/</li>
             {tool.categories[0] && (
               <>

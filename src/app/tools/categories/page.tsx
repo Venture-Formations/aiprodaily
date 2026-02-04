@@ -1,8 +1,19 @@
 import Link from 'next/link'
+import type { Metadata } from 'next'
 import { getApprovedCategories } from '@/lib/directory'
 import { Container } from '@/components/salient/Container'
 
 export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = {
+  title: 'AI Tools Categories - AI Accounting Daily',
+  description: 'Browse AI tools by category. Find the best AI solutions for accounting, tax, payroll, finance, expense management, HR, and more.',
+  openGraph: {
+    title: 'AI Tools Categories - AI Accounting Daily',
+    description: 'Browse AI tools by category. Find the best AI solutions for accounting, tax, payroll, finance, expense management, HR, and more.',
+    url: 'https://aiaccountingdaily.com/tools/categories',
+  },
+}
 
 // Category icons mapping
 const categoryIcons: Record<string, string> = {
@@ -18,9 +29,42 @@ const categoryIcons: Record<string, string> = {
 export default async function CategoriesPage() {
   const categories = await getApprovedCategories()
 
+  // JSON-LD structured data for CollectionPage of categories
+  const categoriesPageSchema = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "AI Tools Categories",
+    "description": "Browse AI tools by category. Find the best AI solutions for accounting, tax, payroll, finance, expense management, HR, and more.",
+    "url": "https://aiaccountingdaily.com/tools/categories",
+    "publisher": {
+      "@type": "Organization",
+      "name": "AI Accounting Daily",
+      "url": "https://aiaccountingdaily.com"
+    },
+    "mainEntity": {
+      "@type": "ItemList",
+      "numberOfItems": categories.length,
+      "itemListElement": categories.map((category, index) => ({
+        "@type": "ListItem",
+        "position": index + 1,
+        "item": {
+          "@type": "Thing",
+          "name": category.name,
+          "description": category.description,
+          "url": `https://aiaccountingdaily.com/tools/category/${category.slug}`
+        }
+      }))
+    }
+  }
+
   return (
     <section className="py-16">
       <Container>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(categoriesPageSchema) }}
+        />
+
         <div className="text-center mb-12">
           <h1 className="font-display text-4xl font-medium tracking-tight text-slate-900 sm:text-5xl">
             Browse AI Tools by Category

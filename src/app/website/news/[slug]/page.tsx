@@ -143,12 +143,13 @@ export default async function ArticlePage({ params }: PageProps) {
     }
   }
 
-  // JSON-LD structured data
+  // JSON-LD structured data for NewsArticle
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'NewsArticle',
     headline: article.title,
     datePublished: article.publish_date,
+    dateModified: article.publish_date,
     author: {
       '@type': 'Organization',
       name: newsletterName
@@ -158,10 +159,41 @@ export default async function ArticlePage({ params }: PageProps) {
       name: businessName,
       logo: {
         '@type': 'ImageObject',
-        url: logoUrl
+        url: 'https://aiaccountingdaily.com/logo.png'
       }
     },
-    image: article.image_url ? [article.image_url] : []
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': `https://aiaccountingdaily.com/news/${article.slug}`
+    },
+    image: article.image_url ? [article.image_url] : [],
+    description: article.body.replace(/<[^>]+>/g, '').substring(0, 160)
+  }
+
+  // JSON-LD BreadcrumbList for navigation
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'News',
+        item: 'https://aiaccountingdaily.com/news'
+      },
+      ...(category ? [{
+        '@type': 'ListItem',
+        position: 2,
+        name: category.name,
+        item: `https://aiaccountingdaily.com/news?category=${category.slug}`
+      }] : []),
+      {
+        '@type': 'ListItem',
+        position: category ? 3 : 2,
+        name: article.title,
+        item: `https://aiaccountingdaily.com/news/${article.slug}`
+      }
+    ]
   }
 
   return (
@@ -346,6 +378,10 @@ export default async function ArticlePage({ params }: PageProps) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
     </div>
   )
