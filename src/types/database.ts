@@ -1692,6 +1692,7 @@ export interface FeedbackModule {
   name: string
   display_order: number
   is_active: boolean
+  show_name?: boolean
   config: Record<string, unknown>
   created_at: string
   updated_at: string

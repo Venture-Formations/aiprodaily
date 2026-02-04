@@ -35,3 +35,34 @@ export async function PATCH(
     )
   }
 }
+
+// DELETE /api/feedback-modules/blocks/[blockId] - Delete a feedback block
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ blockId: string }> }
+) {
+  try {
+    const { blockId } = await params
+
+    console.log('[FeedbackBlocks] Deleting block:', blockId)
+
+    const result = await FeedbackModuleSelector.deleteBlock(blockId)
+
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, error: result.error },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true
+    })
+  } catch (error) {
+    console.error('[FeedbackBlocks] Error deleting block:', error)
+    return NextResponse.json(
+      { success: false, error: 'Failed to delete block' },
+      { status: 500 }
+    )
+  }
+}

@@ -98,6 +98,81 @@ export class FeedbackModuleSelector {
   }
 
   /**
+   * Create a new block for a feedback module
+   */
+  static async createBlock(
+    moduleId: string,
+    blockType: 'title' | 'static_text' | 'vote_options' | 'team_photos',
+    displayOrder?: number
+  ): Promise<{ success: boolean; block?: FeedbackBlock; error?: string }> {
+    // Get max display_order if not provided
+    if (displayOrder === undefined) {
+      const { data: blocks } = await supabaseAdmin
+        .from('feedback_blocks')
+        .select('display_order')
+        .eq('feedback_module_id', moduleId)
+        .order('display_order', { ascending: false })
+        .limit(1)
+
+      displayOrder = (blocks && blocks.length > 0) ? blocks[0].display_order + 1 : 0
+    }
+
+    // Default data based on block type
+    let blockData: Record<string, unknown> = {
+      feedback_module_id: moduleId,
+      block_type: blockType,
+      display_order: displayOrder,
+      is_enabled: true
+    }
+
+    if (blockType === 'title') {
+      blockData.title_text = ''
+    } else if (blockType === 'static_text') {
+      blockData.static_content = ''
+      blockData.is_italic = false
+      blockData.is_bold = false
+      blockData.text_size = 'medium'
+    } else if (blockType === 'vote_options') {
+      blockData.vote_options = [
+        { value: 5, label: 'Great', emoji: 'star' },
+        { value: 1, label: 'Not great', emoji: 'star' }
+      ]
+    } else if (blockType === 'team_photos') {
+      blockData.team_photos = []
+    }
+
+    const { data: block, error } = await supabaseAdmin
+      .from('feedback_blocks')
+      .insert(blockData)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[FeedbackSelector] Error creating block:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, block: block as FeedbackBlock }
+  }
+
+  /**
+   * Delete a feedback block
+   */
+  static async deleteBlock(blockId: string): Promise<{ success: boolean; error?: string }> {
+    const { error } = await supabaseAdmin
+      .from('feedback_blocks')
+      .delete()
+      .eq('id', blockId)
+
+    if (error) {
+      console.error('[FeedbackSelector] Error deleting block:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  }
+
+  /**
    * Reorder blocks within a module
    */
   static async reorderBlocks(

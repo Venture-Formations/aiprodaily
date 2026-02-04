@@ -1178,6 +1178,77 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     }
   }
 
+  const handleAddFeedbackBlock = async (blockType: FeedbackBlock['block_type']) => {
+    if (!selectedItem || selectedItem.type !== 'feedback_module') {
+      throw new Error('No feedback module selected')
+    }
+
+    const moduleId = selectedItem.data.id
+    console.log('[SectionsPanel] Adding feedback block:', moduleId, blockType)
+
+    const res = await fetch(`/api/feedback-modules/blocks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ module_id: moduleId, block_type: blockType })
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      console.log('[SectionsPanel] Feedback block added successfully:', data.block)
+      // Update local state to include new block
+      const updatedBlocks = [...selectedItem.data.blocks, data.block]
+
+      setFeedbackModules(prev => prev.map(m => {
+        if (m.id === moduleId) {
+          return { ...m, blocks: updatedBlocks }
+        }
+        return m
+      }))
+      setSelectedItem({
+        type: 'feedback_module',
+        data: { ...selectedItem.data, blocks: updatedBlocks }
+      })
+    } else {
+      const errorData = await res.json().catch(() => ({}))
+      console.error('[SectionsPanel] Failed to add feedback block:', res.status, errorData)
+      throw new Error(errorData.error || `Failed to add feedback block (${res.status})`)
+    }
+  }
+
+  const handleDeleteFeedbackBlock = async (blockId: string) => {
+    if (!selectedItem || selectedItem.type !== 'feedback_module') {
+      throw new Error('No feedback module selected')
+    }
+
+    const moduleId = selectedItem.data.id
+    console.log('[SectionsPanel] Deleting feedback block:', blockId)
+
+    const res = await fetch(`/api/feedback-modules/blocks/${blockId}`, {
+      method: 'DELETE'
+    })
+
+    if (res.ok) {
+      console.log('[SectionsPanel] Feedback block deleted successfully')
+      // Update local state to remove block
+      const updatedBlocks = selectedItem.data.blocks.filter(b => b.id !== blockId)
+
+      setFeedbackModules(prev => prev.map(m => {
+        if (m.id === moduleId) {
+          return { ...m, blocks: updatedBlocks }
+        }
+        return m
+      }))
+      setSelectedItem({
+        type: 'feedback_module',
+        data: { ...selectedItem.data, blocks: updatedBlocks }
+      })
+    } else {
+      const errorData = await res.json().catch(() => ({}))
+      console.error('[SectionsPanel] Failed to delete feedback block:', res.status, errorData)
+      throw new Error(errorData.error || `Failed to delete feedback block (${res.status})`)
+    }
+  }
+
   const handleDeleteFeedbackModule = async () => {
     if (!selectedItem || selectedItem.type !== 'feedback_module') return
 
@@ -1357,6 +1428,8 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
               onUpdate={handleUpdateFeedbackModule}
               onUpdateBlock={handleUpdateFeedbackBlock}
               onReorderBlocks={handleReorderFeedbackBlocks}
+              onAddBlock={handleAddFeedbackBlock}
+              onDeleteBlock={handleDeleteFeedbackBlock}
               onDelete={handleDeleteFeedbackModule}
             />
           ) : selectedItem.type === 'feedback_module' ? (
