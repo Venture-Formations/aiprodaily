@@ -1570,6 +1570,7 @@ export interface TextBoxBlock {
   ai_prompt_json: Record<string, unknown> | null  // Full AI prompt configuration (model, messages, etc.)
   generation_timing: GenerationTiming
   is_bold: boolean  // When true, renders AI prompt content in bold
+  is_italic: boolean  // When true, renders AI prompt content in italic
 
   // Image Block fields
   image_type: ImageType | null
@@ -1666,4 +1667,79 @@ export interface TextBoxPlaceholderData {
     title: string | null
     body: string | null
   }>
+}
+
+// ============================================
+// Feedback Module Types
+// ============================================
+export type FeedbackBlockType = 'title' | 'body' | 'vote_options' | 'sign_off' | 'team_photos'
+
+export interface FeedbackVoteOption {
+  value: number      // e.g., 5, 3, 1
+  label: string      // e.g., "Nailed it", "Average", "Fail"
+  emoji: 'star'      // Currently only star emoji supported
+}
+
+export interface FeedbackTeamMember {
+  name: string
+  image_url: string
+  title?: string
+}
+
+export interface FeedbackModule {
+  id: string
+  publication_id: string
+  name: string
+  display_order: number
+  is_active: boolean
+  block_order: FeedbackBlockType[]
+  title_text: string
+  body_text: string | null
+  body_is_italic: boolean
+  sign_off_text: string
+  sign_off_is_italic: boolean
+  vote_options: FeedbackVoteOption[]
+  team_photos: FeedbackTeamMember[]
+  config: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface FeedbackVote {
+  id: string
+  feedback_module_id: string
+  publication_id: string
+  issue_id: string | null
+  subscriber_email: string
+  ip_address: string | null
+  selected_value: number
+  selected_label: string
+  voted_at: string
+}
+
+export interface FeedbackComment {
+  id: string
+  feedback_vote_id: string
+  publication_id: string
+  issue_id: string | null
+  subscriber_email: string
+  comment_text: string
+  created_at: string
+}
+
+// For API responses with aggregated stats
+export interface FeedbackVoteBreakdown {
+  value: number
+  label: string
+  count: number
+  percentage: number
+}
+
+export interface FeedbackIssueStats {
+  issue_id: string
+  issue_date: string
+  total_votes: number
+  average_score: number
+  vote_breakdown: FeedbackVoteBreakdown[]
+  comments_count: number
 }

@@ -164,9 +164,13 @@ export class TextBoxModuleRenderer {
     let formattedContent = content.replace(/\n/g, '<br>')
     formattedContent = formattedContent.replace(/<p/g, '<p style="margin: 0 0 4px 0;"')
 
-    // Apply bold styling if is_bold is true
-    if (block.is_bold) {
+    // Apply bold and/or italic styling
+    if (block.is_bold && block.is_italic) {
+      formattedContent = `<strong><em>${formattedContent}</em></strong>`
+    } else if (block.is_bold) {
       formattedContent = `<strong>${formattedContent}</strong>`
+    } else if (block.is_italic) {
+      formattedContent = `<em>${formattedContent}</em>`
     }
 
     return `
@@ -292,6 +296,7 @@ export class TextBoxModuleRenderer {
       imageUrl?: string
       textSize?: TextSize
       isBold?: boolean
+      isItalic?: boolean
     }>,
     styles: { primaryColor: string; headingFont: string; bodyFont: string }
   ): string {
@@ -304,9 +309,15 @@ export class TextBoxModuleRenderer {
           // Normalize paragraph margins for consistent spacing
           let formattedContent = block.content.replace(/\n/g, '<br>')
           formattedContent = formattedContent.replace(/<p/g, '<p style="margin: 0 0 4px 0;"')
-          // Apply bold styling for AI prompt blocks with is_bold
-          if (block.type === 'ai_prompt' && block.isBold) {
-            formattedContent = `<strong>${formattedContent}</strong>`
+          // Apply bold and/or italic styling for AI prompt blocks
+          if (block.type === 'ai_prompt') {
+            if (block.isBold && block.isItalic) {
+              formattedContent = `<strong><em>${formattedContent}</em></strong>`
+            } else if (block.isBold) {
+              formattedContent = `<strong>${formattedContent}</strong>`
+            } else if (block.isItalic) {
+              formattedContent = `<em>${formattedContent}</em>`
+            }
           }
           blocksHtml += `
 <tr>

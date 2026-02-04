@@ -6,6 +6,7 @@ import { Suspense } from 'react'
 function ErrorContent() {
   const searchParams = useSearchParams()
   const reason = searchParams.get('reason')
+  const message = searchParams.get('message')
 
   const errorMessages: { [key: string]: string } = {
     'missing-params': 'Required information is missing from your request.',
@@ -15,10 +16,11 @@ function ErrorContent() {
     'server-error': 'A server error occurred while processing your feedback.'
   }
 
-  const errorMessage = reason ? errorMessages[reason] || 'An unknown error occurred.' : 'An error occurred.'
+  // Support both 'reason' (legacy) and 'message' (new) query params
+  const errorMessage = message || (reason ? errorMessages[reason] || 'An unknown error occurred.' : 'An error occurred.')
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-red-50 to-white flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
         <div className="mb-6">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -48,18 +50,9 @@ function ErrorContent() {
           </p>
         </div>
 
-        <div className="border-t pt-6">
-          <a
-            href="https://st-cloud-scoop.vercel.app"
-            className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors"
-          >
-            Visit St. Cloud Scoop
-          </a>
-        </div>
-
-        <div className="mt-6 text-xs text-gray-400">
-          St. Cloud Scoop • Your Local News Source
-        </div>
+        <p className="mt-4 text-center text-sm text-gray-500">
+          You can close this window.
+        </p>
       </div>
     </div>
   )
@@ -68,7 +61,7 @@ function ErrorContent() {
 export default function ErrorPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-b from-red-50 to-white flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-gray-600">Loading...</div>
       </div>
     }>

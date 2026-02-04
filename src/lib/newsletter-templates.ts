@@ -1610,6 +1610,37 @@ export async function generateTextBoxModuleSection(
   }
 }
 
+// ==================== FEEDBACK MODULE ====================
+
+export async function generateFeedbackModuleSection(
+  issue: { id: string; publication_id: string; status?: string },
+  moduleId: string
+): Promise<string> {
+  try {
+    const { FeedbackModuleSelector, FeedbackModuleRenderer } = await import('./feedback-modules')
+
+    // Get the feedback module
+    const module = await FeedbackModuleSelector.getFeedbackModule(issue.publication_id)
+
+    if (!module || module.id !== moduleId) {
+      console.log(`[FeedbackModules] No feedback module found for module ${moduleId} in publication ${issue.publication_id}`)
+      return ''
+    }
+
+    // Render the feedback module
+    const result = await FeedbackModuleRenderer.renderFeedbackModule(
+      module,
+      issue.publication_id,
+      { issueId: issue.id }
+    )
+
+    return result.html
+  } catch (error) {
+    console.error('[FeedbackModules] Error generating feedback module section:', error)
+    return ''
+  }
+}
+
 // ==================== ROAD WORK ====================
 // Feature not needed in this newsletter
 
@@ -1833,12 +1864,20 @@ export async function generateFullNewsletterHtml(
       .eq('is_active', true)
       .order('display_order', { ascending: true })
 
+    // Fetch feedback module (singleton per publication)
+    const { data: feedbackModules } = await supabaseAdmin
+      .from('feedback_modules')
+      .select('*')
+      .eq('publication_id', issue.publication_id)
+      .eq('is_active', true)
+
     console.log('Active newsletter sections:', sections?.map(s => `${s.name} (order: ${s.display_order})`).join(', '))
     console.log('Active ad modules:', adModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
     console.log('Active poll modules:', pollModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
     console.log('Active prompt modules:', promptModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
     console.log('Active article modules:', articleModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
     console.log('Active text box modules:', textBoxModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
+    console.log('Active feedback modules:', feedbackModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
 
     // Format date using local date parsing
     const formatDate = (dateString: string) => {
@@ -1889,7 +1928,7 @@ export async function generateFullNewsletterHtml(
       PROMPT_IDEAS: 'a917ac63-6cf0-428b-afe7-60a74fbf160b'
     }
 
-    // Merge newsletter sections, ad modules, poll modules, prompt modules, article modules, and text box modules into a single sorted list
+    // Merge newsletter sections, ad modules, poll modules, prompt modules, article modules, text box modules, and feedback modules into a single sorted list
     type SectionItem =
       | { type: 'section'; data: any }
       | { type: 'ad_module'; data: any }
@@ -1897,6 +1936,7 @@ export async function generateFullNewsletterHtml(
       | { type: 'prompt_module'; data: any }
       | { type: 'article_module'; data: any }
       | { type: 'text_box_module'; data: any }
+      | { type: 'feedback_module'; data: any }
 
     const allItems: SectionItem[] = [
       ...(sections || []).map(s => ({ type: 'section' as const, data: s })),
@@ -1904,7 +1944,8 @@ export async function generateFullNewsletterHtml(
       ...(pollModules || []).map(m => ({ type: 'poll_module' as const, data: m })),
       ...(promptModules || []).map(m => ({ type: 'prompt_module' as const, data: m })),
       ...(articleModules || []).map(m => ({ type: 'article_module' as const, data: m })),
-      ...(textBoxModules || []).map(m => ({ type: 'text_box_module' as const, data: m }))
+      ...(textBoxModules || []).map(m => ({ type: 'text_box_module' as const, data: m })),
+      ...(feedbackModules || []).map(m => ({ type: 'feedback_module' as const, data: m }))
     ].sort((a, b) => (a.data.display_order ?? 999) - (b.data.display_order ?? 999))
 
     console.log('Combined section order:', allItems.map(item =>
@@ -1943,6 +1984,12 @@ export async function generateFullNewsletterHtml(
         const textBoxModuleHtml = await generateTextBoxModuleSection(issue, item.data.id)
         if (textBoxModuleHtml) {
           sectionsHtml += textBoxModuleHtml
+        }
+      } else if (item.type === 'feedback_module') {
+        // Generate feedback module section
+        const feedbackModuleHtml = await generateFeedbackModuleSection(issue, item.data.id)
+        if (feedbackModuleHtml) {
+          sectionsHtml += feedbackModuleHtml
         }
       } else {
         const section = item.data

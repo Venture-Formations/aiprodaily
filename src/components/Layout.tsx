@@ -88,6 +88,7 @@ export default function Layout({ children }: LayoutProps) {
     const campaignsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/issues` : '/dashboard/issues'
     const analyticsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/analytics` : '/dashboard/analytics'
     const databasesUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/databases` : '/dashboard/databases'
+    const feedbackUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/feedback` : '/dashboard/feedback'
     const settingsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/settings` : '/dashboard/settings'
     const toolsAdminUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/tools-admin` : '/dashboard/tools-admin'
 
@@ -118,6 +119,9 @@ export default function Layout({ children }: LayoutProps) {
                     </Link>
                     <Link href={settingsUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
                       Settings
+                    </Link>
+                    <Link href={feedbackUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
+                      Feedback
                     </Link>
                     <Link href={toolsAdminUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium relative">
                       Tools
@@ -184,6 +188,7 @@ export default function Layout({ children }: LayoutProps) {
   const campaignsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/issues` : '/dashboard/issues'
   const analyticsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/analytics` : '/dashboard/analytics'
   const databasesUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/databases` : '/dashboard/databases'
+  const feedbackUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/feedback` : '/dashboard/feedback'
   const settingsUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/settings` : '/dashboard/settings'
   const toolsAdminUrl = newsletterSlug ? `/dashboard/${newsletterSlug}/tools-admin` : '/dashboard/tools-admin'
 
@@ -211,6 +216,9 @@ export default function Layout({ children }: LayoutProps) {
                   </Link>
                   <Link href={databasesUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
                     Databases
+                  </Link>
+                  <Link href={feedbackUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
+                    Feedback
                   </Link>
                   <Link href={settingsUrl} className="text-gray-900 hover:text-brand-primary px-3 py-2 text-sm font-medium">
                     Settings

@@ -26,6 +26,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { SectionsPanel } from '@/components/ad-modules'
+import { FeedbackModuleSettings } from '@/components/feedback-modules'
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('system')
@@ -239,7 +240,9 @@ function SortableSection({
 }
 
 function NewsletterSettings() {
+  const pathname = usePathname()
   const [sections, setSections] = useState<NewsletterSection[]>([])
+  const [publicationId, setPublicationId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [migrating, setMigrating] = useState(false)
@@ -252,6 +255,25 @@ function NewsletterSettings() {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   )
+
+  // Fetch publication ID from slug
+  useEffect(() => {
+    if (pathname) {
+      const match = pathname.match(/^\/dashboard\/([^\/]+)/)
+      if (match && match[1]) {
+        const slug = match[1]
+        fetch('/api/newsletters')
+          .then(res => res.json())
+          .then(data => {
+            const publication = data.newsletters?.find((n: { slug: string; id: string }) => n.slug === slug)
+            if (publication) {
+              setPublicationId(publication.id)
+            }
+          })
+          .catch(console.error)
+      }
+    }
+  }, [pathname])
 
   useEffect(() => {
     fetchSections()
@@ -430,6 +452,13 @@ function NewsletterSettings() {
         </div>
         <SectionsPanel />
       </div>
+
+      {/* Feedback Module Settings */}
+      {publicationId && (
+        <div className="bg-white shadow rounded-lg p-6">
+          <FeedbackModuleSettings publicationId={publicationId} />
+        </div>
+      )}
 
       {message && (
         <div className={`p-4 rounded-md ${

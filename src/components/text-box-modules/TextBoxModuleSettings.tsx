@@ -246,6 +246,7 @@ export function TextBoxModuleSettings({
   const [editPrompt, setEditPrompt] = useState('')
   const [editTiming, setEditTiming] = useState<'before_articles' | 'after_articles'>('after_articles')
   const [editIsBold, setEditIsBold] = useState(false)
+  const [editIsItalic, setEditIsItalic] = useState(false)
   const [editResponseField, setEditResponseField] = useState('')
   const [testingPrompt, setTestingPrompt] = useState(false)
   const [testResult, setTestResult] = useState<{ result?: string; injectedPrompt?: string; error?: string } | null>(null)
@@ -440,6 +441,7 @@ export function TextBoxModuleSettings({
       }
       setEditTiming(block.generation_timing || 'after_articles')
       setEditIsBold(block.is_bold || false)
+      setEditIsItalic(block.is_italic || false)
       setEditResponseField((promptJson as any)?.response_field || '')
     } else if (block.block_type === 'image') {
       setEditImageType((block.image_type as any) || 'static')
@@ -455,6 +457,7 @@ export function TextBoxModuleSettings({
     setEditContent('')
     setEditPrompt('')
     setEditIsBold(false)
+    setEditIsItalic(false)
     setEditResponseField('')
     setSelectedImage(null)
     setCrop(undefined)
@@ -586,6 +589,7 @@ export function TextBoxModuleSettings({
         updateData.ai_prompt_json = parsedJson
         updateData.generation_timing = editTiming
         updateData.is_bold = editIsBold
+        updateData.is_italic = editIsItalic
       } else if (block.block_type === 'image') {
         updateData.image_type = editImageType
 
@@ -749,18 +753,32 @@ export function TextBoxModuleSettings({
                   <option value="after_articles">After Articles (full newsletter context)</option>
                 </select>
               </div>
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <input
-                  type="checkbox"
-                  id={`bold-${editingBlock}`}
-                  checked={editIsBold}
-                  onChange={(e) => setEditIsBold(e.target.checked)}
-                  className="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-gray-300 rounded"
-                />
-                <label htmlFor={`bold-${editingBlock}`} className="text-sm text-gray-700">
-                  <span className="font-medium">Make content bold</span>
-                  <span className="text-gray-500 ml-1">- Renders the entire AI-generated content in bold</span>
-                </label>
+              <div className="flex flex-wrap items-center gap-4 p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id={`bold-${editingBlock}`}
+                    checked={editIsBold}
+                    onChange={(e) => setEditIsBold(e.target.checked)}
+                    className="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor={`bold-${editingBlock}`} className="text-sm text-gray-700">
+                    <span className="font-medium">Bold</span>
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id={`italic-${editingBlock}`}
+                    checked={editIsItalic}
+                    onChange={(e) => setEditIsItalic(e.target.checked)}
+                    className="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor={`italic-${editingBlock}`} className="text-sm text-gray-700">
+                    <span className="font-medium">Italic</span>
+                  </label>
+                </div>
+                <span className="text-xs text-gray-500">Style the AI-generated content</span>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Response Field (optional)</label>
@@ -808,6 +826,9 @@ export function TextBoxModuleSettings({
                 <span>Timing: {block.generation_timing === 'before_articles' ? 'Before Articles' : 'After Articles'}</span>
                 {block.is_bold && (
                   <span className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded font-medium">Bold</span>
+                )}
+                {block.is_italic && (
+                  <span className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded font-medium">Italic</span>
                 )}
                 {(block.ai_prompt_json as any)?.response_field && (
                   <span className="px-2 py-0.5 bg-cyan-100 text-cyan-700 rounded font-medium">
