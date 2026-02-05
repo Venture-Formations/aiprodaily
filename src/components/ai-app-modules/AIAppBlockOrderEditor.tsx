@@ -107,10 +107,12 @@ function SortableBlock({
   config: ProductCardBlockConfig[keyof ProductCardBlockConfig] | undefined
   onToggle: () => void
   onDelete: () => void
-  onSettingChange: (key: string, value: string) => void
+  onSettingChange: (key: string, value: string | boolean) => void
   disabled?: boolean
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [isEditingText, setIsEditingText] = useState(false)
+  const [editTextValue, setEditTextValue] = useState('')
   const isEnabled = config?.enabled ?? true
   const hasSettings = block === 'logo' || block === 'title' || block === 'description' || block === 'tagline' || block === 'button'
   const settingsBadge = getSettingsBadge(block, config)
@@ -269,19 +271,85 @@ function SortableBlock({
 
             {/* Button settings */}
             {block === 'button' && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm text-gray-600">Default Text</label>
-                  <input
-                    type="text"
-                    value={(config as any)?.staticText || ''}
-                    onChange={(e) => onSettingChange('staticText', e.target.value)}
-                    placeholder="Learn More"
-                    disabled={disabled || !isEnabled}
-                    className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 w-40"
-                  />
+              <div className="space-y-4">
+                {/* Default Text with Edit Modal */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-gray-600">Default Text</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-800 max-w-[150px] truncate">
+                        {(config as any)?.staticText || 'Learn More'}
+                      </span>
+                      <button
+                        onClick={() => {
+                          setEditTextValue((config as any)?.staticText || '')
+                          setIsEditingText(true)
+                        }}
+                        disabled={disabled || !isEnabled}
+                        className="px-2 py-1 text-xs text-cyan-600 hover:text-cyan-700 border border-cyan-200 rounded hover:bg-cyan-50 disabled:opacity-50"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Products with custom button text in the database will override this.</p>
                 </div>
-                <p className="text-xs text-gray-500">Products with custom button text in the database will use that instead.</p>
+
+                {/* Append Email Toggle */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-sm text-gray-600">Append Email to Link</label>
+                    <p className="text-xs text-gray-500">Add subscriber email to URL for newsletter signups</p>
+                  </div>
+                  <button
+                    onClick={() => onSettingChange('appendEmail', !(config as any)?.appendEmail)}
+                    disabled={disabled || !isEnabled}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      (config as any)?.appendEmail ? 'bg-cyan-500' : 'bg-gray-300'
+                    } ${disabled || !isEnabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        (config as any)?.appendEmail ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Edit Text Modal */}
+                {isEditingText && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Edit Button Text</h3>
+                      <input
+                        type="text"
+                        value={editTextValue}
+                        onChange={(e) => setEditTextValue(e.target.value)}
+                        placeholder="Learn More"
+                        autoFocus
+                        className="w-full px-4 py-2 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-2">This text will appear on all buttons unless a product has custom text.</p>
+                      <div className="flex justify-end gap-3 mt-6">
+                        <button
+                          onClick={() => setIsEditingText(false)}
+                          className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => {
+                            onSettingChange('staticText', editTextValue)
+                            setIsEditingText(false)
+                          }}
+                          className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -354,7 +422,7 @@ export default function AIAppBlockOrderEditor({
     onConfigChange(newConfig)
   }
 
-  const handleSettingChange = (block: AIAppBlockType, key: string, value: string) => {
+  const handleSettingChange = (block: AIAppBlockType, key: string, value: string | boolean) => {
     const currentConfig = blockConfig[block] || getDefaultBlockConfig(block)
     const newConfig = {
       ...blockConfig,

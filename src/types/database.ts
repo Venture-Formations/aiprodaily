@@ -650,6 +650,7 @@ export interface ProductCardBlockConfig {
   button?: {
     enabled: boolean
     staticText?: string  // Default button text (used when product has no custom button_text)
+    appendEmail?: boolean  // Whether to append subscriber email to the link URL
   }
 }
 

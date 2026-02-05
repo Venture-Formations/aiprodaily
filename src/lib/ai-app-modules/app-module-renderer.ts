@@ -201,9 +201,17 @@ export class AppModuleRenderer {
         const staticText = buttonConfig?.staticText || 'Learn More'
         const buttonText = app.button_text || staticText
 
+        // Optionally append email to URL for newsletter subscriptions
+        let finalUrl = trackingUrl
+        if (buttonConfig?.appendEmail) {
+          // Add email merge tag - works with MailerLite {$email} or similar ESP tags
+          const separator = trackingUrl.includes('?') ? '&' : '?'
+          finalUrl = `${trackingUrl}${separator}email={$email}`
+        }
+
         return `
           <div style="margin-top: 8px;">
-            <a href="${trackingUrl}"
+            <a href="${finalUrl}"
               style="display: inline-block; padding: 8px 16px; background-color: ${styles.primaryColor}; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 14px; font-family: ${styles.bodyFont};">
               ${buttonText}
             </a>
