@@ -20,6 +20,38 @@ export function OffersContent({ logoUrl, newsletterName }: OffersContentProps) {
     }
   }, [email])
 
+  // Listen for messages from AfterOffers iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Log all messages to see what AfterOffers sends
+      if (event.origin.includes('afteroffers')) {
+        console.log('[AfterOffers Event]', event.data)
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+
+    // Track page visibility changes (user switching tabs, etc.)
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log('[AfterOffers] User left offers page')
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    // Track when user is about to leave the page
+    const handleBeforeUnload = () => {
+      console.log('[AfterOffers] User navigating away from offers page')
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    return () => {
+      window.removeEventListener('message', handleMessage)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [])
+
   // Build the AfterOffers URL with the email
   const afterOffersUrl = `https://offers.afteroffers.com/show_offers/994-2MMat6y-1?email=${encodeURIComponent(email)}`
 
