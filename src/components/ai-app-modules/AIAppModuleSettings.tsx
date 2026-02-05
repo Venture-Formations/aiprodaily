@@ -214,14 +214,14 @@ export default function AIAppModuleSettings({
         {/* Module-specific settings */}
         <div className="border border-gray-200 rounded-lg overflow-hidden">
           <div className="p-4 bg-gray-50">
-            <span className="font-medium text-gray-700">App Selection Settings</span>
+            <span className="font-medium text-gray-700">Product Selection Settings</span>
           </div>
           <div className="p-4 space-y-4">
-            {/* Apps per issue */}
+            {/* Products per issue */}
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-gray-700">Apps per Issue</label>
-                <p className="text-xs text-gray-500">Number of apps to include in this section</p>
+                <label className="text-sm font-medium text-gray-700">Products per Issue</label>
+                <p className="text-xs text-gray-500">Number of products to include in this section</p>
               </div>
               <input
                 type="number"

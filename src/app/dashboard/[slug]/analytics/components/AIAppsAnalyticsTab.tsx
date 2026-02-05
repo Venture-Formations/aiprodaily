@@ -91,7 +91,7 @@ export default function AIAppsAnalyticsTab({ slug, excludeIps = true }: Props) {
               onChange={(e) => setAffiliateFilter(e.target.value)}
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
             >
-              <option value="all">All Apps</option>
+              <option value="all">All Products</option>
               <option value="true">Affiliates Only</option>
               <option value="false">Non-Affiliates</option>
             </select>
@@ -183,7 +183,7 @@ export default function AIAppsAnalyticsTab({ slug, excludeIps = true }: Props) {
             <div className="text-2xl font-bold text-orange-600 mb-1">
               {apps.filter(app => app.is_affiliate).length}
             </div>
-            <div className="text-sm text-gray-600">Affiliate Apps</div>
+            <div className="text-sm text-gray-600">Affiliate Products</div>
           </div>
         </div>
       )}
@@ -236,7 +236,7 @@ export default function AIAppsAnalyticsTab({ slug, excludeIps = true }: Props) {
       {/* Apps Table */}
       {apps.length === 0 ? (
         <div className="bg-white shadow rounded-lg p-12 text-center text-gray-500">
-          No AI apps found for the selected filters
+          No product cards found for the selected filters
         </div>
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">

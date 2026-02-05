@@ -91,14 +91,14 @@ export default function AIAppModulesPanel({ issueId }: AIAppModulesPanelProps) {
     return (
       <div className="bg-white rounded-lg shadow mt-8">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">AI App Sections</h2>
+          <h2 className="text-lg font-medium text-gray-900">Product Cards</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Dynamic AI application sections configured in Settings
+            Dynamic product card sections configured in Settings
           </p>
         </div>
         <div className="p-6">
           <p className="text-gray-500 text-sm">
-            No AI app modules configured. Create AI app modules in Settings &gt; Sections.
+            No product cards modules configured. Create product cards modules in Settings &gt; Sections.
           </p>
         </div>
       </div>
@@ -108,9 +108,9 @@ export default function AIAppModulesPanel({ issueId }: AIAppModulesPanelProps) {
   return (
     <div className="bg-white shadow rounded-lg mt-8">
       <div className="px-6 py-4 border-b border-gray-200">
-        <h2 className="text-lg font-medium text-gray-900">AI App Sections</h2>
+        <h2 className="text-lg font-medium text-gray-900">Product Cards</h2>
         <p className="text-sm text-gray-500 mt-1">
-          Dynamic AI application sections configured in Settings
+          Dynamic product card sections configured in Settings
         </p>
       </div>
 
@@ -143,11 +143,11 @@ export default function AIAppModulesPanel({ issueId }: AIAppModulesPanelProps) {
                 <div className="flex items-center space-x-3">
                   {appIds.length > 0 ? (
                     <span className="text-sm text-green-600">
-                      {appIds.length} apps selected
+                      {appIds.length} products selected
                     </span>
                   ) : (
                     <span className="text-sm text-yellow-600">
-                      No apps selected
+                      No products selected
                     </span>
                   )}
                   <svg
@@ -235,9 +235,9 @@ export default function AIAppModulesPanel({ issueId }: AIAppModulesPanelProps) {
                     </div>
                   ) : (
                     <div className="text-center py-4 text-gray-500 text-sm">
-                      No apps have been selected for this module yet.
+                      No products have been selected for this module yet.
                       <br />
-                      Apps will be auto-selected when the workflow runs.
+                      Products will be auto-selected when the workflow runs.
                     </div>
                   )}
 

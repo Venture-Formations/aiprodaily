@@ -219,10 +219,10 @@ export default function AIApplicationsPage() {
         <div className="mb-6 flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              AI Applications Database
+              Product Cards Database
             </h1>
             <p className="text-gray-600">
-              Manage AI tools and applications for accounting professionals
+              Manage product cards and recommendations for your newsletter
             </p>
           </div>
           <div className="flex items-center space-x-3">
@@ -237,7 +237,7 @@ export default function AIApplicationsPage() {
               onClick={() => setShowAddForm(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
             >
-              + Add Application
+              + Add Product
             </button>
           </div>
         </div>
@@ -492,7 +492,7 @@ export default function AIApplicationsPage() {
         <div className="mb-6 grid grid-cols-2 md:grid-cols-6 gap-4">
           <div className="bg-white p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-blue-600">{apps.length}</div>
-            <div className="text-sm text-gray-600">Total Applications</div>
+            <div className="text-sm text-gray-600">Total Products</div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-green-600">
@@ -791,7 +791,7 @@ export default function AIApplicationsPage() {
 
           {filteredApps.length === 0 && (
             <div className="text-center py-12 text-gray-500">
-              No AI applications found. Click "Add Application" to get started.
+              No product cards found. Click &quot;Add Product&quot; to get started.
             </div>
           )}
         </div>

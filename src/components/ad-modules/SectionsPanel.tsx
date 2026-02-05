@@ -136,7 +136,7 @@ function SortableSectionItem({
           )}
           {isAIAppModule && (
             <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-              AI Apps
+              Products
             </span>
           )}
           {isPromptModule && (
@@ -1494,8 +1494,8 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
                       : 'border-gray-200 hover:border-gray-300 text-gray-600'
                   }`}
                 >
-                  <div className="font-medium text-sm">AI Apps</div>
-                  <div className="text-xs mt-1 opacity-75">App showcase</div>
+                  <div className="font-medium text-sm">Product Cards</div>
+                  <div className="text-xs mt-1 opacity-75">Product showcase</div>
                 </button>
                 <button
                   type="button"
@@ -1576,7 +1576,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
                     : newSectionType === 'poll'
                       ? "e.g., Weekly Poll"
                       : newSectionType === 'ai_app'
-                        ? "e.g., AI Tools Spotlight"
+                        ? "e.g., Products Spotlight"
                         : newSectionType === 'prompt'
                           ? "e.g., Prompt of the Day"
                           : newSectionType === 'article'
