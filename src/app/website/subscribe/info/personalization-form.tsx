@@ -111,29 +111,51 @@ export function PersonalizationForm() {
     }
   }
 
-  // Load SparkLoop script and trigger popup on page load
+  // Load SparkLoop script and trigger popup on page load by simulating form submission
   useEffect(() => {
-    if (typeof window === 'undefined' || sparkLoopTriggered.current) return
+    if (typeof window === 'undefined' || sparkLoopTriggered.current || !initialEmail) return
 
     const triggerSparkLoopPopup = () => {
-      // Try to trigger SparkLoop popup
-      if (window.Slb?.show) {
-        console.log('[SparkLoop] Triggering popup via Slb.show()')
-        window.Slb.show()
-        sparkLoopTriggered.current = true
-      } else if (window.Slb?.open) {
-        console.log('[SparkLoop] Triggering popup via Slb.open()')
-        window.Slb.open()
-        sparkLoopTriggered.current = true
-      } else if (window.SparkLoop?.show) {
-        console.log('[SparkLoop] Triggering popup via SparkLoop.show()')
-        window.SparkLoop.show()
-        sparkLoopTriggered.current = true
-      } else if (window.SparkLoop?.open) {
-        console.log('[SparkLoop] Triggering popup via SparkLoop.open()')
-        window.SparkLoop.open()
-        sparkLoopTriggered.current = true
+      if (sparkLoopTriggered.current) return
+
+      console.log('[SparkLoop] Attempting to trigger popup for email:', initialEmail)
+
+      // Create a hidden form that SparkLoop will detect and intercept
+      const hiddenForm = document.createElement('form')
+      hiddenForm.id = 'sparkloop-trigger-form'
+      hiddenForm.style.display = 'none'
+      hiddenForm.setAttribute('data-sparkloop-form', 'true')
+
+      const emailInput = document.createElement('input')
+      emailInput.type = 'email'
+      emailInput.name = 'email'
+      emailInput.value = initialEmail
+      hiddenForm.appendChild(emailInput)
+
+      document.body.appendChild(hiddenForm)
+
+      // Dispatch a submit event that SparkLoop should intercept
+      const submitEvent = new Event('submit', { bubbles: true, cancelable: true })
+      hiddenForm.dispatchEvent(submitEvent)
+
+      // Also try triggering via SparkLoop's visitor tracking if available
+      const win = window as any
+      if (win.SL?.visitor) {
+        console.log('[SparkLoop] Setting visitor email via SL.visitor')
+        win.SL.visitor.email = initialEmail
       }
+
+      // Dispatch custom SparkLoop events
+      document.dispatchEvent(new CustomEvent('sl:form-submitted', {
+        detail: { email: initialEmail }
+      }))
+
+      sparkLoopTriggered.current = true
+
+      // Clean up hidden form after a delay
+      setTimeout(() => {
+        hiddenForm.remove()
+      }, 5000)
     }
 
     // Load SparkLoop script
@@ -147,19 +169,17 @@ export function PersonalizationForm() {
       // Try to trigger popup once script loads
       script.onload = () => {
         console.log('[SparkLoop] Script loaded, attempting to trigger popup...')
-        // Give SparkLoop a moment to initialize
-        setTimeout(triggerSparkLoopPopup, 500)
-        // Retry a few times in case it takes longer to initialize
-        setTimeout(triggerSparkLoopPopup, 1500)
-        setTimeout(triggerSparkLoopPopup, 3000)
+        // Give SparkLoop time to initialize and detect forms
+        setTimeout(triggerSparkLoopPopup, 1000)
+        setTimeout(triggerSparkLoopPopup, 2500)
       }
 
       document.body.appendChild(script)
     } else {
-      // Script already loaded, try to trigger immediately
-      triggerSparkLoopPopup()
+      // Script already loaded, try to trigger
+      setTimeout(triggerSparkLoopPopup, 500)
     }
-  }, [])
+  }, [initialEmail])
 
   return (
     <div className="space-y-6">
