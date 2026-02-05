@@ -120,79 +120,38 @@ export function PersonalizationForm() {
       const win = window as any
 
       console.log('[SparkLoop] Attempting to trigger popup for email:', initialEmail)
-      console.log('[SparkLoop] Available globals:', {
-        SL: !!win.SL,
-        SLConfig: !!win.SLConfig,
-        sparkloop: !!win.sparkloop,
-      })
 
-      // Log all SL properties to find available methods
       if (win.SL) {
-        console.log('[SparkLoop] SL object:', Object.keys(win.SL))
-      }
+        console.log('[SparkLoop] SL methods:', Object.keys(win.SL))
 
-      // Try to set subscriber data directly
-      if (win.SL) {
-        // Set visitor/subscriber email
+        // Set visitor email first
         if (win.SL.visitor) {
           win.SL.visitor.email = initialEmail
           console.log('[SparkLoop] Set SL.visitor.email')
         }
 
-        // Try to call any show/display methods
-        if (typeof win.SL.showWidget === 'function') {
-          win.SL.showWidget()
-          sparkLoopTriggered.current = true
-          return
-        }
-        if (typeof win.SL.show === 'function') {
-          win.SL.show()
-          sparkLoopTriggered.current = true
-          return
-        }
-        if (typeof win.SL.openHub === 'function') {
-          win.SL.openHub()
-          sparkLoopTriggered.current = true
-          return
-        }
-
-        // Try trackSubscriber if available
-        if (typeof win.SL.trackSubscriber === 'function') {
-          win.SL.trackSubscriber({ email: initialEmail })
-          sparkLoopTriggered.current = true
-          return
+        // Try SL.generate(email) - this should generate/show the referral widget
+        if (typeof win.SL.generate === 'function') {
+          console.log('[SparkLoop] Calling SL.generate() with email')
+          try {
+            win.SL.generate(initialEmail)
+            sparkLoopTriggered.current = true
+            return
+          } catch (e) {
+            console.log('[SparkLoop] SL.generate error:', e)
+          }
         }
       }
 
-      // Create a visible form briefly and submit it programmatically
-      const triggerForm = document.createElement('form')
-      triggerForm.id = 'sl-trigger-form'
-      triggerForm.method = 'POST'
-      triggerForm.action = '#'
-      triggerForm.style.cssText = 'position:absolute;left:-9999px;'
-
-      const emailInput = document.createElement('input')
-      emailInput.type = 'email'
-      emailInput.name = 'email'
-      emailInput.id = 'sl-email'
-      emailInput.value = initialEmail
-      triggerForm.appendChild(emailInput)
-
-      const submitBtn = document.createElement('button')
-      submitBtn.type = 'submit'
-      triggerForm.appendChild(submitBtn)
-
-      document.body.appendChild(triggerForm)
-
-      // Let SparkLoop detect the form, then click submit
-      setTimeout(() => {
-        console.log('[SparkLoop] Clicking hidden form submit')
-        submitBtn.click()
-        sparkLoopTriggered.current = true
-
-        // Remove form after attempt
-        setTimeout(() => triggerForm.remove(), 3000)
-      }, 500)
+      // Fallback: submit the actual form with email pre-filled to trigger SparkLoop
+      console.log('[SparkLoop] Fallback: Looking for form to trigger')
+      const forms = document.querySelectorAll('form')
+      forms.forEach((form, i) => {
+        const emailInput = form.querySelector('input[type="email"]') as HTMLInputElement
+        if (emailInput && emailInput.value) {
+          console.log(`[SparkLoop] Found form ${i} with email:`, emailInput.value)
+        }
+      })
     }
 
     // Load SparkLoop script
@@ -205,8 +164,8 @@ export function PersonalizationForm() {
 
       script.onload = () => {
         console.log('[SparkLoop] Script loaded')
-        // Give SparkLoop time to initialize
-        setTimeout(triggerSparkLoopPopup, 1500)
+        // Give SparkLoop time to initialize fully
+        setTimeout(triggerSparkLoopPopup, 2000)
       }
 
       document.body.appendChild(script)
