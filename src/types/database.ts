@@ -680,6 +680,8 @@ export interface AIAppModule {
   // Display settings
   show_emoji: boolean  // Whether to display category-based emoji icons
   show_numbers: boolean  // Whether to display numbered list (1. 2. 3.)
+  // Archive settings
+  include_in_archive: boolean  // Whether this module appears in archived newsletter pages
   created_at: string
   updated_at: string
 }

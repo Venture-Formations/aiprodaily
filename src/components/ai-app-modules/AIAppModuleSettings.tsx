@@ -160,6 +160,19 @@ export default function AIAppModuleSettings({
     }
   }
 
+  const handleIncludeInArchiveToggle = async () => {
+    setSaving(true)
+    try {
+      const newValue = localModule.include_in_archive === false ? true : false
+      await onUpdate({ include_in_archive: newValue })
+      setLocalModule(prev => ({ ...prev, include_in_archive: newValue }))
+    } catch (error) {
+      console.error('Failed to update include_in_archive:', error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleShowEmojiToggle = async () => {
     setSaving(true)
     try {
@@ -424,7 +437,7 @@ export default function AIAppModuleSettings({
             </div>
 
             {/* Show in Directory */}
-            <div className="flex items-center justify-between py-3">
+            <div className="flex items-center justify-between py-3 border-b border-gray-100">
               <div>
                 <label className="text-sm font-medium text-gray-700">Show in Tools Directory</label>
                 <p className="text-xs text-gray-500">Products in this module appear in the public /tools directory</p>
@@ -439,6 +452,27 @@ export default function AIAppModuleSettings({
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                     localModule.show_in_directory !== false ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Include in Archive */}
+            <div className="flex items-center justify-between py-3">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Include in Archive</label>
+                <p className="text-xs text-gray-500">Show this module on archived newsletter pages (/news)</p>
+              </div>
+              <button
+                onClick={handleIncludeInArchiveToggle}
+                disabled={saving}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  localModule.include_in_archive !== false ? 'bg-cyan-500' : 'bg-gray-300'
+                } ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    localModule.include_in_archive !== false ? 'translate-x-6' : 'translate-x-1'
                   }`}
                 />
               </button>

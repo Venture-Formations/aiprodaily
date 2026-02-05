@@ -124,6 +124,11 @@ export async function PATCH(
       updates.show_numbers = Boolean(body.show_numbers)
     }
 
+    // Archive settings
+    if (body.include_in_archive !== undefined) {
+      updates.include_in_archive = Boolean(body.include_in_archive)
+    }
+
     const { data: module, error } = await supabaseAdmin
       .from('ai_app_modules')
       .update(updates)

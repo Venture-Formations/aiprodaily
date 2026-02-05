@@ -120,15 +120,23 @@ export class NewsletterArchiver {
             id,
             name,
             display_order,
-            block_order
+            block_order,
+            include_in_archive
           )
         `)
         .eq('issue_id', issueId)
 
-      if (aiAppModuleSelections && aiAppModuleSelections.length > 0) {
+      // Filter to only modules with include_in_archive = true (or not set, for backwards compat)
+      const archivableModules = aiAppModuleSelections?.filter((selection: any) => {
+        const moduleData = selection.ai_app_module as any
+        const module = Array.isArray(moduleData) ? moduleData[0] : moduleData
+        return module?.include_in_archive !== false
+      }) || []
+
+      if (archivableModules.length > 0) {
         // Collect all app_ids to fetch apps in a single query
         const allAppIds: string[] = []
-        for (const selection of aiAppModuleSelections) {
+        for (const selection of archivableModules) {
           const appIds = selection.app_ids as string[] || []
           allAppIds.push(...appIds)
         }
@@ -147,7 +155,7 @@ export class NewsletterArchiver {
         }
 
         // Structure AI App modules like ad_modules (with display_order and apps per module)
-        sections.ai_app_modules = aiAppModuleSelections.map((selection: any) => {
+        sections.ai_app_modules = archivableModules.map((selection: any) => {
           const moduleData = selection.ai_app_module as any
           const module = Array.isArray(moduleData) ? moduleData[0] : moduleData
           const appIds = selection.app_ids as string[] || []
