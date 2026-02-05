@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import Layout from '@/components/Layout'
-import type { AIApplication } from '@/types/database'
+import type { AIApplication, AIAppModule } from '@/types/database'
 
 export default function AIApplicationsPage() {
   const [apps, setApps] = useState<AIApplication[]>([])
+  const [modules, setModules] = useState<AIAppModule[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<AIApplication>>({})
@@ -20,10 +21,12 @@ export default function AIApplicationsPage() {
     is_active: true,
     is_featured: false,
     is_paid_placement: false,
-    is_affiliate: false
+    is_affiliate: false,
+    ai_app_module_id: null
   })
   const [filterCategory, setFilterCategory] = useState<string>('all')
   const [filterAffiliate, setFilterAffiliate] = useState<string>('all')
+  const [filterModule, setFilterModule] = useState<string>('all')
   const [uploadingCSV, setUploadingCSV] = useState(false)
   const [uploadMessage, setUploadMessage] = useState('')
   const [showUploadModal, setShowUploadModal] = useState(false)
@@ -31,6 +34,7 @@ export default function AIApplicationsPage() {
 
   useEffect(() => {
     fetchApps()
+    fetchModules()
   }, [])
 
   const fetchApps = async () => {
@@ -45,6 +49,18 @@ export default function AIApplicationsPage() {
       console.error('Failed to fetch AI applications:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchModules = async () => {
+    try {
+      const response = await fetch('/api/ai-app-modules')
+      if (response.ok) {
+        const data = await response.json()
+        setModules(data.modules || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch modules:', error)
     }
   }
 
@@ -194,11 +210,21 @@ export default function AIApplicationsPage() {
     const matchesAffiliate = filterAffiliate === 'all' ||
       (filterAffiliate === 'affiliates' && app.is_affiliate) ||
       (filterAffiliate === 'non-affiliates' && !app.is_affiliate)
+    const matchesModule = filterModule === 'all' ||
+      (filterModule === 'unassigned' && !app.ai_app_module_id) ||
+      app.ai_app_module_id === filterModule
     const matchesSearch = searchQuery === '' ||
       app.app_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       app.description?.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesCategory && matchesAffiliate && matchesSearch
+    return matchesCategory && matchesAffiliate && matchesModule && matchesSearch
   })
+
+  // Helper to get module name by ID
+  const getModuleName = (moduleId: string | null) => {
+    if (!moduleId) return null
+    const module = modules.find(m => m.id === moduleId)
+    return module?.name || 'Unknown'
+  }
 
   const categories = ['Payroll', 'HR', 'Accounting System', 'Finance', 'Productivity', 'Client Management', 'Banking']
   const toolTypes = ['Client', 'Firm']
@@ -432,6 +458,22 @@ export default function AIApplicationsPage() {
                   placeholder="https://example.com/logo.png"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Assign to Module
+                </label>
+                <select
+                  value={addForm.ai_app_module_id || ''}
+                  onChange={(e) => setAddForm({ ...addForm, ai_app_module_id: e.target.value || null })}
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                >
+                  <option value="">All Modules (shared)</option>
+                  {modules.map(mod => (
+                    <option key={mod.id} value={mod.id}>{mod.name}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Leave as &quot;All Modules&quot; to share across all Product Card sections</p>
+              </div>
               <div className="flex items-center space-x-4">
                 <label className="flex items-center">
                   <input
@@ -561,6 +603,19 @@ export default function AIApplicationsPage() {
                 <option value="affiliates">Affiliates Only</option>
                 <option value="non-affiliates">Non-Affiliates</option>
               </select>
+
+              <label className="text-sm font-medium text-gray-700 ml-3">Module:</label>
+              <select
+                value={filterModule}
+                onChange={(e) => setFilterModule(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2"
+              >
+                <option value="all">All Modules</option>
+                <option value="unassigned">Unassigned (Shared)</option>
+                {modules.map(mod => (
+                  <option key={mod.id} value={mod.id}>{mod.name}</option>
+                ))}
+              </select>
             </div>
             <span className="text-sm text-gray-600 whitespace-nowrap">
               Showing {filteredApps.length} of {apps.length} applications
@@ -584,6 +639,9 @@ export default function AIApplicationsPage() {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Tool Type
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Module
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
@@ -644,6 +702,18 @@ export default function AIApplicationsPage() {
                         >
                           {toolTypes.map(type => (
                             <option key={type} value={type}>{type}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-6 py-4">
+                        <select
+                          value={editForm.ai_app_module_id || ''}
+                          onChange={(e) => setEditForm({ ...editForm, ai_app_module_id: e.target.value || null })}
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                        >
+                          <option value="">All (shared)</option>
+                          {modules.map(mod => (
+                            <option key={mod.id} value={mod.id}>{mod.name}</option>
                           ))}
                         </select>
                       </td>
@@ -742,6 +812,15 @@ export default function AIApplicationsPage() {
                         <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
                           {app.tool_type || 'Client'}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {app.ai_app_module_id ? (
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">
+                            {getModuleName(app.ai_app_module_id)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">All (shared)</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {app.is_active ? (
