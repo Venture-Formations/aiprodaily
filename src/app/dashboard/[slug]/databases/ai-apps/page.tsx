@@ -464,7 +464,11 @@ export default function AIApplicationsPage() {
                 </label>
                 <select
                   value={addForm.ai_app_module_id || ''}
-                  onChange={(e) => setAddForm({ ...addForm, ai_app_module_id: e.target.value || null })}
+                  onChange={(e) => setAddForm({
+                    ...addForm,
+                    ai_app_module_id: e.target.value || null,
+                    pinned_position: e.target.value ? addForm.pinned_position : null
+                  })}
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 >
                   <option value="">All Modules (shared)</option>
@@ -473,6 +477,25 @@ export default function AIApplicationsPage() {
                   ))}
                 </select>
                 <p className="text-xs text-gray-500 mt-1">Leave as &quot;All Modules&quot; to share across all Product Card sections</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Pinned Position {!addForm.ai_app_module_id && <span className="text-gray-400 font-normal">(requires module)</span>}
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={addForm.pinned_position || ''}
+                  onChange={(e) => setAddForm({
+                    ...addForm,
+                    pinned_position: e.target.value ? parseInt(e.target.value) : null
+                  })}
+                  disabled={!addForm.ai_app_module_id}
+                  placeholder={addForm.ai_app_module_id ? "Not pinned" : "Select module first"}
+                  className={`w-full border border-gray-300 rounded px-3 py-2 ${!addForm.ai_app_module_id ? 'bg-gray-100 text-gray-400' : ''}`}
+                />
+                <p className="text-xs text-gray-500 mt-1">Pin to position 1-20 within the selected module</p>
               </div>
               <div className="flex items-center space-x-4">
                 <label className="flex items-center">
@@ -708,7 +731,11 @@ export default function AIApplicationsPage() {
                       <td className="px-6 py-4">
                         <select
                           value={editForm.ai_app_module_id || ''}
-                          onChange={(e) => setEditForm({ ...editForm, ai_app_module_id: e.target.value || null })}
+                          onChange={(e) => setEditForm({
+                            ...editForm,
+                            ai_app_module_id: e.target.value || null,
+                            pinned_position: e.target.value ? editForm.pinned_position : null
+                          })}
                           className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
                         >
                           <option value="">All (shared)</option>
@@ -765,10 +792,13 @@ export default function AIApplicationsPage() {
                             ...editForm,
                             pinned_position: e.target.value ? parseInt(e.target.value) : null
                           })}
-                          placeholder="Not pinned"
-                          className="w-20 border border-gray-300 rounded px-2 py-1 text-sm"
+                          disabled={!editForm.ai_app_module_id}
+                          placeholder={editForm.ai_app_module_id ? "Not pinned" : "N/A"}
+                          className={`w-20 border border-gray-300 rounded px-2 py-1 text-sm ${!editForm.ai_app_module_id ? 'bg-gray-100 text-gray-400' : ''}`}
                         />
-                        <p className="text-xs text-gray-500 mt-1">1-20</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {editForm.ai_app_module_id ? '1-20' : 'Needs module'}
+                        </p>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <button
@@ -839,12 +869,14 @@ export default function AIApplicationsPage() {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {app.pinned_position ? (
+                        {app.pinned_position && app.ai_app_module_id ? (
                           <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
-                            📌 Position {app.pinned_position}
+                            📌 #{app.pinned_position}
                           </span>
-                        ) : (
+                        ) : app.ai_app_module_id ? (
                           <span className="text-gray-400">-</span>
+                        ) : (
+                          <span className="text-gray-300 text-xs">N/A</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
