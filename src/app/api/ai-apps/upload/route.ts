@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File
+    const moduleId = formData.get('module_id') as string | null
 
     if (!file) {
       return NextResponse.json(
@@ -101,7 +102,8 @@ export async function POST(request: NextRequest) {
           is_paid_placement: false,
           is_affiliate: isAffiliate,
           category_priority: 0,
-          times_used: 0
+          times_used: 0,
+          ai_app_module_id: moduleId || null
         }
 
         // Validate required fields
@@ -147,28 +149,38 @@ export async function POST(request: NextRequest) {
       // Get all existing apps for this newsletter to check for duplicates
       const { data: existingApps } = await supabaseAdmin
         .from('ai_applications')
-        .select('id, app_name, app_url')
+        .select('id, app_name, app_url, ai_app_module_id')
         .eq('publication_id', newsletter.id)
 
       const existingAppMap = new Map(
         existingApps?.map(app => [app.app_name.toLowerCase(), app]) || []
       )
 
+      // If module_id specified, we'll assign it to apps that don't have one
+      const assignModuleId = moduleId || null
+
       for (const app of apps) {
         const existingApp = existingAppMap.get(app.app_name.toLowerCase())
 
         if (existingApp) {
           // Update existing app
+          const updateData: any = {
+            category: app.category,
+            tool_type: app.tool_type,
+            app_url: app.app_url,
+            description: app.description,
+            tagline: app.tagline,
+            is_affiliate: app.is_affiliate
+          }
+
+          // If a module was specified and the existing app doesn't have one, assign it
+          if (assignModuleId && !existingApp.ai_app_module_id) {
+            updateData.ai_app_module_id = assignModuleId
+          }
+
           const { error } = await supabaseAdmin
             .from('ai_applications')
-            .update({
-              category: app.category,
-              tool_type: app.tool_type,
-              app_url: app.app_url,
-              description: app.description,
-              tagline: app.tagline,
-              is_affiliate: app.is_affiliate
-            })
+            .update(updateData)
             .eq('id', existingApp.id)
 
           if (error) {

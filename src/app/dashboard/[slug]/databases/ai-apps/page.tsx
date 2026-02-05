@@ -30,6 +30,7 @@ export default function AIApplicationsPage() {
   const [uploadingCSV, setUploadingCSV] = useState(false)
   const [uploadMessage, setUploadMessage] = useState('')
   const [showUploadModal, setShowUploadModal] = useState(false)
+  const [uploadModuleId, setUploadModuleId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
@@ -151,6 +152,9 @@ export default function AIApplicationsPage() {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      if (uploadModuleId) {
+        formData.append('module_id', uploadModuleId)
+      }
 
       const response = await fetch('/api/ai-apps/upload', {
         method: 'POST',
@@ -354,6 +358,27 @@ export default function AIApplicationsPage() {
                     <li>All new apps will be set to Active by default</li>
                     <li><strong>Duplicate handling:</strong> Apps with matching names will be updated (not duplicated)</li>
                   </ul>
+                </div>
+
+                {/* Module Assignment Dropdown */}
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    Assign Imported Products to Section (Optional)
+                  </label>
+                  <select
+                    value={uploadModuleId || ''}
+                    onChange={(e) => setUploadModuleId(e.target.value || null)}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Don&apos;t assign to any section (shared)</option>
+                    {modules.map(mod => (
+                      <option key={mod.id} value={mod.id}>{mod.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-sm text-gray-600 mt-2">
+                    Products without a module assignment will be assigned to the selected section.
+                    Leave as &quot;Don&apos;t assign&quot; to keep them shared across all sections.
+                  </p>
                 </div>
 
                 <div className="flex justify-between items-center gap-4">
