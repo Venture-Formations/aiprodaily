@@ -1,7 +1,21 @@
 'use client'
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useSearchParams } from "next/navigation"
+
+// Declare SparkLoop global for TypeScript
+declare global {
+  interface Window {
+    Slb?: {
+      show?: () => void;
+      open?: () => void;
+    };
+    SparkLoop?: {
+      show?: () => void;
+      open?: () => void;
+    };
+  }
+}
 
 const JOB_TYPE_OPTIONS = [
   { value: 'partner_owner', label: 'Partner/Owner' },
@@ -30,6 +44,7 @@ export function PersonalizationForm() {
   const [yearlyClients, setYearlyClients] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const sparkLoopTriggered = useRef(false)
 
   // Show error if no email provided
   useEffect(() => {
@@ -84,9 +99,8 @@ export function PersonalizationForm() {
       const data = await response.json()
 
       if (response.ok) {
-        // SparkLoop will detect the form submission and show popup automatically
-        // Wait for popup to close before redirecting
-        waitForSparkLoopPopupClose()
+        // Redirect to AfterOffers with subscriber email
+        window.location.href = `https://offers.afteroffers.com/show_offers/994-2MMat6y-1?email=${encodeURIComponent(email)}`
       } else {
         setError(data.error || 'Update failed. Please try again.')
         setIsSubmitting(false)
@@ -97,109 +111,55 @@ export function PersonalizationForm() {
     }
   }
 
-  // SparkLoop will auto-detect the form submission since the form has an email field
-  // We just need to load the script on this page
+  // Load SparkLoop script and trigger popup on page load
   useEffect(() => {
-    // Load SparkLoop script when page loads so it can track the form
-    if (typeof window !== 'undefined' && !document.getElementById('sparkloop-script')) {
+    if (typeof window === 'undefined' || sparkLoopTriggered.current) return
+
+    const triggerSparkLoopPopup = () => {
+      // Try to trigger SparkLoop popup
+      if (window.Slb?.show) {
+        console.log('[SparkLoop] Triggering popup via Slb.show()')
+        window.Slb.show()
+        sparkLoopTriggered.current = true
+      } else if (window.Slb?.open) {
+        console.log('[SparkLoop] Triggering popup via Slb.open()')
+        window.Slb.open()
+        sparkLoopTriggered.current = true
+      } else if (window.SparkLoop?.show) {
+        console.log('[SparkLoop] Triggering popup via SparkLoop.show()')
+        window.SparkLoop.show()
+        sparkLoopTriggered.current = true
+      } else if (window.SparkLoop?.open) {
+        console.log('[SparkLoop] Triggering popup via SparkLoop.open()')
+        window.SparkLoop.open()
+        sparkLoopTriggered.current = true
+      }
+    }
+
+    // Load SparkLoop script
+    if (!document.getElementById('sparkloop-script')) {
       const script = document.createElement('script')
       script.id = 'sparkloop-script'
       script.src = 'https://js.sparkloop.app/embed.js?publication_id=pub_6b958dc16ac6'
       script.async = true
       script.setAttribute('data-sparkloop', '')
+
+      // Try to trigger popup once script loads
+      script.onload = () => {
+        console.log('[SparkLoop] Script loaded, attempting to trigger popup...')
+        // Give SparkLoop a moment to initialize
+        setTimeout(triggerSparkLoopPopup, 500)
+        // Retry a few times in case it takes longer to initialize
+        setTimeout(triggerSparkLoopPopup, 1500)
+        setTimeout(triggerSparkLoopPopup, 3000)
+      }
+
       document.body.appendChild(script)
+    } else {
+      // Script already loaded, try to trigger immediately
+      triggerSparkLoopPopup()
     }
   }, [])
-
-  const waitForSparkLoopPopupClose = () => {
-    // Wait for SparkLoop popup to appear, then wait for it to close
-    let popupDetected = false
-    let initialBodyChildCount = document.body.children.length
-    let checkCount = 0
-    const maxWaitTime = 180 // 3 minutes max
-
-    const checkInterval = setInterval(() => {
-      checkCount++
-
-      // SparkLoop adds elements to the body when showing popup
-      // Look specifically for popup/overlay elements, NOT forms
-      const sparkloopIframe = document.querySelector('iframe[src*="sparkloop"]') ||
-                              document.querySelector('iframe[src*="upscribe"]')
-
-      // Look for fixed/absolute positioned overlays (popups typically use these)
-      const overlayElements = document.querySelectorAll('body > div')
-      let hasPopupOverlay = false
-
-      overlayElements.forEach((el) => {
-        const style = window.getComputedStyle(el)
-        const isOverlay = style.position === 'fixed' ||
-                         (style.position === 'absolute' && style.zIndex && parseInt(style.zIndex) > 1000)
-        if (isOverlay && !el.id?.includes('sparkloop-script')) {
-          hasPopupOverlay = true
-        }
-      })
-
-      // Check if body has more children than initially (SparkLoop injects popup)
-      const currentBodyChildCount = document.body.children.length
-      const hasNewElements = currentBodyChildCount > initialBodyChildCount
-
-      const popupExists = sparkloopIframe || hasPopupOverlay || hasNewElements
-
-      // Debug logging
-      if (checkCount <= 5 || checkCount % 10 === 0) {
-        console.log('[SparkLoop] Checking for popup:', {
-          popupExists,
-          popupDetected,
-          checkCount,
-          hasPopupOverlay,
-          hasNewElements,
-          bodyChildren: currentBodyChildCount,
-          initialChildren: initialBodyChildCount
-        })
-      }
-
-      if (popupExists && !popupDetected) {
-        popupDetected = true
-        // Update initial count now that popup is detected
-        console.log('[SparkLoop] Popup detected!')
-      }
-
-      // If popup was detected, check if the new elements are gone
-      if (popupDetected) {
-        // Give it a moment, then check if overlay is gone
-        if (!hasPopupOverlay && !sparkloopIframe) {
-          // Double-check after a short delay
-          setTimeout(() => {
-            const stillHasOverlay = Array.from(document.querySelectorAll('body > div')).some((el) => {
-              const style = window.getComputedStyle(el)
-              return style.position === 'fixed' ||
-                     (style.position === 'absolute' && style.zIndex && parseInt(style.zIndex) > 1000)
-            })
-
-            if (!stillHasOverlay) {
-              console.log('[SparkLoop] Popup closed, redirecting...')
-              clearInterval(checkInterval)
-              window.location.href = '/'
-            }
-          }, 500)
-        }
-      }
-
-      // If no popup detected after 15 seconds, redirect anyway
-      if (!popupDetected && checkCount >= 15) {
-        console.log('[SparkLoop] No popup detected after 15s, redirecting...')
-        clearInterval(checkInterval)
-        window.location.href = '/'
-        return
-      }
-
-      // Timeout after max wait time
-      if (checkCount >= maxWaitTime) {
-        clearInterval(checkInterval)
-        window.location.href = '/'
-      }
-    }, 1000)
-  }
 
   return (
     <div className="space-y-6">
