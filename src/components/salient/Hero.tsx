@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Container } from '@/components/salient/Container'
 
 // Declare fbq for TypeScript
@@ -54,6 +54,85 @@ export function Hero() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
 
+  // Load SparkLoop script on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!document.getElementById('sparkloop-script')) {
+      const script = document.createElement('script')
+      script.id = 'sparkloop-script'
+      script.src = 'https://js.sparkloop.app/embed.js?publication_id=pub_6b958dc16ac6'
+      script.async = true
+      script.setAttribute('data-sparkloop', '')
+      document.body.appendChild(script)
+    }
+  }, [])
+
+  // Wait for SparkLoop popup to close then redirect
+  const waitForSparkLoopPopupClose = (emailToRedirect: string) => {
+    let popupDetected = false
+    let checkCount = 0
+    const maxWaitTime = 180 // 3 minutes max
+
+    const checkInterval = setInterval(() => {
+      checkCount++
+
+      // Look for SparkLoop popup elements
+      const sparkloopIframe = document.querySelector('iframe[src*="sparkloop"]') ||
+                              document.querySelector('iframe[src*="upscribe"]')
+
+      // Look for fixed/absolute positioned overlays
+      const overlayElements = document.querySelectorAll('body > div')
+      let hasPopupOverlay = false
+
+      overlayElements.forEach((el) => {
+        const style = window.getComputedStyle(el)
+        const isOverlay = style.position === 'fixed' ||
+                         (style.position === 'absolute' && style.zIndex && parseInt(style.zIndex) > 1000)
+        if (isOverlay && !el.id?.includes('sparkloop-script')) {
+          hasPopupOverlay = true
+        }
+      })
+
+      const popupExists = sparkloopIframe || hasPopupOverlay
+
+      if (popupExists && !popupDetected) {
+        popupDetected = true
+        console.log('[SparkLoop] Popup detected!')
+      }
+
+      // If popup was detected and is now gone, redirect
+      if (popupDetected && !hasPopupOverlay && !sparkloopIframe) {
+        setTimeout(() => {
+          const stillHasOverlay = Array.from(document.querySelectorAll('body > div')).some((el) => {
+            const style = window.getComputedStyle(el)
+            return style.position === 'fixed' ||
+                   (style.position === 'absolute' && style.zIndex && parseInt(style.zIndex) > 1000)
+          })
+
+          if (!stillHasOverlay) {
+            console.log('[SparkLoop] Popup closed, redirecting...')
+            clearInterval(checkInterval)
+            window.location.href = `/subscribe/info?email=${encodeURIComponent(emailToRedirect)}`
+          }
+        }, 500)
+      }
+
+      // If no popup detected after 10 seconds, redirect anyway
+      if (!popupDetected && checkCount >= 10) {
+        console.log('[SparkLoop] No popup detected after 10s, redirecting...')
+        clearInterval(checkInterval)
+        window.location.href = `/subscribe/info?email=${encodeURIComponent(emailToRedirect)}`
+        return
+      }
+
+      // Timeout after max wait time
+      if (checkCount >= maxWaitTime) {
+        clearInterval(checkInterval)
+        window.location.href = `/subscribe/info?email=${encodeURIComponent(emailToRedirect)}`
+      }
+    }, 1000)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!email || !email.includes('@')) {
@@ -85,8 +164,9 @@ export function Hero() {
           window.fbq('track', 'Lead')
         }
 
-        // Redirect to personalization form with email parameter
-        window.location.href = `/subscribe/info?email=${encodeURIComponent(email)}`
+        // SparkLoop will detect the form submission and show popup
+        // Wait for popup to close before redirecting
+        waitForSparkLoopPopupClose(email)
       } else {
         setError(data.error || 'Subscription failed. Please try again.')
         setIsSubmitting(false)

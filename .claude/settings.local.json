@@ -107,7 +107,9 @@
       "Bash(git status:*)",
       "Bash(cd:*)",
       "mcp__mailerlite__list_fields",
-      "mcp__mailerlite__list_subscribers"
+      "mcp__mailerlite__list_subscribers",
+      "WebFetch(domain:js.sparkloop.app)",
+      "WebFetch(domain:script.sparkloop.app)"
     ],
     "deny": [],
     "ask": []

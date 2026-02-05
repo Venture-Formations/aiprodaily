@@ -1,21 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-
-// Declare SparkLoop global for TypeScript
-declare global {
-  interface Window {
-    Slb?: {
-      show?: () => void;
-      open?: () => void;
-    };
-    SparkLoop?: {
-      show?: () => void;
-      open?: () => void;
-    };
-  }
-}
 
 const JOB_TYPE_OPTIONS = [
   { value: 'partner_owner', label: 'Partner/Owner' },
@@ -44,7 +30,6 @@ export function PersonalizationForm() {
   const [yearlyClients, setYearlyClients] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const sparkLoopTriggered = useRef(false)
 
   // Show error if no email provided
   useEffect(() => {
@@ -111,58 +96,6 @@ export function PersonalizationForm() {
     }
   }
 
-  // Load SparkLoop script on page load
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    // Load SparkLoop script
-    if (!document.getElementById('sparkloop-script')) {
-      const script = document.createElement('script')
-      script.id = 'sparkloop-script'
-      script.src = 'https://js.sparkloop.app/embed.js?publication_id=pub_6b958dc16ac6'
-      script.async = true
-      script.setAttribute('data-sparkloop', '')
-      script.onload = () => console.log('[SparkLoop] Script loaded')
-      document.body.appendChild(script)
-    }
-  }, [])
-
-  // Trigger SparkLoop when user clicks into first name field
-  const handleFirstNameFocus = () => {
-    if (sparkLoopTriggered.current || !initialEmail) return
-    sparkLoopTriggered.current = true
-
-    console.log('[SparkLoop] First name focused, triggering popup for:', initialEmail)
-
-    // Create and submit a hidden form to trigger SparkLoop
-    const triggerForm = document.createElement('form')
-    triggerForm.id = 'sl-trigger-form'
-    triggerForm.style.cssText = 'position:absolute;left:-9999px;opacity:0;'
-
-    const emailInput = document.createElement('input')
-    emailInput.type = 'email'
-    emailInput.name = 'email'
-    emailInput.value = initialEmail
-    triggerForm.appendChild(emailInput)
-
-    const submitBtn = document.createElement('button')
-    submitBtn.type = 'submit'
-    triggerForm.appendChild(submitBtn)
-
-    document.body.appendChild(triggerForm)
-
-    // Give SparkLoop a moment to detect the form, then submit
-    setTimeout(() => {
-      console.log('[SparkLoop] Submitting trigger form')
-      submitBtn.click()
-    }, 100)
-
-    // Clean up after a delay
-    setTimeout(() => {
-      const form = document.getElementById('sl-trigger-form')
-      if (form) form.remove()
-    }, 5000)
-  }
 
   return (
     <div className="space-y-6">
@@ -202,7 +135,6 @@ export function PersonalizationForm() {
               required
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
-              onFocus={handleFirstNameFocus}
               disabled={isSubmitting || !email}
               placeholder="John"
               className="w-full rounded-lg border-0 bg-white px-4 py-3 text-slate-900 shadow-lg ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
