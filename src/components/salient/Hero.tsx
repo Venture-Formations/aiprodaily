@@ -54,9 +54,28 @@ export function Hero() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // Load SparkLoop script on mount
+  // Load SparkLoop script on mount and set up event listeners
   useEffect(() => {
     if (typeof window === 'undefined') return
+
+    // Listen for SparkLoop events
+    const handleSparkLoopEvent = (e: Event) => {
+      const customEvent = e as CustomEvent
+      console.log('[SparkLoop Event]', e.type, customEvent.detail)
+
+      // Track the event (you can send this to your analytics)
+      if (e.type === 'sl:subscriber-updated') {
+        console.log('[SparkLoop] User subscribed to recommendations')
+      }
+    }
+
+    // SparkLoop custom events
+    document.addEventListener('sl:subscriber-updated', handleSparkLoopEvent)
+    document.addEventListener('sl:form-submitted', handleSparkLoopEvent)
+    document.addEventListener('sl:referrer-tracked', handleSparkLoopEvent)
+    document.addEventListener('sl:widget-closed', handleSparkLoopEvent)
+    document.addEventListener('sl:widget-opened', handleSparkLoopEvent)
+
     if (!document.getElementById('sparkloop-script')) {
       const script = document.createElement('script')
       script.id = 'sparkloop-script'
@@ -64,6 +83,14 @@ export function Hero() {
       script.async = true
       script.setAttribute('data-sparkloop', '')
       document.body.appendChild(script)
+    }
+
+    return () => {
+      document.removeEventListener('sl:subscriber-updated', handleSparkLoopEvent)
+      document.removeEventListener('sl:form-submitted', handleSparkLoopEvent)
+      document.removeEventListener('sl:referrer-tracked', handleSparkLoopEvent)
+      document.removeEventListener('sl:widget-closed', handleSparkLoopEvent)
+      document.removeEventListener('sl:widget-opened', handleSparkLoopEvent)
     }
   }, [])
 
