@@ -164,17 +164,6 @@ function SortableBlock({
         </div>
 
         <div className="flex items-center gap-3">
-          {/* View/Edit link */}
-          {hasSettings && (
-            <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              disabled={disabled}
-              className={`text-sm font-medium ${isEnabled ? 'text-cyan-600 hover:text-cyan-700' : 'text-gray-400'}`}
-            >
-              View/Edit
-            </button>
-          )}
-
           {/* Enable/disable toggle */}
           <button
             onClick={onToggle}
