@@ -624,7 +624,7 @@ export class FeedbackModuleSelector {
     // Build query for votes (include ip_address for filtering)
     let query = supabaseAdmin
       .from('feedback_votes')
-      .select('issue_id, selected_value, selected_label, voted_at, ip_address')
+      .select('issue_id, selected_value, selected_label, voted_at, ip_address, subscriber_email')
       .eq('feedback_module_id', module.id)
       .not('issue_id', 'is', null)
 
@@ -710,22 +710,24 @@ export class FeedbackModuleSelector {
     for (const [issueId, issueVotes] of Object.entries(votesByIssue)) {
       const total = issueVotes.length
       let totalScore = 0
-      const countsByValue: Record<number, { label: string; count: number }> = {}
+      const countsByValue: Record<number, { label: string; count: number; emails: string[] }> = {}
 
       for (const vote of issueVotes) {
         if (!countsByValue[vote.selected_value]) {
-          countsByValue[vote.selected_value] = { label: vote.selected_label, count: 0 }
+          countsByValue[vote.selected_value] = { label: vote.selected_label, count: 0, emails: [] }
         }
         countsByValue[vote.selected_value].count++
+        countsByValue[vote.selected_value].emails.push(vote.subscriber_email)
         totalScore += vote.selected_value
       }
 
       const breakdown: FeedbackVoteBreakdown[] = Object.entries(countsByValue)
-        .map(([value, { label, count }]) => ({
+        .map(([value, { label, count, emails }]) => ({
           value: parseInt(value),
           label,
           count,
-          percentage: Math.round((count / total) * 100)
+          percentage: Math.round((count / total) * 100),
+          emails: emails.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
         }))
         .sort((a, b) => b.value - a.value)
 

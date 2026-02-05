@@ -1763,6 +1763,7 @@ export interface FeedbackVoteBreakdown {
   label: string
   count: number
   percentage: number
+  emails?: string[]  // Subscriber emails who voted this rating (for dashboard)
 }
 
 export interface FeedbackIssueStats {

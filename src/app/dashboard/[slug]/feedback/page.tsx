@@ -28,6 +28,7 @@ export default function FeedbackDashboardPage() {
   const [analytics, setAnalytics] = useState<FeedbackAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [expandedIssue, setExpandedIssue] = useState<string | null>(null)
+  const [expandedRating, setExpandedRating] = useState<string | null>(null) // Format: "issueId-value"
   const [markingRead, setMarkingRead] = useState<Set<string>>(new Set())
 
   // Fetch publication ID from slug
@@ -274,30 +275,63 @@ export default function FeedbackDashboardPage() {
                       {/* Expanded Details */}
                       {expandedIssue === stat.issue_id && (
                         <div className="mt-4 pt-4 border-t border-gray-100">
-                          <div className="space-y-3">
-                            {stat.vote_breakdown.map((option) => (
-                              <div key={option.value} className="flex items-center gap-4">
-                                <div className="w-24 flex items-center gap-2">
-                                  <span className="text-amber-400">{generateStars(option.value)}</span>
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
-                                      <div
-                                        className="h-full bg-cyan-600 rounded-full"
-                                        style={{ width: `${option.percentage}%` }}
-                                      />
+                          <div className="space-y-2">
+                            {stat.vote_breakdown.map((option) => {
+                              const ratingKey = `${stat.issue_id}-${option.value}`
+                              const isRatingExpanded = expandedRating === ratingKey
+                              return (
+                                <div key={option.value}>
+                                  <div
+                                    className="flex items-center gap-4 cursor-pointer hover:bg-gray-50 p-2 rounded -mx-2"
+                                    onClick={() => setExpandedRating(isRatingExpanded ? null : ratingKey)}
+                                  >
+                                    <div className="w-24 flex items-center gap-2">
+                                      <span className="text-amber-400">{generateStars(option.value)}</span>
                                     </div>
-                                    <span className="text-sm text-gray-600 w-16 text-right">
-                                      {option.percentage}%
-                                    </span>
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <div className="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
+                                          <div
+                                            className="h-full bg-cyan-600 rounded-full"
+                                            style={{ width: `${option.percentage}%` }}
+                                          />
+                                        </div>
+                                        <span className="text-sm text-gray-600 w-16 text-right">
+                                          {option.percentage}%
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="w-24 text-right">
+                                      <span className="text-sm text-gray-500">{option.count} votes</span>
+                                    </div>
+                                    <svg
+                                      className={`w-4 h-4 text-gray-400 transition-transform ${isRatingExpanded ? 'rotate-180' : ''}`}
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
                                   </div>
+                                  {/* Expanded email list */}
+                                  {isRatingExpanded && option.emails && option.emails.length > 0 && (
+                                    <div className="ml-28 mt-2 mb-3 p-3 bg-gray-50 rounded-lg">
+                                      <p className="text-xs text-gray-500 mb-2">Subscribers who voted {option.value} star{option.value !== 1 ? 's' : ''}:</p>
+                                      <div className="flex flex-wrap gap-2">
+                                        {option.emails.map((email) => (
+                                          <span
+                                            key={email}
+                                            className="text-xs bg-white px-2 py-1 rounded border border-gray-200 text-gray-700"
+                                          >
+                                            {email}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
-                                <div className="w-24 text-right">
-                                  <span className="text-sm text-gray-500">{option.count} votes</span>
-                                </div>
-                              </div>
-                            ))}
+                              )
+                            })}
                           </div>
                         </div>
                       )}
