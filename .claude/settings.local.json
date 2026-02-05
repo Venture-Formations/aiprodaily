@@ -109,7 +109,9 @@
       "mcp__mailerlite__list_fields",
       "mcp__mailerlite__list_subscribers",
       "WebFetch(domain:js.sparkloop.app)",
-      "WebFetch(domain:script.sparkloop.app)"
+      "WebFetch(domain:script.sparkloop.app)",
+      "WebFetch(domain:docs.sparkloop.app)",
+      "WebFetch(domain:help.sparkloop.app)"
     ],
     "deny": [],
     "ask": []

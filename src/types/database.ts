@@ -93,6 +93,9 @@ export interface AIApplication {
   // Module assignment (for AI App Modules system)
   ai_app_module_id: string | null  // Links to ai_app_modules. NULL = available for any module
   priority: number  // Higher priority = selected first in affiliate_priority mode
+
+  // Pinning (Product Cards)
+  pinned_position: number | null  // 1-based position for globally pinned apps. NULL = not pinned.
 }
 
 export interface IssueAIAppSelection {
@@ -608,10 +611,15 @@ export interface IssuePollModule {
   poll?: Poll
 }
 
-// AI App Module Types
+// AI App Module Types (Product Cards)
 export type AIAppBlockType = 'title' | 'logo' | 'image' | 'tagline' | 'description' | 'button'
 
 export type AIAppSelectionMode = 'affiliate_priority' | 'random' | 'manual'
+
+// Product Card Layout Settings
+export type ProductCardLayoutMode = 'stacked' | 'inline'
+export type ProductCardLogoStyle = 'round' | 'square'
+export type ProductCardTextSize = 'small' | 'medium' | 'large'
 
 export interface AIAppModule {
   id: string
@@ -627,6 +635,11 @@ export interface AIAppModule {
   max_per_category: number
   affiliate_cooldown_days: number
   next_position: number
+  // Layout settings (Product Cards)
+  layout_mode: ProductCardLayoutMode
+  logo_style: ProductCardLogoStyle
+  title_size: ProductCardTextSize
+  description_size: ProductCardTextSize
   created_at: string
   updated_at: string
 }
@@ -639,6 +652,8 @@ export interface IssueAIAppModule {
   selection_mode?: AIAppSelectionMode
   selected_at: string
   used_at: string | null
+  // Per-issue pinning overrides (Product Cards)
+  pinned_overrides: Record<string, number | null>  // {"app_id": position|null}. null = explicit unpin for this issue.
   // Joined relations
   ai_app_module?: AIAppModule
   apps?: AIApplication[]

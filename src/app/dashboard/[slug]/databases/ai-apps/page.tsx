@@ -589,6 +589,9 @@ export default function AIApplicationsPage() {
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Pinned
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -682,6 +685,21 @@ export default function AIApplicationsPage() {
                           Affiliate
                         </label>
                       </td>
+                      <td className="px-6 py-4">
+                        <input
+                          type="number"
+                          min="1"
+                          max="20"
+                          value={editForm.pinned_position || ''}
+                          onChange={(e) => setEditForm({
+                            ...editForm,
+                            pinned_position: e.target.value ? parseInt(e.target.value) : null
+                          })}
+                          placeholder="Not pinned"
+                          className="w-20 border border-gray-300 rounded px-2 py-1 text-sm"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">1-20</p>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <button
                           onClick={() => handleSave(app.id)}
@@ -739,6 +757,15 @@ export default function AIApplicationsPage() {
                         )}
                         {app.is_affiliate && (
                           <span className="block text-blue-600 text-xs font-semibold">$ Affiliate</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {app.pinned_position ? (
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                            📌 Position {app.pinned_position}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">

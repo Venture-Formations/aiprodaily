@@ -56,12 +56,31 @@ export async function PATCH(
     const { id } = params
     const body = await request.json()
 
+    // Build update object with validation
+    const updates: Record<string, unknown> = {
+      ...body,
+      updated_at: new Date().toISOString()
+    }
+
+    // Validate pinned_position (must be 1-20 or null)
+    if ('pinned_position' in body) {
+      if (body.pinned_position === null || body.pinned_position === '') {
+        updates.pinned_position = null
+      } else {
+        const position = parseInt(body.pinned_position)
+        if (isNaN(position) || position < 1 || position > 20) {
+          return NextResponse.json(
+            { success: false, error: 'Pinned position must be between 1 and 20' },
+            { status: 400 }
+          )
+        }
+        updates.pinned_position = position
+      }
+    }
+
     const { data: app, error } = await supabaseAdmin
       .from('ai_applications')
-      .update({
-        ...body,
-        updated_at: new Date().toISOString()
-      })
+      .update(updates)
       .eq('id', id)
       .select()
       .single()

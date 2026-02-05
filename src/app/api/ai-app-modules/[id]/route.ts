@@ -83,6 +83,28 @@ export async function PATCH(
       updates.next_position = Math.max(1, body.next_position)
     }
 
+    // Layout settings (Product Cards)
+    if (body.layout_mode !== undefined) {
+      if (['stacked', 'inline'].includes(body.layout_mode)) {
+        updates.layout_mode = body.layout_mode
+      }
+    }
+    if (body.logo_style !== undefined) {
+      if (['round', 'square'].includes(body.logo_style)) {
+        updates.logo_style = body.logo_style
+      }
+    }
+    if (body.title_size !== undefined) {
+      if (['small', 'medium', 'large'].includes(body.title_size)) {
+        updates.title_size = body.title_size
+      }
+    }
+    if (body.description_size !== undefined) {
+      if (['small', 'medium', 'large'].includes(body.description_size)) {
+        updates.description_size = body.description_size
+      }
+    }
+
     const { data: module, error } = await supabaseAdmin
       .from('ai_app_modules')
       .update(updates)

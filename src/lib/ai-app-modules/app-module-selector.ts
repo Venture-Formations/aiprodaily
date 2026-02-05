@@ -19,6 +19,11 @@ interface AppSelectionResult {
   reason: string
 }
 
+interface PinnedApp {
+  position: number  // 1-based position
+  app: AIApplication
+}
+
 export class AppModuleSelector {
   /**
    * Check if an affiliate app is within cooldown period
@@ -68,96 +73,234 @@ export class AppModuleSelector {
   }
 
   /**
+   * Get pinned apps for a module, considering global pins and per-issue overrides
+   * @param publicationId - Publication ID
+   * @param moduleId - Module ID
+   * @param issueId - Optional issue ID for per-issue overrides
+   * @returns Array of pinned apps with their positions
+   */
+  private static async getPinnedApps(
+    publicationId: string,
+    moduleId: string,
+    issueId?: string
+  ): Promise<PinnedApp[]> {
+    // Get globally pinned apps (where pinned_position is set)
+    const { data: globalPinned, error } = await supabaseAdmin
+      .from('ai_applications')
+      .select('*')
+      .eq('publication_id', publicationId)
+      .eq('is_active', true)
+      .not('pinned_position', 'is', null)
+      .order('pinned_position', { ascending: true })
+
+    if (error) {
+      console.error('[AppModuleSelector] Error fetching pinned apps:', error)
+      return []
+    }
+
+    if (!globalPinned || globalPinned.length === 0) {
+      // No global pins - check for per-issue only pins
+      if (!issueId) return []
+    }
+
+    // Get per-issue overrides if issue exists
+    let overrides: Record<string, number | null> = {}
+    if (issueId) {
+      const { data: selection } = await supabaseAdmin
+        .from('issue_ai_app_modules')
+        .select('pinned_overrides')
+        .eq('issue_id', issueId)
+        .eq('ai_app_module_id', moduleId)
+        .single()
+
+      if (selection?.pinned_overrides) {
+        overrides = selection.pinned_overrides as Record<string, number | null>
+      }
+    }
+
+    const pinnedWithOverrides: PinnedApp[] = []
+    const processedAppIds = new Set<string>()
+
+    // Process globally pinned apps with overrides
+    for (const app of globalPinned || []) {
+      const override = overrides[app.id]
+
+      if (override === null) {
+        // Explicitly unpinned for this issue - skip
+        console.log(`[AppModuleSelector] App ${app.app_name} unpinned for this issue`)
+        processedAppIds.add(app.id)
+        continue
+      } else if (override !== undefined) {
+        // Position override for this issue
+        pinnedWithOverrides.push({ position: override, app: app as AIApplication })
+        console.log(`[AppModuleSelector] App ${app.app_name} position overridden to ${override}`)
+      } else {
+        // Use global position
+        pinnedWithOverrides.push({ position: app.pinned_position!, app: app as AIApplication })
+        console.log(`[AppModuleSelector] App ${app.app_name} pinned to position ${app.pinned_position}`)
+      }
+      processedAppIds.add(app.id)
+    }
+
+    // Check for apps that are ONLY pinned per-issue (not globally pinned)
+    for (const [appId, position] of Object.entries(overrides)) {
+      if (position !== null && !processedAppIds.has(appId)) {
+        // This app is pinned only for this issue
+        const { data: app } = await supabaseAdmin
+          .from('ai_applications')
+          .select('*')
+          .eq('id', appId)
+          .eq('is_active', true)
+          .single()
+
+        if (app) {
+          pinnedWithOverrides.push({ position, app: app as AIApplication })
+          console.log(`[AppModuleSelector] App ${app.app_name} pinned for this issue only at position ${position}`)
+        }
+      }
+    }
+
+    // Sort by position
+    return pinnedWithOverrides.sort((a, b) => a.position - b.position)
+  }
+
+  /**
    * Select apps using affiliate_priority mode (current logic)
-   * Phase 1: Affiliates first (respecting cooldown and category max)
+   * Phase 0: Place pinned apps first
+   * Phase 1: Affiliates (respecting cooldown and category max)
    * Phase 2: Non-affiliates to fill remaining (respecting category max)
    */
   private static async selectAffiliatePriority(
     allApps: AIApplication[],
     module: AIAppModule,
-    issueDate: Date
+    issueDate: Date,
+    pinnedApps: PinnedApp[] = []
   ): Promise<AIApplication[]> {
     const { apps_count, max_per_category, affiliate_cooldown_days } = module
-    const selectedApps: AIApplication[] = []
+
+    // Initialize array with null slots
+    const selectedApps: (AIApplication | null)[] = new Array(apps_count).fill(null)
     const selectedAppIds = new Set<string>()
 
+    // Phase 0: Place pinned apps in their positions
+    for (const { position, app } of pinnedApps) {
+      if (position >= 1 && position <= apps_count) {
+        selectedApps[position - 1] = app  // Convert to 0-based index
+        selectedAppIds.add(app.id)
+        console.log(`[AppModuleSelector] Pinned app ${app.app_name} placed at position ${position}`)
+      }
+    }
+
+    // Get remaining apps (excluding already pinned)
+    const availableApps = allApps.filter(app => !selectedAppIds.has(app.id))
+
     // Separate affiliates and non-affiliates
-    const affiliates = allApps.filter(app => app.is_affiliate)
-    const nonAffiliates = allApps.filter(app => !app.is_affiliate)
+    const affiliates = availableApps.filter(app => app.is_affiliate)
+    const nonAffiliates = availableApps.filter(app => !app.is_affiliate)
 
     // Phase 1: Select affiliates first
     const availableAffiliates = affiliates.filter(
       app => !this.isInCooldown(app, affiliate_cooldown_days, issueDate)
     )
 
-    // Sort by priority (higher first), then shuffle for variety
+    // Sort by priority (higher first)
     const sortedAffiliates = [...availableAffiliates]
       .sort((a, b) => (b.priority || 0) - (a.priority || 0))
 
+    // Helper to get non-null apps for category counting
+    const getNonNullApps = () => selectedApps.filter((a): a is AIApplication => a !== null)
+
     for (const app of sortedAffiliates) {
-      if (selectedApps.length >= apps_count) break
+      // Find first empty slot
+      const emptyIndex = selectedApps.findIndex(a => a === null)
+      if (emptyIndex === -1) break  // No more empty slots
 
       // Check category maximum
-      if (this.wouldExceedCategoryMax(app, selectedApps, max_per_category)) {
+      if (this.wouldExceedCategoryMax(app, getNonNullApps(), max_per_category)) {
         console.log(`[AppModuleSelector] Skipping affiliate ${app.app_name} - would exceed ${max_per_category} max for ${app.category}`)
         continue
       }
 
-      selectedApps.push(app)
+      selectedApps[emptyIndex] = app
       selectedAppIds.add(app.id)
       console.log(`[AppModuleSelector] Selected affiliate: ${app.app_name} (${app.category})`)
     }
 
     // Phase 2: Fill remaining slots with non-affiliates
-    if (selectedApps.length < apps_count) {
-      // Shuffle for variety
-      const shuffledNonAffiliates = [...nonAffiliates].sort(() => Math.random() - 0.5)
+    // Shuffle for variety
+    const shuffledNonAffiliates = [...nonAffiliates].sort(() => Math.random() - 0.5)
 
-      for (const app of shuffledNonAffiliates) {
-        if (selectedApps.length >= apps_count) break
-        if (selectedAppIds.has(app.id)) continue
+    for (const app of shuffledNonAffiliates) {
+      // Find first empty slot
+      const emptyIndex = selectedApps.findIndex(a => a === null)
+      if (emptyIndex === -1) break  // No more empty slots
+      if (selectedAppIds.has(app.id)) continue
 
-        // Check category maximum
-        if (this.wouldExceedCategoryMax(app, selectedApps, max_per_category)) {
-          console.log(`[AppModuleSelector] Skipping non-affiliate ${app.app_name} - would exceed max for ${app.category}`)
-          continue
-        }
-
-        selectedApps.push(app)
-        selectedAppIds.add(app.id)
-        console.log(`[AppModuleSelector] Selected non-affiliate: ${app.app_name} (${app.category})`)
+      // Check category maximum
+      if (this.wouldExceedCategoryMax(app, getNonNullApps(), max_per_category)) {
+        console.log(`[AppModuleSelector] Skipping non-affiliate ${app.app_name} - would exceed max for ${app.category}`)
+        continue
       }
+
+      selectedApps[emptyIndex] = app
+      selectedAppIds.add(app.id)
+      console.log(`[AppModuleSelector] Selected non-affiliate: ${app.app_name} (${app.category})`)
     }
 
-    return selectedApps
+    // Return non-null apps in order
+    return selectedApps.filter((a): a is AIApplication => a !== null)
   }
 
   /**
    * Select apps using random mode
-   * Random selection respecting category limits
+   * Phase 0: Place pinned apps first
+   * Random selection respecting category limits for remaining slots
    */
   private static selectRandom(
     allApps: AIApplication[],
-    module: AIAppModule
+    module: AIAppModule,
+    pinnedApps: PinnedApp[] = []
   ): AIApplication[] {
     const { apps_count, max_per_category } = module
-    const selectedApps: AIApplication[] = []
 
-    // Shuffle all apps
-    const shuffled = [...allApps].sort(() => Math.random() - 0.5)
+    // Initialize array with null slots
+    const selectedApps: (AIApplication | null)[] = new Array(apps_count).fill(null)
+    const selectedAppIds = new Set<string>()
+
+    // Phase 0: Place pinned apps in their positions
+    for (const { position, app } of pinnedApps) {
+      if (position >= 1 && position <= apps_count) {
+        selectedApps[position - 1] = app  // Convert to 0-based index
+        selectedAppIds.add(app.id)
+        console.log(`[AppModuleSelector] Pinned app ${app.app_name} placed at position ${position}`)
+      }
+    }
+
+    // Get remaining apps (excluding already pinned)
+    const availableApps = allApps.filter(app => !selectedAppIds.has(app.id))
+
+    // Shuffle all available apps
+    const shuffled = [...availableApps].sort(() => Math.random() - 0.5)
+
+    // Helper to get non-null apps for category counting
+    const getNonNullApps = () => selectedApps.filter((a): a is AIApplication => a !== null)
 
     for (const app of shuffled) {
-      if (selectedApps.length >= apps_count) break
+      // Find first empty slot
+      const emptyIndex = selectedApps.findIndex(a => a === null)
+      if (emptyIndex === -1) break  // No more empty slots
 
       // Check category maximum
-      if (this.wouldExceedCategoryMax(app, selectedApps, max_per_category)) {
+      if (this.wouldExceedCategoryMax(app, getNonNullApps(), max_per_category)) {
         continue
       }
 
-      selectedApps.push(app)
+      selectedApps[emptyIndex] = app
+      selectedAppIds.add(app.id)
     }
 
-    return selectedApps
+    // Return non-null apps in order
+    return selectedApps.filter((a): a is AIApplication => a !== null)
   }
 
   /**
@@ -166,11 +309,19 @@ export class AppModuleSelector {
   static async selectAppsForModule(
     module: AIAppModule,
     publicationId: string,
-    issueDate: Date
+    issueDate: Date,
+    issueId?: string
   ): Promise<AppSelectionResult> {
     // Manual mode returns empty - admin must pick
     if (module.selection_mode === 'manual') {
       return { apps: [], reason: 'Manual selection required' }
+    }
+
+    // Get pinned apps first (global pins + per-issue overrides)
+    const pinnedApps = await this.getPinnedApps(publicationId, module.id, issueId)
+    const pinnedCount = pinnedApps.length
+    if (pinnedCount > 0) {
+      console.log(`[AppModuleSelector] Found ${pinnedCount} pinned app(s) for module ${module.name}`)
     }
 
     // Get all active apps for this publication
@@ -196,19 +347,19 @@ export class AppModuleSelector {
 
     switch (module.selection_mode) {
       case 'affiliate_priority':
-        selectedApps = await this.selectAffiliatePriority(allApps, module, issueDate)
+        selectedApps = await this.selectAffiliatePriority(allApps, module, issueDate, pinnedApps)
         break
       case 'random':
-        selectedApps = this.selectRandom(allApps, module)
+        selectedApps = this.selectRandom(allApps, module, pinnedApps)
         break
       default:
-        selectedApps = await this.selectAffiliatePriority(allApps, module, issueDate)
+        selectedApps = await this.selectAffiliatePriority(allApps, module, issueDate, pinnedApps)
     }
 
     const affiliateCount = selectedApps.filter(a => a.is_affiliate).length
     return {
       apps: selectedApps,
-      reason: `Selected ${selectedApps.length} apps via ${module.selection_mode} (${affiliateCount} affiliates, ${selectedApps.length - affiliateCount} non-affiliates)`
+      reason: `Selected ${selectedApps.length} apps via ${module.selection_mode} (${pinnedCount} pinned, ${affiliateCount} affiliates, ${selectedApps.length - affiliateCount - pinnedCount} others)`
     }
   }
 
@@ -259,7 +410,8 @@ export class AppModuleSelector {
       const result = await this.selectAppsForModule(
         module as AIAppModule,
         publicationId,
-        issueDate
+        issueDate,
+        issueId  // Pass issueId for per-issue pinning overrides
       )
 
       // Store selection

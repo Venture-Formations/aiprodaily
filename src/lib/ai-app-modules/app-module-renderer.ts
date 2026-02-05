@@ -8,8 +8,29 @@ import { getBusinessSettings } from '../publication-settings'
 import type {
   AIAppModule,
   AIApplication,
-  AIAppBlockType
+  AIAppBlockType,
+  ProductCardLayoutMode,
+  ProductCardLogoStyle,
+  ProductCardTextSize
 } from '@/types/database'
+
+/**
+ * Size mapping for title text
+ */
+const TITLE_SIZES: Record<ProductCardTextSize, string> = {
+  small: '14px',
+  medium: '16px',
+  large: '18px'
+}
+
+/**
+ * Size mapping for description text
+ */
+const DESCRIPTION_SIZES: Record<ProductCardTextSize, string> = {
+  small: '12px',
+  medium: '14px',
+  large: '16px'
+}
 
 /**
  * Context for rendering (issue info for URL tracking)
@@ -38,6 +59,11 @@ interface BlockStyleOptions {
   tertiaryColor?: string
   headingFont: string
   bodyFont: string
+  // Layout settings (Product Cards)
+  layoutMode: ProductCardLayoutMode
+  logoStyle: ProductCardLogoStyle
+  titleSize: ProductCardTextSize
+  descriptionSize: ProductCardTextSize
 }
 
 /**
@@ -79,16 +105,18 @@ export class AppModuleRenderer {
     switch (blockType) {
       case 'title': {
         const emoji = getAppEmoji(app)
-        return `<strong>${index + 1}.</strong> ${emoji} <a href="${trackingUrl}" style="color: ${styles.secondaryColor || styles.primaryColor}; text-decoration: underline; font-weight: bold;">${app.app_name}</a>`
+        const fontSize = TITLE_SIZES[styles.titleSize] || '16px'
+        return `<strong style="font-size: ${fontSize};">${index + 1}.</strong> ${emoji} <a href="${trackingUrl}" style="color: ${styles.secondaryColor || styles.primaryColor}; text-decoration: underline; font-weight: bold; font-size: ${fontSize};">${app.app_name}</a>`
       }
 
       case 'logo': {
         if (!app.logo_url) return ''
+        const borderRadius = styles.logoStyle === 'round' ? '50%' : '8px'
         return `
           <div style="margin: 8px 0;">
             <a href="${trackingUrl}">
               <img src="${app.logo_url}" alt="${app.app_name}"
-                style="width: 48px; height: 48px; border-radius: 8px; object-fit: contain;" />
+                style="width: 48px; height: 48px; border-radius: ${borderRadius}; object-fit: cover;" />
             </a>
           </div>`
       }
@@ -113,7 +141,8 @@ export class AppModuleRenderer {
       }
 
       case 'description': {
-        return ` ${app.description || 'AI-powered application'}`
+        const fontSize = DESCRIPTION_SIZES[styles.descriptionSize] || '14px'
+        return `<span style="font-size: ${fontSize};"> ${app.description || 'AI-powered application'}</span>`
       }
 
       case 'button': {
@@ -143,8 +172,23 @@ export class AppModuleRenderer {
   ): string {
     let blocksHtml = ''
 
-    for (const blockType of blockOrder) {
-      blocksHtml += this.renderBlock(blockType, app, trackingUrl, styles, index)
+    if (styles.layoutMode === 'stacked') {
+      // Stacked layout: title/logo on their own line, then description below
+      for (const blockType of blockOrder) {
+        const blockHtml = this.renderBlock(blockType, app, trackingUrl, styles, index)
+        if (blockType === 'title' || blockType === 'logo' || blockType === 'image') {
+          blocksHtml += `<div>${blockHtml}</div>`
+        } else if (blockType === 'description' || blockType === 'tagline') {
+          blocksHtml += `<div style="margin-top: 4px;">${blockHtml}</div>`
+        } else {
+          blocksHtml += blockHtml
+        }
+      }
+    } else {
+      // Inline layout: current behavior - all on same line
+      for (const blockType of blockOrder) {
+        blocksHtml += this.renderBlock(blockType, app, trackingUrl, styles, index)
+      }
     }
 
     return `
@@ -208,7 +252,12 @@ export class AppModuleRenderer {
       secondaryColor: settings.secondary_color,
       tertiaryColor: settings.tertiary_color,
       headingFont: settings.heading_font,
-      bodyFont: settings.body_font
+      bodyFont: settings.body_font,
+      // Layout settings from module (Product Cards)
+      layoutMode: module.layout_mode || 'inline',
+      logoStyle: module.logo_style || 'square',
+      titleSize: module.title_size || 'medium',
+      descriptionSize: module.description_size || 'medium'
     }
 
     // Render each app
@@ -296,7 +345,12 @@ export class AppModuleRenderer {
       secondaryColor: settings.secondary_color,
       tertiaryColor: settings.tertiary_color,
       headingFont: settings.heading_font,
-      bodyFont: settings.body_font
+      bodyFont: settings.body_font,
+      // Layout settings from module (Product Cards)
+      layoutMode: module.layout_mode || 'inline',
+      logoStyle: module.logo_style || 'square',
+      titleSize: module.title_size || 'medium',
+      descriptionSize: module.description_size || 'medium'
     }
 
     if (!apps || apps.length === 0) {
