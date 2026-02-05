@@ -111,48 +111,9 @@ export function PersonalizationForm() {
     }
   }
 
-  // Load SparkLoop script and trigger popup on page load
+  // Load SparkLoop script on page load
   useEffect(() => {
-    if (typeof window === 'undefined' || sparkLoopTriggered.current || !initialEmail) return
-
-    const triggerSparkLoopPopup = () => {
-      if (sparkLoopTriggered.current) return
-      const win = window as any
-
-      console.log('[SparkLoop] Attempting to trigger popup for email:', initialEmail)
-
-      if (win.SL) {
-        console.log('[SparkLoop] SL methods:', Object.keys(win.SL))
-
-        // Set visitor email first
-        if (win.SL.visitor) {
-          win.SL.visitor.email = initialEmail
-          console.log('[SparkLoop] Set SL.visitor.email')
-        }
-
-        // Try SL.generate(email) - this should generate/show the referral widget
-        if (typeof win.SL.generate === 'function') {
-          console.log('[SparkLoop] Calling SL.generate() with email')
-          try {
-            win.SL.generate(initialEmail)
-            sparkLoopTriggered.current = true
-            return
-          } catch (e) {
-            console.log('[SparkLoop] SL.generate error:', e)
-          }
-        }
-      }
-
-      // Fallback: submit the actual form with email pre-filled to trigger SparkLoop
-      console.log('[SparkLoop] Fallback: Looking for form to trigger')
-      const forms = document.querySelectorAll('form')
-      forms.forEach((form, i) => {
-        const emailInput = form.querySelector('input[type="email"]') as HTMLInputElement
-        if (emailInput && emailInput.value) {
-          console.log(`[SparkLoop] Found form ${i} with email:`, emailInput.value)
-        }
-      })
-    }
+    if (typeof window === 'undefined') return
 
     // Load SparkLoop script
     if (!document.getElementById('sparkloop-script')) {
@@ -161,18 +122,47 @@ export function PersonalizationForm() {
       script.src = 'https://js.sparkloop.app/embed.js?publication_id=pub_6b958dc16ac6'
       script.async = true
       script.setAttribute('data-sparkloop', '')
-
-      script.onload = () => {
-        console.log('[SparkLoop] Script loaded')
-        // Give SparkLoop time to initialize fully
-        setTimeout(triggerSparkLoopPopup, 2000)
-      }
-
+      script.onload = () => console.log('[SparkLoop] Script loaded')
       document.body.appendChild(script)
-    } else {
-      setTimeout(triggerSparkLoopPopup, 500)
     }
-  }, [initialEmail])
+  }, [])
+
+  // Trigger SparkLoop when user clicks into first name field
+  const handleFirstNameFocus = () => {
+    if (sparkLoopTriggered.current || !initialEmail) return
+    sparkLoopTriggered.current = true
+
+    console.log('[SparkLoop] First name focused, triggering popup for:', initialEmail)
+
+    // Create and submit a hidden form to trigger SparkLoop
+    const triggerForm = document.createElement('form')
+    triggerForm.id = 'sl-trigger-form'
+    triggerForm.style.cssText = 'position:absolute;left:-9999px;opacity:0;'
+
+    const emailInput = document.createElement('input')
+    emailInput.type = 'email'
+    emailInput.name = 'email'
+    emailInput.value = initialEmail
+    triggerForm.appendChild(emailInput)
+
+    const submitBtn = document.createElement('button')
+    submitBtn.type = 'submit'
+    triggerForm.appendChild(submitBtn)
+
+    document.body.appendChild(triggerForm)
+
+    // Give SparkLoop a moment to detect the form, then submit
+    setTimeout(() => {
+      console.log('[SparkLoop] Submitting trigger form')
+      submitBtn.click()
+    }, 100)
+
+    // Clean up after a delay
+    setTimeout(() => {
+      const form = document.getElementById('sl-trigger-form')
+      if (form) form.remove()
+    }, 5000)
+  }
 
   return (
     <div className="space-y-6">
@@ -212,6 +202,7 @@ export function PersonalizationForm() {
               required
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
+              onFocus={handleFirstNameFocus}
               disabled={isSubmitting || !email}
               placeholder="John"
               className="w-full rounded-lg border-0 bg-white px-4 py-3 text-slate-900 shadow-lg ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
