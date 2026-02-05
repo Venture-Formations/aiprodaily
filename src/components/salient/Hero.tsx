@@ -58,32 +58,52 @@ export function Hero() {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    // Listen for SparkLoop events and store them
-    const handleSparkLoopEvent = (e: Event) => {
-      const customEvent = e as CustomEvent
-      console.log('[SparkLoop Event]', e.type, customEvent.detail)
+    // Listen for ALL custom events to find what SparkLoop dispatches
+    const handleAnyEvent = (e: Event) => {
+      // Only log events that might be from SparkLoop
+      if (e.type.includes('sl') || e.type.includes('spark') || e.type.includes('upscribe')) {
+        const customEvent = e as CustomEvent
+        console.log('[SparkLoop Event]', e.type, customEvent.detail)
 
-      // Store events in sessionStorage so we can see them after redirect
-      const events = JSON.parse(sessionStorage.getItem('sparkloop_events') || '[]')
-      events.push({
-        type: e.type,
-        detail: customEvent.detail,
-        timestamp: new Date().toISOString()
-      })
-      sessionStorage.setItem('sparkloop_events', JSON.stringify(events))
-
-      // Track the event (you can send this to your analytics)
-      if (e.type === 'sl:subscriber-updated') {
-        sessionStorage.setItem('sparkloop_subscribed', 'true')
+        const events = JSON.parse(sessionStorage.getItem('sparkloop_events') || '[]')
+        events.push({
+          type: e.type,
+          detail: customEvent.detail,
+          timestamp: new Date().toISOString()
+        })
+        sessionStorage.setItem('sparkloop_events', JSON.stringify(events))
       }
     }
 
-    // SparkLoop custom events
-    document.addEventListener('sl:subscriber-updated', handleSparkLoopEvent)
-    document.addEventListener('sl:form-submitted', handleSparkLoopEvent)
-    document.addEventListener('sl:referrer-tracked', handleSparkLoopEvent)
-    document.addEventListener('sl:widget-closed', handleSparkLoopEvent)
-    document.addEventListener('sl:widget-opened', handleSparkLoopEvent)
+    // Listen on both document and window for any SparkLoop events
+    const eventTypes = [
+      'sl:subscriber-updated', 'sl:form-submitted', 'sl:referrer-tracked',
+      'sl:widget-closed', 'sl:widget-opened', 'sl:popup-closed', 'sl:popup-opened',
+      'sparkloop:closed', 'sparkloop:opened', 'sparkloop:subscribed',
+      'upscribe:closed', 'upscribe:subscribed'
+    ]
+
+    eventTypes.forEach(type => {
+      document.addEventListener(type, handleAnyEvent)
+      window.addEventListener(type, handleAnyEvent)
+    })
+
+    // Also monitor for any message events from SparkLoop iframes
+    const handleMessage = (e: MessageEvent) => {
+      if (e.origin?.includes('sparkloop') || e.origin?.includes('upscribe') ||
+          (typeof e.data === 'string' && (e.data.includes('spark') || e.data.includes('upscribe')))) {
+        console.log('[SparkLoop postMessage]', e.data)
+        const events = JSON.parse(sessionStorage.getItem('sparkloop_events') || '[]')
+        events.push({
+          type: 'postMessage',
+          data: e.data,
+          origin: e.origin,
+          timestamp: new Date().toISOString()
+        })
+        sessionStorage.setItem('sparkloop_events', JSON.stringify(events))
+      }
+    }
+    window.addEventListener('message', handleMessage)
 
     if (!document.getElementById('sparkloop-script')) {
       const script = document.createElement('script')
@@ -95,11 +115,11 @@ export function Hero() {
     }
 
     return () => {
-      document.removeEventListener('sl:subscriber-updated', handleSparkLoopEvent)
-      document.removeEventListener('sl:form-submitted', handleSparkLoopEvent)
-      document.removeEventListener('sl:referrer-tracked', handleSparkLoopEvent)
-      document.removeEventListener('sl:widget-closed', handleSparkLoopEvent)
-      document.removeEventListener('sl:widget-opened', handleSparkLoopEvent)
+      eventTypes.forEach(type => {
+        document.removeEventListener(type, handleAnyEvent)
+        window.removeEventListener(type, handleAnyEvent)
+      })
+      window.removeEventListener('message', handleMessage)
     }
   }, [])
 
