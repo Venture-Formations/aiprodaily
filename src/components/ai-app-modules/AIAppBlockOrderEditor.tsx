@@ -89,6 +89,12 @@ function getSettingsBadge(block: AIAppBlockType, config: ProductCardBlockConfig[
   if ((block === 'title' || block === 'description' || block === 'tagline') && 'size' in config) {
     return config.size as string
   }
+  if (block === 'button' && 'mode' in config) {
+    const mode = config.mode as string
+    if (mode === 'static') return 'static'
+    if (mode === 'custom') return 'custom'
+    return 'dynamic'
+  }
   return null
 }
 
@@ -109,7 +115,7 @@ function SortableBlock({
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const isEnabled = config?.enabled ?? true
-  const hasSettings = block === 'logo' || block === 'title' || block === 'description' || block === 'tagline'
+  const hasSettings = block === 'logo' || block === 'title' || block === 'description' || block === 'tagline' || block === 'button'
   const settingsBadge = getSettingsBadge(block, config)
 
   const {
@@ -262,6 +268,38 @@ function SortableBlock({
                   ))}
                 </select>
               </div>
+            )}
+
+            {/* Button settings */}
+            {block === 'button' && (
+              <>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm text-gray-600">Button Mode</label>
+                  <select
+                    value={(config as any)?.mode || 'dynamic'}
+                    onChange={(e) => onSettingChange('mode', e.target.value)}
+                    disabled={disabled || !isEnabled}
+                    className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  >
+                    <option value="dynamic">Dynamic (Try App Name)</option>
+                    <option value="static">Static (Fixed Text)</option>
+                    <option value="custom">Custom (From Database)</option>
+                  </select>
+                </div>
+                {(config as any)?.mode === 'static' && (
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-gray-600">Button Text</label>
+                    <input
+                      type="text"
+                      value={(config as any)?.staticText || ''}
+                      onChange={(e) => onSettingChange('staticText', e.target.value)}
+                      placeholder="Learn More"
+                      disabled={disabled || !isEnabled}
+                      className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 w-40"
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

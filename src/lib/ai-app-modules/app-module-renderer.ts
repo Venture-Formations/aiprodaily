@@ -196,11 +196,27 @@ export class AppModuleRenderer {
       }
 
       case 'button': {
+        // Determine button text based on mode
+        const buttonConfig = styles.blockConfig.button
+        const buttonMode = buttonConfig?.mode || 'dynamic'
+        let buttonText: string
+
+        if (buttonMode === 'static' && buttonConfig?.staticText) {
+          // Static mode: use configured text
+          buttonText = buttonConfig.staticText
+        } else if (buttonMode === 'custom' && app.button_text) {
+          // Custom mode: use database text if available
+          buttonText = app.button_text
+        } else {
+          // Dynamic mode (default): use "Try {app_name}"
+          buttonText = `Try ${app.app_name}`
+        }
+
         return `
           <div style="margin-top: 8px;">
             <a href="${trackingUrl}"
               style="display: inline-block; padding: 8px 16px; background-color: ${styles.primaryColor}; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 14px; font-family: ${styles.bodyFont};">
-              Try ${app.app_name}
+              ${buttonText}
             </a>
           </div>`
       }

@@ -96,6 +96,9 @@ export interface AIApplication {
 
   // Pinning (Product Cards)
   pinned_position: number | null  // 1-based position for globally pinned apps. NULL = not pinned.
+
+  // Button customization
+  button_text: string | null  // Custom button text for this product. NULL uses module default.
 }
 
 export interface IssueAIAppSelection {
@@ -646,6 +649,8 @@ export interface ProductCardBlockConfig {
   }
   button?: {
     enabled: boolean
+    mode?: 'static' | 'dynamic' | 'custom'  // static=fixed text, dynamic="Try {name}", custom=from database
+    staticText?: string  // Text to use when mode is 'static'
   }
 }
 
