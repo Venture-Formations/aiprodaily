@@ -21,9 +21,25 @@ const YEARLY_CLIENTS_OPTIONS = [
 
 export function PersonalizationForm() {
   const searchParams = useSearchParams()
-  const initialEmail = searchParams.get('email') || ''
+  const urlEmail = searchParams.get('email') || ''
 
-  const [email, setEmail] = useState(initialEmail)
+  // Check if URL email is valid, otherwise try sessionStorage
+  const getInitialEmail = () => {
+    // If URL has a valid email, use it
+    if (urlEmail && urlEmail !== '{{email}}' && urlEmail.includes('@')) {
+      return urlEmail
+    }
+    // Try sessionStorage as fallback
+    if (typeof window !== 'undefined') {
+      const storedEmail = sessionStorage.getItem('subscribe_email')
+      if (storedEmail && storedEmail.includes('@')) {
+        return storedEmail
+      }
+    }
+    return ''
+  }
+
+  const [email, setEmail] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [jobType, setJobType] = useState('')
@@ -31,12 +47,15 @@ export function PersonalizationForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // Show error if no email provided
+  // Set initial email on mount (need useEffect for sessionStorage access)
   useEffect(() => {
-    if (!initialEmail) {
+    const initialEmail = getInitialEmail()
+    if (initialEmail) {
+      setEmail(initialEmail)
+    } else {
       setError('No email found. Please go back and subscribe first.')
     }
-  }, [initialEmail])
+  }, [urlEmail])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -66,14 +85,15 @@ export function PersonalizationForm() {
 
     try {
       // If email was corrected, pass both old and new email
-      const emailChanged = email !== initialEmail && initialEmail !== ''
+      const storedEmail = sessionStorage.getItem('subscribe_email') || ''
+      const emailChanged = email !== storedEmail && storedEmail !== ''
 
       const response = await fetch('/api/subscribe/personalize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
-          original_email: emailChanged ? initialEmail : undefined,
+          original_email: emailChanged ? storedEmail : undefined,
           name: firstName.trim(),
           last_name: lastName.trim(),
           job_type: jobType,
@@ -116,11 +136,6 @@ export function PersonalizationForm() {
             placeholder="you@example.com"
             className="w-full rounded-lg border-0 bg-white px-4 py-3 text-slate-900 shadow-lg ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
           />
-          {email !== initialEmail && initialEmail && (
-            <p className="text-xs text-amber-600 mt-1 text-left">
-              Email will be updated from {initialEmail}
-            </p>
-          )}
         </div>
 
         {/* Name Fields - Side by Side */}

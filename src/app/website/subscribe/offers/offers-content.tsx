@@ -1,6 +1,7 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
+import { useEffect } from 'react'
 import { Container } from '@/components/salient/Container'
 
 interface OffersContentProps {
@@ -11,6 +12,13 @@ interface OffersContentProps {
 export function OffersContent({ logoUrl, newsletterName }: OffersContentProps) {
   const searchParams = useSearchParams()
   const email = searchParams.get('email') || ''
+
+  // Store email in sessionStorage so info page can retrieve it as fallback
+  useEffect(() => {
+    if (email && email !== '{{email}}' && email.includes('@')) {
+      sessionStorage.setItem('subscribe_email', email)
+    }
+  }, [email])
 
   // Build the AfterOffers URL with the email
   const afterOffersUrl = `https://offers.afteroffers.com/show_offers/994-2MMat6y-1?email=${encodeURIComponent(email)}`
