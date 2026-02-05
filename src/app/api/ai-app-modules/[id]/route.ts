@@ -116,6 +116,14 @@ export async function PATCH(
       updates.show_in_directory = Boolean(body.show_in_directory)
     }
 
+    // Display settings
+    if (body.show_emoji !== undefined) {
+      updates.show_emoji = Boolean(body.show_emoji)
+    }
+    if (body.show_numbers !== undefined) {
+      updates.show_numbers = Boolean(body.show_numbers)
+    }
+
     const { data: module, error } = await supabaseAdmin
       .from('ai_app_modules')
       .update(updates)

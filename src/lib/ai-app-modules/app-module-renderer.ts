@@ -76,6 +76,9 @@ interface BlockStyleOptions {
   // Layout settings (Product Cards)
   layoutMode: ProductCardLayoutMode
   blockConfig: ProductCardBlockConfig
+  // Display settings
+  showEmoji: boolean
+  showNumbers: boolean
   // Legacy settings (fallback)
   logoStyle: ProductCardLogoStyle
   titleSize: ProductCardTextSize
@@ -154,9 +157,10 @@ export class AppModuleRenderer {
 
     switch (blockType) {
       case 'title': {
-        const emoji = getAppEmoji(app)
         const fontSize = TITLE_SIZES[this.getTitleSize(styles)]
-        return `<strong style="font-size: ${fontSize};">${index + 1}.</strong> ${emoji} <a href="${trackingUrl}" style="color: ${styles.secondaryColor || styles.primaryColor}; text-decoration: underline; font-weight: bold; font-size: ${fontSize};">${app.app_name}</a>`
+        const numberPart = styles.showNumbers ? `<strong style="font-size: ${fontSize};">${index + 1}.</strong> ` : ''
+        const emojiPart = styles.showEmoji ? `${getAppEmoji(app)} ` : ''
+        return `${numberPart}${emojiPart}<a href="${trackingUrl}" style="color: ${styles.secondaryColor || styles.primaryColor}; text-decoration: underline; font-weight: bold; font-size: ${fontSize};">${app.app_name}</a>`
       }
 
       case 'logo': {
@@ -362,6 +366,9 @@ export class AppModuleRenderer {
       // Layout settings from module (Product Cards)
       layoutMode: module.layout_mode || 'inline',
       blockConfig,
+      // Display settings (default true for backwards compatibility)
+      showEmoji: module.show_emoji !== false,
+      showNumbers: module.show_numbers !== false,
       // Legacy fallbacks
       logoStyle: module.logo_style || 'square',
       titleSize: module.title_size || 'medium',
@@ -464,6 +471,9 @@ export class AppModuleRenderer {
       // Layout settings from module (Product Cards)
       layoutMode: module.layout_mode || 'inline',
       blockConfig,
+      // Display settings (default true for backwards compatibility)
+      showEmoji: module.show_emoji !== false,
+      showNumbers: module.show_numbers !== false,
       // Legacy fallbacks
       logoStyle: module.logo_style || 'square',
       titleSize: module.title_size || 'medium',

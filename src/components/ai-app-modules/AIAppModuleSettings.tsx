@@ -160,6 +160,32 @@ export default function AIAppModuleSettings({
     }
   }
 
+  const handleShowEmojiToggle = async () => {
+    setSaving(true)
+    try {
+      const newValue = localModule.show_emoji === false ? true : false
+      await onUpdate({ show_emoji: newValue })
+      setLocalModule(prev => ({ ...prev, show_emoji: newValue }))
+    } catch (error) {
+      console.error('Failed to update show_emoji:', error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleShowNumbersToggle = async () => {
+    setSaving(true)
+    try {
+      const newValue = localModule.show_numbers === false ? true : false
+      await onUpdate({ show_numbers: newValue })
+      setLocalModule(prev => ({ ...prev, show_numbers: newValue }))
+    } catch (error) {
+      console.error('Failed to update show_numbers:', error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleDelete = async () => {
     if (deleteText !== 'DELETE') return
 
@@ -353,6 +379,48 @@ export default function AIAppModuleSettings({
                 <option value="inline">Inline (title with description)</option>
                 <option value="stacked">Stacked (title above description)</option>
               </select>
+            </div>
+
+            {/* Show Emoji */}
+            <div className="flex items-center justify-between py-3 border-b border-gray-100">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Show Emoji</label>
+                <p className="text-xs text-gray-500">Display category-based emoji icons next to titles</p>
+              </div>
+              <button
+                onClick={handleShowEmojiToggle}
+                disabled={saving}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  localModule.show_emoji !== false ? 'bg-cyan-500' : 'bg-gray-300'
+                } ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    localModule.show_emoji !== false ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Show Numbers */}
+            <div className="flex items-center justify-between py-3 border-b border-gray-100">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Show Numbers</label>
+                <p className="text-xs text-gray-500">Display numbered list (1. 2. 3.) next to titles</p>
+              </div>
+              <button
+                onClick={handleShowNumbersToggle}
+                disabled={saving}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  localModule.show_numbers !== false ? 'bg-cyan-500' : 'bg-gray-300'
+                } ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    localModule.show_numbers !== false ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
             </div>
 
             {/* Show in Directory */}

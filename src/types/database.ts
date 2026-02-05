@@ -672,6 +672,9 @@ export interface AIAppModule {
   block_config: ProductCardBlockConfig
   // Directory visibility
   show_in_directory: boolean  // Whether apps in this module appear in the public /tools directory
+  // Display settings
+  show_emoji: boolean  // Whether to display category-based emoji icons
+  show_numbers: boolean  // Whether to display numbered list (1. 2. 3.)
   created_at: string
   updated_at: string
 }
