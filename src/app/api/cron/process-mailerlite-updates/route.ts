@@ -384,13 +384,13 @@ export async function GET(request: NextRequest) {
   try {
     let realClickSyncResult = null
 
-    // Run Real_Click sync once daily (at 6 AM hour) or when forced
-    const currentHour = new Date().getHours()
-    const currentMinute = new Date().getMinutes()
-    // Run during the 6:00-6:05 window (cron runs every 5 mins)
-    const isDailySyncTime = currentHour === 6 && currentMinute < 5
+    // Run Real_Click sync every 2 hours or when forced
+    const currentHour = new Date().getUTCHours()
+    const currentMinute = new Date().getUTCMinutes()
+    // Run during the first 5 minutes of every even hour (0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22 UTC)
+    const isSyncTime = currentHour % 2 === 0 && currentMinute < 5
 
-    if (forceSync || isDailySyncTime) {
+    if (forceSync || isSyncTime) {
       console.log('[MailerLite Updates] Running Real_Click sync...')
       realClickSyncResult = await syncRealClickStatus()
       console.log(`[MailerLite Updates] Real_Click sync complete: ${realClickSyncResult.newClickers} new, ${realClickSyncResult.removedClickers} removed`)
