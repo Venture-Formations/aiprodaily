@@ -3,17 +3,27 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * GET /api/ai-app-modules - List AI app modules for a publication
- * Query params: publication_id (required)
+ * Query params: publication_id (optional, defaults to 'accounting' publication)
  */
 export async function GET(request: NextRequest) {
   try {
-    const publicationId = request.nextUrl.searchParams.get('publication_id')
+    let publicationId = request.nextUrl.searchParams.get('publication_id')
 
+    // If no publication_id provided, get the accounting newsletter
     if (!publicationId) {
-      return NextResponse.json(
-        { error: 'publication_id is required' },
-        { status: 400 }
-      )
+      const { data: newsletter } = await supabaseAdmin
+        .from('publications')
+        .select('id')
+        .eq('slug', 'accounting')
+        .single()
+
+      if (!newsletter) {
+        return NextResponse.json(
+          { error: 'Publication not found' },
+          { status: 404 }
+        )
+      }
+      publicationId = newsletter.id
     }
 
     const { data: modules, error } = await supabaseAdmin

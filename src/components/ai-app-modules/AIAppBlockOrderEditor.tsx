@@ -79,21 +79,38 @@ function getDefaultBlockConfig(blockType: AIAppBlockType): ProductCardBlockConfi
   }
 }
 
+// Get badge text for a block's settings
+function getSettingsBadge(block: AIAppBlockType, config: ProductCardBlockConfig[keyof ProductCardBlockConfig] | undefined): string | null {
+  if (!config) return null
+
+  if (block === 'logo' && 'style' in config && 'position' in config) {
+    return `${config.style}, ${config.position}`
+  }
+  if ((block === 'title' || block === 'description' || block === 'tagline') && 'size' in config) {
+    return config.size as string
+  }
+  return null
+}
+
 function SortableBlock({
   block,
   config,
   onToggle,
+  onDelete,
   onSettingChange,
   disabled
 }: {
   block: AIAppBlockType
   config: ProductCardBlockConfig[keyof ProductCardBlockConfig] | undefined
   onToggle: () => void
+  onDelete: () => void
   onSettingChange: (key: string, value: string) => void
   disabled?: boolean
 }) {
-  const [showSettings, setShowSettings] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
   const isEnabled = config?.enabled ?? true
+  const hasSettings = block === 'logo' || block === 'title' || block === 'description' || block === 'tagline'
+  const settingsBadge = getSettingsBadge(block, config)
 
   const {
     attributes,
@@ -110,18 +127,16 @@ function SortableBlock({
     opacity: isDragging ? 0.5 : 1,
   }
 
-  const hasSettings = block === 'logo' || block === 'title' || block === 'description' || block === 'tagline'
-
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={`bg-white border rounded-lg ${
         isDragging ? 'shadow-lg border-blue-300' : 'border-gray-200'
-      } ${disabled ? 'opacity-60' : ''} ${!isEnabled ? 'bg-gray-50' : ''}`}
+      } ${disabled ? 'opacity-60' : ''} ${!isEnabled ? 'opacity-50' : ''}`}
     >
       {/* Main row */}
-      <div className="flex items-center justify-between p-3">
+      <div className="flex items-center justify-between p-4">
         <div className="flex items-center gap-3">
           {/* Drag handle */}
           <button
@@ -136,36 +151,27 @@ function SortableBlock({
           </button>
 
           {/* Block name */}
-          <span className={`font-medium ${isEnabled ? 'text-gray-700' : 'text-gray-400'}`}>
+          <span className={`font-medium ${isEnabled ? 'text-gray-900' : 'text-gray-400'}`}>
             {BLOCK_LABELS[block]}
           </span>
 
-          {/* Settings summary badge */}
-          {hasSettings && isEnabled && (
-            <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded">
-              {block === 'logo' && config && 'style' in config && 'position' in config && (
-                <>{config.style}, {config.position}</>
-              )}
-              {(block === 'title' || block === 'description' || block === 'tagline') && config && 'size' in config && (
-                <>{config.size}</>
-              )}
+          {/* Settings badge(s) */}
+          {settingsBadge && (
+            <span className={`text-xs px-2 py-0.5 rounded ${isEnabled ? 'bg-gray-100 text-gray-600' : 'bg-gray-50 text-gray-400'}`}>
+              {settingsBadge}
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Settings button */}
-          {hasSettings && isEnabled && (
+        <div className="flex items-center gap-3">
+          {/* View/Edit link */}
+          {hasSettings && (
             <button
-              onClick={() => setShowSettings(!showSettings)}
+              onClick={() => setIsExpanded(!isExpanded)}
               disabled={disabled}
-              className={`p-1.5 rounded hover:bg-gray-100 ${showSettings ? 'bg-gray-100 text-blue-600' : 'text-gray-400'}`}
-              title="Block settings"
+              className={`text-sm font-medium ${isEnabled ? 'text-cyan-600 hover:text-cyan-700' : 'text-gray-400'}`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
+              View/Edit
             </button>
           )}
 
@@ -173,23 +179,53 @@ function SortableBlock({
           <button
             onClick={onToggle}
             disabled={disabled}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-              isEnabled ? 'bg-green-600' : 'bg-gray-300'
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              isEnabled ? 'bg-cyan-500' : 'bg-gray-300'
             } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           >
             <span
-              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                isEnabled ? 'translate-x-5' : 'translate-x-1'
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                isEnabled ? 'translate-x-6' : 'translate-x-1'
               }`}
             />
           </button>
+
+          {/* Delete button */}
+          <button
+            onClick={onDelete}
+            disabled={disabled}
+            className="text-gray-400 hover:text-gray-600 p-1"
+            title="Remove block"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+
+          {/* Expand chevron */}
+          {hasSettings && (
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              disabled={disabled}
+              className="text-gray-400 hover:text-gray-600 p-1"
+            >
+              <svg
+                className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
       {/* Settings panel (expandable) */}
-      {showSettings && isEnabled && hasSettings && (
+      {isExpanded && hasSettings && (
         <div className="px-4 pb-4 pt-0 border-t border-gray-100">
-          <div className="pt-3 space-y-3">
+          <div className="pt-4 space-y-4">
             {/* Logo settings */}
             {block === 'logo' && (
               <>
@@ -198,8 +234,8 @@ function SortableBlock({
                   <select
                     value={(config as any)?.style || 'square'}
                     onChange={(e) => onSettingChange('style', e.target.value)}
-                    disabled={disabled}
-                    className="px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    disabled={disabled || !isEnabled}
+                    className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   >
                     {LOGO_STYLE_OPTIONS.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -211,8 +247,8 @@ function SortableBlock({
                   <select
                     value={(config as any)?.position || 'left'}
                     onChange={(e) => onSettingChange('position', e.target.value)}
-                    disabled={disabled}
-                    className="px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    disabled={disabled || !isEnabled}
+                    className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   >
                     {LOGO_POSITION_OPTIONS.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -229,8 +265,8 @@ function SortableBlock({
                 <select
                   value={(config as any)?.size || 'medium'}
                   onChange={(e) => onSettingChange('size', e.target.value)}
-                  disabled={disabled}
-                  className="px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  disabled={disabled || !isEnabled}
+                  className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 >
                   {SIZE_OPTIONS.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -252,8 +288,6 @@ export default function AIAppBlockOrderEditor({
   onConfigChange,
   disabled = false
 }: AIAppBlockOrderEditorProps) {
-  const [isOpen, setIsOpen] = useState(false)
-
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -261,39 +295,21 @@ export default function AIAppBlockOrderEditor({
     })
   )
 
-  // Build full list: blocks in order, then disabled blocks at the end
-  const enabledBlocks = blockOrder.filter(block => {
-    const cfg = blockConfig[block]
-    return cfg?.enabled !== false
-  })
-
-  const disabledBlocks = ALL_BLOCK_TYPES.filter(block => {
-    const cfg = blockConfig[block]
-    return cfg?.enabled === false || !blockOrder.includes(block)
-  })
-
-  // For display, show all blocks in order with their enabled state
-  const displayBlocks = [...blockOrder, ...ALL_BLOCK_TYPES.filter(b => !blockOrder.includes(b))]
+  // Get blocks that are not in the current order (available to add)
+  const availableBlocks = ALL_BLOCK_TYPES.filter(block => !blockOrder.includes(block))
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
 
-    if (active.id !== over?.id) {
+    if (active.id !== over?.id && over) {
       const activeBlock = active.id as AIAppBlockType
-      const overBlock = over?.id as AIAppBlockType
+      const overBlock = over.id as AIAppBlockType
 
-      // Only reorder within enabled blocks
-      const currentOrder = [...blockOrder]
-      const oldIndex = currentOrder.indexOf(activeBlock)
-      const newIndex = currentOrder.indexOf(overBlock)
+      const oldIndex = blockOrder.indexOf(activeBlock)
+      const newIndex = blockOrder.indexOf(overBlock)
 
       if (oldIndex !== -1 && newIndex !== -1) {
-        onOrderChange(arrayMove(currentOrder, oldIndex, newIndex))
-      } else if (oldIndex === -1 && newIndex !== -1) {
-        // Adding a new block by dragging
-        const newOrder = [...currentOrder]
-        newOrder.splice(newIndex, 0, activeBlock)
-        onOrderChange(newOrder)
+        onOrderChange(arrayMove(blockOrder, oldIndex, newIndex))
       }
     }
   }
@@ -308,15 +324,24 @@ export default function AIAppBlockOrderEditor({
       [block]: { ...currentConfig, enabled: newEnabled }
     }
     onConfigChange(newConfig)
+  }
 
-    // If enabling, add to block order if not present
-    if (newEnabled && !blockOrder.includes(block)) {
-      onOrderChange([...blockOrder, block])
+  const handleDeleteBlock = (block: AIAppBlockType) => {
+    // Remove from block order
+    onOrderChange(blockOrder.filter(b => b !== block))
+    // Optionally reset config (or keep it for if they re-add)
+  }
+
+  const handleAddBlock = (block: AIAppBlockType) => {
+    // Add to end of block order
+    onOrderChange([...blockOrder, block])
+    // Ensure config exists and is enabled
+    const currentConfig = blockConfig[block] || getDefaultBlockConfig(block)
+    const newConfig = {
+      ...blockConfig,
+      [block]: { ...currentConfig, enabled: true }
     }
-    // If disabling, remove from block order
-    if (!newEnabled && blockOrder.includes(block)) {
-      onOrderChange(blockOrder.filter(b => b !== block))
-    }
+    onConfigChange(newConfig)
   }
 
   const handleSettingChange = (block: AIAppBlockType, key: string, value: string) => {
@@ -328,67 +353,53 @@ export default function AIAppBlockOrderEditor({
     onConfigChange(newConfig)
   }
 
-  // Get enabled blocks summary for header
-  const enabledSummary = blockOrder
-    .filter(b => blockConfig[b]?.enabled !== false)
-    .map(b => BLOCK_LABELS[b])
-    .join(' → ')
-
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-gray-700">Block Order & Settings</span>
-          {enabledSummary && (
-            <span className="text-xs px-2 py-0.5 bg-gray-200 text-gray-600 rounded-full max-w-xs truncate">
-              {enabledSummary}
-            </span>
-          )}
-        </div>
-        <svg
-          className={`w-5 h-5 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+    <div className="space-y-4">
+      {/* Block list */}
+      {blockOrder.length > 0 ? (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {/* Content */}
-      {isOpen && (
-        <div className="p-4 space-y-3">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
+          <SortableContext
+            items={blockOrder}
+            strategy={verticalListSortingStrategy}
           >
-            <SortableContext
-              items={ALL_BLOCK_TYPES}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="space-y-2">
-                {ALL_BLOCK_TYPES.map(block => (
-                  <SortableBlock
-                    key={block}
-                    block={block}
-                    config={blockConfig[block]}
-                    onToggle={() => handleToggleBlock(block)}
-                    onSettingChange={(key, value) => handleSettingChange(block, key, value)}
-                    disabled={disabled}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
+            <div className="space-y-2">
+              {blockOrder.map(block => (
+                <SortableBlock
+                  key={block}
+                  block={block}
+                  config={blockConfig[block]}
+                  onToggle={() => handleToggleBlock(block)}
+                  onDelete={() => handleDeleteBlock(block)}
+                  onSettingChange={(key, value) => handleSettingChange(block, key, value)}
+                  disabled={disabled}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      ) : (
+        <div className="text-center py-8 text-gray-500 border border-dashed border-gray-300 rounded-lg">
+          No blocks added. Use the buttons below to add blocks.
+        </div>
+      )}
 
-          <p className="text-xs text-gray-400 mt-2">
-            Toggle blocks on/off. Drag to reorder. Click the gear icon to configure block-specific settings.
-          </p>
+      {/* Add block buttons */}
+      {availableBlocks.length > 0 && (
+        <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
+          {availableBlocks.map(block => (
+            <button
+              key={block}
+              onClick={() => handleAddBlock(block)}
+              disabled={disabled}
+              className="px-4 py-2 text-sm font-medium text-purple-600 bg-white border border-purple-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              + {BLOCK_LABELS[block]}
+            </button>
+          ))}
         </div>
       )}
     </div>
