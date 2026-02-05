@@ -66,20 +66,18 @@ export function SubscribeForm() {
     }
   }, [])
 
-  // Wait for SparkLoop popup to close then redirect
+  // Wait for SparkLoop popup to close then redirect to offers
   const waitForSparkLoopPopupClose = (emailToRedirect: string) => {
     let popupDetected = false
     let checkCount = 0
-    const maxWaitTime = 180 // 3 minutes max
+    const maxWaitTime = 180
 
     const checkInterval = setInterval(() => {
       checkCount++
 
-      // Look for SparkLoop popup elements
       const sparkloopIframe = document.querySelector('iframe[src*="sparkloop"]') ||
                               document.querySelector('iframe[src*="upscribe"]')
 
-      // Look for fixed/absolute positioned overlays
       const overlayElements = document.querySelectorAll('body > div')
       let hasPopupOverlay = false
 
@@ -96,10 +94,8 @@ export function SubscribeForm() {
 
       if (popupExists && !popupDetected) {
         popupDetected = true
-        console.log('[SparkLoop] Popup detected!')
       }
 
-      // If popup was detected and is now gone, redirect
       if (popupDetected && !hasPopupOverlay && !sparkloopIframe) {
         setTimeout(() => {
           const stillHasOverlay = Array.from(document.querySelectorAll('body > div')).some((el) => {
@@ -109,25 +105,21 @@ export function SubscribeForm() {
           })
 
           if (!stillHasOverlay) {
-            console.log('[SparkLoop] Popup closed, redirecting...')
             clearInterval(checkInterval)
-            window.location.href = `/subscribe/info?email=${encodeURIComponent(emailToRedirect)}`
+            window.location.href = `/subscribe/offers?email=${encodeURIComponent(emailToRedirect)}`
           }
         }, 500)
       }
 
-      // If no popup detected after 10 seconds, redirect anyway
       if (!popupDetected && checkCount >= 10) {
-        console.log('[SparkLoop] No popup detected after 10s, redirecting...')
         clearInterval(checkInterval)
-        window.location.href = `/subscribe/info?email=${encodeURIComponent(emailToRedirect)}`
+        window.location.href = `/subscribe/offers?email=${encodeURIComponent(emailToRedirect)}`
         return
       }
 
-      // Timeout after max wait time
       if (checkCount >= maxWaitTime) {
         clearInterval(checkInterval)
-        window.location.href = `/subscribe/info?email=${encodeURIComponent(emailToRedirect)}`
+        window.location.href = `/subscribe/offers?email=${encodeURIComponent(emailToRedirect)}`
       }
     }, 1000)
   }
@@ -164,8 +156,8 @@ export function SubscribeForm() {
           window.fbq('track', 'Lead')
         }
 
-        // SparkLoop will detect the form submission and show popup
-        // Wait for popup to close before redirecting
+        // SparkLoop will detect form submission and show popup
+        // Wait for popup to close, then redirect to offers
         waitForSparkLoopPopupClose(email)
       } else {
         setError(data.error || 'Subscription failed. Please try again.')
