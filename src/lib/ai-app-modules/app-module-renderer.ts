@@ -196,21 +196,10 @@ export class AppModuleRenderer {
       }
 
       case 'button': {
-        // Determine button text based on mode
+        // Button text priority: custom from database > static fallback from settings
         const buttonConfig = styles.blockConfig.button
-        const buttonMode = buttonConfig?.mode || 'dynamic'
-        let buttonText: string
-
-        if (buttonMode === 'static' && buttonConfig?.staticText) {
-          // Static mode: use configured text
-          buttonText = buttonConfig.staticText
-        } else if (buttonMode === 'custom' && app.button_text) {
-          // Custom mode: use database text if available
-          buttonText = app.button_text
-        } else {
-          // Dynamic mode (default): use "Try {app_name}"
-          buttonText = `Try ${app.app_name}`
-        }
+        const staticText = buttonConfig?.staticText || 'Learn More'
+        const buttonText = app.button_text || staticText
 
         return `
           <div style="margin-top: 8px;">

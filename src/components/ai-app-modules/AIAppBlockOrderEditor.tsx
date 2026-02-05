@@ -89,11 +89,8 @@ function getSettingsBadge(block: AIAppBlockType, config: ProductCardBlockConfig[
   if ((block === 'title' || block === 'description' || block === 'tagline') && 'size' in config) {
     return config.size as string
   }
-  if (block === 'button' && 'mode' in config) {
-    const mode = config.mode as string
-    if (mode === 'static') return 'static'
-    if (mode === 'custom') return 'custom'
-    return 'dynamic'
+  if (block === 'button' && 'staticText' in config && config.staticText) {
+    return config.staticText as string
   }
   return null
 }
@@ -272,34 +269,20 @@ function SortableBlock({
 
             {/* Button settings */}
             {block === 'button' && (
-              <>
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm text-gray-600">Button Mode</label>
-                  <select
-                    value={(config as any)?.mode || 'dynamic'}
-                    onChange={(e) => onSettingChange('mode', e.target.value)}
+                  <label className="text-sm text-gray-600">Default Text</label>
+                  <input
+                    type="text"
+                    value={(config as any)?.staticText || ''}
+                    onChange={(e) => onSettingChange('staticText', e.target.value)}
+                    placeholder="Learn More"
                     disabled={disabled || !isEnabled}
-                    className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                  >
-                    <option value="dynamic">Dynamic (Try App Name)</option>
-                    <option value="static">Static (Fixed Text)</option>
-                    <option value="custom">Custom (From Database)</option>
-                  </select>
+                    className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 w-40"
+                  />
                 </div>
-                {(config as any)?.mode === 'static' && (
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm text-gray-600">Button Text</label>
-                    <input
-                      type="text"
-                      value={(config as any)?.staticText || ''}
-                      onChange={(e) => onSettingChange('staticText', e.target.value)}
-                      placeholder="Learn More"
-                      disabled={disabled || !isEnabled}
-                      className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 w-40"
-                    />
-                  </div>
-                )}
-              </>
+                <p className="text-xs text-gray-500">Products with custom button text in the database will use that instead.</p>
+              </div>
             )}
           </div>
         </div>

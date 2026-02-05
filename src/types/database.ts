@@ -649,8 +649,7 @@ export interface ProductCardBlockConfig {
   }
   button?: {
     enabled: boolean
-    mode?: 'static' | 'dynamic' | 'custom'  // static=fixed text, dynamic="Try {name}", custom=from database
-    staticText?: string  // Text to use when mode is 'static'
+    staticText?: string  // Default button text (used when product has no custom button_text)
   }
 }
 
