@@ -14,9 +14,9 @@ export default function AIApplicationsPage() {
   const [addForm, setAddForm] = useState<Partial<AIApplication>>({
     app_name: '',
     description: '',
-    category: 'Payroll',
+    category: null,
     app_url: '',
-    tool_type: 'Client',
+    tool_type: null,
     category_priority: 0,
     is_active: true,
     is_featured: false,
@@ -127,14 +127,15 @@ export default function AIApplicationsPage() {
         setAddForm({
           app_name: '',
           description: '',
-          category: 'Payroll',
+          category: null,
           app_url: '',
-          tool_type: 'Client',
+          tool_type: null,
           category_priority: 0,
           is_active: true,
           is_featured: false,
           is_paid_placement: false,
-          is_affiliate: false
+          is_affiliate: false,
+          ai_app_module_id: null
         })
       }
     } catch (error) {
@@ -206,7 +207,9 @@ export default function AIApplicationsPage() {
   }
 
   const filteredApps = apps.filter(app => {
-    const matchesCategory = filterCategory === 'all' || app.category === filterCategory
+    const matchesCategory = filterCategory === 'all' ||
+      (filterCategory === 'uncategorized' && !app.category) ||
+      app.category === filterCategory
     const matchesAffiliate = filterAffiliate === 'all' ||
       (filterAffiliate === 'affiliates' && app.is_affiliate) ||
       (filterAffiliate === 'non-affiliates' && !app.is_affiliate)
@@ -226,7 +229,18 @@ export default function AIApplicationsPage() {
     return module?.name || 'Unknown'
   }
 
-  const categories = ['Payroll', 'HR', 'Accounting System', 'Finance', 'Productivity', 'Client Management', 'Banking']
+  // Categories matching AIAppCategory type from database.ts
+  const categories = [
+    'Accounting & Bookkeeping',
+    'Tax & Compliance',
+    'Payroll',
+    'Finance & Analysis',
+    'Expense Management',
+    'Client Management',
+    'Productivity',
+    'HR',
+    'Banking & Payments'
+  ]
   const toolTypes = ['Client', 'Firm']
 
   if (loading) {
@@ -412,9 +426,10 @@ export default function AIApplicationsPage() {
                 </label>
                 <select
                   value={addForm.category || ''}
-                  onChange={(e) => setAddForm({ ...addForm, category: e.target.value as any })}
+                  onChange={(e) => setAddForm({ ...addForm, category: e.target.value || null as any })}
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 >
+                  <option value="">-- Select Category --</option>
                   {categories.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
@@ -425,10 +440,11 @@ export default function AIApplicationsPage() {
                   Tool Type
                 </label>
                 <select
-                  value={addForm.tool_type || 'Client'}
-                  onChange={(e) => setAddForm({ ...addForm, tool_type: e.target.value as any })}
+                  value={addForm.tool_type || ''}
+                  onChange={(e) => setAddForm({ ...addForm, tool_type: e.target.value || null as any })}
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 >
+                  <option value="">-- Select Type --</option>
                   {toolTypes.map(type => (
                     <option key={type} value={type}>{type}</option>
                   ))}
@@ -611,6 +627,7 @@ export default function AIApplicationsPage() {
                 className="border border-gray-300 rounded-lg px-3 py-2"
               >
                 <option value="all">All Categories</option>
+                <option value="uncategorized">No Category</option>
                 {categories.map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
@@ -709,9 +726,10 @@ export default function AIApplicationsPage() {
                       <td className="px-6 py-4">
                         <select
                           value={editForm.category || ''}
-                          onChange={(e) => setEditForm({ ...editForm, category: e.target.value as any })}
+                          onChange={(e) => setEditForm({ ...editForm, category: e.target.value || null as any })}
                           className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
                         >
+                          <option value="">-- None --</option>
                           {categories.map(cat => (
                             <option key={cat} value={cat}>{cat}</option>
                           ))}
@@ -719,10 +737,11 @@ export default function AIApplicationsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <select
-                          value={editForm.tool_type || 'Client'}
-                          onChange={(e) => setEditForm({ ...editForm, tool_type: e.target.value as any })}
+                          value={editForm.tool_type || ''}
+                          onChange={(e) => setEditForm({ ...editForm, tool_type: e.target.value || null as any })}
                           className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
                         >
+                          <option value="">-- None --</option>
                           {toolTypes.map(type => (
                             <option key={type} value={type}>{type}</option>
                           ))}
