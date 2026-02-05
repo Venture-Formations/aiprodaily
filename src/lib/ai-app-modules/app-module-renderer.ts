@@ -1,6 +1,6 @@
 /**
  * AI App Module Renderer
- * Renders AI app modules with configurable block order
+ * Renders AI app modules with configurable block order and per-block settings
  */
 
 import { wrapTrackingUrl, type LinkType } from '../url-tracking'
@@ -11,7 +11,9 @@ import type {
   AIAppBlockType,
   ProductCardLayoutMode,
   ProductCardLogoStyle,
-  ProductCardTextSize
+  ProductCardLogoPosition,
+  ProductCardTextSize,
+  ProductCardBlockConfig
 } from '@/types/database'
 
 /**
@@ -30,6 +32,18 @@ const DESCRIPTION_SIZES: Record<ProductCardTextSize, string> = {
   small: '12px',
   medium: '14px',
   large: '16px'
+}
+
+/**
+ * Default block config when none exists
+ */
+const DEFAULT_BLOCK_CONFIG: ProductCardBlockConfig = {
+  logo: { enabled: true, style: 'square', position: 'left' },
+  title: { enabled: true, size: 'medium' },
+  description: { enabled: true, size: 'medium' },
+  tagline: { enabled: false, size: 'medium' },
+  image: { enabled: false },
+  button: { enabled: false }
 }
 
 /**
@@ -61,6 +75,8 @@ interface BlockStyleOptions {
   bodyFont: string
   // Layout settings (Product Cards)
   layoutMode: ProductCardLayoutMode
+  blockConfig: ProductCardBlockConfig
+  // Legacy settings (fallback)
   logoStyle: ProductCardLogoStyle
   titleSize: ProductCardTextSize
   descriptionSize: ProductCardTextSize
@@ -93,6 +109,35 @@ function getAppEmoji(app: AIApplication): string {
  */
 export class AppModuleRenderer {
   /**
+   * Get effective setting from block_config or fall back to module-level setting
+   */
+  private static getLogoStyle(styles: BlockStyleOptions): ProductCardLogoStyle {
+    return styles.blockConfig.logo?.style || styles.logoStyle || 'square'
+  }
+
+  private static getLogoPosition(styles: BlockStyleOptions): ProductCardLogoPosition {
+    return styles.blockConfig.logo?.position || 'left'
+  }
+
+  private static getTitleSize(styles: BlockStyleOptions): ProductCardTextSize {
+    return styles.blockConfig.title?.size || styles.titleSize || 'medium'
+  }
+
+  private static getDescriptionSize(styles: BlockStyleOptions): ProductCardTextSize {
+    return styles.blockConfig.description?.size || styles.descriptionSize || 'medium'
+  }
+
+  private static getTaglineSize(styles: BlockStyleOptions): ProductCardTextSize {
+    return styles.blockConfig.tagline?.size || 'medium'
+  }
+
+  private static isBlockEnabled(blockType: AIAppBlockType, styles: BlockStyleOptions): boolean {
+    const config = styles.blockConfig[blockType]
+    // Default to enabled if not specified
+    return config?.enabled !== false
+  }
+
+  /**
    * Render a single block for an app
    */
   private static renderBlock(
@@ -102,23 +147,26 @@ export class AppModuleRenderer {
     styles: BlockStyleOptions,
     index: number
   ): string {
+    // Check if block is enabled
+    if (!this.isBlockEnabled(blockType, styles)) {
+      return ''
+    }
+
     switch (blockType) {
       case 'title': {
         const emoji = getAppEmoji(app)
-        const fontSize = TITLE_SIZES[styles.titleSize] || '16px'
+        const fontSize = TITLE_SIZES[this.getTitleSize(styles)]
         return `<strong style="font-size: ${fontSize};">${index + 1}.</strong> ${emoji} <a href="${trackingUrl}" style="color: ${styles.secondaryColor || styles.primaryColor}; text-decoration: underline; font-weight: bold; font-size: ${fontSize};">${app.app_name}</a>`
       }
 
       case 'logo': {
         if (!app.logo_url) return ''
-        const borderRadius = styles.logoStyle === 'round' ? '50%' : '8px'
-        return `
-          <div style="margin: 8px 0;">
-            <a href="${trackingUrl}">
-              <img src="${app.logo_url}" alt="${app.app_name}"
-                style="width: 48px; height: 48px; border-radius: ${borderRadius}; object-fit: cover;" />
-            </a>
-          </div>`
+        const logoStyle = this.getLogoStyle(styles)
+        const borderRadius = logoStyle === 'round' ? '50%' : '8px'
+        return `<a href="${trackingUrl}">
+          <img src="${app.logo_url}" alt="${app.app_name}"
+            style="width: 48px; height: 48px; border-radius: ${borderRadius}; object-fit: cover; vertical-align: middle;" />
+        </a>`
       }
 
       case 'image': {
@@ -134,14 +182,12 @@ export class AppModuleRenderer {
 
       case 'tagline': {
         if (!app.tagline) return ''
-        return `
-          <div style="font-style: italic; color: #666; font-size: 14px; margin: 4px 0;">
-            ${app.tagline}
-          </div>`
+        const fontSize = DESCRIPTION_SIZES[this.getTaglineSize(styles)]
+        return `<span style="font-style: italic; color: #666; font-size: ${fontSize};">${app.tagline}</span>`
       }
 
       case 'description': {
-        const fontSize = DESCRIPTION_SIZES[styles.descriptionSize] || '14px'
+        const fontSize = DESCRIPTION_SIZES[this.getDescriptionSize(styles)]
         return `<span style="font-size: ${fontSize};"> ${app.description || 'AI-powered application'}</span>`
       }
 
@@ -170,30 +216,83 @@ export class AppModuleRenderer {
     styles: BlockStyleOptions,
     index: number
   ): string {
-    let blocksHtml = ''
+    // Filter to only enabled blocks
+    const enabledBlocks = blockOrder.filter(b => this.isBlockEnabled(b, styles))
+
+    if (enabledBlocks.length === 0) {
+      return ''
+    }
+
+    const logoPosition = this.getLogoPosition(styles)
+    const hasLogo = enabledBlocks.includes('logo') && app.logo_url
+    const logoHtml = hasLogo ? this.renderBlock('logo', app, trackingUrl, styles, index) : ''
+
+    // Separate logo from other content for left/right positioning
+    const otherBlocks = enabledBlocks.filter(b => b !== 'logo')
+
+    let contentHtml = ''
 
     if (styles.layoutMode === 'stacked') {
-      // Stacked layout: title/logo on their own line, then description below
-      for (const blockType of blockOrder) {
+      // Stacked layout: title on one line, description below
+      for (const blockType of otherBlocks) {
         const blockHtml = this.renderBlock(blockType, app, trackingUrl, styles, index)
-        if (blockType === 'title' || blockType === 'logo' || blockType === 'image') {
-          blocksHtml += `<div>${blockHtml}</div>`
+        if (!blockHtml) continue
+
+        if (blockType === 'title') {
+          contentHtml += `<div>${blockHtml}</div>`
         } else if (blockType === 'description' || blockType === 'tagline') {
-          blocksHtml += `<div style="margin-top: 4px;">${blockHtml}</div>`
+          contentHtml += `<div style="margin-top: 4px;">${blockHtml}</div>`
         } else {
-          blocksHtml += blockHtml
+          contentHtml += blockHtml
         }
       }
     } else {
-      // Inline layout: current behavior - all on same line
-      for (const blockType of blockOrder) {
-        blocksHtml += this.renderBlock(blockType, app, trackingUrl, styles, index)
+      // Inline layout: all on same line
+      for (const blockType of otherBlocks) {
+        contentHtml += this.renderBlock(blockType, app, trackingUrl, styles, index)
       }
+    }
+
+    // Build final HTML based on logo position
+    let itemHtml = ''
+
+    if (hasLogo && logoPosition === 'left') {
+      // Logo on left using table for email compatibility
+      itemHtml = `
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+          <tr>
+            <td style="width: 60px; vertical-align: top; padding-right: 12px;">
+              ${logoHtml}
+            </td>
+            <td style="vertical-align: top;">
+              ${contentHtml}
+            </td>
+          </tr>
+        </table>`
+    } else if (hasLogo && logoPosition === 'right') {
+      // Logo on right
+      itemHtml = `
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+          <tr>
+            <td style="vertical-align: top;">
+              ${contentHtml}
+            </td>
+            <td style="width: 60px; vertical-align: top; padding-left: 12px; text-align: right;">
+              ${logoHtml}
+            </td>
+          </tr>
+        </table>`
+    } else if (hasLogo && logoPosition === 'inline') {
+      // Logo inline with text
+      itemHtml = `${logoHtml} ${contentHtml}`
+    } else {
+      // No logo or logo disabled
+      itemHtml = contentHtml
     }
 
     return `
       <div style="padding: 12px 0; border-bottom: 1px solid #e0e0e0; font-family: ${styles.bodyFont}; font-size: 16px; line-height: 24px; color: #333;">
-        ${blocksHtml}
+        ${itemHtml}
       </div>`
   }
 
@@ -247,6 +346,13 @@ export class AppModuleRenderer {
 
     // Get publication styling
     const settings = await getBusinessSettings(publicationId)
+
+    // Merge default block config with module's block config
+    const blockConfig: ProductCardBlockConfig = {
+      ...DEFAULT_BLOCK_CONFIG,
+      ...(module.block_config || {})
+    }
+
     const styles: BlockStyleOptions = {
       primaryColor: settings.primary_color,
       secondaryColor: settings.secondary_color,
@@ -255,6 +361,8 @@ export class AppModuleRenderer {
       bodyFont: settings.body_font,
       // Layout settings from module (Product Cards)
       layoutMode: module.layout_mode || 'inline',
+      blockConfig,
+      // Legacy fallbacks
       logoStyle: module.logo_style || 'square',
       titleSize: module.title_size || 'medium',
       descriptionSize: module.description_size || 'medium'
@@ -340,6 +448,13 @@ export class AppModuleRenderer {
     publicationId: string
   ): Promise<string> {
     const settings = await getBusinessSettings(publicationId)
+
+    // Merge default block config with module's block config
+    const blockConfig: ProductCardBlockConfig = {
+      ...DEFAULT_BLOCK_CONFIG,
+      ...(module.block_config || {})
+    }
+
     const styles: BlockStyleOptions = {
       primaryColor: settings.primary_color,
       secondaryColor: settings.secondary_color,
@@ -348,6 +463,8 @@ export class AppModuleRenderer {
       bodyFont: settings.body_font,
       // Layout settings from module (Product Cards)
       layoutMode: module.layout_mode || 'inline',
+      blockConfig,
+      // Legacy fallbacks
       logoStyle: module.logo_style || 'square',
       titleSize: module.title_size || 'medium',
       descriptionSize: module.description_size || 'medium'

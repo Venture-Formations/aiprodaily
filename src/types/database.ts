@@ -620,6 +620,34 @@ export type AIAppSelectionMode = 'affiliate_priority' | 'random' | 'manual'
 export type ProductCardLayoutMode = 'stacked' | 'inline'
 export type ProductCardLogoStyle = 'round' | 'square'
 export type ProductCardTextSize = 'small' | 'medium' | 'large'
+export type ProductCardLogoPosition = 'left' | 'right' | 'inline'
+
+// Per-block configuration for Product Cards
+export interface ProductCardBlockConfig {
+  logo?: {
+    enabled: boolean
+    style: ProductCardLogoStyle
+    position: ProductCardLogoPosition
+  }
+  title?: {
+    enabled: boolean
+    size: ProductCardTextSize
+  }
+  description?: {
+    enabled: boolean
+    size: ProductCardTextSize
+  }
+  tagline?: {
+    enabled: boolean
+    size: ProductCardTextSize
+  }
+  image?: {
+    enabled: boolean
+  }
+  button?: {
+    enabled: boolean
+  }
+}
 
 export interface AIAppModule {
   id: string
@@ -640,6 +668,8 @@ export interface AIAppModule {
   logo_style: ProductCardLogoStyle
   title_size: ProductCardTextSize
   description_size: ProductCardTextSize
+  // Per-block configuration (Product Cards)
+  block_config: ProductCardBlockConfig
   created_at: string
   updated_at: string
 }

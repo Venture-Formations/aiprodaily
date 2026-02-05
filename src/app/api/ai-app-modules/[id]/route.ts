@@ -105,6 +105,12 @@ export async function PATCH(
       }
     }
 
+    // Block config (per-block settings)
+    if (body.block_config !== undefined) {
+      updates.block_config = body.block_config
+      console.log(`[AIAppModules] Saving block_config:`, JSON.stringify(body.block_config))
+    }
+
     const { data: module, error } = await supabaseAdmin
       .from('ai_app_modules')
       .update(updates)

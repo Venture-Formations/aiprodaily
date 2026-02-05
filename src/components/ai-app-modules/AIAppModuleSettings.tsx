@@ -7,9 +7,8 @@ import type {
   AIAppModule,
   AIAppBlockType,
   AIAppSelectionMode,
-  ProductCardLayoutMode,
-  ProductCardLogoStyle,
-  ProductCardTextSize
+  ProductCardBlockConfig,
+  ProductCardLayoutMode
 } from '@/types/database'
 
 interface AIAppModuleSettingsProps {
@@ -17,6 +16,16 @@ interface AIAppModuleSettingsProps {
   publicationId: string
   onUpdate: (updates: Partial<AIAppModule>) => Promise<void>
   onDelete: () => void
+}
+
+// Default block config when none exists
+const DEFAULT_BLOCK_CONFIG: ProductCardBlockConfig = {
+  logo: { enabled: true, style: 'square', position: 'left' },
+  title: { enabled: true, size: 'medium' },
+  description: { enabled: true, size: 'medium' },
+  tagline: { enabled: false, size: 'medium' },
+  image: { enabled: false },
+  button: { enabled: false }
 }
 
 export default function AIAppModuleSettings({
@@ -37,6 +46,12 @@ export default function AIAppModuleSettings({
     setDeleteConfirm(false)
     setDeleteText('')
   }, [module.id])
+
+  // Ensure block_config has defaults merged
+  const blockConfig: ProductCardBlockConfig = {
+    ...DEFAULT_BLOCK_CONFIG,
+    ...(localModule.block_config || {})
+  }
 
   const handleNameChange = async (newName: string) => {
     if (newName.trim() === module.name) return
@@ -64,6 +79,18 @@ export default function AIAppModuleSettings({
       setLocalModule(prev => ({ ...prev, block_order: newOrder }))
     } catch (error) {
       console.error('Failed to update block order:', error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleBlockConfigChange = async (newConfig: ProductCardBlockConfig) => {
+    setSaving(true)
+    try {
+      await onUpdate({ block_config: newConfig })
+      setLocalModule(prev => ({ ...prev, block_config: newConfig }))
+    } catch (error) {
+      console.error('Failed to update block config:', error)
     } finally {
       setSaving(false)
     }
@@ -105,13 +132,13 @@ export default function AIAppModuleSettings({
     }
   }
 
-  const handleLayoutChange = async (key: 'layout_mode' | 'logo_style' | 'title_size' | 'description_size', value: string) => {
+  const handleLayoutModeChange = async (value: ProductCardLayoutMode) => {
     setSaving(true)
     try {
-      await onUpdate({ [key]: value })
-      setLocalModule(prev => ({ ...prev, [key]: value as any }))
+      await onUpdate({ layout_mode: value })
+      setLocalModule(prev => ({ ...prev, layout_mode: value }))
     } catch (error) {
-      console.error(`Failed to update ${key}:`, error)
+      console.error('Failed to update layout mode:', error)
     } finally {
       setSaving(false)
     }
@@ -199,9 +226,12 @@ export default function AIAppModuleSettings({
 
       {/* Settings Sections */}
       <div className="space-y-4">
+        {/* Block Order & Settings - now includes per-block config */}
         <AIAppBlockOrderEditor
           blockOrder={localModule.block_order as AIAppBlockType[]}
-          onChange={handleBlockOrderChange}
+          blockConfig={blockConfig}
+          onOrderChange={handleBlockOrderChange}
+          onConfigChange={handleBlockConfigChange}
           disabled={saving}
         />
 
@@ -211,7 +241,7 @@ export default function AIAppModuleSettings({
           disabled={saving}
         />
 
-        {/* Module-specific settings */}
+        {/* Product Selection Settings */}
         <div className="border border-gray-200 rounded-lg overflow-hidden">
           <div className="p-4 bg-gray-50">
             <span className="font-medium text-gray-700">Product Selection Settings</span>
@@ -270,13 +300,12 @@ export default function AIAppModuleSettings({
           </div>
         </div>
 
-        {/* Layout Settings Section */}
+        {/* Layout Mode (stacked vs inline for text) */}
         <div className="border border-gray-200 rounded-lg overflow-hidden">
           <div className="p-4 bg-gray-50">
-            <span className="font-medium text-gray-700">Layout Settings</span>
+            <span className="font-medium text-gray-700">Text Layout</span>
           </div>
-          <div className="p-4 space-y-4">
-            {/* Layout Mode */}
+          <div className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <label className="text-sm font-medium text-gray-700">Layout Mode</label>
@@ -284,65 +313,12 @@ export default function AIAppModuleSettings({
               </div>
               <select
                 value={localModule.layout_mode || 'inline'}
-                onChange={(e) => handleLayoutChange('layout_mode', e.target.value)}
+                onChange={(e) => handleLayoutModeChange(e.target.value as ProductCardLayoutMode)}
                 disabled={saving}
                 className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               >
                 <option value="inline">Inline (title with description)</option>
                 <option value="stacked">Stacked (title above description)</option>
-              </select>
-            </div>
-
-            {/* Logo Style */}
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Logo Style</label>
-                <p className="text-xs text-gray-500">Shape of product logos</p>
-              </div>
-              <select
-                value={localModule.logo_style || 'square'}
-                onChange={(e) => handleLayoutChange('logo_style', e.target.value)}
-                disabled={saving}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="square">Square (rounded corners)</option>
-                <option value="round">Round (circular)</option>
-              </select>
-            </div>
-
-            {/* Title Size */}
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Title Size</label>
-                <p className="text-xs text-gray-500">Font size for product names</p>
-              </div>
-              <select
-                value={localModule.title_size || 'medium'}
-                onChange={(e) => handleLayoutChange('title_size', e.target.value)}
-                disabled={saving}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="small">Small (14px)</option>
-                <option value="medium">Medium (16px)</option>
-                <option value="large">Large (18px)</option>
-              </select>
-            </div>
-
-            {/* Description Size */}
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Description Size</label>
-                <p className="text-xs text-gray-500">Font size for product descriptions</p>
-              </div>
-              <select
-                value={localModule.description_size || 'medium'}
-                onChange={(e) => handleLayoutChange('description_size', e.target.value)}
-                disabled={saving}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="small">Small (12px)</option>
-                <option value="medium">Medium (14px)</option>
-                <option value="large">Large (16px)</option>
               </select>
             </div>
           </div>
