@@ -49,15 +49,6 @@ export function OffersContent({ logoUrl, newsletterName }: OffersContentProps) {
             />
           </div>
 
-          {/* Skip link */}
-          <p className="mt-6 text-sm text-slate-500">
-            <a
-              href={`/subscribe/info?email=${encodeURIComponent(email)}`}
-              className="text-blue-600 hover:text-blue-500 underline"
-            >
-              Skip and continue to complete your profile
-            </a>
-          </p>
         </div>
       </Container>
     </section>
