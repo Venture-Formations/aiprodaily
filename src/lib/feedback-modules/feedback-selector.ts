@@ -7,6 +7,7 @@
  */
 
 import { supabaseAdmin } from '../supabase'
+import { isIPExcluded, IPExclusion } from '../ip-utils'
 import type { FeedbackModule, FeedbackModuleWithBlocks, FeedbackBlock, FeedbackVote, FeedbackComment, FeedbackVoteBreakdown, FeedbackIssueStats } from '@/types/database'
 
 export class FeedbackModuleSelector {
@@ -494,17 +495,42 @@ export class FeedbackModuleSelector {
     user_vote?: { value: number; label: string }
     average_score: number
   }> {
-    // Get all votes for this issue
-    const { data: votes, error } = await supabaseAdmin
+    // Get the module to find publication_id for IP exclusion
+    const { data: module } = await supabaseAdmin
+      .from('feedback_modules')
+      .select('publication_id')
+      .eq('id', moduleId)
+      .single()
+
+    // Fetch excluded IPs if we have a publication
+    let exclusions: IPExclusion[] = []
+    if (module?.publication_id) {
+      const { data: excludedIpsData } = await supabaseAdmin
+        .from('excluded_ips')
+        .select('ip_address, is_range, cidr_prefix')
+        .eq('publication_id', module.publication_id)
+
+      exclusions = (excludedIpsData || []).map(e => ({
+        ip_address: e.ip_address,
+        is_range: e.is_range || false,
+        cidr_prefix: e.cidr_prefix
+      }))
+    }
+
+    // Get all votes for this issue (include ip_address for filtering)
+    const { data: allVotes, error } = await supabaseAdmin
       .from('feedback_votes')
-      .select('selected_value, selected_label, subscriber_email')
+      .select('selected_value, selected_label, subscriber_email, ip_address')
       .eq('feedback_module_id', moduleId)
       .eq('issue_id', issueId)
 
-    if (error || !votes) {
+    if (error || !allVotes) {
       console.error('[FeedbackSelector] Error fetching votes:', error)
       return { total_votes: 0, breakdown: [], average_score: 0 }
     }
+
+    // Filter out excluded IPs
+    const votes = allVotes.filter(vote => !isIPExcluded(vote.ip_address, exclusions))
 
     const total = votes.length
     if (total === 0) {
@@ -532,10 +558,10 @@ export class FeedbackModuleSelector {
       }))
       .sort((a, b) => b.value - a.value) // Sort by value descending (highest first)
 
-    // Find user's vote if email provided
+    // Find user's vote if email provided (check against unfiltered votes so user sees their own vote)
     let user_vote: { value: number; label: string } | undefined
     if (email) {
-      const userVote = votes.find(v => v.subscriber_email.toLowerCase() === email.toLowerCase())
+      const userVote = allVotes.find(v => v.subscriber_email.toLowerCase() === email.toLowerCase())
       if (userVote) {
         user_vote = { value: userVote.selected_value, label: userVote.selected_label }
       }
@@ -583,10 +609,22 @@ export class FeedbackModuleSelector {
       return []
     }
 
-    // Build query for votes
+    // Fetch excluded IPs for this publication
+    const { data: excludedIpsData } = await supabaseAdmin
+      .from('excluded_ips')
+      .select('ip_address, is_range, cidr_prefix')
+      .eq('publication_id', publicationId)
+
+    const exclusions: IPExclusion[] = (excludedIpsData || []).map(e => ({
+      ip_address: e.ip_address,
+      is_range: e.is_range || false,
+      cidr_prefix: e.cidr_prefix
+    }))
+
+    // Build query for votes (include ip_address for filtering)
     let query = supabaseAdmin
       .from('feedback_votes')
-      .select('issue_id, selected_value, selected_label, voted_at')
+      .select('issue_id, selected_value, selected_label, voted_at, ip_address')
       .eq('feedback_module_id', module.id)
       .not('issue_id', 'is', null)
 
@@ -597,11 +635,21 @@ export class FeedbackModuleSelector {
       query = query.lte('voted_at', dateTo)
     }
 
-    const { data: votes, error } = await query
+    const { data: allVotes, error } = await query
 
-    if (error || !votes) {
+    if (error || !allVotes) {
       console.error('[FeedbackSelector] Error fetching analytics:', error)
       return []
+    }
+
+    // Filter out excluded IPs
+    const votes = allVotes.filter(vote => !isIPExcluded(vote.ip_address, exclusions))
+
+    if (exclusions.length > 0) {
+      const excludedCount = allVotes.length - votes.length
+      if (excludedCount > 0) {
+        console.log(`[FeedbackSelector] Filtered ${excludedCount} votes from excluded IPs`)
+      }
     }
 
     // Get comment counts per issue
@@ -630,18 +678,18 @@ export class FeedbackModuleSelector {
       }
     }
 
-    // Get issue dates
+    // Get issue dates from publication_issues table
     const issueIds = Array.from(new Set(votes.map(v => v.issue_id).filter(Boolean)))
     let issueDates: Record<string, string> = {}
 
     if (issueIds.length > 0) {
       const { data: issues } = await supabaseAdmin
-        .from('issues')
-        .select('id, issue_date')
+        .from('publication_issues')
+        .select('id, date')
         .in('id', issueIds)
 
       if (issues) {
-        issueDates = Object.fromEntries(issues.map(i => [i.id, i.issue_date]))
+        issueDates = Object.fromEntries(issues.map(i => [i.id, i.date]))
       }
     }
 
