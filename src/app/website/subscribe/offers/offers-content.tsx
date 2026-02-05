@@ -18,6 +18,14 @@ export function OffersContent({ logoUrl, newsletterName }: OffersContentProps) {
     if (email && email !== '{{email}}' && email.includes('@')) {
       sessionStorage.setItem('subscribe_email', email)
     }
+
+    // Log SparkLoop events from previous page
+    const sparkloopEvents = sessionStorage.getItem('sparkloop_events')
+    if (sparkloopEvents) {
+      console.log('[SparkLoop Events from previous page]:', JSON.parse(sparkloopEvents))
+      const subscribed = sessionStorage.getItem('sparkloop_subscribed')
+      console.log('[SparkLoop] User subscribed to recommendations:', subscribed === 'true')
+    }
   }, [email])
 
   // Listen for messages from AfterOffers iframe

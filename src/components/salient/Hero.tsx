@@ -58,14 +58,23 @@ export function Hero() {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    // Listen for SparkLoop events
+    // Listen for SparkLoop events and store them
     const handleSparkLoopEvent = (e: Event) => {
       const customEvent = e as CustomEvent
       console.log('[SparkLoop Event]', e.type, customEvent.detail)
 
+      // Store events in sessionStorage so we can see them after redirect
+      const events = JSON.parse(sessionStorage.getItem('sparkloop_events') || '[]')
+      events.push({
+        type: e.type,
+        detail: customEvent.detail,
+        timestamp: new Date().toISOString()
+      })
+      sessionStorage.setItem('sparkloop_events', JSON.stringify(events))
+
       // Track the event (you can send this to your analytics)
       if (e.type === 'sl:subscriber-updated') {
-        console.log('[SparkLoop] User subscribed to recommendations')
+        sessionStorage.setItem('sparkloop_subscribed', 'true')
       }
     }
 
