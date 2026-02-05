@@ -104,8 +104,8 @@ export function PersonalizationForm() {
       const data = await response.json()
 
       if (response.ok) {
-        // Redirect to AfterOffers with subscriber email
-        window.location.href = `https://offers.afteroffers.com/show_offers/994-2MMat6y-1?email=${encodeURIComponent(email)}`
+        // Redirect to home page
+        window.location.href = '/'
       } else {
         setError(data.error || 'Update failed. Please try again.')
         setIsSubmitting(false)
