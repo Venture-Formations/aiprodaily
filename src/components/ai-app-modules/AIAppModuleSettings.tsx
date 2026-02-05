@@ -148,6 +148,18 @@ export default function AIAppModuleSettings({
     }
   }
 
+  const handleShowInDirectoryToggle = async () => {
+    setSaving(true)
+    try {
+      await onUpdate({ show_in_directory: !localModule.show_in_directory })
+      setLocalModule(prev => ({ ...prev, show_in_directory: !prev.show_in_directory }))
+    } catch (error) {
+      console.error('Failed to update show_in_directory:', error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleDelete = async () => {
     if (deleteText !== 'DELETE') return
 
@@ -327,7 +339,7 @@ export default function AIAppModuleSettings({
             </div>
 
             {/* Layout Mode */}
-            <div className="flex items-center justify-between py-3">
+            <div className="flex items-center justify-between py-3 border-b border-gray-100">
               <div>
                 <label className="text-sm font-medium text-gray-700">Text Layout Mode</label>
                 <p className="text-xs text-gray-500">How title and description are arranged</p>
@@ -341,6 +353,27 @@ export default function AIAppModuleSettings({
                 <option value="inline">Inline (title with description)</option>
                 <option value="stacked">Stacked (title above description)</option>
               </select>
+            </div>
+
+            {/* Show in Directory */}
+            <div className="flex items-center justify-between py-3">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Show in Tools Directory</label>
+                <p className="text-xs text-gray-500">Products in this module appear in the public /tools directory</p>
+              </div>
+              <button
+                onClick={handleShowInDirectoryToggle}
+                disabled={saving}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  localModule.show_in_directory !== false ? 'bg-cyan-500' : 'bg-gray-300'
+                } ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    localModule.show_in_directory !== false ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
             </div>
           </div>
 

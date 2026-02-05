@@ -111,6 +111,11 @@ export async function PATCH(
       console.log(`[AIAppModules] Saving block_config:`, JSON.stringify(body.block_config))
     }
 
+    // Directory visibility
+    if (body.show_in_directory !== undefined) {
+      updates.show_in_directory = Boolean(body.show_in_directory)
+    }
+
     const { data: module, error } = await supabaseAdmin
       .from('ai_app_modules')
       .update(updates)

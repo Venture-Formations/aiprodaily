@@ -670,6 +670,8 @@ export interface AIAppModule {
   description_size: ProductCardTextSize
   // Per-block configuration (Product Cards)
   block_config: ProductCardBlockConfig
+  // Directory visibility
+  show_in_directory: boolean  // Whether apps in this module appear in the public /tools directory
   created_at: string
   updated_at: string
 }
