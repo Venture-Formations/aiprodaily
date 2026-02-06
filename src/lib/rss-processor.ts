@@ -400,13 +400,39 @@ export class RSSProcessor {
           }
 
           // Generate body using existing headline
-          const bodyResult = section === 'primary'
+          let bodyResult = section === 'primary'
             ? await AI_CALL.primaryArticleBody(postData, newsletterId, article.headline, 500, 0.7)
             : await AI_CALL.secondaryArticleBody(postData, newsletterId, article.headline, 500, 0.7)
+
+          // If AI returned { raw: jsonString } (parse failure), try to re-parse and extract content
+          if ((!bodyResult.content || !bodyResult.word_count) && bodyResult.raw && typeof bodyResult.raw === 'string') {
+            try {
+              const parsed = JSON.parse(bodyResult.raw)
+              if (parsed && parsed.content) {
+                bodyResult = { content: parsed.content, word_count: parsed.word_count || parsed.content.split(/\s+/).length }
+              }
+            } catch {
+              // not valid JSON
+            }
+          }
 
           if (!bodyResult.content || !bodyResult.word_count) {
             console.error(`[Bodies] Invalid body response for article ${article.id}`)
             return
+          }
+
+          // Safety check: if content looks like a JSON object, extract the content field
+          if (bodyResult.content.trimStart().startsWith('{') && bodyResult.content.trimEnd().endsWith('}')) {
+            try {
+              const parsed = JSON.parse(bodyResult.content)
+              if (parsed && typeof parsed.content === 'string') {
+                console.warn(`[Bodies] Content was raw JSON for article ${article.id}, extracting content field`)
+                bodyResult.content = parsed.content
+                bodyResult.word_count = parsed.word_count || parsed.content.split(/\s+/).length
+              }
+            } catch {
+              // Not valid JSON despite looking like it, use as-is
+            }
           }
 
           // Debug: Check if content has newlines before save
@@ -2763,9 +2789,21 @@ export class RSSProcessor {
     }
 
     // Step 2: Generate body using AI_CALL with the generated title
-    const bodyResult = section === 'primary'
+    let bodyResult = section === 'primary'
       ? await AI_CALL.primaryArticleBody(postData, newsletterId, headline, 500, 0.7)
       : await AI_CALL.secondaryArticleBody(postData, newsletterId, headline, 500, 0.7)
+
+    // If AI returned { raw: jsonString } (parse failure), try to re-parse and extract content
+    if ((!bodyResult.content || !bodyResult.word_count) && bodyResult.raw && typeof bodyResult.raw === 'string') {
+      try {
+        const parsed = JSON.parse(bodyResult.raw)
+        if (parsed && parsed.content) {
+          bodyResult = { content: parsed.content, word_count: parsed.word_count || parsed.content.split(/\s+/).length }
+        }
+      } catch {
+        // not valid JSON
+      }
+    }
 
     if (!bodyResult.content || !bodyResult.word_count) {
       throw new Error('Invalid article body response')
@@ -4068,8 +4106,25 @@ export class RSSProcessor {
               bodyResult = { content: rawResult.trim(), word_count: rawResult.split(/\s+/).length }
             } else if (rawResult.content) {
               bodyResult = rawResult
+            } else if (rawResult.raw) {
+              // callOpenAI returned { raw: string } — JSON parsing failed internally.
+              // Try to re-parse and extract the content field before falling back.
+              let extracted = false
+              try {
+                const parsed = JSON.parse(rawResult.raw)
+                if (parsed && parsed.content) {
+                  bodyResult = { content: parsed.content, word_count: parsed.word_count || parsed.content.split(/\s+/).length }
+                  extracted = true
+                }
+              } catch {
+                // not valid JSON, fall through
+              }
+              if (!extracted) {
+                console.warn(`[Module Bodies] Could not extract content from raw AI response, using raw text`)
+                bodyResult = { content: rawResult.raw, word_count: rawResult.raw.split(/\s+/).length }
+              }
             } else {
-              bodyResult = { content: rawResult.raw || '', word_count: (rawResult.raw || '').split(/\s+/).length }
+              bodyResult = { content: '', word_count: 0 }
             }
           } else {
             bodyResult = await AI_CALL.primaryArticleBody(postData, newsletterId, article.headline, 500, 0.7)
@@ -4078,6 +4133,20 @@ export class RSSProcessor {
           if (!bodyResult.content || !bodyResult.word_count) {
             console.error(`[Module Bodies] Invalid body response for article ${article.id}`)
             return
+          }
+
+          // Safety check: if content looks like a JSON object, extract the content field
+          if (bodyResult.content.trimStart().startsWith('{') && bodyResult.content.trimEnd().endsWith('}')) {
+            try {
+              const parsed = JSON.parse(bodyResult.content)
+              if (parsed && typeof parsed.content === 'string') {
+                console.warn(`[Module Bodies] Content was raw JSON for article ${article.id}, extracting content field`)
+                bodyResult.content = parsed.content
+                bodyResult.word_count = parsed.word_count || parsed.content.split(/\s+/).length
+              }
+            } catch {
+              // Not valid JSON despite looking like it, use as-is
+            }
           }
 
           await supabaseAdmin

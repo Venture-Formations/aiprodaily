@@ -77,7 +77,9 @@ export default function FeedbackDashboardPage() {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A'
-    const date = new Date(dateString)
+    // Parse as local date to avoid timezone shift (dateString is "YYYY-MM-DD")
+    const [year, month, day] = dateString.split('T')[0].split('-').map(Number)
+    const date = new Date(year, month - 1, day)
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
