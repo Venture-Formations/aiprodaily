@@ -10,13 +10,17 @@ const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
  * POST /api/sparkloop/subscribe
  *
  * Subscribe a user to selected newsletter recommendations
- * Proxies to SparkLoop API to keep API key server-side
- * Also tracks submissions in our recommendation metrics
+ * Follows SparkLoop's 3-step Upscribe flow:
+ *   1. Get recommendations (already done client-side via /api/sparkloop/recommendations)
+ *   2. Create/fetch subscriber in SparkLoop
+ *   3. Subscribe to selected newsletters
+ *
+ * Country code is detected server-side from Vercel's x-vercel-ip-country header.
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, refCodes, countryCode } = body
+    const { email, refCodes } = body
 
     if (!email) {
       return NextResponse.json(
@@ -34,9 +38,31 @@ export async function POST(request: NextRequest) {
 
     const service = new SparkLoopService()
 
+    // Detect country from Vercel geo header (fallback: 'US')
+    const countryCode = request.headers.get('x-vercel-ip-country') || 'US'
+    const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || undefined
+    const userAgent = request.headers.get('user-agent') || undefined
+
+    console.log(`[SparkLoop Subscribe] Detected country: ${countryCode}, IP: ${ipAddress ? 'present' : 'none'}`)
+
+    // Step 2: Create or fetch subscriber in SparkLoop (non-blocking)
+    try {
+      const subscriber = await service.createOrFetchSubscriber({
+        email,
+        country_code: countryCode,
+        ip_address: ipAddress,
+        user_agent: userAgent,
+      })
+      console.log(`[SparkLoop Subscribe] Subscriber ready: ${subscriber.uuid}`)
+    } catch (subError) {
+      // Non-blocking: log but continue with subscribe
+      console.error('[SparkLoop Subscribe] Step 2 (create/fetch subscriber) failed:', subError)
+    }
+
+    // Step 3: Subscribe to selected newsletters
     await service.subscribeToNewsletters({
       subscriber_email: email,
-      country_code: countryCode || 'US',
+      country_code: countryCode,
       recommendations: refCodes.join(','),
       utm_source: 'custom_popup',
     })

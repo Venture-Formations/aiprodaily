@@ -10,6 +10,8 @@ import type {
   SparkLoopRecommendationsResponse,
   SparkLoopGenerateRequest,
   SparkLoopSubscribeRequest,
+  SparkLoopSubscriber,
+  SparkLoopSubscriberResponse,
   StoredSparkLoopRecommendation,
 } from '@/types/sparkloop'
 import { supabaseAdmin } from '@/lib/supabase'
@@ -108,6 +110,67 @@ export class SparkLoopService {
     console.log(`[SparkLoop] Generated ${data.recommendations.length} recommendations`)
 
     return data.recommendations.filter(rec => rec.status === 'active')
+  }
+
+  /**
+   * Create or fetch a subscriber in SparkLoop (Step 2 of Upscribe flow)
+   * POST /v2/subscribers — if 400 (already exists), GET /v2/subscribers/:email
+   */
+  async createOrFetchSubscriber(params: {
+    email: string
+    country_code: string
+    ip_address?: string
+    user_agent?: string
+  }): Promise<SparkLoopSubscriber> {
+    const createUrl = `${SPARKLOOP_API_BASE}/subscribers`
+
+    const createBody: Record<string, string> = {
+      email: params.email,
+      country_code: params.country_code,
+    }
+    if (params.ip_address) createBody.ip_address = params.ip_address
+    if (params.user_agent) createBody.user_agent = params.user_agent
+
+    const createResponse = await fetch(createUrl, {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': this.apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(createBody),
+    })
+
+    if (createResponse.ok) {
+      const data: SparkLoopSubscriberResponse = await createResponse.json()
+      console.log(`[SparkLoop] Created subscriber: ${data.subscriber.uuid}`)
+      return data.subscriber
+    }
+
+    // 400 typically means subscriber already exists — fetch instead
+    if (createResponse.status === 400) {
+      console.log(`[SparkLoop] Subscriber ${params.email} already exists, fetching...`)
+      const fetchUrl = `${SPARKLOOP_API_BASE}/subscribers/${encodeURIComponent(params.email)}`
+
+      const fetchResponse = await fetch(fetchUrl, {
+        method: 'GET',
+        headers: {
+          'X-API-KEY': this.apiKey,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (fetchResponse.ok) {
+        const data: SparkLoopSubscriberResponse = await fetchResponse.json()
+        console.log(`[SparkLoop] Fetched existing subscriber: ${data.subscriber.uuid}`)
+        return data.subscriber
+      }
+
+      const fetchError = await fetchResponse.text()
+      throw new Error(`SparkLoop fetch subscriber error: ${fetchResponse.status} - ${fetchError}`)
+    }
+
+    const errorText = await createResponse.text()
+    throw new Error(`SparkLoop create subscriber error: ${createResponse.status} - ${errorText}`)
   }
 
   /**

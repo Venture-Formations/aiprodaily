@@ -216,7 +216,6 @@ export function SparkLoopModal({
         body: JSON.stringify({
           email: subscriberEmail,
           refCodes,
-          countryCode: 'US', // Could be detected from IP in future
         }),
       })
 

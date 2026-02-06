@@ -114,6 +114,24 @@ export interface SparkLoopSubscribeRequest {
 }
 
 /**
+ * Subscriber object from SparkLoop API
+ * POST /v2/subscribers or GET /v2/subscribers/:email
+ */
+export interface SparkLoopSubscriber {
+  uuid: string
+  email: string
+  name: string | null
+  created_at: string
+}
+
+/**
+ * Response from POST /v2/subscribers or GET /v2/subscribers/:email
+ */
+export interface SparkLoopSubscriberResponse {
+  subscriber: SparkLoopSubscriber
+}
+
+/**
  * Modal state for the custom SparkLoop popup
  */
 export interface SparkLoopModalState {
