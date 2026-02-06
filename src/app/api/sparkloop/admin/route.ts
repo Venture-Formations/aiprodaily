@@ -52,12 +52,17 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Get full counts from unfiltered data
+    // Get full counts from unfiltered data (mutually exclusive categories)
     const { data: allData } = await supabaseAdmin
       .from('sparkloop_recommendations')
       .select('status, excluded')
       .eq('publication_id', DEFAULT_PUBLICATION_ID)
 
+    // Categories are mutually exclusive:
+    // - Active: status=active AND not excluded
+    // - Excluded: any status but excluded=true
+    // - Paused: status=paused AND not excluded
+    // - Archived: status in (archived, awaiting_approval) AND not excluded
     return NextResponse.json({
       success: true,
       recommendations: withScores,
@@ -65,8 +70,8 @@ export async function GET(request: NextRequest) {
         total: allData?.length || 0,
         active: allData?.filter(r => r.status === 'active' && !r.excluded).length || 0,
         excluded: allData?.filter(r => r.excluded).length || 0,
-        paused: allData?.filter(r => r.status === 'paused').length || 0,
-        archived: allData?.filter(r => r.status === 'archived' || r.status === 'awaiting_approval').length || 0,
+        paused: allData?.filter(r => r.status === 'paused' && !r.excluded).length || 0,
+        archived: allData?.filter(r => (r.status === 'archived' || r.status === 'awaiting_approval') && !r.excluded).length || 0,
       },
     })
   } catch (error) {
