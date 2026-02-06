@@ -47,6 +47,10 @@
     {
       "path": "/api/cron/post-to-facebook",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-sparkloop",
+      "schedule": "*/15 * * * *"
     }
   ],
   "functions": {
