@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
     console.log(`[SparkLoop Subscribe] Detected country: ${countryCode}, IP: ${ipAddress ? 'present' : 'none'}`)
 
     // Step 2: Create or fetch subscriber in SparkLoop (non-blocking)
+    let subscriberUuid: string | null = null
     try {
       const subscriber = await service.createOrFetchSubscriber({
         email,
@@ -53,19 +54,40 @@ export async function POST(request: NextRequest) {
         ip_address: ipAddress,
         user_agent: userAgent,
       })
-      console.log(`[SparkLoop Subscribe] Subscriber ready: ${subscriber.uuid}`)
+      subscriberUuid = subscriber.uuid
+      console.log(`[SparkLoop Subscribe] Subscriber ready: ${subscriberUuid}`)
     } catch (subError) {
       // Non-blocking: log but continue with subscribe
       console.error('[SparkLoop Subscribe] Step 2 (create/fetch subscriber) failed:', subError)
     }
 
     // Step 3: Subscribe to selected newsletters
-    await service.subscribeToNewsletters({
+    const subscribeResult = await service.subscribeToNewsletters({
       subscriber_email: email,
       country_code: countryCode,
       recommendations: refCodes.join(','),
       utm_source: 'custom_popup',
     })
+
+    // Record the SparkLoop API confirmation as a server-side event
+    try {
+      await supabaseAdmin.from('sparkloop_events').insert({
+        publication_id: DEFAULT_PUBLICATION_ID,
+        event_type: 'api_subscribe_confirmed',
+        subscriber_email: email,
+        raw_payload: {
+          source: 'server',
+          subscriber_uuid: subscriberUuid,
+          country_code: countryCode,
+          ref_codes: refCodes,
+          sparkloop_response: subscribeResult.response,
+          ip_present: !!ipAddress,
+        },
+        event_timestamp: new Date().toISOString(),
+      })
+    } catch (eventError) {
+      console.error('[SparkLoop Subscribe] Failed to record API confirmation event:', eventError)
+    }
 
     // Record submissions in our metrics (increments submissions and pending counts)
     try {
