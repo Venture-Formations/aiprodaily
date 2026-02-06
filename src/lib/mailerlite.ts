@@ -896,26 +896,14 @@ export class MailerLiteService {
     try {
       console.log(`Updating MailerLite subscriber field: ${email}, ${fieldName} = ${fieldValue}`)
 
-      // Find subscriber by email
-      const searchResponse = await mailerliteClient.get(`/subscribers`, {
-        params: { filter: { email } }
-      })
-
-      if (!searchResponse.data || !searchResponse.data.data || searchResponse.data.data.length === 0) {
-        console.log(`Subscriber ${email} not found in MailerLite`)
-        return { success: false, error: 'Subscriber not found' }
-      }
-
-      const subscriberId = searchResponse.data.data[0].id
-
-      // Update subscriber with custom field
+      // Update subscriber with custom field - MailerLite API accepts email as identifier
       const updateData = {
         fields: {
           [fieldName]: fieldValue
         }
       }
 
-      const updateResponse = await mailerliteClient.put(`/subscribers/${subscriberId}`, updateData)
+      const updateResponse = await mailerliteClient.put(`/subscribers/${encodeURIComponent(email)}`, updateData)
 
       if (updateResponse.status === 200 || updateResponse.status === 201) {
         console.log(`Successfully updated ${fieldName} for ${email}`)
@@ -925,9 +913,14 @@ export class MailerLiteService {
       console.error('Unexpected response status:', updateResponse.status)
       return { success: false, error: `Unexpected status: ${updateResponse.status}` }
 
-    } catch (error) {
-      console.error('Error updating MailerLite subscriber field:', error)
-      return { success: false, error }
+    } catch (error: any) {
+      // Check if it's a 404 (subscriber not found)
+      if (error?.response?.status === 404) {
+        console.log(`Subscriber ${email} not found in MailerLite`)
+        return { success: false, error: 'Subscriber not found' }
+      }
+      console.error('Error updating MailerLite subscriber field:', error?.response?.data || error)
+      return { success: false, error: error?.response?.data?.message || error }
     }
   }
 }

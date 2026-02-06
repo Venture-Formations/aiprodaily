@@ -54,9 +54,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Update MailerLite subscriber field to mark as SparkLoop participant
+    // Use retry with delay since subscriber might not be fully created yet
     try {
       const mailerlite = new MailerLiteService()
-      const result = await mailerlite.updateSubscriberField(email, 'sparkloop', 'true')
+      let result = await mailerlite.updateSubscriberField(email, 'sparkloop', 'true')
+
+      // If subscriber not found, wait and retry (timing issue with new subscribers)
+      if (!result.success && result.error === 'Subscriber not found') {
+        console.log(`[SparkLoop Subscribe] Subscriber ${email} not found, waiting 2s and retrying...`)
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        result = await mailerlite.updateSubscriberField(email, 'sparkloop', 'true')
+      }
+
       if (result.success) {
         console.log(`[SparkLoop Subscribe] Updated MailerLite SparkLoop field for ${email}`)
       } else {
