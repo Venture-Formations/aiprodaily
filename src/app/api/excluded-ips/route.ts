@@ -194,8 +194,10 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * DELETE - Remove an IP from the exclusion list
- * Body: { publication_id, ip_address }
+ * DELETE - Remove IP(s) from the exclusion list
+ * Body options:
+ *   - { publication_id, ip_address } - Remove single IP
+ *   - { publication_id, exclusion_source } - Remove all IPs with given source (velocity, honeypot, manual)
  */
 export async function DELETE(request: NextRequest) {
   try {
@@ -206,7 +208,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { publication_id, ip_address } = body
+    const { publication_id, ip_address, exclusion_source } = body
 
     if (!publication_id) {
       return NextResponse.json(
@@ -215,9 +217,71 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    // Bulk delete by exclusion_source
+    if (exclusion_source && typeof exclusion_source === 'string') {
+      const validSources = ['manual', 'velocity', 'honeypot']
+      if (!validSources.includes(exclusion_source)) {
+        return NextResponse.json(
+          { error: `exclusion_source must be one of: ${validSources.join(', ')}` },
+          { status: 400 }
+        )
+      }
+
+      // Count before deletion
+      const { count: beforeCount } = await supabaseAdmin
+        .from('excluded_ips')
+        .select('*', { count: 'exact', head: true })
+        .eq('publication_id', publication_id)
+        .eq('exclusion_source', exclusion_source)
+
+      // Delete all with given source
+      const { error: bulkDeleteError } = await supabaseAdmin
+        .from('excluded_ips')
+        .delete()
+        .eq('publication_id', publication_id)
+        .eq('exclusion_source', exclusion_source)
+
+      if (bulkDeleteError) {
+        console.error('[IP Exclusion] Error bulk removing excluded IPs:', bulkDeleteError)
+        return NextResponse.json({ error: bulkDeleteError.message }, { status: 500 })
+      }
+
+      console.log(`[IP Exclusion] Bulk removed ${beforeCount || 0} IPs with source: ${exclusion_source}`)
+
+      // Return updated list using pagination
+      const BATCH_SIZE = 1000
+      let allExcludedIps: any[] = []
+      let offset = 0
+      let hasMore = true
+
+      while (hasMore) {
+        const { data: batch } = await supabaseAdmin
+          .from('excluded_ips')
+          .select('id, ip_address, is_range, cidr_prefix, reason, added_by, created_at, exclusion_source')
+          .eq('publication_id', publication_id)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + BATCH_SIZE - 1)
+
+        if (batch && batch.length > 0) {
+          allExcludedIps = allExcludedIps.concat(batch)
+          offset += BATCH_SIZE
+          hasMore = batch.length === BATCH_SIZE
+        } else {
+          hasMore = false
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Removed ${beforeCount || 0} IPs with exclusion_source="${exclusion_source}"`,
+        removed: beforeCount || 0,
+        ips: allExcludedIps
+      })
+    }
+
     if (!ip_address || typeof ip_address !== 'string') {
       return NextResponse.json(
-        { error: 'ip_address is required' },
+        { error: 'ip_address or exclusion_source is required' },
         { status: 400 }
       )
     }
