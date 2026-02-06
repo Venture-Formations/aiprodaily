@@ -221,6 +221,7 @@ export class SparkLoopService {
       // Get budget info from partner campaigns
       const budgetInfo = campaignBudgets.get(rec.uuid)
       const remainingBudget = budgetInfo?.remaining_budget_dollars ?? null
+      const screeningPeriod = budgetInfo?.referral_pending_period ?? null
       const cpaInDollars = (rec.cpa || 0) / 100
       const minBudgetRequired = cpaInDollars * 5 // Need at least 5 referrals worth of budget
 
@@ -264,6 +265,7 @@ export class SparkLoopService {
         sparkloop_earnings: rec.earnings || 0,
         sparkloop_net_earnings: rec.net_earnings || 0,
         remaining_budget_dollars: remainingBudget,
+        screening_period: screeningPeriod,
         excluded,
         excluded_reason: excludedReason,
         last_synced_at: new Date().toISOString(),
