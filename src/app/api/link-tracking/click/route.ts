@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import {
+  checkUserAgent,
+  checkAndAutoExcludeVelocity,
+  handleHoneypotClick,
+  HONEYPOT_CONFIG
+} from '@/lib/bot-detection'
 
 /**
  * Ensures URL has a protocol, prepending https:// if missing
@@ -198,6 +204,9 @@ export async function GET(request: NextRequest) {
                       request.headers.get('x-real-ip') ||
                       null
 
+    // Check for bot user agent
+    const uaCheck = checkUserAgent(userAgent)
+
     // Look up publication_id from issue_id for multi-tenant filtering
     let publicationId: string | null = null
     if (issueId) {
@@ -233,7 +242,9 @@ export async function GET(request: NextRequest) {
         link_url: url,
         link_section: section,
         user_agent: userAgent,
-        ip_address: ipAddress
+        ip_address: ipAddress,
+        is_bot_ua: uaCheck.isBot,
+        bot_ua_reason: uaCheck.reason
       })
       .select()
       .single()
@@ -245,6 +256,18 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('Link click tracked successfully:', data.id)
+
+    // Bot detection: Honeypot auto-exclusion (fire-and-forget)
+    if (section === HONEYPOT_CONFIG.SECTION_NAME && ipAddress && publicationId) {
+      handleHoneypotClick(ipAddress, publicationId)
+        .catch(err => console.error('[Honeypot] Error:', err))
+    }
+
+    // Bot detection: Velocity check (fire-and-forget)
+    if (ipAddress && issueId && publicationId) {
+      checkAndAutoExcludeVelocity({ ipAddress, issueId, publicationId })
+        .catch(err => console.error('[Velocity] Error:', err))
+    }
 
     // Check if this click should queue an email provider field update
     const fieldToUpdate = getFieldForClick(section, linkType || undefined)

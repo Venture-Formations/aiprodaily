@@ -3,6 +3,7 @@
 
 import { supabaseAdmin } from './supabase'
 import { wrapTrackingUrl } from './url-tracking'
+import { HONEYPOT_CONFIG } from './bot-detection'
 import { AdScheduler } from './ad-scheduler'
 import { normalizeEmailHtml } from './html-normalizer'
 import { getBusinessSettings as getPublicationBusinessSettings } from './publication-settings'
@@ -1762,6 +1763,16 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
   </tr>
 </table>` : ''
 
+  // Generate honeypot link for bot detection (invisible to humans)
+  const honeypotUrl = issueDate
+    ? wrapTrackingUrl(HONEYPOT_CONFIG.DUMMY_URL, HONEYPOT_CONFIG.SECTION_NAME, issueDate, issueId)
+    : null
+
+  const honeypotHtml = honeypotUrl ? `
+<div style="display:none;position:absolute;left:-9999px;visibility:hidden;height:0;width:0;overflow:hidden;">
+  <a href="${honeypotUrl}" tabindex="-1" aria-hidden="true">.</a>
+</div>` : ''
+
   return `
 ${socialMediaSection}
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:770px;margin:0 auto;">
@@ -1775,6 +1786,7 @@ ${socialMediaSection}
     </td>
   </tr>
 </table>
+${honeypotHtml}
   </div>
 </body>
 </html>`
