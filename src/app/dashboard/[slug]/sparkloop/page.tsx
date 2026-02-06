@@ -2,7 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import Layout from '@/components/Layout'
-import { RefreshCw, Ban, CheckCircle, ExternalLink, TrendingUp } from 'lucide-react'
+import { RefreshCw, Ban, CheckCircle, TrendingUp, Calendar, DollarSign, Clock, Users } from 'lucide-react'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts'
 
 interface Recommendation {
   id: string
@@ -43,6 +53,36 @@ interface Counts {
   archived: number
 }
 
+interface DailyStats {
+  date: string
+  pending: number
+  confirmed: number
+  projectedEarnings: number
+}
+
+interface TopEarner {
+  name: string
+  logo: string | null
+  referrals: number
+  earnings: number
+}
+
+interface ChartStats {
+  summary: {
+    totalPending: number
+    totalConfirmed: number
+    totalEarnings: number
+    projectedFromPending: number
+    avgCPA: number
+  }
+  dailyStats: DailyStats[]
+  topEarners: TopEarner[]
+  dateRange: {
+    from: string
+    to: string
+  }
+}
+
 export default function SparkLoopAdminPage() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [counts, setCounts] = useState<Counts>({ total: 0, active: 0, excluded: 0, paused: 0, archived: 0 })
@@ -52,9 +92,18 @@ export default function SparkLoopAdminPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
+  // Chart state
+  const [chartStats, setChartStats] = useState<ChartStats | null>(null)
+  const [chartLoading, setChartLoading] = useState(true)
+  const [timeframe, setTimeframe] = useState<'7' | '30' | '90'>('30')
+
   useEffect(() => {
     fetchRecommendations()
   }, [filter])
+
+  useEffect(() => {
+    fetchChartStats()
+  }, [timeframe])
 
   async function fetchRecommendations() {
     setLoading(true)
@@ -71,6 +120,20 @@ export default function SparkLoopAdminPage() {
     setLoading(false)
   }
 
+  async function fetchChartStats() {
+    setChartLoading(true)
+    try {
+      const res = await fetch(`/api/sparkloop/stats?days=${timeframe}`)
+      const data = await res.json()
+      if (data.success) {
+        setChartStats(data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch chart stats:', error)
+    }
+    setChartLoading(false)
+  }
+
   async function syncFromSparkLoop() {
     setSyncing(true)
     try {
@@ -79,6 +142,7 @@ export default function SparkLoopAdminPage() {
       if (data.success) {
         alert(`Synced ${data.synced} recommendations (${data.created} new, ${data.updated} updated)`)
         fetchRecommendations()
+        fetchChartStats()
       } else {
         alert('Sync failed: ' + data.error)
       }
@@ -177,6 +241,28 @@ export default function SparkLoopAdminPage() {
     return `${value.toFixed(0)}%`
   }
 
+  const formatDollars = (value: number) => {
+    return `$${value.toFixed(2)}`
+  }
+
+  // Custom tooltip for chart
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const pending = payload.find((p: any) => p.dataKey === 'pending')?.value || 0
+      const confirmed = payload.find((p: any) => p.dataKey === 'confirmed')?.value || 0
+      const earnings = payload.find((p: any) => p.dataKey === 'projectedEarnings')?.value || 0
+      return (
+        <div className="bg-gray-900 text-white p-3 rounded-lg shadow-lg text-sm">
+          <div className="font-medium mb-1">{label}</div>
+          <div className="text-yellow-400">Pending Referrals: {pending}</div>
+          <div className="text-green-400">Confirmed Referrals: {confirmed}</div>
+          <div className="text-purple-400">Projected Earnings: ${earnings.toFixed(2)}</div>
+        </div>
+      )
+    }
+    return null
+  }
+
   return (
     <Layout>
       <div className="p-6">
@@ -197,7 +283,145 @@ export default function SparkLoopAdminPage() {
           </button>
         </div>
 
-        {/* Stats */}
+        {/* Summary Stats */}
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-lg border p-4">
+            <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+              <Clock className="w-4 h-4" />
+              Pending Referrals
+            </div>
+            <div className="text-2xl font-bold text-yellow-600">
+              {chartStats?.summary.totalPending || 0}
+            </div>
+          </div>
+          <div className="bg-white rounded-lg border p-4">
+            <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+              <CheckCircle className="w-4 h-4" />
+              Confirmed Referrals
+            </div>
+            <div className="text-2xl font-bold text-green-600">
+              {chartStats?.summary.totalConfirmed || 0}
+            </div>
+          </div>
+          <div className="bg-white rounded-lg border p-4">
+            <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+              <DollarSign className="w-4 h-4" />
+              Total Earnings
+            </div>
+            <div className="text-2xl font-bold text-purple-600">
+              {formatDollars(chartStats?.summary.totalEarnings || 0)}
+            </div>
+          </div>
+          <div className="bg-white rounded-lg border p-4">
+            <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+              <TrendingUp className="w-4 h-4" />
+              Projected (Pending)
+            </div>
+            <div className="text-2xl font-bold text-blue-600">
+              {formatDollars(chartStats?.summary.projectedFromPending || 0)}
+            </div>
+          </div>
+        </div>
+
+        {/* Chart Section */}
+        <div className="bg-white rounded-lg border p-6 mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">Referral Activity</h2>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setTimeframe('7')}
+                className={`px-3 py-1.5 text-sm rounded-lg ${
+                  timeframe === '7' ? 'bg-purple-600 text-white' : 'bg-gray-100 hover:bg-gray-200'
+                }`}
+              >
+                7 Days
+              </button>
+              <button
+                onClick={() => setTimeframe('30')}
+                className={`px-3 py-1.5 text-sm rounded-lg ${
+                  timeframe === '30' ? 'bg-purple-600 text-white' : 'bg-gray-100 hover:bg-gray-200'
+                }`}
+              >
+                30 Days
+              </button>
+              <button
+                onClick={() => setTimeframe('90')}
+                className={`px-3 py-1.5 text-sm rounded-lg ${
+                  timeframe === '90' ? 'bg-purple-600 text-white' : 'bg-gray-100 hover:bg-gray-200'
+                }`}
+              >
+                90 Days
+              </button>
+            </div>
+          </div>
+
+          {chartLoading ? (
+            <div className="h-64 flex items-center justify-center text-gray-500">
+              Loading chart...
+            </div>
+          ) : chartStats?.dailyStats && chartStats.dailyStats.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartStats.dailyStats}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 12 }}
+                  tickFormatter={(value) => {
+                    const date = new Date(value)
+                    return `${date.getMonth() + 1}/${date.getDate()}`
+                  }}
+                />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend />
+                <Bar dataKey="pending" name="Pending" fill="#eab308" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="confirmed" name="Confirmed" fill="#22c55e" radius={[2, 2, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-gray-500">
+              No data available for this timeframe
+            </div>
+          )}
+
+          {chartStats?.dateRange && (
+            <div className="text-xs text-gray-500 mt-2 text-center">
+              {chartStats.dateRange.from} to {chartStats.dateRange.to}
+            </div>
+          )}
+        </div>
+
+        {/* Top Earners Section */}
+        {chartStats?.topEarners && chartStats.topEarners.length > 0 && (
+          <div className="bg-white rounded-lg border p-6 mb-6">
+            <h2 className="text-lg font-semibold mb-4">
+              Top-Earning Recommendations ({chartStats.dateRange.from} - {chartStats.dateRange.to})
+            </h2>
+            <div className="grid grid-cols-3 gap-4">
+              {chartStats.topEarners.map((earner, index) => (
+                <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  {earner.logo ? (
+                    <img src={earner.logo} alt="" className="w-10 h-10 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                      <Users className="w-5 h-5 text-purple-600" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm truncate">{earner.name}</div>
+                    <div className="text-xs text-gray-500">
+                      <span className="text-purple-600">{earner.referrals} referrals</span>
+                      <span className="mx-1">•</span>
+                      <span className="text-green-600">{formatDollars(earner.earnings)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Recommendation Counts */}
         <div className="grid grid-cols-5 gap-4 mb-6">
           <div className="bg-white rounded-lg border p-4">
             <div className="text-sm text-gray-500">Total</div>
@@ -365,9 +589,10 @@ export default function SparkLoopAdminPage() {
                       ${rec.calculated_score.toFixed(4)}
                     </td>
                     <td className="px-4 py-3 text-xs">
-                      <div>👁 {rec.impressions} imp</div>
-                      <div>📤 {rec.submissions} sub</div>
-                      <div>✅ {rec.confirms} / ❌ {rec.rejections}</div>
+                      <div>Imp: {rec.impressions}</div>
+                      <div>Sub: {rec.submissions}</div>
+                      <div className="text-green-600">Conf: {rec.sparkloop_confirmed}</div>
+                      <div className="text-yellow-600">Pend: {rec.sparkloop_pending}</div>
                     </td>
                     <td className="px-4 py-3">
                       {rec.excluded ? (

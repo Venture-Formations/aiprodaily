@@ -117,7 +117,9 @@
       "Bash(source:*)",
       "Bash(npx vercel logs:*)",
       "mcp__mailerlite__get_subscriber",
-      "mcp__supabase__search_docs"
+      "mcp__supabase__search_docs",
+      "Bash(git remote set-url:*)",
+      "Bash(git hash-object:*)"
     ],
     "deny": [],
     "ask": []
