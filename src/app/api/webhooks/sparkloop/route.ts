@@ -10,7 +10,8 @@ const EVENT_TYPES = {
   NEW_OFFER_LEAD: 'new_offer_lead',
   NEW_REFERRAL: 'new_referral',
   NEW_PARTNER_PENDING_REFERRAL: 'new_partner_pending_referral',
-  NEW_PARTNER_REFERRAL: 'new_partner_referral',
+  NEW_PARTNER_REFERRAL: 'new_partner_referral', // Confirmed referral
+  PARTNER_REFERRAL_REJECTED: 'partner_referral_rejected',
   REWARD_UNLOCKED: 'reward_unlocked',
   REWARD_REDEEMED: 'reward_redeemed',
   SYNC_SUBSCRIBER: 'sync_subscriber',
@@ -70,9 +71,16 @@ export async function POST(request: NextRequest) {
         await handleNewReferral(payload)
         break
 
-      case EVENT_TYPES.NEW_PARTNER_REFERRAL:
       case EVENT_TYPES.NEW_PARTNER_PENDING_REFERRAL:
-        await handlePartnerReferral(payload, eventType)
+        await handlePartnerReferral(payload, eventType, 'pending')
+        break
+
+      case EVENT_TYPES.NEW_PARTNER_REFERRAL:
+        await handlePartnerReferral(payload, eventType, 'confirmed')
+        break
+
+      case EVENT_TYPES.PARTNER_REFERRAL_REJECTED:
+        await handlePartnerReferral(payload, eventType, 'rejected')
         break
 
       case EVENT_TYPES.REWARD_UNLOCKED:
@@ -166,20 +174,70 @@ async function handleNewReferral(payload: any) {
 }
 
 /**
- * Handle partner referral events
+ * Handle partner referral events (pending, confirmed, rejected)
+ * Updates our recommendation metrics for RCR calculation
  */
-async function handlePartnerReferral(payload: any, eventType: string) {
+async function handlePartnerReferral(
+  payload: any,
+  eventType: string,
+  status: 'pending' | 'confirmed' | 'rejected'
+) {
   const subscriber = payload.subscriber || payload.data?.subscriber || {}
+  const offer = payload.offer || payload.data?.offer || {}
 
   const subscriberEmail = subscriber.email || payload.email
   const subscriberUuid = subscriber.uuid || subscriber.id
+  const refCode = offer.ref_code || payload.ref_code
 
-  console.log(`[SparkLoop Webhook] Partner referral (${eventType}): ${subscriberEmail}`)
+  console.log(`[SparkLoop Webhook] Partner referral (${status}): ${subscriberEmail} - ref_code: ${refCode}`)
 
   await storeEvent(eventType, payload, {
     subscriber_email: subscriberEmail,
     subscriber_uuid: subscriberUuid,
+    referred_publication: offer.publication_name,
+    referred_publication_id: offer.id,
   })
+
+  // Update our recommendation metrics if we have a ref_code
+  if (refCode) {
+    try {
+      if (status === 'confirmed') {
+        await supabaseAdmin.rpc('record_sparkloop_confirm', {
+          p_publication_id: DEFAULT_PUBLICATION_ID,
+          p_ref_code: refCode,
+        })
+        console.log(`[SparkLoop Webhook] Recorded confirm for ${refCode}`)
+
+        // Send Slack notification for confirmed referral
+        const slack = new SlackNotificationService()
+        await slack.sendSimpleMessage(
+          `✅ SparkLoop Referral Confirmed!\n\n` +
+          `Subscriber: ${subscriberEmail}\n` +
+          `Newsletter: ${offer.publication_name || refCode}\n` +
+          `Time: ${new Date().toISOString()}`
+        )
+      } else if (status === 'rejected') {
+        await supabaseAdmin.rpc('record_sparkloop_rejection', {
+          p_publication_id: DEFAULT_PUBLICATION_ID,
+          p_ref_code: refCode,
+        })
+        console.log(`[SparkLoop Webhook] Recorded rejection for ${refCode}`)
+
+        // Send Slack notification for rejected referral
+        const slack = new SlackNotificationService()
+        await slack.sendSimpleMessage(
+          `❌ SparkLoop Referral Rejected\n\n` +
+          `Subscriber: ${subscriberEmail}\n` +
+          `Newsletter: ${offer.publication_name || refCode}\n` +
+          `Time: ${new Date().toISOString()}`
+        )
+      }
+      // For 'pending', we don't need to update metrics here - it's tracked when submitted
+    } catch (metricsError) {
+      console.error(`[SparkLoop Webhook] Failed to update metrics for ${refCode}:`, metricsError)
+      // Don't fail the webhook for metrics errors
+    }
+  }
 }
 
 /**

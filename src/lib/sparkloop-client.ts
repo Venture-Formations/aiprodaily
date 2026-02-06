@@ -10,9 +10,14 @@ import type {
   SparkLoopRecommendationsResponse,
   SparkLoopGenerateRequest,
   SparkLoopSubscribeRequest,
+  StoredSparkLoopRecommendation,
 } from '@/types/sparkloop'
+import { supabaseAdmin } from '@/lib/supabase'
 
 const SPARKLOOP_API_BASE = 'https://api.sparkloop.app/v2'
+
+// Default publication ID for AI Pro Daily
+const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
 
 export class SparkLoopService {
   private apiKey: string
@@ -34,16 +39,16 @@ export class SparkLoopService {
   }
 
   /**
-   * Get all recommendations for the Upscribe
-   * Returns active recommendations sorted by potential value
+   * Get all recommendations for the Upscribe (including paused)
+   * Used for syncing to database
    */
-  async getRecommendations(): Promise<SparkLoopRecommendation[]> {
+  async getAllRecommendations(): Promise<SparkLoopRecommendation[]> {
     const url = `${SPARKLOOP_API_BASE}/upscribes/${this.upscribeId}/recommendations?per_page=50`
 
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
+        'X-API-KEY': this.apiKey,
         'Content-Type': 'application/json',
       },
     })
@@ -55,10 +60,20 @@ export class SparkLoopService {
     }
 
     const data: SparkLoopRecommendationsResponse = await response.json()
-    console.log(`[SparkLoop] Fetched ${data.recommendations.length} recommendations`)
+    console.log(`[SparkLoop] Fetched ${data.recommendations.length} total recommendations`)
 
-    // Filter to only active recommendations
-    return data.recommendations.filter(rec => rec.status === 'active')
+    return data.recommendations
+  }
+
+  /**
+   * Get active recommendations for the Upscribe
+   * Used for displaying in popup (only show active ones)
+   */
+  async getRecommendations(): Promise<SparkLoopRecommendation[]> {
+    const all = await this.getAllRecommendations()
+    const active = all.filter(rec => rec.status === 'active')
+    console.log(`[SparkLoop] ${active.length} active of ${all.length} total`)
+    return active
   }
 
   /**
@@ -73,7 +88,7 @@ export class SparkLoopService {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
+        'X-API-KEY': this.apiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -97,8 +112,9 @@ export class SparkLoopService {
 
   /**
    * Subscribe a user to selected newsletter recommendations
+   * Returns the SparkLoop API response for verification
    */
-  async subscribeToNewsletters(params: SparkLoopSubscribeRequest): Promise<void> {
+  async subscribeToNewsletters(params: SparkLoopSubscribeRequest): Promise<{ success: boolean; response?: unknown }> {
     const url = `${SPARKLOOP_API_BASE}/upscribes/${this.upscribeId}/subscribe`
 
     console.log(`[SparkLoop] Subscribing ${params.subscriber_email} to: ${params.recommendations}`)
@@ -106,7 +122,7 @@ export class SparkLoopService {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
+        'X-API-KEY': this.apiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -118,40 +134,390 @@ export class SparkLoopService {
       }),
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('[SparkLoop] Failed to subscribe:', response.status, errorText)
-      throw new Error(`SparkLoop subscribe error: ${response.status}`)
+    const responseText = await response.text()
+    let responseData: unknown = null
+    try {
+      responseData = JSON.parse(responseText)
+    } catch {
+      responseData = responseText
     }
 
-    console.log(`[SparkLoop] Successfully subscribed ${params.subscriber_email}`)
+    if (!response.ok) {
+      console.error('[SparkLoop] Failed to subscribe:', response.status, responseData)
+      throw new Error(`SparkLoop subscribe error: ${response.status} - ${responseText}`)
+    }
+
+    console.log(`[SparkLoop] Successfully subscribed ${params.subscriber_email}`, responseData)
+    return { success: true, response: responseData }
   }
 
   /**
-   * Score and sort recommendations for pre-selection
-   * Prioritizes by: CPA (payout) * estimated value
+   * Fetch partner campaign details which includes remaining_budget_dollars
+   * This tells us which recommendations are out of budget
+   */
+  async getPartnerCampaigns(): Promise<Map<string, { remaining_budget_dollars: number; referral_pending_period: number }>> {
+    const url = `${SPARKLOOP_API_BASE}/partner_profile/partner_campaigns?per_page=200`
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'X-API-KEY': this.apiKey,
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      console.error('[SparkLoop] Failed to fetch partner campaigns:', response.status)
+      return new Map()
+    }
+
+    const data = await response.json()
+    const campaigns = data.partner_campaigns || []
+
+    // Map by uuid for quick lookup
+    const campaignMap = new Map<string, { remaining_budget_dollars: number; referral_pending_period: number }>()
+    for (const campaign of campaigns) {
+      campaignMap.set(campaign.uuid, {
+        remaining_budget_dollars: campaign.remaining_budget_dollars ?? 0,
+        referral_pending_period: campaign.referral_pending_period ?? 14,
+      })
+    }
+
+    console.log(`[SparkLoop] Fetched ${campaignMap.size} partner campaigns with budget info`)
+    return campaignMap
+  }
+
+  /**
+   * Sync all recommendations from SparkLoop API to our database
+   * Updates existing records and creates new ones
+   * Includes both active AND paused recommendations to track status changes
+   * Also fetches budget info to auto-exclude out-of-budget recommendations
+   */
+  async syncRecommendationsToDatabase(publicationId: string = DEFAULT_PUBLICATION_ID): Promise<{
+    synced: number
+    created: number
+    updated: number
+    active: number
+    paused: number
+    outOfBudget: number
+  }> {
+    // Fetch recommendations and partner campaign budget info in parallel
+    const [recommendations, campaignBudgets] = await Promise.all([
+      this.getAllRecommendations(),
+      this.getPartnerCampaigns(),
+    ])
+    let created = 0
+    let updated = 0
+    let outOfBudget = 0
+
+    for (const rec of recommendations) {
+      const { data: existing } = await supabaseAdmin
+        .from('sparkloop_recommendations')
+        .select('id, excluded, excluded_reason')
+        .eq('publication_id', publicationId)
+        .eq('ref_code', rec.ref_code)
+        .single()
+
+      // Get budget info from partner campaigns
+      const budgetInfo = campaignBudgets.get(rec.uuid)
+      const remainingBudget = budgetInfo?.remaining_budget_dollars ?? null
+      const cpaInDollars = (rec.cpa || 0) / 100
+      const minBudgetRequired = cpaInDollars * 5 // Need at least 5 referrals worth of budget
+
+      // Out of budget if: no budget left OR less than 5x CPA remaining
+      const isOutOfBudget = remainingBudget !== null && remainingBudget < minBudgetRequired
+
+      // Auto-exclude if out of budget, auto-reactivate if budget restored
+      let excluded = existing?.excluded ?? false
+      let excludedReason = existing?.excluded_reason ?? null
+
+      if (isOutOfBudget && !excluded) {
+        excluded = true
+        excludedReason = 'budget_used_up'
+        outOfBudget++
+        console.log(`[SparkLoop] Auto-excluding ${rec.publication_name} (budget $${remainingBudget} < 5x CPA $${minBudgetRequired})`)
+      } else if (!isOutOfBudget && excluded && excludedReason === 'budget_used_up') {
+        // Budget restored, reactivate if it was auto-excluded for budget
+        excluded = false
+        excludedReason = null
+        console.log(`[SparkLoop] Auto-reactivating ${rec.publication_name} (budget restored: $${remainingBudget})`)
+      }
+
+      const recordData = {
+        publication_id: publicationId,
+        ref_code: rec.ref_code,
+        sparkloop_uuid: rec.uuid,
+        publication_name: rec.publication_name,
+        publication_logo: rec.publication_logo,
+        description: rec.description,
+        type: rec.type,
+        status: rec.status,
+        cpa: rec.cpa,
+        sparkloop_rcr: rec.last_30_days_confirmation_rate,
+        pinned: rec.pinned,
+        position: rec.position,
+        max_payout: rec.max_payout,
+        partner_program_uuid: rec.partner_program_uuid,
+        sparkloop_pending: rec.referrals?.pending || 0,
+        sparkloop_rejected: rec.referrals?.rejected || 0,
+        sparkloop_confirmed: rec.referrals?.confirmed || 0,
+        sparkloop_earnings: rec.earnings || 0,
+        sparkloop_net_earnings: rec.net_earnings || 0,
+        remaining_budget_dollars: remainingBudget,
+        excluded,
+        excluded_reason: excludedReason,
+        last_synced_at: new Date().toISOString(),
+      }
+
+      if (existing) {
+        // Update existing record (don't overwrite our tracking metrics)
+        await supabaseAdmin
+          .from('sparkloop_recommendations')
+          .update(recordData)
+          .eq('id', existing.id)
+        updated++
+      } else {
+        // Create new record
+        await supabaseAdmin
+          .from('sparkloop_recommendations')
+          .insert(recordData)
+        created++
+      }
+    }
+
+    const active = recommendations.filter(r => r.status === 'active').length
+    const paused = recommendations.filter(r => r.status === 'paused').length
+
+    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (${active} active, ${paused} paused, ${outOfBudget} auto-excluded for budget)`)
+    return { synced: recommendations.length, created, updated, active, paused, outOfBudget }
+  }
+
+  /**
+   * Get stored recommendations from our database
+   * Falls back to API if no stored data
+   */
+  async getStoredRecommendations(publicationId: string = DEFAULT_PUBLICATION_ID): Promise<StoredSparkLoopRecommendation[]> {
+    const { data, error } = await supabaseAdmin
+      .from('sparkloop_recommendations')
+      .select('*')
+      .eq('publication_id', publicationId)
+      .eq('status', 'active')
+      .order('cpa', { ascending: false })
+
+    if (error || !data || data.length === 0) {
+      console.log('[SparkLoop] No stored recommendations, syncing from API...')
+      await this.syncRecommendationsToDatabase(publicationId)
+
+      // Retry fetch after sync
+      const { data: refreshedData } = await supabaseAdmin
+        .from('sparkloop_recommendations')
+        .select('*')
+        .eq('publication_id', publicationId)
+        .eq('status', 'active')
+        .order('cpa', { ascending: false })
+
+      return (refreshedData || []) as StoredSparkLoopRecommendation[]
+    }
+
+    return data as StoredSparkLoopRecommendation[]
+  }
+
+  /**
+   * Increment impression count for recommendations shown in popup
+   */
+  static async recordImpressions(refCodes: string[], publicationId: string = DEFAULT_PUBLICATION_ID): Promise<void> {
+    if (refCodes.length === 0) return
+
+    const { error } = await supabaseAdmin.rpc('increment_sparkloop_impressions', {
+      p_publication_id: publicationId,
+      p_ref_codes: refCodes,
+    })
+
+    if (error) {
+      console.error('[SparkLoop] Failed to record impressions:', error)
+    } else {
+      console.log(`[SparkLoop] Recorded impressions for ${refCodes.length} recommendations`)
+    }
+  }
+
+  /**
+   * Increment selection count when user selects a recommendation
+   */
+  static async recordSelections(refCodes: string[], publicationId: string = DEFAULT_PUBLICATION_ID): Promise<void> {
+    if (refCodes.length === 0) return
+
+    const { error } = await supabaseAdmin.rpc('increment_sparkloop_selections', {
+      p_publication_id: publicationId,
+      p_ref_codes: refCodes,
+    })
+
+    if (error) {
+      console.error('[SparkLoop] Failed to record selections:', error)
+    }
+  }
+
+  /**
+   * Increment submission count when user submits selections
+   */
+  static async recordSubmissions(refCodes: string[], publicationId: string = DEFAULT_PUBLICATION_ID): Promise<void> {
+    if (refCodes.length === 0) return
+
+    const { error } = await supabaseAdmin.rpc('increment_sparkloop_submissions', {
+      p_publication_id: publicationId,
+      p_ref_codes: refCodes,
+    })
+
+    if (error) {
+      console.error('[SparkLoop] Failed to record submissions:', error)
+    } else {
+      console.log(`[SparkLoop] Recorded submissions for ${refCodes.length} recommendations`)
+    }
+  }
+
+  /**
+   * Record a confirmed referral (called from webhook handler)
+   */
+  static async recordConfirm(refCode: string, publicationId: string = DEFAULT_PUBLICATION_ID): Promise<void> {
+    const { error } = await supabaseAdmin.rpc('record_sparkloop_confirm', {
+      p_publication_id: publicationId,
+      p_ref_code: refCode,
+    })
+
+    if (error) {
+      console.error(`[SparkLoop] Failed to record confirm for ${refCode}:`, error)
+    } else {
+      console.log(`[SparkLoop] Recorded confirm for ${refCode}`)
+    }
+  }
+
+  /**
+   * Record a rejected referral (called from webhook handler)
+   */
+  static async recordRejection(refCode: string, publicationId: string = DEFAULT_PUBLICATION_ID): Promise<void> {
+    const { error } = await supabaseAdmin.rpc('record_sparkloop_rejection', {
+      p_publication_id: publicationId,
+      p_ref_code: refCode,
+    })
+
+    if (error) {
+      console.error(`[SparkLoop] Failed to record rejection for ${refCode}:`, error)
+    } else {
+      console.log(`[SparkLoop] Recorded rejection for ${refCode}`)
+    }
+  }
+
+  /**
+   * Score a recommendation using CR × CPA × RCR formula
+   * Returns expected revenue per impression (higher = better)
+   *
+   * @param rec - SparkLoop recommendation from API
+   * @param ourCR - Our conversion rate (submissions/impressions), null if < 20 impressions
+   * @param ourRCR - Our referral confirmation rate, null if < 20 outcomes
+   */
+  static scoreRecommendation(
+    rec: SparkLoopRecommendation,
+    ourCR: number | null = null,
+    ourRCR: number | null = null
+  ): number {
+    // CPA in dollars (convert from cents)
+    const cpa = (rec.cpa || 0) / 100
+
+    // Use our CR if we have 20+ impressions, otherwise assume 10%
+    const cr = ourCR !== null ? ourCR / 100 : 0.10
+
+    // Use our RCR if we have 20+ outcomes, otherwise use SparkLoop's, otherwise assume 25%
+    const rcr = ourRCR !== null
+      ? ourRCR / 100
+      : (rec.last_30_days_confirmation_rate !== null
+          ? rec.last_30_days_confirmation_rate / 100
+          : 0.25)
+
+    // CR × CPA × RCR = expected revenue per impression
+    return cr * cpa * rcr
+  }
+
+  /**
+   * Score and sort recommendations for display using CR × CPA × RCR
+   * Optionally uses our stored metrics if provided
+   *
+   * @param recommendations - SparkLoop recommendations from API
+   * @param storedMetrics - Optional map of ref_code -> { our_cr, our_rcr } from our database
    */
   static scoreAndSortRecommendations(
-    recommendations: SparkLoopRecommendation[]
+    recommendations: SparkLoopRecommendation[],
+    storedMetrics?: Map<string, { our_cr: number | null; our_rcr: number | null }>
   ): SparkLoopRecommendation[] {
     return [...recommendations].sort((a, b) => {
-      // Paid recommendations with CPA get priority
-      const scoreA = (a.cpa || 0) + (a.type === 'paid' ? 100 : 0)
-      const scoreB = (b.cpa || 0) + (b.type === 'paid' ? 100 : 0)
+      const metricsA = storedMetrics?.get(a.ref_code)
+      const metricsB = storedMetrics?.get(b.ref_code)
+
+      const scoreA = SparkLoopService.scoreRecommendation(
+        a,
+        metricsA?.our_cr ?? null,
+        metricsA?.our_rcr ?? null
+      )
+      const scoreB = SparkLoopService.scoreRecommendation(
+        b,
+        metricsB?.our_cr ?? null,
+        metricsB?.our_rcr ?? null
+      )
       return scoreB - scoreA
     })
   }
 
   /**
+   * Get our stored metrics for recommendations (CR and RCR)
+   * Returns a map of ref_code -> metrics for use in scoring
+   */
+  static async getStoredMetrics(
+    publicationId: string = DEFAULT_PUBLICATION_ID
+  ): Promise<Map<string, { our_cr: number | null; our_rcr: number | null }>> {
+    const { data } = await supabaseAdmin
+      .from('sparkloop_recommendations')
+      .select('ref_code, our_cr, our_rcr')
+      .eq('publication_id', publicationId)
+
+    const metricsMap = new Map<string, { our_cr: number | null; our_rcr: number | null }>()
+
+    if (data) {
+      for (const row of data) {
+        metricsMap.set(row.ref_code, {
+          our_cr: row.our_cr,
+          our_rcr: row.our_rcr,
+        })
+      }
+    }
+
+    return metricsMap
+  }
+
+  /**
+   * Get the top N recommendations to display in the popup
+   * Sorts by CR × CPA × RCR score and returns only the best ones
+   *
+   * @param recommendations - SparkLoop recommendations from API
+   * @param count - Number of recommendations to return (default: 5)
+   * @param storedMetrics - Optional map of ref_code -> metrics from our database
+   */
+  static getTopRecommendations(
+    recommendations: SparkLoopRecommendation[],
+    count: number = 5,
+    storedMetrics?: Map<string, { our_cr: number | null; our_rcr: number | null }>
+  ): SparkLoopRecommendation[] {
+    const sorted = SparkLoopService.scoreAndSortRecommendations(recommendations, storedMetrics)
+    return sorted.slice(0, count)
+  }
+
+  /**
    * Get pre-selected ref_codes based on scoring
-   * Returns top N recommendations by value
+   * Returns top N recommendations by value (from already-filtered list)
    */
   static getPreSelectedRefCodes(
     recommendations: SparkLoopRecommendation[],
     count: number = 3
   ): string[] {
-    const sorted = SparkLoopService.scoreAndSortRecommendations(recommendations)
-    return sorted.slice(0, count).map(rec => rec.ref_code)
+    // Don't re-sort, just take first N (already sorted)
+    return recommendations.slice(0, count).map(rec => rec.ref_code)
   }
 }
 

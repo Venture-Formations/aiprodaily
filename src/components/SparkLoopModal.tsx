@@ -152,8 +152,9 @@ export function SparkLoopModal({
           // Pre-select top recommendations
           setSelectedRefCodes(new Set(data.preSelectedRefCodes || []))
 
-          // Track popup opened
+          // Track popup opened with all shown ref_codes (for impressions)
           await trackEvent('popup_opened', subscriberEmail, {
+            refCodes: data.recommendations.map((r: SparkLoopRecommendation) => r.ref_code),
             recommendationCount: data.recommendations.length,
             selectedCount: data.preSelectedRefCodes?.length || 0,
           })
@@ -174,27 +175,18 @@ export function SparkLoopModal({
     fetchRecommendations()
   }, [isOpen, subscriberEmail, onClose, onSubscribeComplete])
 
-  // Toggle recommendation selection
-  const toggleSelection = useCallback(
-    (refCode: string) => {
-      setSelectedRefCodes((prev) => {
-        const next = new Set(prev)
-        if (next.has(refCode)) {
-          next.delete(refCode)
-          trackEvent('recommendation_deselected', subscriberEmail, {
-            refCodes: [refCode],
-          })
-        } else {
-          next.add(refCode)
-          trackEvent('recommendation_selected', subscriberEmail, {
-            refCodes: [refCode],
-          })
-        }
-        return next
-      })
-    },
-    [subscriberEmail]
-  )
+  // Toggle recommendation selection (no per-click tracking - we track final state at submit)
+  const toggleSelection = useCallback((refCode: string) => {
+    setSelectedRefCodes((prev) => {
+      const next = new Set(prev)
+      if (next.has(refCode)) {
+        next.delete(refCode)
+      } else {
+        next.add(refCode)
+      }
+      return next
+    })
+  }, [])
 
   // Handle skip/close
   const handleSkip = useCallback(async () => {
@@ -231,10 +223,24 @@ export function SparkLoopModal({
       const data = await response.json()
 
       if (response.ok && data.success) {
+        // Track which were selected vs not selected at submit time
+        const allShownRefCodes = recommendations.map(r => r.ref_code)
+        const notSelectedRefCodes = allShownRefCodes.filter(code => !selectedRefCodes.has(code))
+
         await trackEvent('subscriptions_success', subscriberEmail, {
-          refCodes,
+          refCodes, // selected ones
           selectedCount: refCodes.length,
+          recommendationCount: recommendations.length,
         })
+
+        // Also track which ones were NOT selected (shown but skipped)
+        if (notSelectedRefCodes.length > 0) {
+          await trackEvent('recommendations_not_selected', subscriberEmail, {
+            refCodes: notSelectedRefCodes,
+            selectedCount: notSelectedRefCodes.length,
+          })
+        }
+
         onClose()
         onSubscribeComplete()
       } else {

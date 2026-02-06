@@ -17,13 +17,67 @@ export interface SparkLoopRecommendation {
   publication_name: string
   publication_logo: string | null
   description: string | null
-  cpa: number | null // Cost per acquisition (payout for paid recommendations)
+  cpa: number | null // Cost per acquisition in cents (e.g., 250 = $2.50)
+  max_payout: number | null // Maximum payout in cents
+  last_30_days_confirmation_rate: number | null // SparkLoop's 30-day RCR (0-100)
+  pinned: boolean
+  position: number | null
+  referrals: {
+    pending: number
+    rejected: number
+    confirmed: number
+  }
+  earnings: number // Total earnings in cents
+  net_earnings: number // Net earnings after fees in cents
+  partner_program_uuid: string
+}
+
+/**
+ * Our stored recommendation with both SparkLoop data and our metrics
+ */
+export interface StoredSparkLoopRecommendation {
+  id: string
+  publication_id: string
+  ref_code: string
+  sparkloop_uuid: string | null
+  publication_name: string
+  publication_logo: string | null
+  description: string | null
+
+  // SparkLoop metadata
+  type: 'free' | 'paid'
+  status: 'active' | 'paused'
+  cpa: number | null
+  screening_period: number | null
+  sparkloop_rcr: number | null // SparkLoop's 30-day confirmation rate
+  pinned: boolean
+  position: number | null
   max_payout: number | null
-  referral_pending_duration: number | null // Days before referral is confirmed
-  // Additional fields that may be present
-  pinned?: boolean
-  created_at?: string
-  updated_at?: string
+  partner_program_uuid: string | null
+
+  // SparkLoop's referral tracking
+  sparkloop_pending: number
+  sparkloop_rejected: number
+  sparkloop_confirmed: number
+  sparkloop_earnings: number
+  sparkloop_net_earnings: number
+
+  // Our tracking metrics
+  impressions: number // Times shown in popup
+  selections: number // Times user selected/checked
+  submissions: number // Times submitted to SparkLoop
+  confirms: number // Our confirmed referrals
+  rejections: number // Our rejected referrals
+  pending: number // Our pending referrals
+
+  // Our calculated rates (null until enough data)
+  our_cr: number | null // Conversion Rate: submissions/impressions (null until 20+ impressions)
+  our_rcr: number | null // Referral Confirmation Rate: confirms/(confirms+rejections) (null until 20+ outcomes)
+
+  // Timestamps
+  last_synced_at: string | null
+  created_at: string
+  updated_at: string
 }
 
 /**
@@ -82,6 +136,7 @@ export type SparkLoopPopupEventType =
   | 'popup_closed'
   | 'recommendation_selected'
   | 'recommendation_deselected'
+  | 'recommendations_not_selected'
   | 'subscriptions_submitted'
   | 'subscriptions_failed'
   | 'subscriptions_success'

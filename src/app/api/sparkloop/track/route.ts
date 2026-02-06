@@ -10,6 +10,7 @@ const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
  *
  * Track popup interaction events for analytics
  * Stores events in sparkloop_events table
+ * Also updates recommendation metrics (impressions, selections)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -22,8 +23,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Map popup events to database event types
-    const eventType = `popup_${event.event_type}`
+    const eventType = event.event_type
 
     // Build metadata for raw_payload
     const metadata: Record<string, unknown> = {
@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
       client_timestamp: event.timestamp,
     }
 
+    // Store event in sparkloop_events table
     const { error } = await supabaseAdmin
       .from('sparkloop_events')
       .insert({
@@ -46,14 +47,32 @@ export async function POST(request: NextRequest) {
         event_timestamp: event.timestamp ? new Date(event.timestamp).toISOString() : new Date().toISOString(),
       })
 
-    if (error) {
-      // Ignore duplicate constraint violations
-      if (error.code === '23505') {
-        console.log(`[SparkLoop Track] Duplicate event ignored: ${eventType}`)
-        return NextResponse.json({ success: true, duplicate: true })
-      }
+    if (error && error.code !== '23505') {
       console.error('[SparkLoop Track] Failed to store event:', error)
-      throw error
+    }
+
+    // Update recommendation metrics based on event type
+    if (event.ref_codes && event.ref_codes.length > 0) {
+      try {
+        if (eventType === 'popup_opened') {
+          // Record impressions for all shown recommendations
+          await supabaseAdmin.rpc('increment_sparkloop_impressions', {
+            p_publication_id: DEFAULT_PUBLICATION_ID,
+            p_ref_codes: event.ref_codes,
+          })
+          console.log(`[SparkLoop Track] Recorded ${event.ref_codes.length} impressions`)
+        } else if (eventType === 'recommendation_selected') {
+          // Record selection for the selected recommendation
+          await supabaseAdmin.rpc('increment_sparkloop_selections', {
+            p_publication_id: DEFAULT_PUBLICATION_ID,
+            p_ref_codes: event.ref_codes,
+          })
+          console.log(`[SparkLoop Track] Recorded selection for ${event.ref_codes[0]}`)
+        }
+      } catch (metricsError) {
+        console.error('[SparkLoop Track] Failed to update metrics:', metricsError)
+        // Don't fail the request for metrics errors
+      }
     }
 
     console.log(`[SparkLoop Track] Recorded: ${eventType} for ${event.subscriber_email}`)
