@@ -192,6 +192,7 @@ export class SparkLoopService {
    * Updates existing records and creates new ones
    * Includes both active AND paused recommendations to track status changes
    * Also fetches budget info to auto-exclude out-of-budget recommendations
+   * Tracks deltas in confirms/rejections for timeframe-based RCR calculation
    */
   async syncRecommendationsToDatabase(publicationId: string = DEFAULT_PUBLICATION_ID): Promise<{
     synced: number
@@ -200,6 +201,8 @@ export class SparkLoopService {
     active: number
     paused: number
     outOfBudget: number
+    confirmDeltas: number
+    rejectionDeltas: number
   }> {
     // Fetch recommendations and partner campaign budget info in parallel
     const [recommendations, campaignBudgets] = await Promise.all([
@@ -209,11 +212,13 @@ export class SparkLoopService {
     let created = 0
     let updated = 0
     let outOfBudget = 0
+    let confirmDeltas = 0
+    let rejectionDeltas = 0
 
     for (const rec of recommendations) {
       const { data: existing } = await supabaseAdmin
         .from('sparkloop_recommendations')
-        .select('id, excluded, excluded_reason')
+        .select('id, excluded, excluded_reason, sparkloop_confirmed, sparkloop_rejected')
         .eq('publication_id', publicationId)
         .eq('ref_code', rec.ref_code)
         .single()
@@ -272,6 +277,55 @@ export class SparkLoopService {
       }
 
       if (existing) {
+        // Track deltas for confirms and rejections (for timeframe-based RCR)
+        const currentConfirmed = rec.referrals?.confirmed || 0
+        const currentRejected = rec.referrals?.rejected || 0
+        const previousConfirmed = existing.sparkloop_confirmed || 0
+        const previousRejected = existing.sparkloop_rejected || 0
+
+        const confirmDelta = currentConfirmed - previousConfirmed
+        const rejectionDelta = currentRejected - previousRejected
+
+        // Log confirm deltas as individual events
+        if (confirmDelta > 0) {
+          await supabaseAdmin.from('sparkloop_events').insert({
+            publication_id: publicationId,
+            event_type: 'sync_confirm_delta',
+            subscriber_email: 'system_sync',
+            referred_publication: rec.publication_name,
+            referred_publication_id: rec.ref_code,
+            raw_payload: {
+              delta: confirmDelta,
+              previous: previousConfirmed,
+              current: currentConfirmed,
+              ref_code: rec.ref_code,
+            },
+            event_timestamp: new Date().toISOString(),
+          })
+          confirmDeltas += confirmDelta
+          console.log(`[SparkLoop] +${confirmDelta} confirms for ${rec.publication_name}`)
+        }
+
+        // Log rejection deltas as individual events
+        if (rejectionDelta > 0) {
+          await supabaseAdmin.from('sparkloop_events').insert({
+            publication_id: publicationId,
+            event_type: 'sync_rejection_delta',
+            subscriber_email: 'system_sync',
+            referred_publication: rec.publication_name,
+            referred_publication_id: rec.ref_code,
+            raw_payload: {
+              delta: rejectionDelta,
+              previous: previousRejected,
+              current: currentRejected,
+              ref_code: rec.ref_code,
+            },
+            event_timestamp: new Date().toISOString(),
+          })
+          rejectionDeltas += rejectionDelta
+          console.log(`[SparkLoop] +${rejectionDelta} rejections for ${rec.publication_name}`)
+        }
+
         // Update existing record (don't overwrite our tracking metrics)
         await supabaseAdmin
           .from('sparkloop_recommendations')
@@ -291,7 +345,10 @@ export class SparkLoopService {
     const paused = recommendations.filter(r => r.status === 'paused').length
 
     console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (${active} active, ${paused} paused, ${outOfBudget} auto-excluded for budget)`)
-    return { synced: recommendations.length, created, updated, active, paused, outOfBudget }
+    if (confirmDeltas > 0 || rejectionDeltas > 0) {
+      console.log(`[SparkLoop] Deltas tracked: +${confirmDeltas} confirms, +${rejectionDeltas} rejections`)
+    }
+    return { synced: recommendations.length, created, updated, active, paused, outOfBudget, confirmDeltas, rejectionDeltas }
   }
 
   /**
@@ -465,6 +522,112 @@ export class SparkLoopService {
       )
       return scoreB - scoreA
     })
+  }
+
+  /**
+   * Calculate RCR for a recommendation within a specific timeframe
+   * Uses delta events logged during sync to compute confirms/(confirms+rejections)
+   *
+   * @param refCode - The recommendation ref_code
+   * @param days - Number of days to look back (default: 30)
+   * @param publicationId - Publication ID
+   * @returns RCR percentage (0-100) or null if insufficient data
+   */
+  static async calculateRCRForTimeframe(
+    refCode: string,
+    days: number = 30,
+    publicationId: string = DEFAULT_PUBLICATION_ID
+  ): Promise<number | null> {
+    const since = new Date()
+    since.setDate(since.getDate() - days)
+
+    // Sum up confirm deltas in timeframe
+    const { data: confirmData } = await supabaseAdmin
+      .from('sparkloop_events')
+      .select('raw_payload')
+      .eq('publication_id', publicationId)
+      .eq('event_type', 'sync_confirm_delta')
+      .eq('referred_publication_id', refCode)
+      .gte('event_timestamp', since.toISOString())
+
+    // Sum up rejection deltas in timeframe
+    const { data: rejectionData } = await supabaseAdmin
+      .from('sparkloop_events')
+      .select('raw_payload')
+      .eq('publication_id', publicationId)
+      .eq('event_type', 'sync_rejection_delta')
+      .eq('referred_publication_id', refCode)
+      .gte('event_timestamp', since.toISOString())
+
+    const confirms = confirmData?.reduce((sum, e) => sum + ((e.raw_payload as { delta?: number })?.delta || 0), 0) || 0
+    const rejections = rejectionData?.reduce((sum, e) => sum + ((e.raw_payload as { delta?: number })?.delta || 0), 0) || 0
+
+    const total = confirms + rejections
+    if (total < 5) {
+      // Need at least 5 outcomes for meaningful RCR
+      return null
+    }
+
+    return (confirms / total) * 100
+  }
+
+  /**
+   * Get RCR for all recommendations within a timeframe
+   * Returns a map of ref_code -> RCR percentage
+   */
+  static async getRCRsForTimeframe(
+    days: number = 30,
+    publicationId: string = DEFAULT_PUBLICATION_ID
+  ): Promise<Map<string, number>> {
+    const since = new Date()
+    since.setDate(since.getDate() - days)
+
+    // Get all confirm deltas in timeframe grouped by ref_code
+    const { data: confirmData } = await supabaseAdmin
+      .from('sparkloop_events')
+      .select('referred_publication_id, raw_payload')
+      .eq('publication_id', publicationId)
+      .eq('event_type', 'sync_confirm_delta')
+      .gte('event_timestamp', since.toISOString())
+
+    // Get all rejection deltas in timeframe grouped by ref_code
+    const { data: rejectionData } = await supabaseAdmin
+      .from('sparkloop_events')
+      .select('referred_publication_id, raw_payload')
+      .eq('publication_id', publicationId)
+      .eq('event_type', 'sync_rejection_delta')
+      .gte('event_timestamp', since.toISOString())
+
+    // Aggregate by ref_code
+    const confirms = new Map<string, number>()
+    const rejections = new Map<string, number>()
+
+    confirmData?.forEach(e => {
+      const refCode = e.referred_publication_id || ''
+      const delta = (e.raw_payload as { delta?: number })?.delta || 0
+      confirms.set(refCode, (confirms.get(refCode) || 0) + delta)
+    })
+
+    rejectionData?.forEach(e => {
+      const refCode = e.referred_publication_id || ''
+      const delta = (e.raw_payload as { delta?: number })?.delta || 0
+      rejections.set(refCode, (rejections.get(refCode) || 0) + delta)
+    })
+
+    // Calculate RCR for each ref_code
+    const rcrMap = new Map<string, number>()
+    const allRefCodes = new Set([...Array.from(confirms.keys()), ...Array.from(rejections.keys())])
+
+    allRefCodes.forEach(refCode => {
+      const c = confirms.get(refCode) || 0
+      const r = rejections.get(refCode) || 0
+      const total = c + r
+      if (total >= 5) {
+        rcrMap.set(refCode, (c / total) * 100)
+      }
+    })
+
+    return rcrMap
   }
 
   /**

@@ -142,6 +142,13 @@ export type SparkLoopPopupEventType =
   | 'subscriptions_success'
 
 /**
+ * Event types for sync delta tracking (for timeframe-based RCR)
+ */
+export type SparkLoopSyncEventType =
+  | 'sync_confirm_delta'
+  | 'sync_rejection_delta'
+
+/**
  * Event data for tracking
  */
 export interface SparkLoopPopupEvent {

@@ -26,12 +26,12 @@ export async function GET(request: NextRequest) {
     const service = new SparkLoopService()
     const result = await service.syncRecommendationsToDatabase(DEFAULT_PUBLICATION_ID)
 
-    console.log(`[SparkLoop Cron] Completed: ${result.synced} synced, ${result.outOfBudget} auto-excluded`)
+    console.log(`[SparkLoop Cron] Completed: ${result.synced} synced, ${result.outOfBudget} auto-excluded, +${result.confirmDeltas} confirms, +${result.rejectionDeltas} rejections`)
 
     return NextResponse.json({
       success: true,
       ...result,
-      message: `Synced ${result.synced} recommendations (${result.created} new, ${result.updated} updated, ${result.outOfBudget} auto-excluded for budget)`,
+      message: `Synced ${result.synced} recommendations (${result.created} new, ${result.updated} updated, ${result.outOfBudget} auto-excluded, +${result.confirmDeltas} confirms, +${result.rejectionDeltas} rejections)`,
     })
   } catch (error) {
     console.error('[SparkLoop Cron] Failed:', error)
