@@ -52,14 +52,21 @@ export async function GET(request: NextRequest) {
       }
     })
 
+    // Get full counts from unfiltered data
+    const { data: allData } = await supabaseAdmin
+      .from('sparkloop_recommendations')
+      .select('status, excluded')
+      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+
     return NextResponse.json({
       success: true,
       recommendations: withScores,
       counts: {
-        total: data?.length || 0,
-        active: data?.filter(r => r.status === 'active' && !r.excluded).length || 0,
-        excluded: data?.filter(r => r.excluded).length || 0,
-        paused: data?.filter(r => r.status === 'paused').length || 0,
+        total: allData?.length || 0,
+        active: allData?.filter(r => r.status === 'active' && !r.excluded).length || 0,
+        excluded: allData?.filter(r => r.excluded).length || 0,
+        paused: allData?.filter(r => r.status === 'paused').length || 0,
+        archived: allData?.filter(r => r.status === 'archived' || r.status === 'awaiting_approval').length || 0,
       },
     })
   } catch (error) {

@@ -39,11 +39,12 @@ interface Counts {
   active: number
   excluded: number
   paused: number
+  archived: number
 }
 
 export default function SparkLoopAdminPage() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
-  const [counts, setCounts] = useState<Counts>({ total: 0, active: 0, excluded: 0, paused: 0 })
+  const [counts, setCounts] = useState<Counts>({ total: 0, active: 0, excluded: 0, paused: 0, archived: 0 })
   const [filter, setFilter] = useState<'all' | 'active' | 'excluded'>('all')
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
@@ -196,7 +197,7 @@ export default function SparkLoopAdminPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-5 gap-4 mb-6">
           <div className="bg-white rounded-lg border p-4">
             <div className="text-sm text-gray-500">Total</div>
             <div className="text-2xl font-bold">{counts.total}</div>
@@ -210,8 +211,12 @@ export default function SparkLoopAdminPage() {
             <div className="text-2xl font-bold text-red-600">{counts.excluded}</div>
           </div>
           <div className="bg-white rounded-lg border p-4">
-            <div className="text-sm text-gray-500">Paused (SparkLoop)</div>
+            <div className="text-sm text-gray-500">Paused</div>
             <div className="text-2xl font-bold text-yellow-600">{counts.paused}</div>
+          </div>
+          <div className="bg-white rounded-lg border p-4">
+            <div className="text-sm text-gray-500">Archived</div>
+            <div className="text-2xl font-bold text-gray-400">{counts.archived}</div>
           </div>
         </div>
 
