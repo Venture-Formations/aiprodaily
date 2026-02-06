@@ -111,7 +111,13 @@
       "WebFetch(domain:js.sparkloop.app)",
       "WebFetch(domain:script.sparkloop.app)",
       "WebFetch(domain:docs.sparkloop.app)",
-      "WebFetch(domain:help.sparkloop.app)"
+      "WebFetch(domain:help.sparkloop.app)",
+      "Bash(timeout:*)",
+      "WebFetch(domain:sparkloop.readme.io)",
+      "Bash(source:*)",
+      "Bash(npx vercel logs:*)",
+      "mcp__mailerlite__get_subscriber",
+      "mcp__supabase__search_docs"
     ],
     "deny": [],
     "ask": []

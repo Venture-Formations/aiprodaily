@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     while (hasMore) {
       const { data: batch, error } = await supabaseAdmin
         .from('excluded_ips')
-        .select('id, ip_address, is_range, cidr_prefix, reason, added_by, created_at')
+        .select('id, ip_address, is_range, cidr_prefix, reason, added_by, created_at, exclusion_source')
         .eq('publication_id', publicationId)
         .order('created_at', { ascending: false })
         .range(offset, offset + BATCH_SIZE - 1)

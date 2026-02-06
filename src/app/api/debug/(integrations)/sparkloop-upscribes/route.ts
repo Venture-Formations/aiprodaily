@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const response = await fetch(`${SPARKLOOP_API_BASE}/upscribes`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'X-API-KEY': apiKey,
         'Content-Type': 'application/json',
       },
     })
