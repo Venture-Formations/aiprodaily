@@ -207,6 +207,53 @@ export async function POST(request: NextRequest) {
 }
 
 /**
+ * DELETE - Remove velocity-based exclusions (rollback)
+ * These were too aggressive and may have caught legitimate users
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get('authorization')
+    const cronSecret = process.env.CRON_SECRET
+
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Count velocity exclusions before deletion
+    const { count: beforeCount } = await supabaseAdmin
+      .from('excluded_ips')
+      .select('*', { count: 'exact', head: true })
+      .eq('exclusion_source', 'velocity')
+
+    // Delete all velocity-based exclusions
+    const { error } = await supabaseAdmin
+      .from('excluded_ips')
+      .delete()
+      .eq('exclusion_source', 'velocity')
+
+    if (error) {
+      console.error('[Backfill] Error removing velocity exclusions:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    console.log(`[Backfill] Removed ${beforeCount || 0} velocity-based IP exclusions`)
+
+    return NextResponse.json({
+      success: true,
+      removed: beforeCount || 0,
+      message: `Removed ${beforeCount || 0} velocity-based IP exclusions. Real-time velocity detection (5 clicks in 10 seconds) will still work for new clicks.`
+    })
+
+  } catch (error) {
+    console.error('[Backfill] Rollback error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
  * GET - Check backfill status / preview what would be processed
  */
 export async function GET(request: NextRequest) {
