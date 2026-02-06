@@ -146,10 +146,14 @@ export class SparkLoopService {
       return data.subscriber
     }
 
+    // Log the error body for debugging
+    const createErrorText = await createResponse.text()
+    console.log(`[SparkLoop] Create subscriber returned ${createResponse.status}: ${createErrorText}`)
+
     // 400 typically means subscriber already exists — fetch instead
     if (createResponse.status === 400) {
-      console.log(`[SparkLoop] Subscriber ${params.email} already exists, fetching...`)
       const fetchUrl = `${SPARKLOOP_API_BASE}/subscribers/${encodeURIComponent(params.email)}`
+      console.log(`[SparkLoop] Fetching existing subscriber by email...`)
 
       const fetchResponse = await fetch(fetchUrl, {
         method: 'GET',
@@ -165,12 +169,25 @@ export class SparkLoopService {
         return data.subscriber
       }
 
-      const fetchError = await fetchResponse.text()
-      throw new Error(`SparkLoop fetch subscriber error: ${fetchResponse.status} - ${fetchError}`)
+      // GET by email failed — try extracting UUID from the 400 error body if present
+      const fetchErrorText = await fetchResponse.text()
+      console.log(`[SparkLoop] GET by email returned ${fetchResponse.status}: ${fetchErrorText}`)
+
+      // Some APIs return the existing subscriber info in the 400 response
+      try {
+        const errorJson = JSON.parse(createErrorText)
+        if (errorJson.subscriber?.uuid) {
+          console.log(`[SparkLoop] Found subscriber UUID in 400 response: ${errorJson.subscriber.uuid}`)
+          return errorJson.subscriber as SparkLoopSubscriber
+        }
+      } catch {
+        // Not JSON or no subscriber in error response
+      }
+
+      throw new Error(`SparkLoop fetch subscriber failed: POST 400 (${createErrorText}), GET ${fetchResponse.status} (${fetchErrorText})`)
     }
 
-    const errorText = await createResponse.text()
-    throw new Error(`SparkLoop create subscriber error: ${createResponse.status} - ${errorText}`)
+    throw new Error(`SparkLoop create subscriber error: ${createResponse.status} - ${createErrorText}`)
   }
 
   /**
