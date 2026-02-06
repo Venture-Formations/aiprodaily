@@ -15,6 +15,7 @@ interface Recommendation {
   cpa: number | null
   sparkloop_rcr: number | null
   max_payout: number | null
+  screening_period: number | null
   excluded: boolean
   excluded_reason: string | null
   impressions: number
@@ -279,6 +280,7 @@ export default function SparkLoopAdminPage() {
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Newsletter</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">CPA</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Screening</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">RCR</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">CR</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
@@ -294,13 +296,13 @@ export default function SparkLoopAdminPage() {
             <tbody className="divide-y">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
                     Loading...
                   </td>
                 </tr>
               ) : recommendations.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
                     No recommendations found
                   </td>
                 </tr>
@@ -335,6 +337,9 @@ export default function SparkLoopAdminPage() {
                     </td>
                     <td className="px-4 py-3 font-mono text-sm">
                       {formatCurrency(rec.cpa)}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {rec.screening_period ? `${rec.screening_period}d` : '-'}
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-sm">
