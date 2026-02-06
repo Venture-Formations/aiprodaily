@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     // Update MailerLite subscriber field to mark as SparkLoop participant
     try {
       const mailerlite = new MailerLiteService()
-      const result = await mailerlite.updateSubscriberField(email, 'SparkLoop', true)
+      const result = await mailerlite.updateSubscriberField(email, 'sparkloop', 'true')
       if (result.success) {
         console.log(`[SparkLoop Subscribe] Updated MailerLite SparkLoop field for ${email}`)
       } else {
