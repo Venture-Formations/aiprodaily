@@ -92,6 +92,22 @@ async function removeFromMailerLiteGroup(subscriberId: string, groupId: string):
 }
 
 /**
+ * Update a MailerLite subscriber's custom field
+ */
+async function updateMailerLiteField(email: string, fieldKey: string, value: string): Promise<boolean> {
+  try {
+    await mailerliteClient.put(`/subscribers/${encodeURIComponent(email)}`, {
+      fields: { [fieldKey]: value }
+    })
+    console.log(`[Preferences] Updated ${fieldKey}=${value} for ${email}`)
+    return true
+  } catch (error: any) {
+    console.error(`[Preferences] Error updating ${fieldKey} for ${email}:`, error.response?.data || error.message)
+    return false
+  }
+}
+
+/**
  * Update subscriber preferences (MailerLite or SendGrid based on settings)
  * POST /api/preferences
  * Body: { email: string, preference: 'daily' | 'weekly' | 'unsubscribe' }
@@ -201,6 +217,8 @@ export async function POST(request: NextRequest) {
           if (secondaryGroupId) {
             await removeFromMailerLiteGroup(subscriber.id, secondaryGroupId)
           }
+          // Reset reduced_send field since they want daily
+          await updateMailerLiteField(email, 'reduced_send', 'FALSE')
           break
 
         case 'weekly':
@@ -211,6 +229,8 @@ export async function POST(request: NextRequest) {
           if (mainGroupId) {
             await removeFromMailerLiteGroup(subscriber.id, mainGroupId)
           }
+          // Mark reduced_send since they opted for weekly
+          await updateMailerLiteField(email, 'reduced_send', 'TRUE')
           break
 
         case 'unsubscribe':
