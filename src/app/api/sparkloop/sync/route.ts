@@ -13,12 +13,14 @@ const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
  */
 export async function POST(request: NextRequest) {
   try {
-    // Optional: verify cron secret for automated calls
+    // Verify cron secret for automated calls (skip for browser requests with cookies)
     const authHeader = request.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
+    const hasCookie = request.headers.get('cookie')
 
-    // Allow calls without auth in development, require in production
-    if (process.env.NODE_ENV === 'production' && cronSecret) {
+    // Allow browser calls (have cookies from logged-in dashboard session)
+    // Require Bearer token for headless/cron calls
+    if (!hasCookie && process.env.NODE_ENV === 'production' && cronSecret) {
       if (authHeader !== `Bearer ${cronSecret}`) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
