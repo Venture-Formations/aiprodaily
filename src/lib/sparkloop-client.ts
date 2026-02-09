@@ -42,29 +42,41 @@ export class SparkLoopService {
 
   /**
    * Get all recommendations for the Upscribe (including paused)
-   * Used for syncing to database
+   * Used for syncing to database — paginates through all pages
    */
   async getAllRecommendations(): Promise<SparkLoopRecommendation[]> {
-    const url = `${SPARKLOOP_API_BASE}/upscribes/${this.upscribeId}/recommendations?per_page=50`
+    const allRecs: SparkLoopRecommendation[] = []
+    let page = 1
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'X-API-KEY': this.apiKey,
-        'Content-Type': 'application/json',
-      },
-    })
+    while (true) {
+      const url = `${SPARKLOOP_API_BASE}/upscribes/${this.upscribeId}/recommendations?per_page=200&page=${page}`
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('[SparkLoop] Failed to fetch recommendations:', response.status, errorText)
-      throw new Error(`SparkLoop API error: ${response.status}`)
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'X-API-KEY': this.apiKey,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('[SparkLoop] Failed to fetch recommendations:', response.status, errorText)
+        throw new Error(`SparkLoop API error: ${response.status}`)
+      }
+
+      const data: SparkLoopRecommendationsResponse = await response.json()
+      allRecs.push(...data.recommendations)
+
+      if (page >= data.meta.total_pages) break
+      page++
     }
 
-    const data: SparkLoopRecommendationsResponse = await response.json()
-    console.log(`[SparkLoop] Fetched ${data.recommendations.length} total recommendations`)
+    const active = allRecs.filter(r => r.status === 'active').length
+    const paused = allRecs.filter(r => r.status === 'paused').length
+    console.log(`[SparkLoop] Fetched ${allRecs.length} total recommendations (${active} active, ${paused} paused) across ${page} page(s)`)
 
-    return data.recommendations
+    return allRecs
   }
 
   /**
