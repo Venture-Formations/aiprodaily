@@ -51,12 +51,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Filter out recs with no SL RCR that have hit 100 impressions
+    // Filter out recs with no SL RCR that have hit 100 submissions
     const eligible = (recommendations || []).filter(rec => {
       const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
       const hasSLRcr = slRcr !== null && slRcr > 0
-      if (!hasSLRcr && (rec.impressions || 0) >= 100) {
-        return false // Capped: no SL RCR data after 100 impressions
+      if (!hasSLRcr && (rec.submissions || 0) >= 100) {
+        return false // Capped: no SL RCR data after 100 submissions
       }
       return true
     })

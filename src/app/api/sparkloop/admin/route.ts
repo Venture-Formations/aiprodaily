@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
         effective_rcr: hasSLRcr ? slRcr : 25,
         cr_source: rec.our_cr !== null && Number(rec.our_cr) > 0 ? 'ours' : 'default',
         rcr_source: hasSLRcr ? 'sparkloop' : 'default',
-        impression_capped: !hasSLRcr && (rec.impressions || 0) >= 100,
+        submission_capped: !hasSLRcr && (rec.submissions || 0) >= 100,
       }
     })
 

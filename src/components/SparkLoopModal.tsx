@@ -80,7 +80,7 @@ function RecommendationCard({
           {recommendation.publication_name}
         </h4>
         {recommendation.description && (
-          <p className="text-gray-500 text-sm line-clamp-2 mt-0.5">
+          <p className="text-gray-500 text-sm mt-0.5">
             {recommendation.description}
           </p>
         )}
@@ -268,7 +268,7 @@ export function SparkLoopModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[716px] max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Close button */}
         <button
           onClick={handleSkip}
