@@ -177,7 +177,7 @@ export default function SparkLoopAdminPage() {
         body: JSON.stringify({
           id: rec.id,
           excluded: !rec.excluded,
-          excluded_reason: !rec.excluded ? 'budget_used_up' : null,
+          excluded_reason: !rec.excluded ? 'manual' : null,
         }),
       })
       const data = await res.json()
