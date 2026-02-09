@@ -53,6 +53,7 @@ export function SubscribeForm() {
   const [email, setEmail] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [didYouMean, setDidYouMean] = useState('')
   const [showSparkLoopModal, setShowSparkLoopModal] = useState(false)
   const [subscribedEmail, setSubscribedEmail] = useState('')
 
@@ -76,6 +77,7 @@ export function SubscribeForm() {
 
     setIsSubmitting(true)
     setError('')
+    setDidYouMean('')
 
     try {
       // Get Facebook Pixel data at submit time
@@ -103,6 +105,9 @@ export function SubscribeForm() {
         setShowSparkLoopModal(true)
       } else {
         setError(data.error || 'Subscription failed. Please try again.')
+        if (data.did_you_mean) {
+          setDidYouMean(data.did_you_mean)
+        }
         setIsSubmitting(false)
       }
     } catch (err) {
@@ -136,7 +141,26 @@ export function SubscribeForm() {
         </form>
 
         {error && (
-          <p className="text-sm text-red-500">{error}</p>
+          <div className="text-sm text-red-500">
+            <p>{error}</p>
+            {didYouMean && (
+              <p className="mt-1">
+                Did you mean{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail(didYouMean)
+                    setError('')
+                    setDidYouMean('')
+                  }}
+                  className="font-semibold text-blue-600 underline hover:text-blue-500"
+                >
+                  {didYouMean}
+                </button>
+                ?
+              </p>
+            )}
+          </div>
         )}
 
         {!error && (

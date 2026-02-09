@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import axios from 'axios'
 import { getPublicationByDomain, getPublicationSetting, getEmailProviderSettings } from '@/lib/publication-settings'
 import { SendGridService } from '@/lib/sendgrid'
+import { verifyEmail, buildKickboxFields } from '@/lib/kickbox'
 
 // MailerLite API client
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
@@ -30,6 +31,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         error: 'Valid email address is required'
       }, { status: 400 })
+    }
+
+    // Verify email with Kickbox (fail-open: if Kickbox is down, allow through)
+    const verification = await verifyEmail(email)
+    let kickboxFields: Record<string, string> = {}
+
+    if (verification.success && verification.data) {
+      const { data } = verification
+      kickboxFields = buildKickboxFields(data)
+
+      if (data.result === 'undeliverable') {
+        const response: Record<string, any> = {
+          error: 'This email address appears to be invalid. Please check and try again.',
+          verification_failed: true,
+        }
+        if (data.did_you_mean) {
+          response.did_you_mean = data.did_you_mean
+        }
+        return NextResponse.json(response, { status: 400 })
+      }
+
+      // deliverable, risky, unknown → proceed
+      if (data.did_you_mean) {
+        console.log(`[Subscribe] Kickbox suggested ${data.did_you_mean} for ${email}`)
+      }
     }
 
     // Get domain from headers (Next.js 15 requires await)
@@ -61,6 +87,11 @@ export async function POST(request: NextRequest) {
     }
     if (userAgent) customFields.fb_pixel_user_agent = userAgent
     if (ipAddress) customFields.fb_pixel_ip = ipAddress
+
+    // Add Kickbox verification fields
+    if (Object.keys(kickboxFields).length > 0) {
+      Object.assign(customFields, kickboxFields)
+    }
 
     if (facebook_pixel) {
       console.log('[Subscribe] Facebook Pixel data captured')
@@ -155,10 +186,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    const successResponse: Record<string, any> = {
       success: true,
-      message: 'Successfully subscribed!'
-    })
+      message: 'Successfully subscribed!',
+    }
+    if (verification.data?.did_you_mean) {
+      successResponse.did_you_mean = verification.data.did_you_mean
+    }
+
+    return NextResponse.json(successResponse)
 
   } catch (error: any) {
     console.error('[Subscribe] Subscription failed:', error)
