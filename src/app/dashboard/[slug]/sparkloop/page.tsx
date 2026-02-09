@@ -97,7 +97,7 @@ export default function SparkLoopAdminPage() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [counts, setCounts] = useState<Counts>({ total: 0, active: 0, excluded: 0, paused: 0, archived: 0 })
   const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null)
-  const [filter, setFilter] = useState<'all' | 'active' | 'excluded'>('all')
+  const [filter, setFilter] = useState<'all' | 'active' | 'excluded' | 'paused'>('all')
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -487,6 +487,12 @@ export default function SparkLoopAdminPage() {
                   className={`px-3 py-1.5 text-sm rounded-lg ${filter === 'active' ? 'bg-green-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}
                 >
                   Active
+                </button>
+                <button
+                  onClick={() => setFilter('paused')}
+                  className={`px-3 py-1.5 text-sm rounded-lg ${filter === 'paused' ? 'bg-yellow-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}
+                >
+                  Paused
                 </button>
                 <button
                   onClick={() => setFilter('excluded')}

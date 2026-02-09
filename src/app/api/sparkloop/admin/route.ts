@@ -25,6 +25,8 @@ export async function GET(request: NextRequest) {
       query = query.eq('status', 'active').or('excluded.is.null,excluded.eq.false')
     } else if (filter === 'excluded') {
       query = query.eq('excluded', true)
+    } else if (filter === 'paused') {
+      query = query.eq('status', 'paused').or('excluded.is.null,excluded.eq.false')
     }
 
     const { data, error } = await query
