@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { Inter, Lexend } from 'next/font/google'
-import Script from 'next/script'
 import clsx from 'clsx'
 import './globals.css'
 import AuthProvider from '@/components/AuthProvider'
@@ -36,14 +35,6 @@ export default function RootLayout({
         lexend.variable,
       )}
     >
-      <head>
-        <Script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1173459595320946"
-          crossOrigin="anonymous"
-          strategy="beforeInteractive"
-        />
-      </head>
       <body className="flex h-full flex-col">
         <AuthProvider>
           {children}

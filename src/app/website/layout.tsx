@@ -46,6 +46,14 @@ export default function WebsiteLayout({
 
   return (
     <>
+      {/* Google AdSense */}
+      <Script
+        async
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1173459595320946"
+        crossOrigin="anonymous"
+        strategy="afterInteractive"
+      />
+
       {/* JSON-LD Structured Data */}
       <script
         type="application/ld+json"
