@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createHash } from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase'
 import type { SparkLoopPopupEvent } from '@/types/sparkloop'
 
@@ -25,6 +26,10 @@ export async function POST(request: NextRequest) {
 
     const eventType = event.event_type
 
+    // Extract IP hash for subscription events
+    const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || undefined
+    const ipHash = ipAddress ? createHash('sha256').update(ipAddress).digest('hex').slice(0, 16) : null
+
     // Build metadata for raw_payload
     const metadata: Record<string, unknown> = {
       source: 'custom_popup',
@@ -34,6 +39,7 @@ export async function POST(request: NextRequest) {
       ref_codes: event.ref_codes,
       error_message: event.error_message,
       client_timestamp: event.timestamp,
+      ...(eventType === 'subscriptions_success' && { ip_hash: ipHash }),
     }
 
     // Store event in sparkloop_events table

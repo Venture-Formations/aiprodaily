@@ -58,6 +58,78 @@ export async function GET(request: NextRequest) {
       .select('status, excluded')
       .eq('publication_id', DEFAULT_PUBLICATION_ID)
 
+    // Query unique IPs and avg offers from sparkloop_events
+    let uniqueIpsByRefCode: Record<string, number> = {}
+    let globalUniqueIps = 0
+    let avgOffersSelected = 0
+
+    try {
+      // Get all subscribe-confirmed events with ip_hash
+      const { data: subscribeEvents } = await supabaseAdmin
+        .from('sparkloop_events')
+        .select('raw_payload')
+        .eq('publication_id', DEFAULT_PUBLICATION_ID)
+        .eq('event_type', 'api_subscribe_confirmed')
+
+      if (subscribeEvents && subscribeEvents.length > 0) {
+        const globalIps = new Set<string>()
+        const refCodeIps: Record<string, Set<string>> = {}
+
+        for (const evt of subscribeEvents) {
+          const payload = evt.raw_payload as Record<string, unknown> | null
+          if (!payload) continue
+          const ipHash = payload.ip_hash as string | null
+          const refCodes = payload.ref_codes as string[] | null
+
+          if (ipHash) {
+            globalIps.add(ipHash)
+            if (refCodes) {
+              for (const rc of refCodes) {
+                if (!refCodeIps[rc]) refCodeIps[rc] = new Set()
+                refCodeIps[rc].add(ipHash)
+              }
+            }
+          }
+        }
+
+        globalUniqueIps = globalIps.size
+        for (const [rc, ips] of Object.entries(refCodeIps)) {
+          uniqueIpsByRefCode[rc] = ips.size
+        }
+      }
+
+      // Get avg offers selected from subscriptions_success events
+      const { data: successEvents } = await supabaseAdmin
+        .from('sparkloop_events')
+        .select('raw_payload')
+        .eq('publication_id', DEFAULT_PUBLICATION_ID)
+        .eq('event_type', 'subscriptions_success')
+
+      if (successEvents && successEvents.length > 0) {
+        let totalSelected = 0
+        let countWithData = 0
+        for (const evt of successEvents) {
+          const payload = evt.raw_payload as Record<string, unknown> | null
+          const selected = payload?.selected_count as number | undefined
+          if (selected !== undefined && selected !== null) {
+            totalSelected += selected
+            countWithData++
+          }
+        }
+        if (countWithData > 0) {
+          avgOffersSelected = totalSelected / countWithData
+        }
+      }
+    } catch (statsError) {
+      console.error('[SparkLoop Admin] Failed to compute IP/offer stats:', statsError)
+    }
+
+    // Add unique_ips to each recommendation
+    const withIpStats = withScores.map(rec => ({
+      ...rec,
+      unique_ips: uniqueIpsByRefCode[rec.ref_code] || 0,
+    }))
+
     // Categories are mutually exclusive:
     // - Active: status=active AND not excluded
     // - Excluded: any status but excluded=true
@@ -65,13 +137,17 @@ export async function GET(request: NextRequest) {
     // - Archived: status in (archived, awaiting_approval) AND not excluded
     return NextResponse.json({
       success: true,
-      recommendations: withScores,
+      recommendations: withIpStats,
       counts: {
         total: allData?.length || 0,
         active: allData?.filter(r => r.status === 'active' && !r.excluded).length || 0,
         excluded: allData?.filter(r => r.excluded).length || 0,
         paused: allData?.filter(r => r.status === 'paused' && !r.excluded).length || 0,
         archived: allData?.filter(r => (r.status === 'archived' || r.status === 'awaiting_approval') && !r.excluded).length || 0,
+      },
+      globalStats: {
+        uniqueIps: globalUniqueIps,
+        avgOffersSelected: Math.round(avgOffersSelected * 100) / 100,
       },
     })
   } catch (error) {

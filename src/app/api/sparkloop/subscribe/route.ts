@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createHash } from 'crypto'
 import { SparkLoopService } from '@/lib/sparkloop-client'
 import { supabaseAdmin } from '@/lib/supabase'
 import { MailerLiteService } from '@/lib/mailerlite'
@@ -108,7 +109,9 @@ export async function POST(request: NextRequest) {
           ref_codes: activeRefCodes,
           filtered_out: filteredOut.length > 0 ? filteredOut : undefined,
           sparkloop_response: subscribeResult.response,
-          ip_present: !!ipAddress,
+          ip_hash: ipAddress ? createHash('sha256').update(ipAddress).digest('hex').slice(0, 16) : null,
+          selected_count: activeRefCodes.length,
+          shown_count: 5,
         },
         event_timestamp: new Date().toISOString(),
       })
