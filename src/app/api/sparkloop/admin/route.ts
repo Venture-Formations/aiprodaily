@@ -132,6 +132,9 @@ export async function GET(request: NextRequest) {
       unique_ips: uniqueIpsByRefCode[rec.ref_code] || 0,
     }))
 
+    // Sort by score descending (highest expected revenue per impression first)
+    withIpStats.sort((a, b) => (b.calculated_score || 0) - (a.calculated_score || 0))
+
     // Categories are mutually exclusive:
     // - Active: status=active AND not excluded
     // - Excluded: any status but excluded=true
