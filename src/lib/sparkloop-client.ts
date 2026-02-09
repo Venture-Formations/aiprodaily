@@ -246,8 +246,14 @@ export class SparkLoopService {
   /**
    * Fetch partner campaign details which includes remaining_budget_dollars
    * This tells us which recommendations are out of budget
+   * Returns campaign data indexed by UUID and by normalized name for reliable matching
    */
-  async getPartnerCampaigns(): Promise<Map<string, { remaining_budget_dollars: number; referral_pending_period: number }>> {
+  async getPartnerCampaigns(): Promise<{
+    byUuid: Map<string, { remaining_budget_dollars: number; referral_pending_period: number; name: string }>;
+    nameSet: Set<string>;
+    byName: Map<string, { remaining_budget_dollars: number; referral_pending_period: number }>;
+  }> {
+    const emptyResult = { byUuid: new Map(), nameSet: new Set<string>(), byName: new Map() }
     const url = `${SPARKLOOP_API_BASE}/partner_profile/partner_campaigns?per_page=200`
 
     const response = await fetch(url, {
@@ -260,7 +266,7 @@ export class SparkLoopService {
 
     if (!response.ok) {
       console.error('[SparkLoop] Failed to fetch partner campaigns:', response.status)
-      return new Map()
+      return emptyResult
     }
 
     const data = await response.json()
@@ -270,20 +276,31 @@ export class SparkLoopService {
     if (campaigns.length > 0) {
       const sample = campaigns[0]
       console.log(`[SparkLoop] Sample campaign keys: ${Object.keys(sample).join(', ')}`)
-      console.log(`[SparkLoop] Sample campaign: uuid=${sample.uuid}, name=${sample.name || sample.publication_name || 'N/A'}, budget=$${sample.remaining_budget_dollars}`)
+      const sampleName = sample.name || sample.publication_name || sample.title || 'N/A'
+      console.log(`[SparkLoop] Sample campaign: uuid=${sample.uuid}, name=${sampleName}, status=${sample.status || 'N/A'}, budget=$${sample.remaining_budget_dollars}`)
     }
 
-    // Map by uuid for quick lookup
-    const campaignMap = new Map<string, { remaining_budget_dollars: number; referral_pending_period: number }>()
+    // Build multiple lookup maps for reliable matching
+    const byUuid = new Map<string, { remaining_budget_dollars: number; referral_pending_period: number; name: string }>()
+    const nameSet = new Set<string>()
+    const byName = new Map<string, { remaining_budget_dollars: number; referral_pending_period: number }>()
+
     for (const campaign of campaigns) {
-      campaignMap.set(campaign.uuid, {
+      const campaignName = (campaign.name || campaign.publication_name || campaign.title || '').trim().toLowerCase()
+      const budgetData = {
         remaining_budget_dollars: campaign.remaining_budget_dollars ?? 0,
         referral_pending_period: campaign.referral_pending_period ?? 14,
-      })
+      }
+
+      byUuid.set(campaign.uuid, { ...budgetData, name: campaignName })
+      if (campaignName) {
+        nameSet.add(campaignName)
+        byName.set(campaignName, budgetData)
+      }
     }
 
-    console.log(`[SparkLoop] Fetched ${campaignMap.size} partner campaigns with budget info`)
-    return campaignMap
+    console.log(`[SparkLoop] Fetched ${byUuid.size} partner campaigns (${nameSet.size} unique names)`)
+    return { byUuid, nameSet, byName }
   }
 
   /**
@@ -304,7 +321,7 @@ export class SparkLoopService {
     rejectionDeltas: number
   }> {
     // Fetch recommendations and partner campaign budget info in parallel
-    const [recommendations, campaignBudgets] = await Promise.all([
+    const [recommendations, campaignData] = await Promise.all([
       this.getAllRecommendations(),
       this.getPartnerCampaigns(),
     ])
@@ -317,12 +334,14 @@ export class SparkLoopService {
     // Log budget match diagnostics
     let budgetMatched = 0
     let budgetUnmatched = 0
+    let matchedByUuid = 0
+    let matchedByName = 0
 
     // Log first rec UUIDs for diagnostics
     if (recommendations.length > 0) {
       const r = recommendations[0]
-      console.log(`[SparkLoop] Sample rec: uuid=${r.uuid}, partner_program_uuid=${r.partner_program_uuid}, ref_code=${r.ref_code}`)
-      console.log(`[SparkLoop] Campaign map keys (first 3): ${Array.from(campaignBudgets.keys()).slice(0, 3).join(', ')}`)
+      console.log(`[SparkLoop] Sample rec: uuid=${r.uuid}, partner_program_uuid=${r.partner_program_uuid}, ref_code=${r.ref_code}, name=${r.publication_name}`)
+      console.log(`[SparkLoop] Campaign UUID map size: ${campaignData.byUuid.size}, name map size: ${campaignData.byName.size}`)
     }
 
     for (const rec of recommendations) {
@@ -333,13 +352,51 @@ export class SparkLoopService {
         .eq('ref_code', rec.ref_code)
         .single()
 
-      // Get budget info from partner campaigns
-      // Try partner_program_uuid first, fall back to rec.uuid
-      const budgetInfo = campaignBudgets.get(rec.partner_program_uuid) || campaignBudgets.get(rec.uuid)
-      if (budgetInfo) { budgetMatched++ } else { budgetUnmatched++ }
+      // Get budget info from partner campaigns using multiple matching strategies
+      // Strategy 1: Match by partner_program_uuid
+      // Strategy 2: Match by rec.uuid (some APIs use this)
+      // Strategy 3: Match by publication name (most reliable fallback)
+      const recNameNormalized = (rec.publication_name || '').trim().toLowerCase()
 
-      // If rec is in recommendations API but NOT in partner campaigns, it's paused
-      // Partner campaigns only lists active campaigns; paused ones disappear from it
+      let budgetInfo: { remaining_budget_dollars: number; referral_pending_period: number } | undefined
+      let matchMethod = 'none'
+
+      // Try UUID-based matching first
+      const uuidMatch = campaignData.byUuid.get(rec.partner_program_uuid) || campaignData.byUuid.get(rec.uuid)
+      if (uuidMatch) {
+        // Verify UUID match by checking name similarity to avoid false positives
+        const uuidMatchNameMatches = uuidMatch.name === recNameNormalized
+        if (uuidMatchNameMatches || !recNameNormalized) {
+          budgetInfo = uuidMatch
+          matchMethod = 'uuid_verified'
+        } else {
+          // UUID matched but name doesn't — check if name is in campaign set at all
+          const nameInCampaigns = campaignData.nameSet.has(recNameNormalized)
+          if (nameInCampaigns) {
+            // Name found under a different UUID — use name-based budget
+            budgetInfo = campaignData.byName.get(recNameNormalized)
+            matchMethod = 'name'
+            matchedByName++
+          } else {
+            // UUID matched something but name isn't in campaigns — this is a false UUID match
+            // The rec's publication is genuinely not in partner campaigns (paused)
+            budgetInfo = undefined
+            matchMethod = 'uuid_false_positive'
+            console.log(`[SparkLoop] False UUID match for ${rec.publication_name}: uuid matched campaign "${uuidMatch.name}" but names differ — treating as paused`)
+          }
+        }
+      } else {
+        // No UUID match — try name-based matching
+        budgetInfo = campaignData.byName.get(recNameNormalized)
+        if (budgetInfo) {
+          matchMethod = 'name'
+          matchedByName++
+        }
+      }
+
+      if (budgetInfo) { budgetMatched++; if (matchMethod.startsWith('uuid')) matchedByUuid++ } else { budgetUnmatched++ }
+
+      // If rec is in recommendations API but NOT in partner campaigns (by any match), it's paused
       const isPausedByPartner = !budgetInfo
       const remainingBudget = isPausedByPartner ? 0 : (budgetInfo?.remaining_budget_dollars ?? 0)
       const screeningPeriod = budgetInfo?.referral_pending_period ?? null
@@ -518,7 +575,7 @@ export class SparkLoopService {
     const active = recommendations.filter(r => r.status === 'active').length
     const paused = recommendations.filter(r => r.status === 'paused').length
 
-    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (${active} active, ${paused} paused, ${outOfBudget} auto-excluded for budget, ${pausedByPartner} paused by partner, ${reactivated} reactivated, budget matched: ${budgetMatched}, unmatched: ${budgetUnmatched})`)
+    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (${active} active, ${paused} paused, ${outOfBudget} auto-excluded for budget, ${pausedByPartner} paused by partner, ${reactivated} reactivated, budget matched: ${budgetMatched} [${matchedByUuid} uuid, ${matchedByName} name], unmatched: ${budgetUnmatched})`)
     if (confirmDeltas > 0 || rejectionDeltas > 0) {
       console.log(`[SparkLoop] Deltas tracked: +${confirmDeltas} confirms, +${rejectionDeltas} rejections`)
     }
