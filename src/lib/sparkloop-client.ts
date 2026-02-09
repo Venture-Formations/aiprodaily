@@ -337,14 +337,17 @@ export class SparkLoopService {
       // Try partner_program_uuid first, fall back to rec.uuid
       const budgetInfo = campaignBudgets.get(rec.partner_program_uuid) || campaignBudgets.get(rec.uuid)
       if (budgetInfo) { budgetMatched++ } else { budgetUnmatched++ }
-      const remainingBudget = budgetInfo?.remaining_budget_dollars ?? null
+
+      // If rec is in recommendations API but NOT in partner campaigns, it's paused
+      // Partner campaigns only lists active campaigns; paused ones disappear from it
+      const isPausedByPartner = !budgetInfo
+      const remainingBudget = budgetInfo?.remaining_budget_dollars ?? 0
       const screeningPeriod = budgetInfo?.referral_pending_period ?? null
       const cpaInDollars = (rec.cpa || 0) / 100
       const minBudgetRequired = cpaInDollars * 5 // Need at least 5 referrals worth of budget
 
-      // Out of budget only when we have budget data and it's below threshold
-      // If no budget info (campaign UUID mismatch), skip budget-based exclusion
-      const isOutOfBudget = remainingBudget !== null && remainingBudget < minBudgetRequired
+      // Out of budget if: paused (no campaign = $0 budget) OR budget below threshold
+      const isOutOfBudget = isPausedByPartner || remainingBudget < minBudgetRequired
 
       // Auto-exclude if out of budget, auto-reactivate if budget restored
       let excluded = existing?.excluded ?? false
@@ -352,15 +355,18 @@ export class SparkLoopService {
 
       if (isOutOfBudget && !excluded) {
         excluded = true
-        excludedReason = 'budget_used_up'
+        excludedReason = isPausedByPartner ? 'partner_paused' : 'budget_used_up'
         outOfBudget++
-        console.log(`[SparkLoop] Auto-excluding ${rec.publication_name} (budget $${remainingBudget} < 5x CPA $${minBudgetRequired})`)
-      } else if (!isOutOfBudget && excluded && excludedReason === 'budget_used_up') {
-        // Budget restored, reactivate if it was auto-excluded for budget
+        console.log(`[SparkLoop] Auto-excluding ${rec.publication_name} (${isPausedByPartner ? 'not in partner campaigns — paused' : `budget $${remainingBudget} < 5x CPA $${minBudgetRequired}`})`)
+      } else if (!isOutOfBudget && excluded && (excludedReason === 'budget_used_up' || excludedReason === 'partner_paused')) {
+        // Budget restored or partner un-paused, reactivate if it was auto-excluded
         excluded = false
         excludedReason = null
         console.log(`[SparkLoop] Auto-reactivating ${rec.publication_name} (budget restored: $${remainingBudget})`)
       }
+
+      // Derive effective status: if not in partner campaigns, it's paused
+      const effectiveStatus = isPausedByPartner ? 'paused' : rec.status
 
       const recordData = {
         publication_id: publicationId,
@@ -370,7 +376,7 @@ export class SparkLoopService {
         publication_logo: rec.publication_logo,
         description: rec.description,
         type: rec.type,
-        status: rec.status,
+        status: effectiveStatus,
         cpa: rec.cpa,
         sparkloop_rcr: rec.last_30_days_confirmation_rate,
         pinned: rec.pinned,
