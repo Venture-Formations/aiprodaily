@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     // Calculate scores for each recommendation
     const withScores = (data || []).map(rec => {
-      const cr = rec.our_cr !== null ? rec.our_cr / 100 : 0.10
+      const cr = rec.our_cr !== null ? rec.our_cr / 100 : 0.22
       const rcr = rec.our_rcr !== null
         ? rec.our_rcr / 100
         : (rec.sparkloop_rcr !== null ? rec.sparkloop_rcr / 100 : 0.25)

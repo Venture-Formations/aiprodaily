@@ -12,7 +12,7 @@ const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
  * - Filters to active recommendations only
  * - Scores by CR × CPA × RCR (expected revenue per impression)
  * - Uses our CR/RCR if we have 20+ data points
- * - Falls back to 10% CR, SparkLoop RCR or 25% if null
+ * - Falls back to 22% CR, SparkLoop RCR or 25% if null
  */
 export async function GET(request: NextRequest) {
   try {
@@ -53,8 +53,8 @@ export async function GET(request: NextRequest) {
 
     // Score and sort recommendations by CR × CPA × RCR
     const scored = (recommendations || []).map(rec => {
-      // Use our CR if 20+ impressions, otherwise 10%
-      const cr = rec.our_cr !== null ? rec.our_cr / 100 : 0.10
+      // Use our CR if 20+ impressions, otherwise 22%
+      const cr = rec.our_cr !== null ? rec.our_cr / 100 : 0.22
 
       // Use our RCR if 20+ outcomes, otherwise SparkLoop's, otherwise 25%
       const rcr = rec.our_rcr !== null

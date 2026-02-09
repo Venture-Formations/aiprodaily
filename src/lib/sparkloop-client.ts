@@ -347,6 +347,9 @@ export class SparkLoopService {
         sparkloop_pending: rec.referrals?.pending || 0,
         sparkloop_rejected: rec.referrals?.rejected || 0,
         sparkloop_confirmed: rec.referrals?.confirmed || 0,
+        // Mirror into confirms/rejections so the DB trigger calculates our_rcr
+        confirms: rec.referrals?.confirmed || 0,
+        rejections: rec.referrals?.rejected || 0,
         sparkloop_earnings: rec.earnings || 0,
         sparkloop_net_earnings: rec.net_earnings || 0,
         remaining_budget_dollars: remainingBudget,
@@ -421,10 +424,51 @@ export class SparkLoopService {
       }
     }
 
+    // Detect recommendations that disappeared from the API (partner paused their campaign)
+    // SparkLoop removes paused campaigns from the recommendations response entirely
+    const apiRefCodes = new Set(recommendations.map(r => r.ref_code))
+    const { data: storedActive } = await supabaseAdmin
+      .from('sparkloop_recommendations')
+      .select('id, ref_code, publication_name, status')
+      .eq('publication_id', publicationId)
+      .eq('status', 'active')
+
+    let pausedByPartner = 0
+    for (const stored of (storedActive || [])) {
+      if (!apiRefCodes.has(stored.ref_code)) {
+        // This recommendation was active in our DB but is no longer in the API response
+        await supabaseAdmin
+          .from('sparkloop_recommendations')
+          .update({
+            status: 'paused',
+            last_synced_at: new Date().toISOString(),
+          })
+          .eq('id', stored.id)
+        pausedByPartner++
+        console.log(`[SparkLoop] Auto-paused ${stored.publication_name} (disappeared from API — partner likely paused)`)
+      }
+    }
+
+    // Also detect recommendations that reappeared (partner un-paused)
+    const { data: storedPaused } = await supabaseAdmin
+      .from('sparkloop_recommendations')
+      .select('id, ref_code, publication_name, status')
+      .eq('publication_id', publicationId)
+      .eq('status', 'paused')
+
+    let reactivated = 0
+    for (const stored of (storedPaused || [])) {
+      if (apiRefCodes.has(stored.ref_code)) {
+        // This was paused in our DB but is back in the API — already updated above in the main loop
+        reactivated++
+        console.log(`[SparkLoop] Reactivated ${stored.publication_name} (reappeared in API — partner un-paused)`)
+      }
+    }
+
     const active = recommendations.filter(r => r.status === 'active').length
     const paused = recommendations.filter(r => r.status === 'paused').length
 
-    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (${active} active, ${paused} paused, ${outOfBudget} auto-excluded for budget)`)
+    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (${active} active, ${paused} paused, ${outOfBudget} auto-excluded for budget, ${pausedByPartner} paused by partner, ${reactivated} reactivated)`)
     if (confirmDeltas > 0 || rejectionDeltas > 0) {
       console.log(`[SparkLoop] Deltas tracked: +${confirmDeltas} confirms, +${rejectionDeltas} rejections`)
     }
@@ -561,8 +605,8 @@ export class SparkLoopService {
     // CPA in dollars (convert from cents)
     const cpa = (rec.cpa || 0) / 100
 
-    // Use our CR if we have 20+ impressions, otherwise assume 10%
-    const cr = ourCR !== null ? ourCR / 100 : 0.10
+    // Use our CR if we have 20+ impressions, otherwise assume 22%
+    const cr = ourCR !== null ? ourCR / 100 : 0.22
 
     // Use our RCR if we have 20+ outcomes, otherwise use SparkLoop's, otherwise assume 25%
     const rcr = ourRCR !== null

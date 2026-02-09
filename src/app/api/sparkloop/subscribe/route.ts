@@ -45,6 +45,32 @@ export async function POST(request: NextRequest) {
 
     console.log(`[SparkLoop Subscribe] Detected country: ${countryCode}, IP: ${ipAddress ? 'present' : 'none'}`)
 
+    // Validate: only subscribe to active, non-excluded recommendations
+    // This prevents stale popup selections from subscribing to paused/excluded recs
+    const { data: activeRecs } = await supabaseAdmin
+      .from('sparkloop_recommendations')
+      .select('ref_code')
+      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('status', 'active')
+      .or('excluded.is.null,excluded.eq.false')
+      .in('ref_code', refCodes)
+
+    const activeRefCodes = activeRecs?.map(r => r.ref_code) || []
+    const filteredOut = refCodes.filter((rc: string) => !activeRefCodes.includes(rc))
+
+    if (filteredOut.length > 0) {
+      console.log(`[SparkLoop Subscribe] Filtered out ${filteredOut.length} paused/excluded recs: ${filteredOut.join(', ')}`)
+    }
+
+    if (activeRefCodes.length === 0) {
+      console.log('[SparkLoop Subscribe] No active recommendations to subscribe to after filtering')
+      return NextResponse.json({
+        success: true,
+        subscribedCount: 0,
+        filtered: filteredOut,
+      })
+    }
+
     // Step 2: Create or fetch subscriber in SparkLoop (non-blocking)
     let subscriberUuid: string | null = null
     try {
@@ -61,11 +87,11 @@ export async function POST(request: NextRequest) {
       console.error('[SparkLoop Subscribe] Step 2 (create/fetch subscriber) failed:', subError)
     }
 
-    // Step 3: Subscribe to selected newsletters
+    // Step 3: Subscribe to selected newsletters (only active ones)
     const subscribeResult = await service.subscribeToNewsletters({
       subscriber_email: email,
       country_code: countryCode,
-      recommendations: refCodes.join(','),
+      recommendations: activeRefCodes.join(','),
       utm_source: 'custom_popup',
     })
 
@@ -79,7 +105,8 @@ export async function POST(request: NextRequest) {
           source: 'server',
           subscriber_uuid: subscriberUuid,
           country_code: countryCode,
-          ref_codes: refCodes,
+          ref_codes: activeRefCodes,
+          filtered_out: filteredOut.length > 0 ? filteredOut : undefined,
           sparkloop_response: subscribeResult.response,
           ip_present: !!ipAddress,
         },
@@ -93,9 +120,9 @@ export async function POST(request: NextRequest) {
     try {
       await supabaseAdmin.rpc('increment_sparkloop_submissions', {
         p_publication_id: DEFAULT_PUBLICATION_ID,
-        p_ref_codes: refCodes,
+        p_ref_codes: activeRefCodes,
       })
-      console.log(`[SparkLoop Subscribe] Recorded ${refCodes.length} submissions`)
+      console.log(`[SparkLoop Subscribe] Recorded ${activeRefCodes.length} submissions`)
     } catch (metricsError) {
       console.error('[SparkLoop Subscribe] Failed to record metrics:', metricsError)
       // Don't fail the request for metrics errors
@@ -124,11 +151,11 @@ export async function POST(request: NextRequest) {
       // Don't fail the request for MailerLite errors
     }
 
-    console.log(`[SparkLoop Subscribe] Successfully subscribed ${email} to ${refCodes.length} newsletters`)
+    console.log(`[SparkLoop Subscribe] Successfully subscribed ${email} to ${activeRefCodes.length} newsletters${filteredOut.length > 0 ? ` (${filteredOut.length} filtered out as paused/excluded)` : ''}`)
 
     return NextResponse.json({
       success: true,
-      subscribedCount: refCodes.length,
+      subscribedCount: activeRefCodes.length,
     })
   } catch (error) {
     console.error('[SparkLoop Subscribe] Failed:', error)
