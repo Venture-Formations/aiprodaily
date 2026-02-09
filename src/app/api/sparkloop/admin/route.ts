@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       return {
         ...rec,
         calculated_score: score,
-        effective_cr: rec.our_cr !== null ? rec.our_cr : 10,
+        effective_cr: rec.our_cr !== null ? rec.our_cr : 22,
         effective_rcr: rec.our_rcr !== null ? rec.our_rcr : (rec.sparkloop_rcr || 25),
         cr_source: rec.our_cr !== null ? 'ours' : 'default',
         rcr_source: rec.our_rcr !== null ? 'ours' : (rec.sparkloop_rcr !== null ? 'sparkloop' : 'default'),
