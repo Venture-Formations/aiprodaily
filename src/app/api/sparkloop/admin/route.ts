@@ -18,8 +18,6 @@ export async function GET(request: NextRequest) {
       .from('sparkloop_recommendations')
       .select('*')
       .eq('publication_id', DEFAULT_PUBLICATION_ID)
-      .order('excluded', { ascending: true })
-      .order('cpa', { ascending: false, nullsFirst: false })
 
     if (filter === 'active') {
       query = query.eq('status', 'active').or('excluded.is.null,excluded.eq.false')
@@ -37,20 +35,25 @@ export async function GET(request: NextRequest) {
 
     // Calculate scores for each recommendation
     const withScores = (data || []).map(rec => {
-      const cr = rec.our_cr !== null ? rec.our_cr / 100 : 0.22
-      const rcr = rec.our_rcr !== null
-        ? rec.our_rcr / 100
-        : (rec.sparkloop_rcr !== null ? rec.sparkloop_rcr / 100 : 0.25)
+      const cr = rec.our_cr !== null && Number(rec.our_cr) > 0 ? Number(rec.our_cr) / 100 : 0.22
+      const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
+      const rcr = rec.our_rcr !== null && Number(rec.our_rcr) > 0
+        ? Number(rec.our_rcr) / 100
+        : (slRcr !== null && slRcr > 0 ? slRcr / 100 : 0.25)
       const cpa = (rec.cpa || 0) / 100
       const score = cr * cpa * rcr
 
       return {
         ...rec,
         calculated_score: score,
-        effective_cr: rec.our_cr !== null ? rec.our_cr : 22,
-        effective_rcr: rec.our_rcr !== null ? rec.our_rcr : (rec.sparkloop_rcr || 25),
-        cr_source: rec.our_cr !== null ? 'ours' : 'default',
-        rcr_source: rec.our_rcr !== null ? 'ours' : (rec.sparkloop_rcr !== null ? 'sparkloop' : 'default'),
+        effective_cr: rec.our_cr !== null && Number(rec.our_cr) > 0 ? Number(rec.our_cr) : 22,
+        effective_rcr: rec.our_rcr !== null && Number(rec.our_rcr) > 0
+          ? Number(rec.our_rcr)
+          : (slRcr !== null && slRcr > 0 ? slRcr : 25),
+        cr_source: rec.our_cr !== null && Number(rec.our_cr) > 0 ? 'ours' : 'default',
+        rcr_source: rec.our_rcr !== null && Number(rec.our_rcr) > 0
+          ? 'ours'
+          : (slRcr !== null && slRcr > 0 ? 'sparkloop' : 'default'),
       }
     })
 
