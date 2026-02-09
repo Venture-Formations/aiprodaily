@@ -307,6 +307,10 @@ export class SparkLoopService {
     let confirmDeltas = 0
     let rejectionDeltas = 0
 
+    // Log budget match diagnostics
+    let budgetMatched = 0
+    let budgetUnmatched = 0
+
     for (const rec of recommendations) {
       const { data: existing } = await supabaseAdmin
         .from('sparkloop_recommendations')
@@ -315,8 +319,10 @@ export class SparkLoopService {
         .eq('ref_code', rec.ref_code)
         .single()
 
-      // Get budget info from partner campaigns (match on partner_program_uuid, not rec uuid)
-      const budgetInfo = campaignBudgets.get(rec.partner_program_uuid)
+      // Get budget info from partner campaigns
+      // Try partner_program_uuid first, fall back to rec.uuid
+      const budgetInfo = campaignBudgets.get(rec.partner_program_uuid) || campaignBudgets.get(rec.uuid)
+      if (budgetInfo) { budgetMatched++ } else { budgetUnmatched++ }
       const remainingBudget = budgetInfo?.remaining_budget_dollars ?? 0
       const screeningPeriod = budgetInfo?.referral_pending_period ?? null
       const cpaInDollars = (rec.cpa || 0) / 100
@@ -480,7 +486,7 @@ export class SparkLoopService {
     const active = recommendations.filter(r => r.status === 'active').length
     const paused = recommendations.filter(r => r.status === 'paused').length
 
-    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (${active} active, ${paused} paused, ${outOfBudget} auto-excluded for budget, ${pausedByPartner} paused by partner, ${reactivated} reactivated)`)
+    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (${active} active, ${paused} paused, ${outOfBudget} auto-excluded for budget, ${pausedByPartner} paused by partner, ${reactivated} reactivated, budget matched: ${budgetMatched}, unmatched: ${budgetUnmatched})`)
     if (confirmDeltas > 0 || rejectionDeltas > 0) {
       console.log(`[SparkLoop] Deltas tracked: +${confirmDeltas} confirms, +${rejectionDeltas} rejections`)
     }
