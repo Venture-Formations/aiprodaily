@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   description: "Daily insights, tools, and strategies to help accountants and finance professionals leverage AI for better outcomes.",
   other: {
     'impact-site-verification': '95d00837-a42c-4e90-abfb-559b7845cfa8',
+    'google-adsense-account': 'ca-pub-1173459595320946',
   },
 }
 
