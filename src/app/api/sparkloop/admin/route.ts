@@ -34,26 +34,23 @@ export async function GET(request: NextRequest) {
     }
 
     // Calculate scores for each recommendation
+    // RCR: only use SparkLoop RCR or default 25% (our_rcr not used until data is more reliable)
     const withScores = (data || []).map(rec => {
       const cr = rec.our_cr !== null && Number(rec.our_cr) > 0 ? Number(rec.our_cr) / 100 : 0.22
       const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
-      const rcr = rec.our_rcr !== null && Number(rec.our_rcr) > 0
-        ? Number(rec.our_rcr) / 100
-        : (slRcr !== null && slRcr > 0 ? slRcr / 100 : 0.25)
+      const rcr = slRcr !== null && slRcr > 0 ? slRcr / 100 : 0.25
       const cpa = (rec.cpa || 0) / 100
       const score = cr * cpa * rcr
+      const hasSLRcr = slRcr !== null && slRcr > 0
 
       return {
         ...rec,
         calculated_score: score,
         effective_cr: rec.our_cr !== null && Number(rec.our_cr) > 0 ? Number(rec.our_cr) : 22,
-        effective_rcr: rec.our_rcr !== null && Number(rec.our_rcr) > 0
-          ? Number(rec.our_rcr)
-          : (slRcr !== null && slRcr > 0 ? slRcr : 25),
+        effective_rcr: hasSLRcr ? slRcr : 25,
         cr_source: rec.our_cr !== null && Number(rec.our_cr) > 0 ? 'ours' : 'default',
-        rcr_source: rec.our_rcr !== null && Number(rec.our_rcr) > 0
-          ? 'ours'
-          : (slRcr !== null && slRcr > 0 ? 'sparkloop' : 'default'),
+        rcr_source: hasSLRcr ? 'sparkloop' : 'default',
+        impression_capped: !hasSLRcr && (rec.impressions || 0) >= 100,
       }
     })
 

@@ -51,20 +51,23 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Filter out recs with no SL RCR that have hit 100 impressions
+    const eligible = (recommendations || []).filter(rec => {
+      const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
+      const hasSLRcr = slRcr !== null && slRcr > 0
+      if (!hasSLRcr && (rec.impressions || 0) >= 100) {
+        return false // Capped: no SL RCR data after 100 impressions
+      }
+      return true
+    })
+
     // Score and sort recommendations by CR × CPA × RCR
-    const scored = (recommendations || []).map(rec => {
-      // Use our CR if 20+ impressions, otherwise 22%
-      const cr = rec.our_cr !== null ? rec.our_cr / 100 : 0.22
-
-      // Use our RCR if 20+ outcomes, otherwise SparkLoop's, otherwise 25%
-      const rcr = rec.our_rcr !== null
-        ? rec.our_rcr / 100
-        : (rec.sparkloop_rcr !== null ? rec.sparkloop_rcr / 100 : 0.25)
-
-      // CPA in dollars
+    // RCR: only use SparkLoop RCR or default 25% (our_rcr not used until data is more reliable)
+    const scored = eligible.map(rec => {
+      const cr = rec.our_cr !== null && Number(rec.our_cr) > 0 ? Number(rec.our_cr) / 100 : 0.22
+      const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
+      const rcr = slRcr !== null && slRcr > 0 ? slRcr / 100 : 0.25
       const cpa = (rec.cpa || 0) / 100
-
-      // Score = CR × CPA × RCR (expected revenue per impression)
       const score = cr * cpa * rcr
 
       return { ...rec, score }
