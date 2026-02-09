@@ -266,6 +266,13 @@ export class SparkLoopService {
     const data = await response.json()
     const campaigns = data.partner_campaigns || []
 
+    // Log first campaign shape for diagnostics
+    if (campaigns.length > 0) {
+      const sample = campaigns[0]
+      console.log(`[SparkLoop] Sample campaign keys: ${Object.keys(sample).join(', ')}`)
+      console.log(`[SparkLoop] Sample campaign: uuid=${sample.uuid}, name=${sample.name || sample.publication_name || 'N/A'}, budget=$${sample.remaining_budget_dollars}`)
+    }
+
     // Map by uuid for quick lookup
     const campaignMap = new Map<string, { remaining_budget_dollars: number; referral_pending_period: number }>()
     for (const campaign of campaigns) {
@@ -311,6 +318,13 @@ export class SparkLoopService {
     let budgetMatched = 0
     let budgetUnmatched = 0
 
+    // Log first rec UUIDs for diagnostics
+    if (recommendations.length > 0) {
+      const r = recommendations[0]
+      console.log(`[SparkLoop] Sample rec: uuid=${r.uuid}, partner_program_uuid=${r.partner_program_uuid}, ref_code=${r.ref_code}`)
+      console.log(`[SparkLoop] Campaign map keys (first 3): ${Array.from(campaignBudgets.keys()).slice(0, 3).join(', ')}`)
+    }
+
     for (const rec of recommendations) {
       const { data: existing } = await supabaseAdmin
         .from('sparkloop_recommendations')
@@ -323,13 +337,14 @@ export class SparkLoopService {
       // Try partner_program_uuid first, fall back to rec.uuid
       const budgetInfo = campaignBudgets.get(rec.partner_program_uuid) || campaignBudgets.get(rec.uuid)
       if (budgetInfo) { budgetMatched++ } else { budgetUnmatched++ }
-      const remainingBudget = budgetInfo?.remaining_budget_dollars ?? 0
+      const remainingBudget = budgetInfo?.remaining_budget_dollars ?? null
       const screeningPeriod = budgetInfo?.referral_pending_period ?? null
       const cpaInDollars = (rec.cpa || 0) / 100
       const minBudgetRequired = cpaInDollars * 5 // Need at least 5 referrals worth of budget
 
-      // Out of budget if: no budget info (treat as $0) OR less than 5x CPA remaining
-      const isOutOfBudget = remainingBudget < minBudgetRequired
+      // Out of budget only when we have budget data and it's below threshold
+      // If no budget info (campaign UUID mismatch), skip budget-based exclusion
+      const isOutOfBudget = remainingBudget !== null && remainingBudget < minBudgetRequired
 
       // Auto-exclude if out of budget, auto-reactivate if budget restored
       let excluded = existing?.excluded ?? false
