@@ -315,15 +315,15 @@ export class SparkLoopService {
         .eq('ref_code', rec.ref_code)
         .single()
 
-      // Get budget info from partner campaigns
-      const budgetInfo = campaignBudgets.get(rec.uuid)
-      const remainingBudget = budgetInfo?.remaining_budget_dollars ?? null
+      // Get budget info from partner campaigns (match on partner_program_uuid, not rec uuid)
+      const budgetInfo = campaignBudgets.get(rec.partner_program_uuid)
+      const remainingBudget = budgetInfo?.remaining_budget_dollars ?? 0
       const screeningPeriod = budgetInfo?.referral_pending_period ?? null
       const cpaInDollars = (rec.cpa || 0) / 100
       const minBudgetRequired = cpaInDollars * 5 // Need at least 5 referrals worth of budget
 
-      // Out of budget if: no budget left OR less than 5x CPA remaining
-      const isOutOfBudget = remainingBudget !== null && remainingBudget < minBudgetRequired
+      // Out of budget if: no budget info (treat as $0) OR less than 5x CPA remaining
+      const isOutOfBudget = remainingBudget < minBudgetRequired
 
       // Auto-exclude if out of budget, auto-reactivate if budget restored
       let excluded = existing?.excluded ?? false
