@@ -337,9 +337,8 @@ export class SparkLoopService {
     let matchedByUuid = 0
     let matchedByName = 0
 
-    // Track recs that are active in API but unmatched in partner campaigns
-    // These will be evaluated for paused status in a second pass
-    const unmatchedActiveRecs: { ref_code: string; publication_name: string }[] = []
+    // Check if partner campaigns data is available (non-empty API response)
+    const partnerCampaignsAvailable = campaignData.byUuid.size > 0 || campaignData.byName.size > 0
 
     // Log first rec UUIDs for diagnostics
     if (recommendations.length > 0) {
@@ -357,38 +356,21 @@ export class SparkLoopService {
         .single()
 
       // Get budget info from partner campaigns using multiple matching strategies
-      // Strategy 1: Match by partner_program_uuid
-      // Strategy 2: Match by rec.uuid (some APIs use this)
-      // Strategy 3: Match by publication name (most reliable fallback)
+      // Strategy 1: Match by partner_program_uuid (trust UUID — it's a unique identifier)
+      // Strategy 2: Match by rec.uuid
+      // Strategy 3: Match by publication name (case-insensitive, fallback)
       const recNameNormalized = (rec.publication_name || '').trim().toLowerCase()
 
       let budgetInfo: { remaining_budget_dollars: number; referral_pending_period: number } | undefined
       let matchMethod = 'none'
 
-      // Try UUID-based matching first
+      // Try UUID-based matching first — trust UUID matches without name verification.
+      // UUIDs are unique identifiers; requiring name verification caused mass false-negatives
+      // because campaign names often differ slightly from recommendation names.
       const uuidMatch = campaignData.byUuid.get(rec.partner_program_uuid) || campaignData.byUuid.get(rec.uuid)
       if (uuidMatch) {
-        // Verify UUID match by checking name similarity to avoid false positives
-        const uuidMatchNameMatches = uuidMatch.name === recNameNormalized
-        if (uuidMatchNameMatches || !recNameNormalized) {
-          budgetInfo = uuidMatch
-          matchMethod = 'uuid_verified'
-        } else {
-          // UUID matched but name doesn't — check if name is in campaign set at all
-          const nameInCampaigns = campaignData.nameSet.has(recNameNormalized)
-          if (nameInCampaigns) {
-            // Name found under a different UUID — use name-based budget
-            budgetInfo = campaignData.byName.get(recNameNormalized)
-            matchMethod = 'name'
-            matchedByName++
-          } else {
-            // UUID matched something but name isn't in campaigns — this is a false UUID match
-            // The rec's publication is genuinely not in partner campaigns (paused)
-            budgetInfo = undefined
-            matchMethod = 'uuid_false_positive'
-            console.log(`[SparkLoop] False UUID match for ${rec.publication_name}: uuid matched campaign "${uuidMatch.name}" but names differ — treating as paused`)
-          }
-        }
+        budgetInfo = uuidMatch
+        matchMethod = 'uuid'
       } else {
         // No UUID match — try name-based matching
         budgetInfo = campaignData.byName.get(recNameNormalized)
@@ -398,23 +380,25 @@ export class SparkLoopService {
         }
       }
 
-      if (budgetInfo) { budgetMatched++; if (matchMethod.startsWith('uuid')) matchedByUuid++ } else { budgetUnmatched++ }
+      if (budgetInfo) { budgetMatched++; if (matchMethod === 'uuid') matchedByUuid++ } else { budgetUnmatched++ }
 
-      // Use SparkLoop recommendations API status as the base.
-      // Partner campaigns paused detection is applied in a second pass below
-      // (only if the match rate is high enough to trust the data).
-      const effectiveStatus = rec.status
+      // Determine effective status:
+      // - If rec.status is already 'paused' from the API, trust it
+      // - If partner_campaigns data is available and this rec is NOT in it, mark as paused
+      //   (SparkLoop's recommendations API often reports 'active' for paused recs)
+      // - Otherwise, use the API status
+      const isPausedByPartner = !budgetInfo && partnerCampaignsAvailable
+      const effectiveStatus = isPausedByPartner ? 'paused' : rec.status
 
-      // Budget info is optional — if we can't match, just skip budget tracking
-      const remainingBudget = budgetInfo?.remaining_budget_dollars ?? null
+      const remainingBudget = isPausedByPartner ? 0 : (budgetInfo?.remaining_budget_dollars ?? 0)
       const screeningPeriod = budgetInfo?.referral_pending_period ?? null
       const cpaInDollars = (rec.cpa || 0) / 100
       const minBudgetRequired = cpaInDollars * 5 // Need at least 5 referrals worth of budget
 
-      // Budget-based auto-exclusion only when we have budget data
-      const isOutOfBudget = remainingBudget !== null && remainingBudget < minBudgetRequired
+      // Budget-based auto-exclusion only for active recs with known budget
+      const isOutOfBudget = !isPausedByPartner && remainingBudget < minBudgetRequired
 
-      // Auto-exclude/reactivate only for budget reasons (paused is handled separately)
+      // Auto-exclude/reactivate only for budget reasons (paused is handled by status alone)
       let excluded = existing?.excluded ?? false
       let excludedReason = existing?.excluded_reason ?? null
 
@@ -424,23 +408,21 @@ export class SparkLoopService {
         outOfBudget++
         console.log(`[SparkLoop] Auto-excluding ${rec.publication_name} (budget $${remainingBudget} < 5x CPA $${minBudgetRequired})`)
       } else if (!isOutOfBudget && excluded && excludedReason === 'budget_used_up') {
-        // Budget restored or no longer trackable, reactivate if it was auto-excluded for budget
+        // Budget restored, reactivate if it was auto-excluded for budget
         excluded = false
         excludedReason = null
         console.log(`[SparkLoop] Auto-reactivating ${rec.publication_name} (budget restored: $${remainingBudget})`)
       }
 
-      // If previously auto-excluded as partner_paused but API now says active, clear it
-      // (will be re-evaluated in the partner campaigns pass below if needed)
-      if (rec.status === 'active' && excluded && excludedReason === 'partner_paused') {
+      // If previously auto-excluded as partner_paused but now back in partner campaigns, clear it
+      if (!isPausedByPartner && excluded && excludedReason === 'partner_paused') {
         excluded = false
         excludedReason = null
-        console.log(`[SparkLoop] Clearing partner_paused exclusion for ${rec.publication_name} (API status is active)`)
+        console.log(`[SparkLoop] Clearing partner_paused exclusion for ${rec.publication_name} (back in partner campaigns)`)
       }
 
-      // Track unmatched active recs for the partner-campaigns paused pass below
-      if (!budgetInfo && rec.status === 'active') {
-        unmatchedActiveRecs.push({ ref_code: rec.ref_code, publication_name: rec.publication_name })
+      if (isPausedByPartner) {
+        console.log(`[SparkLoop] ${rec.publication_name} — paused (not in partner campaigns, match method: ${matchMethod})`)
       }
 
       const recordData = {
@@ -538,34 +520,6 @@ export class SparkLoopService {
       }
     }
 
-    // SECOND PASS: Partner-campaigns paused detection with safety threshold.
-    // Only mark active recs as paused via partner_campaigns absence if the match rate
-    // is high enough to trust the data. This prevents marking everything as paused
-    // when the partner_campaigns API returns mismatched data.
-    const activeRecsCount = recommendations.filter(r => r.status === 'active').length
-    const partnerCampaignsAvailable = campaignData.byUuid.size > 0 || campaignData.byName.size > 0
-    const matchRate = activeRecsCount > 0 ? budgetMatched / activeRecsCount : 0
-    const matchRateThreshold = 0.3 // Need at least 30% match rate to trust the data
-
-    let partnerPausedCount = 0
-    if (partnerCampaignsAvailable && matchRate >= matchRateThreshold && unmatchedActiveRecs.length > 0) {
-      console.log(`[SparkLoop] Partner campaigns match rate: ${(matchRate * 100).toFixed(0)}% (${budgetMatched}/${activeRecsCount}) — applying paused detection to ${unmatchedActiveRecs.length} unmatched recs`)
-      for (const unmatched of unmatchedActiveRecs) {
-        await supabaseAdmin
-          .from('sparkloop_recommendations')
-          .update({
-            status: 'paused',
-            last_synced_at: new Date().toISOString(),
-          })
-          .eq('publication_id', publicationId)
-          .eq('ref_code', unmatched.ref_code)
-        partnerPausedCount++
-        console.log(`[SparkLoop] ${unmatched.publication_name} — paused (active in API but not in partner campaigns)`)
-      }
-    } else if (unmatchedActiveRecs.length > 0) {
-      console.log(`[SparkLoop] Skipping partner-campaigns paused detection: match rate ${(matchRate * 100).toFixed(0)}% (${budgetMatched}/${activeRecsCount}) below ${(matchRateThreshold * 100).toFixed(0)}% threshold — ${unmatchedActiveRecs.length} recs would have been paused`)
-    }
-
     // Detect recommendations that disappeared from the API (partner paused their campaign)
     // SparkLoop removes paused campaigns from the recommendations response entirely
     const apiRefCodes = new Set(recommendations.map(r => r.ref_code))
@@ -610,7 +564,7 @@ export class SparkLoopService {
     const active = recommendations.filter(r => r.status === 'active').length
     const paused = recommendations.filter(r => r.status === 'paused').length
 
-    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (API: ${active} active, ${paused} paused | ${outOfBudget} budget-excluded, ${partnerPausedCount} partner-paused, ${pausedByPartner} disappeared, ${reactivated} reactivated | budget match: ${budgetMatched}/${activeRecsCount} = ${(matchRate * 100).toFixed(0)}% [${matchedByUuid} uuid, ${matchedByName} name], unmatched: ${budgetUnmatched})`)
+    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (API: ${active} active, ${paused} paused | ${outOfBudget} budget-excluded, ${budgetUnmatched} partner-paused, ${pausedByPartner} disappeared, ${reactivated} reactivated | budget match: ${budgetMatched} [${matchedByUuid} uuid, ${matchedByName} name], unmatched: ${budgetUnmatched}, partner_campaigns available: ${partnerCampaignsAvailable})`)
     if (confirmDeltas > 0 || rejectionDeltas > 0) {
       console.log(`[SparkLoop] Deltas tracked: +${confirmDeltas} confirms, +${rejectionDeltas} rejections`)
     }
