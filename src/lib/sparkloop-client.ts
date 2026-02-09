@@ -300,8 +300,11 @@ export class SparkLoopService {
       }
     }
 
-    const pausedCount = Array.from(byUuid.values()).filter(c => c.status === 'paused').length
-    console.log(`[SparkLoop] Fetched ${byUuid.size} partner campaigns (${nameSet.size} unique names, ${pausedCount} paused)`)
+    const statusCounts: Record<string, number> = {}
+    for (const c of Array.from(byUuid.values())) {
+      statusCounts[c.status] = (statusCounts[c.status] || 0) + 1
+    }
+    console.log(`[SparkLoop] Fetched ${byUuid.size} partner campaigns (${nameSet.size} unique names, statuses: ${JSON.stringify(statusCounts)})`)
     return { byUuid, nameSet, byName }
   }
 
@@ -384,6 +387,11 @@ export class SparkLoopService {
       }
 
       if (budgetInfo) { budgetMatched++; if (matchMethod === 'uuid') matchedByUuid++ } else { budgetUnmatched++ }
+
+      // Debug: log specific rec for diagnostics
+      if (rec.ref_code === '3bff334870') {
+        console.log(`[SparkLoop DEBUG] Colin Rocker: rec.status=${rec.status}, match=${matchMethod}, budgetInfo.status=${budgetInfo?.status ?? 'N/A'}, budget=$${budgetInfo?.remaining_budget_dollars ?? 'N/A'}`)
+      }
 
       // Determine effective status:
       // - If rec.status is already 'paused' from the API, trust it
