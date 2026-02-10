@@ -459,9 +459,6 @@ export class SparkLoopService {
         sparkloop_pending: rec.referrals?.pending || 0,
         sparkloop_rejected: rec.referrals?.rejected || 0,
         sparkloop_confirmed: rec.referrals?.confirmed || 0,
-        // Mirror into confirms/rejections so the DB trigger calculates our_rcr
-        confirms: rec.referrals?.confirmed || 0,
-        rejections: rec.referrals?.rejected || 0,
         sparkloop_earnings: rec.earnings || 0,
         sparkloop_net_earnings: rec.net_earnings || 0,
         remaining_budget_dollars: remainingBudget,

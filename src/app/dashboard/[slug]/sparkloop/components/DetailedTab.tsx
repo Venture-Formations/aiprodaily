@@ -28,6 +28,10 @@ interface Recommendation {
   sparkloop_rejected: number
   sparkloop_earnings: number
   sparkloop_net_earnings: number
+  our_total_subscribes: number
+  our_confirms: number
+  our_rejections: number
+  our_pending: number
   remaining_budget_dollars: number | null
   last_synced_at: string | null
   calculated_score: number
@@ -74,9 +78,13 @@ const DEFAULT_COLUMNS: Column[] = [
   { key: 'calculated_score', label: 'Score', enabled: true, exportable: true, width: 'sm' },
   { key: 'impressions', label: 'Impressions', enabled: true, exportable: true, width: 'xs' },
   { key: 'submissions', label: 'Submissions', enabled: true, exportable: true, width: 'xs' },
-  { key: 'sparkloop_confirmed', label: 'Confirmed', enabled: true, exportable: true, width: 'xs' },
-  { key: 'sparkloop_rejected', label: 'Rejected', enabled: true, exportable: true, width: 'xs' },
-  { key: 'sparkloop_pending', label: 'Pending', enabled: true, exportable: true, width: 'xs' },
+  { key: 'our_total_subscribes', label: 'Our Subs', enabled: true, exportable: true, width: 'xs' },
+  { key: 'our_confirms', label: 'Our Conf', enabled: true, exportable: true, width: 'xs' },
+  { key: 'our_rejections', label: 'Our Rej', enabled: true, exportable: true, width: 'xs' },
+  { key: 'our_pending', label: 'Our Pend', enabled: true, exportable: true, width: 'xs' },
+  { key: 'sparkloop_confirmed', label: 'SL Confirmed', enabled: false, exportable: true, width: 'xs' },
+  { key: 'sparkloop_rejected', label: 'SL Rejected', enabled: false, exportable: true, width: 'xs' },
+  { key: 'sparkloop_pending', label: 'SL Pending', enabled: false, exportable: true, width: 'xs' },
   { key: 'sparkloop_earnings', label: 'Earnings', enabled: true, exportable: true, width: 'sm' },
   { key: 'sparkloop_net_earnings', label: 'Net Earnings', enabled: false, exportable: true, width: 'sm' },
   { key: 'remaining_budget_dollars', label: 'Budget Left', enabled: true, exportable: true, width: 'sm' },
@@ -300,14 +308,26 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
       case 'calculated_score':
         return <span className="font-mono font-medium">${rec.calculated_score.toFixed(4)}</span>
 
+      case 'our_total_subscribes':
+        return <span className="text-blue-600">{rec.our_total_subscribes}</span>
+
+      case 'our_confirms':
+        return <span className="text-green-600 font-medium">{rec.our_confirms}</span>
+
+      case 'our_rejections':
+        return <span className="text-red-600">{rec.our_rejections}</span>
+
+      case 'our_pending':
+        return <span className="text-yellow-600">{rec.our_pending}</span>
+
       case 'sparkloop_confirmed':
-        return <span className="text-green-600">{rec.sparkloop_confirmed}</span>
+        return <span className="text-green-600/60">{rec.sparkloop_confirmed}</span>
 
       case 'sparkloop_rejected':
-        return <span className="text-red-600">{rec.sparkloop_rejected}</span>
+        return <span className="text-red-600/60">{rec.sparkloop_rejected}</span>
 
       case 'sparkloop_pending':
-        return <span className="text-yellow-600">{rec.sparkloop_pending}</span>
+        return <span className="text-yellow-600/60">{rec.sparkloop_pending}</span>
 
       case 'sparkloop_earnings':
         return rec.sparkloop_earnings ? `$${(rec.sparkloop_earnings / 100).toFixed(2)}` : '-'

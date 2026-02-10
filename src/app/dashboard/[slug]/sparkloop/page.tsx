@@ -40,6 +40,10 @@ interface Recommendation {
   sparkloop_rejected: number
   sparkloop_earnings: number
   sparkloop_net_earnings: number
+  our_total_subscribes: number
+  our_confirms: number
+  our_rejections: number
+  our_pending: number
   remaining_budget_dollars: number | null
   last_synced_at: string | null
   calculated_score: number
@@ -81,6 +85,7 @@ interface ChartStats {
   summary: {
     totalPending: number
     totalConfirmed: number
+    totalSubscribes: number
     totalEarnings: number
     projectedFromPending: number
     avgCPA: number
@@ -632,10 +637,10 @@ export default function SparkLoopAdminPage() {
                           {rec.submissions}
                         </td>
                         <td className="px-2 py-2 text-xs text-center text-green-600 font-medium">
-                          {rec.sparkloop_confirmed}
+                          {rec.our_confirms}
                         </td>
                         <td className="px-2 py-2 text-xs text-center text-yellow-600 font-medium">
-                          {rec.sparkloop_pending}
+                          {rec.our_pending}
                         </td>
                         <td className="px-2 py-2">
                           {rec.excluded ? (

@@ -14,8 +14,10 @@ interface DailyStats {
 /**
  * GET /api/sparkloop/stats
  *
- * Fetches SparkLoop statistics for charts and summaries
- * Supports timeframe filtering (7d, 30d, 90d, custom)
+ * Fetches SparkLoop statistics for charts and summaries.
+ * Uses our sparkloop_referrals table for popup-sourced data
+ * and sparkloop_recommendations aggregate columns for summary totals.
+ * Supports timeframe filtering (7d, 30d, 90d, custom).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -36,14 +38,15 @@ export async function GET(request: NextRequest) {
       fromDate.setDate(fromDate.getDate() - days)
     }
 
-    // Get current totals from sparkloop_recommendations
+    // Get current totals from our aggregate columns on sparkloop_recommendations
     const { data: recommendations } = await supabaseAdmin
       .from('sparkloop_recommendations')
-      .select('sparkloop_pending, sparkloop_confirmed, sparkloop_earnings, cpa')
+      .select('our_pending, our_confirms, our_total_subscribes, sparkloop_earnings, cpa')
       .eq('publication_id', DEFAULT_PUBLICATION_ID)
 
-    const totalPending = recommendations?.reduce((sum, r) => sum + (r.sparkloop_pending || 0), 0) || 0
-    const totalConfirmed = recommendations?.reduce((sum, r) => sum + (r.sparkloop_confirmed || 0), 0) || 0
+    const totalPending = recommendations?.reduce((sum, r) => sum + (r.our_pending || 0), 0) || 0
+    const totalConfirmed = recommendations?.reduce((sum, r) => sum + (r.our_confirms || 0), 0) || 0
+    const totalSubscribes = recommendations?.reduce((sum, r) => sum + (r.our_total_subscribes || 0), 0) || 0
     const totalEarnings = recommendations?.reduce((sum, r) => sum + (r.sparkloop_earnings || 0), 0) || 0
 
     // Calculate average CPA for projecting pending earnings
@@ -53,25 +56,26 @@ export async function GET(request: NextRequest) {
 
     const projectedFromPending = (totalPending * avgCPA * 0.25) / 100 // Assume 25% RCR for pending
 
-    // Get daily data from sparkloop_events (delta tracking)
-    const { data: confirmEvents } = await supabaseAdmin
-      .from('sparkloop_events')
-      .select('event_timestamp, raw_payload')
+    // Get daily confirmed data from sparkloop_referrals (our popup referrals)
+    const { data: confirmedByDay } = await supabaseAdmin
+      .from('sparkloop_referrals')
+      .select('confirmed_at')
       .eq('publication_id', DEFAULT_PUBLICATION_ID)
-      .eq('event_type', 'sync_confirm_delta')
-      .gte('event_timestamp', fromDate.toISOString())
-      .lte('event_timestamp', toDate.toISOString())
-      .order('event_timestamp', { ascending: true })
+      .eq('source', 'custom_popup')
+      .eq('status', 'confirmed')
+      .not('confirmed_at', 'is', null)
+      .gte('confirmed_at', fromDate.toISOString())
+      .lte('confirmed_at', toDate.toISOString())
 
-    // Also get submission events for pending tracking
-    const { data: submissionEvents } = await supabaseAdmin
-      .from('sparkloop_events')
-      .select('event_timestamp, raw_payload')
+    // Get daily subscribed data from sparkloop_referrals (our popup referrals)
+    const { data: subscribedByDay } = await supabaseAdmin
+      .from('sparkloop_referrals')
+      .select('subscribed_at')
       .eq('publication_id', DEFAULT_PUBLICATION_ID)
-      .eq('event_type', 'subscriptions_success')
-      .gte('event_timestamp', fromDate.toISOString())
-      .lte('event_timestamp', toDate.toISOString())
-      .order('event_timestamp', { ascending: true })
+      .eq('source', 'custom_popup')
+      .not('subscribed_at', 'is', null)
+      .gte('subscribed_at', fromDate.toISOString())
+      .lte('subscribed_at', toDate.toISOString())
 
     // Aggregate by day
     const dailyMap = new Map<string, { pending: number; confirmed: number; earnings: number }>()
@@ -84,25 +88,22 @@ export async function GET(request: NextRequest) {
       currentDate.setDate(currentDate.getDate() + 1)
     }
 
-    // Add confirmed deltas
-    confirmEvents?.forEach(event => {
-      const dateKey = event.event_timestamp?.split('T')[0]
+    // Count confirmed per day
+    confirmedByDay?.forEach(row => {
+      const dateKey = row.confirmed_at?.split('T')[0]
       if (dateKey && dailyMap.has(dateKey)) {
-        const delta = (event.raw_payload as { delta?: number })?.delta || 0
         const existing = dailyMap.get(dateKey)!
-        existing.confirmed += delta
-        // Estimate earnings based on average CPA
-        existing.earnings += (delta * avgCPA) / 100
+        existing.confirmed += 1
+        existing.earnings += avgCPA / 100
       }
     })
 
-    // Count submissions per day as pending
-    submissionEvents?.forEach(event => {
-      const dateKey = event.event_timestamp?.split('T')[0]
+    // Count subscribed per day as pending
+    subscribedByDay?.forEach(row => {
+      const dateKey = row.subscribed_at?.split('T')[0]
       if (dateKey && dailyMap.has(dateKey)) {
-        const refCodes = (event.raw_payload as { refCodes?: string[] })?.refCodes || []
         const existing = dailyMap.get(dateKey)!
-        existing.pending += refCodes.length
+        existing.pending += 1
       }
     })
 
@@ -117,7 +118,7 @@ export async function GET(request: NextRequest) {
     // Get top earning recommendations
     const { data: topRecs } = await supabaseAdmin
       .from('sparkloop_recommendations')
-      .select('publication_name, publication_logo, sparkloop_confirmed, sparkloop_earnings')
+      .select('publication_name, publication_logo, our_confirms, sparkloop_earnings')
       .eq('publication_id', DEFAULT_PUBLICATION_ID)
       .gt('sparkloop_earnings', 0)
       .order('sparkloop_earnings', { ascending: false })
@@ -128,6 +129,7 @@ export async function GET(request: NextRequest) {
       summary: {
         totalPending,
         totalConfirmed,
+        totalSubscribes,
         totalEarnings: totalEarnings / 100, // Convert cents to dollars
         projectedFromPending: projectedFromPending,
         avgCPA: avgCPA / 100,
@@ -136,7 +138,7 @@ export async function GET(request: NextRequest) {
       topEarners: topRecs?.map(r => ({
         name: r.publication_name,
         logo: r.publication_logo,
-        referrals: r.sparkloop_confirmed,
+        referrals: r.our_confirms || 0,
         earnings: (r.sparkloop_earnings || 0) / 100,
       })) || [],
       dateRange: {

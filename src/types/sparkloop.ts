@@ -62,13 +62,19 @@ export interface StoredSparkLoopRecommendation {
   sparkloop_earnings: number
   sparkloop_net_earnings: number
 
-  // Our tracking metrics
+  // Our tracking metrics (legacy popup-level counters)
   impressions: number // Times shown in popup
   selections: number // Times user selected/checked
   submissions: number // Times submitted to SparkLoop
-  confirms: number // Our confirmed referrals
-  rejections: number // Our rejected referrals
-  pending: number // Our pending referrals
+  confirms: number // Our confirmed referrals (legacy)
+  rejections: number // Our rejected referrals (legacy)
+  pending: number // Our pending referrals (legacy)
+
+  // Our referral-level tracking (from sparkloop_referrals table)
+  our_total_subscribes: number // Total popup subscriptions tracked
+  our_confirms: number // Confirmed via webhook matching our popup
+  our_rejections: number // Rejected via webhook matching our popup
+  our_pending: number // Subscribed/pending, not yet confirmed/rejected
 
   // Our calculated rates (null until enough data)
   our_cr: number | null // Conversion Rate: submissions/impressions (null until 20+ impressions)
