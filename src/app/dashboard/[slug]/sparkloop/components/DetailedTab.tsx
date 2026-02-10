@@ -103,7 +103,7 @@ const DEFAULT_COLUMNS: Column[] = [
 ]
 
 // Columns that get overridden when date range is active
-const DATE_FILTERED_COLUMNS = new Set(['impressions', 'submissions', 'our_confirms', 'our_rejections', 'our_pending'])
+const DATE_FILTERED_COLUMNS = new Set(['impressions', 'submissions', 'our_cr', 'our_confirms', 'our_rejections', 'our_pending'])
 
 const fmtDollars = (value: number) =>
   value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -166,6 +166,14 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
     setDateRangeMetrics(null)
   }, [])
 
+  const setQuickRange = useCallback((days: number) => {
+    const end = new Date()
+    const start = new Date()
+    start.setDate(end.getDate() - days + 1)
+    setDateStart(start.toISOString().split('T')[0])
+    setDateEnd(end.toISOString().split('T')[0])
+  }, [])
+
   const enabledColumns = columns.filter(col => col.enabled)
 
   const handleSort = (columnKey: string) => {
@@ -188,10 +196,15 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
     if (!dateRangeMetrics) return recommendations
     return recommendations.map(rec => {
       const drm = dateRangeMetrics[rec.ref_code]
+      const impr = drm?.impressions ?? 0
+      const subs = drm?.submissions ?? 0
+      // Calculate CR from date-filtered data: submissions / impressions * 100
+      const crForRange = impr > 0 ? Math.round((subs / impr) * 10000) / 100 : null
       return {
         ...rec,
-        impressions: drm?.impressions ?? 0,
-        submissions: drm?.submissions ?? 0,
+        impressions: impr,
+        submissions: subs,
+        our_cr: crForRange,
         our_confirms: drm?.confirms ?? 0,
         our_rejections: drm?.rejections ?? 0,
         our_pending: drm?.pending ?? 0,
@@ -363,7 +376,7 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
 
       case 'our_cr':
         return rec.our_cr !== null
-          ? <span className="text-blue-600 font-medium">{rec.our_cr.toFixed(1)}%</span>
+          ? <span className={`font-medium ${dateRangeActive ? 'text-purple-600' : 'text-blue-600'}`}>{rec.our_cr.toFixed(1)}%</span>
           : '-'
 
       case 'effective_cr':
@@ -505,7 +518,25 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
       {/* Date Range Picker */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <Calendar className="w-4 h-4 text-gray-400" />
-        <span className="text-xs text-gray-500">Date Range:</span>
+        <button
+          onClick={() => setQuickRange(7)}
+          className={`px-2 py-1 text-xs rounded-lg ${
+            dateRangeActive && dateStart === new Date(Date.now() - 6 * 86400000).toISOString().split('T')[0]
+              ? 'bg-purple-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+          }`}
+        >
+          7 Days
+        </button>
+        <button
+          onClick={() => setQuickRange(30)}
+          className={`px-2 py-1 text-xs rounded-lg ${
+            dateRangeActive && dateStart === new Date(Date.now() - 29 * 86400000).toISOString().split('T')[0]
+              ? 'bg-purple-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+          }`}
+        >
+          30 Days
+        </button>
+        <span className="text-xs text-gray-300">|</span>
         <input
           type="date"
           value={dateStart}
@@ -533,7 +564,7 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
         )}
         {dateRangeActive && !dateRangeLoading && (
           <span className="px-2 py-0.5 text-[10px] rounded-full bg-purple-100 text-purple-700">
-            Filtered: Impr, Subs, Conf, Rej, Pend
+            Filtered: Impr, Subs, CR, Conf, Rej, Pend
           </span>
         )}
       </div>
