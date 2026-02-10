@@ -238,6 +238,15 @@ async function handlePartnerReferral(
       // Don't fail the webhook for metrics errors
     }
   }
+
+  // Update sparkloop_referrals tracking table
+  if (refCode && subscriberEmail) {
+    try {
+      await updateReferralTracking(subscriberEmail, refCode, status)
+    } catch (trackingError) {
+      console.error(`[SparkLoop Webhook] Failed to update referral tracking:`, trackingError)
+    }
+  }
 }
 
 /**
@@ -287,6 +296,133 @@ async function handleSyncSubscriber(payload: any) {
     subscriber_email: subscriberEmail,
     subscriber_uuid: subscriberUuid,
   })
+}
+
+/**
+ * Update sparkloop_referrals tracking table for a webhook event.
+ * Tries to match existing popup referral first; if no match, inserts as webhook_only.
+ */
+async function updateReferralTracking(
+  subscriberEmail: string,
+  refCode: string,
+  status: 'pending' | 'confirmed' | 'rejected'
+) {
+  const now = new Date().toISOString()
+
+  if (status === 'pending') {
+    // Try to update existing custom_popup referral
+    const { data: updated } = await supabaseAdmin
+      .from('sparkloop_referrals')
+      .update({ status: 'pending', pending_at: now, updated_at: now })
+      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('subscriber_email', subscriberEmail)
+      .eq('ref_code', refCode)
+      .eq('source', 'custom_popup')
+      .in('status', ['subscribed'])
+      .select('id')
+
+    if (updated && updated.length > 0) {
+      console.log(`[SparkLoop Webhook] Updated popup referral to pending: ${subscriberEmail} / ${refCode}`)
+    } else {
+      // No match — insert as webhook_only
+      const { error } = await supabaseAdmin
+        .from('sparkloop_referrals')
+        .upsert({
+          publication_id: DEFAULT_PUBLICATION_ID,
+          subscriber_email: subscriberEmail,
+          ref_code: refCode,
+          source: 'webhook_only',
+          status: 'pending',
+          pending_at: now,
+        }, { onConflict: 'publication_id,subscriber_email,ref_code', ignoreDuplicates: true })
+
+      if (error && error.code !== '23505') {
+        console.error('[SparkLoop Webhook] Failed to insert webhook_only pending referral:', error)
+      } else {
+        console.log(`[SparkLoop Webhook] Inserted webhook_only pending referral: ${subscriberEmail} / ${refCode}`)
+      }
+    }
+  } else if (status === 'confirmed') {
+    // Try to update existing referral (any source)
+    const { data: existing } = await supabaseAdmin
+      .from('sparkloop_referrals')
+      .select('id, source')
+      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('subscriber_email', subscriberEmail)
+      .eq('ref_code', refCode)
+      .limit(1)
+      .single()
+
+    if (existing) {
+      await supabaseAdmin
+        .from('sparkloop_referrals')
+        .update({ status: 'confirmed', confirmed_at: now, updated_at: now })
+        .eq('id', existing.id)
+
+      // Update aggregate columns if it was from our popup
+      if (existing.source === 'custom_popup') {
+        const { error: confirmErr } = await supabaseAdmin.rpc('record_our_confirm', {
+          p_publication_id: DEFAULT_PUBLICATION_ID,
+          p_ref_code: refCode,
+        })
+        if (confirmErr) console.error('[SparkLoop Webhook] Failed to record our confirm:', confirmErr)
+      }
+      console.log(`[SparkLoop Webhook] Updated referral to confirmed (${existing.source}): ${subscriberEmail} / ${refCode}`)
+    } else {
+      // No existing row — insert as webhook_only confirmed
+      await supabaseAdmin
+        .from('sparkloop_referrals')
+        .upsert({
+          publication_id: DEFAULT_PUBLICATION_ID,
+          subscriber_email: subscriberEmail,
+          ref_code: refCode,
+          source: 'webhook_only',
+          status: 'confirmed',
+          confirmed_at: now,
+        }, { onConflict: 'publication_id,subscriber_email,ref_code', ignoreDuplicates: true })
+
+      console.log(`[SparkLoop Webhook] Inserted webhook_only confirmed referral: ${subscriberEmail} / ${refCode}`)
+    }
+  } else if (status === 'rejected') {
+    // Try to update existing referral
+    const { data: existing } = await supabaseAdmin
+      .from('sparkloop_referrals')
+      .select('id, source')
+      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('subscriber_email', subscriberEmail)
+      .eq('ref_code', refCode)
+      .limit(1)
+      .single()
+
+    if (existing) {
+      await supabaseAdmin
+        .from('sparkloop_referrals')
+        .update({ status: 'rejected', rejected_at: now, updated_at: now })
+        .eq('id', existing.id)
+
+      if (existing.source === 'custom_popup') {
+        const { error: rejErr } = await supabaseAdmin.rpc('record_our_rejection', {
+          p_publication_id: DEFAULT_PUBLICATION_ID,
+          p_ref_code: refCode,
+        })
+        if (rejErr) console.error('[SparkLoop Webhook] Failed to record our rejection:', rejErr)
+      }
+      console.log(`[SparkLoop Webhook] Updated referral to rejected (${existing.source}): ${subscriberEmail} / ${refCode}`)
+    } else {
+      await supabaseAdmin
+        .from('sparkloop_referrals')
+        .upsert({
+          publication_id: DEFAULT_PUBLICATION_ID,
+          subscriber_email: subscriberEmail,
+          ref_code: refCode,
+          source: 'webhook_only',
+          status: 'rejected',
+          rejected_at: now,
+        }, { onConflict: 'publication_id,subscriber_email,ref_code', ignoreDuplicates: true })
+
+      console.log(`[SparkLoop Webhook] Inserted webhook_only rejected referral: ${subscriberEmail} / ${refCode}`)
+    }
+  }
 }
 
 /**

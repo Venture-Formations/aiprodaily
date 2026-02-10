@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { Download, Settings2, Search, X } from 'lucide-react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { Download, Settings2, Search, X, Calendar } from 'lucide-react'
 
 interface Recommendation {
   id: string
@@ -61,6 +61,14 @@ interface DetailedTabProps {
   loading: boolean
 }
 
+interface DateRangeMetrics {
+  impressions: number
+  submissions: number
+  confirms: number
+  rejections: number
+  pending: number
+}
+
 const DEFAULT_COLUMNS: Column[] = [
   { key: 'publication_name', label: 'Newsletter', enabled: true, exportable: true, width: 'lg' },
   { key: 'ref_code', label: 'Ref Code', enabled: false, exportable: true, width: 'md' },
@@ -78,7 +86,6 @@ const DEFAULT_COLUMNS: Column[] = [
   { key: 'calculated_score', label: 'Score', enabled: true, exportable: true, width: 'sm' },
   { key: 'impressions', label: 'Impressions', enabled: true, exportable: true, width: 'xs' },
   { key: 'submissions', label: 'Submissions', enabled: true, exportable: true, width: 'xs' },
-  { key: 'our_total_subscribes', label: 'Our Subs', enabled: true, exportable: true, width: 'xs' },
   { key: 'our_confirms', label: 'Our Conf', enabled: true, exportable: true, width: 'xs' },
   { key: 'our_rejections', label: 'Our Rej', enabled: true, exportable: true, width: 'xs' },
   { key: 'our_pending', label: 'Our Pend', enabled: true, exportable: true, width: 'xs' },
@@ -94,6 +101,9 @@ const DEFAULT_COLUMNS: Column[] = [
   { key: 'excluded_reason', label: 'Excl. Reason', enabled: false, exportable: true, width: 'md' },
   { key: 'last_synced_at', label: 'Last Synced', enabled: false, exportable: true, width: 'md' },
 ]
+
+// Columns that get overridden when date range is active
+const DATE_FILTERED_COLUMNS = new Set(['impressions', 'submissions', 'our_confirms', 'our_rejections', 'our_pending'])
 
 const fmtDollars = (value: number) =>
   value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -116,6 +126,46 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'excluded' | 'paused'>('all')
 
+  // Date range state
+  const [dateStart, setDateStart] = useState('')
+  const [dateEnd, setDateEnd] = useState('')
+  const [dateRangeMetrics, setDateRangeMetrics] = useState<Record<string, DateRangeMetrics> | null>(null)
+  const [dateRangeLoading, setDateRangeLoading] = useState(false)
+
+  const dateRangeActive = dateRangeMetrics !== null
+
+  // Fetch date range metrics when dates change
+  useEffect(() => {
+    if (!dateStart || !dateEnd) {
+      setDateRangeMetrics(null)
+      return
+    }
+
+    // Validate: start <= end
+    if (dateStart > dateEnd) return
+
+    const fetchDateRange = async () => {
+      setDateRangeLoading(true)
+      try {
+        const res = await fetch(`/api/sparkloop/admin/daterange?start=${dateStart}&end=${dateEnd}`)
+        const data = await res.json()
+        if (data.success) {
+          setDateRangeMetrics(data.metrics)
+        }
+      } catch (error) {
+        console.error('Failed to fetch date range metrics:', error)
+      }
+      setDateRangeLoading(false)
+    }
+    fetchDateRange()
+  }, [dateStart, dateEnd])
+
+  const clearDateRange = useCallback(() => {
+    setDateStart('')
+    setDateEnd('')
+    setDateRangeMetrics(null)
+  }, [])
+
   const enabledColumns = columns.filter(col => col.enabled)
 
   const handleSort = (columnKey: string) => {
@@ -133,8 +183,24 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
     ))
   }
 
+  // Apply date range overrides to recommendations before filtering/sorting
+  const effectiveRecommendations = useMemo(() => {
+    if (!dateRangeMetrics) return recommendations
+    return recommendations.map(rec => {
+      const drm = dateRangeMetrics[rec.ref_code]
+      return {
+        ...rec,
+        impressions: drm?.impressions ?? 0,
+        submissions: drm?.submissions ?? 0,
+        our_confirms: drm?.confirms ?? 0,
+        our_rejections: drm?.rejections ?? 0,
+        our_pending: drm?.pending ?? 0,
+      }
+    })
+  }, [recommendations, dateRangeMetrics])
+
   const filteredAndSorted = useMemo(() => {
-    let result = [...recommendations]
+    let result = [...effectiveRecommendations]
 
     // Search filter
     if (searchQuery) {
@@ -196,7 +262,7 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
     }
 
     return result
-  }, [recommendations, searchQuery, statusFilter, sortColumn, sortDirection])
+  }, [effectiveRecommendations, searchQuery, statusFilter, sortColumn, sortDirection])
 
   const getColumnValue = (rec: Recommendation, key: string): string => {
     const value = rec[key as keyof Recommendation]
@@ -311,17 +377,24 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
       case 'calculated_score':
         return <span className="font-mono font-medium">${rec.calculated_score.toFixed(4)}</span>
 
-      case 'our_total_subscribes':
-        return <span className="text-blue-600">{rec.our_total_subscribes}</span>
+      case 'impressions':
+        return dateRangeActive
+          ? <span className="text-purple-600">{rec.impressions}</span>
+          : rec.impressions
+
+      case 'submissions':
+        return dateRangeActive
+          ? <span className="text-purple-600">{rec.submissions}</span>
+          : rec.submissions
 
       case 'our_confirms':
-        return <span className="text-green-600 font-medium">{rec.our_confirms}</span>
+        return <span className={`font-medium ${dateRangeActive ? 'text-purple-600' : 'text-green-600'}`}>{rec.our_confirms}</span>
 
       case 'our_rejections':
-        return <span className="text-red-600">{rec.our_rejections}</span>
+        return <span className={dateRangeActive ? 'text-purple-600' : 'text-red-600'}>{rec.our_rejections}</span>
 
       case 'our_pending':
-        return <span className="text-yellow-600">{rec.our_pending}</span>
+        return <span className={dateRangeActive ? 'text-purple-600' : 'text-yellow-600'}>{rec.our_pending}</span>
 
       case 'sparkloop_confirmed':
         return <span className="text-green-600/60">{rec.sparkloop_confirmed}</span>
@@ -429,6 +502,42 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
         </span>
       </div>
 
+      {/* Date Range Picker */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <Calendar className="w-4 h-4 text-gray-400" />
+        <span className="text-xs text-gray-500">Date Range:</span>
+        <input
+          type="date"
+          value={dateStart}
+          onChange={(e) => setDateStart(e.target.value)}
+          className="px-2 py-1 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+        />
+        <span className="text-xs text-gray-400">to</span>
+        <input
+          type="date"
+          value={dateEnd}
+          onChange={(e) => setDateEnd(e.target.value)}
+          className="px-2 py-1 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+        />
+        {(dateStart || dateEnd) && (
+          <button
+            onClick={clearDateRange}
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600"
+          >
+            <X className="w-3 h-3" />
+            Clear
+          </button>
+        )}
+        {dateRangeLoading && (
+          <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-gray-300 border-t-purple-500" />
+        )}
+        {dateRangeActive && !dateRangeLoading && (
+          <span className="px-2 py-0.5 text-[10px] rounded-full bg-purple-100 text-purple-700">
+            Filtered: Impr, Subs, Conf, Rej, Pend
+          </span>
+        )}
+      </div>
+
       {/* Global stats bar */}
       {globalStats && (
         <div className="flex gap-4 mb-4 text-xs text-gray-600">
@@ -469,7 +578,10 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
                   className={`px-2 py-2 text-left text-[11px] font-medium text-gray-500 cursor-pointer hover:bg-gray-100 whitespace-nowrap ${getColumnWidthClass(col.width)}`}
                 >
                   <div className="flex items-center gap-1" title={col.label}>
-                    <span className="truncate">{col.label}</span>
+                    <span className="truncate">
+                      {col.label}
+                      {dateRangeActive && DATE_FILTERED_COLUMNS.has(col.key) ? '*' : ''}
+                    </span>
                     <span className="text-gray-400 flex-shrink-0">
                       {sortColumn === col.key ? (
                         sortDirection === 'desc' ? '▼' : '▲'
@@ -518,6 +630,12 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
       <div className="mt-3 text-[10px] text-gray-500">
         <strong>Score</strong> = CR x CPA x RCR (expected revenue per impression) |
         <span className="text-blue-600 ml-1">Blue values</span> = calculated from our data (20+ samples)
+        {dateRangeActive && (
+          <>
+            {' | '}
+            <span className="text-purple-600">* Purple values</span> = filtered by date range ({dateStart} to {dateEnd})
+          </>
+        )}
       </div>
     </div>
   )

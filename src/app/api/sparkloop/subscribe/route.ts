@@ -131,6 +131,39 @@ export async function POST(request: NextRequest) {
       // Don't fail the request for metrics errors
     }
 
+    // Record referral rows in sparkloop_referrals (one per ref_code)
+    try {
+      const referralRows = activeRefCodes.map((refCode: string) => ({
+        publication_id: DEFAULT_PUBLICATION_ID,
+        subscriber_email: email,
+        ref_code: refCode,
+        source: 'custom_popup',
+        status: 'subscribed',
+        subscribed_at: new Date().toISOString(),
+      }))
+
+      const { error: refError } = await supabaseAdmin
+        .from('sparkloop_referrals')
+        .upsert(referralRows, { onConflict: 'publication_id,subscriber_email,ref_code', ignoreDuplicates: true })
+
+      if (refError) {
+        console.error('[SparkLoop Subscribe] Failed to record referrals:', refError)
+      } else {
+        // Increment our_total_subscribes and our_pending on recommendations
+        const { error: aggError } = await supabaseAdmin.rpc('increment_our_subscribes', {
+          p_publication_id: DEFAULT_PUBLICATION_ID,
+          p_ref_codes: activeRefCodes,
+        })
+        if (aggError) {
+          console.error('[SparkLoop Subscribe] Failed to increment aggregates:', aggError)
+        }
+        console.log(`[SparkLoop Subscribe] Recorded ${activeRefCodes.length} referral rows`)
+      }
+    } catch (referralError) {
+      console.error('[SparkLoop Subscribe] Failed to record referrals:', referralError)
+      // Don't fail the request for referral tracking errors
+    }
+
     // Update MailerLite subscriber field to mark as SparkLoop participant
     // Use retry with delay since subscriber might not be fully created yet
     try {
