@@ -89,8 +89,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 3: Subscribe to selected newsletters (only active ones)
+    // subscriber_uuid is required for proper referral tracking attribution
     const subscribeResult = await service.subscribeToNewsletters({
       subscriber_email: email,
+      subscriber_uuid: subscriberUuid || undefined,
       country_code: countryCode,
       recommendations: activeRefCodes.join(','),
       utm_source: 'custom_popup',

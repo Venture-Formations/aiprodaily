@@ -113,6 +113,7 @@ export interface SparkLoopGenerateRequest {
  */
 export interface SparkLoopSubscribeRequest {
   subscriber_email: string
+  subscriber_uuid?: string // Required for referral tracking attribution
   country_code: string // Required: ISO 3166-1 Alpha-2
   recommendations: string // Comma-separated ref_codes
   utm_source?: string

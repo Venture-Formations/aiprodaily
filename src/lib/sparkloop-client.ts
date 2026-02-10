@@ -211,19 +211,25 @@ export class SparkLoopService {
 
     console.log(`[SparkLoop] Subscribing ${params.subscriber_email} to: ${params.recommendations}`)
 
+    const payload: Record<string, string | undefined> = {
+      subscriber_email: params.subscriber_email,
+      country_code: params.country_code,
+      recommendations: params.recommendations,
+      utm_source: params.utm_source || 'custom_popup',
+      utm_campaign: params.utm_campaign,
+    }
+    // subscriber_uuid is required for proper referral tracking attribution
+    if (params.subscriber_uuid) {
+      payload.subscriber_uuid = params.subscriber_uuid
+    }
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'X-API-KEY': this.apiKey,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        subscriber_email: params.subscriber_email,
-        country_code: params.country_code,
-        recommendations: params.recommendations,
-        utm_source: params.utm_source || 'custom_popup',
-        utm_campaign: params.utm_campaign,
-      }),
+      body: JSON.stringify(payload),
     })
 
     const responseText = await response.text()

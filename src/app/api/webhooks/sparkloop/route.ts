@@ -184,18 +184,19 @@ async function handlePartnerReferral(
 ) {
   const subscriber = payload.subscriber || payload.data?.subscriber || {}
   const offer = payload.offer || payload.data?.offer || {}
+  const campaign = payload.campaign || payload.data?.campaign || {}
 
   const subscriberEmail = subscriber.email || payload.email
   const subscriberUuid = subscriber.uuid || subscriber.id
-  const refCode = offer.ref_code || payload.ref_code
+  const refCode = campaign.referral_code || offer.ref_code || payload.ref_code
 
   console.log(`[SparkLoop Webhook] Partner referral (${status}): ${subscriberEmail} - ref_code: ${refCode}`)
 
   await storeEvent(eventType, payload, {
     subscriber_email: subscriberEmail,
     subscriber_uuid: subscriberUuid,
-    referred_publication: offer.publication_name,
-    referred_publication_id: offer.id,
+    referred_publication: offer.publication_name || campaign.publication_name,
+    referred_publication_id: offer.id || campaign.publication_id,
   })
 
   // Update our recommendation metrics if we have a ref_code
