@@ -95,6 +95,9 @@ const DEFAULT_COLUMNS: Column[] = [
   { key: 'last_synced_at', label: 'Last Synced', enabled: false, exportable: true, width: 'md' },
 ]
 
+const fmtDollars = (value: number) =>
+  value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
 const getColumnWidthClass = (width?: 'xs' | 'sm' | 'md' | 'lg') => {
   switch (width) {
     case 'xs': return 'w-14 min-w-[3.5rem] max-w-[4rem]'
@@ -268,10 +271,10 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
         return <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-green-100 text-green-700">Active</span>
 
       case 'cpa':
-        return rec.cpa !== null ? `$${(rec.cpa / 100).toFixed(2)}` : '-'
+        return rec.cpa !== null ? `$${fmtDollars(rec.cpa / 100)}` : '-'
 
       case 'max_payout':
-        return rec.max_payout !== null ? `$${(rec.max_payout / 100).toFixed(2)}` : '-'
+        return rec.max_payout !== null ? `$${fmtDollars(rec.max_payout / 100)}` : '-'
 
       case 'screening_period':
         return rec.screening_period ? `${rec.screening_period}d` : '-'
@@ -330,14 +333,14 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
         return <span className="text-yellow-600/60">{rec.sparkloop_pending}</span>
 
       case 'sparkloop_earnings':
-        return rec.sparkloop_earnings ? `$${(rec.sparkloop_earnings / 100).toFixed(2)}` : '-'
+        return rec.sparkloop_earnings ? `$${fmtDollars(rec.sparkloop_earnings / 100)}` : '-'
 
       case 'sparkloop_net_earnings':
-        return rec.sparkloop_net_earnings ? `$${(rec.sparkloop_net_earnings / 100).toFixed(2)}` : '-'
+        return rec.sparkloop_net_earnings ? `$${fmtDollars(rec.sparkloop_net_earnings / 100)}` : '-'
 
       case 'remaining_budget_dollars':
         if (rec.remaining_budget_dollars === null || rec.remaining_budget_dollars === undefined) return '-'
-        return `$${rec.remaining_budget_dollars.toFixed(2)}`
+        return `$${fmtDollars(rec.remaining_budget_dollars)}`
 
       case 'excluded':
         return rec.excluded ? 'Yes' : 'No'
@@ -465,7 +468,7 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
                   onClick={() => handleSort(col.key)}
                   className={`px-2 py-2 text-left text-[11px] font-medium text-gray-500 cursor-pointer hover:bg-gray-100 whitespace-nowrap ${getColumnWidthClass(col.width)}`}
                 >
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1" title={col.label}>
                     <span className="truncate">{col.label}</span>
                     <span className="text-gray-400 flex-shrink-0">
                       {sortColumn === col.key ? (
