@@ -80,7 +80,7 @@ function RecommendationCard({
           {recommendation.publication_name}
         </h4>
         {recommendation.description && (
-          <p className="text-gray-500 text-sm mt-0.5">
+          <p className="text-gray-500 text-sm leading-snug mt-0.5">
             {recommendation.description}
           </p>
         )}
