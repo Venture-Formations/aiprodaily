@@ -212,6 +212,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create ad - no data returned' }, { status: 500 })
     }
 
+    // Auto-upsert ad_module_advertisers junction entry for company-based rotation
+    if (ad.ad_module_id && ad.advertiser_id) {
+      // Get current max display_order for this module
+      const { data: maxOrderResult } = await supabaseAdmin
+        .from('ad_module_advertisers')
+        .select('display_order')
+        .eq('ad_module_id', ad.ad_module_id)
+        .order('display_order', { ascending: false })
+        .limit(1)
+
+      const nextOrder = (maxOrderResult?.[0]?.display_order || 0) + 1
+
+      const { error: junctionError } = await supabaseAdmin
+        .from('ad_module_advertisers')
+        .upsert({
+          ad_module_id: ad.ad_module_id,
+          advertiser_id: ad.advertiser_id,
+          display_order: nextOrder,
+          next_ad_position: 1,
+          times_used: 0,
+          priority: 0
+        }, {
+          onConflict: 'ad_module_id,advertiser_id',
+          ignoreDuplicates: true  // Don't update if already exists
+        })
+
+      if (junctionError) {
+        console.error('[Ads] Failed to upsert junction entry:', junctionError)
+      } else {
+        console.log(`[Ads] Ensured junction entry for module=${ad.ad_module_id}, advertiser=${ad.advertiser_id}`)
+      }
+    }
+
     console.log('[Ads] Successfully created ad:', ad.id)
     return NextResponse.json({ ad })
   } catch (error) {

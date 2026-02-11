@@ -15,6 +15,18 @@ interface AdWithRelations extends Advertisement {
   advertiser?: { id: string; company_name: string; logo_url?: string } | null
 }
 
+interface CompanyGroup {
+  id: string
+  ad_module_id: string
+  advertiser_id: string
+  display_order: number
+  next_ad_position: number
+  times_used: number
+  priority: number
+  advertiser: { id: string; company_name: string; logo_url?: string; is_active: boolean; last_used_date?: string; times_used: number }
+  advertisements: Advertisement[]
+}
+
 export default function AdsManagementPage() {
   const pathname = usePathname()
   const [activeStatusTab, setActiveStatusTab] = useState<'active' | 'inactive' | 'review'>('active')
@@ -28,6 +40,13 @@ export default function AdsManagementPage() {
   const [nextAdPosition, setNextAdPosition] = useState<number>(1)
   const [draggedItem, setDraggedItem] = useState<number | null>(null)
   const [publicationId, setPublicationId] = useState<string | null>(null)
+  // Company-grouped state for active tab
+  const [companyGroups, setCompanyGroups] = useState<CompanyGroup[]>([])
+  const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set())
+  const [draggedCompany, setDraggedCompany] = useState<number | null>(null)
+  const [draggedAdInCompany, setDraggedAdInCompany] = useState<{ companyId: string; index: number } | null>(null)
+  const [moduleNextPosition, setModuleNextPosition] = useState<number>(1)
+  const [moduleSelectionMode, setModuleSelectionMode] = useState<string>('sequential')
 
   // Fetch publication ID from pathname
   useEffect(() => {
@@ -81,24 +100,28 @@ export default function AdsManagementPage() {
   }
 
   useEffect(() => {
-    fetchAds()
-    if (activeStatusTab === 'active') {
-      fetchNextAdPosition()
+    if (activeStatusTab === 'active' && selectedSection) {
+      fetchCompanyGroups()
+    } else if (selectedSection) {
+      fetchAds()
     }
   }, [activeStatusTab, selectedSection])
 
-  const fetchNextAdPosition = async () => {
+  const fetchCompanyGroups = async () => {
+    if (!selectedSection) return
+    setLoading(true)
     try {
-      const response = await fetch('/api/settings/email')
+      const response = await fetch(`/api/ad-modules/${selectedSection}/companies`)
       if (response.ok) {
         const data = await response.json()
-        const nextPos = data.settings.find((s: any) => s.key === 'next_ad_position')
-        if (nextPos) {
-          setNextAdPosition(parseInt(nextPos.value))
-        }
+        setCompanyGroups(data.companies || [])
+        setModuleNextPosition(data.module?.next_position || 1)
+        setModuleSelectionMode(data.module?.selection_mode || 'sequential')
       }
     } catch (error) {
-      console.error('Failed to fetch next ad position:', error)
+      console.error('Failed to fetch company groups:', error)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -107,37 +130,19 @@ export default function AdsManagementPage() {
     try {
       const params = new URLSearchParams()
 
-      if (activeStatusTab === 'active') {
-        params.set('status', 'active')
-      } else if (activeStatusTab === 'inactive') {
+      if (activeStatusTab === 'inactive') {
         params.set('status', 'rejected,completed,approved')
       } else if (activeStatusTab === 'review') {
         params.set('status', 'pending_review')
       }
 
-      // Add section filter (always filter by section now)
+      // Add section filter
       params.set('ad_module_id', selectedSection)
 
       const response = await fetch(`/api/ads?${params.toString()}`)
       if (response.ok) {
         const data = await response.json()
-        let fetchedAds = data.ads || []
-
-        // Sort active ads by display_order (show all, even without display_order)
-        if (activeStatusTab === 'active') {
-          fetchedAds = fetchedAds.sort((a: Advertisement, b: Advertisement) => {
-            // Ads with display_order come first, sorted by their order
-            if (a.display_order !== null && b.display_order !== null) {
-              return a.display_order - b.display_order
-            }
-            // Ads without display_order go to the end
-            if (a.display_order === null) return 1
-            if (b.display_order === null) return -1
-            return 0
-          })
-        }
-
-        setAds(fetchedAds)
+        setAds(data.ads || [])
       }
     } catch (error) {
       console.error('Failed to fetch ads:', error)
@@ -146,110 +151,113 @@ export default function AdsManagementPage() {
     }
   }
 
-  const handleResetOrder = async () => {
-    if (!confirm('Reset the next ad position to 1? This will start the rotation from the beginning.')) return
-
-    try {
-      const response = await fetch('/api/ads/reset-position', {
-        method: 'POST'
-      })
-
-      if (response.ok) {
-        alert('Ad position reset to 1!')
-        setNextAdPosition(1)
+  const toggleCompanyExpanded = (companyId: string) => {
+    setExpandedCompanies(prev => {
+      const next = new Set(prev)
+      if (next.has(companyId)) {
+        next.delete(companyId)
       } else {
-        throw new Error('Failed to reset position')
+        next.add(companyId)
       }
-    } catch (error) {
-      console.error('Reset error:', error)
-      alert('Failed to reset position')
-    }
+      return next
+    })
   }
 
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
-    setDraggedItem(index)
+  // Company drag-drop handlers
+  const handleCompanyDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    setDraggedCompany(index)
     e.dataTransfer.effectAllowed = 'move'
   }
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleCompanyDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
   }
 
-  const handleDrop = async (e: React.DragEvent<HTMLDivElement>, dropIndex: number) => {
+  const handleCompanyDrop = async (e: React.DragEvent<HTMLDivElement>, dropIndex: number) => {
     e.preventDefault()
-
-    if (draggedItem === null || draggedItem === dropIndex) {
-      setDraggedItem(null)
+    if (draggedCompany === null || draggedCompany === dropIndex) {
+      setDraggedCompany(null)
       return
     }
 
-    // Reorder ads array
-    const newAds = [...ads]
-    const [removed] = newAds.splice(draggedItem, 1)
-    newAds.splice(dropIndex, 0, removed)
+    const newGroups = [...companyGroups]
+    const [removed] = newGroups.splice(draggedCompany, 1)
+    newGroups.splice(dropIndex, 0, removed)
 
-    // Update display_order values
-    const updates = newAds.map((ad, index) => ({
-      id: ad.id,
-      display_order: index + 1
+    // Build reorder payload
+    const order = newGroups.map((g, i) => ({
+      advertiser_id: g.advertiser_id,
+      display_order: i + 1
     }))
 
-    // Optimistically update UI
-    setAds(newAds)
-    setDraggedItem(null)
+    setCompanyGroups(newGroups)
+    setDraggedCompany(null)
 
-    // Save to backend
     try {
-      const response = await fetch('/api/ads/reorder', {
+      const response = await fetch(`/api/ad-modules/${selectedSection}/companies/reorder`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updates })
+        body: JSON.stringify({ order })
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to reorder ads')
-      }
-
-      // Refresh to ensure consistency
-      await fetchAds()
-      await fetchNextAdPosition()
+      if (!response.ok) throw new Error('Failed to reorder')
+      await fetchCompanyGroups()
     } catch (error) {
-      console.error('Reorder error:', error)
-      alert('Failed to reorder ads')
-      await fetchAds()
-      await fetchNextAdPosition()
+      console.error('Company reorder error:', error)
+      await fetchCompanyGroups()
     }
   }
 
-  const handleOrderChange = async (adId: string, newOrder: number) => {
-    if (newOrder < 1) {
-      alert('Order must be at least 1')
+  // Ad-within-company drag-drop handlers
+  const handleAdDragStart = (e: React.DragEvent<HTMLDivElement>, companyId: string, index: number) => {
+    e.stopPropagation()
+    setDraggedAdInCompany({ companyId, index })
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleAdDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleAdDrop = async (e: React.DragEvent<HTMLDivElement>, companyId: string, dropIndex: number) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!draggedAdInCompany || draggedAdInCompany.companyId !== companyId || draggedAdInCompany.index === dropIndex) {
+      setDraggedAdInCompany(null)
       return
     }
 
-    if (newOrder > ads.length) {
-      alert(`Order cannot exceed ${ads.length}`)
-      return
-    }
+    const company = companyGroups.find(g => g.advertiser_id === companyId)
+    if (!company) return
+
+    const newAds = [...company.advertisements]
+    const [removed] = newAds.splice(draggedAdInCompany.index, 1)
+    newAds.splice(dropIndex, 0, removed)
+
+    const order = newAds.map((ad, i) => ({
+      id: ad.id,
+      display_order: i + 1
+    }))
+
+    // Optimistic update
+    setCompanyGroups(prev => prev.map(g =>
+      g.advertiser_id === companyId ? { ...g, advertisements: newAds } : g
+    ))
+    setDraggedAdInCompany(null)
 
     try {
-      const response = await fetch('/api/ads/update-order', {
+      const response = await fetch(`/api/ad-modules/${selectedSection}/companies/${companyId}/ads`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adId, newOrder })
+        body: JSON.stringify({ order })
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to update order')
-      }
-
-      // Refresh ads to show updated ordering
-      await fetchAds()
-      await fetchNextAdPosition()
+      if (!response.ok) throw new Error('Failed to reorder ads')
+      await fetchCompanyGroups()
     } catch (error) {
-      console.error('Order update error:', error)
-      alert('Failed to update order')
+      console.error('Ad reorder error:', error)
+      await fetchCompanyGroups()
     }
   }
 
@@ -331,7 +339,11 @@ export default function AdsManagementPage() {
 
       if (response.ok) {
         alert('Ad deleted successfully!')
-        fetchAds()
+        if (activeStatusTab === 'active') {
+          fetchCompanyGroups()
+        } else {
+          fetchAds()
+        }
       } else {
         throw new Error('Failed to delete ad')
       }
@@ -480,48 +492,50 @@ export default function AdsManagementPage() {
           </button>
         </div>
 
-        {/* Selection Mode Info for Ad Module Sections */}
-        {activeStatusTab === 'active' && !loading && ads.length > 0 && (() => {
-          const currentModule = adModules.find(m => m.id === selectedSection)
-          if (!currentModule) return null
-          const selectionMode = currentModule.selection_mode || 'sequential'
+        {/* Selection Mode Info - Company Rotation */}
+        {activeStatusTab === 'active' && !loading && companyGroups.length > 0 && (() => {
           const modeLabels: Record<string, { label: string; description: string }> = {
-            sequential: { label: 'Sequential', description: 'Ads rotate in order by position' },
-            random: { label: 'Random', description: 'A random ad is selected each time' },
-            priority: { label: 'Priority', description: 'Highest priority ad is selected first' },
+            sequential: { label: 'Sequential', description: 'Companies rotate in order by position' },
+            random: { label: 'Random', description: 'A random company is selected each time' },
+            priority: { label: 'Priority', description: 'Highest priority company is selected first' },
             manual: { label: 'Manual', description: 'Admin selects ad manually per issue' }
           }
-          const modeInfo = modeLabels[selectionMode] || modeLabels.sequential
-          // For sequential mode, find the next ad based on next_position
-          const nextPosition = currentModule.next_position || 1
-          const nextAd = selectionMode === 'sequential'
-            ? ads.find(ad => ad.display_order === nextPosition) || ads[0]
+          const modeInfo = modeLabels[moduleSelectionMode] || modeLabels.sequential
+          const nextCompany = moduleSelectionMode === 'sequential'
+            ? companyGroups.find(g => g.display_order === moduleNextPosition) || companyGroups[0]
+            : null
+          const nextAd = nextCompany
+            ? nextCompany.advertisements.find(ad => ad.display_order === nextCompany.next_ad_position) || nextCompany.advertisements[0]
             : null
           return (
-            <div className={`mb-4 border rounded-lg p-4 ${selectionMode === 'sequential' ? 'bg-purple-50 border-purple-200' : 'bg-blue-50 border-blue-200'}`}>
+            <div className={`mb-4 border rounded-lg p-4 ${moduleSelectionMode === 'sequential' ? 'bg-purple-50 border-purple-200' : 'bg-blue-50 border-blue-200'}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-sm ${selectionMode === 'sequential' ? 'text-purple-800' : 'text-blue-800'}`}>
+                  <p className={`text-sm ${moduleSelectionMode === 'sequential' ? 'text-purple-800' : 'text-blue-800'}`}>
                     <strong>Selection Mode:</strong> {modeInfo.label}
-                    <span className={`ml-2 ${selectionMode === 'sequential' ? 'text-purple-600' : 'text-blue-600'}`}>— {modeInfo.description}</span>
+                    <span className={`ml-2 ${moduleSelectionMode === 'sequential' ? 'text-purple-600' : 'text-blue-600'}`}>— {modeInfo.description}</span>
                   </p>
-                  {selectionMode === 'sequential' && nextAd && (
+                  {moduleSelectionMode === 'sequential' && nextCompany && (
                     <p className="text-sm text-purple-800 mt-1">
-                      <strong>Next in rotation:</strong> Position {nextPosition} — <span className="text-purple-600">{nextAd.title}</span>
+                      <strong>Next company:</strong> Position {moduleNextPosition} — <span className="text-purple-600">{nextCompany.advertiser.company_name}</span>
+                      {nextAd && (
+                        <span className="ml-2 text-purple-600">| Next ad: {nextAd.title}</span>
+                      )}
                     </p>
                   )}
                 </div>
-                {selectionMode === 'sequential' && (
+                {moduleSelectionMode === 'sequential' && (
                   <div className="flex items-center gap-2">
                     <button
                       onClick={async () => {
-                        if (confirm('Reset rotation to position 1?')) {
-                          const res = await fetch(`/api/ad-modules/${currentModule.id}`, {
+                        if (confirm('Reset company rotation to position 1?')) {
+                          const res = await fetch(`/api/ad-modules/${selectedSection}`, {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ next_position: 1 })
                           })
                           if (res.ok) {
+                            fetchCompanyGroups()
                             fetchAdModules()
                           }
                         }
@@ -533,21 +547,22 @@ export default function AdsManagementPage() {
                     <input
                       type="number"
                       min="1"
-                      max={ads.length}
-                      value={nextPosition}
+                      max={companyGroups.length}
+                      value={moduleNextPosition}
                       onChange={async (e) => {
                         const newPos = parseInt(e.target.value) || 1
-                        const res = await fetch(`/api/ad-modules/${currentModule.id}`, {
+                        const res = await fetch(`/api/ad-modules/${selectedSection}`, {
                           method: 'PATCH',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ next_position: newPos })
                         })
                         if (res.ok) {
+                          fetchCompanyGroups()
                           fetchAdModules()
                         }
                       }}
                       className="w-16 px-2 py-1 border border-purple-300 rounded text-center text-sm"
-                      title="Set next position"
+                      title="Set next company position"
                     />
                   </div>
                 )}
@@ -563,171 +578,172 @@ export default function AdsManagementPage() {
           </div>
         )}
 
-        {/* Active Ads List (Drag & Drop) */}
+        {/* Active Ads - Company Grouped View */}
         {!loading && activeStatusTab === 'active' && (
-          <div className="space-y-4">
-            {ads.length === 0 ? (
+          <div className="space-y-3">
+            {companyGroups.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-lg shadow">
                 <p className="text-gray-500">No active advertisements found.</p>
               </div>
             ) : (
-              ads.map((ad, index) => {
-                const currentModule = adModules.find(m => m.id === selectedSection)
-                const selectionMode = currentModule?.selection_mode || 'sequential'
-                const nextPosition = currentModule?.next_position || 1
-                const isNextInSequential = selectionMode === 'sequential' && ad.display_order === nextPosition
+              companyGroups.map((company, companyIndex) => {
+                const isNextCompany = moduleSelectionMode === 'sequential' && company.display_order === moduleNextPosition
+                const isExpanded = expandedCompanies.has(company.advertiser_id)
 
                 return (
-                <div
-                  key={ad.id}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, index)}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, index)}
-                  className={`bg-white rounded-lg shadow p-6 cursor-move hover:shadow-lg transition-shadow ${
-                    isNextInSequential ? 'ring-4 ring-purple-400 bg-purple-50' : ''
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1 flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-2xl font-bold text-gray-400">☰</span>
-                        <span className="w-16 px-2 py-1 border border-gray-200 bg-gray-50 rounded text-center font-bold text-gray-600">
-                          {index + 1}
-                        </span>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-xl font-semibold">{ad.title}</h3>
-                          {getStatusBadge(ad.status)}
-                          {isNextInSequential && (
-                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-200 text-purple-800">
-                              NEXT IN ROTATION
+                  <div
+                    key={company.advertiser_id}
+                    draggable
+                    onDragStart={(e) => handleCompanyDragStart(e, companyIndex)}
+                    onDragOver={handleCompanyDragOver}
+                    onDrop={(e) => handleCompanyDrop(e, companyIndex)}
+                    className={`bg-white rounded-lg shadow transition-shadow ${
+                      isNextCompany ? 'ring-2 ring-purple-400' : ''
+                    }`}
+                  >
+                    {/* Company Header */}
+                    <div
+                      className={`flex items-center gap-3 p-4 cursor-pointer select-none ${
+                        isNextCompany ? 'bg-purple-50' : 'hover:bg-gray-50'
+                      }`}
+                      onClick={() => toggleCompanyExpanded(company.advertiser_id)}
+                    >
+                      <span className="text-lg text-gray-400 cursor-move" title="Drag to reorder">☰</span>
+                      <span className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded font-bold text-gray-600 text-sm">
+                        {companyIndex + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-gray-900 truncate">
+                            {company.advertiser.company_name}
+                          </h3>
+                          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                            {company.advertisements.length} {company.advertisements.length === 1 ? 'ad' : 'ads'}
+                          </span>
+                          {isNextCompany && (
+                            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-200 text-purple-800">
+                              NEXT COMPANY
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-gray-600">
-                          {ad.times_used} times used
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Used {company.times_used}x
+                          {company.advertiser.last_used_date && (
+                            <span> | Last: {new Date(company.advertiser.last_used_date).toLocaleDateString()}</span>
+                          )}
                         </p>
                       </div>
+                      <svg
+                        className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setPreviewingAd(ad)}
-                        className="bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 text-sm"
-                      >
-                        Preview
-                      </button>
-                      <button
-                        onClick={() => setEditingAd(ad)}
-                        className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(ad.id)}
-                        className="bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-700 text-sm"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
 
-                  <div className="mb-4 flex gap-4">
-                    <div className="flex-1">
-                      <div
-                        className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_a]:cursor-pointer [&_ol]:list-none [&_ol]:pl-0 [&_ol_li[data-list='bullet']]:pl-6 [&_ol_li[data-list='bullet']]:relative [&_ol_li[data-list='bullet']]:before:content-['•'] [&_ol_li[data-list='bullet']]:before:absolute [&_ol_li[data-list='bullet']]:before:left-0 [&_ol]:counter-reset-[item] [&_ol_li[data-list='ordered']]:pl-6 [&_ol_li[data-list='ordered']]:relative [&_ol_li[data-list='ordered']]:before:content-[counter(item)_'.'] [&_ol_li[data-list='ordered']]:before:absolute [&_ol_li[data-list='ordered']]:before:left-0 [&_ol_li[data-list='ordered']]:counter-increment-[item]"
-                        dangerouslySetInnerHTML={{ __html: ad.body }}
-                      />
-                    </div>
-                    {ad.image_url && (
-                      <img
-                        src={ad.image_url}
-                        alt={ad.title}
-                        className="w-[284px] h-40 object-cover rounded border border-gray-200 flex-shrink-0"
-                      />
+                    {/* Expanded: Ads within company */}
+                    {isExpanded && (
+                      <div className="border-t border-gray-100 px-4 pb-4">
+                        {/* Internal ad rotation position control */}
+                        {company.advertisements.length > 1 && (
+                          <div className="flex items-center gap-2 py-2 text-xs text-gray-500">
+                            <span>Next ad position:</span>
+                            <input
+                              type="number"
+                              min="1"
+                              max={company.advertisements.length}
+                              value={company.next_ad_position}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={async (e) => {
+                                const newPos = parseInt(e.target.value) || 1
+                                await fetch(`/api/ad-modules/${selectedSection}/companies/${company.advertiser_id}/next-position`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ next_ad_position: newPos })
+                                })
+                                fetchCompanyGroups()
+                              }}
+                              className="w-12 px-1 py-0.5 border border-gray-200 rounded text-center text-xs"
+                            />
+                          </div>
+                        )}
+
+                        <div className="space-y-2 mt-1">
+                          {company.advertisements.map((ad, adIndex) => {
+                            const isNextAd = ad.display_order === company.next_ad_position
+                            return (
+                              <div
+                                key={ad.id}
+                                draggable
+                                onDragStart={(e) => handleAdDragStart(e, company.advertiser_id, adIndex)}
+                                onDragOver={handleAdDragOver}
+                                onDrop={(e) => handleAdDrop(e, company.advertiser_id, adIndex)}
+                                className={`rounded-lg border p-3 cursor-move hover:shadow transition-shadow ${
+                                  isNextAd ? 'border-purple-300 bg-purple-50/50' : 'border-gray-200'
+                                }`}
+                              >
+                                <div className="flex justify-between items-start">
+                                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                                    <span className="text-sm text-gray-400">☰</span>
+                                    <span className="w-6 h-6 flex items-center justify-center bg-gray-50 rounded text-xs font-medium text-gray-500">
+                                      {adIndex + 1}
+                                    </span>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <h4 className="font-medium text-gray-900 truncate">{ad.title}</h4>
+                                        {isNextAd && (
+                                          <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-purple-100 text-purple-700 flex-shrink-0">
+                                            NEXT AD
+                                          </span>
+                                        )}
+                                        {ad.paid && ad.frequency === 'weekly' && ad.times_paid > 0 && (() => {
+                                          const remaining = Math.max(0, ad.times_paid - (ad.times_used || 0))
+                                          return remaining <= 2 ? (
+                                            <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-amber-100 text-amber-700 flex-shrink-0">
+                                              {remaining === 0 ? 'EXHAUSTED' : `${remaining}wk left`}
+                                            </span>
+                                          ) : null
+                                        })()}
+                                      </div>
+                                      <p className="text-xs text-gray-500 truncate">
+                                        {ad.times_used}x used
+                                        {ad.last_used_date && ` | Last: ${new Date(ad.last_used_date).toLocaleDateString()}`}
+                                        {ad.paid && ad.frequency === 'weekly' && ad.times_paid > 0 && (
+                                          <span> | {Math.max(0, ad.times_paid - (ad.times_used || 0))}/{ad.times_paid} wks</span>
+                                        )}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-1 flex-shrink-0 ml-2">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setPreviewingAd(ad as AdWithRelations) }}
+                                      className="bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700 text-xs"
+                                    >
+                                      Preview
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setEditingAd(ad as AdWithRelations) }}
+                                      className="bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 text-xs"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleDelete(ad.id) }}
+                                      className="bg-gray-600 text-white px-2 py-1 rounded hover:bg-gray-700 text-xs"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
                     )}
                   </div>
-
-                  <div className="grid grid-cols-4 gap-4 pt-4 border-t text-sm">
-                    <div>
-                      <span className="font-medium">Company:</span>
-                      <p className="text-gray-600 truncate" title={ad.advertiser?.company_name || ad.company_name || ''}>
-                        {ad.advertiser?.company_name || ad.company_name || '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="font-medium">URL:</span>
-                      <p className="text-gray-600 truncate" title={ad.button_url}>{ad.button_url}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium">Last Used:</span>
-                      <p className="text-gray-600">
-                        {ad.last_used_date ? new Date(ad.last_used_date).toLocaleDateString() : 'Never'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="font-medium">Analytics:</span>
-                      <div className="flex items-center gap-2">
-                        <a
-                          href={`/ads/${ad.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline truncate"
-                        >
-                          View Analytics
-                        </a>
-                        <button
-                          onClick={() => {
-                            const url = `${window.location.origin}/ads/${ad.id}`
-                            navigator.clipboard.writeText(url)
-                            alert('Analytics URL copied!')
-                          }}
-                          className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
-                          title="Copy analytics URL"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Remaining weeks for paid weekly ads */}
-                  {ad.frequency === 'weekly' && ad.paid === true && ad.times_paid && ad.times_paid > 0 && (() => {
-                    const remaining = Math.max(0, ad.times_paid - (ad.times_used || 0))
-                    const isLow = remaining <= 2 && remaining > 0
-                    return (
-                      <div className="mt-3 pt-3 border-t border-dashed border-gray-200 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm">Weeks Remaining:</span>
-                          <span className={`text-sm ${isLow ? 'text-amber-600 font-semibold' : 'text-gray-600'}`}>
-                            {remaining} / {ad.times_paid}
-                          </span>
-                          {isLow && (
-                            <span className="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-medium">
-                              Low
-                            </span>
-                          )}
-                          {remaining === 0 && (
-                            <span className="text-xs bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-medium">
-                              Exhausted
-                            </span>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => handleExtendWeeks(ad.id)}
-                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                        >
-                          + Add weeks
-                        </button>
-                      </div>
-                    )
-                  })()}
-                </div>
-              )})
+                )
+              })
             )}
           </div>
         )}
@@ -971,7 +987,11 @@ export default function AdsManagementPage() {
             onClose={() => setShowAddModal(false)}
             onSuccess={() => {
               setShowAddModal(false)
-              fetchAds()
+              if (activeStatusTab === 'active') {
+                fetchCompanyGroups()
+              } else {
+                fetchAds()
+              }
             }}
             publicationId={publicationId}
             selectedSection={selectedSection}
@@ -986,7 +1006,11 @@ export default function AdsManagementPage() {
             onClose={() => setEditingAd(null)}
             onSuccess={() => {
               setEditingAd(null)
-              fetchAds()
+              if (activeStatusTab === 'active') {
+                fetchCompanyGroups()
+              } else {
+                fetchAds()
+              }
             }}
             publicationId={publicationId}
           />

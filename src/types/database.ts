@@ -1476,6 +1476,24 @@ export interface AdModuleWithAds extends AdModule {
   ad_count?: number
 }
 
+// Company-based ad rotation junction table
+export interface AdModuleAdvertiser {
+  id: string
+  ad_module_id: string
+  advertiser_id: string
+  display_order: number        // Company position in module rotation
+  next_ad_position: number     // Which ad is next within this company
+  times_used: number           // For random/priority cycle tracking
+  priority: number             // For priority selection mode
+  created_at: string
+  updated_at: string
+}
+
+export interface AdModuleAdvertiserWithDetails extends AdModuleAdvertiser {
+  advertiser: Advertiser
+  advertisements: Advertisement[]  // Active ads for this company in this module
+}
+
 // ===========================================
 // Article Module System Types
 // ===========================================

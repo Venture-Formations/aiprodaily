@@ -3,14 +3,20 @@ import type {
   AdModule,
   Advertisement,
   Advertiser,
-  AdSelectionMode,
   AdvertisementWithAdvertiser,
+  AdModuleAdvertiser,
   IssueModuleAd
 } from '@/types/database'
 
 interface AdSelectionResult {
   ad: AdvertisementWithAdvertiser | null
   reason: string
+}
+
+interface EligibleCompany {
+  junction: AdModuleAdvertiser
+  advertiser: Advertiser
+  ads: AdvertisementWithAdvertiser[]  // Eligible ads for this company
 }
 
 /**
@@ -45,7 +51,6 @@ export class ModuleAdSelector {
 
   /**
    * Check if an advertiser is within cooldown period
-   * Cooldown is based on last_used_date (set during send-final)
    */
   private static isAdvertiserInCooldown(
     advertiser: Advertiser,
@@ -66,12 +71,10 @@ export class ModuleAdSelector {
 
   /**
    * Check if an ad is within its valid date range
-   * Uses preferred_start_date as start and checks status for completion
    */
   private static isAdInDateRange(ad: Advertisement, issueDate: Date): boolean {
     const issueDateStr = issueDate.toISOString().split('T')[0]
 
-    // Check start date if set
     if (ad.preferred_start_date && ad.preferred_start_date > issueDateStr) {
       return false
     }
@@ -80,16 +83,74 @@ export class ModuleAdSelector {
   }
 
   /**
-   * Get all eligible ads for a module (respecting cooldown and date ranges)
+   * Check if a single ad is eligible (date range, paid limits, etc.)
    */
-  private static async getEligibleAds(
+  private static isAdEligible(ad: Advertisement, issueDate: Date): boolean {
+    // Check date range
+    if (!this.isAdInDateRange(ad, issueDate)) {
+      return false
+    }
+
+    // PAID ADS ONLY: Additional checks for sponsored ads with weekly limits
+    const isPaidWeeklyAd = ad.paid === true && ad.frequency === 'weekly' && ad.times_paid && ad.times_paid > 0
+
+    if (isPaidWeeklyAd) {
+      // Check if ad has remaining uses
+      const remaining = ad.times_paid - (ad.times_used || 0)
+      if (remaining <= 0) {
+        return false
+      }
+
+      // Check if ad already ran this week (Sun-Sat)
+      if (ad.last_used_date) {
+        const lastUsed = new Date(ad.last_used_date)
+        const issueWeekStart = getWeekStart(issueDate)
+        const lastUsedWeekStart = getWeekStart(lastUsed)
+
+        if (issueWeekStart.getTime() === lastUsedWeekStart.getTime()) {
+          return false
+        }
+
+        const lastDayOfWeek = lastUsed.getDay()
+        const issueDayOfWeek = issueDate.getDay()
+
+        if (lastDayOfWeek === issueDayOfWeek) {
+          return false
+        }
+      }
+    }
+
+    return true
+  }
+
+  /**
+   * Get eligible companies for a module with their eligible ads.
+   * A company is eligible if: its advertiser is active, not in cooldown,
+   * and has at least one eligible ad.
+   */
+  private static async getEligibleCompanies(
     moduleId: string,
     publicationId: string,
     issueDate: Date,
     cooldownDays: number
-  ): Promise<AdvertisementWithAdvertiser[]> {
-    // Fetch all active ads for this module with their advertisers
-    const { data: ads, error } = await supabaseAdmin
+  ): Promise<EligibleCompany[]> {
+    // Fetch junction entries for this module with advertiser details
+    const { data: junctions, error: junctionError } = await supabaseAdmin
+      .from('ad_module_advertisers')
+      .select(`
+        *,
+        advertiser:advertisers(*)
+      `)
+      .eq('ad_module_id', moduleId)
+      .order('display_order', { ascending: true })
+
+    if (junctionError || !junctions) {
+      console.error('[AdSelector] Error fetching company junctions:', junctionError)
+      return []
+    }
+
+    // Fetch all active ads for this module
+    const { data: allAds, error: adsError } = await supabaseAdmin
       .from('advertisements')
       .select(`
         *,
@@ -100,150 +161,142 @@ export class ModuleAdSelector {
       .eq('status', 'active')
       .order('display_order', { ascending: true, nullsFirst: false })
 
-    if (error || !ads) {
-      console.error('[AdSelector] Error fetching ads:', error)
+    if (adsError || !allAds) {
+      console.error('[AdSelector] Error fetching ads:', adsError)
       return []
     }
 
-    // Filter by eligibility
-    const eligibleAds = ads.filter(ad => {
-      // Check date range
-      if (!this.isAdInDateRange(ad, issueDate)) {
-        return false
-      }
+    const eligibleCompanies: EligibleCompany[] = []
 
-      // Check advertiser cooldown (if advertiser is linked)
-      if (ad.advertiser && this.isAdvertiserInCooldown(ad.advertiser, cooldownDays, issueDate)) {
-        return false
-      }
+    for (const junction of junctions) {
+      const advertiser = junction.advertiser as Advertiser
+      if (!advertiser) continue
 
-      // Check advertiser is active (if linked)
-      if (ad.advertiser && !ad.advertiser.is_active) {
-        return false
-      }
+      // Check advertiser is active
+      if (!advertiser.is_active) continue
 
-      // PAID ADS ONLY: Additional checks for sponsored ads with weekly limits
-      // paid=true identifies sponsored ads that have weekly limits
-      const isPaidWeeklyAd = ad.paid === true && ad.frequency === 'weekly' && ad.times_paid && ad.times_paid > 0
+      // Check advertiser cooldown
+      if (this.isAdvertiserInCooldown(advertiser, cooldownDays, issueDate)) continue
 
-      if (isPaidWeeklyAd) {
-        // Check if ad has remaining uses
-        const remaining = ad.times_paid - (ad.times_used || 0)
-        if (remaining <= 0) {
-          return false
-        }
+      // Get this company's eligible ads in this module
+      const companyAds = allAds
+        .filter(ad => ad.advertiser_id === junction.advertiser_id)
+        .filter(ad => this.isAdEligible(ad, issueDate)) as AdvertisementWithAdvertiser[]
 
-        // Check if ad already ran this week (Sun-Sat)
-        if (ad.last_used_date) {
-          const lastUsed = new Date(ad.last_used_date)
-          const issueWeekStart = getWeekStart(issueDate)
-          const lastUsedWeekStart = getWeekStart(lastUsed)
+      // Company is only eligible if it has at least one eligible ad
+      if (companyAds.length === 0) continue
 
-          // If last used is in same week, skip this ad
-          if (issueWeekStart.getTime() === lastUsedWeekStart.getTime()) {
-            return false
-          }
+      eligibleCompanies.push({
+        junction: junction as AdModuleAdvertiser,
+        advertiser,
+        ads: companyAds
+      })
+    }
 
-          // Cannot run on same day of week as last time
-          const lastDayOfWeek = lastUsed.getDay() // 0=Sun, 6=Sat
-          const issueDayOfWeek = issueDate.getDay()
-
-          if (lastDayOfWeek === issueDayOfWeek) {
-            return false
-          }
-        }
-      }
-      // Non-paid ads (paid=false) have no additional restrictions
-
-      return true
-    })
-
-    return eligibleAds as AdvertisementWithAdvertiser[]
+    return eligibleCompanies
   }
 
   /**
-   * Select ad using Sequential mode (fixed order rotation)
-   * Follows the display_order set on the ads page, cycling through in order.
-   * Uses the module's next_position field to track which display_order to pick next.
-   * Loops back to position 1 after reaching the last ad.
+   * Select company using Sequential mode (fixed order rotation)
+   * Uses the module's next_position to track which company display_order to pick next.
    */
-  private static selectSequential(
-    ads: AdvertisementWithAdvertiser[],
+  private static selectCompanySequential(
+    companies: EligibleCompany[],
     nextPosition: number
-  ): AdvertisementWithAdvertiser | null {
-    if (ads.length === 0) return null
+  ): EligibleCompany | null {
+    if (companies.length === 0) return null
 
     // Sort by display_order
-    const sorted = [...ads].sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+    const sorted = [...companies].sort((a, b) => a.junction.display_order - b.junction.display_order)
 
-    // Find ad at the next_position
-    let selectedAd = sorted.find(ad => ad.display_order === nextPosition)
+    // Find company at the next_position
+    let selected = sorted.find(c => c.junction.display_order === nextPosition)
 
-    // If no ad at that position (gap or past end), find next available
-    if (!selectedAd) {
-      // Find first ad with display_order >= nextPosition
-      selectedAd = sorted.find(ad => (ad.display_order || 0) >= nextPosition)
+    // If no company at that position, find next available
+    if (!selected) {
+      selected = sorted.find(c => c.junction.display_order >= nextPosition)
 
-      // If still none found (past the end), loop back to first ad
-      if (!selectedAd) {
-        selectedAd = sorted[0]
+      // If still none found (past the end), loop back to first
+      if (!selected) {
+        selected = sorted[0]
       }
     }
 
-    return selectedAd
+    return selected
   }
 
   /**
-   * Select ad using Random mode (shuffle without repeat)
-   * Randomly picks from ads that haven't been used in the current cycle.
-   * A cycle completes when all eligible ads have been used once, then resets.
-   * Only picks from ads with the minimum times_used (those not yet used this cycle).
+   * Select company using Random mode (shuffle without repeat)
+   * Picks from companies with minimum times_used.
    */
-  private static selectRandom(ads: AdvertisementWithAdvertiser[]): AdvertisementWithAdvertiser | null {
-    if (ads.length === 0) return null
+  private static selectCompanyRandom(companies: EligibleCompany[]): EligibleCompany | null {
+    if (companies.length === 0) return null
 
-    // Find the minimum times_used among eligible ads
-    const minTimesUsed = Math.min(...ads.map(ad => ad.times_used))
+    const minTimesUsed = Math.min(...companies.map(c => c.junction.times_used))
+    const available = companies.filter(c => c.junction.times_used === minTimesUsed)
 
-    // Filter to only ads at minimum times_used (not yet used this cycle)
-    const availableAds = ads.filter(ad => ad.times_used === minTimesUsed)
-
-    // Random pick from available ads
-    const randomIndex = Math.floor(Math.random() * availableAds.length)
-    return availableAds[randomIndex]
+    const randomIndex = Math.floor(Math.random() * available.length)
+    return available[randomIndex]
   }
 
   /**
-   * Select ad using Priority mode (priority tiers with rotation)
-   * Higher priority ads are shown first. Within each priority tier,
-   * ads rotate sequentially. Only moves to lower priority tier after
-   * all higher priority ads have been used in the current cycle.
-   *
-   * Logic: Sort by times_used first (cycle tracking), then by priority DESC,
-   * then by display_order. This ensures all priority 10 ads show before
-   * any priority 5 ads in each cycle.
+   * Select company using Priority mode (priority tiers with rotation)
+   * Higher priority companies are shown first. Within each tier,
+   * companies rotate by times_used.
    */
-  private static selectPriority(ads: AdvertisementWithAdvertiser[]): AdvertisementWithAdvertiser | null {
-    if (ads.length === 0) return null
+  private static selectCompanyPriority(companies: EligibleCompany[]): EligibleCompany | null {
+    if (companies.length === 0) return null
 
-    // Sort by: times_used ASC (cycle), then priority DESC (high priority first), then display_order
-    const sorted = [...ads].sort((a, b) => {
+    const sorted = [...companies].sort((a, b) => {
       // First: cycle position (least used first)
-      if (a.times_used !== b.times_used) {
-        return a.times_used - b.times_used
+      if (a.junction.times_used !== b.junction.times_used) {
+        return a.junction.times_used - b.junction.times_used
       }
       // Same cycle position: higher priority first
-      if ((b.priority || 0) !== (a.priority || 0)) {
-        return (b.priority || 0) - (a.priority || 0)
+      if (b.junction.priority !== a.junction.priority) {
+        return b.junction.priority - a.junction.priority
       }
       // Same priority: by display_order
-      return (a.display_order || 0) - (b.display_order || 0)
+      return a.junction.display_order - b.junction.display_order
     })
     return sorted[0]
   }
 
   /**
-   * Select an ad for a module based on its selection mode
+   * Select the next ad within a company (always sequential).
+   * Uses the junction's next_ad_position to pick.
+   */
+  private static selectAdWithinCompany(
+    company: EligibleCompany
+  ): AdvertisementWithAdvertiser | null {
+    const ads = company.ads
+    if (ads.length === 0) return null
+
+    // Sort by display_order
+    const sorted = [...ads].sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+
+    const nextPos = company.junction.next_ad_position || 1
+
+    // Find ad at next_ad_position
+    let selected = sorted.find(ad => ad.display_order === nextPos)
+
+    // If not found, find next available
+    if (!selected) {
+      selected = sorted.find(ad => (ad.display_order || 0) >= nextPos)
+
+      // If past end, loop back
+      if (!selected) {
+        selected = sorted[0]
+      }
+    }
+
+    return selected
+  }
+
+  /**
+   * Select an ad for a module using two-tier selection:
+   * 1. Select a company (using module's selection mode)
+   * 2. Select the next ad within that company (always sequential)
    */
   static async selectAd(
     module: AdModule,
@@ -260,38 +313,44 @@ export class ModuleAdSelector {
     // Get cooldown setting
     const cooldownDays = await this.getCooldownDays(publicationId)
 
-    // Get eligible ads
-    const eligibleAds = await this.getEligibleAds(module.id, publicationId, issueDate, cooldownDays)
+    // Get eligible companies with their eligible ads
+    const eligibleCompanies = await this.getEligibleCompanies(module.id, publicationId, issueDate, cooldownDays)
 
-    if (eligibleAds.length === 0) {
-      return { ad: null, reason: 'No eligible ads available (check cooldown, dates, status)' }
+    if (eligibleCompanies.length === 0) {
+      return { ad: null, reason: 'No eligible companies available (check cooldown, dates, status)' }
     }
 
-    // Select based on mode
-    let selectedAd: AdvertisementWithAdvertiser | null = null
+    // Tier 1: Select company based on module's selection mode
+    let selectedCompany: EligibleCompany | null = null
 
     switch (selectionMode) {
       case 'sequential':
-        // Use the module's next_position for sequential mode
-        selectedAd = this.selectSequential(eligibleAds, module.next_position || 1)
+        selectedCompany = this.selectCompanySequential(eligibleCompanies, module.next_position || 1)
         break
       case 'random':
-        selectedAd = this.selectRandom(eligibleAds)
+        selectedCompany = this.selectCompanyRandom(eligibleCompanies)
         break
       case 'priority':
-        selectedAd = this.selectPriority(eligibleAds)
+        selectedCompany = this.selectCompanyPriority(eligibleCompanies)
         break
       default:
-        selectedAd = this.selectSequential(eligibleAds, module.next_position || 1)
+        selectedCompany = this.selectCompanySequential(eligibleCompanies, module.next_position || 1)
     }
 
+    if (!selectedCompany) {
+      return { ad: null, reason: 'Company selection algorithm returned no company' }
+    }
+
+    // Tier 2: Select ad within company (always sequential)
+    const selectedAd = this.selectAdWithinCompany(selectedCompany)
+
     if (!selectedAd) {
-      return { ad: null, reason: 'Selection algorithm returned no ad' }
+      return { ad: null, reason: `Company "${selectedCompany.advertiser.company_name}" has no eligible ads` }
     }
 
     return {
       ad: selectedAd,
-      reason: `Selected via ${selectionMode} mode from ${eligibleAds.length} eligible ads (position ${module.next_position || 1})`
+      reason: `Selected via ${selectionMode} mode: company "${selectedCompany.advertiser.company_name}" (pos ${selectedCompany.junction.display_order}), ad "${selectedAd.title}" (pos ${selectedAd.display_order}) from ${eligibleCompanies.length} eligible companies`
     }
   }
 
@@ -359,8 +418,7 @@ export class ModuleAdSelector {
   }
 
   /**
-   * Record ad usage at send time (updates cooldown tracking and advances sequential position)
-   * Uses the unified advertisements table
+   * Record ad usage at send time (updates cooldown tracking and advances both company and ad positions)
    */
   static async recordUsageSimple(
     issueId: string,
@@ -445,9 +503,14 @@ export class ModuleAdSelector {
         .update({ used_at: new Date().toISOString() })
         .eq('id', selection.id)
 
-      // Advance next_position for sequential modules
-      if (adModule && adModule.selection_mode === 'sequential') {
-        await this.advanceSequentialPosition(adModule.id, ad.display_order)
+      // Update junction table: increment times_used, advance next_ad_position
+      if (ad.advertiser_id && ad.ad_module_id) {
+        await this.advanceAdPositionWithinCompany(ad.ad_module_id, ad.advertiser_id, ad.display_order)
+      }
+
+      // Advance company position for sequential modules
+      if (adModule && adModule.selection_mode === 'sequential' && ad.advertiser_id) {
+        await this.advanceCompanyPosition(adModule.id, ad.advertiser_id)
       }
 
       recorded++
@@ -458,34 +521,88 @@ export class ModuleAdSelector {
   }
 
   /**
-   * Advance the next_position for a sequential module after an ad is used
+   * Advance the next_ad_position within a company after an ad is used.
+   * Also increments times_used on the junction.
    */
-  private static async advanceSequentialPosition(
+  private static async advanceAdPositionWithinCompany(
     moduleId: string,
+    advertiserId: string,
     usedDisplayOrder: number
   ): Promise<void> {
-    // Get all active ads for this module to find max position
+    // Get all active ads for this company in this module
     const { data: ads } = await supabaseAdmin
       .from('advertisements')
       .select('display_order')
       .eq('ad_module_id', moduleId)
+      .eq('advertiser_id', advertiserId)
       .eq('status', 'active')
       .order('display_order', { ascending: true })
 
     if (!ads || ads.length === 0) return
 
     const maxPosition = Math.max(...ads.map(ad => ad.display_order || 0))
-    let nextPosition = usedDisplayOrder + 1
+    let nextAdPosition = usedDisplayOrder + 1
 
-    // Loop back to 1 if we've passed the max
-    if (nextPosition > maxPosition) {
-      nextPosition = 1
-      console.log(`[AdSelector] Module ${moduleId}: Reached end of rotation, looping back to position 1`)
-    } else {
-      console.log(`[AdSelector] Module ${moduleId}: Advancing to position ${nextPosition}`)
+    if (nextAdPosition > maxPosition) {
+      nextAdPosition = 1
     }
 
-    // Update the module's next_position
+    // Get current junction row
+    const { data: junction } = await supabaseAdmin
+      .from('ad_module_advertisers')
+      .select('times_used')
+      .eq('ad_module_id', moduleId)
+      .eq('advertiser_id', advertiserId)
+      .single()
+
+    // Update junction: advance ad position and increment times_used
+    await supabaseAdmin
+      .from('ad_module_advertisers')
+      .update({
+        next_ad_position: nextAdPosition,
+        times_used: (junction?.times_used || 0) + 1,
+        updated_at: new Date().toISOString()
+      })
+      .eq('ad_module_id', moduleId)
+      .eq('advertiser_id', advertiserId)
+
+    console.log(`[AdSelector] Company in module ${moduleId}: ad position -> ${nextAdPosition}, times_used -> ${(junction?.times_used || 0) + 1}`)
+  }
+
+  /**
+   * Advance the company position for a sequential module after a company's ad is used.
+   * Queries ad_module_advertisers for the next company in display_order.
+   */
+  private static async advanceCompanyPosition(
+    moduleId: string,
+    usedAdvertiserId: string
+  ): Promise<void> {
+    // Get all junction entries for this module to find positions
+    const { data: junctions } = await supabaseAdmin
+      .from('ad_module_advertisers')
+      .select('advertiser_id, display_order')
+      .eq('ad_module_id', moduleId)
+      .order('display_order', { ascending: true })
+
+    if (!junctions || junctions.length === 0) return
+
+    // Find the used company's position
+    const usedJunction = junctions.find(j => j.advertiser_id === usedAdvertiserId)
+    if (!usedJunction) return
+
+    const usedPosition = usedJunction.display_order
+    const maxPosition = Math.max(...junctions.map(j => j.display_order))
+
+    let nextPosition = usedPosition + 1
+
+    if (nextPosition > maxPosition) {
+      nextPosition = 1
+      console.log(`[AdSelector] Module ${moduleId}: Reached end of company rotation, looping back to position 1`)
+    } else {
+      console.log(`[AdSelector] Module ${moduleId}: Advancing to company position ${nextPosition}`)
+    }
+
+    // Update the module's next_position (now tracks company position)
     await supabaseAdmin
       .from('ad_modules')
       .update({
