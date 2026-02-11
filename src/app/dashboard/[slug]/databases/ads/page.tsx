@@ -627,7 +627,7 @@ export default function AdsManagementPage() {
                           )}
                         </div>
                         <p className="text-xs text-gray-500 mt-0.5">
-                          Used {company.times_used}x
+                          Used {company.advertisements.reduce((sum: number, a: any) => sum + (a.times_used || 0), 0)}x
                           {company.advertiser.last_used_date && (
                             <span> | Last: {new Date(company.advertiser.last_used_date).toLocaleDateString()}</span>
                           )}
