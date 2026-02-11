@@ -34,9 +34,44 @@ export async function GET(
     // Extract results page config from module
     const resultsPageConfig = moduleData?.config?.results_page || {}
 
+    // Add 5 phantom five-star votes to the voter-facing display
+    // This only affects the results shown after voting, not admin analytics
+    const PHANTOM_5STAR_COUNT = 5
+    const boostedResults = { ...results }
+    boostedResults.total_votes = results.total_votes + PHANTOM_5STAR_COUNT
+
+    // Find or create the 5-star entry in breakdown
+    const fiveStarIndex = boostedResults.breakdown.findIndex((b: { value: number }) => b.value === 5)
+    if (fiveStarIndex >= 0) {
+      boostedResults.breakdown = boostedResults.breakdown.map((b: { value: number; count: number; label: string; percentage: number }) => ({
+        ...b,
+        count: b.value === 5 ? b.count + PHANTOM_5STAR_COUNT : b.count,
+      }))
+    } else {
+      // No 5-star votes yet — add the entry
+      boostedResults.breakdown = [
+        { value: 5, label: '5 Stars', count: PHANTOM_5STAR_COUNT, percentage: 0 },
+        ...boostedResults.breakdown
+      ]
+    }
+
+    // Recalculate percentages and average
+    const totalBoosted = boostedResults.total_votes
+    let weightedSum = 0
+    boostedResults.breakdown = boostedResults.breakdown.map((b: { value: number; count: number; label: string; percentage: number }) => {
+      weightedSum += b.value * b.count
+      return {
+        ...b,
+        percentage: totalBoosted > 0 ? Math.round((b.count / totalBoosted) * 100) : 0
+      }
+    })
+    boostedResults.average_score = totalBoosted > 0
+      ? Math.round((weightedSum / totalBoosted) * 10) / 10
+      : 0
+
     return NextResponse.json({
       success: true,
-      results,
+      results: boostedResults,
       config: resultsPageConfig
     })
   } catch (error) {
