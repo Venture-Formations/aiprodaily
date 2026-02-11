@@ -513,17 +513,30 @@ export default function DetailedTab({ recommendations, globalStats, loading, onR
     return ''
   }
 
+  // Check if an active rec is excluded from the popup
+  const getPopupExclusionReason = (rec: Recommendation): string | null => {
+    if (rec.excluded || rec.status !== 'active') return null
+    if (!rec.cpa || rec.cpa <= 0) return 'no CPA'
+    if (rec.submission_capped) return 'sub capped'
+    return null
+  }
+
   const renderCellContent = (rec: Recommendation, columnKey: string) => {
     switch (columnKey) {
-      case 'publication_name':
+      case 'publication_name': {
+        const popupExcluded = getPopupExclusionReason(rec) !== null
         return (
           <div className="flex items-center gap-2">
             {rec.publication_logo && (
               <img src={rec.publication_logo} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
             )}
-            <span className="truncate">{rec.publication_name}</span>
+            <span className="truncate">
+              {popupExcluded && <span className="text-gray-400" title="Not in popup">*</span>}
+              {rec.publication_name}
+            </span>
           </div>
         )
+      }
 
       case 'status': {
         const hasCrOverride = rec.override_cr !== null && rec.override_cr !== undefined
@@ -552,10 +565,7 @@ export default function DetailedTab({ recommendations, globalStats, loading, onR
             </div>
           )
         }
-        // Check if active but excluded from popup
-        const noCpa = !rec.cpa || rec.cpa <= 0
-        const capped = rec.submission_capped
-        const popupReason = noCpa ? 'no CPA' : capped ? 'sub capped' : null
+        const popupReason = getPopupExclusionReason(rec)
         return (
           <div>
             <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-green-100 text-green-700">Active</span>
@@ -563,9 +573,7 @@ export default function DetailedTab({ recommendations, globalStats, loading, onR
               <div className="text-[9px] text-orange-500 mt-0.5">{overrideParts.join(' ')}</div>
             )}
             {popupReason && (
-              <div className="text-[9px] text-gray-400 mt-0.5" title={noCpa ? 'No CPA set — excluded from popup' : 'No SL RCR after 50+ submissions — excluded from popup'}>
-                not in popup ({popupReason})
-              </div>
+              <div className="text-[9px] text-gray-400 mt-0.5">({popupReason})</div>
             )}
           </div>
         )
