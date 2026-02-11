@@ -17,6 +17,7 @@ interface Recommendation {
   screening_period: number | null
   excluded: boolean
   excluded_reason: string | null
+  paused_reason: string | null
   impressions: number
   submissions: number
   confirms: number
@@ -342,10 +343,10 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
 
       case 'status':
         if (rec.excluded) {
-          return <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-red-100 text-red-700">Excluded</span>
+          return <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-red-100 text-red-700">{rec.excluded_reason || 'excluded'}</span>
         }
         if (rec.status === 'paused') {
-          return <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-yellow-100 text-yellow-700">Paused</span>
+          return <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-yellow-100 text-yellow-700">{rec.paused_reason || 'paused'}</span>
         }
         return <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-green-100 text-green-700">Active</span>
 
@@ -640,7 +641,7 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
               filteredAndSorted.map(rec => (
                 <tr
                   key={rec.id}
-                  className={`hover:bg-gray-50 ${rec.excluded ? 'bg-red-50/50' : ''}`}
+                  className={`hover:bg-gray-50 ${rec.excluded ? 'bg-red-50/50' : rec.status === 'paused' && rec.paused_reason === 'manual' ? 'bg-yellow-50/50' : ''}`}
                 >
                   {enabledColumns.map(col => (
                     <td

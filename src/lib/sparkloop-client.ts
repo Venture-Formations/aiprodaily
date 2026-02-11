@@ -362,7 +362,7 @@ export class SparkLoopService {
     for (const rec of recommendations) {
       const { data: existing } = await supabaseAdmin
         .from('sparkloop_recommendations')
-        .select('id, excluded, excluded_reason, sparkloop_confirmed, sparkloop_rejected')
+        .select('id, excluded, excluded_reason, paused_reason, sparkloop_confirmed, sparkloop_rejected')
         .eq('publication_id', publicationId)
         .eq('ref_code', rec.ref_code)
         .single()
@@ -407,7 +407,18 @@ export class SparkLoopService {
       // - Otherwise, use the API status
       const isPausedByPartner = !budgetInfo && partnerCampaignsAvailable
       const isPausedByCampaignStatus = budgetInfo && budgetInfo.status === 'paused'
-      const effectiveStatus = (isPausedByPartner || isPausedByCampaignStatus) ? 'paused' : rec.status
+      const isManuallyPaused = existing?.paused_reason === 'manual'
+
+      // Respect manual pauses — don't override admin decisions
+      const effectiveStatus = isManuallyPaused
+        ? 'paused'
+        : (isPausedByPartner || isPausedByCampaignStatus) ? 'paused' : rec.status
+
+      // Set paused_reason to track why it's paused
+      const pausedReason = isManuallyPaused
+        ? 'manual'
+        : (isPausedByPartner || isPausedByCampaignStatus) ? 'partner_paused'
+        : (effectiveStatus === 'paused' ? (existing?.paused_reason || 'partner_paused') : null)
 
       const remainingBudget = (isPausedByPartner || isPausedByCampaignStatus) ? 0 : (budgetInfo?.remaining_budget_dollars ?? 0)
       const screeningPeriod = budgetInfo?.referral_pending_period ?? null
@@ -471,6 +482,7 @@ export class SparkLoopService {
         screening_period: screeningPeriod,
         excluded,
         excluded_reason: excludedReason,
+        paused_reason: pausedReason,
         last_synced_at: new Date().toISOString(),
       }
 

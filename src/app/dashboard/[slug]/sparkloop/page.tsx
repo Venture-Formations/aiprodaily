@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Layout from '@/components/Layout'
-import { RefreshCw, Ban, CheckCircle, TrendingUp, DollarSign, Clock, Users } from 'lucide-react'
+import { RefreshCw, Ban, CheckCircle, TrendingUp, DollarSign, Clock, Users, Pause, Play } from 'lucide-react'
 import {
   BarChart,
   Bar,
@@ -29,6 +29,7 @@ interface Recommendation {
   screening_period: number | null
   excluded: boolean
   excluded_reason: string | null
+  paused_reason: string | null
   impressions: number
   submissions: number
   confirms: number
@@ -198,7 +199,32 @@ export default function SparkLoopAdminPage() {
     setActionLoading(null)
   }
 
-  async function bulkAction(action: 'exclude' | 'reactivate') {
+  async function togglePause(rec: Recommendation) {
+    setActionLoading(rec.id)
+    try {
+      const isPaused = rec.status === 'paused' && rec.paused_reason === 'manual'
+      const res = await fetch('/api/sparkloop/admin', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: rec.id,
+          action: isPaused ? 'unpause' : 'pause',
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        fetchRecommendations()
+      } else {
+        alert('Update failed: ' + data.error)
+      }
+    } catch (error) {
+      console.error('Update failed:', error)
+      alert('Update failed')
+    }
+    setActionLoading(null)
+  }
+
+  async function bulkAction(action: 'exclude' | 'reactivate' | 'pause') {
     if (selectedIds.size === 0) {
       alert('No recommendations selected')
       return
@@ -220,7 +246,8 @@ export default function SparkLoopAdminPage() {
       })
       const data = await res.json()
       if (data.success) {
-        alert(`${action === 'exclude' ? 'Excluded' : 'Reactivated'} ${data.updated} recommendations`)
+        const label = action === 'exclude' ? 'Excluded' : action === 'pause' ? 'Paused' : 'Reactivated'
+        alert(`${label} ${data.updated} recommendations`)
         setSelectedIds(new Set())
         fetchRecommendations()
       } else {
@@ -511,6 +538,13 @@ export default function SparkLoopAdminPage() {
                 <div className="flex gap-2">
                   <span className="text-sm text-gray-500 self-center">{selectedIds.size} selected</span>
                   <button
+                    onClick={() => bulkAction('pause')}
+                    disabled={actionLoading === 'bulk'}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 text-sm"
+                  >
+                    <Pause className="w-4 h-4" /> Pause
+                  </button>
+                  <button
                     onClick={() => bulkAction('exclude')}
                     disabled={actionLoading === 'bulk'}
                     className="flex items-center gap-1 px-3 py-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200 text-sm"
@@ -576,7 +610,7 @@ export default function SparkLoopAdminPage() {
                     recommendations.map(rec => (
                       <tr
                         key={rec.id}
-                        className={`hover:bg-gray-50 ${rec.excluded ? 'bg-red-50/50' : ''}`}
+                        className={`hover:bg-gray-50 ${rec.excluded ? 'bg-red-50/50' : rec.status === 'paused' && rec.paused_reason === 'manual' ? 'bg-yellow-50/50' : ''}`}
                       >
                         <td className="px-2 py-2">
                           <input
@@ -649,8 +683,9 @@ export default function SparkLoopAdminPage() {
                               {rec.excluded_reason || 'excluded'}
                             </span>
                           ) : rec.status === 'paused' ? (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] bg-yellow-100 text-yellow-700">
-                              Paused
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] bg-yellow-100 text-yellow-700">
+                              <Pause className="w-2.5 h-2.5" />
+                              {rec.paused_reason || 'paused'}
                             </span>
                           ) : (
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] bg-green-100 text-green-700">
@@ -659,24 +694,37 @@ export default function SparkLoopAdminPage() {
                           )}
                         </td>
                         <td className="px-2 py-2 text-center">
-                          <button
-                            onClick={() => toggleExclusion(rec)}
-                            disabled={actionLoading === rec.id}
-                            title={rec.excluded ? 'Reactivate' : 'Exclude'}
-                            className={`p-1 rounded ${
-                              rec.excluded
-                                ? 'text-green-600 hover:bg-green-100'
-                                : 'text-red-600 hover:bg-red-100'
-                            } disabled:opacity-50`}
-                          >
-                            {actionLoading === rec.id ? (
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            ) : rec.excluded ? (
-                              <CheckCircle className="w-3.5 h-3.5" />
-                            ) : (
-                              <Ban className="w-3.5 h-3.5" />
-                            )}
-                          </button>
+                          {actionLoading === rec.id ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin inline" />
+                          ) : rec.excluded || rec.status === 'paused' ? (
+                            <button
+                              onClick={() => rec.excluded ? toggleExclusion(rec) : togglePause(rec)}
+                              disabled={actionLoading === rec.id}
+                              title="Reactivate"
+                              className="p-1 rounded text-green-600 hover:bg-green-100 disabled:opacity-50"
+                            >
+                              <Play className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <div className="flex items-center justify-center gap-0.5">
+                              <button
+                                onClick={() => togglePause(rec)}
+                                disabled={actionLoading === rec.id}
+                                title="Pause"
+                                className="p-1 rounded text-yellow-600 hover:bg-yellow-100 disabled:opacity-50"
+                              >
+                                <Pause className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => toggleExclusion(rec)}
+                                disabled={actionLoading === rec.id}
+                                title="Exclude"
+                                className="p-1 rounded text-red-600 hover:bg-red-100 disabled:opacity-50"
+                              >
+                                <Ban className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))

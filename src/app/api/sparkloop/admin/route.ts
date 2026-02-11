@@ -169,12 +169,12 @@ export async function GET(request: NextRequest) {
 /**
  * PATCH /api/sparkloop/admin
  *
- * Update recommendation (exclude/reactivate)
+ * Update recommendation (exclude/reactivate/pause/unpause)
  */
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, excluded, excluded_reason } = body
+    const { id, excluded, excluded_reason, action } = body
 
     if (!id) {
       return NextResponse.json(
@@ -183,10 +183,22 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    const updateData: Record<string, unknown> = {
-      excluded: excluded ?? false,
-      excluded_reason: excluded ? (excluded_reason || 'manual_exclusion') : null,
+    let updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
+    }
+
+    if (action === 'pause') {
+      // Manual pause: set status to paused, mark reason as manual
+      updateData.status = 'paused'
+      updateData.paused_reason = 'manual'
+    } else if (action === 'unpause') {
+      // Unpause: restore to active, clear paused_reason
+      updateData.status = 'active'
+      updateData.paused_reason = null
+    } else {
+      // Legacy exclude/reactivate toggle
+      updateData.excluded = excluded ?? false
+      updateData.excluded_reason = excluded ? (excluded_reason || 'manual_exclusion') : null
     }
 
     const { data, error } = await supabaseAdmin
@@ -200,7 +212,8 @@ export async function PATCH(request: NextRequest) {
       throw new Error(`Database error: ${error.message}`)
     }
 
-    console.log(`[SparkLoop Admin] ${excluded ? 'Excluded' : 'Reactivated'} recommendation: ${data.publication_name}`)
+    const actionLabel = action === 'pause' ? 'Paused' : action === 'unpause' ? 'Unpaused' : excluded ? 'Excluded' : 'Reactivated'
+    console.log(`[SparkLoop Admin] ${actionLabel} recommendation: ${data.publication_name}`)
 
     return NextResponse.json({
       success: true,
@@ -244,11 +257,19 @@ export async function POST(request: NextRequest) {
       updateData = {
         excluded: false,
         excluded_reason: null,
+        status: 'active',
+        paused_reason: null,
+        updated_at: new Date().toISOString(),
+      }
+    } else if (action === 'pause') {
+      updateData = {
+        status: 'paused',
+        paused_reason: 'manual',
         updated_at: new Date().toISOString(),
       }
     } else {
       return NextResponse.json(
-        { success: false, error: 'Invalid action. Use "exclude" or "reactivate"' },
+        { success: false, error: 'Invalid action. Use "exclude", "reactivate", or "pause"' },
         { status: 400 }
       )
     }
