@@ -359,7 +359,6 @@ export class SparkLoopService {
     let matchedByUuid = 0
     let matchedByName = 0
     let pausedByCampaignStatus = 0
-    let pausedByGenerateCount = 0
 
     // Check if partner campaigns data is available (non-empty API response)
     const partnerCampaignsAvailable = campaignData.byUuid.size > 0 || campaignData.byName.size > 0
@@ -423,22 +422,20 @@ export class SparkLoopService {
       const isPausedByPartner = !budgetInfo && partnerCampaignsAvailable
       const isPausedByCampaignStatus = budgetInfo && budgetInfo.status === 'paused'
 
-      // Generate-based paused detection: the generate endpoint only returns truly
-      // active/recommendable recs (confirmed by SparkLoop support). If a rec is NOT
-      // in generate results, it's not recommendable right now — mark it paused.
-      const isPausedByGenerate = generateActiveRefCodes.size > 0 &&
-        rec.status === 'active' &&
-        !generateActiveRefCodes.has(rec.ref_code) &&
-        !isPausedByPartner && !isPausedByCampaignStatus
-      let effectiveStatus = (isPausedByPartner || isPausedByCampaignStatus || isPausedByGenerate) ? 'paused' : rec.status
+      // Generate endpoint check: log which recs are in generate vs not, but do NOT
+      // use it for pausing. The generate endpoint excludes recs for many reasons beyond
+      // paused status (targeting, randomization, limit). Publications with engagement
+      // screening requirements are still active even if not in generate results.
+      const isInGenerate = generateActiveRefCodes.has(rec.ref_code)
+      let effectiveStatus = (isPausedByPartner || isPausedByCampaignStatus) ? 'paused' : rec.status
 
-      const remainingBudget = (isPausedByPartner || isPausedByCampaignStatus || isPausedByGenerate) ? 0 : (budgetInfo?.remaining_budget_dollars ?? 0)
+      const remainingBudget = (isPausedByPartner || isPausedByCampaignStatus) ? 0 : (budgetInfo?.remaining_budget_dollars ?? 0)
       const screeningPeriod = budgetInfo?.referral_pending_period ?? null
       const cpaInDollars = (rec.cpa || 0) / 100
       const minBudgetRequired = cpaInDollars * 5 // Need at least 5 referrals worth of budget
 
       // Budget-based auto-exclusion only for active recs with known budget
-      const isOutOfBudget = !isPausedByPartner && !isPausedByCampaignStatus && !isPausedByGenerate && remainingBudget < minBudgetRequired
+      const isOutOfBudget = !isPausedByPartner && !isPausedByCampaignStatus && remainingBudget < minBudgetRequired
 
       // Auto-exclude/reactivate only for budget reasons (paused is handled by status alone)
       let excluded = existing?.excluded ?? false
@@ -464,10 +461,9 @@ export class SparkLoopService {
       }
 
       // If previously marked as generate_inactive but now appears in generate, clear it
-      if (generateActiveRefCodes.has(rec.ref_code) && excluded && excludedReason === 'generate_inactive') {
+      if (isInGenerate && excluded && excludedReason === 'generate_inactive') {
         excluded = false
         excludedReason = null
-        effectiveStatus = rec.status // Restore API status since generate confirms it's active
         console.log(`[SparkLoop] Clearing generate_inactive exclusion for ${rec.publication_name} (now in generate results)`)
       }
 
@@ -476,9 +472,6 @@ export class SparkLoopService {
         console.log(`[SparkLoop] ${rec.publication_name} — paused (campaign status='paused', match: ${matchMethod})`)
       } else if (isPausedByPartner) {
         console.log(`[SparkLoop] ${rec.publication_name} — paused (not in partner campaigns, match: ${matchMethod})`)
-      } else if (isPausedByGenerate) {
-        pausedByGenerateCount++
-        console.log(`[SparkLoop] ${rec.publication_name} (${rec.ref_code}) — paused (not in generate results)`)
       }
 
       const recordData = {
@@ -619,7 +612,7 @@ export class SparkLoopService {
     const active = recommendations.filter(r => r.status === 'active').length
     const paused = recommendations.filter(r => r.status === 'paused').length
 
-    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (API: ${active} active, ${paused} paused | ${pausedByCampaignStatus} campaign-paused, ${pausedByGenerateCount} generate-paused, ${budgetUnmatched} absent-paused, ${pausedByPartner} disappeared, ${outOfBudget} budget-excluded, ${reactivated} reactivated | budget match: ${budgetMatched} [${matchedByUuid} uuid, ${matchedByName} name], unmatched: ${budgetUnmatched})`)
+    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (API: ${active} active, ${paused} paused | ${pausedByCampaignStatus} campaign-paused, ${budgetUnmatched} absent-paused, ${pausedByPartner} disappeared, ${outOfBudget} budget-excluded, ${reactivated} reactivated | budget match: ${budgetMatched} [${matchedByUuid} uuid, ${matchedByName} name], unmatched: ${budgetUnmatched})`)
     if (confirmDeltas > 0 || rejectionDeltas > 0) {
       console.log(`[SparkLoop] Deltas tracked: +${confirmDeltas} confirms, +${rejectionDeltas} rejections`)
     }
