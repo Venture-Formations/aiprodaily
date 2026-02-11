@@ -70,6 +70,11 @@ interface DateRangeMetrics {
   pending: number
 }
 
+interface RangeStats {
+  uniqueIps: number
+  avgOffersSelected: number
+}
+
 const DEFAULT_COLUMNS: Column[] = [
   { key: 'publication_name', label: 'Newsletter', enabled: true, exportable: true, width: 'lg' },
   { key: 'ref_code', label: 'Ref Code', enabled: false, exportable: true, width: 'md' },
@@ -132,6 +137,7 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
   const [dateEnd, setDateEnd] = useState('')
   const [dateRangeMetrics, setDateRangeMetrics] = useState<Record<string, DateRangeMetrics> | null>(null)
   const [dateRangeLoading, setDateRangeLoading] = useState(false)
+  const [rangeStats, setRangeStats] = useState<RangeStats | null>(null)
 
   const dateRangeActive = dateRangeMetrics !== null
 
@@ -139,6 +145,7 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
   useEffect(() => {
     if (!dateStart || !dateEnd) {
       setDateRangeMetrics(null)
+      setRangeStats(null)
       return
     }
 
@@ -152,6 +159,7 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
         const data = await res.json()
         if (data.success) {
           setDateRangeMetrics(data.metrics)
+          setRangeStats(data.rangeStats || null)
         }
       } catch (error) {
         console.error('Failed to fetch date range metrics:', error)
@@ -165,6 +173,7 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
     setDateStart('')
     setDateEnd('')
     setDateRangeMetrics(null)
+    setRangeStats(null)
   }, [])
 
   const setQuickRange = useCallback((days: number) => {
@@ -574,7 +583,15 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
       {globalStats && (
         <div className="flex gap-4 mb-4 text-xs text-gray-600">
           <span>Global Unique IPs: <strong>{globalStats.uniqueIps}</strong></span>
-          <span>Avg Offers Selected: <strong>{globalStats.avgOffersSelected.toFixed(1)}</strong></span>
+          {dateRangeActive && rangeStats && (
+            <>
+              <span className="text-purple-600">Unique IPs ({dateStart} to {dateEnd}): <strong>{rangeStats.uniqueIps}</strong></span>
+              <span className="text-purple-600">Avg Offers Selected: <strong>{rangeStats.avgOffersSelected.toFixed(1)}</strong></span>
+            </>
+          )}
+          {!dateRangeActive && (
+            <span>Avg Offers Selected: <strong>{globalStats.avgOffersSelected.toFixed(1)}</strong></span>
+          )}
         </div>
       )}
 

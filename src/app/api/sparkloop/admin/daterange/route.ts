@@ -93,6 +93,52 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // 3. Unique IPs from api_subscribe_confirmed events in range
+    const { data: subscribeEvents } = await supabaseAdmin
+      .from('sparkloop_events')
+      .select('raw_payload')
+      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('event_type', 'api_subscribe_confirmed')
+      .gte('event_timestamp', startDate)
+      .lte('event_timestamp', endDate)
+
+    let uniqueIps = 0
+    if (subscribeEvents && subscribeEvents.length > 0) {
+      const ips = new Set<string>()
+      for (const evt of subscribeEvents) {
+        const payload = evt.raw_payload as Record<string, unknown> | null
+        const ipHash = payload?.ip_hash as string | null
+        if (ipHash) ips.add(ipHash)
+      }
+      uniqueIps = ips.size
+    }
+
+    // 4. Avg offers selected from subscriptions_success events in range
+    const { data: successEvents } = await supabaseAdmin
+      .from('sparkloop_events')
+      .select('raw_payload')
+      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('event_type', 'subscriptions_success')
+      .gte('event_timestamp', startDate)
+      .lte('event_timestamp', endDate)
+
+    let avgOffersSelected = 0
+    if (successEvents && successEvents.length > 0) {
+      let totalSelected = 0
+      let countWithData = 0
+      for (const evt of successEvents) {
+        const payload = evt.raw_payload as Record<string, unknown> | null
+        const selected = payload?.selected_count as number | undefined
+        if (selected !== undefined && selected !== null) {
+          totalSelected += selected
+          countWithData++
+        }
+      }
+      if (countWithData > 0) {
+        avgOffersSelected = Math.round((totalSelected / countWithData) * 100) / 100
+      }
+    }
+
     // Merge into single response keyed by ref_code
     const allRefCodes = Array.from(new Set([
       ...Object.keys(impressionsByRef),
@@ -117,12 +163,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log(`[SparkLoop Admin] Date range ${start} to ${end}: ${popupEvents?.length || 0} popup events, ${referrals?.length || 0} referrals`)
+    console.log(`[SparkLoop Admin] Date range ${start} to ${end}: ${popupEvents?.length || 0} popup events, ${referrals?.length || 0} referrals, ${uniqueIps} unique IPs`)
 
     return NextResponse.json({
       success: true,
       metrics,
       dateRange: { start, end },
+      rangeStats: {
+        uniqueIps,
+        avgOffersSelected,
+      },
     })
   } catch (error) {
     console.error('[SparkLoop Admin] Date range query failed:', error)
