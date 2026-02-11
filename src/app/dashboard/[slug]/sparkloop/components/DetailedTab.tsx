@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Download, Settings2, Search, X, Calendar } from 'lucide-react'
+import { Download, Settings2, Search, X, Calendar, Ban, Pause, Play, Pencil, RefreshCw, CheckCircle } from 'lucide-react'
 
 interface Recommendation {
   id: string
@@ -41,6 +41,8 @@ interface Recommendation {
   cr_source: string
   rcr_source: string
   unique_ips: number
+  override_cr: number | null
+  override_rcr: number | null
 }
 
 interface GlobalStats {
@@ -60,6 +62,7 @@ interface DetailedTabProps {
   recommendations: Recommendation[]
   globalStats: GlobalStats | null
   loading: boolean
+  onRefresh: () => void
 }
 
 interface DateRangeMetrics {
@@ -124,7 +127,7 @@ const getColumnWidthClass = (width?: 'xs' | 'sm' | 'md' | 'lg') => {
   }
 }
 
-export default function DetailedTab({ recommendations, globalStats, loading }: DetailedTabProps) {
+export default function DetailedTab({ recommendations, globalStats, loading, onRefresh }: DetailedTabProps) {
   const [columns, setColumns] = useState<Column[]>(DEFAULT_COLUMNS)
   const [sortColumn, setSortColumn] = useState<string | null>('calculated_score')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
@@ -138,6 +141,16 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
   const [dateRangeMetrics, setDateRangeMetrics] = useState<Record<string, DateRangeMetrics> | null>(null)
   const [dateRangeLoading, setDateRangeLoading] = useState(false)
   const [rangeStats, setRangeStats] = useState<RangeStats | null>(null)
+
+  // Action state
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // Override modal state
+  const [overrideRec, setOverrideRec] = useState<Recommendation | null>(null)
+  const [overrideCrValue, setOverrideCrValue] = useState('')
+  const [overrideRcrValue, setOverrideRcrValue] = useState('')
+  const [overrideSaving, setOverrideSaving] = useState(false)
 
   const dateRangeActive = dateRangeMetrics !== null
 
@@ -287,6 +300,161 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
     return result
   }, [effectiveRecommendations, searchQuery, statusFilter, sortColumn, sortDirection])
 
+  // --- Action handlers ---
+  async function handlePause(rec: Recommendation) {
+    setActionLoading(rec.id)
+    try {
+      const res = await fetch('/api/sparkloop/admin', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: rec.id, action: 'pause' }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        onRefresh()
+      } else {
+        alert('Pause failed: ' + data.error)
+      }
+    } catch {
+      alert('Pause failed')
+    }
+    setActionLoading(null)
+  }
+
+  async function handleExclude(rec: Recommendation) {
+    setActionLoading(rec.id)
+    try {
+      const res = await fetch('/api/sparkloop/admin', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: rec.id, excluded: true, excluded_reason: 'manual' }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        onRefresh()
+      } else {
+        alert('Exclude failed: ' + data.error)
+      }
+    } catch {
+      alert('Exclude failed')
+    }
+    setActionLoading(null)
+  }
+
+  async function handleReactivate(rec: Recommendation) {
+    setActionLoading(rec.id)
+    try {
+      // If excluded, un-exclude. If paused, unpause.
+      const body = rec.excluded
+        ? { id: rec.id, excluded: false }
+        : { id: rec.id, action: 'unpause' }
+      const res = await fetch('/api/sparkloop/admin', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (data.success) {
+        onRefresh()
+      } else {
+        alert('Reactivate failed: ' + data.error)
+      }
+    } catch {
+      alert('Reactivate failed')
+    }
+    setActionLoading(null)
+  }
+
+  async function bulkAction(action: 'exclude' | 'reactivate' | 'pause') {
+    if (selectedIds.size === 0) return
+
+    const reason = action === 'exclude' ? prompt('Exclusion reason (e.g., budget_used_up):') : null
+    if (action === 'exclude' && reason === null) return
+
+    setActionLoading('bulk')
+    try {
+      const res = await fetch('/api/sparkloop/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          ids: Array.from(selectedIds),
+          excluded_reason: reason,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        const label = action === 'exclude' ? 'Excluded' : action === 'pause' ? 'Paused' : 'Reactivated'
+        alert(`${label} ${data.updated} recommendations`)
+        setSelectedIds(new Set())
+        onRefresh()
+      } else {
+        alert('Bulk update failed: ' + data.error)
+      }
+    } catch {
+      alert('Bulk update failed')
+    }
+    setActionLoading(null)
+  }
+
+  function toggleSelect(id: string) {
+    const newSelected = new Set(selectedIds)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedIds(newSelected)
+  }
+
+  function selectAll() {
+    if (selectedIds.size === filteredAndSorted.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredAndSorted.map(r => r.id)))
+    }
+  }
+
+  // --- Override modal ---
+  function openOverrideModal(rec: Recommendation) {
+    setOverrideRec(rec)
+    setOverrideCrValue(rec.override_cr !== null && rec.override_cr !== undefined ? String(rec.override_cr) : '')
+    setOverrideRcrValue(rec.override_rcr !== null && rec.override_rcr !== undefined ? String(rec.override_rcr) : '')
+  }
+
+  async function saveOverrides() {
+    if (!overrideRec) return
+    setOverrideSaving(true)
+    try {
+      const body: Record<string, unknown> = {
+        id: overrideRec.id,
+        action: 'set_overrides',
+      }
+      // Parse CR: empty string = clear (null), otherwise number
+      body.override_cr = overrideCrValue.trim() === '' ? null : parseFloat(overrideCrValue)
+      body.override_rcr = overrideRcrValue.trim() === '' ? null : parseFloat(overrideRcrValue)
+
+      const res = await fetch('/api/sparkloop/admin', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setOverrideRec(null)
+        onRefresh()
+      } else {
+        alert('Save failed: ' + data.error)
+      }
+    } catch {
+      alert('Save failed')
+    }
+    setOverrideSaving(false)
+  }
+
+  // Total columns for colSpan = checkbox + enabled columns + actions
+  const totalColumns = 2 + enabledColumns.length
+
   const getColumnValue = (rec: Recommendation, key: string): string => {
     const value = rec[key as keyof Recommendation]
     if (value === null || value === undefined) return ''
@@ -338,6 +506,12 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
     document.body.removeChild(link)
   }
 
+  const getSourceColor = (source: string) => {
+    if (source === 'override') return 'text-orange-600 font-medium'
+    if (source === 'ours') return 'text-blue-600 font-medium'
+    return ''
+  }
+
   const renderCellContent = (rec: Recommendation, columnKey: string) => {
     switch (columnKey) {
       case 'publication_name':
@@ -377,12 +551,13 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
           : '-'
 
       case 'effective_rcr':
-        return `${rec.effective_rcr.toFixed(1)}%`
+        return <span className={getSourceColor(rec.rcr_source)}>{rec.effective_rcr.toFixed(1)}%</span>
 
       case 'rcr_source':
-        return rec.rcr_source === 'ours' ? (
-          <span className="text-blue-600">ours</span>
-        ) : rec.rcr_source === 'sparkloop' ? 'SL' : 'default'
+        if (rec.rcr_source === 'override') return <span className="text-orange-600">override</span>
+        if (rec.rcr_source === 'ours') return <span className="text-blue-600">ours</span>
+        if (rec.rcr_source === 'sparkloop') return 'SL'
+        return 'default'
 
       case 'our_cr':
         return rec.our_cr !== null
@@ -390,12 +565,12 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
           : '-'
 
       case 'effective_cr':
-        return `${rec.effective_cr.toFixed(1)}%`
+        return <span className={getSourceColor(rec.cr_source)}>{rec.effective_cr.toFixed(1)}%</span>
 
       case 'cr_source':
-        return rec.cr_source === 'ours' ? (
-          <span className="text-blue-600">ours</span>
-        ) : 'default'
+        if (rec.cr_source === 'override') return <span className="text-orange-600">override</span>
+        if (rec.cr_source === 'ours') return <span className="text-blue-600">ours</span>
+        return 'default'
 
       case 'calculated_score':
         return <span className="font-mono font-medium">${rec.calculated_score.toFixed(4)}</span>
@@ -525,6 +700,36 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
         </span>
       </div>
 
+      {/* Bulk actions bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-2 mb-4 p-2 bg-gray-50 rounded-lg border">
+          <span className="text-sm text-gray-600 font-medium">{selectedIds.size} selected</span>
+          <div className="flex gap-1 ml-auto">
+            <button
+              onClick={() => bulkAction('pause')}
+              disabled={actionLoading === 'bulk'}
+              className="flex items-center gap-1 px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 text-xs disabled:opacity-50"
+            >
+              <Pause className="w-3.5 h-3.5" /> Pause
+            </button>
+            <button
+              onClick={() => bulkAction('exclude')}
+              disabled={actionLoading === 'bulk'}
+              className="flex items-center gap-1 px-3 py-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs disabled:opacity-50"
+            >
+              <Ban className="w-3.5 h-3.5" /> Exclude
+            </button>
+            <button
+              onClick={() => bulkAction('reactivate')}
+              disabled={actionLoading === 'bulk'}
+              className="flex items-center gap-1 px-3 py-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200 text-xs disabled:opacity-50"
+            >
+              <CheckCircle className="w-3.5 h-3.5" /> Reactivate
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Date Range Picker */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <Calendar className="w-4 h-4 text-gray-400" />
@@ -620,6 +825,15 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
         <table className="w-full">
           <thead className="bg-gray-50 border-b">
             <tr>
+              {/* Fixed checkbox column */}
+              <th className="px-2 py-2 text-left w-8">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.size === filteredAndSorted.length && filteredAndSorted.length > 0}
+                  onChange={selectAll}
+                  className="rounded"
+                />
+              </th>
               {enabledColumns.map(col => (
                 <th
                   key={col.key}
@@ -639,18 +853,22 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
                   </div>
                 </th>
               ))}
+              {/* Fixed actions column */}
+              <th className="px-2 py-2 text-center text-[11px] font-medium text-gray-500 w-24 whitespace-nowrap">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {loading ? (
               <tr>
-                <td colSpan={enabledColumns.length} className="px-4 py-8 text-center text-gray-500 text-sm">
+                <td colSpan={totalColumns} className="px-4 py-8 text-center text-gray-500 text-sm">
                   Loading...
                 </td>
               </tr>
             ) : filteredAndSorted.length === 0 ? (
               <tr>
-                <td colSpan={enabledColumns.length} className="px-4 py-8 text-center text-gray-500 text-sm">
+                <td colSpan={totalColumns} className="px-4 py-8 text-center text-gray-500 text-sm">
                   No recommendations found
                 </td>
               </tr>
@@ -660,6 +878,16 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
                   key={rec.id}
                   className={`hover:bg-gray-50 ${rec.excluded ? 'bg-red-50/50' : rec.status === 'paused' && rec.paused_reason === 'manual' ? 'bg-yellow-50/50' : ''}`}
                 >
+                  {/* Checkbox */}
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(rec.id)}
+                      onChange={() => toggleSelect(rec.id)}
+                      className="rounded"
+                    />
+                  </td>
+                  {/* Data columns */}
                   {enabledColumns.map(col => (
                     <td
                       key={col.key}
@@ -668,6 +896,48 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
                       {renderCellContent(rec, col.key)}
                     </td>
                   ))}
+                  {/* Actions column */}
+                  <td className="px-2 py-1.5 text-center">
+                    {actionLoading === rec.id ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin inline" />
+                    ) : (
+                      <div className="flex items-center justify-center gap-0.5">
+                        {rec.excluded || rec.status === 'paused' ? (
+                          <button
+                            onClick={() => handleReactivate(rec)}
+                            title="Reactivate"
+                            className="p-1 rounded text-green-600 hover:bg-green-100"
+                          >
+                            <Play className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handlePause(rec)}
+                              title="Pause"
+                              className="p-1 rounded text-yellow-600 hover:bg-yellow-100"
+                            >
+                              <Pause className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleExclude(rec)}
+                              title="Exclude"
+                              className="p-1 rounded text-red-600 hover:bg-red-100"
+                            >
+                              <Ban className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => openOverrideModal(rec)}
+                          title="Edit overrides"
+                          className="p-1 rounded text-gray-500 hover:bg-gray-100"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))
             )}
@@ -678,14 +948,127 @@ export default function DetailedTab({ recommendations, globalStats, loading }: D
       {/* Legend */}
       <div className="mt-3 text-[10px] text-gray-500">
         <strong>Score</strong> = CR x CPA x RCR (expected revenue per impression) |
-        <span className="text-blue-600 ml-1">Blue values</span> = calculated from our data (20+ samples)
+        <span className="text-blue-600 ml-1">Blue</span> = our data |
+        <span className="text-orange-600 ml-1">Orange</span> = manual override
         {dateRangeActive && (
           <>
             {' | '}
-            <span className="text-purple-600">* Purple values</span> = filtered by date range ({dateStart} to {dateEnd})
+            <span className="text-purple-600">* Purple</span> = filtered by date range ({dateStart} to {dateEnd})
           </>
         )}
       </div>
+
+      {/* Override Modal */}
+      {overrideRec && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setOverrideRec(null)}>
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold mb-1">Edit Score Overrides</h3>
+            <p className="text-sm text-gray-500 mb-4">{overrideRec.publication_name}</p>
+
+            {/* Current values display */}
+            <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Our CR (calculated):</span>
+                <span className="text-blue-600 font-medium">
+                  {overrideRec.our_cr !== null ? `${overrideRec.our_cr.toFixed(1)}%` : '-'}
+                  {overrideRec.impressions < 50 && <span className="text-gray-400 ml-1">(&lt;50 impressions)</span>}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">SparkLoop RCR:</span>
+                <span>{overrideRec.sparkloop_rcr !== null ? `${overrideRec.sparkloop_rcr.toFixed(0)}%` : '-'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Default CR:</span>
+                <span>22%</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Default RCR:</span>
+                <span>25%</span>
+              </div>
+              <div className="border-t pt-1.5 flex justify-between font-medium">
+                <span className="text-gray-700">Current effective CR:</span>
+                <span className={overrideRec.cr_source === 'override' ? 'text-orange-600' : overrideRec.cr_source === 'ours' ? 'text-blue-600' : ''}>
+                  {overrideRec.effective_cr.toFixed(1)}% ({overrideRec.cr_source})
+                </span>
+              </div>
+              <div className="flex justify-between font-medium">
+                <span className="text-gray-700">Current effective RCR:</span>
+                <span className={overrideRec.rcr_source === 'override' ? 'text-orange-600' : overrideRec.rcr_source === 'sparkloop' ? '' : ''}>
+                  {overrideRec.effective_rcr.toFixed(1)}% ({overrideRec.rcr_source})
+                </span>
+              </div>
+            </div>
+
+            {/* Override inputs */}
+            <div className="space-y-3 mb-5">
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-1">
+                  Override CR (%)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    placeholder="Leave empty to use calculated"
+                    value={overrideCrValue}
+                    onChange={e => setOverrideCrValue(e.target.value)}
+                    className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <button
+                    onClick={() => setOverrideCrValue('')}
+                    className="px-3 py-2 text-xs bg-gray-100 rounded-lg hover:bg-gray-200 text-gray-600"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-1">
+                  Override RCR (%)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    placeholder="Leave empty to use SL/default"
+                    value={overrideRcrValue}
+                    onChange={e => setOverrideRcrValue(e.target.value)}
+                    className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <button
+                    onClick={() => setOverrideRcrValue('')}
+                    className="px-3 py-2 text-xs bg-gray-100 rounded-lg hover:bg-gray-200 text-gray-600"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setOverrideRec(null)}
+                className="px-4 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveOverrides}
+                disabled={overrideSaving}
+                className="px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+              >
+                {overrideSaving ? 'Saving...' : 'Save Overrides'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

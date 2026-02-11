@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Layout from '@/components/Layout'
-import { RefreshCw, Ban, CheckCircle, TrendingUp, DollarSign, Clock, Users, Pause, Play } from 'lucide-react'
+import { RefreshCw, CheckCircle, TrendingUp, DollarSign, Clock, Users } from 'lucide-react'
 import {
   BarChart,
   Bar,
@@ -53,6 +53,9 @@ interface Recommendation {
   cr_source: string
   rcr_source: string
   unique_ips: number
+  override_cr: number | null
+  override_rcr: number | null
+  submission_capped?: boolean
 }
 
 interface Counts {
@@ -103,11 +106,8 @@ export default function SparkLoopAdminPage() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [counts, setCounts] = useState<Counts>({ total: 0, active: 0, excluded: 0, paused: 0, archived: 0 })
   const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null)
-  const [filter, setFilter] = useState<'all' | 'active' | 'excluded' | 'paused'>('all')
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<'overview' | 'detailed'>('overview')
 
   // Chart state
@@ -117,7 +117,7 @@ export default function SparkLoopAdminPage() {
 
   useEffect(() => {
     fetchRecommendations()
-  }, [filter])
+  }, [])
 
   useEffect(() => {
     fetchChartStats()
@@ -126,7 +126,7 @@ export default function SparkLoopAdminPage() {
   async function fetchRecommendations() {
     setLoading(true)
     try {
-      const res = await fetch(`/api/sparkloop/admin?filter=${filter}`)
+      const res = await fetch('/api/sparkloop/admin?filter=all')
       const data = await res.json()
       if (data.success) {
         setRecommendations(data.recommendations)
@@ -174,108 +174,8 @@ export default function SparkLoopAdminPage() {
     setSyncing(false)
   }
 
-  async function toggleExclusion(rec: Recommendation) {
-    setActionLoading(rec.id)
-    try {
-      const res = await fetch('/api/sparkloop/admin', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: rec.id,
-          excluded: !rec.excluded,
-          excluded_reason: !rec.excluded ? 'manual' : null,
-        }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        fetchRecommendations()
-      } else {
-        alert('Update failed: ' + data.error)
-      }
-    } catch (error) {
-      console.error('Update failed:', error)
-      alert('Update failed')
-    }
-    setActionLoading(null)
-  }
-
-  async function togglePause(rec: Recommendation) {
-    setActionLoading(rec.id)
-    try {
-      const isPaused = rec.status === 'paused' && rec.paused_reason === 'manual'
-      const res = await fetch('/api/sparkloop/admin', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: rec.id,
-          action: isPaused ? 'unpause' : 'pause',
-        }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        fetchRecommendations()
-      } else {
-        alert('Update failed: ' + data.error)
-      }
-    } catch (error) {
-      console.error('Update failed:', error)
-      alert('Update failed')
-    }
-    setActionLoading(null)
-  }
-
-  async function bulkAction(action: 'exclude' | 'reactivate' | 'pause') {
-    if (selectedIds.size === 0) {
-      alert('No recommendations selected')
-      return
-    }
-
-    const reason = action === 'exclude' ? prompt('Exclusion reason (e.g., budget_used_up):') : null
-    if (action === 'exclude' && reason === null) return
-
-    setActionLoading('bulk')
-    try {
-      const res = await fetch('/api/sparkloop/admin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action,
-          ids: Array.from(selectedIds),
-          excluded_reason: reason,
-        }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        const label = action === 'exclude' ? 'Excluded' : action === 'pause' ? 'Paused' : 'Reactivated'
-        alert(`${label} ${data.updated} recommendations`)
-        setSelectedIds(new Set())
-        fetchRecommendations()
-      } else {
-        alert('Bulk update failed: ' + data.error)
-      }
-    } catch (error) {
-      console.error('Bulk update failed:', error)
-      alert('Bulk update failed')
-    }
-    setActionLoading(null)
-  }
-
-  function toggleSelect(id: string) {
-    const newSelected = new Set(selectedIds)
-    if (newSelected.has(id)) {
-      newSelected.delete(id)
-    } else {
-      newSelected.add(id)
-    }
-    setSelectedIds(newSelected)
-  }
-
-  function selectAll() {
-    if (selectedIds.size === recommendations.length) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(recommendations.map(r => r.id)))
-    }
+  const formatDollars = (value: number) => {
+    return `$${value.toFixed(2)}`
   }
 
   const formatCurrency = (cents: number | null) => {
@@ -283,13 +183,37 @@ export default function SparkLoopAdminPage() {
     return `$${(cents / 100).toFixed(2)}`
   }
 
-  const formatPercent = (value: number | null) => {
-    if (value === null) return '-'
-    return `${value.toFixed(0)}%`
+  // Compute popup preview: top 5 recs that would appear in the actual popup
+  // Matches /api/sparkloop/recommendations filtering logic
+  const popupPreview = useMemo(() => {
+    return recommendations
+      .filter(rec => {
+        if (rec.status !== 'active') return false
+        if (rec.excluded) return false
+        if (rec.paused_reason === 'manual') return false
+        if (!rec.cpa || rec.cpa <= 0) return false
+        // Submission capped: no SL RCR + 50+ submissions, unless has override_rcr
+        const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
+        const hasSLRcr = slRcr !== null && slRcr > 0
+        const hasOverrideRcr = rec.override_rcr !== null && rec.override_rcr !== undefined
+        if (!hasSLRcr && !hasOverrideRcr && (rec.submissions || 0) >= 50) return false
+        return true
+      })
+      .sort((a, b) => (b.calculated_score || 0) - (a.calculated_score || 0))
+      .slice(0, 5)
+  }, [recommendations])
+
+  const getSourceColor = (source: string) => {
+    if (source === 'override') return 'text-orange-600'
+    if (source === 'ours') return 'text-blue-600'
+    return 'text-gray-500'
   }
 
-  const formatDollars = (value: number) => {
-    return `$${value.toFixed(2)}`
+  const getSourceLabel = (source: string) => {
+    if (source === 'override') return 'override'
+    if (source === 'ours') return 'ours'
+    if (source === 'sparkloop') return 'SL'
+    return 'default'
   }
 
   // Custom tooltip for chart
@@ -505,238 +429,75 @@ export default function SparkLoopAdminPage() {
               </div>
             </div>
 
-            {/* Filters and Bulk Actions */}
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setFilter('all')}
-                  className={`px-3 py-1.5 text-sm rounded-lg ${filter === 'all' ? 'bg-gray-900 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => setFilter('active')}
-                  className={`px-3 py-1.5 text-sm rounded-lg ${filter === 'active' ? 'bg-green-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}
-                >
-                  Active
-                </button>
-                <button
-                  onClick={() => setFilter('paused')}
-                  className={`px-3 py-1.5 text-sm rounded-lg ${filter === 'paused' ? 'bg-yellow-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}
-                >
-                  Paused
-                </button>
-                <button
-                  onClick={() => setFilter('excluded')}
-                  className={`px-3 py-1.5 text-sm rounded-lg ${filter === 'excluded' ? 'bg-red-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}
-                >
-                  Excluded
-                </button>
+            {/* Popup Preview */}
+            <div className="bg-white rounded-lg border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Popup Preview</h2>
+                <span className="text-xs text-gray-500">
+                  Top 5 recommendations by score (what subscribers see)
+                </span>
               </div>
 
-              {selectedIds.size > 0 && (
-                <div className="flex gap-2">
-                  <span className="text-sm text-gray-500 self-center">{selectedIds.size} selected</span>
-                  <button
-                    onClick={() => bulkAction('pause')}
-                    disabled={actionLoading === 'bulk'}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 text-sm"
-                  >
-                    <Pause className="w-4 h-4" /> Pause
-                  </button>
-                  <button
-                    onClick={() => bulkAction('exclude')}
-                    disabled={actionLoading === 'bulk'}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200 text-sm"
-                  >
-                    <Ban className="w-4 h-4" /> Exclude
-                  </button>
-                  <button
-                    onClick={() => bulkAction('reactivate')}
-                    disabled={actionLoading === 'bulk'}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200 text-sm"
-                  >
-                    <CheckCircle className="w-4 h-4" /> Reactivate
-                  </button>
+              {loading ? (
+                <div className="py-8 text-center text-gray-500 text-sm">Loading...</div>
+              ) : popupPreview.length === 0 ? (
+                <div className="py-8 text-center text-gray-500 text-sm">No eligible recommendations for popup</div>
+              ) : (
+                <div className="space-y-2">
+                  {popupPreview.map((rec, index) => (
+                    <div
+                      key={rec.id}
+                      className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg"
+                    >
+                      <span className="text-lg font-bold text-gray-400 w-6 text-center">
+                        {index + 1}
+                      </span>
+                      {rec.publication_logo ? (
+                        <img src={rec.publication_logo} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                          <Users className="w-4 h-4 text-purple-600" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{rec.publication_name}</div>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs flex-shrink-0">
+                        <div className="text-center">
+                          <div className="text-gray-400">CPA</div>
+                          <div className="font-mono font-medium">{formatCurrency(rec.cpa)}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-gray-400">CR</div>
+                          <div className={`font-medium ${getSourceColor(rec.cr_source)}`}>
+                            {rec.effective_cr.toFixed(0)}%
+                          </div>
+                          <div className="text-[10px] text-gray-400">{getSourceLabel(rec.cr_source)}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-gray-400">RCR</div>
+                          <div className={`font-medium ${getSourceColor(rec.rcr_source)}`}>
+                            {rec.effective_rcr.toFixed(0)}%
+                          </div>
+                          <div className="text-[10px] text-gray-400">{getSourceLabel(rec.rcr_source)}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-gray-400">Score</div>
+                          <div className="font-mono font-medium">${rec.calculated_score.toFixed(4)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
-            </div>
 
-            {/* Overview Table */}
-            <div className="bg-white rounded-lg border overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-2 py-2 text-left w-8">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.size === recommendations.length && recommendations.length > 0}
-                        onChange={selectAll}
-                        className="rounded"
-                      />
-                    </th>
-                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500">Newsletter</th>
-                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500">CPA</th>
-                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500">Screen</th>
-                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500">RCR</th>
-                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500">CR</th>
-                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500">
-                      <div className="flex items-center gap-1">
-                        Score <TrendingUp className="w-3 h-3" />
-                      </div>
-                    </th>
-                    <th className="px-2 py-2 text-center text-xs font-medium text-gray-500">Impr</th>
-                    <th className="px-2 py-2 text-center text-xs font-medium text-gray-500">Subs</th>
-                    <th className="px-2 py-2 text-center text-xs font-medium text-gray-500">Conf</th>
-                    <th className="px-2 py-2 text-center text-xs font-medium text-gray-500">Pend</th>
-                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500">Status</th>
-                    <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 w-10"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={13} className="px-4 py-8 text-center text-gray-500 text-sm">
-                        Loading...
-                      </td>
-                    </tr>
-                  ) : recommendations.length === 0 ? (
-                    <tr>
-                      <td colSpan={13} className="px-4 py-8 text-center text-gray-500 text-sm">
-                        No recommendations found
-                      </td>
-                    </tr>
-                  ) : (
-                    recommendations.map(rec => (
-                      <tr
-                        key={rec.id}
-                        className={`hover:bg-gray-50 ${rec.excluded ? 'bg-red-50/50' : rec.status === 'paused' && rec.paused_reason === 'manual' ? 'bg-yellow-50/50' : ''}`}
-                      >
-                        <td className="px-2 py-2">
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.has(rec.id)}
-                            onChange={() => toggleSelect(rec.id)}
-                            className="rounded"
-                          />
-                        </td>
-                        <td className="px-2 py-2">
-                          <div className="flex items-center gap-2">
-                            {rec.publication_logo && (
-                              <img
-                                src={rec.publication_logo}
-                                alt=""
-                                className="w-6 h-6 rounded-full object-cover flex-shrink-0"
-                              />
-                            )}
-                            <div className="min-w-0">
-                              <div className="font-medium text-xs truncate max-w-[160px]">{rec.publication_name}</div>
-                              <div className="text-[10px] text-gray-400 truncate">{rec.ref_code}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 font-mono text-xs">
-                          {formatCurrency(rec.cpa)}
-                        </td>
-                        <td className="px-2 py-2 text-xs text-gray-600">
-                          {rec.screening_period ? `${rec.screening_period}d` : '-'}
-                        </td>
-                        <td className="px-2 py-2">
-                          <div className="text-xs">
-                            <span className={rec.rcr_source === 'ours' ? 'text-blue-600 font-medium' : ''}>
-                              {formatPercent(rec.effective_rcr)}
-                            </span>
-                            <div className="text-[10px] text-gray-400">
-                              {rec.rcr_source === 'ours' ? 'ours' : rec.rcr_source === 'sparkloop' ? 'SL' : 'def'}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-2 py-2">
-                          <div className="text-xs">
-                            <span className={rec.cr_source === 'ours' ? 'text-blue-600 font-medium' : ''}>
-                              {formatPercent(rec.effective_cr)}
-                            </span>
-                            <div className="text-[10px] text-gray-400">
-                              {rec.cr_source === 'ours' ? 'ours' : 'def'}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 font-mono text-xs font-medium">
-                          ${rec.calculated_score.toFixed(4)}
-                        </td>
-                        <td className="px-2 py-2 text-xs text-center text-gray-600">
-                          {rec.impressions}
-                        </td>
-                        <td className="px-2 py-2 text-xs text-center text-gray-600">
-                          {rec.submissions}
-                        </td>
-                        <td className="px-2 py-2 text-xs text-center text-green-600 font-medium">
-                          {rec.our_confirms}
-                        </td>
-                        <td className="px-2 py-2 text-xs text-center text-yellow-600 font-medium">
-                          {rec.our_pending}
-                        </td>
-                        <td className="px-2 py-2">
-                          {rec.excluded ? (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] bg-red-100 text-red-700">
-                              <Ban className="w-2.5 h-2.5" />
-                              {rec.excluded_reason || 'excluded'}
-                            </span>
-                          ) : rec.status === 'paused' ? (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] bg-yellow-100 text-yellow-700">
-                              <Pause className="w-2.5 h-2.5" />
-                              {rec.paused_reason || 'paused'}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] bg-green-100 text-green-700">
-                              Active
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-2 py-2 text-center">
-                          {actionLoading === rec.id ? (
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin inline" />
-                          ) : rec.excluded || rec.status === 'paused' ? (
-                            <button
-                              onClick={() => rec.excluded ? toggleExclusion(rec) : togglePause(rec)}
-                              disabled={actionLoading === rec.id}
-                              title="Reactivate"
-                              className="p-1 rounded text-green-600 hover:bg-green-100 disabled:opacity-50"
-                            >
-                              <Play className="w-3.5 h-3.5" />
-                            </button>
-                          ) : (
-                            <div className="flex items-center justify-center gap-0.5">
-                              <button
-                                onClick={() => togglePause(rec)}
-                                disabled={actionLoading === rec.id}
-                                title="Pause"
-                                className="p-1 rounded text-yellow-600 hover:bg-yellow-100 disabled:opacity-50"
-                              >
-                                <Pause className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => toggleExclusion(rec)}
-                                disabled={actionLoading === rec.id}
-                                title="Exclude"
-                                className="p-1 rounded text-red-600 hover:bg-red-100 disabled:opacity-50"
-                              >
-                                <Ban className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Legend */}
-            <div className="mt-3 text-[10px] text-gray-500">
-              <strong>Score</strong> = CR x CPA x RCR (expected revenue per impression) |
-              <span className="text-blue-600 ml-1">Blue values</span> = calculated from our data (20+ samples)
+              {/* Legend */}
+              <div className="mt-3 text-[10px] text-gray-500">
+                <strong>Score</strong> = CR x CPA x RCR (expected revenue per impression) |
+                <span className="text-blue-600 ml-1">Blue</span> = our data |
+                <span className="text-orange-600 ml-1">Orange</span> = manual override |
+                Gray = default
+              </div>
             </div>
           </>
         ) : (
@@ -744,6 +505,7 @@ export default function SparkLoopAdminPage() {
             recommendations={recommendations}
             globalStats={globalStats}
             loading={loading}
+            onRefresh={fetchRecommendations}
           />
         )}
       </div>

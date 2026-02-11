@@ -51,24 +51,35 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Filter out recs with no SL RCR that have hit 50 submissions
+    // Filter out recs with no SL RCR that have hit 50 submissions (unless they have an override_rcr)
     const eligible = (recommendations || []).filter(rec => {
       const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
       const hasSLRcr = slRcr !== null && slRcr > 0
-      if (!hasSLRcr && (rec.submissions || 0) >= 50) {
+      const hasOverrideRcr = rec.override_rcr !== null && rec.override_rcr !== undefined
+      if (!hasSLRcr && !hasOverrideRcr && (rec.submissions || 0) >= 50) {
         return false // Capped: no SL RCR data after 50 submissions
       }
       return true
     })
 
     // Score and sort recommendations by CR × CPA × RCR
-    // RCR: only use SparkLoop RCR or default 25%
-    // CR: only use ours after 50+ impressions, otherwise default 22%
+    // Priority: override > calculated/sparkloop > default
+    // CR:  override_cr > our_cr (if 50+ impressions) > 22% default
+    // RCR: override_rcr > sparkloop_rcr > 25% default
     const scored = eligible.map(rec => {
+      const hasOverrideCr = rec.override_cr !== null && rec.override_cr !== undefined
+      const hasOverrideRcr = rec.override_rcr !== null && rec.override_rcr !== undefined
       const hasEnoughData = (rec.impressions || 0) >= 50
-      const cr = hasEnoughData && rec.our_cr !== null && Number(rec.our_cr) > 0 ? Number(rec.our_cr) / 100 : 0.22
+      const hasOurCr = hasEnoughData && rec.our_cr !== null && Number(rec.our_cr) > 0
       const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
-      const rcr = slRcr !== null && slRcr > 0 ? slRcr / 100 : 0.25
+      const hasSLRcr = slRcr !== null && slRcr > 0
+
+      const cr = hasOverrideCr ? Number(rec.override_cr) / 100
+        : hasOurCr ? Number(rec.our_cr) / 100
+        : 0.22
+      const rcr = hasOverrideRcr ? Number(rec.override_rcr) / 100
+        : hasSLRcr ? slRcr! / 100
+        : 0.25
       const cpa = (rec.cpa || 0) / 100
       const score = cr * cpa * rcr
 

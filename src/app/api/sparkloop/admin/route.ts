@@ -34,25 +34,58 @@ export async function GET(request: NextRequest) {
     }
 
     // Calculate scores for each recommendation
-    // RCR: only use SparkLoop RCR or default 25%
-    // CR: only use ours after 50+ impressions, otherwise default 22%
+    // Priority: override > calculated/sparkloop > default
+    // CR:  override_cr > our_cr (if 50+ impressions) > 22% default
+    // RCR: override_rcr > sparkloop_rcr > 25% default
     const withScores = (data || []).map(rec => {
+      const hasOverrideCr = rec.override_cr !== null && rec.override_cr !== undefined
+      const hasOverrideRcr = rec.override_rcr !== null && rec.override_rcr !== undefined
       const hasEnoughData = (rec.impressions || 0) >= 50
-      const cr = hasEnoughData && rec.our_cr !== null && Number(rec.our_cr) > 0 ? Number(rec.our_cr) / 100 : 0.22
+      const hasOurCr = hasEnoughData && rec.our_cr !== null && Number(rec.our_cr) > 0
       const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
-      const rcr = slRcr !== null && slRcr > 0 ? slRcr / 100 : 0.25
+      const hasSLRcr = slRcr !== null && slRcr > 0
+
+      // Effective CR: override > ours > default 22%
+      let effectiveCr: number
+      let crSource: string
+      if (hasOverrideCr) {
+        effectiveCr = Number(rec.override_cr)
+        crSource = 'override'
+      } else if (hasOurCr) {
+        effectiveCr = Number(rec.our_cr)
+        crSource = 'ours'
+      } else {
+        effectiveCr = 22
+        crSource = 'default'
+      }
+
+      // Effective RCR: override > sparkloop > default 25%
+      let effectiveRcr: number
+      let rcrSource: string
+      if (hasOverrideRcr) {
+        effectiveRcr = Number(rec.override_rcr)
+        rcrSource = 'override'
+      } else if (hasSLRcr) {
+        effectiveRcr = slRcr!
+        rcrSource = 'sparkloop'
+      } else {
+        effectiveRcr = 25
+        rcrSource = 'default'
+      }
+
+      const cr = effectiveCr / 100
+      const rcr = effectiveRcr / 100
       const cpa = (rec.cpa || 0) / 100
       const score = cr * cpa * rcr
-      const hasSLRcr = slRcr !== null && slRcr > 0
 
       return {
         ...rec,
         calculated_score: score,
-        effective_cr: hasEnoughData && rec.our_cr !== null && Number(rec.our_cr) > 0 ? Number(rec.our_cr) : 22,
-        effective_rcr: hasSLRcr ? slRcr : 25,
-        cr_source: hasEnoughData && rec.our_cr !== null && Number(rec.our_cr) > 0 ? 'ours' : 'default',
-        rcr_source: hasSLRcr ? 'sparkloop' : 'default',
-        submission_capped: !hasSLRcr && (rec.submissions || 0) >= 50,
+        effective_cr: effectiveCr,
+        effective_rcr: effectiveRcr,
+        cr_source: crSource,
+        rcr_source: rcrSource,
+        submission_capped: !hasSLRcr && !hasOverrideRcr && (rec.submissions || 0) >= 50,
       }
     })
 
@@ -187,7 +220,16 @@ export async function PATCH(request: NextRequest) {
       updated_at: new Date().toISOString(),
     }
 
-    if (action === 'pause') {
+    if (action === 'set_overrides') {
+      // Set or clear CR/RCR overrides
+      // Number = set override, null = clear override, field absent = don't touch
+      if ('override_cr' in body) {
+        updateData.override_cr = body.override_cr
+      }
+      if ('override_rcr' in body) {
+        updateData.override_rcr = body.override_rcr
+      }
+    } else if (action === 'pause') {
       // Manual pause: set status to paused, mark reason as manual
       updateData.status = 'paused'
       updateData.paused_reason = 'manual'
@@ -212,7 +254,7 @@ export async function PATCH(request: NextRequest) {
       throw new Error(`Database error: ${error.message}`)
     }
 
-    const actionLabel = action === 'pause' ? 'Paused' : action === 'unpause' ? 'Unpaused' : excluded ? 'Excluded' : 'Reactivated'
+    const actionLabel = action === 'set_overrides' ? 'Updated overrides for' : action === 'pause' ? 'Paused' : action === 'unpause' ? 'Unpaused' : excluded ? 'Excluded' : 'Reactivated'
     console.log(`[SparkLoop Admin] ${actionLabel} recommendation: ${data.publication_name}`)
 
     return NextResponse.json({
