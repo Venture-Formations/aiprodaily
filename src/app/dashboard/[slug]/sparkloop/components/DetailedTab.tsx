@@ -526,11 +526,31 @@ export default function DetailedTab({ recommendations, globalStats, loading, onR
         )
 
       case 'status': {
+        const hasCrOverride = rec.override_cr !== null && rec.override_cr !== undefined
+        const hasRcrOverride = rec.override_rcr !== null && rec.override_rcr !== undefined
+        const overrideParts: string[] = []
+        if (hasCrOverride) overrideParts.push(`CR:${rec.override_cr}%`)
+        if (hasRcrOverride) overrideParts.push(`RCR:${rec.override_rcr}%`)
+
         if (rec.excluded) {
-          return <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-red-100 text-red-700">{rec.excluded_reason || 'excluded'}</span>
+          return (
+            <div>
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-red-100 text-red-700">{rec.excluded_reason || 'excluded'}</span>
+              {overrideParts.length > 0 && (
+                <div className="text-[9px] text-orange-500 mt-0.5">{overrideParts.join(' ')}</div>
+              )}
+            </div>
+          )
         }
         if (rec.status === 'paused') {
-          return <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-yellow-100 text-yellow-700">{rec.paused_reason || 'paused'}</span>
+          return (
+            <div>
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-yellow-100 text-yellow-700">{rec.paused_reason || 'paused'}</span>
+              {overrideParts.length > 0 && (
+                <div className="text-[9px] text-orange-500 mt-0.5">{overrideParts.join(' ')}</div>
+              )}
+            </div>
+          )
         }
         // Check if active but excluded from popup
         const noCpa = !rec.cpa || rec.cpa <= 0
@@ -539,6 +559,9 @@ export default function DetailedTab({ recommendations, globalStats, loading, onR
         return (
           <div>
             <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-green-100 text-green-700">Active</span>
+            {overrideParts.length > 0 && (
+              <div className="text-[9px] text-orange-500 mt-0.5">{overrideParts.join(' ')}</div>
+            )}
             {popupReason && (
               <div className="text-[9px] text-gray-400 mt-0.5" title={noCpa ? 'No CPA set — excluded from popup' : 'No SL RCR after 50+ submissions — excluded from popup'}>
                 not in popup ({popupReason})
