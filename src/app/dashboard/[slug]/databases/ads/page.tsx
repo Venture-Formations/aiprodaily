@@ -1116,6 +1116,18 @@ function AddAdModal({ onClose, onSuccess, publicationId, selectedSection, sectio
         }
       }
 
+      // Validate company is provided
+      if (companyMode === 'existing' && !selectedAdvertiserId) {
+        alert('Please select a company')
+        setSubmitting(false)
+        return
+      }
+      if (companyMode === 'new' && !newCompanyName.trim()) {
+        alert('Please enter a company name')
+        setSubmitting(false)
+        return
+      }
+
       // Handle company/advertiser
       let advertiserId = null
       let companyName = ''
@@ -1219,7 +1231,7 @@ function AddAdModal({ onClose, onSuccess, publicationId, selectedSection, sectio
           {/* Company/Advertiser */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Company
+              Company *
             </label>
             <div className="space-y-3">
               {/* Mode toggle */}
