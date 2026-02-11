@@ -21,7 +21,8 @@ const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, refCodes } = body
+    const { email, refCodes, source } = body
+    const submissionSource = source === 'recs_page' ? 'recs_page' : 'custom_popup'
 
     if (!email) {
       return NextResponse.json(
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
       subscriber_uuid: subscriberUuid || undefined,
       country_code: countryCode,
       recommendations: activeRefCodes.join(','),
-      utm_source: 'custom_popup',
+      utm_source: submissionSource,
     })
 
     // Record the SparkLoop API confirmation as a server-side event
@@ -106,6 +107,7 @@ export async function POST(request: NextRequest) {
         subscriber_email: email,
         raw_payload: {
           source: 'server',
+          submission_source: submissionSource,
           subscriber_uuid: subscriberUuid,
           country_code: countryCode,
           ref_codes: activeRefCodes,
@@ -139,7 +141,7 @@ export async function POST(request: NextRequest) {
         publication_id: DEFAULT_PUBLICATION_ID,
         subscriber_email: email,
         ref_code: refCode,
-        source: 'custom_popup',
+        source: submissionSource,
         status: 'subscribed',
         subscribed_at: new Date().toISOString(),
       }))

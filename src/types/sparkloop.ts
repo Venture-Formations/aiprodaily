@@ -184,6 +184,7 @@ export interface SparkLoopPopupEvent {
   selected_count?: number // Number selected
   error_message?: string // For failed events
   timestamp?: string
+  source?: 'custom_popup' | 'recs_page'
 }
 
 /**

@@ -203,6 +203,24 @@ export default function SparkLoopAdminPage() {
       .slice(0, 5)
   }, [recommendations])
 
+  // Compute recs page preview: positions 6-10 (what shows on /subscribe/recommendations)
+  const recsPagePreview = useMemo(() => {
+    return recommendations
+      .filter(rec => {
+        if (rec.status !== 'active') return false
+        if (rec.excluded) return false
+        if (rec.paused_reason === 'manual') return false
+        if (!rec.cpa || rec.cpa <= 0) return false
+        const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
+        const hasSLRcr = slRcr !== null && slRcr > 0
+        const hasOverrideRcr = rec.override_rcr !== null && rec.override_rcr !== undefined
+        if (!hasSLRcr && !hasOverrideRcr && (rec.submissions || 0) >= 50) return false
+        return true
+      })
+      .sort((a, b) => (b.calculated_score || 0) - (a.calculated_score || 0))
+      .slice(5, 10)
+  }, [recommendations])
+
   const getSourceColor = (source: string) => {
     if (source === 'override') return 'text-orange-600'
     if (source === 'ours') return 'text-blue-600'
@@ -498,6 +516,69 @@ export default function SparkLoopAdminPage() {
                 <span className="text-orange-600 ml-1">Orange</span> = manual override |
                 Gray = default
               </div>
+            </div>
+
+            {/* Recommendation Page Preview */}
+            <div className="bg-white rounded-lg border p-6 mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Recommendation Page Preview</h2>
+                <span className="text-xs text-gray-500">
+                  Positions 6-10 by score (shown on /subscribe/recommendations)
+                </span>
+              </div>
+
+              {loading ? (
+                <div className="py-8 text-center text-gray-500 text-sm">Loading...</div>
+              ) : recsPagePreview.length === 0 ? (
+                <div className="py-8 text-center text-gray-500 text-sm">No additional recommendations beyond popup top 5</div>
+              ) : (
+                <div className="space-y-2">
+                  {recsPagePreview.map((rec, index) => (
+                    <div
+                      key={rec.id}
+                      className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg"
+                    >
+                      <span className="text-lg font-bold text-gray-400 w-6 text-center">
+                        {index + 6}
+                      </span>
+                      {rec.publication_logo ? (
+                        <img src={rec.publication_logo} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                          <Users className="w-4 h-4 text-purple-600" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{rec.publication_name}</div>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs flex-shrink-0">
+                        <div className="text-center">
+                          <div className="text-gray-400">CPA</div>
+                          <div className="font-mono font-medium">{formatCurrency(rec.cpa)}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-gray-400">CR</div>
+                          <div className={`font-medium ${getSourceColor(rec.cr_source)}`}>
+                            {rec.effective_cr.toFixed(0)}%
+                          </div>
+                          <div className="text-[10px] text-gray-400">{getSourceLabel(rec.cr_source)}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-gray-400">RCR</div>
+                          <div className={`font-medium ${getSourceColor(rec.rcr_source)}`}>
+                            {rec.effective_rcr.toFixed(0)}%
+                          </div>
+                          <div className="text-[10px] text-gray-400">{getSourceLabel(rec.rcr_source)}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-gray-400">Score</div>
+                          <div className="font-mono font-medium">${rec.calculated_score.toFixed(4)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         ) : (

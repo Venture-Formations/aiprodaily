@@ -15,7 +15,7 @@ const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
  */
 export async function POST(request: NextRequest) {
   try {
-    const event: SparkLoopPopupEvent = await request.json()
+    const event: SparkLoopPopupEvent & { source?: string } = await request.json()
 
     if (!event.event_type || !event.subscriber_email) {
       return NextResponse.json(
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     // Build metadata for raw_payload
     const metadata: Record<string, unknown> = {
-      source: 'custom_popup',
+      source: event.source || 'custom_popup',
       event_type: event.event_type,
       recommendation_count: event.recommendation_count,
       selected_count: event.selected_count,

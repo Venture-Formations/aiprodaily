@@ -86,15 +86,18 @@ export async function GET(request: NextRequest) {
       return { ...rec, score }
     })
 
-    // Sort by score descending and take top 5
+    // Sort by score descending and slice with offset/limit
     scored.sort((a, b) => b.score - a.score)
-    const top5 = scored.slice(0, 5)
+    const url = new URL(request.url)
+    const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10))
+    const limit = Math.max(1, Math.min(parseInt(url.searchParams.get('limit') || '5', 10), 20))
+    const selected = scored.slice(offset, offset + limit)
 
-    // Pre-select all 5
-    const preSelectedRefCodes = top5.map(r => r.ref_code)
+    // Pre-select all returned recommendations
+    const preSelectedRefCodes = selected.map(r => r.ref_code)
 
     // Convert to SparkLoop API format for frontend compatibility
-    const formattedRecommendations = top5.map(rec => ({
+    const formattedRecommendations = selected.map(rec => ({
       uuid: rec.sparkloop_uuid,
       ref_code: rec.ref_code,
       type: rec.type,
@@ -121,7 +124,7 @@ export async function GET(request: NextRequest) {
       _our_rcr: rec.our_rcr,
     }))
 
-    console.log(`[SparkLoop] Showing top 5 of ${recommendations?.length || 0} active recommendations (scored by CR×CPA×RCR)`)
+    console.log(`[SparkLoop] Showing ${selected.length} of ${recommendations?.length || 0} active recommendations (offset=${offset}, limit=${limit}, scored by CR×CPA×RCR)`)
 
     return NextResponse.json({
       recommendations: formattedRecommendations,
