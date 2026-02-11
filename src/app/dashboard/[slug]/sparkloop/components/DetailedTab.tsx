@@ -539,39 +539,16 @@ export default function DetailedTab({ recommendations, globalStats, loading, onR
       }
 
       case 'status': {
-        const hasCrOverride = rec.override_cr !== null && rec.override_cr !== undefined
-        const hasRcrOverride = rec.override_rcr !== null && rec.override_rcr !== undefined
-        const overrideParts: string[] = []
-        if (hasCrOverride) overrideParts.push(`CR:${rec.override_cr}%`)
-        if (hasRcrOverride) overrideParts.push(`RCR:${rec.override_rcr}%`)
-
         if (rec.excluded) {
-          return (
-            <div>
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-red-100 text-red-700">{rec.excluded_reason || 'excluded'}</span>
-              {overrideParts.length > 0 && (
-                <div className="text-[9px] text-orange-500 mt-0.5">{overrideParts.join(' ')}</div>
-              )}
-            </div>
-          )
+          return <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-red-100 text-red-700">{rec.excluded_reason || 'excluded'}</span>
         }
         if (rec.status === 'paused') {
-          return (
-            <div>
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-yellow-100 text-yellow-700">{rec.paused_reason || 'paused'}</span>
-              {overrideParts.length > 0 && (
-                <div className="text-[9px] text-orange-500 mt-0.5">{overrideParts.join(' ')}</div>
-              )}
-            </div>
-          )
+          return <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-yellow-100 text-yellow-700">{rec.paused_reason || 'paused'}</span>
         }
         const popupReason = getPopupExclusionReason(rec)
         return (
           <div>
             <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-green-100 text-green-700">Active</span>
-            {overrideParts.length > 0 && (
-              <div className="text-[9px] text-orange-500 mt-0.5">{overrideParts.join(' ')}</div>
-            )}
             {popupReason && (
               <div className="text-[9px] text-gray-400 mt-0.5">({popupReason})</div>
             )}
@@ -618,8 +595,21 @@ export default function DetailedTab({ recommendations, globalStats, loading, onR
         if (rec.cr_source === 'ours') return <span className="text-blue-600">ours</span>
         return 'default'
 
-      case 'calculated_score':
-        return <span className="font-mono font-medium">${rec.calculated_score.toFixed(4)}</span>
+      case 'calculated_score': {
+        const crOvr = rec.override_cr !== null && rec.override_cr !== undefined
+        const rcrOvr = rec.override_rcr !== null && rec.override_rcr !== undefined
+        const parts: string[] = []
+        if (crOvr) parts.push(`CR:${rec.override_cr}%`)
+        if (rcrOvr) parts.push(`RCR:${rec.override_rcr}%`)
+        return (
+          <div>
+            <span className="font-mono font-medium">${rec.calculated_score.toFixed(4)}</span>
+            {parts.length > 0 && (
+              <div className="text-[9px] text-orange-500 mt-0.5">{parts.join(' ')}</div>
+            )}
+          </div>
+        )
+      }
 
       case 'impressions':
         return dateRangeActive
