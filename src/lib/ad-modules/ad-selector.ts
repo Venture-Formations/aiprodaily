@@ -31,43 +31,8 @@ function getWeekStart(date: Date): Date {
 }
 
 export class ModuleAdSelector {
-  /**
-   * Get the global company cooldown days setting
-   */
-  static async getCooldownDays(publicationId: string): Promise<number> {
-    try {
-      const { data } = await supabaseAdmin
-        .from('publication_settings')
-        .select('value')
-        .eq('publication_id', publicationId)
-        .eq('key', 'ad_company_cooldown_days')
-        .single()
-
-      return data?.value ? parseInt(data.value) : 7
-    } catch {
-      return 7 // Default
-    }
-  }
-
-  /**
-   * Check if an advertiser is within cooldown period
-   */
-  private static isAdvertiserInCooldown(
-    advertiser: Advertiser,
-    cooldownDays: number,
-    issueDate: Date
-  ): boolean {
-    if (!advertiser.last_used_date) {
-      return false
-    }
-
-    const lastUsed = new Date(advertiser.last_used_date)
-    const daysSinceLastUsed = Math.floor(
-      (issueDate.getTime() - lastUsed.getTime()) / (1000 * 60 * 60 * 24)
-    )
-
-    return daysSinceLastUsed < cooldownDays
-  }
+  // No global cooldown — same-day dedup is handled in selectAdsForIssue
+  // by passing excludedAdvertiserIds to getEligibleCompanies
 
   /**
    * Check if an ad is within its valid date range
@@ -125,14 +90,14 @@ export class ModuleAdSelector {
 
   /**
    * Get eligible companies for a module with their eligible ads.
-   * A company is eligible if: its advertiser is active, not in cooldown,
+   * A company is eligible if: its advertiser is active, not already used in this issue,
    * and has at least one eligible ad.
    */
   private static async getEligibleCompanies(
     moduleId: string,
     publicationId: string,
     issueDate: Date,
-    cooldownDays: number
+    excludedAdvertiserIds: Set<string> = new Set()
   ): Promise<EligibleCompany[]> {
     // Fetch junction entries for this module with advertiser details
     const { data: junctions, error: junctionError } = await supabaseAdmin
@@ -175,8 +140,8 @@ export class ModuleAdSelector {
       // Check advertiser is active
       if (!advertiser.is_active) continue
 
-      // Check advertiser cooldown
-      if (this.isAdvertiserInCooldown(advertiser, cooldownDays, issueDate)) continue
+      // Check advertiser not already selected in another module for this issue
+      if (excludedAdvertiserIds.has(junction.advertiser_id)) continue
 
       // Get this company's eligible ads in this module
       const companyAds = allAds
@@ -301,7 +266,8 @@ export class ModuleAdSelector {
   static async selectAd(
     module: AdModule,
     publicationId: string,
-    issueDate: Date
+    issueDate: Date,
+    excludedAdvertiserIds: Set<string> = new Set()
   ): Promise<AdSelectionResult> {
     const selectionMode = module.selection_mode
 
@@ -310,14 +276,11 @@ export class ModuleAdSelector {
       return { ad: null, reason: 'Manual selection required' }
     }
 
-    // Get cooldown setting
-    const cooldownDays = await this.getCooldownDays(publicationId)
-
-    // Get eligible companies with their eligible ads
-    const eligibleCompanies = await this.getEligibleCompanies(module.id, publicationId, issueDate, cooldownDays)
+    // Get eligible companies (excluding ones already selected for this issue)
+    const eligibleCompanies = await this.getEligibleCompanies(module.id, publicationId, issueDate, excludedAdvertiserIds)
 
     if (eligibleCompanies.length === 0) {
-      return { ad: null, reason: 'No eligible companies available (check cooldown, dates, status)' }
+      return { ad: null, reason: 'No eligible companies available (all used in other modules or inactive)' }
     }
 
     // Tier 1: Select company based on module's selection mode
@@ -387,14 +350,21 @@ export class ModuleAdSelector {
     }
 
     const results: { moduleId: string; result: AdSelectionResult }[] = []
+    const usedAdvertiserIds = new Set<string>()
 
-    // Select ad for each module
+    // Select ad for each module, excluding companies already picked for this issue
     for (const module of modules) {
       const result = await this.selectAd(
         module as AdModule,
         publicationId,
-        issueDate
+        issueDate,
+        usedAdvertiserIds
       )
+
+      // Track the selected advertiser so it won't be picked by another module
+      if (result.ad?.advertiser_id) {
+        usedAdvertiserIds.add(result.ad.advertiser_id)
+      }
 
       // Store selection in database (using advertisement_id)
       const { error: insertError } = await supabaseAdmin
