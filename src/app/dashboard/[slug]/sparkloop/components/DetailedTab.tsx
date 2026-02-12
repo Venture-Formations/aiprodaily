@@ -299,6 +299,18 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
     // Sort
     if (sortColumn) {
       result.sort((a, b) => {
+        // Status column: sort by the effective display label (what's in the badge)
+        if (sortColumn === 'status') {
+          const getStatusLabel = (r: Recommendation) => {
+            if (r.excluded) return r.excluded_reason || 'excluded'
+            if (r.status === 'paused') return r.paused_reason || 'paused'
+            return 'active'
+          }
+          const strA = getStatusLabel(a).toLowerCase()
+          const strB = getStatusLabel(b).toLowerCase()
+          return sortDirection === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA)
+        }
+
         const aVal = a[sortColumn as keyof Recommendation]
         const bVal = b[sortColumn as keyof Recommendation]
 
