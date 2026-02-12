@@ -109,20 +109,15 @@ export function HubspotOfferContent({ logoUrl, newsletterName }: HubspotOfferCon
                 Claim Offer
               </button>
 
-              {/* Finalize text */}
-              <p className="text-slate-400 text-sm mt-3">
+              {/* Skip / finalize link */}
+              <button
+                onClick={handleSkip}
+                className="text-slate-400 hover:text-slate-600 text-sm mt-3 transition-colors"
+              >
                 Finalize your subscription
-              </p>
+              </button>
             </div>
           </div>
-
-          {/* Skip link */}
-          <button
-            onClick={handleSkip}
-            className="mt-4 text-sm text-slate-400 hover:text-slate-600 underline transition-colors"
-          >
-            Skip this offer
-          </button>
         </div>
       </Container>
     </section>
