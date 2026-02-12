@@ -99,12 +99,15 @@ export async function GET(request: NextRequest) {
       return { ...rec, score }
     })
 
+    // Exclude recommendations missing a description
+    const withDescription = scored.filter(rec => rec.description && rec.description.trim().length > 0)
+
     // Sort by score descending and slice with offset/limit
-    scored.sort((a, b) => b.score - a.score)
+    withDescription.sort((a, b) => b.score - a.score)
     const url = new URL(request.url)
     const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10))
     const limit = Math.max(1, Math.min(parseInt(url.searchParams.get('limit') || '5', 10), 20))
-    const selected = scored.slice(offset, offset + limit)
+    const selected = withDescription.slice(offset, offset + limit)
 
     // Pre-select all returned recommendations
     const preSelectedRefCodes = selected.map(r => r.ref_code)
