@@ -245,12 +245,12 @@ export function RecommendationsContent({ logoUrl, newsletterName }: Recommendati
           </div>
 
           {/* Headline */}
-          <h1 className="font-display text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
+          <h1 className="font-display text-xl tracking-tight text-slate-900 sm:text-2xl mb-2">
             You&apos;re Almost There!
           </h1>
 
           {/* Subheadline */}
-          <p className="mt-4 sm:mt-6 text-base tracking-tight text-slate-700">
+          <p className="text-base text-slate-600 mb-6">
             These publishers cover topics we think you&apos;ll find valuable.
           </p>
 
