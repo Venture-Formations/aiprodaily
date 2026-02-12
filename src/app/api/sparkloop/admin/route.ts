@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getPublicationSettings, updatePublicationSetting } from '@/lib/publication-settings'
 
 // Default publication ID for AI Pro Daily
 const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+
+// Hardcoded fallbacks if no publication_settings exist
+const FALLBACK_DEFAULT_CR = 22
+const FALLBACK_DEFAULT_RCR = 25
 
 /**
  * GET /api/sparkloop/admin
@@ -33,10 +38,18 @@ export async function GET(request: NextRequest) {
       throw new Error(`Database error: ${error.message}`)
     }
 
+    // Load configurable defaults from publication_settings
+    const defaults = await getPublicationSettings(DEFAULT_PUBLICATION_ID, [
+      'sparkloop_default_cr',
+      'sparkloop_default_rcr',
+    ])
+    const defaultCr = defaults.sparkloop_default_cr ? parseFloat(defaults.sparkloop_default_cr) : FALLBACK_DEFAULT_CR
+    const defaultRcr = defaults.sparkloop_default_rcr ? parseFloat(defaults.sparkloop_default_rcr) : FALLBACK_DEFAULT_RCR
+
     // Calculate scores for each recommendation
     // Priority: override > calculated/sparkloop > default
-    // CR:  override_cr > our_cr (if 50+ impressions) > 22% default
-    // RCR: override_rcr > sparkloop_rcr > 25% default
+    // CR:  override_cr > our_cr (if 50+ impressions) > configurable default
+    // RCR: override_rcr > sparkloop_rcr > configurable default
     const withScores = (data || []).map(rec => {
       const hasOverrideCr = rec.override_cr !== null && rec.override_cr !== undefined
       const hasOverrideRcr = rec.override_rcr !== null && rec.override_rcr !== undefined
@@ -45,7 +58,7 @@ export async function GET(request: NextRequest) {
       const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
       const hasSLRcr = slRcr !== null && slRcr > 0
 
-      // Effective CR: override > ours > default 22%
+      // Effective CR: override > ours > configurable default
       let effectiveCr: number
       let crSource: string
       if (hasOverrideCr) {
@@ -55,11 +68,11 @@ export async function GET(request: NextRequest) {
         effectiveCr = Number(rec.our_cr)
         crSource = 'ours'
       } else {
-        effectiveCr = 22
+        effectiveCr = defaultCr
         crSource = 'default'
       }
 
-      // Effective RCR: override > sparkloop > default 25%
+      // Effective RCR: override > sparkloop > configurable default
       let effectiveRcr: number
       let rcrSource: string
       if (hasOverrideRcr) {
@@ -69,7 +82,7 @@ export async function GET(request: NextRequest) {
         effectiveRcr = slRcr!
         rcrSource = 'sparkloop'
       } else {
-        effectiveRcr = 25
+        effectiveRcr = defaultRcr
         rcrSource = 'default'
       }
 
@@ -189,6 +202,10 @@ export async function GET(request: NextRequest) {
         uniqueIps: globalUniqueIps,
         avgOffersSelected: Math.round(avgOffersSelected * 100) / 100,
       },
+      defaults: {
+        cr: defaultCr,
+        rcr: defaultRcr,
+      },
     })
   } catch (error) {
     console.error('[SparkLoop Admin] Failed to fetch recommendations:', error)
@@ -208,6 +225,35 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
     const { id, excluded, excluded_reason, action } = body
+
+    // set_defaults doesn't need an id — handle it before the id check
+    if (action === 'set_defaults') {
+      const results: string[] = []
+      if ('default_cr' in body && body.default_cr !== undefined) {
+        const val = parseFloat(body.default_cr)
+        if (isNaN(val) || val < 0 || val > 100) {
+          return NextResponse.json(
+            { success: false, error: 'default_cr must be between 0 and 100' },
+            { status: 400 }
+          )
+        }
+        await updatePublicationSetting(DEFAULT_PUBLICATION_ID, 'sparkloop_default_cr', String(val))
+        results.push(`CR=${val}%`)
+      }
+      if ('default_rcr' in body && body.default_rcr !== undefined) {
+        const val = parseFloat(body.default_rcr)
+        if (isNaN(val) || val < 0 || val > 100) {
+          return NextResponse.json(
+            { success: false, error: 'default_rcr must be between 0 and 100' },
+            { status: 400 }
+          )
+        }
+        await updatePublicationSetting(DEFAULT_PUBLICATION_ID, 'sparkloop_default_rcr', String(val))
+        results.push(`RCR=${val}%`)
+      }
+      console.log(`[SparkLoop Admin] Updated defaults: ${results.join(', ')}`)
+      return NextResponse.json({ success: true, updated: results })
+    }
 
     if (!id) {
       return NextResponse.json(

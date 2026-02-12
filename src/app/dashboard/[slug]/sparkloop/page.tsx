@@ -71,6 +71,11 @@ interface GlobalStats {
   avgOffersSelected: number
 }
 
+interface Defaults {
+  cr: number
+  rcr: number
+}
+
 interface DailyStats {
   date: string
   pending: number
@@ -106,6 +111,7 @@ export default function SparkLoopAdminPage() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [counts, setCounts] = useState<Counts>({ total: 0, active: 0, excluded: 0, paused: 0, archived: 0 })
   const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null)
+  const [defaults, setDefaults] = useState<Defaults>({ cr: 22, rcr: 25 })
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [activeTab, setActiveTab] = useState<'overview' | 'detailed'>('overview')
@@ -133,6 +139,9 @@ export default function SparkLoopAdminPage() {
         setCounts(data.counts)
         if (data.globalStats) {
           setGlobalStats(data.globalStats)
+        }
+        if (data.defaults) {
+          setDefaults(data.defaults)
         }
       }
     } catch (error) {
@@ -585,6 +594,7 @@ export default function SparkLoopAdminPage() {
           <DetailedTab
             recommendations={recommendations}
             globalStats={globalStats}
+            defaults={defaults}
             loading={loading}
             onRefresh={fetchRecommendations}
           />

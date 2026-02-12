@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SparkLoopService } from '@/lib/sparkloop-client'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getPublicationSettings } from '@/lib/publication-settings'
 
 // Default publication ID for AI Pro Daily
 const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+
+// Hardcoded fallbacks if no publication_settings exist
+const FALLBACK_DEFAULT_CR = 0.22
+const FALLBACK_DEFAULT_RCR = 0.25
 
 /**
  * GET /api/sparkloop/recommendations
@@ -62,10 +67,18 @@ export async function GET(request: NextRequest) {
       return true
     })
 
+    // Load configurable defaults from publication_settings
+    const defaults = await getPublicationSettings(DEFAULT_PUBLICATION_ID, [
+      'sparkloop_default_cr',
+      'sparkloop_default_rcr',
+    ])
+    const defaultCr = defaults.sparkloop_default_cr ? parseFloat(defaults.sparkloop_default_cr) / 100 : FALLBACK_DEFAULT_CR
+    const defaultRcr = defaults.sparkloop_default_rcr ? parseFloat(defaults.sparkloop_default_rcr) / 100 : FALLBACK_DEFAULT_RCR
+
     // Score and sort recommendations by CR × CPA × RCR
     // Priority: override > calculated/sparkloop > default
-    // CR:  override_cr > our_cr (if 50+ impressions) > 22% default
-    // RCR: override_rcr > sparkloop_rcr > 25% default
+    // CR:  override_cr > our_cr (if 50+ impressions) > configurable default
+    // RCR: override_rcr > sparkloop_rcr > configurable default
     const scored = eligible.map(rec => {
       const hasOverrideCr = rec.override_cr !== null && rec.override_cr !== undefined
       const hasOverrideRcr = rec.override_rcr !== null && rec.override_rcr !== undefined
@@ -76,10 +89,10 @@ export async function GET(request: NextRequest) {
 
       const cr = hasOverrideCr ? Number(rec.override_cr) / 100
         : hasOurCr ? Number(rec.our_cr) / 100
-        : 0.22
+        : defaultCr
       const rcr = hasOverrideRcr ? Number(rec.override_rcr) / 100
         : hasSLRcr ? slRcr! / 100
-        : 0.25
+        : defaultRcr
       const cpa = (rec.cpa || 0) / 100
       const score = cr * cpa * rcr
 

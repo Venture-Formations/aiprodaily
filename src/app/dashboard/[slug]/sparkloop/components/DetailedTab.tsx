@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Download, Settings2, Search, X, Calendar, Ban, Pause, Play, Pencil, RefreshCw, CheckCircle } from 'lucide-react'
+import { Download, Settings2, Search, X, Calendar, Ban, Pause, Play, Pencil, RefreshCw, CheckCircle, Check } from 'lucide-react'
 
 interface Recommendation {
   id: string
@@ -59,9 +59,15 @@ interface Column {
   width?: 'xs' | 'sm' | 'md' | 'lg'
 }
 
+interface Defaults {
+  cr: number
+  rcr: number
+}
+
 interface DetailedTabProps {
   recommendations: Recommendation[]
   globalStats: GlobalStats | null
+  defaults: Defaults
   loading: boolean
   onRefresh: () => void
 }
@@ -128,7 +134,7 @@ const getColumnWidthClass = (width?: 'xs' | 'sm' | 'md' | 'lg') => {
   }
 }
 
-export default function DetailedTab({ recommendations, globalStats, loading, onRefresh }: DetailedTabProps) {
+export default function DetailedTab({ recommendations, globalStats, defaults, loading, onRefresh }: DetailedTabProps) {
   const [columns, setColumns] = useState<Column[]>(DEFAULT_COLUMNS)
   const [sortColumn, setSortColumn] = useState<string | null>('calculated_score')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
@@ -152,6 +158,13 @@ export default function DetailedTab({ recommendations, globalStats, loading, onR
   const [overrideCrValue, setOverrideCrValue] = useState('')
   const [overrideRcrValue, setOverrideRcrValue] = useState('')
   const [overrideSaving, setOverrideSaving] = useState(false)
+
+  // Default CR/RCR editing state
+  const [editingDefaultCr, setEditingDefaultCr] = useState(false)
+  const [editingDefaultRcr, setEditingDefaultRcr] = useState(false)
+  const [defaultCrInput, setDefaultCrInput] = useState('')
+  const [defaultRcrInput, setDefaultRcrInput] = useState('')
+  const [defaultSaving, setDefaultSaving] = useState(false)
 
   const dateRangeActive = dateRangeMetrics !== null
 
@@ -451,6 +464,38 @@ export default function DetailedTab({ recommendations, globalStats, loading, onR
       alert('Save failed')
     }
     setOverrideSaving(false)
+  }
+
+  async function saveDefault(field: 'cr' | 'rcr') {
+    const value = field === 'cr' ? defaultCrInput : defaultRcrInput
+    const parsed = parseFloat(value)
+    if (isNaN(parsed) || parsed < 0 || parsed > 100) {
+      alert('Value must be between 0 and 100')
+      return
+    }
+    setDefaultSaving(true)
+    try {
+      const body: Record<string, unknown> = { action: 'set_defaults' }
+      if (field === 'cr') body.default_cr = parsed
+      if (field === 'rcr') body.default_rcr = parsed
+
+      const res = await fetch('/api/sparkloop/admin', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (data.success) {
+        if (field === 'cr') setEditingDefaultCr(false)
+        if (field === 'rcr') setEditingDefaultRcr(false)
+        onRefresh()
+      } else {
+        alert('Save failed: ' + data.error)
+      }
+    } catch {
+      alert('Save failed')
+    }
+    setDefaultSaving(false)
   }
 
   // Total columns for colSpan = checkbox + enabled columns + actions
@@ -836,6 +881,115 @@ export default function DetailedTab({ recommendations, globalStats, loading, onR
         </div>
       )}
 
+      {/* Default CR/RCR Controls */}
+      <div className="flex items-center justify-end gap-4 mb-4">
+        {/* Default CR */}
+        <div className="flex items-center gap-1.5 text-xs">
+          <span className="text-gray-500">Default CR:</span>
+          {editingDefaultCr ? (
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={defaultCrInput}
+                onChange={e => setDefaultCrInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') saveDefault('cr')
+                  if (e.key === 'Escape') setEditingDefaultCr(false)
+                }}
+                autoFocus
+                className="w-16 px-1.5 py-0.5 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+              />
+              <span className="text-gray-400">%</span>
+              <button
+                onClick={() => saveDefault('cr')}
+                disabled={defaultSaving}
+                className="p-0.5 rounded text-green-600 hover:bg-green-100 disabled:opacity-50"
+                title="Save"
+              >
+                <Check className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setEditingDefaultCr(false)}
+                className="p-0.5 rounded text-gray-400 hover:bg-gray-100"
+                title="Cancel"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <span className="font-medium">{defaults.cr}%</span>
+              <button
+                onClick={() => {
+                  setDefaultCrInput(String(defaults.cr))
+                  setEditingDefaultCr(true)
+                }}
+                className="p-0.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                title="Edit default CR"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Default RCR */}
+        <div className="flex items-center gap-1.5 text-xs">
+          <span className="text-gray-500">Default RCR:</span>
+          {editingDefaultRcr ? (
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={defaultRcrInput}
+                onChange={e => setDefaultRcrInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') saveDefault('rcr')
+                  if (e.key === 'Escape') setEditingDefaultRcr(false)
+                }}
+                autoFocus
+                className="w-16 px-1.5 py-0.5 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+              />
+              <span className="text-gray-400">%</span>
+              <button
+                onClick={() => saveDefault('rcr')}
+                disabled={defaultSaving}
+                className="p-0.5 rounded text-green-600 hover:bg-green-100 disabled:opacity-50"
+                title="Save"
+              >
+                <Check className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setEditingDefaultRcr(false)}
+                className="p-0.5 rounded text-gray-400 hover:bg-gray-100"
+                title="Cancel"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <span className="font-medium">{defaults.rcr}%</span>
+              <button
+                onClick={() => {
+                  setDefaultRcrInput(String(defaults.rcr))
+                  setEditingDefaultRcr(true)
+                }}
+                className="p-0.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                title="Edit default RCR"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Column Selector */}
       {showColumnSelector && (
         <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -1016,11 +1170,11 @@ export default function DetailedTab({ recommendations, globalStats, loading, onR
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Default CR:</span>
-                <span>22%</span>
+                <span>{defaults.cr}%</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Default RCR:</span>
-                <span>25%</span>
+                <span>{defaults.rcr}%</span>
               </div>
               <div className="border-t pt-1.5 flex justify-between font-medium">
                 <span className="text-gray-700">Current effective CR:</span>
