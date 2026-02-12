@@ -78,7 +78,9 @@ export function OffersContent({ logoUrl, newsletterName }: OffersContentProps) {
 
           {/* Headline */}
           <h1 className="font-display text-xl tracking-tight text-slate-900 sm:text-2xl mb-2">
-            You&apos;re Almost There!
+            More Newsletters You&apos;ll Love
+            <br />
+            <span className="text-slate-900">Curated Just for You</span>
           </h1>
 
           <p className="text-base text-slate-600 mb-6">

@@ -246,9 +246,7 @@ export function RecommendationsContent({ logoUrl, newsletterName }: Recommendati
 
           {/* Headline */}
           <h1 className="font-display text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
-            More Newsletters You&apos;ll Love
-            <br />
-            <span className="text-slate-900">Curated Just for You</span>
+            You&apos;re Almost There!
           </h1>
 
           {/* Subheadline */}
