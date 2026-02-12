@@ -12,6 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  LabelList,
 } from 'recharts'
 import DetailedTab from './components/DetailedTab'
 
@@ -91,7 +92,9 @@ interface DailyStats {
   date: string
   pending: number
   confirmed: number
+  rejected: number
   projectedEarnings: number
+  confirmedEarnings: number
 }
 
 interface TopEarner {
@@ -105,10 +108,10 @@ interface ChartStats {
   summary: {
     totalPending: number
     totalConfirmed: number
+    totalRejected: number
     totalSubscribes: number
     totalEarnings: number
     projectedFromPending: number
-    avgCPA: number
   }
   dailyStats: DailyStats[]
   topEarners: TopEarner[]
@@ -223,7 +226,7 @@ export default function SparkLoopAdminPage() {
       .slice(0, 5)
   }, [recommendations])
 
-  // Compute recs page preview: positions 6-10 (what shows on /subscribe/recommendations)
+  // Compute recs page preview: positions 6-8 (what shows on /subscribe/recommendations)
   const recsPagePreview = useMemo(() => {
     return recommendations
       .filter(rec => {
@@ -238,7 +241,7 @@ export default function SparkLoopAdminPage() {
         return true
       })
       .sort((a, b) => (b.calculated_score || 0) - (a.calculated_score || 0))
-      .slice(5, 10)
+      .slice(5, 8)
   }, [recommendations])
 
   const getSourceColor = (source: string) => {
@@ -259,13 +262,27 @@ export default function SparkLoopAdminPage() {
     if (active && payload && payload.length) {
       const pending = payload.find((p: any) => p.dataKey === 'pending')?.value || 0
       const confirmed = payload.find((p: any) => p.dataKey === 'confirmed')?.value || 0
-      const earnings = payload.find((p: any) => p.dataKey === 'projectedEarnings')?.value || 0
+      const rejected = payload.find((p: any) => p.dataKey === 'rejected')?.value || 0
+      const projectedEarnings = payload.find((p: any) => p.dataKey === 'projectedEarnings')?.value || 0
+      const confirmedEarnings = payload.find((p: any) => p.dataKey === 'confirmedEarnings')?.value || 0
       return (
         <div className="bg-gray-900 text-white p-3 rounded-lg shadow-lg text-sm">
           <div className="font-medium mb-1">{label}</div>
-          <div className="text-yellow-400">Pending Referrals: {pending}</div>
-          <div className="text-green-400">Confirmed Referrals: {confirmed}</div>
-          <div className="text-purple-400">Projected Earnings: ${earnings.toFixed(2)}</div>
+          {pending > 0 && (
+            <>
+              <div className="text-purple-300">Pending Referrals: {pending}</div>
+              <div className="text-purple-300">Projected Earnings: ${projectedEarnings.toFixed(2)}</div>
+            </>
+          )}
+          {confirmed > 0 && (
+            <>
+              <div className="text-gray-300">Confirmed Referrals: {confirmed}</div>
+              <div className="text-gray-300">Confirmed Earnings: ${confirmedEarnings.toFixed(2)}</div>
+            </>
+          )}
+          {rejected > 0 && (
+            <div className="text-gray-500">Rejected Referrals: {rejected}</div>
+          )}
         </div>
       )
     }
@@ -383,11 +400,16 @@ export default function SparkLoopAdminPage() {
                 </div>
               ) : chartStats?.dailyStats && chartStats.dailyStats.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={chartStats.dailyStats}>
+                  <BarChart data={chartStats.dailyStats.map(d => ({
+                    ...d,
+                    totalEarningsLabel: (d.projectedEarnings + d.confirmedEarnings) > 0
+                      ? `$${(d.projectedEarnings + d.confirmedEarnings).toFixed(2)}`
+                      : '',
+                  }))}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis
                       dataKey="date"
-                      tick={{ fontSize: 12 }}
+                      tick={{ fontSize: 11 }}
                       tickFormatter={(value) => {
                         const date = new Date(value)
                         return `${date.getMonth() + 1}/${date.getDate()}`
@@ -396,8 +418,15 @@ export default function SparkLoopAdminPage() {
                     <YAxis tick={{ fontSize: 12 }} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
-                    <Bar dataKey="pending" name="Pending" fill="#eab308" radius={[2, 2, 0, 0]} />
-                    <Bar dataKey="confirmed" name="Confirmed" fill="#22c55e" radius={[2, 2, 0, 0]} />
+                    <Bar dataKey="pending" name="Pending" stackId="a" fill="#c4b5fd" />
+                    <Bar dataKey="confirmed" name="Confirmed" stackId="a" fill="#9ca3af" />
+                    <Bar dataKey="rejected" name="Rejected" stackId="a" fill="#4b5563" radius={[2, 2, 0, 0]}>
+                      <LabelList
+                        dataKey="totalEarningsLabel"
+                        position="top"
+                        style={{ fontSize: 10, fill: '#6b7280' }}
+                      />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -543,7 +572,7 @@ export default function SparkLoopAdminPage() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">Recommendation Page Preview</h2>
                 <span className="text-xs text-gray-500">
-                  Positions 6-10 by score (shown on /subscribe/recommendations)
+                  Positions 6-8 by score (shown on /subscribe/recommendations)
                 </span>
               </div>
 

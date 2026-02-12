@@ -1,23 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getPublicationSettings } from '@/lib/publication-settings'
 
 // Default publication ID for AI Pro Daily
 const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+const FALLBACK_DEFAULT_RCR = 25
 
 interface DailyStats {
   date: string
   pending: number
   confirmed: number
+  rejected: number
   projectedEarnings: number
+  confirmedEarnings: number
 }
 
 /**
  * GET /api/sparkloop/stats
  *
  * Fetches SparkLoop statistics for charts and summaries.
- * Uses our sparkloop_referrals table for popup-sourced data
- * and sparkloop_recommendations aggregate columns for summary totals.
- * Supports timeframe filtering (7d, 30d, 90d, custom).
+ * Uses sparkloop_referrals joined with sparkloop_recommendations
+ * to calculate per-referral projected and confirmed earnings.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -38,81 +41,102 @@ export async function GET(request: NextRequest) {
       fromDate.setDate(fromDate.getDate() - days)
     }
 
-    // Get current totals from our aggregate columns on sparkloop_recommendations
+    // Load default RCR from publication_settings
+    const defaults = await getPublicationSettings(DEFAULT_PUBLICATION_ID, [
+      'sparkloop_default_rcr',
+    ])
+    const defaultRcr = defaults.sparkloop_default_rcr
+      ? parseFloat(defaults.sparkloop_default_rcr) / 100
+      : FALLBACK_DEFAULT_RCR / 100
+
+    // Get all recommendations with CPA and RCR data (keyed by ref_code)
     const { data: recommendations } = await supabaseAdmin
       .from('sparkloop_recommendations')
-      .select('our_pending, our_confirms, our_total_subscribes, sparkloop_earnings, cpa')
+      .select('ref_code, cpa, sparkloop_rcr, override_rcr, our_pending, our_confirms, our_rejections, our_total_subscribes, sparkloop_earnings')
       .eq('publication_id', DEFAULT_PUBLICATION_ID)
 
-    const totalPending = recommendations?.reduce((sum, r) => sum + (r.our_pending || 0), 0) || 0
-    const totalConfirmed = recommendations?.reduce((sum, r) => sum + (r.our_confirms || 0), 0) || 0
-    const totalSubscribes = recommendations?.reduce((sum, r) => sum + (r.our_total_subscribes || 0), 0) || 0
-    const totalEarnings = recommendations?.reduce((sum, r) => sum + (r.sparkloop_earnings || 0), 0) || 0
+    // Build a lookup: ref_code -> { cpaDollars, rcr }
+    const recLookup = new Map<string, { cpaDollars: number; rcr: number }>()
+    for (const rec of recommendations || []) {
+      const cpaDollars = (rec.cpa || 0) / 100
+      const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
+      const hasSLRcr = slRcr !== null && slRcr > 0
+      const hasOverrideRcr = rec.override_rcr !== null && rec.override_rcr !== undefined
+      // RCR priority: sparkloop > override > default
+      const rcr = hasSLRcr ? slRcr! / 100
+        : hasOverrideRcr ? Number(rec.override_rcr) / 100
+        : defaultRcr
+      recLookup.set(rec.ref_code, { cpaDollars, rcr })
+    }
 
-    // Calculate average CPA for projecting pending earnings
-    const avgCPA = recommendations?.length
-      ? recommendations.reduce((sum, r) => sum + (r.cpa || 0), 0) / recommendations.length
-      : 100 // Default $1.00
-
-    const projectedFromPending = (totalPending * avgCPA * 0.25) / 100 // Assume 25% RCR for pending
-
-    // Get daily confirmed data from sparkloop_referrals (our popup referrals)
-    const { data: confirmedByDay } = await supabaseAdmin
+    // Get all referrals in the date range with ref_code and status
+    const { data: referrals } = await supabaseAdmin
       .from('sparkloop_referrals')
-      .select('confirmed_at')
+      .select('ref_code, status, subscribed_at, confirmed_at')
       .eq('publication_id', DEFAULT_PUBLICATION_ID)
-      .eq('source', 'custom_popup')
-      .eq('status', 'confirmed')
-      .not('confirmed_at', 'is', null)
-      .gte('confirmed_at', fromDate.toISOString())
-      .lte('confirmed_at', toDate.toISOString())
-
-    // Get daily subscribed data from sparkloop_referrals (our popup referrals)
-    const { data: subscribedByDay } = await supabaseAdmin
-      .from('sparkloop_referrals')
-      .select('subscribed_at')
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
-      .eq('source', 'custom_popup')
-      .not('subscribed_at', 'is', null)
+      .in('source', ['custom_popup', 'recs_page'])
       .gte('subscribed_at', fromDate.toISOString())
       .lte('subscribed_at', toDate.toISOString())
 
     // Aggregate by day
-    const dailyMap = new Map<string, { pending: number; confirmed: number; earnings: number }>()
+    const dailyMap = new Map<string, {
+      pending: number
+      confirmed: number
+      rejected: number
+      projectedEarnings: number
+      confirmedEarnings: number
+    }>()
 
     // Initialize all days in range
     const currentDate = new Date(fromDate)
     while (currentDate <= toDate) {
       const dateKey = currentDate.toISOString().split('T')[0]
-      dailyMap.set(dateKey, { pending: 0, confirmed: 0, earnings: 0 })
+      dailyMap.set(dateKey, { pending: 0, confirmed: 0, rejected: 0, projectedEarnings: 0, confirmedEarnings: 0 })
       currentDate.setDate(currentDate.getDate() + 1)
     }
 
-    // Count confirmed per day
-    confirmedByDay?.forEach(row => {
-      const dateKey = row.confirmed_at?.split('T')[0]
-      if (dateKey && dailyMap.has(dateKey)) {
-        const existing = dailyMap.get(dateKey)!
-        existing.confirmed += 1
-        existing.earnings += avgCPA / 100
-      }
-    })
+    // Process each referral
+    for (const ref of referrals || []) {
+      const dateKey = ref.subscribed_at?.split('T')[0]
+      if (!dateKey || !dailyMap.has(dateKey)) continue
 
-    // Count subscribed per day as pending
-    subscribedByDay?.forEach(row => {
-      const dateKey = row.subscribed_at?.split('T')[0]
-      if (dateKey && dailyMap.has(dateKey)) {
-        const existing = dailyMap.get(dateKey)!
-        existing.pending += 1
+      const day = dailyMap.get(dateKey)!
+      const info = recLookup.get(ref.ref_code) || { cpaDollars: 0, rcr: defaultRcr }
+
+      if (ref.status === 'confirmed') {
+        day.confirmed += 1
+        day.confirmedEarnings += info.cpaDollars
+      } else if (ref.status === 'rejected') {
+        day.rejected += 1
+      } else {
+        // 'subscribed' or 'pending'
+        day.pending += 1
+        day.projectedEarnings += info.cpaDollars * info.rcr
       }
-    })
+    }
+
+    // Compute summary totals from the date-filtered referral data
+    let totalPending = 0
+    let totalConfirmed = 0
+    let totalRejected = 0
+    let totalConfirmedEarnings = 0
+    let totalProjectedEarnings = 0
+    for (const day of Array.from(dailyMap.values())) {
+      totalPending += day.pending
+      totalConfirmed += day.confirmed
+      totalRejected += day.rejected
+      totalConfirmedEarnings += day.confirmedEarnings
+      totalProjectedEarnings += day.projectedEarnings
+    }
 
     // Convert to array
     const dailyStats: DailyStats[] = Array.from(dailyMap.entries()).map(([date, stats]) => ({
       date,
       pending: stats.pending,
       confirmed: stats.confirmed,
-      projectedEarnings: stats.earnings,
+      rejected: stats.rejected,
+      projectedEarnings: Math.round(stats.projectedEarnings * 100) / 100,
+      confirmedEarnings: Math.round(stats.confirmedEarnings * 100) / 100,
     }))
 
     // Get top earning recommendations
@@ -129,10 +153,10 @@ export async function GET(request: NextRequest) {
       summary: {
         totalPending,
         totalConfirmed,
-        totalSubscribes,
-        totalEarnings: totalEarnings / 100, // Convert cents to dollars
-        projectedFromPending: projectedFromPending,
-        avgCPA: avgCPA / 100,
+        totalRejected,
+        totalSubscribes: totalPending + totalConfirmed + totalRejected,
+        totalEarnings: Math.round(totalConfirmedEarnings * 100) / 100,
+        projectedFromPending: Math.round(totalProjectedEarnings * 100) / 100,
       },
       dailyStats,
       topEarners: topRecs?.map(r => ({

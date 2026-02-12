@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const startDate = `${start}T00:00:00.000Z`
     const endDate = `${end}T23:59:59.999Z`
 
-    // 1. Impressions: popup_opened events in range
+    // 1. Impressions: popup_opened events in range (split by source)
     const { data: popupEvents, error: popupError } = await supabaseAdmin
       .from('sparkloop_events')
       .select('raw_payload')
@@ -44,24 +44,27 @@ export async function GET(request: NextRequest) {
     }
 
     const impressionsByRef: Record<string, number> = {}
+    const pageImpressionsByRef: Record<string, number> = {}
     if (popupEvents) {
       for (const evt of popupEvents) {
         const payload = evt.raw_payload as Record<string, unknown> | null
         const refCodes = payload?.ref_codes as string[] | null
+        const source = payload?.source as string | null
         if (refCodes) {
+          const target = source === 'recs_page' ? pageImpressionsByRef : impressionsByRef
           for (const rc of refCodes) {
-            impressionsByRef[rc] = (impressionsByRef[rc] || 0) + 1
+            target[rc] = (target[rc] || 0) + 1
           }
         }
       }
     }
 
-    // 2. Referrals from our popup in date range (by subscribed_at)
+    // 2. Referrals in date range (by subscribed_at), split by source
     const { data: referrals, error: refError } = await supabaseAdmin
       .from('sparkloop_referrals')
-      .select('ref_code, status')
+      .select('ref_code, status, source')
       .eq('publication_id', DEFAULT_PUBLICATION_ID)
-      .eq('source', 'custom_popup')
+      .in('source', ['custom_popup', 'recs_page'])
       .gte('subscribed_at', startDate)
       .lte('subscribed_at', endDate)
 
@@ -76,19 +79,26 @@ export async function GET(request: NextRequest) {
       pending: number
     }> = {}
 
+    const pageRefMetrics: Record<string, {
+      submissions: number
+      confirms: number
+      rejections: number
+      pending: number
+    }> = {}
+
     if (referrals) {
       for (const r of referrals) {
-        if (!refMetrics[r.ref_code]) {
-          refMetrics[r.ref_code] = { submissions: 0, confirms: 0, rejections: 0, pending: 0 }
+        const target = r.source === 'recs_page' ? pageRefMetrics : refMetrics
+        if (!target[r.ref_code]) {
+          target[r.ref_code] = { submissions: 0, confirms: 0, rejections: 0, pending: 0 }
         }
-        refMetrics[r.ref_code].submissions++
+        target[r.ref_code].submissions++
         if (r.status === 'confirmed') {
-          refMetrics[r.ref_code].confirms++
+          target[r.ref_code].confirms++
         } else if (r.status === 'rejected') {
-          refMetrics[r.ref_code].rejections++
+          target[r.ref_code].rejections++
         } else {
-          // 'subscribed' or 'pending' both count as pending
-          refMetrics[r.ref_code].pending++
+          target[r.ref_code].pending++
         }
       }
     }
@@ -143,6 +153,8 @@ export async function GET(request: NextRequest) {
     const allRefCodes = Array.from(new Set([
       ...Object.keys(impressionsByRef),
       ...Object.keys(refMetrics),
+      ...Object.keys(pageImpressionsByRef),
+      ...Object.keys(pageRefMetrics),
     ]))
 
     const metrics: Record<string, {
@@ -151,6 +163,8 @@ export async function GET(request: NextRequest) {
       confirms: number
       rejections: number
       pending: number
+      page_impressions: number
+      page_submissions: number
     }> = {}
 
     for (const rc of allRefCodes) {
@@ -160,6 +174,8 @@ export async function GET(request: NextRequest) {
         confirms: refMetrics[rc]?.confirms || 0,
         rejections: refMetrics[rc]?.rejections || 0,
         pending: refMetrics[rc]?.pending || 0,
+        page_impressions: pageImpressionsByRef[rc] || 0,
+        page_submissions: pageRefMetrics[rc]?.submissions || 0,
       }
     }
 

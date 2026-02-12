@@ -123,13 +123,16 @@ export async function POST(request: NextRequest) {
       console.error('[SparkLoop Subscribe] Failed to record API confirmation event:', eventError)
     }
 
-    // Record submissions in our metrics (increments submissions and pending counts)
+    // Record submissions in our metrics — route to popup or page column based on source
     try {
-      await supabaseAdmin.rpc('increment_sparkloop_submissions', {
+      const submissionRpc = submissionSource === 'recs_page'
+        ? 'increment_sparkloop_page_submissions'
+        : 'increment_sparkloop_submissions'
+      await supabaseAdmin.rpc(submissionRpc, {
         p_publication_id: DEFAULT_PUBLICATION_ID,
         p_ref_codes: activeRefCodes,
       })
-      console.log(`[SparkLoop Subscribe] Recorded ${activeRefCodes.length} submissions`)
+      console.log(`[SparkLoop Subscribe] Recorded ${activeRefCodes.length} ${submissionSource === 'recs_page' ? 'page' : 'popup'} submissions`)
     } catch (metricsError) {
       console.error('[SparkLoop Subscribe] Failed to record metrics:', metricsError)
       // Don't fail the request for metrics errors

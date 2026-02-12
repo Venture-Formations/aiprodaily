@@ -1229,8 +1229,9 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
       {overrideRec && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setOverrideRec(null)}>
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold mb-1">Edit Score Overrides</h3>
+            <h3 className="text-lg font-semibold mb-1">Edit Default Overrides</h3>
             <p className="text-sm text-gray-500 mb-4">{overrideRec.publication_name}</p>
+            <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 mb-4">Overrides only replace the default value. Real data (Our CR, SL RCR) always takes priority when available.</p>
 
             {/* Current values display */}
             <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs space-y-1.5">
@@ -1271,7 +1272,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
             <div className="space-y-3 mb-5">
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-1">
-                  Override CR (%)
+                  Override CR (%) <span className="text-gray-400 font-normal">— replaces default when no real data</span>
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -1279,7 +1280,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
                     step="0.1"
                     min="0"
                     max="100"
-                    placeholder="Leave empty to use calculated"
+                    placeholder="Leave empty to use global default"
                     value={overrideCrValue}
                     onChange={e => setOverrideCrValue(e.target.value)}
                     className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -1294,7 +1295,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-1">
-                  Override RCR (%)
+                  Override RCR (%) <span className="text-gray-400 font-normal">— replaces default when no SL RCR</span>
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -1302,7 +1303,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
                     step="0.1"
                     min="0"
                     max="100"
-                    placeholder="Leave empty to use SL/default"
+                    placeholder="Leave empty to use global default"
                     value={overrideRcrValue}
                     onChange={e => setOverrideRcrValue(e.target.value)}
                     className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"

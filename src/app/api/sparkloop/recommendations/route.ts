@@ -76,9 +76,9 @@ export async function GET(request: NextRequest) {
     const defaultRcr = defaults.sparkloop_default_rcr ? parseFloat(defaults.sparkloop_default_rcr) / 100 : FALLBACK_DEFAULT_RCR
 
     // Score and sort recommendations by CR × CPA × RCR
-    // Priority: override > calculated/sparkloop > default
-    // CR:  override_cr > our_cr (if 50+ impressions) > configurable default
-    // RCR: override_rcr > sparkloop_rcr > configurable default
+    // Priority: real data > override (replaces default) > default
+    // CR:  our_cr (if 50+ impressions) > override_cr > configurable default
+    // RCR: sparkloop_rcr > override_rcr > configurable default
     const scored = eligible.map(rec => {
       const hasOverrideCr = rec.override_cr !== null && rec.override_cr !== undefined
       const hasOverrideRcr = rec.override_rcr !== null && rec.override_rcr !== undefined
@@ -87,11 +87,11 @@ export async function GET(request: NextRequest) {
       const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
       const hasSLRcr = slRcr !== null && slRcr > 0
 
-      const cr = hasOverrideCr ? Number(rec.override_cr) / 100
-        : hasOurCr ? Number(rec.our_cr) / 100
+      const cr = hasOurCr ? Number(rec.our_cr) / 100
+        : hasOverrideCr ? Number(rec.override_cr) / 100
         : defaultCr
-      const rcr = hasOverrideRcr ? Number(rec.override_rcr) / 100
-        : hasSLRcr ? slRcr! / 100
+      const rcr = hasSLRcr ? slRcr! / 100
+        : hasOverrideRcr ? Number(rec.override_rcr) / 100
         : defaultRcr
       const cpa = (rec.cpa || 0) / 100
       const score = cr * cpa * rcr

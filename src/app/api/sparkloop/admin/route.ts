@@ -48,9 +48,9 @@ export async function GET(request: NextRequest) {
     const defaultRcr = defaults.sparkloop_default_rcr ? parseFloat(defaults.sparkloop_default_rcr) : FALLBACK_DEFAULT_RCR
 
     // Calculate scores for each recommendation
-    // Priority: override > calculated/sparkloop > default
-    // CR:  override_cr > our_cr (if 50+ impressions) > configurable default
-    // RCR: override_rcr > sparkloop_rcr > configurable default
+    // Priority: real data > override (replaces default) > default
+    // CR:  our_cr (if 50+ impressions) > override_cr > configurable default
+    // RCR: sparkloop_rcr > override_rcr > configurable default
     const withScores = (data || []).map(rec => {
       const hasOverrideCr = rec.override_cr !== null && rec.override_cr !== undefined
       const hasOverrideRcr = rec.override_rcr !== null && rec.override_rcr !== undefined
@@ -59,29 +59,29 @@ export async function GET(request: NextRequest) {
       const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
       const hasSLRcr = slRcr !== null && slRcr > 0
 
-      // Effective CR: override > ours > configurable default
+      // Effective CR: ours > override > configurable default
       let effectiveCr: number
       let crSource: string
-      if (hasOverrideCr) {
-        effectiveCr = Number(rec.override_cr)
-        crSource = 'override'
-      } else if (hasOurCr) {
+      if (hasOurCr) {
         effectiveCr = Number(rec.our_cr)
         crSource = 'ours'
+      } else if (hasOverrideCr) {
+        effectiveCr = Number(rec.override_cr)
+        crSource = 'override'
       } else {
         effectiveCr = defaultCr
         crSource = 'default'
       }
 
-      // Effective RCR: override > sparkloop > configurable default
+      // Effective RCR: sparkloop > override > configurable default
       let effectiveRcr: number
       let rcrSource: string
-      if (hasOverrideRcr) {
-        effectiveRcr = Number(rec.override_rcr)
-        rcrSource = 'override'
-      } else if (hasSLRcr) {
+      if (hasSLRcr) {
         effectiveRcr = slRcr!
         rcrSource = 'sparkloop'
+      } else if (hasOverrideRcr) {
+        effectiveRcr = Number(rec.override_rcr)
+        rcrSource = 'override'
       } else {
         effectiveRcr = defaultRcr
         rcrSource = 'default'

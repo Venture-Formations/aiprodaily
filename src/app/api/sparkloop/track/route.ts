@@ -61,12 +61,16 @@ export async function POST(request: NextRequest) {
     if (event.ref_codes && event.ref_codes.length > 0) {
       try {
         if (eventType === 'popup_opened') {
-          // Record impressions for all shown recommendations
-          await supabaseAdmin.rpc('increment_sparkloop_impressions', {
+          // Record impressions — route to popup or page column based on source
+          const isRecsPage = event.source === 'recs_page'
+          const rpcName = isRecsPage
+            ? 'increment_sparkloop_page_impressions'
+            : 'increment_sparkloop_impressions'
+          await supabaseAdmin.rpc(rpcName, {
             p_publication_id: DEFAULT_PUBLICATION_ID,
             p_ref_codes: event.ref_codes,
           })
-          console.log(`[SparkLoop Track] Recorded ${event.ref_codes.length} impressions`)
+          console.log(`[SparkLoop Track] Recorded ${event.ref_codes.length} ${isRecsPage ? 'page' : 'popup'} impressions`)
         } else if (eventType === 'recommendation_selected') {
           // Record selection for the selected recommendation
           await supabaseAdmin.rpc('increment_sparkloop_selections', {
