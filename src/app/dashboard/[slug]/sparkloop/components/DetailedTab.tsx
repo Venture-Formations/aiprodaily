@@ -44,6 +44,17 @@ interface Recommendation {
   override_cr: number | null
   override_rcr: number | null
   submission_capped?: boolean
+  page_impressions: number
+  page_submissions: number
+  page_cr: number | null
+  rcr_14d: number | null
+  rcr_30d: number | null
+  slippage_14d: number | null
+  slippage_30d: number | null
+  sends_14d: number
+  sends_30d: number
+  confirms_gained_14d: number
+  confirms_gained_30d: number
 }
 
 interface GlobalStats {
@@ -78,6 +89,8 @@ interface DateRangeMetrics {
   confirms: number
   rejections: number
   pending: number
+  page_impressions: number
+  page_submissions: number
 }
 
 interface RangeStats {
@@ -93,15 +106,22 @@ const DEFAULT_COLUMNS: Column[] = [
   { key: 'cpa', label: 'CPA', enabled: true, exportable: true, width: 'xs' },
   { key: 'screening_period', label: 'Screening', enabled: false, exportable: true, width: 'xs' },
   { key: 'sparkloop_rcr', label: 'SL RCR', enabled: true, exportable: true, width: 'sm' },
-  { key: 'our_rcr', label: 'Our RCR', enabled: true, exportable: true, width: 'sm' },
+  { key: 'rcr_14d', label: '14D RCR', enabled: true, exportable: true, width: 'sm' },
+  { key: 'rcr_30d', label: '30D RCR', enabled: true, exportable: true, width: 'sm' },
+  { key: 'slippage_14d', label: '14D Slip%', enabled: true, exportable: true, width: 'sm' },
+  { key: 'slippage_30d', label: '30D Slip%', enabled: true, exportable: true, width: 'sm' },
+  { key: 'our_rcr', label: 'Our RCR', enabled: false, exportable: true, width: 'sm' },
   { key: 'effective_rcr', label: 'Eff. RCR', enabled: false, exportable: true, width: 'sm' },
   { key: 'rcr_source', label: 'RCR Source', enabled: false, exportable: true, width: 'sm' },
-  { key: 'our_cr', label: 'Our CR', enabled: true, exportable: true, width: 'sm' },
+  { key: 'our_cr', label: 'Popup CR', enabled: true, exportable: true, width: 'sm' },
+  { key: 'page_cr', label: 'Page CR', enabled: true, exportable: true, width: 'sm' },
   { key: 'effective_cr', label: 'Eff. CR', enabled: false, exportable: true, width: 'sm' },
   { key: 'cr_source', label: 'CR Source', enabled: false, exportable: true, width: 'sm' },
   { key: 'calculated_score', label: 'Score', enabled: true, exportable: true, width: 'sm' },
-  { key: 'impressions', label: 'Impressions', enabled: true, exportable: true, width: 'xs' },
-  { key: 'submissions', label: 'Submissions', enabled: true, exportable: true, width: 'xs' },
+  { key: 'impressions', label: 'Popup Impr', enabled: true, exportable: true, width: 'xs' },
+  { key: 'submissions', label: 'Popup Subs', enabled: true, exportable: true, width: 'xs' },
+  { key: 'page_impressions', label: 'Page Impr', enabled: true, exportable: true, width: 'xs' },
+  { key: 'page_submissions', label: 'Page Subs', enabled: true, exportable: true, width: 'xs' },
   { key: 'our_confirms', label: 'Our Conf', enabled: true, exportable: true, width: 'xs' },
   { key: 'our_rejections', label: 'Our Rej', enabled: true, exportable: true, width: 'xs' },
   { key: 'our_pending', label: 'Our Pend', enabled: true, exportable: true, width: 'xs' },
@@ -119,7 +139,7 @@ const DEFAULT_COLUMNS: Column[] = [
 ]
 
 // Columns that get overridden when date range is active
-const DATE_FILTERED_COLUMNS = new Set(['impressions', 'submissions', 'our_cr', 'our_confirms', 'our_rejections', 'our_pending'])
+const DATE_FILTERED_COLUMNS = new Set(['impressions', 'submissions', 'our_cr', 'our_confirms', 'our_rejections', 'our_pending', 'page_impressions', 'page_submissions', 'page_cr'])
 
 const fmtDollars = (value: number) =>
   value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -235,13 +255,19 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
       const drm = dateRangeMetrics[rec.ref_code]
       const impr = drm?.impressions ?? 0
       const subs = drm?.submissions ?? 0
-      // Calculate CR from date-filtered data: submissions / impressions * 100
+      const pageImpr = drm?.page_impressions ?? 0
+      const pageSubs = drm?.page_submissions ?? 0
+      // Calculate CRs from date-filtered data
       const crForRange = impr > 0 ? Math.round((subs / impr) * 10000) / 100 : null
+      const pageCrForRange = pageImpr > 0 ? Math.round((pageSubs / pageImpr) * 10000) / 100 : null
       return {
         ...rec,
         impressions: impr,
         submissions: subs,
         our_cr: crForRange,
+        page_impressions: pageImpr,
+        page_submissions: pageSubs,
+        page_cr: pageCrForRange,
         our_confirms: drm?.confirms ?? 0,
         our_rejections: drm?.rejections ?? 0,
         our_pending: drm?.pending ?? 0,
@@ -516,7 +542,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
     if (key === 'calculated_score') {
       return (value as number).toFixed(4)
     }
-    if (key === 'our_cr' || key === 'our_rcr' || key === 'sparkloop_rcr' || key === 'effective_cr' || key === 'effective_rcr') {
+    if (key === 'our_cr' || key === 'our_rcr' || key === 'sparkloop_rcr' || key === 'effective_cr' || key === 'effective_rcr' || key === 'page_cr' || key === 'rcr_14d' || key === 'rcr_30d' || key === 'slippage_14d' || key === 'slippage_30d') {
       return `${(value as number).toFixed(1)}%`
     }
     if (key === 'remaining_budget_dollars') {
@@ -618,6 +644,29 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
           ? <span className="text-blue-600 font-medium">{rec.our_rcr.toFixed(1)}%</span>
           : '-'
 
+      case 'rcr_14d':
+        return rec.rcr_14d !== null
+          ? <span className="text-green-600 font-medium" title={`${rec.confirms_gained_14d} confirms / ${rec.sends_14d} sends in 14D window`}>{rec.rcr_14d.toFixed(1)}%</span>
+          : <span className="text-gray-400" title="Insufficient data (need 14+ days of snapshots and 5+ sends)">-</span>
+
+      case 'rcr_30d':
+        return rec.rcr_30d !== null
+          ? <span className="text-green-600 font-medium" title={`${rec.confirms_gained_30d} confirms / ${rec.sends_30d} sends in 30D window`}>{rec.rcr_30d.toFixed(1)}%</span>
+          : <span className="text-gray-400" title="Insufficient data (need 30+ days of snapshots and 5+ sends)">-</span>
+
+      case 'slippage_14d': {
+        if (rec.slippage_14d === null) return <span className="text-gray-400" title="Insufficient data">-</span>
+        const color14 = rec.slippage_14d < 15 ? 'text-green-600' : rec.slippage_14d < 30 ? 'text-yellow-600' : 'text-red-600'
+        const slipCount14 = Math.max(0, rec.sends_14d - (rec.confirms_gained_14d + (rec.sends_14d - rec.confirms_gained_14d - Math.round(rec.sends_14d * (100 - (rec.slippage_14d || 0)) / 100))))
+        return <span className={`${color14} font-medium`} title={`${rec.sends_14d} sends - ${rec.confirms_gained_14d} confirms = unaccounted subs in 14D`}>{rec.slippage_14d.toFixed(1)}%</span>
+      }
+
+      case 'slippage_30d': {
+        if (rec.slippage_30d === null) return <span className="text-gray-400" title="Insufficient data">-</span>
+        const color30 = rec.slippage_30d < 15 ? 'text-green-600' : rec.slippage_30d < 30 ? 'text-yellow-600' : 'text-red-600'
+        return <span className={`${color30} font-medium`} title={`${rec.sends_30d} sends - ${rec.confirms_gained_30d} confirms = unaccounted subs in 30D`}>{rec.slippage_30d.toFixed(1)}%</span>
+      }
+
       case 'effective_rcr':
         return <span className={getSourceColor(rec.rcr_source)}>{rec.effective_rcr.toFixed(1)}%</span>
 
@@ -630,6 +679,11 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
       case 'our_cr':
         return rec.our_cr !== null
           ? <span className={`font-medium ${dateRangeActive ? 'text-purple-600' : 'text-blue-600'}`}>{rec.our_cr.toFixed(1)}%</span>
+          : '-'
+
+      case 'page_cr':
+        return rec.page_cr !== null
+          ? <span className={`font-medium ${dateRangeActive ? 'text-purple-600' : 'text-teal-600'}`}>{rec.page_cr.toFixed(1)}%</span>
           : '-'
 
       case 'effective_cr':
@@ -665,6 +719,16 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
         return dateRangeActive
           ? <span className="text-purple-600">{rec.submissions}</span>
           : rec.submissions
+
+      case 'page_impressions':
+        return dateRangeActive
+          ? <span className="text-purple-600">{rec.page_impressions}</span>
+          : rec.page_impressions
+
+      case 'page_submissions':
+        return dateRangeActive
+          ? <span className="text-purple-600">{rec.page_submissions}</span>
+          : rec.page_submissions
 
       case 'our_confirms':
         return <span className={`font-medium ${dateRangeActive ? 'text-purple-600' : 'text-green-600'}`}>{rec.our_confirms}</span>
@@ -860,7 +924,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
         )}
         {dateRangeActive && !dateRangeLoading && (
           <span className="px-2 py-0.5 text-[10px] rounded-full bg-purple-100 text-purple-700">
-            Filtered: Impr, Subs, CR, Conf, Rej, Pend
+            Filtered: Popup Impr/Subs/CR, Page Impr/Subs/CR, Conf, Rej, Pend
           </span>
         )}
       </div>
@@ -1138,7 +1202,8 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
       {/* Legend */}
       <div className="mt-3 text-[10px] text-gray-500">
         <strong>Score</strong> = CR x CPA x RCR (expected revenue per impression) |
-        <span className="text-blue-600 ml-1">Blue</span> = our data |
+        <span className="text-blue-600 ml-1">Blue</span> = popup data |
+        <span className="text-teal-600 ml-1">Teal</span> = page data |
         <span className="text-orange-600 ml-1">Orange</span> = manual override
         {dateRangeActive && (
           <>

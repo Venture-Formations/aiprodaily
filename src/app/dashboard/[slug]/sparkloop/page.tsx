@@ -56,6 +56,17 @@ interface Recommendation {
   override_cr: number | null
   override_rcr: number | null
   submission_capped?: boolean
+  page_impressions: number
+  page_submissions: number
+  page_cr: number | null
+  rcr_14d: number | null
+  rcr_30d: number | null
+  slippage_14d: number | null
+  slippage_30d: number | null
+  sends_14d: number
+  sends_30d: number
+  confirms_gained_14d: number
+  confirms_gained_30d: number
 }
 
 interface Counts {

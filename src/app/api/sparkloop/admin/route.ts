@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicationSettings, updatePublicationSetting } from '@/lib/publication-settings'
+import { SparkLoopService } from '@/lib/sparkloop-client'
 
 // Default publication ID for AI Pro Daily
 const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
@@ -180,8 +181,31 @@ export async function GET(request: NextRequest) {
       unique_ips: uniqueIpsByRefCode[rec.ref_code] || 0,
     }))
 
+    // Calculate rolling window metrics (14D and 30D) in parallel
+    const [metrics14d, metrics30d] = await Promise.all([
+      SparkLoopService.calculateRollingWindowMetrics(14, DEFAULT_PUBLICATION_ID),
+      SparkLoopService.calculateRollingWindowMetrics(30, DEFAULT_PUBLICATION_ID),
+    ])
+
+    // Merge rolling metrics into each recommendation
+    const withRollingMetrics = withIpStats.map(rec => {
+      const m14 = metrics14d.get(rec.ref_code)
+      const m30 = metrics30d.get(rec.ref_code)
+      return {
+        ...rec,
+        rcr_14d: m14?.rcr ?? null,
+        rcr_30d: m30?.rcr ?? null,
+        slippage_14d: m14?.slippage_rate ?? null,
+        slippage_30d: m30?.slippage_rate ?? null,
+        sends_14d: m14?.sends ?? 0,
+        sends_30d: m30?.sends ?? 0,
+        confirms_gained_14d: m14?.confirms_gained ?? 0,
+        confirms_gained_30d: m30?.confirms_gained ?? 0,
+      }
+    })
+
     // Sort by score descending (highest expected revenue per impression first)
-    withIpStats.sort((a, b) => (b.calculated_score || 0) - (a.calculated_score || 0))
+    withRollingMetrics.sort((a, b) => (b.calculated_score || 0) - (a.calculated_score || 0))
 
     // Categories are mutually exclusive:
     // - Active: status=active AND not excluded
@@ -190,7 +214,7 @@ export async function GET(request: NextRequest) {
     // - Archived: status in (archived, awaiting_approval) AND not excluded
     return NextResponse.json({
       success: true,
-      recommendations: withIpStats,
+      recommendations: withRollingMetrics,
       counts: {
         total: allData?.length || 0,
         active: allData?.filter(r => r.status === 'active' && !r.excluded).length || 0,

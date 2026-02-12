@@ -882,6 +882,212 @@ export class SparkLoopService {
   }
 
   /**
+   * Take a daily snapshot of all recommendation aggregates
+   * Upserts one row per recommendation for today's date
+   * Idempotent — last sync of the day wins
+   */
+  async takeDailySnapshot(publicationId: string = DEFAULT_PUBLICATION_ID): Promise<number> {
+    const today = new Date().toISOString().split('T')[0]
+
+    const { data: recs, error } = await supabaseAdmin
+      .from('sparkloop_recommendations')
+      .select('ref_code, sparkloop_confirmed, sparkloop_rejected, sparkloop_pending')
+      .eq('publication_id', publicationId)
+
+    if (error || !recs) {
+      console.error('[SparkLoop] Failed to fetch recommendations for snapshot:', error)
+      return 0
+    }
+
+    let upserted = 0
+    for (const rec of recs) {
+      const { error: upsertError } = await supabaseAdmin
+        .from('sparkloop_daily_snapshots')
+        .upsert({
+          publication_id: publicationId,
+          ref_code: rec.ref_code,
+          snapshot_date: today,
+          sparkloop_confirmed: rec.sparkloop_confirmed || 0,
+          sparkloop_rejected: rec.sparkloop_rejected || 0,
+          sparkloop_pending: rec.sparkloop_pending || 0,
+        }, {
+          onConflict: 'publication_id,ref_code,snapshot_date',
+        })
+
+      if (upsertError) {
+        console.error(`[SparkLoop] Snapshot upsert failed for ${rec.ref_code}:`, upsertError)
+      } else {
+        upserted++
+      }
+    }
+
+    console.log(`[SparkLoop] Daily snapshot: ${upserted}/${recs.length} recs for ${today}`)
+    return upserted
+  }
+
+  /**
+   * Calculate rolling window RCR and Slippage for all recommendations
+   *
+   * For each recommendation (screening_period = S, window = W):
+   * - Sends: count from sparkloop_referrals where subscribed_at between (S+W) and (S+1) days ago
+   * - Confirms gained: snapshot[today].confirmed - snapshot[today - W].confirmed
+   * - Rejections gained: snapshot[today].rejected - snapshot[today - W].rejected
+   * - RCR = confirms_gained / sends (null if sends < 5)
+   * - Slippage = sends - (confirms_gained + rejections_gained)
+   * - Slippage rate = slippage / sends (null if no sends)
+   */
+  static async calculateRollingWindowMetrics(
+    windowDays: number = 14,
+    publicationId: string = DEFAULT_PUBLICATION_ID
+  ): Promise<Map<string, {
+    rcr: number | null
+    slippage_rate: number | null
+    sends: number
+    confirms_gained: number
+    rejections_gained: number
+  }>> {
+    const results = new Map<string, {
+      rcr: number | null
+      slippage_rate: number | null
+      sends: number
+      confirms_gained: number
+      rejections_gained: number
+    }>()
+
+    // Get all recommendations with their screening periods
+    const { data: recs } = await supabaseAdmin
+      .from('sparkloop_recommendations')
+      .select('ref_code, screening_period')
+      .eq('publication_id', publicationId)
+
+    if (!recs || recs.length === 0) return results
+
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+
+    // Get today's snapshots for all recs
+    const { data: todaySnaps } = await supabaseAdmin
+      .from('sparkloop_daily_snapshots')
+      .select('ref_code, sparkloop_confirmed, sparkloop_rejected')
+      .eq('publication_id', publicationId)
+      .eq('snapshot_date', todayStr)
+
+    const todayMap = new Map<string, { confirmed: number; rejected: number }>()
+    for (const snap of todaySnaps || []) {
+      todayMap.set(snap.ref_code, {
+        confirmed: snap.sparkloop_confirmed,
+        rejected: snap.sparkloop_rejected,
+      })
+    }
+
+    // Get window-start snapshots (W days ago)
+    const windowStart = new Date(today)
+    windowStart.setDate(windowStart.getDate() - windowDays)
+    const windowStartStr = windowStart.toISOString().split('T')[0]
+
+    // For window-start, get the closest snapshot on or before the target date
+    const { data: windowStartSnaps } = await supabaseAdmin
+      .from('sparkloop_daily_snapshots')
+      .select('ref_code, sparkloop_confirmed, sparkloop_rejected, snapshot_date')
+      .eq('publication_id', publicationId)
+      .lte('snapshot_date', windowStartStr)
+      .order('snapshot_date', { ascending: false })
+
+    // Group by ref_code, take the most recent snapshot for each
+    const windowStartMap = new Map<string, { confirmed: number; rejected: number }>()
+    for (const snap of windowStartSnaps || []) {
+      if (!windowStartMap.has(snap.ref_code)) {
+        windowStartMap.set(snap.ref_code, {
+          confirmed: snap.sparkloop_confirmed,
+          rejected: snap.sparkloop_rejected,
+        })
+      }
+    }
+
+    // Compute the broadest date range needed for send counts
+    // We need referrals where subscribed_at is between (S+W) and (S+1) days ago
+    // S varies per rec (default 14), so find the max range
+    const maxScreening = Math.max(...recs.map(r => r.screening_period || 14))
+    const sendsRangeStart = new Date(today)
+    sendsRangeStart.setDate(sendsRangeStart.getDate() - (maxScreening + windowDays))
+    const sendsRangeEnd = new Date(today)
+    // Minimum screening+1 for any rec
+    sendsRangeEnd.setDate(sendsRangeEnd.getDate() - 2) // at least S+1=2 days ago for S=1
+
+    // Fetch all referrals in the broadest date range at once
+    const { data: allReferrals } = await supabaseAdmin
+      .from('sparkloop_referrals')
+      .select('ref_code, subscribed_at')
+      .eq('publication_id', publicationId)
+      .gte('subscribed_at', sendsRangeStart.toISOString().split('T')[0])
+
+    // Group referrals by ref_code with their dates
+    const referralsByRefCode = new Map<string, Date[]>()
+    for (const ref of allReferrals || []) {
+      if (!referralsByRefCode.has(ref.ref_code)) {
+        referralsByRefCode.set(ref.ref_code, [])
+      }
+      referralsByRefCode.get(ref.ref_code)!.push(new Date(ref.subscribed_at))
+    }
+
+    // Calculate metrics for each recommendation
+    for (const rec of recs) {
+      const S = rec.screening_period || 14
+      const W = windowDays
+
+      // Sends window: subscribed_at between (S+W) and (S+1) days ago
+      const sendsFrom = new Date(today)
+      sendsFrom.setDate(sendsFrom.getDate() - (S + W))
+      const sendsTo = new Date(today)
+      sendsTo.setDate(sendsTo.getDate() - (S + 1))
+
+      // Count sends in window from pre-fetched data
+      const refDates = referralsByRefCode.get(rec.ref_code) || []
+      const sends = refDates.filter(d => d >= sendsFrom && d <= sendsTo).length
+
+      // Get snapshot deltas
+      const todaySnap = todayMap.get(rec.ref_code)
+      const startSnap = windowStartMap.get(rec.ref_code)
+
+      if (!todaySnap || !startSnap) {
+        // Not enough snapshot history
+        results.set(rec.ref_code, {
+          rcr: null,
+          slippage_rate: null,
+          sends,
+          confirms_gained: 0,
+          rejections_gained: 0,
+        })
+        continue
+      }
+
+      // Clamp negative deltas to 0 (SparkLoop may adjust counts down)
+      const confirmsGained = Math.max(0, todaySnap.confirmed - startSnap.confirmed)
+      const rejectionsGained = Math.max(0, todaySnap.rejected - startSnap.rejected)
+
+      // RCR = confirms / sends (null if sends < 5)
+      const rcr = sends >= 5 ? (confirmsGained / sends) * 100 : null
+
+      // Slippage = sends - (confirms + rejections), rate = slippage / sends
+      let slippageRate: number | null = null
+      if (sends > 0) {
+        const slippage = Math.max(0, sends - (confirmsGained + rejectionsGained))
+        slippageRate = (slippage / sends) * 100
+      }
+
+      results.set(rec.ref_code, {
+        rcr,
+        slippage_rate: slippageRate,
+        sends,
+        confirms_gained: confirmsGained,
+        rejections_gained: rejectionsGained,
+      })
+    }
+
+    return results
+  }
+
+  /**
    * Get our stored metrics for recommendations (CR and RCR)
    * Returns a map of ref_code -> metrics for use in scoring
    */

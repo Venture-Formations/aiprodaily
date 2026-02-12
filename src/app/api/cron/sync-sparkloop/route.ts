@@ -26,12 +26,16 @@ export async function GET(request: NextRequest) {
     const service = new SparkLoopService()
     const result = await service.syncRecommendationsToDatabase(DEFAULT_PUBLICATION_ID)
 
-    console.log(`[SparkLoop Cron] Completed: ${result.synced} synced, ${result.outOfBudget} auto-excluded, +${result.confirmDeltas} confirms, +${result.rejectionDeltas} rejections`)
+    // Take daily snapshot after sync (idempotent — last sync of the day wins)
+    const snapshotCount = await service.takeDailySnapshot(DEFAULT_PUBLICATION_ID)
+
+    console.log(`[SparkLoop Cron] Completed: ${result.synced} synced, ${result.outOfBudget} auto-excluded, +${result.confirmDeltas} confirms, +${result.rejectionDeltas} rejections, ${snapshotCount} snapshot rows`)
 
     return NextResponse.json({
       success: true,
       ...result,
-      message: `Synced ${result.synced} recommendations (${result.created} new, ${result.updated} updated, ${result.outOfBudget} auto-excluded, +${result.confirmDeltas} confirms, +${result.rejectionDeltas} rejections)`,
+      snapshotCount,
+      message: `Synced ${result.synced} recommendations (${result.created} new, ${result.updated} updated, ${result.outOfBudget} auto-excluded, +${result.confirmDeltas} confirms, +${result.rejectionDeltas} rejections, ${snapshotCount} snapshot rows)`,
     })
   } catch (error) {
     console.error('[SparkLoop Cron] Failed:', error)
