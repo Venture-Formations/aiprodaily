@@ -35,12 +35,50 @@ export class RSSProcessor {
   private archiveService: ArticleArchiveService
   private articleExtractor: ArticleExtractor
 
+  // AI refusal phrases that should never appear in published content
+  private static readonly AI_REFUSAL_PATTERNS = [
+    "i'm sorry",
+    "i cannot",
+    "i can't",
+    "i need the content",
+    "i need more information",
+    "i don't have",
+    "i do not have",
+    "unable to generate",
+    "unable to create",
+    "can you provide more",
+    "could you provide",
+    "please provide",
+    "i'd need",
+    "i would need",
+    "provide more information",
+    "provide more details",
+    "provide a brief summary",
+    "key details of the article",
+    "without access to",
+    "without the full",
+  ]
+
   constructor() {
     this.errorHandler = new ErrorHandler()
     this.slack = new SlackNotificationService()
     this.githubStorage = new GitHubImageStorage()
     this.archiveService = new ArticleArchiveService()
     this.articleExtractor = new ArticleExtractor()
+  }
+
+  /**
+   * Detect AI refusal/apology messages that should never be stored as article content.
+   * Returns the matched phrase if a refusal is detected, or null if content is valid.
+   */
+  private static detectAIRefusal(content: string): string | null {
+    const lower = content.toLowerCase().trim()
+    for (const phrase of RSSProcessor.AI_REFUSAL_PATTERNS) {
+      if (lower.includes(phrase)) {
+        return phrase
+      }
+    }
+    return null
   }
 
   /**
@@ -306,6 +344,13 @@ export class RSSProcessor {
             return
           }
 
+          // Guard: Reject AI refusal/apology messages in titles
+          const titleRefusal = RSSProcessor.detectAIRefusal(headline)
+          if (titleRefusal) {
+            console.error(`[Titles] AI returned refusal for post ${post.id} (matched: "${titleRefusal}"): ${headline.substring(0, 200)}`)
+            return
+          }
+
           // Create article record with title only
           const { error: insertError } = await supabaseAdmin
             .from(tableName)
@@ -433,6 +478,13 @@ export class RSSProcessor {
             } catch {
               // Not valid JSON despite looking like it, use as-is
             }
+          }
+
+          // Guard: Reject AI refusal/apology messages
+          const refusalMatch = RSSProcessor.detectAIRefusal(bodyResult.content)
+          if (refusalMatch) {
+            console.error(`[Bodies] AI returned refusal for article ${article.id} (matched: "${refusalMatch}"): ${bodyResult.content.substring(0, 200)}`)
+            return
           }
 
           // Debug: Check if content has newlines before save
@@ -2788,6 +2840,12 @@ export class RSSProcessor {
       throw new Error('Failed to generate article title')
     }
 
+    // Guard: Reject AI refusal/apology messages in titles
+    const titleRefusal = RSSProcessor.detectAIRefusal(headline)
+    if (titleRefusal) {
+      throw new Error(`AI returned refusal instead of article title (matched: "${titleRefusal}"): ${headline.substring(0, 200)}`)
+    }
+
     // Step 2: Generate body using AI_CALL with the generated title
     let bodyResult = section === 'primary'
       ? await AI_CALL.primaryArticleBody(postData, newsletterId, headline, 500, 0.7)
@@ -2807,6 +2865,12 @@ export class RSSProcessor {
 
     if (!bodyResult.content || !bodyResult.word_count) {
       throw new Error('Invalid article body response')
+    }
+
+    // Guard: Reject AI refusal/apology messages
+    const refusalMatch = RSSProcessor.detectAIRefusal(bodyResult.content)
+    if (refusalMatch) {
+      throw new Error(`AI returned refusal instead of article body (matched: "${refusalMatch}"): ${bodyResult.content.substring(0, 200)}`)
     }
 
     return {
@@ -3994,6 +4058,13 @@ export class RSSProcessor {
             return
           }
 
+          // Guard: Reject AI refusal/apology messages in titles
+          const titleRefusal = RSSProcessor.detectAIRefusal(headline)
+          if (titleRefusal) {
+            console.error(`[Module Titles] AI returned refusal for post ${post.id} (matched: "${titleRefusal}"): ${headline.substring(0, 200)}`)
+            return
+          }
+
           // Create module_article record
           const { error: insertError } = await supabaseAdmin
             .from('module_articles')
@@ -4147,6 +4218,13 @@ export class RSSProcessor {
             } catch {
               // Not valid JSON despite looking like it, use as-is
             }
+          }
+
+          // Guard: Reject AI refusal/apology messages
+          const refusalMatch = RSSProcessor.detectAIRefusal(bodyResult.content)
+          if (refusalMatch) {
+            console.error(`[Module Bodies] AI returned refusal for article ${article.id} (matched: "${refusalMatch}"): ${bodyResult.content.substring(0, 200)}`)
+            return
           }
 
           await supabaseAdmin
