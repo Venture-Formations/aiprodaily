@@ -334,7 +334,7 @@ export function RecommendationsContent({ logoUrl, newsletterName }: Recommendati
                           {rec.publication_name}
                         </h4>
                         {rec.description && (
-                          <p className="text-sm text-slate-500 leading-snug mt-0.5 line-clamp-2">
+                          <p className="text-sm text-slate-500 leading-snug mt-0.5">
                             {rec.description}
                           </p>
                         )}
@@ -352,7 +352,7 @@ export function RecommendationsContent({ logoUrl, newsletterName }: Recommendati
                 <button
                   onClick={handleSubscribe}
                   disabled={isSubmitting}
-                  className="mt-6 w-full rounded-full bg-blue-600 py-3.5 px-4 text-sm font-semibold text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="mt-6 w-full rounded-full bg-blue-600 py-3.5 px-4 text-base font-semibold text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (
                     <span className="flex items-center justify-center gap-2">
