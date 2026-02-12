@@ -83,10 +83,6 @@ export function OffersContent({ logoUrl, newsletterName }: OffersContentProps) {
             <span className="text-slate-900">Curated Just for You</span>
           </h1>
 
-          <p className="text-base text-slate-600 mb-6">
-            Check out these recommended resources while we prepare your subscription.
-          </p>
-
           {/* AfterOffers iframe */}
           <div className="rounded-xl overflow-hidden shadow-lg border border-slate-200">
             <iframe

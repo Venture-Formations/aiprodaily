@@ -251,7 +251,7 @@ export function RecommendationsContent({ logoUrl, newsletterName }: Recommendati
 
           {/* Subheadline */}
           <p className="text-base text-slate-600 mb-6">
-            These publishers cover topics we think you&apos;ll find valuable.
+            Check out these recommended resources while we prepare your subscription.
           </p>
 
           {/* Content */}
