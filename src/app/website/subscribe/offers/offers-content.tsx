@@ -66,7 +66,7 @@ export function OffersContent({ logoUrl, newsletterName }: OffersContentProps) {
   return (
     <section className="pt-8 sm:pt-12 pb-6 sm:pb-16">
       <Container>
-        <div className="mx-auto max-w-4xl text-center">
+        <div className="mx-auto max-w-[600px] text-center">
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <img
