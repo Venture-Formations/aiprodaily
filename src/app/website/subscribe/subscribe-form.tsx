@@ -64,7 +64,7 @@ export function SubscribeForm() {
 
   // Handle subscribe complete - redirect to offers page
   const handleSubscribeComplete = useCallback(() => {
-    window.location.href = `/subscribe/offers?email=${encodeURIComponent(subscribedEmail)}`
+    window.location.href = `/subscribe/hubspot-offer?email=${encodeURIComponent(subscribedEmail)}`
   }, [subscribedEmail])
 
   const handleSubmit = async (e: React.FormEvent) => {

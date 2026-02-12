@@ -15,6 +15,7 @@ import {
   LabelList,
 } from 'recharts'
 import DetailedTab from './components/DetailedTab'
+import OffersTab from './components/OffersTab'
 
 interface Recommendation {
   id: string
@@ -128,7 +129,7 @@ export default function SparkLoopAdminPage() {
   const [defaults, setDefaults] = useState<Defaults>({ cr: 22, rcr: 25 })
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'detailed'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'detailed' | 'offers'>('overview')
 
   // Chart state
   const [chartStats, setChartStats] = useState<ChartStats | null>(null)
@@ -331,9 +332,21 @@ export default function SparkLoopAdminPage() {
           >
             Detailed
           </button>
+          <button
+            onClick={() => setActiveTab('offers')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
+              activeTab === 'offers'
+                ? 'border-purple-600 text-purple-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Offers
+          </button>
         </div>
 
-        {activeTab === 'overview' ? (
+        {activeTab === 'offers' ? (
+          <OffersTab />
+        ) : activeTab === 'overview' ? (
           <>
             {/* Summary Stats */}
             <div className="grid grid-cols-4 gap-4 mb-6">
