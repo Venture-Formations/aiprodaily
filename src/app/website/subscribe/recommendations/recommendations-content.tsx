@@ -84,7 +84,7 @@ export function RecommendationsContent({ logoUrl, newsletterName }: Recommendati
       setError(null)
 
       try {
-        const response = await fetch('/api/sparkloop/recommendations?offset=5&limit=5')
+        const response = await fetch('/api/sparkloop/recommendations?offset=5&limit=3')
         const data = await response.json()
 
         if (data.recommendations && data.recommendations.length > 0) {
@@ -202,10 +202,18 @@ export function RecommendationsContent({ logoUrl, newsletterName }: Recommendati
   // Missing email state
   if (!email || !email.includes('@')) {
     return (
-      <section className="pt-8 sm:pt-16 pb-6 sm:pb-16">
+      <section className="pt-8 sm:pt-12 pb-6 sm:pb-16">
         <Container>
-          <div className="mx-auto max-w-2xl text-center">
-            <h1 className="font-display text-2xl tracking-tight text-slate-900 sm:text-4xl">
+          <div className="mx-auto max-w-[600px] text-center">
+            {/* Logo */}
+            <div className="flex justify-center mb-6">
+              <img
+                src={logoUrl}
+                alt={newsletterName}
+                className="h-20 sm:h-28 w-auto object-contain"
+              />
+            </div>
+            <h1 className="font-display text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
               Something went wrong
             </h1>
             <p className="mt-4 text-base text-slate-600">
@@ -224,18 +232,27 @@ export function RecommendationsContent({ logoUrl, newsletterName }: Recommendati
   }
 
   return (
-    <section className="pt-8 sm:pt-16 pb-6 sm:pb-16">
+    <section className="pt-8 sm:pt-12 pb-6 sm:pb-16">
       <Container>
-        <div className="mx-auto max-w-2xl text-center">
+        <div className="mx-auto max-w-[600px] text-center">
+          {/* Logo */}
+          <div className="flex justify-center mb-6">
+            <img
+              src={logoUrl}
+              alt={newsletterName}
+              className="h-20 sm:h-28 w-auto object-contain"
+            />
+          </div>
+
           {/* Headline */}
-          <h1 className="font-display text-2xl tracking-tight text-slate-900 sm:text-4xl">
+          <h1 className="font-display text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
             More Newsletters You&apos;ll Love
             <br />
             <span className="text-slate-900">Curated Just for You</span>
           </h1>
 
           {/* Subheadline */}
-          <p className="mt-4 sm:mt-6 text-base sm:text-lg tracking-tight text-slate-700">
+          <p className="mt-4 sm:mt-6 text-base tracking-tight text-slate-700">
             These publishers cover topics we think you&apos;ll find valuable.
           </p>
 
