@@ -68,10 +68,8 @@ export function OffersContent({ logoUrl, newsletterName }: OffersContentProps) {
     <section className="pt-8 sm:pt-12 pb-6 sm:pb-16">
       <Container>
         <div className="mx-auto max-w-[600px] text-center">
-          <SubscribeProgressBar step={2} />
-
           {/* Logo */}
-          <div className="flex justify-center mb-6">
+          <div className="flex justify-center mb-4">
             <img
               src={logoUrl}
               alt={newsletterName}
@@ -79,11 +77,11 @@ export function OffersContent({ logoUrl, newsletterName }: OffersContentProps) {
             />
           </div>
 
+          <SubscribeProgressBar step={2} />
+
           {/* Headline */}
           <h1 className="font-display text-xl tracking-tight text-slate-900 sm:text-2xl mb-2">
-            More Newsletters You&apos;ll Love
-            <br />
-            <span className="text-slate-900">Curated Just for You</span>
+            Thank you for visiting AI Accounting Daily
           </h1>
 
           {/* AfterOffers iframe */}

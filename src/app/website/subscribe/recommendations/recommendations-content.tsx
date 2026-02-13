@@ -206,16 +206,17 @@ export function RecommendationsContent({ logoUrl, newsletterName }: Recommendati
       <section className="pt-8 sm:pt-12 pb-6 sm:pb-16">
         <Container>
           <div className="mx-auto max-w-[600px] text-center">
-            <SubscribeProgressBar step={3} />
-
             {/* Logo */}
-            <div className="flex justify-center mb-6">
+            <div className="flex justify-center mb-4">
               <img
                 src={logoUrl}
                 alt={newsletterName}
                 className="h-20 sm:h-28 w-auto object-contain"
               />
             </div>
+
+            <SubscribeProgressBar step={3} />
+
             <h1 className="font-display text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
               Something went wrong
             </h1>
@@ -238,10 +239,8 @@ export function RecommendationsContent({ logoUrl, newsletterName }: Recommendati
     <section className="pt-8 sm:pt-12 pb-6 sm:pb-16">
       <Container>
         <div className="mx-auto max-w-[600px] text-center">
-          <SubscribeProgressBar step={3} />
-
           {/* Logo */}
-          <div className="flex justify-center mb-6">
+          <div className="flex justify-center mb-4">
             <img
               src={logoUrl}
               alt={newsletterName}
@@ -249,9 +248,11 @@ export function RecommendationsContent({ logoUrl, newsletterName }: Recommendati
             />
           </div>
 
+          <SubscribeProgressBar step={3} />
+
           {/* Headline */}
           <h1 className="font-display text-xl tracking-tight text-slate-900 sm:text-2xl mb-2">
-            You&apos;re Almost There!
+            Thank you for visiting AI Accounting Daily
           </h1>
 
           {/* Subheadline */}

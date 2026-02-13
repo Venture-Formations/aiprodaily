@@ -30,16 +30,16 @@ export default async function SubscribeInfoPage() {
       <section className="pt-8 sm:pt-16 pb-6 sm:pb-16">
         <Container>
           <div className="mx-auto max-w-2xl text-center">
-            <SubscribeProgressBar step={4} />
-
             {/* Logo */}
-            <div className="flex justify-center mb-6 sm:mb-8">
+            <div className="flex justify-center mb-4 sm:mb-6">
               <img
                 src={logoUrl}
                 alt={newsletterName}
-                className="h-28 sm:h-44 w-auto object-contain"
+                className="h-20 sm:h-28 w-auto object-contain"
               />
             </div>
+
+            <SubscribeProgressBar step={4} />
 
             {/* Headline */}
             <h1 className="font-display text-2xl tracking-tight text-slate-900 sm:text-4xl">

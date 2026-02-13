@@ -68,16 +68,16 @@ export function HubspotOfferContent({ logoUrl, newsletterName }: HubspotOfferCon
     <section className="pt-8 sm:pt-12 pb-6 sm:pb-16">
       <Container>
         <div className="mx-auto max-w-[600px] text-center">
-          <SubscribeProgressBar step={1} />
-
           {/* Logo */}
-          <div className="flex justify-center mb-6">
+          <div className="flex justify-center mb-4">
             <img
               src={logoUrl}
               alt={newsletterName}
               className="h-20 sm:h-28 w-auto object-contain"
             />
           </div>
+
+          <SubscribeProgressBar step={1} />
 
           {/* Offer Card */}
           <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
