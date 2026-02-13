@@ -21,29 +21,35 @@ export class SparkLoopRecModuleRenderer {
   static renderSection(
     sectionName: string,
     recs: RecCard[],
-    issueId: string
+    issueId: string,
+    primaryColor: string = '#1877F2',
+    headingFont: string = 'Arial, sans-serif'
   ): string {
     if (recs.length === 0) return ''
 
     const cardsHtml = recs.map(rec => this.renderCard(rec, issueId)).join('')
 
     return `
-<table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #f7f7f7; border-radius: 10px; margin: 10px auto; max-width: 750px; background-color: #ffffff; font-family: Arial, sans-serif;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
   <tr>
-    <td style="padding: 24px 20px 8px 20px;">
-      <h2 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 700; color: #1a1a1a; text-align: center;">${sectionName}</h2>
-      <p style="margin: 0 0 20px 0; font-size: 14px; color: #666; text-align: center;">Curated newsletters we think you'll love</p>
-    </td>
-  </tr>
-  <tr>
-    <td style="padding: 0 20px 24px 20px;">
-      <table width="100%" cellpadding="0" cellspacing="0">
-        ${cardsHtml}
+    <td style="padding:0 10px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
+        <tr>
+          <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">${sectionName}</h2>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 0 10px 10px 10px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              ${cardsHtml}
+            </table>
+          </td>
+        </tr>
       </table>
     </td>
   </tr>
-</table>
-<br>`
+</table>`
   }
 
   /**

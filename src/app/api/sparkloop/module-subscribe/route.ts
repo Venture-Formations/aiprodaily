@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { SparkLoopService } from '@/lib/sparkloop-client'
 import { supabaseAdmin } from '@/lib/supabase'
+import { checkUserAgent } from '@/lib/bot-detection'
+import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
 
 const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.com'
@@ -32,6 +34,71 @@ export async function GET(request: NextRequest) {
     )
   }
 
+  // Extract request metadata early (needed for bot detection + tracking)
+  const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || undefined
+  const userAgent = request.headers.get('user-agent') || undefined
+  const countryCode = request.headers.get('x-vercel-ip-country') || 'US'
+
+  // Bot detection
+  const uaCheck = checkUserAgent(userAgent || null)
+
+  // IP exclusion check (fail-open: if check fails, allow the subscribe)
+  let ipExcluded = false
+  try {
+    const { data: exclusions } = await supabaseAdmin
+      .from('excluded_ips')
+      .select('ip_address, is_range, cidr_prefix')
+      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+
+    if (exclusions && ipAddress) {
+      ipExcluded = isIPExcluded(ipAddress, exclusions as IPExclusion[])
+    }
+  } catch (exErr) {
+    console.error('[SparkLoop Module Subscribe] IP exclusion check failed (fail-open):', exErr)
+  }
+
+  const shouldBlock = uaCheck.isBot || ipExcluded
+
+  // Record every click attempt (fire-and-forget)
+  const clickRecordId = crypto.randomUUID()
+  supabaseAdmin
+    .from('sparkloop_module_clicks')
+    .insert({
+      id: clickRecordId,
+      publication_id: DEFAULT_PUBLICATION_ID,
+      subscriber_email: email,
+      ref_code: refCode,
+      issue_id: issueId || null,
+      ip_address: ipAddress || null,
+      user_agent: userAgent || null,
+      country_code: countryCode,
+      is_bot_ua: uaCheck.isBot,
+      bot_ua_reason: uaCheck.reason,
+      is_ip_excluded: ipExcluded,
+      sparkloop_called: false,
+    })
+    .then(({ error }) => {
+      if (error) console.error('[SparkLoop Module Subscribe] Failed to record click:', error)
+    })
+
+  // If blocked, redirect to confirmation but skip SparkLoop API calls
+  if (shouldBlock) {
+    const reason = uaCheck.isBot ? `bot_ua: ${uaCheck.reason}` : 'ip_excluded'
+    console.log(`[SparkLoop Module Subscribe] Blocked ${email} (${reason}) - redirecting without SparkLoop call`)
+
+    // Still redirect to confirmation page (don't break UX)
+    const { data: rec } = await supabaseAdmin
+      .from('sparkloop_recommendations')
+      .select('publication_name')
+      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('ref_code', refCode)
+      .single()
+
+    const confirmUrl = new URL(`${BASE_URL}/website/subscribe/module-confirmed`)
+    if (rec) confirmUrl.searchParams.set('name', rec.publication_name)
+    return NextResponse.redirect(confirmUrl.toString())
+  }
+
   try {
     // Verify ref_code is active and non-excluded
     const { data: rec } = await supabaseAdmin
@@ -48,9 +115,6 @@ export async function GET(request: NextRequest) {
     }
 
     const service = new SparkLoopService()
-    const countryCode = request.headers.get('x-vercel-ip-country') || 'US'
-    const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || undefined
-    const userAgent = request.headers.get('user-agent') || undefined
 
     // Step 2: Create or fetch subscriber (CRITICAL: need UUID for attribution)
     let subscriberUuid: string | null = null
@@ -75,6 +139,15 @@ export async function GET(request: NextRequest) {
       recommendations: refCode,
       utm_source: 'newsletter_module',
     })
+
+    // Update click record: SparkLoop was called successfully (fire-and-forget)
+    supabaseAdmin
+      .from('sparkloop_module_clicks')
+      .update({ sparkloop_called: true, sparkloop_success: true })
+      .eq('id', clickRecordId)
+      .then(({ error }) => {
+        if (error) console.error('[SparkLoop Module Subscribe] Failed to update click record:', error)
+      })
 
     // Record referral in sparkloop_referrals
     try {
@@ -134,6 +207,16 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('[SparkLoop Module Subscribe] Failed:', error)
+
+    // Update click record on error (fire-and-forget)
+    supabaseAdmin
+      .from('sparkloop_module_clicks')
+      .update({ sparkloop_called: true, sparkloop_success: false })
+      .eq('id', clickRecordId)
+      .then(({ error: updateErr }) => {
+        if (updateErr) console.error('[SparkLoop Module Subscribe] Failed to update click error record:', updateErr)
+      })
+
     return NextResponse.redirect(
       `${BASE_URL}/website/subscribe/module-confirmed?error=failed`
     )

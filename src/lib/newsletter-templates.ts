@@ -1669,6 +1669,9 @@ export async function generateSparkLoopRecModuleSection(
       return ''
     }
 
+    // Fetch business settings for consistent section styling
+    const { primaryColor, headingFont } = await fetchBusinessSettings(issue.publication_id)
+
     // Render cards
     const html = SparkLoopRecModuleRenderer.renderSection(
       module.name,
@@ -1678,7 +1681,9 @@ export async function generateSparkLoopRecModuleSection(
         publication_logo: r.publication_logo,
         description: r.description,
       })),
-      issue.id
+      issue.id,
+      primaryColor,
+      headingFont
     )
 
     return html
