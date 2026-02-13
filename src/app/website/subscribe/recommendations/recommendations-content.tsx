@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Container } from '@/components/salient/Container'
+import { SubscribeProgressBar } from '@/components/SubscribeProgressBar'
 import type {
   SparkLoopRecommendation,
   SparkLoopPopupEventType,
@@ -205,6 +206,8 @@ export function RecommendationsContent({ logoUrl, newsletterName }: Recommendati
       <section className="pt-8 sm:pt-12 pb-6 sm:pb-16">
         <Container>
           <div className="mx-auto max-w-[600px] text-center">
+            <SubscribeProgressBar step={3} />
+
             {/* Logo */}
             <div className="flex justify-center mb-6">
               <img
@@ -235,6 +238,8 @@ export function RecommendationsContent({ logoUrl, newsletterName }: Recommendati
     <section className="pt-8 sm:pt-12 pb-6 sm:pb-16">
       <Container>
         <div className="mx-auto max-w-[600px] text-center">
+          <SubscribeProgressBar step={3} />
+
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <img

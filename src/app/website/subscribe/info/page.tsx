@@ -1,4 +1,5 @@
 import { Container } from "@/components/salient/Container"
+import { SubscribeProgressBar } from '@/components/SubscribeProgressBar'
 import { PersonalizationForm } from "./personalization-form"
 import { headers } from 'next/headers'
 import { getPublicationByDomain, getPublicationSettings } from '@/lib/publication-settings'
@@ -29,6 +30,8 @@ export default async function SubscribeInfoPage() {
       <section className="pt-8 sm:pt-16 pb-6 sm:pb-16">
         <Container>
           <div className="mx-auto max-w-2xl text-center">
+            <SubscribeProgressBar step={4} />
+
             {/* Logo */}
             <div className="flex justify-center mb-6 sm:mb-8">
               <img

@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation'
 import { useEffect } from 'react'
 import { Container } from '@/components/salient/Container'
+import { SubscribeProgressBar } from '@/components/SubscribeProgressBar'
 
 interface OffersContentProps {
   logoUrl: string
@@ -67,6 +68,8 @@ export function OffersContent({ logoUrl, newsletterName }: OffersContentProps) {
     <section className="pt-8 sm:pt-12 pb-6 sm:pb-16">
       <Container>
         <div className="mx-auto max-w-[600px] text-center">
+          <SubscribeProgressBar step={2} />
+
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <img

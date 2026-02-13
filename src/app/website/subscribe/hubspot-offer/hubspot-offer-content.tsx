@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useRef } from 'react'
 import { Container } from '@/components/salient/Container'
+import { SubscribeProgressBar } from '@/components/SubscribeProgressBar'
 
 const OFFER_ID = 'offer_recommendation_cfb40ae9d10d'
 const TRACKING_URL = 'https://dash.sparkloop.app/offer_recommendations/offer_recommendation_cfb40ae9d10d/action_click_redirect'
@@ -67,6 +68,8 @@ export function HubspotOfferContent({ logoUrl, newsletterName }: HubspotOfferCon
     <section className="pt-8 sm:pt-12 pb-6 sm:pb-16">
       <Container>
         <div className="mx-auto max-w-[600px] text-center">
+          <SubscribeProgressBar step={1} />
+
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <img
