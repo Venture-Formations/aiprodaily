@@ -96,6 +96,7 @@ interface DailyStats {
   rejected: number
   projectedEarnings: number
   confirmedEarnings: number
+  newPending: number | null
 }
 
 interface TopEarner {
@@ -266,6 +267,8 @@ export default function SparkLoopAdminPage() {
       const rejected = payload.find((p: any) => p.dataKey === 'rejected')?.value || 0
       const projectedEarnings = payload.find((p: any) => p.dataKey === 'projectedEarnings')?.value || 0
       const confirmedEarnings = payload.find((p: any) => p.dataKey === 'confirmedEarnings')?.value || 0
+      const dataRow = payload[0]?.payload
+      const newPending = dataRow?.newPending
       return (
         <div className="bg-gray-900 text-white p-3 rounded-lg shadow-lg text-sm">
           <div className="font-medium mb-1">{label}</div>
@@ -283,6 +286,16 @@ export default function SparkLoopAdminPage() {
           )}
           {rejected > 0 && (
             <div className="text-gray-500">Rejected Referrals: {rejected}</div>
+          )}
+          {newPending !== null && newPending !== undefined && (
+            <div className={newPending >= 0 ? 'text-amber-300' : 'text-red-300'}>
+              New Pending (SL): {newPending >= 0 ? '+' : ''}{newPending}
+            </div>
+          )}
+          {(projectedEarnings > 0 || confirmedEarnings > 0) && (
+            <div className="text-green-300 mt-1 pt-1 border-t border-gray-700">
+              Total: ${(projectedEarnings + confirmedEarnings).toFixed(2)}
+            </div>
           )}
         </div>
       )
@@ -374,7 +387,10 @@ export default function SparkLoopAdminPage() {
                   Total Earnings
                 </div>
                 <div className="text-2xl font-bold text-purple-600">
-                  {formatDollars(chartStats?.summary.totalEarnings || 0)}
+                  {formatDollars((chartStats?.summary.totalEarnings || 0) + (chartStats?.summary.projectedFromPending || 0))}
+                </div>
+                <div className="text-xs text-gray-400 mt-1">
+                  {formatDollars(chartStats?.summary.totalEarnings || 0)} confirmed + {formatDollars(chartStats?.summary.projectedFromPending || 0)} projected
                 </div>
               </div>
               <div className="bg-white rounded-lg border p-4">
@@ -415,9 +431,17 @@ export default function SparkLoopAdminPage() {
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={chartStats.dailyStats.map(d => ({
                     ...d,
-                    totalEarningsLabel: (d.projectedEarnings + d.confirmedEarnings) > 0
-                      ? `$${(d.projectedEarnings + d.confirmedEarnings).toFixed(2)}`
+                    earningsLabel: d.projectedEarnings > 0
+                      ? `$${d.projectedEarnings.toFixed(2)}`
+                      : d.confirmedEarnings > 0
+                        ? `$${d.confirmedEarnings.toFixed(2)}`
+                        : '',
+                    // For the new pending bar, show absolute value (null means no data)
+                    newPendingDisplay: d.newPending !== null ? Math.abs(d.newPending) : 0,
+                    newPendingLabel: d.newPending !== null && d.newPending !== 0
+                      ? `${d.newPending >= 0 ? '+' : ''}${d.newPending}`
                       : '',
+                    newPendingIsNegative: d.newPending !== null && d.newPending < 0,
                   }))}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis
@@ -435,9 +459,16 @@ export default function SparkLoopAdminPage() {
                     <Bar dataKey="confirmed" name="Confirmed" stackId="a" fill="#9ca3af" />
                     <Bar dataKey="rejected" name="Rejected" stackId="a" fill="#4b5563" radius={[2, 2, 0, 0]}>
                       <LabelList
-                        dataKey="totalEarningsLabel"
+                        dataKey="earningsLabel"
                         position="top"
-                        style={{ fontSize: 10, fill: '#6b7280' }}
+                        style={{ fontSize: 10, fill: '#7c3aed' }}
+                      />
+                    </Bar>
+                    <Bar dataKey="newPendingDisplay" name="New Pending (SL)" fill="#f59e0b" radius={[2, 2, 0, 0]}>
+                      <LabelList
+                        dataKey="newPendingLabel"
+                        position="top"
+                        style={{ fontSize: 9, fill: '#d97706' }}
                       />
                     </Bar>
                   </BarChart>

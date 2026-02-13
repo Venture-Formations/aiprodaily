@@ -13,6 +13,7 @@ interface DailyStats {
   rejected: number
   projectedEarnings: number
   confirmedEarnings: number
+  newPending: number | null  // daily change in pending from snapshots
 }
 
 /**
@@ -85,14 +86,45 @@ export async function GET(request: NextRequest) {
       rejected: number
       projectedEarnings: number
       confirmedEarnings: number
+      newPending: number | null
     }>()
 
     // Initialize all days in range
     const currentDate = new Date(fromDate)
     while (currentDate <= toDate) {
       const dateKey = currentDate.toISOString().split('T')[0]
-      dailyMap.set(dateKey, { pending: 0, confirmed: 0, rejected: 0, projectedEarnings: 0, confirmedEarnings: 0 })
+      dailyMap.set(dateKey, { pending: 0, confirmed: 0, rejected: 0, projectedEarnings: 0, confirmedEarnings: 0, newPending: null })
       currentDate.setDate(currentDate.getDate() + 1)
+    }
+
+    // Fetch daily snapshots for pending change calculation
+    // We need one extra day before the range to compute the first day's delta
+    const snapshotFromDate = new Date(fromDate)
+    snapshotFromDate.setDate(snapshotFromDate.getDate() - 1)
+    const { data: snapshots } = await supabaseAdmin
+      .from('sparkloop_daily_snapshots')
+      .select('snapshot_date, sparkloop_pending')
+      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .gte('snapshot_date', snapshotFromDate.toISOString().split('T')[0])
+      .lte('snapshot_date', toDate.toISOString().split('T')[0])
+      .order('snapshot_date', { ascending: true })
+
+    // Aggregate snapshots by date (sum across all ref_codes)
+    const snapshotByDate = new Map<string, number>()
+    for (const snap of snapshots || []) {
+      const dateKey = snap.snapshot_date
+      snapshotByDate.set(dateKey, (snapshotByDate.get(dateKey) || 0) + (snap.sparkloop_pending || 0))
+    }
+
+    // Compute daily pending change (delta from previous day)
+    const sortedSnapshotDates = Array.from(snapshotByDate.keys()).sort()
+    for (let i = 1; i < sortedSnapshotDates.length; i++) {
+      const prevDate = sortedSnapshotDates[i - 1]
+      const currDate = sortedSnapshotDates[i]
+      const delta = snapshotByDate.get(currDate)! - snapshotByDate.get(prevDate)!
+      if (dailyMap.has(currDate)) {
+        dailyMap.get(currDate)!.newPending = delta
+      }
     }
 
     // Process each referral
@@ -137,6 +169,7 @@ export async function GET(request: NextRequest) {
       rejected: stats.rejected,
       projectedEarnings: Math.round(stats.projectedEarnings * 100) / 100,
       confirmedEarnings: Math.round(stats.confirmedEarnings * 100) / 100,
+      newPending: stats.newPending,
     }))
 
     // Get top earning recommendations
