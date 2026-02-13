@@ -387,10 +387,7 @@ export default function SparkLoopAdminPage() {
                   Total Earnings
                 </div>
                 <div className="text-2xl font-bold text-purple-600">
-                  {formatDollars((chartStats?.summary.totalEarnings || 0) + (chartStats?.summary.projectedFromPending || 0))}
-                </div>
-                <div className="text-xs text-gray-400 mt-1">
-                  {formatDollars(chartStats?.summary.totalEarnings || 0)} confirmed + {formatDollars(chartStats?.summary.projectedFromPending || 0)} projected
+                  {formatDollars(chartStats?.summary.totalEarnings || 0)}
                 </div>
               </div>
               <div className="bg-white rounded-lg border p-4">
@@ -431,11 +428,9 @@ export default function SparkLoopAdminPage() {
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={chartStats.dailyStats.map(d => ({
                     ...d,
-                    earningsLabel: d.projectedEarnings > 0
-                      ? `$${d.projectedEarnings.toFixed(2)}`
-                      : d.confirmedEarnings > 0
-                        ? `$${d.confirmedEarnings.toFixed(2)}`
-                        : '',
+                    earningsLabel: (d.projectedEarnings + d.confirmedEarnings) > 0
+                      ? `$${(d.projectedEarnings + d.confirmedEarnings).toFixed(2)}`
+                      : '',
                     // For the new pending bar, show absolute value (null means no data)
                     newPendingDisplay: d.newPending !== null ? Math.abs(d.newPending) : 0,
                     newPendingLabel: d.newPending !== null && d.newPending !== 0
