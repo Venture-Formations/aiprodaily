@@ -293,7 +293,7 @@ export default function SparkLoopAdminPage() {
           )}
           {newPending !== null && newPending !== undefined && newPending > 0 && (
             <div className="text-amber-300">
-              New Pending (SL): +{formatNumber(newPending)}
+              New Pending (SL): {formatNumber(newPending)}
             </div>
           )}
           {(projectedEarnings > 0 || confirmedEarnings > 0) && (
@@ -437,7 +437,7 @@ export default function SparkLoopAdminPage() {
                       : '',
                     newPendingDisplay: d.newPending !== null && d.newPending > 0 ? d.newPending : 0,
                     newPendingLabel: d.newPending !== null && d.newPending > 0
-                      ? `+${d.newPending.toLocaleString('en-US')}`
+                      ? d.newPending.toLocaleString('en-US')
                       : '',
                   }))}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
