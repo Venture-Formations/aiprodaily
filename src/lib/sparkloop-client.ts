@@ -347,10 +347,6 @@ export class SparkLoopService {
     let budgetUnmatched = 0
     let matchedByUuid = 0
     let matchedByName = 0
-    let pausedByCampaignStatus = 0
-
-    // Check if partner campaigns data is available (non-empty API response)
-    const partnerCampaignsAvailable = campaignData.byUuid.size > 0 || campaignData.byName.size > 0
 
     // Log first rec UUIDs for diagnostics
     if (recommendations.length > 0) {
@@ -394,41 +390,24 @@ export class SparkLoopService {
 
       if (budgetInfo) { budgetMatched++; if (matchMethod === 'uuid') matchedByUuid++ } else { budgetUnmatched++ }
 
-      // Debug: log specific rec for diagnostics
-      if (rec.ref_code === '3bff334870') {
-        console.log(`[SparkLoop DEBUG] Colin Rocker: rec.status=${rec.status}, match=${matchMethod}, budgetInfo.status=${budgetInfo?.status ?? 'N/A'}, budget=$${budgetInfo?.remaining_budget_dollars ?? 'N/A'}`)
-      }
-
-      // Determine effective status:
-      // - If rec.status is already 'paused' from the API, trust it
-      // - If partner campaign has status 'paused', trust that over the recommendations API
-      //   (SparkLoop's recommendations API often reports 'active' for paused recs)
-      // - If partner_campaigns data is available and this rec is NOT in it, mark as paused
-      // - Otherwise, use the API status
-      const isPausedByPartner = !budgetInfo && partnerCampaignsAvailable
-      const isPausedByCampaignStatus = budgetInfo && budgetInfo.status === 'paused'
+      // Trust rec.status from the recommendations API as source of truth for paused/active.
+      // The partner_campaigns endpoint can disagree — recommendations API is authoritative.
+      // Only override: manual pauses set by admin in our dashboard.
       const isManuallyPaused = existing?.paused_reason === 'manual'
+      const effectiveStatus = isManuallyPaused ? 'paused' : rec.status
 
-      // Respect manual pauses — don't override admin decisions
-      const effectiveStatus = isManuallyPaused
-        ? 'paused'
-        : (isPausedByPartner || isPausedByCampaignStatus) ? 'paused' : rec.status
-
-      // Set paused_reason to track why it's paused
       const pausedReason = isManuallyPaused
         ? 'manual'
-        : (isPausedByPartner || isPausedByCampaignStatus) ? 'partner_paused'
-        : (effectiveStatus === 'paused' ? (existing?.paused_reason || 'partner_paused') : null)
+        : (rec.status === 'paused' ? 'api_paused' : null)
 
-      const remainingBudget = (isPausedByPartner || isPausedByCampaignStatus) ? 0 : (budgetInfo?.remaining_budget_dollars ?? 0)
+      const remainingBudget = budgetInfo?.remaining_budget_dollars ?? 0
       const screeningPeriod = budgetInfo?.referral_pending_period ?? null
       const cpaInDollars = (rec.cpa || 0) / 100
       const minBudgetRequired = cpaInDollars * 5 // Need at least 5 referrals worth of budget
 
       // Budget-based auto-exclusion only for active recs with known budget
-      const isOutOfBudget = !isPausedByPartner && !isPausedByCampaignStatus && remainingBudget < minBudgetRequired
+      const isOutOfBudget = effectiveStatus === 'active' && budgetInfo && remainingBudget < minBudgetRequired
 
-      // Auto-exclude/reactivate only for budget reasons (paused is handled by status alone)
       let excluded = existing?.excluded ?? false
       let excludedReason = existing?.excluded_reason ?? null
 
@@ -438,24 +417,16 @@ export class SparkLoopService {
         outOfBudget++
         console.log(`[SparkLoop] Auto-excluding ${rec.publication_name} (budget $${remainingBudget} < 5x CPA $${minBudgetRequired})`)
       } else if (!isOutOfBudget && excluded && excludedReason === 'budget_used_up') {
-        // Budget restored, reactivate if it was auto-excluded for budget
         excluded = false
         excludedReason = null
         console.log(`[SparkLoop] Auto-reactivating ${rec.publication_name} (budget restored: $${remainingBudget})`)
       }
 
-      // If previously auto-excluded as partner_paused but now back in partner campaigns, clear it
-      if (!isPausedByPartner && excluded && excludedReason === 'partner_paused') {
+      // Clear legacy partner_paused exclusions — status now comes from API directly
+      if (excluded && excludedReason === 'partner_paused') {
         excluded = false
         excludedReason = null
-        console.log(`[SparkLoop] Clearing partner_paused exclusion for ${rec.publication_name} (back in partner campaigns)`)
-      }
-
-      if (isPausedByCampaignStatus) {
-        pausedByCampaignStatus++
-        console.log(`[SparkLoop] ${rec.publication_name} — paused (campaign status='paused', match: ${matchMethod})`)
-      } else if (isPausedByPartner) {
-        console.log(`[SparkLoop] ${rec.publication_name} — paused (not in partner campaigns, match: ${matchMethod})`)
+        console.log(`[SparkLoop] Clearing legacy partner_paused exclusion for ${rec.publication_name}`)
       }
 
       const recordData = {
@@ -595,7 +566,7 @@ export class SparkLoopService {
     const active = recommendations.filter(r => r.status === 'active').length
     const paused = recommendations.filter(r => r.status === 'paused').length
 
-    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (API: ${active} active, ${paused} paused | ${pausedByCampaignStatus} campaign-paused, ${budgetUnmatched} absent-paused, ${pausedByPartner} disappeared, ${outOfBudget} budget-excluded, ${reactivated} reactivated | budget match: ${budgetMatched} [${matchedByUuid} uuid, ${matchedByName} name], unmatched: ${budgetUnmatched})`)
+    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (API: ${active} active, ${paused} paused | ${pausedByPartner} disappeared, ${outOfBudget} budget-excluded, ${reactivated} reactivated | budget match: ${budgetMatched} [${matchedByUuid} uuid, ${matchedByName} name], unmatched: ${budgetUnmatched})`)
     if (confirmDeltas > 0 || rejectionDeltas > 0) {
       console.log(`[SparkLoop] Deltas tracked: +${confirmDeltas} confirms, +${rejectionDeltas} rejections`)
     }
