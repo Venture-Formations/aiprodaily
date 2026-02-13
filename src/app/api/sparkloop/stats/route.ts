@@ -108,33 +108,39 @@ export async function GET(request: NextRequest) {
       currentDate.setDate(currentDate.getDate() + 1)
     }
 
-    // Fetch daily snapshots for pending change calculation
+    // Fetch daily snapshots for new pending calculation
     // We need one extra day before the range to compute the first day's delta
     const snapshotFromDate = new Date(fromDate)
     snapshotFromDate.setDate(snapshotFromDate.getDate() - 1)
     const { data: snapshots } = await supabaseAdmin
       .from('sparkloop_daily_snapshots')
-      .select('snapshot_date, sparkloop_pending')
+      .select('snapshot_date, sparkloop_pending, sparkloop_confirmed, sparkloop_rejected')
       .eq('publication_id', DEFAULT_PUBLICATION_ID)
       .gte('snapshot_date', snapshotFromDate.toISOString().split('T')[0])
       .lte('snapshot_date', toDate.toISOString().split('T')[0])
       .order('snapshot_date', { ascending: true })
 
     // Aggregate snapshots by date (sum across all ref_codes)
-    const snapshotByDate = new Map<string, number>()
+    const snapshotByDate = new Map<string, { pending: number; confirmed: number; rejected: number }>()
     for (const snap of snapshots || []) {
       const dateKey = snap.snapshot_date
-      snapshotByDate.set(dateKey, (snapshotByDate.get(dateKey) || 0) + (snap.sparkloop_pending || 0))
+      const existing = snapshotByDate.get(dateKey) || { pending: 0, confirmed: 0, rejected: 0 }
+      existing.pending += snap.sparkloop_pending || 0
+      existing.confirmed += snap.sparkloop_confirmed || 0
+      existing.rejected += snap.sparkloop_rejected || 0
+      snapshotByDate.set(dateKey, existing)
     }
 
-    // Compute daily pending change (delta from previous day, clamped to 0 minimum)
+    // Compute new pending: delta_pending + delta_confirmed + delta_rejected
+    // This accounts for referrals that moved out of pending into confirmed/rejected
     const sortedSnapshotDates = Array.from(snapshotByDate.keys()).sort()
     for (let i = 1; i < sortedSnapshotDates.length; i++) {
-      const prevDate = sortedSnapshotDates[i - 1]
+      const prev = snapshotByDate.get(sortedSnapshotDates[i - 1])!
+      const curr = snapshotByDate.get(sortedSnapshotDates[i])!
+      const newPending = (curr.pending - prev.pending) + (curr.confirmed - prev.confirmed) + (curr.rejected - prev.rejected)
       const currDate = sortedSnapshotDates[i]
-      const delta = snapshotByDate.get(currDate)! - snapshotByDate.get(prevDate)!
       if (dailyMap.has(currDate)) {
-        dailyMap.get(currDate)!.newPending = Math.max(0, delta)
+        dailyMap.get(currDate)!.newPending = Math.max(0, newPending)
       }
     }
 
