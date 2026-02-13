@@ -65,19 +65,13 @@ export class FeedbackModuleRenderer {
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
   <tr>
     <td style="padding:0 10px;">
-      <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"
+             style="border:1px solid #ddd; border-radius:10px; margin-top:10px; background-color:#ffffff;
+                    font-family:${styles.bodyFont}; box-shadow:0 4px 12px rgba(0,0,0,.15);">
+        ${headerHtml}
         <tr>
-          <td style="padding:5px;">
-            <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"
-                   style="width:100%; max-width:650px; margin:10px auto; background-color:#ffffff;
-                          border:1px solid #ddd; border-radius:10px; font-family:${styles.bodyFont}; box-shadow:0 4px 12px rgba(0,0,0,.15);">
-              ${headerHtml}
-              <tr>
-                <td style="padding:20px; color:#1a1a1a; font-size:16px; line-height:1.6;">
-                  ${content}
-                </td>
-              </tr>
-            </table>
+          <td style="padding:20px; color:#1a1a1a; font-size:16px; line-height:1.6;">
+            ${content}
           </td>
         </tr>
       </table>
