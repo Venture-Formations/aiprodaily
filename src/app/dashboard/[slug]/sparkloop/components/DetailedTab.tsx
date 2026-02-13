@@ -55,6 +55,7 @@ interface Recommendation {
   sends_30d: number
   confirms_gained_14d: number
   confirms_gained_30d: number
+  eligible_for_module: boolean
 }
 
 interface GlobalStats {
@@ -135,6 +136,7 @@ const DEFAULT_COLUMNS: Column[] = [
   { key: 'unique_ips', label: 'Unique IPs', enabled: true, exportable: true, width: 'xs' },
   { key: 'excluded', label: 'Excluded', enabled: false, exportable: true, width: 'xs' },
   { key: 'excluded_reason', label: 'Excl. Reason', enabled: false, exportable: true, width: 'md' },
+  { key: 'eligible_for_module', label: 'Module', enabled: true, exportable: true, width: 'xs' },
   { key: 'last_synced_at', label: 'Last Synced', enabled: false, exportable: true, width: 'md' },
 ]
 
@@ -447,6 +449,22 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
       alert('Bulk update failed')
     }
     setActionLoading(null)
+  }
+
+  async function handleToggleModuleEligible(rec: Recommendation) {
+    try {
+      const res = await fetch('/api/sparkloop/admin', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: rec.id, action: 'toggle_module_eligible', eligible_for_module: !rec.eligible_for_module }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        onRefresh()
+      }
+    } catch {
+      // Silent fail - toggle will revert on refresh
+    }
   }
 
   function toggleSelect(id: string) {
@@ -772,6 +790,23 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
 
       case 'excluded':
         return rec.excluded ? 'Yes' : 'No'
+
+      case 'eligible_for_module':
+        return (
+          <button
+            onClick={(e) => { e.stopPropagation(); handleToggleModuleEligible(rec) }}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              rec.eligible_for_module ? 'bg-indigo-600' : 'bg-gray-300'
+            }`}
+            title={rec.eligible_for_module ? 'Eligible for newsletter module' : 'Not in newsletter module'}
+          >
+            <span
+              className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                rec.eligible_for_module ? 'translate-x-4.5' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
+        )
 
       case 'last_synced_at':
         if (!rec.last_synced_at) return '-'

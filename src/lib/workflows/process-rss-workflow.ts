@@ -138,6 +138,16 @@ async function setupIssue(newsletterId: string): Promise<{ issueId: string; modu
         // Continue workflow even if AI selection fails (non-critical)
       }
 
+      // Select SparkLoop recommendations for newsletter modules
+      try {
+        const { SparkLoopRecModuleSelector } = await import('@/lib/sparkloop-rec-modules')
+        const slRecResults = await SparkLoopRecModuleSelector.selectRecsForIssue(issueId, newsletter.id)
+        const modulesWithRecs = slRecResults.filter(s => s.refCodes.length > 0).length
+        console.log(`[Workflow Step 1] SparkLoop rec modules: ${modulesWithRecs} module(s) with selections`)
+      } catch (slError) {
+        console.log('[Workflow Step 1] SparkLoop rec module selection failed (non-critical):', slError)
+      }
+
       // Get active article modules
       const articleModules = await ArticleModuleSelector.getActiveModules(newsletter.id)
       const moduleIds = articleModules.map(m => m.id)

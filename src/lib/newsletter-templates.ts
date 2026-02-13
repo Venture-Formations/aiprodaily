@@ -1642,6 +1642,52 @@ export async function generateFeedbackModuleSection(
   }
 }
 
+// ==================== SPARKLOOP REC MODULE ====================
+
+export async function generateSparkLoopRecModuleSection(
+  issue: { id: string; publication_id: string; status?: string },
+  moduleId: string
+): Promise<string> {
+  try {
+    const { SparkLoopRecModuleSelector, SparkLoopRecModuleRenderer } = await import('./sparkloop-rec-modules')
+
+    // Get module config
+    const { data: module } = await supabaseAdmin
+      .from('sparkloop_rec_modules')
+      .select('id, name, recs_count')
+      .eq('id', moduleId)
+      .single()
+
+    if (!module) return ''
+
+    // Get issue selections
+    const { selections } = await SparkLoopRecModuleSelector.getIssueSelections(issue.id)
+    const sel = selections.find(s => s.sparkloop_rec_module_id === moduleId)
+
+    if (!sel || sel.ref_codes.length === 0 || sel.recommendations.length === 0) {
+      console.log(`[SparkLoop Rec Module] No selections for module ${module.name} on issue ${issue.id}`)
+      return ''
+    }
+
+    // Render cards
+    const html = SparkLoopRecModuleRenderer.renderSection(
+      module.name,
+      sel.recommendations.map(r => ({
+        ref_code: r.ref_code,
+        publication_name: r.publication_name,
+        publication_logo: r.publication_logo,
+        description: r.description,
+      })),
+      issue.id
+    )
+
+    return html
+  } catch (error) {
+    console.error('[SparkLoop Rec Module] Error generating section:', error)
+    return ''
+  }
+}
+
 // ==================== ROAD WORK ====================
 // Feature not needed in this newsletter
 
@@ -1876,6 +1922,14 @@ export async function generateFullNewsletterHtml(
       .eq('is_active', true)
       .order('display_order', { ascending: true })
 
+    // Fetch sparkloop rec modules for this publication
+    const { data: sparkloopRecModules } = await supabaseAdmin
+      .from('sparkloop_rec_modules')
+      .select('id, name, display_order, is_active, selection_mode, block_order, config, recs_count')
+      .eq('publication_id', issue.publication_id)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+
     // Fetch feedback module (singleton per publication)
     const { data: feedbackModules } = await supabaseAdmin
       .from('feedback_modules')
@@ -1889,6 +1943,7 @@ export async function generateFullNewsletterHtml(
     console.log('Active prompt modules:', promptModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
     console.log('Active article modules:', articleModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
     console.log('Active text box modules:', textBoxModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
+    console.log('Active sparkloop rec modules:', sparkloopRecModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
     console.log('Active feedback modules:', feedbackModules?.map(m => `${m.name} (order: ${m.display_order})`).join(', '))
 
     // Format date using local date parsing
@@ -1949,6 +2004,7 @@ export async function generateFullNewsletterHtml(
       | { type: 'article_module'; data: any }
       | { type: 'text_box_module'; data: any }
       | { type: 'feedback_module'; data: any }
+      | { type: 'sparkloop_rec_module'; data: any }
 
     const allItems: SectionItem[] = [
       ...(sections || []).map(s => ({ type: 'section' as const, data: s })),
@@ -1957,7 +2013,8 @@ export async function generateFullNewsletterHtml(
       ...(promptModules || []).map(m => ({ type: 'prompt_module' as const, data: m })),
       ...(articleModules || []).map(m => ({ type: 'article_module' as const, data: m })),
       ...(textBoxModules || []).map(m => ({ type: 'text_box_module' as const, data: m })),
-      ...(feedbackModules || []).map(m => ({ type: 'feedback_module' as const, data: m }))
+      ...(feedbackModules || []).map(m => ({ type: 'feedback_module' as const, data: m })),
+      ...(sparkloopRecModules || []).map(m => ({ type: 'sparkloop_rec_module' as const, data: m }))
     ].sort((a, b) => (a.data.display_order ?? 999) - (b.data.display_order ?? 999))
 
     console.log('Combined section order:', allItems.map(item =>
@@ -2002,6 +2059,12 @@ export async function generateFullNewsletterHtml(
         const feedbackModuleHtml = await generateFeedbackModuleSection(issue, item.data.id)
         if (feedbackModuleHtml) {
           sectionsHtml += feedbackModuleHtml
+        }
+      } else if (item.type === 'sparkloop_rec_module') {
+        // Generate sparkloop recommendation module section
+        const slRecHtml = await generateSparkLoopRecModuleSection(issue, item.data.id)
+        if (slRecHtml) {
+          sectionsHtml += slRecHtml
         }
       } else {
         const section = item.data

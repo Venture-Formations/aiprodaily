@@ -69,6 +69,7 @@ interface Recommendation {
   sends_30d: number
   confirms_gained_14d: number
   confirms_gained_30d: number
+  eligible_for_module: boolean
 }
 
 interface Counts {

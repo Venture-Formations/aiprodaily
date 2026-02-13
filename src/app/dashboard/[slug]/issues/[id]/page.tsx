@@ -10,6 +10,7 @@ import AIAppModulesPanel from '@/components/AIAppModulesPanel'
 import PromptModulesPanel from '@/components/PromptModulesPanel'
 import ArticleModulesPanel from '@/components/ArticleModulesPanel'
 import TextBoxModulesPanel from '@/components/TextBoxModulesPanel'
+import SparkLoopRecsModulesPanel from '@/components/SparkLoopRecsModulesPanel'
 import type { issueWithArticles, ArticleWithPost, issueEvent, Event, NewsletterSection } from '@/types/database'
 import {
   DndContext,
@@ -2421,6 +2422,9 @@ export default function issueDetailPage() {
 
         {/* Text Box Sections */}
         {issue && <TextBoxModulesPanel issueId={issue.id} issueStatus={issue.status} />}
+
+        {/* SparkLoop Recommendation Modules */}
+        {issue && <SparkLoopRecsModulesPanel issueId={issue.id} />}
 
         {/* Preview Modal */}
         {showPreview && (

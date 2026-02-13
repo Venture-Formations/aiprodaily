@@ -343,6 +343,17 @@ export async function POST(request: NextRequest) {
       // Don't fail the send if poll tracking fails
     }
 
+    // Record SparkLoop rec module usage
+    try {
+      const { SparkLoopRecModuleSelector } = await import('@/lib/sparkloop-rec-modules')
+      const slRecResult = await SparkLoopRecModuleSelector.recordUsage(issue.id)
+      if (slRecResult.recorded > 0) {
+        console.log(`[Send Final] ✓ SparkLoop rec module usage recorded (${slRecResult.recorded} modules)`)
+      }
+    } catch (slRecError) {
+      console.error('[Send Final] Failed to record SparkLoop rec module usage (non-critical):', slRecError)
+    }
+
     // Capture the active poll for this issue
     const { poll_id, poll_snapshot } = await capturePollForIssue(issue.id, newsletter.id)
 
@@ -637,6 +648,17 @@ export async function GET(request: NextRequest) {
     } catch (pollError) {
       console.error('[Send Final] Failed to record poll module usage (non-critical):', pollError)
       // Don't fail the send if poll tracking fails
+    }
+
+    // Record SparkLoop rec module usage
+    try {
+      const { SparkLoopRecModuleSelector } = await import('@/lib/sparkloop-rec-modules')
+      const slRecResult = await SparkLoopRecModuleSelector.recordUsage(issue.id)
+      if (slRecResult.recorded > 0) {
+        console.log(`[Send Final] ✓ SparkLoop rec module usage recorded (${slRecResult.recorded} modules)`)
+      }
+    } catch (slRecError) {
+      console.error('[Send Final] Failed to record SparkLoop rec module usage (non-critical):', slRecError)
     }
 
     // Capture the active poll for this issue

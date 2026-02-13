@@ -748,6 +748,38 @@ export interface IssuePromptModuleWithDetails extends IssuePromptModule {
   prompt: PromptIdea | null
 }
 
+// SparkLoop Rec Module Types
+export type SparkLoopRecBlockType = 'logo' | 'name' | 'description' | 'button'
+
+export type SparkLoopRecSelectionMode = 'score_based' | 'random' | 'sequential' | 'manual'
+
+export interface SparkLoopRecModule {
+  id: string
+  publication_id: string
+  name: string
+  display_order: number
+  is_active: boolean
+  selection_mode: SparkLoopRecSelectionMode
+  block_order: SparkLoopRecBlockType[]
+  config: Record<string, unknown>
+  recs_count: number
+  next_position: number
+  created_at: string
+  updated_at: string
+}
+
+export interface IssueSparkLoopRecModule {
+  id: string
+  issue_id: string
+  sparkloop_rec_module_id: string
+  ref_codes: string[]  // Array of selected ref_codes
+  selection_mode?: SparkLoopRecSelectionMode
+  selected_at: string
+  used_at: string | null
+  // Joined relations
+  sparkloop_rec_module?: SparkLoopRecModule
+}
+
 // Combined types for API responses
 export interface ArticleWithPost extends Article {
   rss_post: RssPost & {

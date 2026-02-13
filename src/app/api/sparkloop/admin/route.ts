@@ -307,6 +307,9 @@ export async function PATCH(request: NextRequest) {
       // Unpause: restore to active, clear paused_reason
       updateData.status = 'active'
       updateData.paused_reason = null
+    } else if (action === 'toggle_module_eligible') {
+      // Toggle whether this rec appears in newsletter email modules
+      updateData.eligible_for_module = body.eligible_for_module ?? false
     } else {
       // Legacy exclude/reactivate toggle
       updateData.excluded = excluded ?? false
