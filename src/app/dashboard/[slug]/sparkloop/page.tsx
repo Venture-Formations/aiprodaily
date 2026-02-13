@@ -200,12 +200,16 @@ export default function SparkLoopAdminPage() {
   }
 
   const formatDollars = (value: number) => {
-    return `$${value.toFixed(2)}`
+    return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
+
+  const formatNumber = (value: number) => {
+    return value.toLocaleString('en-US')
   }
 
   const formatCurrency = (cents: number | null) => {
     if (cents === null) return '-'
-    return `$${(cents / 100).toFixed(2)}`
+    return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
   // Compute popup preview: top 5 recs that would appear in the actual popup
@@ -262,39 +266,39 @@ export default function SparkLoopAdminPage() {
   // Custom tooltip for chart
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      const pending = payload.find((p: any) => p.dataKey === 'pending')?.value || 0
-      const confirmed = payload.find((p: any) => p.dataKey === 'confirmed')?.value || 0
-      const rejected = payload.find((p: any) => p.dataKey === 'rejected')?.value || 0
-      const projectedEarnings = payload.find((p: any) => p.dataKey === 'projectedEarnings')?.value || 0
-      const confirmedEarnings = payload.find((p: any) => p.dataKey === 'confirmedEarnings')?.value || 0
       const dataRow = payload[0]?.payload
+      const pending = dataRow?.pending || 0
+      const confirmed = dataRow?.confirmed || 0
+      const rejected = dataRow?.rejected || 0
+      const projectedEarnings = dataRow?.projectedEarnings || 0
+      const confirmedEarnings = dataRow?.confirmedEarnings || 0
       const newPending = dataRow?.newPending
       return (
         <div className="bg-gray-900 text-white p-3 rounded-lg shadow-lg text-sm">
           <div className="font-medium mb-1">{label}</div>
           {pending > 0 && (
             <>
-              <div className="text-purple-300">Pending Referrals: {pending}</div>
-              <div className="text-purple-300">Projected Earnings: ${projectedEarnings.toFixed(2)}</div>
+              <div className="text-purple-300">Pending Referrals: {formatNumber(pending)}</div>
+              <div className="text-purple-300">Projected Earnings: {formatDollars(projectedEarnings)}</div>
             </>
           )}
           {confirmed > 0 && (
             <>
-              <div className="text-gray-300">Confirmed Referrals: {confirmed}</div>
-              <div className="text-gray-300">Confirmed Earnings: ${confirmedEarnings.toFixed(2)}</div>
+              <div className="text-gray-300">Confirmed Referrals: {formatNumber(confirmed)}</div>
+              <div className="text-gray-300">Confirmed Earnings: {formatDollars(confirmedEarnings)}</div>
             </>
           )}
           {rejected > 0 && (
-            <div className="text-gray-500">Rejected Referrals: {rejected}</div>
+            <div className="text-gray-500">Rejected Referrals: {formatNumber(rejected)}</div>
           )}
-          {newPending !== null && newPending !== undefined && (
-            <div className={newPending >= 0 ? 'text-amber-300' : 'text-red-300'}>
-              New Pending (SL): {newPending >= 0 ? '+' : ''}{newPending}
+          {newPending !== null && newPending !== undefined && newPending > 0 && (
+            <div className="text-amber-300">
+              New Pending (SL): +{formatNumber(newPending)}
             </div>
           )}
           {(projectedEarnings > 0 || confirmedEarnings > 0) && (
             <div className="text-green-300 mt-1 pt-1 border-t border-gray-700">
-              Total: ${(projectedEarnings + confirmedEarnings).toFixed(2)}
+              Total: {formatDollars(projectedEarnings + confirmedEarnings)}
             </div>
           )}
         </div>
@@ -369,7 +373,7 @@ export default function SparkLoopAdminPage() {
                   Pending Referrals
                 </div>
                 <div className="text-2xl font-bold text-yellow-600">
-                  {chartStats?.summary.totalPending || 0}
+                  {formatNumber(chartStats?.summary.totalPending || 0)}
                 </div>
               </div>
               <div className="bg-white rounded-lg border p-4">
@@ -378,7 +382,7 @@ export default function SparkLoopAdminPage() {
                   Confirmed Referrals
                 </div>
                 <div className="text-2xl font-bold text-green-600">
-                  {chartStats?.summary.totalConfirmed || 0}
+                  {formatNumber(chartStats?.summary.totalConfirmed || 0)}
                 </div>
               </div>
               <div className="bg-white rounded-lg border p-4">
@@ -429,14 +433,12 @@ export default function SparkLoopAdminPage() {
                   <BarChart data={chartStats.dailyStats.map(d => ({
                     ...d,
                     earningsLabel: (d.projectedEarnings + d.confirmedEarnings) > 0
-                      ? `$${(d.projectedEarnings + d.confirmedEarnings).toFixed(2)}`
+                      ? `$${(d.projectedEarnings + d.confirmedEarnings).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : '',
-                    // For the new pending bar, show absolute value (null means no data)
-                    newPendingDisplay: d.newPending !== null ? Math.abs(d.newPending) : 0,
-                    newPendingLabel: d.newPending !== null && d.newPending !== 0
-                      ? `${d.newPending >= 0 ? '+' : ''}${d.newPending}`
+                    newPendingDisplay: d.newPending !== null && d.newPending > 0 ? d.newPending : 0,
+                    newPendingLabel: d.newPending !== null && d.newPending > 0
+                      ? `+${d.newPending.toLocaleString('en-US')}`
                       : '',
-                    newPendingIsNegative: d.newPending !== null && d.newPending < 0,
                   }))}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis
@@ -500,7 +502,7 @@ export default function SparkLoopAdminPage() {
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm truncate">{earner.name}</div>
                         <div className="text-xs text-gray-500">
-                          <span className="text-purple-600">{earner.referrals} referrals</span>
+                          <span className="text-purple-600">{formatNumber(earner.referrals)} referrals</span>
                           <span className="mx-1">-</span>
                           <span className="text-green-600">{formatDollars(earner.earnings)}</span>
                         </div>
@@ -515,23 +517,23 @@ export default function SparkLoopAdminPage() {
             <div className="grid grid-cols-5 gap-4 mb-6">
               <div className="bg-white rounded-lg border p-4">
                 <div className="text-sm text-gray-500">Total</div>
-                <div className="text-2xl font-bold">{counts.total}</div>
+                <div className="text-2xl font-bold">{formatNumber(counts.total)}</div>
               </div>
               <div className="bg-white rounded-lg border p-4">
                 <div className="text-sm text-gray-500">Active</div>
-                <div className="text-2xl font-bold text-green-600">{counts.active}</div>
+                <div className="text-2xl font-bold text-green-600">{formatNumber(counts.active)}</div>
               </div>
               <div className="bg-white rounded-lg border p-4">
                 <div className="text-sm text-gray-500">Excluded</div>
-                <div className="text-2xl font-bold text-red-600">{counts.excluded}</div>
+                <div className="text-2xl font-bold text-red-600">{formatNumber(counts.excluded)}</div>
               </div>
               <div className="bg-white rounded-lg border p-4">
                 <div className="text-sm text-gray-500">Paused</div>
-                <div className="text-2xl font-bold text-yellow-600">{counts.paused}</div>
+                <div className="text-2xl font-bold text-yellow-600">{formatNumber(counts.paused)}</div>
               </div>
               <div className="bg-white rounded-lg border p-4">
                 <div className="text-sm text-gray-500">Archived</div>
-                <div className="text-2xl font-bold text-gray-400">{counts.archived}</div>
+                <div className="text-2xl font-bold text-gray-400">{formatNumber(counts.archived)}</div>
               </div>
             </div>
 

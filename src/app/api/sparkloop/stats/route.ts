@@ -71,13 +71,24 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all referrals in the date range with ref_code and status
-    const { data: referrals } = await supabaseAdmin
-      .from('sparkloop_referrals')
-      .select('ref_code, status, subscribed_at, confirmed_at')
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
-      .in('source', ['custom_popup', 'recs_page'])
-      .gte('subscribed_at', fromDate.toISOString())
-      .lte('subscribed_at', toDate.toISOString())
+    // Paginate to avoid Supabase default 1000-row limit
+    let referrals: { ref_code: string; status: string; subscribed_at: string; confirmed_at: string | null }[] = []
+    let pageFrom = 0
+    const pageSize = 1000
+    while (true) {
+      const { data: page } = await supabaseAdmin
+        .from('sparkloop_referrals')
+        .select('ref_code, status, subscribed_at, confirmed_at')
+        .eq('publication_id', DEFAULT_PUBLICATION_ID)
+        .in('source', ['custom_popup', 'recs_page'])
+        .gte('subscribed_at', fromDate.toISOString())
+        .lte('subscribed_at', toDate.toISOString())
+        .range(pageFrom, pageFrom + pageSize - 1)
+      if (!page || page.length === 0) break
+      referrals = referrals.concat(page)
+      if (page.length < pageSize) break
+      pageFrom += pageSize
+    }
 
     // Aggregate by day
     const dailyMap = new Map<string, {
@@ -116,19 +127,19 @@ export async function GET(request: NextRequest) {
       snapshotByDate.set(dateKey, (snapshotByDate.get(dateKey) || 0) + (snap.sparkloop_pending || 0))
     }
 
-    // Compute daily pending change (delta from previous day)
+    // Compute daily pending change (delta from previous day, clamped to 0 minimum)
     const sortedSnapshotDates = Array.from(snapshotByDate.keys()).sort()
     for (let i = 1; i < sortedSnapshotDates.length; i++) {
       const prevDate = sortedSnapshotDates[i - 1]
       const currDate = sortedSnapshotDates[i]
       const delta = snapshotByDate.get(currDate)! - snapshotByDate.get(prevDate)!
       if (dailyMap.has(currDate)) {
-        dailyMap.get(currDate)!.newPending = delta
+        dailyMap.get(currDate)!.newPending = Math.max(0, delta)
       }
     }
 
     // Process each referral
-    for (const ref of referrals || []) {
+    for (const ref of referrals) {
       const dateKey = ref.subscribed_at?.split('T')[0]
       if (!dateKey || !dailyMap.has(dateKey)) continue
 
