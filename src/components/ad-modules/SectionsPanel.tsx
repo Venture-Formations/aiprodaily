@@ -26,7 +26,8 @@ import PromptModuleSettings from '../prompt-modules/PromptModuleSettings'
 import { ArticleModuleSettings } from '../article-modules'
 import { TextBoxModuleSettings } from '../text-box-modules'
 import { FeedbackModuleSettings } from '../feedback-modules'
-import type { NewsletterSection, AdModule, PollModule, AIAppModule, PromptModule, ArticleModule, TextBoxModule, FeedbackModuleWithBlocks, FeedbackBlock } from '@/types/database'
+import SparkLoopRecModuleSettings from '../sparkloop-rec-modules/SparkLoopRecModuleSettings'
+import type { NewsletterSection, AdModule, PollModule, AIAppModule, PromptModule, ArticleModule, TextBoxModule, FeedbackModuleWithBlocks, FeedbackBlock, SparkLoopRecModule } from '@/types/database'
 
 interface SectionsPanelProps {
   publicationId?: string // Optional - will be fetched from URL if not provided
@@ -41,6 +42,7 @@ type SectionItem =
   | { type: 'article_module'; data: ArticleModule }
   | { type: 'text_box_module'; data: TextBoxModule }
   | { type: 'feedback_module'; data: FeedbackModuleWithBlocks }
+  | { type: 'sparkloop_rec_module'; data: SparkLoopRecModule }
 
 function SortableSectionItem({
   item,
@@ -69,7 +71,9 @@ function SortableSectionItem({
               ? `text-box-module-${item.data.id}`
               : item.type === 'feedback_module'
                 ? `feedback-module-${item.data.id}`
-                : `prompt-module-${item.data.id}`
+                : item.type === 'sparkloop_rec_module'
+                  ? `sparkloop-rec-module-${item.data.id}`
+                  : `prompt-module-${item.data.id}`
   const name = item.data.name
   const isActive = item.data.is_active
   const isAdModule = item.type === 'ad_module'
@@ -79,6 +83,7 @@ function SortableSectionItem({
   const isArticleModule = item.type === 'article_module'
   const isTextBoxModule = item.type === 'text_box_module'
   const isFeedbackModule = item.type === 'feedback_module'
+  const isSparkLoopRecModule = item.type === 'sparkloop_rec_module'
 
   const {
     attributes,
@@ -157,6 +162,11 @@ function SortableSectionItem({
           {isFeedbackModule && (
             <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full">
               Feedback
+            </span>
+          )}
+          {isSparkLoopRecModule && (
+            <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full">
+              SparkLoop
             </span>
           )}
         </div>
@@ -254,13 +264,14 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
   const [articleModules, setArticleModules] = useState<ArticleModule[]>([])
   const [textBoxModules, setTextBoxModules] = useState<TextBoxModule[]>([])
   const [feedbackModules, setFeedbackModules] = useState<FeedbackModuleWithBlocks[]>([])
+  const [sparkloopRecModules, setSparkloopRecModules] = useState<SparkLoopRecModule[]>([])
   const [selectedItem, setSelectedItem] = useState<SectionItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [cooldownDays, setCooldownDays] = useState(7)
   const [showAddModal, setShowAddModal] = useState(false)
   const [newModuleName, setNewModuleName] = useState('')
-  const [newSectionType, setNewSectionType] = useState<'ad' | 'poll' | 'ai_app' | 'prompt' | 'article' | 'text_box' | 'feedback' | 'standard'>('ad')
+  const [newSectionType, setNewSectionType] = useState<'ad' | 'poll' | 'ai_app' | 'prompt' | 'article' | 'text_box' | 'feedback' | 'sparkloop_rec' | 'standard'>('ad')
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -361,6 +372,13 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
         setTextBoxModules(textBoxModulesData.modules || [])
       }
 
+      // Fetch sparkloop rec modules
+      const sparkloopRecModulesRes = await fetch(`/api/sparkloop-rec-modules?publication_id=${publicationId}`)
+      if (sparkloopRecModulesRes.ok) {
+        const sparkloopRecModulesData = await sparkloopRecModulesRes.json()
+        setSparkloopRecModules(sparkloopRecModulesData.modules || [])
+      }
+
       // Fetch feedback modules (singleton - at most one per publication)
       const feedbackModulesRes = await fetch(`/api/feedback-modules?publication_id=${publicationId}`)
       if (feedbackModulesRes.ok) {
@@ -410,7 +428,8 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     ...promptModules.map(m => ({ type: 'prompt_module' as const, data: m })),
     ...articleModules.map(m => ({ type: 'article_module' as const, data: m })),
     ...textBoxModules.map(m => ({ type: 'text_box_module' as const, data: m })),
-    ...feedbackModules.map(m => ({ type: 'feedback_module' as const, data: m }))
+    ...feedbackModules.map(m => ({ type: 'feedback_module' as const, data: m })),
+    ...sparkloopRecModules.map(m => ({ type: 'sparkloop_rec_module' as const, data: m }))
   ].sort((a, b) => {
     const orderA = a.data.display_order ?? 999
     const orderB = b.data.display_order ?? 999
@@ -432,7 +451,9 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
                 ? `text-box-module-${item.data.id}`
                 : item.type === 'feedback_module'
                   ? `feedback-module-${item.data.id}`
-                  : `prompt-module-${item.data.id}`
+                  : item.type === 'sparkloop_rec_module'
+                    ? `sparkloop-rec-module-${item.data.id}`
+                    : `prompt-module-${item.data.id}`
   )
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -454,6 +475,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     const newArticleModules: ArticleModule[] = []
     const newTextBoxModules: TextBoxModule[] = []
     const newFeedbackModules: FeedbackModuleWithBlocks[] = []
+    const newSparkloopRecModules: SparkLoopRecModule[] = []
 
     reorderedItems.forEach((item, idx) => {
       const newOrder = idx + 1
@@ -471,6 +493,8 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
         newTextBoxModules.push({ ...item.data, display_order: newOrder })
       } else if (item.type === 'feedback_module') {
         newFeedbackModules.push({ ...item.data, display_order: newOrder })
+      } else if (item.type === 'sparkloop_rec_module') {
+        newSparkloopRecModules.push({ ...item.data, display_order: newOrder })
       } else {
         newPromptModules.push({ ...item.data, display_order: newOrder })
       }
@@ -484,6 +508,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     setArticleModules(newArticleModules)
     setTextBoxModules(newTextBoxModules)
     setFeedbackModules(newFeedbackModules)
+    setSparkloopRecModules(newSparkloopRecModules)
 
     // Save to server
     setSaving(true)
@@ -575,6 +600,17 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           })
         })
       }
+
+      // Update sparkloop rec modules order
+      if (newSparkloopRecModules.length > 0) {
+        await fetch('/api/sparkloop-rec-modules', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            modules: newSparkloopRecModules.map(m => ({ id: m.id, display_order: m.display_order }))
+          })
+        })
+      }
     } catch (error) {
       console.error('Failed to save order:', error)
       // Revert on error
@@ -658,6 +694,16 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           body: JSON.stringify({ id: item.data.id, is_active: newActive })
         })
         setFeedbackModules(prev => prev.map(m =>
+          m.id === item.data.id ? { ...m, is_active: newActive } : m
+        ))
+      } else if (item.type === 'sparkloop_rec_module') {
+        // SparkLoop rec module
+        await fetch(`/api/sparkloop-rec-modules/${item.data.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_active: newActive })
+        })
+        setSparkloopRecModules(prev => prev.map(m =>
           m.id === item.data.id ? { ...m, is_active: newActive } : m
         ))
       } else {
@@ -786,6 +832,22 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           const data = await res.json()
           setTextBoxModules(prev => [...prev, data.module])
           setSelectedItem({ type: 'text_box_module', data: data.module })
+        }
+      } else if (newSectionType === 'sparkloop_rec') {
+        // Create sparkloop rec module
+        const res = await fetch('/api/sparkloop-rec-modules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            publication_id: publicationId,
+            name: newModuleName.trim()
+          })
+        })
+
+        if (res.ok) {
+          const data = await res.json()
+          setSparkloopRecModules(prev => [...prev, data.module])
+          setSelectedItem({ type: 'sparkloop_rec_module', data: data.module })
         }
       } else if (newSectionType === 'feedback') {
         // Create feedback module (singleton - POST creates or returns existing)
@@ -1263,6 +1325,46 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     }
   }
 
+  const handleUpdateSparkLoopRecModule = async (updates: Partial<SparkLoopRecModule>) => {
+    if (!selectedItem || selectedItem.type !== 'sparkloop_rec_module') {
+      throw new Error('No sparkloop rec module selected')
+    }
+
+    const moduleId = selectedItem.data.id
+    console.log('[SectionsPanel] Updating sparkloop rec module:', moduleId, updates)
+
+    const res = await fetch(`/api/sparkloop-rec-modules/${moduleId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      console.log('[SectionsPanel] SparkLoop rec module updated successfully:', data.module)
+      setSparkloopRecModules(prev => prev.map(m => m.id === moduleId ? data.module : m))
+      setSelectedItem({ type: 'sparkloop_rec_module', data: data.module })
+    } else {
+      const errorData = await res.json().catch(() => ({}))
+      console.error('[SectionsPanel] Failed to update sparkloop rec module:', res.status, errorData)
+      throw new Error(errorData.error || `Failed to update sparkloop rec module (${res.status})`)
+    }
+  }
+
+  const handleDeleteSparkLoopRecModule = async () => {
+    if (!selectedItem || selectedItem.type !== 'sparkloop_rec_module') return
+
+    const moduleId = selectedItem.data.id
+    const res = await fetch(`/api/sparkloop-rec-modules/${moduleId}`, {
+      method: 'DELETE'
+    })
+
+    if (res.ok) {
+      setSparkloopRecModules(prev => prev.filter(m => m.id !== moduleId))
+      setSelectedItem(null)
+    }
+  }
+
   const handleCooldownChange = async (days: number) => {
     try {
       await fetch('/api/settings/publication', {
@@ -1434,6 +1536,12 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
             />
           ) : selectedItem.type === 'feedback_module' ? (
             <div className="text-gray-500">Loading publication...</div>
+          ) : selectedItem.type === 'sparkloop_rec_module' ? (
+            <SparkLoopRecModuleSettings
+              module={selectedItem.data}
+              onUpdate={handleUpdateSparkLoopRecModule}
+              onDelete={handleDeleteSparkLoopRecModule}
+            />
           ) : (
             <SectionSettings
               section={selectedItem.data}
@@ -1535,6 +1643,18 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
                 </button>
                 <button
                   type="button"
+                  onClick={() => setNewSectionType('sparkloop_rec')}
+                  className={`px-3 py-3 rounded-lg border-2 transition-colors ${
+                    newSectionType === 'sparkloop_rec'
+                      ? 'border-orange-500 bg-orange-50 text-orange-700'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                  }`}
+                >
+                  <div className="font-medium text-sm">SparkLoop</div>
+                  <div className="text-xs mt-1 opacity-75">Recommendations</div>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setNewSectionType('feedback')}
                   disabled={feedbackModules.length > 0}
                   className={`px-3 py-3 rounded-lg border-2 transition-colors ${
@@ -1583,9 +1703,11 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
                             ? "e.g., Top Stories"
                             : newSectionType === 'text_box'
                               ? "e.g., Welcome Section"
-                              : newSectionType === 'feedback'
-                                ? "e.g., Rate This Issue"
-                                : "e.g., Featured Content"
+                              : newSectionType === 'sparkloop_rec'
+                                ? "e.g., Recommended Newsletters"
+                                : newSectionType === 'feedback'
+                                  ? "e.g., Rate This Issue"
+                                  : "e.g., Featured Content"
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 autoFocus
