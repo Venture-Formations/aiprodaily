@@ -6,7 +6,7 @@ import { Container } from '@/components/salient/Container'
 import { SubscribeProgressBar } from '@/components/SubscribeProgressBar'
 
 const OFFER_ID = 'offer_recommendation_cfb40ae9d10d'
-const TRACKING_URL = 'https://dash.sparkloop.app/offer_recommendations/offer_recommendation_cfb40ae9d10d/action_click_redirect'
+const ACTION_REDIRECT_BASE = 'https://dash.sparkloop.app/offer_recommendations/offer_recommendation_cfb40ae9d10d/action_click_redirect'
 
 interface HubspotOfferContentProps {
   logoUrl: string
@@ -53,8 +53,15 @@ export function HubspotOfferContent({ logoUrl, newsletterName }: HubspotOfferCon
       }),
     }).catch(() => {})
 
+    // Generate a session UUID so SparkLoop uses it as the submission ID
+    // in the HubSpot redirect URL (plain UUID format that HubSpot expects).
+    // Without this, action_click_redirect falls back to the internal
+    // offer_submission_* format which HubSpot can't use for conversion tracking.
+    const sessionUuid = crypto.randomUUID()
+    const trackingUrl = `${ACTION_REDIRECT_BASE}?session_uuid=${sessionUuid}`
+
     // Open SparkLoop tracking URL in new tab
-    window.open(TRACKING_URL, '_blank')
+    window.open(trackingUrl, '_blank')
 
     // Redirect current page to offers
     window.location.href = `/subscribe/offers?email=${encodeURIComponent(email)}`
