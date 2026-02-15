@@ -62,9 +62,9 @@ export function SubscribeForm() {
     setShowSparkLoopModal(false)
   }, [])
 
-  // Handle subscribe complete - redirect to offers page
+  // Handle subscribe complete - redirect to SparkLoop recs.page for HubSpot offer
   const handleSubscribeComplete = useCallback(() => {
-    window.location.href = `/subscribe/hubspot-offer?email=${encodeURIComponent(subscribedEmail)}`
+    window.location.href = `https://recs.page/ai-accounting-daily?offer_recommendation_uuid=offer_recommendation_cfb40ae9d10d&email=${encodeURIComponent(subscribedEmail)}`
   }, [subscribedEmail])
 
   const handleSubmit = async (e: React.FormEvent) => {
