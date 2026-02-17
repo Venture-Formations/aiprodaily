@@ -78,9 +78,8 @@ United States
    * via the MailerLite content endpoint (PUT /campaigns/{id}/content).
    */
   private async pushCampaignContent(campaignId: string, html: string, plain: string): Promise<void> {
-    // Step 2: Push content via the undocumented content endpoint
-    // PUT /campaigns/{id}/content with {html, plain, auto_inline}
-    // This must be called AFTER creating the shell (POST with no content)
+    // Attempt to push plain text + auto_inline via the undocumented content endpoint.
+    // Content is ALREADY set via the POST, so this is a non-fatal enhancement attempt.
     try {
       const contentResponse = await mailerliteClient.put(`/campaigns/${campaignId}/content`, {
         html,
@@ -94,11 +93,11 @@ United States
         data: JSON.stringify(contentResponse.data).substring(0, 200),
       })
     } catch (contentError: any) {
-      console.error('[MailerLite] Failed to push campaign content:', {
+      console.error('[MailerLite] Content endpoint failed (non-fatal, content already in POST):', {
         status: contentError?.response?.status,
         data: contentError?.response?.data,
       })
-      throw contentError // Fatal: campaign has no content without this
+      // Non-fatal: content was already set via the initial POST
     }
   }
 
@@ -140,7 +139,6 @@ United States
 
       console.log('Final subject line being sent to MailerLite:', subjectLine)
 
-      // Step 1: Create campaign shell (no content — pushed via /content endpoint in Step 2)
       const issueData = {
         name: `${newsletterName} Review: ${issue.date}`,
         type: 'regular',
@@ -148,6 +146,7 @@ United States
           subject: `${subjectEmoji} ${subjectLine}`,
           from_name: senderName,
           from: fromEmail,
+          content: emailContent,
         }],
         groups: [reviewGroupId]
       }
@@ -583,7 +582,6 @@ United States
         ? `${newsletterName} Newsletter (Secondary): ${issue.date}`
         : `${newsletterName} Newsletter: ${issue.date}`
 
-      // Step 1: Create campaign shell (no content — pushed via /content endpoint in Step 2)
       const issueData = {
         name: campaignName,
         type: 'regular',
@@ -591,6 +589,7 @@ United States
           subject: `${subjectEmoji} ${subjectLine}`,
           from_name: senderName,
           from: fromEmail,
+          content: emailContent,
         }],
         groups: [mainGroupId]
       }
