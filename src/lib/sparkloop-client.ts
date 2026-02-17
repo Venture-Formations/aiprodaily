@@ -18,6 +18,19 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 const SPARKLOOP_API_BASE = 'https://api.sparkloop.app/v2'
 
+/**
+ * Normalize Gmail addresses by stripping periods from the local part.
+ * Gmail ignores periods, so david.pennertz@gmail.com === davidpennertz@gmail.com.
+ * This ensures consistent matching in SparkLoop's API.
+ */
+function normalizeGmailAddress(email: string): string {
+  const [local, domain] = email.split('@')
+  if (domain?.toLowerCase() === 'gmail.com') {
+    return `${local.replace(/\./g, '')}@${domain}`
+  }
+  return email
+}
+
 // Default publication ID for AI Pro Daily
 const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
 
@@ -134,10 +147,14 @@ export class SparkLoopService {
     ip_address?: string
     user_agent?: string
   }): Promise<SparkLoopSubscriber> {
+    const normalizedEmail = normalizeGmailAddress(params.email)
+    if (normalizedEmail !== params.email) {
+      console.log(`[SparkLoop] Normalized Gmail address: ${params.email} -> ${normalizedEmail}`)
+    }
     const createUrl = `${SPARKLOOP_API_BASE}/subscribers`
 
     const createBody: Record<string, string> = {
-      email: params.email,
+      email: normalizedEmail,
       country_code: params.country_code,
     }
     if (params.ip_address) createBody.ip_address = params.ip_address
@@ -164,7 +181,7 @@ export class SparkLoopService {
 
     // 400 typically means subscriber already exists — fetch instead
     if (createResponse.status === 400) {
-      const fetchUrl = `${SPARKLOOP_API_BASE}/subscribers/${encodeURIComponent(params.email)}`
+      const fetchUrl = `${SPARKLOOP_API_BASE}/subscribers/${encodeURIComponent(normalizedEmail)}`
       console.log(`[SparkLoop] Fetching existing subscriber by email...`)
 
       const fetchResponse = await fetch(fetchUrl, {
@@ -208,11 +225,15 @@ export class SparkLoopService {
    */
   async subscribeToNewsletters(params: SparkLoopSubscribeRequest): Promise<{ success: boolean; response?: unknown }> {
     const url = `${SPARKLOOP_API_BASE}/upscribes/${this.upscribeId}/subscribe`
+    const normalizedEmail = normalizeGmailAddress(params.subscriber_email)
+    if (normalizedEmail !== params.subscriber_email) {
+      console.log(`[SparkLoop] Normalized Gmail address: ${params.subscriber_email} -> ${normalizedEmail}`)
+    }
 
     console.log(`[SparkLoop] Subscribing ${params.subscriber_email} to: ${params.recommendations}`)
 
     const payload: Record<string, string | undefined> = {
-      subscriber_email: params.subscriber_email,
+      subscriber_email: normalizedEmail,
       country_code: params.country_code,
       recommendations: params.recommendations,
       utm_source: params.utm_source || 'custom_popup',
