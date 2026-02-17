@@ -3,7 +3,7 @@ import { supabaseAdmin } from './supabase'
 import { ErrorHandler, SlackNotificationService } from './slack'
 import type { issueWithArticles, issueWithEvents, Article } from '@/types/database'
 import { generateFullNewsletterHtml } from './newsletter-templates'
-import { getEmailSettings, getScheduleSettings, getPublicationSetting } from './publication-settings'
+import { getEmailSettings, getScheduleSettings, getPublicationSetting, getPublicationSettings } from './publication-settings'
 
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
 
@@ -23,6 +23,79 @@ export class MailerLiteService {
   constructor() {
     this.errorHandler = new ErrorHandler()
     this.slack = new SlackNotificationService()
+  }
+
+  /**
+   * Generate plain text version of the newsletter for email clients that can't render HTML.
+   * Uses the newsletter name and business info from publication settings.
+   */
+  private async generatePlainText(publicationId: string, senderName: string): Promise<string> {
+    const settings = await getPublicationSettings(publicationId, [
+      'newsletter_name',
+      'business_name',
+      'business_address',
+    ])
+
+    const newsletterName = settings.newsletter_name || senderName
+    const businessName = settings.business_name || 'Venture Formations LLC'
+    const businessAddress = settings.business_address || '8250 Delta Circle, Saint Joseph, MN 56374'
+    const currentYear = new Date().getFullYear()
+
+    // Parse address parts (format: "Street, City, ST ZIP")
+    const addressParts = businessAddress.split(',').map((p: string) => p.trim())
+    const street = addressParts[0] || ''
+    const cityStateZip = addressParts.slice(1).join(', ') || ''
+
+    return `GM!
+
+You're receiving this because you subscribed to ${newsletterName}.
+Your email software currently can't display our full HTML layout.
+
+>> VIEW TODAY'S FULL EDITION IN YOUR BROWSER:
+{$url}
+
+------------------------------------------------------------
+   UNSUBSCRIBE
+------------------------------------------------------------
+If you no longer wish to receive these updates, you can
+instantly opt-out here:
+{$unsubscribe}
+
+------------------------------------------------------------
+   CONTACT US
+------------------------------------------------------------
+${newsletterName}
+${businessName}
+${street}
+${cityStateZip}
+United States
+
+\u00A9${currentYear} ${businessName}. All rights reserved.`
+  }
+
+  /**
+   * Push HTML content, plain text, and auto_inline setting to a campaign
+   * via the MailerLite content endpoint (PUT /campaigns/{id}/content).
+   */
+  private async pushCampaignContent(campaignId: string, html: string, plain: string): Promise<void> {
+    try {
+      const contentResponse = await mailerliteClient.put(`/campaigns/${campaignId}/content`, {
+        html,
+        plain,
+        auto_inline: true,
+      })
+
+      console.log('[MailerLite] Content push response:', {
+        status: contentResponse.status,
+        statusText: contentResponse.statusText,
+      })
+    } catch (contentError: any) {
+      console.error('[MailerLite] Failed to push campaign content:', {
+        status: contentError?.response?.status,
+        data: contentError?.response?.data,
+      })
+      // Non-fatal: campaign was created with inline content as fallback
+    }
   }
 
   async createReviewissue(issue: issueWithEvents, forcedSubjectLine?: string) {
@@ -98,7 +171,11 @@ export class MailerLiteService {
         })
         console.log('issue created successfully with ID:', issueId)
 
-        // Step 2: Schedule the issue using the issue ID
+        // Step 2: Push content with plain text and auto_inline
+        const plainText = await this.generatePlainText(issue.publication_id, senderName)
+        await this.pushCampaignContent(issueId, emailContent, plainText)
+
+        // Step 3: Schedule the issue using the issue ID
         let scheduleData
         try {
           // Schedule review for TODAY at scheduled send time
@@ -541,6 +618,10 @@ export class MailerLiteService {
         })
 
         console.log('Final issue created successfully:', issueId)
+
+        // Push content with plain text and auto_inline
+        const plainText = await this.generatePlainText(issue.publication_id, senderName)
+        await this.pushCampaignContent(issueId, emailContent, plainText)
 
         // Schedule the final issue for TODAY at scheduled send time
         // issue is created at issue Creation Time and scheduled to send same day at Scheduled Send Time
