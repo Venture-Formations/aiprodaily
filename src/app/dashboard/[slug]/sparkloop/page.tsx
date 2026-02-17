@@ -16,6 +16,7 @@ import {
 } from 'recharts'
 import DetailedTab from './components/DetailedTab'
 import OffersTab from './components/OffersTab'
+import PublicationsTab from './components/PublicationsTab'
 
 interface Recommendation {
   id: string
@@ -131,7 +132,7 @@ export default function SparkLoopAdminPage() {
   const [defaults, setDefaults] = useState<Defaults>({ cr: 22, rcr: 25 })
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'detailed' | 'offers'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'detailed' | 'publications' | 'offers'>('overview')
 
   // Chart state
   const [chartStats, setChartStats] = useState<ChartStats | null>(null)
@@ -351,6 +352,16 @@ export default function SparkLoopAdminPage() {
             Detailed
           </button>
           <button
+            onClick={() => setActiveTab('publications')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
+              activeTab === 'publications'
+                ? 'border-purple-600 text-purple-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Publications
+          </button>
+          <button
             onClick={() => setActiveTab('offers')}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
               activeTab === 'offers'
@@ -364,6 +375,8 @@ export default function SparkLoopAdminPage() {
 
         {activeTab === 'offers' ? (
           <OffersTab />
+        ) : activeTab === 'publications' ? (
+          <PublicationsTab recommendations={recommendations} />
         ) : activeTab === 'overview' ? (
           <>
             {/* Summary Stats */}
