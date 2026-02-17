@@ -309,7 +309,7 @@ export default function PublicationsTab({ recommendations }: Props) {
                       <td className="px-4 py-2.5 font-mono text-xs">{r.subscriber_email}</td>
                       <td className="px-4 py-2.5 text-gray-600">
                         {new Date(r.subscribed_at).toLocaleDateString('en-US', {
-                          month: 'short', day: 'numeric', year: 'numeric',
+                          month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC',
                         })}
                       </td>
                       <td className="px-4 py-2.5">
