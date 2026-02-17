@@ -25,8 +25,14 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const startDate = `${start}T00:00:00.000Z`
-    const endDate = `${end}T23:59:59.999Z`
+    // CST = UTC-6: midnight CST = 06:00 UTC
+    const startDate = `${start}T06:00:00.000Z`
+    const endDate = `${end}T06:00:00.000Z`
+    // End date needs to go to next day 05:59:59 UTC (end of CST day)
+    const endDateObj = new Date(endDate)
+    endDateObj.setUTCDate(endDateObj.getUTCDate() + 1)
+    endDateObj.setUTCMilliseconds(-1)
+    const endDateCST = endDateObj.toISOString()
 
     const { data: referrals, error } = await supabaseAdmin
       .from('sparkloop_referrals')
@@ -34,7 +40,7 @@ export async function GET(request: NextRequest) {
       .eq('publication_id', DEFAULT_PUBLICATION_ID)
       .eq('ref_code', refCode)
       .gte('subscribed_at', startDate)
-      .lte('subscribed_at', endDate)
+      .lte('subscribed_at', endDateCST)
       .order('subscribed_at', { ascending: false })
 
     if (error) {
