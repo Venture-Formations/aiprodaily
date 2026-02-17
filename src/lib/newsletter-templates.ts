@@ -1834,7 +1834,7 @@ ${socialMediaSection}
       <p style="margin: 5px 0 0;text-align: center;">
         <a href="${websiteUrl}/unsubscribe?email={$email}" style='text-decoration: underline;'>Manage Preferences</a> | <a href="${websiteUrl}/unsubscribe?email={$email}" style='text-decoration: underline;'>Unsubscribe</a>
       </p>
-      <p style="margin: 5px 0 0;text-align: center;">©${currentYear} ${businessName}, all rights reserved</p>
+      <p style="margin: 5px 0 0;text-align: center;">©${currentYear} {$account}, all rights reserved</p>
       <p style="margin: 2px 0 0;text-align: center;">${businessAddress}</p>
       <a href="{$unsubscribe}" style="color:#ffffff;font-size:1px;text-decoration:none;line-height:0;overflow:hidden;mso-hide:all;" aria-hidden="true">&#8203;</a>
     </td>
