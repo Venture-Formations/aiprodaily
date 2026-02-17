@@ -1750,6 +1750,7 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
   const primaryColor = settingsMap.primary_color || '#1877F2'
   const newsletterName = settingsMap.newsletter_name || 'St. Cloud Scoop'
   const businessName = settingsMap.business_name || 'Venture Formations LLC'
+  const businessAddress = settingsMap.business_address || '8250 Delta Circle, Saint Joseph, MN 56374'
   const websiteUrl = settingsMap.website_url || 'https://www.aiaccountingdaily.com'
   const currentYear = new Date().getFullYear()
 
@@ -1833,7 +1834,8 @@ ${socialMediaSection}
       <p style="margin: 5px 0 0;text-align: center;">
         <a href="${websiteUrl}/unsubscribe?email={$email}" style='text-decoration: underline;'>Manage Preferences</a> | <a href="${websiteUrl}/unsubscribe?email={$email}" style='text-decoration: underline;'>Unsubscribe</a>
       </p>
-      <p style="margin: 5px;text-align: center;">©${currentYear} ${businessName}, all rights reserved</p>
+      <p style="margin: 5px 0 0;text-align: center;">©${currentYear} ${businessName}, all rights reserved</p>
+      <p style="margin: 2px 0 0;text-align: center;">${businessAddress}</p>
       <a href="{$unsubscribe}" style="color:#ffffff;font-size:1px;text-decoration:none;line-height:0;overflow:hidden;mso-hide:all;" aria-hidden="true">&#8203;</a>
     </td>
   </tr>
