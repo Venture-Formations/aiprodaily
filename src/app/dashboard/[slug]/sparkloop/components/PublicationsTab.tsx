@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Search, X, ChevronDown } from 'lucide-react'
+import { Search, X, ChevronDown, Download } from 'lucide-react'
 
 interface Recommendation {
   id: string
@@ -279,9 +279,33 @@ export default function PublicationsTab({ recommendations }: Props) {
                 </button>
               ))}
             </div>
-            <span className="text-sm text-gray-500">
-              {loading ? 'Loading...' : `Showing ${filteredReferrals.length} submissions`}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-500">
+                {loading ? 'Loading...' : `Showing ${filteredReferrals.length} submissions`}
+              </span>
+              {filteredReferrals.length > 0 && (
+                <button
+                  onClick={() => {
+                    const header = 'Email,Date,Status,Source'
+                    const rows = filteredReferrals.map(r =>
+                      `${r.subscriber_email},${r.subscribed_at.split('T')[0]},${r.status},${r.source === 'recs_page' ? 'Page' : 'Popup'}`
+                    )
+                    const csv = [header, ...rows].join('\n')
+                    const blob = new Blob([csv], { type: 'text/csv' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `${selectedRec?.publication_name.replace(/[^a-zA-Z0-9]/g, '_')}_${startDate}_${endDate}.csv`
+                    a.click()
+                    URL.revokeObjectURL(url)
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Export CSV
+                </button>
+              )}
+            </div>
           </div>
 
           {loading ? (
