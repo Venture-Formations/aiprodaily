@@ -77,27 +77,28 @@ United States
    * Push HTML content, plain text, and auto_inline setting to a campaign
    * via the MailerLite content endpoint (PUT /campaigns/{id}/content).
    */
-  private async pushPlainText(campaignId: string, html: string, plain: string): Promise<void> {
-    // Update the campaign with plain text via PUT /campaigns/{id}
-    // The API docs only show emails[].content, but we attempt to include
-    // plain text fields to override the auto-generated version.
+  private async pushCampaignContent(campaignId: string, html: string, plain: string): Promise<void> {
+    // Step 2: Push content via the undocumented content endpoint
+    // PUT /campaigns/{id}/content with {html, plain, auto_inline}
+    // This must be called AFTER creating the shell (POST with no content)
     try {
-      const updateResponse = await mailerliteClient.put(`/campaigns/${campaignId}`, {
-        emails: [{
-          content: html,
-          plain_text: plain,
-        }],
+      const contentResponse = await mailerliteClient.put(`/campaigns/${campaignId}/content`, {
+        html,
+        plain,
+        auto_inline: true,
       })
 
-      console.log('[MailerLite] Campaign content update response:', {
-        status: updateResponse.status,
-        statusText: updateResponse.statusText,
+      console.log('[MailerLite] Content push response:', {
+        status: contentResponse.status,
+        statusText: contentResponse.statusText,
+        data: JSON.stringify(contentResponse.data).substring(0, 200),
       })
     } catch (contentError: any) {
-      console.error('[MailerLite] Failed to update campaign content:', {
+      console.error('[MailerLite] Failed to push campaign content:', {
         status: contentError?.response?.status,
         data: contentError?.response?.data,
       })
+      throw contentError // Fatal: campaign has no content without this
     }
   }
 
@@ -139,6 +140,7 @@ United States
 
       console.log('Final subject line being sent to MailerLite:', subjectLine)
 
+      // Step 1: Create campaign shell (no content — pushed via /content endpoint in Step 2)
       const issueData = {
         name: `${newsletterName} Review: ${issue.date}`,
         type: 'regular',
@@ -146,7 +148,6 @@ United States
           subject: `${subjectEmoji} ${subjectLine}`,
           from_name: senderName,
           from: fromEmail,
-          content: emailContent,
         }],
         groups: [reviewGroupId]
       }
@@ -175,7 +176,7 @@ United States
 
         // Step 2: Push content with plain text and auto_inline
         const plainText = await this.generatePlainText(issue.publication_id, senderName)
-        await this.pushPlainText(issueId, emailContent, plainText)
+        await this.pushCampaignContent(issueId, emailContent, plainText)
 
         // Step 3: Schedule the issue using the issue ID
         let scheduleData
@@ -582,6 +583,7 @@ United States
         ? `${newsletterName} Newsletter (Secondary): ${issue.date}`
         : `${newsletterName} Newsletter: ${issue.date}`
 
+      // Step 1: Create campaign shell (no content — pushed via /content endpoint in Step 2)
       const issueData = {
         name: campaignName,
         type: 'regular',
@@ -589,7 +591,6 @@ United States
           subject: `${subjectEmoji} ${subjectLine}`,
           from_name: senderName,
           from: fromEmail,
-          content: emailContent,
         }],
         groups: [mainGroupId]
       }
@@ -623,7 +624,7 @@ United States
 
         // Push content with plain text and auto_inline
         const plainText = await this.generatePlainText(issue.publication_id, senderName)
-        await this.pushPlainText(issueId, emailContent, plainText)
+        await this.pushCampaignContent(issueId, emailContent, plainText)
 
         // Schedule the final issue for TODAY at scheduled send time
         // issue is created at issue Creation Time and scheduled to send same day at Scheduled Send Time
