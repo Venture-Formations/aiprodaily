@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
 const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+const PAGE_SIZE = 1000
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,17 +12,25 @@ export async function GET(request: NextRequest) {
     since.setDate(since.getDate() - days)
     const sinceStr = since.toISOString()
 
-    // Get daily aggregates
-    const { data: events, error } = await supabaseAdmin
-      .from('sparkloop_offer_events')
-      .select('event_type, created_at, subscriber_email, ip_address')
-      .eq('publication_id', PUBLICATION_ID)
-      .gte('created_at', sinceStr)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('[OfferStats] Query error:', error.message)
-      return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 })
+    // Get all events with pagination to avoid 1000-row default limit
+    let events: { event_type: string; created_at: string; subscriber_email: string | null; ip_address: string | null }[] = []
+    let pageFrom = 0
+    while (true) {
+      const { data: page, error } = await supabaseAdmin
+        .from('sparkloop_offer_events')
+        .select('event_type, created_at, subscriber_email, ip_address')
+        .eq('publication_id', PUBLICATION_ID)
+        .gte('created_at', sinceStr)
+        .order('created_at', { ascending: false })
+        .range(pageFrom, pageFrom + PAGE_SIZE - 1)
+      if (error) {
+        console.error('[OfferStats] Query error:', error.message)
+        return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 })
+      }
+      if (!page || page.length === 0) break
+      events = events.concat(page)
+      if (page.length < PAGE_SIZE) break
+      pageFrom += PAGE_SIZE
     }
 
     // Aggregate by day
@@ -33,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     const todayStr = new Date().toISOString().split('T')[0]
 
-    for (const event of events || []) {
+    for (const event of events) {
       const day = event.created_at.split('T')[0]
       if (!dailyMap[day]) {
         dailyMap[day] = { impressions: 0, claims: 0 }
@@ -63,7 +72,7 @@ export async function GET(request: NextRequest) {
       }))
 
     // Recent events for table (last 50)
-    const recentEvents = (events || []).slice(0, 50).map(e => ({
+    const recentEvents = events.slice(0, 50).map(e => ({
       date: e.created_at,
       email: e.subscriber_email,
       event_type: e.event_type,

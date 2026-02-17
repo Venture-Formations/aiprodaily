@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 // Default publication ID for AI Pro Daily
 const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+const PAGE_SIZE = 1000
 
 /**
  * GET /api/sparkloop/admin/daterange
@@ -30,46 +31,56 @@ export async function GET(request: NextRequest) {
     const startDate = `${start}T00:00:00.000Z`
     const endDate = `${end}T23:59:59.999Z`
 
-    // 1. Impressions: popup_opened events in range (split by source)
-    const { data: popupEvents, error: popupError } = await supabaseAdmin
-      .from('sparkloop_events')
-      .select('raw_payload')
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
-      .eq('event_type', 'popup_opened')
-      .gte('event_timestamp', startDate)
-      .lte('event_timestamp', endDate)
-
-    if (popupError) {
-      throw new Error(`Popup events query failed: ${popupError.message}`)
+    // 1. Impressions: popup_opened events in range (split by source) - paginated
+    let popupEvents: { raw_payload: Record<string, unknown> | null }[] = []
+    let pageFrom = 0
+    while (true) {
+      const { data: page, error } = await supabaseAdmin
+        .from('sparkloop_events')
+        .select('raw_payload')
+        .eq('publication_id', DEFAULT_PUBLICATION_ID)
+        .eq('event_type', 'popup_opened')
+        .gte('event_timestamp', startDate)
+        .lte('event_timestamp', endDate)
+        .range(pageFrom, pageFrom + PAGE_SIZE - 1)
+      if (error) throw new Error(`Popup events query failed: ${error.message}`)
+      if (!page || page.length === 0) break
+      popupEvents = popupEvents.concat(page)
+      if (page.length < PAGE_SIZE) break
+      pageFrom += PAGE_SIZE
     }
 
     const impressionsByRef: Record<string, number> = {}
     const pageImpressionsByRef: Record<string, number> = {}
-    if (popupEvents) {
-      for (const evt of popupEvents) {
-        const payload = evt.raw_payload as Record<string, unknown> | null
-        const refCodes = payload?.ref_codes as string[] | null
-        const source = payload?.source as string | null
-        if (refCodes) {
-          const target = source === 'recs_page' ? pageImpressionsByRef : impressionsByRef
-          for (const rc of refCodes) {
-            target[rc] = (target[rc] || 0) + 1
-          }
+    for (const evt of popupEvents) {
+      const payload = evt.raw_payload
+      const refCodes = payload?.ref_codes as string[] | null
+      const source = payload?.source as string | null
+      if (refCodes) {
+        const target = source === 'recs_page' ? pageImpressionsByRef : impressionsByRef
+        for (const rc of refCodes) {
+          target[rc] = (target[rc] || 0) + 1
         }
       }
     }
 
-    // 2. Referrals in date range (by subscribed_at), split by source
-    const { data: referrals, error: refError } = await supabaseAdmin
-      .from('sparkloop_referrals')
-      .select('ref_code, status, source')
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
-      .in('source', ['custom_popup', 'recs_page'])
-      .gte('subscribed_at', startDate)
-      .lte('subscribed_at', endDate)
-
-    if (refError) {
-      throw new Error(`Referrals query failed: ${refError.message}`)
+    // 2. Referrals in date range (by subscribed_at), split by source - paginated
+    let referrals: { ref_code: string; status: string; source: string }[] = []
+    pageFrom = 0
+    while (true) {
+      const { data: page, error } = await supabaseAdmin
+        .from('sparkloop_referrals')
+        .select('ref_code, status, source')
+        .eq('publication_id', DEFAULT_PUBLICATION_ID)
+        .in('source', ['custom_popup', 'recs_page'])
+        .gte('subscribed_at', startDate)
+        .lte('subscribed_at', endDate)
+        .range(pageFrom, pageFrom + PAGE_SIZE - 1)
+      if (error) throw new Error(`Referrals query failed: ${error.message}`)
+      if (!page || page.length === 0) break
+      referrals = referrals.concat(page)
+      if (page.length < PAGE_SIZE) break
+      pageFrom += PAGE_SIZE
     }
 
     const refMetrics: Record<string, {
@@ -86,58 +97,74 @@ export async function GET(request: NextRequest) {
       pending: number
     }> = {}
 
-    if (referrals) {
-      for (const r of referrals) {
-        const target = r.source === 'recs_page' ? pageRefMetrics : refMetrics
-        if (!target[r.ref_code]) {
-          target[r.ref_code] = { submissions: 0, confirms: 0, rejections: 0, pending: 0 }
-        }
-        target[r.ref_code].submissions++
-        if (r.status === 'confirmed') {
-          target[r.ref_code].confirms++
-        } else if (r.status === 'rejected') {
-          target[r.ref_code].rejections++
-        } else {
-          target[r.ref_code].pending++
-        }
+    for (const r of referrals) {
+      const target = r.source === 'recs_page' ? pageRefMetrics : refMetrics
+      if (!target[r.ref_code]) {
+        target[r.ref_code] = { submissions: 0, confirms: 0, rejections: 0, pending: 0 }
+      }
+      target[r.ref_code].submissions++
+      if (r.status === 'confirmed') {
+        target[r.ref_code].confirms++
+      } else if (r.status === 'rejected') {
+        target[r.ref_code].rejections++
+      } else {
+        target[r.ref_code].pending++
       }
     }
 
-    // 3. Unique IPs from api_subscribe_confirmed events in range
-    const { data: subscribeEvents } = await supabaseAdmin
-      .from('sparkloop_events')
-      .select('raw_payload')
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
-      .eq('event_type', 'api_subscribe_confirmed')
-      .gte('event_timestamp', startDate)
-      .lte('event_timestamp', endDate)
+    // 3. Unique IPs from api_subscribe_confirmed events in range - paginated
+    let subscribeEvents: { raw_payload: Record<string, unknown> | null }[] = []
+    pageFrom = 0
+    while (true) {
+      const { data: page } = await supabaseAdmin
+        .from('sparkloop_events')
+        .select('raw_payload')
+        .eq('publication_id', DEFAULT_PUBLICATION_ID)
+        .eq('event_type', 'api_subscribe_confirmed')
+        .gte('event_timestamp', startDate)
+        .lte('event_timestamp', endDate)
+        .range(pageFrom, pageFrom + PAGE_SIZE - 1)
+      if (!page || page.length === 0) break
+      subscribeEvents = subscribeEvents.concat(page)
+      if (page.length < PAGE_SIZE) break
+      pageFrom += PAGE_SIZE
+    }
 
     let uniqueIps = 0
-    if (subscribeEvents && subscribeEvents.length > 0) {
+    if (subscribeEvents.length > 0) {
       const ips = new Set<string>()
       for (const evt of subscribeEvents) {
-        const payload = evt.raw_payload as Record<string, unknown> | null
+        const payload = evt.raw_payload
         const ipHash = payload?.ip_hash as string | null
         if (ipHash) ips.add(ipHash)
       }
       uniqueIps = ips.size
     }
 
-    // 4. Avg offers selected from subscriptions_success events in range
-    const { data: successEvents } = await supabaseAdmin
-      .from('sparkloop_events')
-      .select('raw_payload')
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
-      .eq('event_type', 'subscriptions_success')
-      .gte('event_timestamp', startDate)
-      .lte('event_timestamp', endDate)
+    // 4. Avg offers selected from subscriptions_success events in range - paginated
+    let successEvents: { raw_payload: Record<string, unknown> | null }[] = []
+    pageFrom = 0
+    while (true) {
+      const { data: page } = await supabaseAdmin
+        .from('sparkloop_events')
+        .select('raw_payload')
+        .eq('publication_id', DEFAULT_PUBLICATION_ID)
+        .eq('event_type', 'subscriptions_success')
+        .gte('event_timestamp', startDate)
+        .lte('event_timestamp', endDate)
+        .range(pageFrom, pageFrom + PAGE_SIZE - 1)
+      if (!page || page.length === 0) break
+      successEvents = successEvents.concat(page)
+      if (page.length < PAGE_SIZE) break
+      pageFrom += PAGE_SIZE
+    }
 
     let avgOffersSelected = 0
-    if (successEvents && successEvents.length > 0) {
+    if (successEvents.length > 0) {
       let totalSelected = 0
       let countWithData = 0
       for (const evt of successEvents) {
-        const payload = evt.raw_payload as Record<string, unknown> | null
+        const payload = evt.raw_payload
         const selected = payload?.selected_count as number | undefined
         if (selected !== undefined && selected !== null) {
           totalSelected += selected
@@ -179,7 +206,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log(`[SparkLoop Admin] Date range ${start} to ${end}: ${popupEvents?.length || 0} popup events, ${referrals?.length || 0} referrals, ${uniqueIps} unique IPs`)
+    console.log(`[SparkLoop Admin] Date range ${start} to ${end}: ${popupEvents.length} popup events, ${referrals.length} referrals, ${uniqueIps} unique IPs`)
 
     return NextResponse.json({
       success: true,

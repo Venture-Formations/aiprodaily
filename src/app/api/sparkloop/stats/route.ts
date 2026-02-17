@@ -112,13 +112,22 @@ export async function GET(request: NextRequest) {
     // We need one extra day before the range to compute the first day's delta
     const snapshotFromDate = new Date(fromDate)
     snapshotFromDate.setDate(snapshotFromDate.getDate() - 1)
-    const { data: snapshots } = await supabaseAdmin
-      .from('sparkloop_daily_snapshots')
-      .select('snapshot_date, sparkloop_pending, sparkloop_confirmed, sparkloop_rejected')
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
-      .gte('snapshot_date', snapshotFromDate.toISOString().split('T')[0])
-      .lte('snapshot_date', toDate.toISOString().split('T')[0])
-      .order('snapshot_date', { ascending: true })
+    let snapshots: { snapshot_date: string; sparkloop_pending: number; sparkloop_confirmed: number; sparkloop_rejected: number }[] = []
+    let snapPageFrom = 0
+    while (true) {
+      const { data: snapPage } = await supabaseAdmin
+        .from('sparkloop_daily_snapshots')
+        .select('snapshot_date, sparkloop_pending, sparkloop_confirmed, sparkloop_rejected')
+        .eq('publication_id', DEFAULT_PUBLICATION_ID)
+        .gte('snapshot_date', snapshotFromDate.toISOString().split('T')[0])
+        .lte('snapshot_date', toDate.toISOString().split('T')[0])
+        .order('snapshot_date', { ascending: true })
+        .range(snapPageFrom, snapPageFrom + pageSize - 1)
+      if (!snapPage || snapPage.length === 0) break
+      snapshots = snapshots.concat(snapPage)
+      if (snapPage.length < pageSize) break
+      snapPageFrom += pageSize
+    }
 
     // Aggregate snapshots by date (sum across all ref_codes)
     const snapshotByDate = new Map<string, { pending: number; confirmed: number; rejected: number }>()
