@@ -59,29 +59,29 @@ export async function GET(request: NextRequest) {
       const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
       const hasSLRcr = slRcr !== null && slRcr > 0
 
-      // Effective CR: ours > override > configurable default
+      // Effective CR: override > ours > configurable default
       let effectiveCr: number
       let crSource: string
-      if (hasOurCr) {
+      if (hasOverrideCr) {
+        effectiveCr = Number(rec.override_cr)
+        crSource = hasOurCr ? 'override_with_data' : 'override'
+      } else if (hasOurCr) {
         effectiveCr = Number(rec.our_cr)
         crSource = 'ours'
-      } else if (hasOverrideCr) {
-        effectiveCr = Number(rec.override_cr)
-        crSource = 'override'
       } else {
         effectiveCr = defaultCr
         crSource = 'default'
       }
 
-      // Effective RCR: sparkloop > override > configurable default
+      // Effective RCR: override > sparkloop > configurable default
       let effectiveRcr: number
       let rcrSource: string
-      if (hasSLRcr) {
+      if (hasOverrideRcr) {
+        effectiveRcr = Number(rec.override_rcr)
+        rcrSource = hasSLRcr ? 'override_with_sl' : 'override'
+      } else if (hasSLRcr) {
         effectiveRcr = slRcr!
         rcrSource = 'sparkloop'
-      } else if (hasOverrideRcr) {
-        effectiveRcr = Number(rec.override_rcr)
-        rcrSource = 'override'
       } else {
         effectiveRcr = defaultRcr
         rcrSource = 'default'

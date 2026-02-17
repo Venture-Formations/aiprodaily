@@ -87,11 +87,11 @@ export async function GET(request: NextRequest) {
       const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
       const hasSLRcr = slRcr !== null && slRcr > 0
 
-      const cr = hasOurCr ? Number(rec.our_cr) / 100
-        : hasOverrideCr ? Number(rec.override_cr) / 100
+      const cr = hasOverrideCr ? Number(rec.override_cr) / 100
+        : hasOurCr ? Number(rec.our_cr) / 100
         : defaultCr
-      const rcr = hasSLRcr ? slRcr! / 100
-        : hasOverrideRcr ? Number(rec.override_rcr) / 100
+      const rcr = hasOverrideRcr ? Number(rec.override_rcr) / 100
+        : hasSLRcr ? slRcr! / 100
         : defaultRcr
       const cpa = (rec.cpa || 0) / 100
       const score = cr * cpa * rcr

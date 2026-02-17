@@ -609,6 +609,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
   }
 
   const getSourceColor = (source: string) => {
+    if (source === 'override_with_data' || source === 'override_with_sl') return 'text-red-600 font-medium'
     if (source === 'override') return 'text-orange-600 font-medium'
     if (source === 'ours') return 'text-blue-600 font-medium'
     return ''
@@ -701,6 +702,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
         return <span className={getSourceColor(rec.rcr_source)}>{rec.effective_rcr.toFixed(1)}%</span>
 
       case 'rcr_source':
+        if (rec.rcr_source === 'override_with_sl') return <span className="text-red-600" title="Override active — SL RCR available">override*</span>
         if (rec.rcr_source === 'override') return <span className="text-orange-600">override</span>
         if (rec.rcr_source === 'ours') return <span className="text-blue-600">ours</span>
         if (rec.rcr_source === 'sparkloop') return 'SL'
@@ -720,6 +722,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
         return <span className={getSourceColor(rec.cr_source)}>{rec.effective_cr.toFixed(1)}%</span>
 
       case 'cr_source':
+        if (rec.cr_source === 'override_with_data') return <span className="text-red-600" title="Override active — Our CR available">override*</span>
         if (rec.cr_source === 'override') return <span className="text-orange-600">override</span>
         if (rec.cr_source === 'ours') return <span className="text-blue-600">ours</span>
         return 'default'
@@ -1251,7 +1254,8 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
         <strong>Score</strong> = CR x CPA x RCR (expected revenue per impression) |
         <span className="text-blue-600 ml-1">Blue</span> = popup data |
         <span className="text-teal-600 ml-1">Teal</span> = page data |
-        <span className="text-orange-600 ml-1">Orange</span> = manual override
+        <span className="text-orange-600 ml-1">Orange</span> = override (no real data) |
+        <span className="text-red-600 ml-1">Red</span> = override (real data available)
         {dateRangeActive && (
           <>
             {' | '}
@@ -1266,7 +1270,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold mb-1">Edit Default Overrides</h3>
             <p className="text-sm text-gray-500 mb-4">{overrideRec.publication_name}</p>
-            <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 mb-4">Overrides only replace the default value. Real data (Our CR, SL RCR) always takes priority when available.</p>
+            <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 mb-4">Overrides take highest priority — they replace both real data and defaults. Values shown in <span className="text-red-600 font-semibold">red</span> when overriding available real data.</p>
 
             {/* Current values display */}
             <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs space-y-1.5">
@@ -1291,14 +1295,14 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
               </div>
               <div className="border-t pt-1.5 flex justify-between font-medium">
                 <span className="text-gray-700">Current effective CR:</span>
-                <span className={overrideRec.cr_source === 'override' ? 'text-orange-600' : overrideRec.cr_source === 'ours' ? 'text-blue-600' : ''}>
-                  {overrideRec.effective_cr.toFixed(1)}% ({overrideRec.cr_source})
+                <span className={overrideRec.cr_source === 'override_with_data' ? 'text-red-600' : overrideRec.cr_source === 'override' ? 'text-orange-600' : overrideRec.cr_source === 'ours' ? 'text-blue-600' : ''}>
+                  {overrideRec.effective_cr.toFixed(1)}% ({overrideRec.cr_source.replace('_with_data', '*')})
                 </span>
               </div>
               <div className="flex justify-between font-medium">
                 <span className="text-gray-700">Current effective RCR:</span>
-                <span className={overrideRec.rcr_source === 'override' ? 'text-orange-600' : overrideRec.rcr_source === 'sparkloop' ? '' : ''}>
-                  {overrideRec.effective_rcr.toFixed(1)}% ({overrideRec.rcr_source})
+                <span className={overrideRec.rcr_source === 'override_with_sl' ? 'text-red-600' : overrideRec.rcr_source === 'override' ? 'text-orange-600' : overrideRec.rcr_source === 'sparkloop' ? '' : ''}>
+                  {overrideRec.effective_rcr.toFixed(1)}% ({overrideRec.rcr_source.replace('_with_sl', '*')})
                 </span>
               </div>
             </div>
@@ -1307,7 +1311,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
             <div className="space-y-3 mb-5">
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-1">
-                  Override CR (%) <span className="text-gray-400 font-normal">— replaces default when no real data</span>
+                  Override CR (%) <span className="text-gray-400 font-normal">— always takes priority over all sources</span>
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -1330,7 +1334,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-1">
-                  Override RCR (%) <span className="text-gray-400 font-normal">— replaces default when no SL RCR</span>
+                  Override RCR (%) <span className="text-gray-400 font-normal">— always takes priority over all sources</span>
                 </label>
                 <div className="flex gap-2">
                   <input

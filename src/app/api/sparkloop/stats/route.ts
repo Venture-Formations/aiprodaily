@@ -63,9 +63,9 @@ export async function GET(request: NextRequest) {
       const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
       const hasSLRcr = slRcr !== null && slRcr > 0
       const hasOverrideRcr = rec.override_rcr !== null && rec.override_rcr !== undefined
-      // RCR priority: sparkloop > override > default
-      const rcr = hasSLRcr ? slRcr! / 100
-        : hasOverrideRcr ? Number(rec.override_rcr) / 100
+      // RCR priority: override > sparkloop > default
+      const rcr = hasOverrideRcr ? Number(rec.override_rcr) / 100
+        : hasSLRcr ? slRcr! / 100
         : defaultRcr
       recLookup.set(rec.ref_code, { cpaDollars, rcr })
     }
