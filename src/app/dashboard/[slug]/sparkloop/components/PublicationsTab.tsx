@@ -237,10 +237,7 @@ export default function PublicationsTab({ recommendations }: Props) {
             )}
           </div>
         </div>
-        <div className="flex items-center justify-between mt-2">
-          <div className="text-xs text-gray-400">
-            All dates and times are in {timezone === 'CST' ? 'CST (Central Time)' : 'UTC'}
-          </div>
+        <div className="flex items-center justify-end mt-2">
           <div className="flex items-center gap-2">
             <span className={`text-xs font-medium ${timezone === 'CST' ? 'text-gray-700' : 'text-gray-400'}`}>CST</span>
             <button
