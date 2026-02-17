@@ -78,7 +78,7 @@ export default function PublicationsTab({ recommendations }: Props) {
     if (selectedRec && startDate && endDate) {
       fetchSubmissions()
     }
-  }, [selectedRec, startDate, endDate])
+  }, [selectedRec, startDate, endDate, timezone])
 
   async function fetchSubmissions() {
     if (!selectedRec || !startDate || !endDate) return
@@ -88,6 +88,7 @@ export default function PublicationsTab({ recommendations }: Props) {
         ref_code: selectedRec.ref_code,
         start: startDate,
         end: endDate,
+        tz: timezone,
       })
       const res = await fetch(`/api/sparkloop/admin/submissions?${params}`)
       const data = await res.json()

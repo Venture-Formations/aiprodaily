@@ -18,6 +18,8 @@ export async function GET(request: NextRequest) {
     const start = searchParams.get('start')
     const end = searchParams.get('end')
 
+    const tz = searchParams.get('tz') || 'CST'
+
     if (!refCode || !start || !end) {
       return NextResponse.json(
         { success: false, error: 'ref_code, start, and end params required' },
@@ -25,14 +27,15 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // CST = UTC-6: midnight CST = 06:00 UTC
-    const startDate = `${start}T06:00:00.000Z`
-    const endDate = `${end}T06:00:00.000Z`
-    // End date needs to go to next day 05:59:59 UTC (end of CST day)
+    // CST = UTC-6: midnight CST = 06:00 UTC; UTC = no offset
+    const offset = tz === 'UTC' ? 'T00:00:00.000Z' : 'T06:00:00.000Z'
+    const startDate = `${start}${offset}`
+    const endDate = `${end}${offset}`
+    // End date goes to end of day in the selected timezone
     const endDateObj = new Date(endDate)
     endDateObj.setUTCDate(endDateObj.getUTCDate() + 1)
     endDateObj.setUTCMilliseconds(-1)
-    const endDateCST = endDateObj.toISOString()
+    const endDateFinal = endDateObj.toISOString()
 
     const { data: referrals, error } = await supabaseAdmin
       .from('sparkloop_referrals')
@@ -40,7 +43,7 @@ export async function GET(request: NextRequest) {
       .eq('publication_id', DEFAULT_PUBLICATION_ID)
       .eq('ref_code', refCode)
       .gte('subscribed_at', startDate)
-      .lte('subscribed_at', endDateCST)
+      .lte('subscribed_at', endDateFinal)
       .order('subscribed_at', { ascending: false })
 
     if (error) {
