@@ -668,7 +668,11 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
         return rec.screening_period ? `${rec.screening_period}d` : '-'
 
       case 'sparkloop_rcr':
-        return rec.sparkloop_rcr !== null ? `${rec.sparkloop_rcr.toFixed(0)}%` : '-'
+        if (rec.sparkloop_rcr === null) return '-'
+        if (rec.rcr_source === 'override_with_sl') {
+          return <span className="text-red-600 font-medium line-through" title={`Override (${rec.effective_rcr.toFixed(0)}%) is replacing this SL RCR`}>{rec.sparkloop_rcr.toFixed(0)}%</span>
+        }
+        return `${rec.sparkloop_rcr.toFixed(0)}%`
 
       case 'our_rcr':
         return rec.our_rcr !== null
@@ -733,11 +737,12 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
         const parts: string[] = []
         if (crOvr) parts.push(`CR:${rec.override_cr}%`)
         if (rcrOvr) parts.push(`RCR:${rec.override_rcr}%`)
+        const hasRedOverride = rec.rcr_source === 'override_with_sl' || rec.cr_source === 'override_with_data'
         return (
           <div>
             <span className="font-mono font-medium">${rec.calculated_score.toFixed(4)}</span>
             {parts.length > 0 && (
-              <div className="text-[9px] text-orange-500 mt-0.5">{parts.join(' ')}</div>
+              <div className={`text-[9px] mt-0.5 ${hasRedOverride ? 'text-red-500' : 'text-orange-500'}`}>{parts.join(' ')}</div>
             )}
           </div>
         )
