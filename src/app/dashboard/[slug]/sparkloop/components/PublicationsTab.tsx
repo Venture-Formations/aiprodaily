@@ -233,7 +233,7 @@ export default function PublicationsTab({ recommendations }: Props) {
             )}
           </div>
         </div>
-        <div className="text-xs text-gray-400 mt-2">All dates and times are in UTC</div>
+        <div className="text-xs text-gray-400 mt-2">All dates and times are in CST (Central Time)</div>
       </div>
 
       {/* Summary Stats */}
@@ -287,9 +287,10 @@ export default function PublicationsTab({ recommendations }: Props) {
                 <button
                   onClick={() => {
                     const header = 'Email,Date,Status,Source'
-                    const rows = filteredReferrals.map(r =>
-                      `${r.subscriber_email},${r.subscribed_at.split('T')[0]},${r.status},${r.source === 'recs_page' ? 'Page' : 'Popup'}`
-                    )
+                    const rows = filteredReferrals.map(r => {
+                      const cstDate = new Date(r.subscribed_at).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
+                      return `${r.subscriber_email},${cstDate},${r.status},${r.source === 'recs_page' ? 'Page' : 'Popup'}`
+                    })
                     const csv = [header, ...rows].join('\n')
                     const blob = new Blob([csv], { type: 'text/csv' })
                     const url = URL.createObjectURL(blob)
@@ -334,7 +335,7 @@ export default function PublicationsTab({ recommendations }: Props) {
                       <td className="px-4 py-2.5 font-mono text-xs">{r.subscriber_email}</td>
                       <td className="px-4 py-2.5 text-gray-600">
                         {new Date(r.subscribed_at).toLocaleDateString('en-US', {
-                          month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+                          month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Chicago',
                         })}
                       </td>
                       <td className="px-4 py-2.5">
