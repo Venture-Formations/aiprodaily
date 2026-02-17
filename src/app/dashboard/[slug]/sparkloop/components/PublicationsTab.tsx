@@ -233,6 +233,7 @@ export default function PublicationsTab({ recommendations }: Props) {
             )}
           </div>
         </div>
+        <div className="text-xs text-gray-400 mt-2">All dates and times are in UTC</div>
       </div>
 
       {/* Summary Stats */}
@@ -328,13 +329,6 @@ export default function PublicationsTab({ recommendations }: Props) {
               </table>
             </div>
           )}
-        </div>
-      )}
-
-      {/* UTC note */}
-      {selectedRec && startDate && endDate && (
-        <div className="text-xs text-gray-400 text-right -mt-4">
-          All dates and times are in UTC
         </div>
       )}
 
