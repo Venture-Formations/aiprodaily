@@ -136,6 +136,7 @@ United States
 
       console.log('Final subject line being sent to MailerLite:', subjectLine)
 
+      // Step 1: Create campaign shell (no content - pushed separately via content endpoint)
       const issueData = {
         name: `${newsletterName} Review: ${issue.date}`,
         type: 'regular',
@@ -143,10 +144,8 @@ United States
           subject: `${subjectEmoji} ${subjectLine}`,
           from_name: senderName,
           from: fromEmail,
-          content: emailContent,
         }],
         groups: [reviewGroupId]
-        // Note: Removed delivery_schedule - we'll schedule separately after creation
       }
 
       console.log('Sending MailerLite API request with data:', JSON.stringify(issueData, null, 2))
@@ -580,6 +579,7 @@ United States
         ? `${newsletterName} Newsletter (Secondary): ${issue.date}`
         : `${newsletterName} Newsletter: ${issue.date}`
 
+      // Step 1: Create campaign shell (no content - pushed separately via content endpoint)
       const issueData = {
         name: campaignName,
         type: 'regular',
@@ -587,7 +587,6 @@ United States
           subject: `${subjectEmoji} ${subjectLine}`,
           from_name: senderName,
           from: fromEmail,
-          content: emailContent,
         }],
         groups: [mainGroupId]
       }
