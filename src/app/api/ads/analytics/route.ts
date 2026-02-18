@@ -204,9 +204,9 @@ export async function GET(request: NextRequest) {
     // Build list of section names to look for (legacy + all module names)
     const adSectionNames = ['Advertorial'] // Legacy name
     if (adModules) {
-      for (const module of adModules) {
-        if (module.name && !adSectionNames.includes(module.name)) {
-          adSectionNames.push(module.name)
+      for (const mod of adModules) {
+        if (mod.name && !adSectionNames.includes(mod.name)) {
+          adSectionNames.push(mod.name)
         }
       }
     }

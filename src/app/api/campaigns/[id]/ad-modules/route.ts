@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { authOptions } from '@/lib/auth'
 
 /**
- * GET /api/campaigns/[id]/ad-modules - Get ad module selections for an issue
+ * GET /api/campaigns/[id]/ad-modules - Get ad mod selections for an issue
  */
 export async function GET(
   request: NextRequest,
@@ -29,7 +29,7 @@ export async function GET(
       return NextResponse.json({ error: 'Issue not found' }, { status: 404 })
     }
 
-    // Get all ad module selections for this issue
+    // Get all ad mod selections for this issue
     let { data: selections, error: selectionsError } = await supabaseAdmin
       .from('issue_module_ads')
       .select(`
@@ -87,7 +87,7 @@ export async function GET(
     if (selectionsError) {
       console.error('[AdModules] Error fetching selections:', selectionsError)
       return NextResponse.json(
-        { error: 'Failed to fetch ad module selections' },
+        { error: 'Failed to fetch ad mod selections' },
         { status: 500 }
       )
     }
@@ -173,11 +173,11 @@ export async function GET(
       .eq('is_active', true)
       .order('display_order', { ascending: true })
 
-    // Get available ads for each module (for manual selection dropdown)
+    // Get available ads for each mod (for manual selection dropdown)
     // Uses advertisements table with ad_module_id filter
     const moduleAds: Record<string, any[]> = {}
     if (allModules) {
-      for (const module of allModules) {
+      for (const mod of allModules) {
         const { data: ads } = await supabaseAdmin
           .from('advertisements')
           .select(`
@@ -188,12 +188,12 @@ export async function GET(
             company_name,
             advertiser:advertisers(company_name)
           `)
-          .eq('ad_module_id', module.id)
+          .eq('ad_module_id', mod.id)
           .eq('publication_id', issue.publication_id)
           .eq('status', 'active')
           .order('title')
 
-        moduleAds[module.id] = ads || []
+        moduleAds[mod.id] = ads || []
       }
     }
 
@@ -213,7 +213,7 @@ export async function GET(
 }
 
 /**
- * POST /api/campaigns/[id]/ad-modules - Manually select an ad for a module
+ * POST /api/campaigns/[id]/ad-modules - Manually select an ad for a mod
  * Body: { moduleId, adId }
  */
 export async function POST(

@@ -1,7 +1,7 @@
 /**
  * Feedback Module Selector
  *
- * Handles feedback module retrieval and vote/comment recording.
+ * Handles feedback mod retrieval and vote/comment recording.
  * Feedback modules are singletons (one per publication).
  * Now uses block-based architecture with feedback_blocks table.
  */
@@ -12,28 +12,28 @@ import type { FeedbackModule, FeedbackModuleWithBlocks, FeedbackBlock, FeedbackV
 
 export class FeedbackModuleSelector {
   /**
-   * Get the feedback module for a publication (singleton)
+   * Get the feedback mod for a publication (singleton)
    */
   static async getFeedbackModule(publicationId: string): Promise<FeedbackModule | null> {
-    const { data: module, error } = await supabaseAdmin
+    const { data: mod, error } = await supabaseAdmin
       .from('feedback_modules')
       .select('*')
       .eq('publication_id', publicationId)
       .single()
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-      console.error('[FeedbackSelector] Error fetching module:', error)
+      console.error('[FeedbackSelector] Error fetching mod:', error)
       return null
     }
 
-    return module
+    return mod
   }
 
   /**
-   * Get the feedback module with its blocks
+   * Get the feedback mod with its blocks
    */
   static async getFeedbackModuleWithBlocks(publicationId: string): Promise<FeedbackModuleWithBlocks | null> {
-    const { data: module, error } = await supabaseAdmin
+    const { data: mod, error } = await supabaseAdmin
       .from('feedback_modules')
       .select(`
         *,
@@ -43,41 +43,41 @@ export class FeedbackModuleSelector {
       .single()
 
     if (error && error.code !== 'PGRST116') {
-      console.error('[FeedbackSelector] Error fetching module with blocks:', error)
+      console.error('[FeedbackSelector] Error fetching mod with blocks:', error)
       return null
     }
 
-    if (!module) return null
+    if (!mod) return null
 
     // Sort blocks by display_order
     return {
-      ...module,
-      blocks: (module.blocks || []).sort((a: FeedbackBlock, b: FeedbackBlock) =>
+      ...mod,
+      blocks: (mod.blocks || []).sort((a: FeedbackBlock, b: FeedbackBlock) =>
         a.display_order - b.display_order
       )
     } as FeedbackModuleWithBlocks
   }
 
   /**
-   * Get a feedback module by its ID
+   * Get a feedback mod by its ID
    */
   static async getModuleById(moduleId: string): Promise<FeedbackModule | null> {
-    const { data: module, error } = await supabaseAdmin
+    const { data: mod, error } = await supabaseAdmin
       .from('feedback_modules')
       .select('*')
       .eq('id', moduleId)
       .single()
 
     if (error && error.code !== 'PGRST116') {
-      console.error('[FeedbackSelector] Error fetching module by ID:', error)
+      console.error('[FeedbackSelector] Error fetching mod by ID:', error)
       return null
     }
 
-    return module
+    return mod
   }
 
   /**
-   * Get blocks for a feedback module
+   * Get blocks for a feedback mod
    */
   static async getBlocks(moduleId: string): Promise<FeedbackBlock[]> {
     const { data: blocks, error } = await supabaseAdmin
@@ -117,7 +117,7 @@ export class FeedbackModuleSelector {
   }
 
   /**
-   * Create a new block for a feedback module
+   * Create a new block for a feedback mod
    */
   static async createBlock(
     moduleId: string,
@@ -192,7 +192,7 @@ export class FeedbackModuleSelector {
   }
 
   /**
-   * Reorder blocks within a module
+   * Reorder blocks within a mod
    */
   static async reorderBlocks(
     moduleId: string,
@@ -221,14 +221,14 @@ export class FeedbackModuleSelector {
   }
 
   /**
-   * Ensure feedback module exists for a publication (create if not exists)
+   * Ensure feedback mod exists for a publication (create if not exists)
    * Also creates default blocks
    */
   static async ensureFeedbackModule(publicationId: string): Promise<FeedbackModuleWithBlocks> {
-    // Try to get existing module with blocks
+    // Try to get existing mod with blocks
     const existing = await this.getFeedbackModuleWithBlocks(publicationId)
     if (existing) {
-      // If module exists but has no blocks, create default blocks
+      // If mod exists but has no blocks, create default blocks
       if (!existing.blocks || existing.blocks.length === 0) {
         await this.createDefaultBlocks(existing.id)
         return await this.getFeedbackModuleWithBlocks(publicationId) as FeedbackModuleWithBlocks
@@ -236,8 +236,8 @@ export class FeedbackModuleSelector {
       return existing
     }
 
-    // Create new module
-    const { data: module, error } = await supabaseAdmin
+    // Create new mod
+    const { data: mod, error } = await supabaseAdmin
       .from('feedback_modules')
       .insert({
         publication_id: publicationId,
@@ -250,19 +250,19 @@ export class FeedbackModuleSelector {
       .single()
 
     if (error) {
-      console.error('[FeedbackSelector] Error creating module:', error)
-      throw new Error(`Failed to create feedback module: ${error.message}`)
+      console.error('[FeedbackSelector] Error creating mod:', error)
+      throw new Error(`Failed to create feedback mod: ${error.message}`)
     }
 
     // Create default blocks
-    await this.createDefaultBlocks(module.id)
+    await this.createDefaultBlocks(mod.id)
 
-    console.log(`[FeedbackSelector] Created feedback module with blocks for publication ${publicationId}`)
+    console.log(`[FeedbackSelector] Created feedback mod with blocks for publication ${publicationId}`)
     return await this.getFeedbackModuleWithBlocks(publicationId) as FeedbackModuleWithBlocks
   }
 
   /**
-   * Create default blocks for a feedback module
+   * Create default blocks for a feedback mod
    */
   static async createDefaultBlocks(moduleId: string): Promise<void> {
     const defaultBlocks = [
@@ -325,17 +325,17 @@ export class FeedbackModuleSelector {
   }
 
   /**
-   * Delete a feedback module and its blocks
+   * Delete a feedback mod and its blocks
    */
   static async deleteModule(moduleId: string): Promise<{ success: boolean; error?: string }> {
-    // Blocks are deleted via CASCADE, just delete the module
+    // Blocks are deleted via CASCADE, just delete the mod
     const { error } = await supabaseAdmin
       .from('feedback_modules')
       .delete()
       .eq('id', moduleId)
 
     if (error) {
-      console.error('[FeedbackSelector] Error deleting module:', error)
+      console.error('[FeedbackSelector] Error deleting mod:', error)
       return { success: false, error: error.message }
     }
 
@@ -343,13 +343,13 @@ export class FeedbackModuleSelector {
   }
 
   /**
-   * Update feedback module configuration
+   * Update feedback mod configuration
    */
   static async updateModule(
     moduleId: string,
     updates: Partial<Omit<FeedbackModule, 'id' | 'publication_id' | 'created_at' | 'updated_at'>>
-  ): Promise<{ success: boolean; module?: FeedbackModule; error?: string }> {
-    const { data: module, error } = await supabaseAdmin
+  ): Promise<{ success: boolean; mod?: FeedbackModule; error?: string }> {
+    const { data: mod, error } = await supabaseAdmin
       .from('feedback_modules')
       .update(updates)
       .eq('id', moduleId)
@@ -357,11 +357,11 @@ export class FeedbackModuleSelector {
       .single()
 
     if (error) {
-      console.error('[FeedbackSelector] Error updating module:', error)
+      console.error('[FeedbackSelector] Error updating mod:', error)
       return { success: false, error: error.message }
     }
 
-    return { success: true, module: module as FeedbackModule }
+    return { success: true, mod: mod as FeedbackModule }
   }
 
   /**
@@ -375,15 +375,15 @@ export class FeedbackModuleSelector {
     label: string,
     ipAddress?: string
   ): Promise<{ success: boolean; voteId?: string; isUpdate?: boolean; error?: string }> {
-    // Get the module to verify and get publication_id
-    const { data: module } = await supabaseAdmin
+    // Get the mod to verify and get publication_id
+    const { data: mod } = await supabaseAdmin
       .from('feedback_modules')
       .select('publication_id')
       .eq('id', moduleId)
       .single()
 
-    if (!module) {
-      return { success: false, error: 'Feedback module not found' }
+    if (!mod) {
+      return { success: false, error: 'Feedback mod not found' }
     }
 
     // Check if vote exists
@@ -402,7 +402,7 @@ export class FeedbackModuleSelector {
       .from('feedback_votes')
       .upsert({
         feedback_module_id: moduleId,
-        publication_id: module.publication_id,
+        publication_id: mod.publication_id,
         issue_id: issueId,
         subscriber_email: email,
         ip_address: ipAddress || null,
@@ -495,8 +495,8 @@ export class FeedbackModuleSelector {
     user_vote?: { value: number; label: string }
     average_score: number
   }> {
-    // Get the module to find publication_id for IP exclusion
-    const { data: module } = await supabaseAdmin
+    // Get the mod to find publication_id for IP exclusion
+    const { data: mod } = await supabaseAdmin
       .from('feedback_modules')
       .select('publication_id')
       .eq('id', moduleId)
@@ -504,11 +504,11 @@ export class FeedbackModuleSelector {
 
     // Fetch excluded IPs if we have a publication
     let exclusions: IPExclusion[] = []
-    if (module?.publication_id) {
+    if (mod?.publication_id) {
       const { data: excludedIpsData } = await supabaseAdmin
         .from('excluded_ips')
         .select('ip_address, is_range, cidr_prefix')
-        .eq('publication_id', module.publication_id)
+        .eq('publication_id', mod.publication_id)
 
       exclusions = (excludedIpsData || []).map(e => ({
         ip_address: e.ip_address,
@@ -603,9 +603,9 @@ export class FeedbackModuleSelector {
     dateFrom?: string,
     dateTo?: string
   ): Promise<FeedbackIssueStats[]> {
-    // Get the feedback module
-    const module = await this.getFeedbackModule(publicationId)
-    if (!module) {
+    // Get the feedback mod
+    const mod = await this.getFeedbackModule(publicationId)
+    if (!mod) {
       return []
     }
 
@@ -625,7 +625,7 @@ export class FeedbackModuleSelector {
     let query = supabaseAdmin
       .from('feedback_votes')
       .select('issue_id, selected_value, selected_label, voted_at, ip_address, subscriber_email')
-      .eq('feedback_module_id', module.id)
+      .eq('feedback_module_id', mod.id)
       .not('issue_id', 'is', null)
 
     if (dateFrom) {

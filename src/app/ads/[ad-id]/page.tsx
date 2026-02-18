@@ -434,7 +434,7 @@ export default async function AdAnalyticsPage({ params }: PageProps) {
             <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No Newsletter Data Yet</h3>
             <p className="text-gray-500">
-              This ad hasn't been sent in any newsletters yet. Analytics will appear here once the ad runs.
+              This ad hasn&apos;t been sent in any newsletters yet. Analytics will appear here once the ad runs.
             </p>
           </div>
         )}

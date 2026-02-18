@@ -8,7 +8,7 @@ import type { BlockData, BlockStyleOptions, BlockRenderContext } from '../types'
 export function renderOptions(
   data: BlockData,
   styles: BlockStyleOptions,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // eslint-disable-next-line no-unused-vars
   _context?: BlockRenderContext
 ): string {
   if (!data.options || data.options.length === 0) {

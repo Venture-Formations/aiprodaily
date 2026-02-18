@@ -1530,7 +1530,7 @@ export class RSSProcessor {
       const { AppModuleSelector } = await import('./ai-app-modules')
       const { PromptSelector } = await import('./prompt-selector')
 
-      // Check if AI Apps already selected (check new module system)
+      // Check if AI Apps already selected (check new mod system)
       const { data: existingApps } = await supabaseAdmin
         .from('issue_ai_app_modules')
         .select('id')
@@ -1850,7 +1850,7 @@ export class RSSProcessor {
   private async evaluatePost(post: RssPost, newsletterId: string, section: 'primary' | 'secondary' = 'primary', moduleId?: string | null): Promise<ContentEvaluation> {
     // moduleId is required - all scoring uses article_module_criteria
     if (!moduleId) {
-      throw new Error('moduleId is required for scoring - all posts must be assigned to an article module')
+      throw new Error('moduleId is required for scoring - all posts must be assigned to an article mod')
     }
 
     const { data: moduleCriteria, error: moduleError } = await supabaseAdmin
@@ -1861,12 +1861,12 @@ export class RSSProcessor {
       .order('criteria_number', { ascending: true })
 
     if (moduleError) {
-      console.error(`[Score] Failed to fetch criteria for module ${moduleId}:`, moduleError)
-      throw new Error(`Failed to fetch criteria for module ${moduleId}`)
+      console.error(`[Score] Failed to fetch criteria for mod ${moduleId}:`, moduleError)
+      throw new Error(`Failed to fetch criteria for mod ${moduleId}`)
     }
 
     if (!moduleCriteria || moduleCriteria.length === 0) {
-      throw new Error(`No active criteria found for module ${moduleId}`)
+      throw new Error(`No active criteria found for mod ${moduleId}`)
     }
 
     const criteria = moduleCriteria.map(c => ({
@@ -1876,7 +1876,7 @@ export class RSSProcessor {
       ai_prompt: c.ai_prompt
     }))
 
-    console.log(`[Score] Using ${criteria.length} criteria from module ${moduleId}`)
+    console.log(`[Score] Using ${criteria.length} criteria from mod ${moduleId}`)
 
     // Evaluate post against each enabled criterion
     const criteriaScores: Array<{ score: number; reason: string; weight: number }> = []
@@ -1890,7 +1890,7 @@ export class RSSProcessor {
           throw new Error(`Criterion ${criterion.number} (${criterion.name}) has no ai_prompt configured`)
         }
 
-        // Parse the JSON prompt configuration from module criteria
+        // Parse the JSON prompt configuration from mod criteria
         const promptConfig = JSON.parse(criterion.ai_prompt)
 
         // Determine provider from model name
@@ -2944,7 +2944,7 @@ export class RSSProcessor {
       // Get publication_id from issue
       const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
-      // Fetch ALL active module articles for this issue
+      // Fetch ALL active mod articles for this issue
       const { data: moduleArticles, error: articlesError } = await supabaseAdmin
         .from('module_articles')
         .select('headline, content')
@@ -3057,7 +3057,7 @@ export class RSSProcessor {
       // Get publication_id from issue
       const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
-      // Get the issue with its module articles for subject line generation
+      // Get the issue with its mod articles for subject line generation
       const { data: issueWithArticles, error: issueError } = await supabaseAdmin
         .from('publication_issues')
         .select(`
@@ -3794,22 +3794,22 @@ export class RSSProcessor {
   // ============================================================================
 
   /**
-   * Assign top posts to a module based on its feeds
-   * Gets highest-scored posts from the module's assigned feeds
+   * Assign top posts to a mod based on its feeds
+   * Gets highest-scored posts from the mod's assigned feeds
    * Filters out posts that don't meet minimum criteria scores (if configured)
    */
   async assignPostsToModule(issueId: string, moduleId: string): Promise<{ assigned: number; filtered?: number }> {
     const { ArticleModuleSelector } = await import('@/lib/article-modules')
 
-    const module = await ArticleModuleSelector.getModule(moduleId)
-    if (!module) {
+    const mod = await ArticleModuleSelector.getModule(moduleId)
+    if (!mod) {
       console.log(`[Module] Module ${moduleId} not found`)
       return { assigned: 0 }
     }
 
     const feedIds = await ArticleModuleSelector.getModuleFeeds(moduleId)
     if (feedIds.length === 0) {
-      console.log(`[Module] No feeds assigned to module ${module.name}`)
+      console.log(`[Module] No feeds assigned to mod ${mod.name}`)
       return { assigned: 0 }
     }
 
@@ -3826,23 +3826,23 @@ export class RSSProcessor {
     const hasMinimumFilters = minimumFilters.length > 0
 
     if (hasMinimumFilters) {
-      console.log(`[Module] Minimum score filters for ${module.name}:`)
+      console.log(`[Module] Minimum score filters for ${mod.name}:`)
       minimumFilters.forEach(c => {
         console.log(`  - Criteria ${c.criteria_number} (${c.name}): minimum ${c.minimum_score}`)
       })
     }
 
-    // Get lookback window from module settings
-    const lookbackHours = module.lookback_hours || 72
+    // Get lookback window from mod settings
+    const lookbackHours = mod.lookback_hours || 72
     const lookbackDate = new Date()
     lookbackDate.setHours(lookbackDate.getHours() - lookbackHours)
     const lookbackTimestamp = lookbackDate.toISOString()
 
     // Get double the needed articles (for backup options)
-    const articlesNeeded = module.articles_count || 3
+    const articlesNeeded = mod.articles_count || 3
     const postsToAssign = articlesNeeded * 4
 
-    // Get top scored posts from module's feeds that aren't assigned yet
+    // Get top scored posts from mod's feeds that aren't assigned yet
     // Include individual criteria scores for minimum filtering
     const { data: topPosts } = await supabaseAdmin
       .from('rss_posts')
@@ -3863,7 +3863,7 @@ export class RSSProcessor {
       .not('post_ratings', 'is', null)
 
     if (!topPosts || topPosts.length === 0) {
-      console.log(`[Module] No available posts for module ${module.name}`)
+      console.log(`[Module] No available posts for mod ${mod.name}`)
       return { assigned: 0 }
     }
 
@@ -3893,7 +3893,7 @@ export class RSSProcessor {
       })
 
       if (filteredCount > 0) {
-        console.log(`[Module] Filtered ${filteredCount} posts that didn't meet minimum scores for ${module.name}:`)
+        console.log(`[Module] Filtered ${filteredCount} posts that didn't meet minimum scores for ${mod.name}:`)
         Object.entries(failedCriteriaDetails).forEach(([name, count]) => {
           console.log(`  - ${name}: ${count} failed`)
         })
@@ -3902,7 +3902,7 @@ export class RSSProcessor {
     }
 
     if (eligiblePosts.length === 0) {
-      console.log(`[Module] No posts meet minimum criteria for module ${module.name}`)
+      console.log(`[Module] No posts meet minimum criteria for mod ${mod.name}`)
       return { assigned: 0, filtered: filteredCount }
     }
 
@@ -3915,7 +3915,7 @@ export class RSSProcessor {
       })
       .slice(0, postsToAssign)
 
-    // Assign posts to issue and module
+    // Assign posts to issue and mod
     if (sortedPosts.length > 0) {
       await supabaseAdmin
         .from('rss_posts')
@@ -3926,31 +3926,31 @@ export class RSSProcessor {
         .in('id', sortedPosts.map((p: any) => p.id))
     }
 
-    console.log(`[Module] Assigned ${sortedPosts.length} posts to module ${module.name}${filteredCount > 0 ? ` (${filteredCount} filtered by minimum scores)` : ''}`)
+    console.log(`[Module] Assigned ${sortedPosts.length} posts to mod ${mod.name}${filteredCount > 0 ? ` (${filteredCount} filtered by minimum scores)` : ''}`)
     return { assigned: sortedPosts.length, filtered: filteredCount }
   }
 
   /**
-   * Generate titles for articles in a module
+   * Generate titles for articles in a mod
    * Creates module_articles records with headlines
    */
   async generateTitlesForModule(issueId: string, moduleId: string): Promise<void> {
     const { ArticleModuleSelector } = await import('@/lib/article-modules')
     const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
-    const module = await ArticleModuleSelector.getModule(moduleId)
-    if (!module) {
+    const mod = await ArticleModuleSelector.getModule(moduleId)
+    if (!mod) {
       console.log(`[Module Titles] Module ${moduleId} not found`)
       return
     }
 
     const feedIds = await ArticleModuleSelector.getModuleFeeds(moduleId)
     if (feedIds.length === 0) {
-      console.log(`[Module Titles] No feeds for module ${module.name}`)
+      console.log(`[Module Titles] No feeds for mod ${mod.name}`)
       return
     }
 
-    // Get posts assigned to this module for this issue
+    // Get posts assigned to this mod for this issue
     const { data: posts } = await supabaseAdmin
       .from('rss_posts')
       .select('*, post_ratings(*)')
@@ -3959,7 +3959,7 @@ export class RSSProcessor {
       .in('feed_id', feedIds)
 
     if (!posts || posts.length === 0) {
-      console.log(`[Module Titles] No posts assigned to module ${module.name}`)
+      console.log(`[Module Titles] No posts assigned to mod ${mod.name}`)
       return
     }
 
@@ -3980,12 +3980,12 @@ export class RSSProcessor {
       duplicatePostIds = new Set(duplicatePosts?.map(d => d.post_id) || [])
     }
 
-    // Get prompts for this module
+    // Get prompts for this mod
     const { prompts } = await ArticleModuleSelector.getModulePrompts(moduleId)
     const titlePrompt = prompts.find(p => p.prompt_type === 'article_title')
 
     // Filter and sort posts
-    const limit = module.articles_count ? module.articles_count * 2 : 6
+    const limit = mod.articles_count ? mod.articles_count * 2 : 6
     const postsWithRatings = posts
       .filter(post =>
         post.post_ratings?.[0] &&
@@ -3999,7 +3999,7 @@ export class RSSProcessor {
       })
       .slice(0, limit)
 
-    console.log(`[Module Titles] Generating ${postsWithRatings.length} titles for ${module.name}...`)
+    console.log(`[Module Titles] Generating ${postsWithRatings.length} titles for ${mod.name}...`)
 
     // Generate titles in batches
     const BATCH_SIZE = 3
@@ -4030,10 +4030,10 @@ export class RSSProcessor {
             source_url: post.source_url || ''
           }
 
-          // Generate title using module-specific prompt or default
+          // Generate title using mod-specific prompt or default
           let titleResult
           if (titlePrompt?.ai_prompt) {
-            // Use custom module prompt - interpolate variables into prompt
+            // Use custom mod prompt - interpolate variables into prompt
             const customPrompt = titlePrompt.ai_prompt
               .replace('{{title}}', postData.title)
               .replace('{{description}}', postData.description)
@@ -4098,24 +4098,24 @@ export class RSSProcessor {
       }
     }
 
-    console.log(`[Module Titles] ✓ Generated titles for ${module.name}`)
+    console.log(`[Module Titles] ✓ Generated titles for ${mod.name}`)
   }
 
   /**
-   * Generate bodies for articles in a module
+   * Generate bodies for articles in a mod
    * Updates module_articles with content
    */
   async generateBodiesForModule(issueId: string, moduleId: string, offset: number = 0, limit: number = 3): Promise<void> {
     const { ArticleModuleSelector } = await import('@/lib/article-modules')
     const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
-    const module = await ArticleModuleSelector.getModule(moduleId)
-    if (!module) {
+    const mod = await ArticleModuleSelector.getModule(moduleId)
+    if (!mod) {
       console.log(`[Module Bodies] Module ${moduleId} not found`)
       return
     }
 
-    // Get prompts for this module
+    // Get prompts for this mod
     const { prompts } = await ArticleModuleSelector.getModulePrompts(moduleId)
     const bodyPrompt = prompts.find(p => p.prompt_type === 'article_body')
 
@@ -4131,11 +4131,11 @@ export class RSSProcessor {
       .limit(limit)
 
     if (!articles || articles.length === 0) {
-      console.log(`[Module Bodies] No articles awaiting body generation for ${module.name}`)
+      console.log(`[Module Bodies] No articles awaiting body generation for ${mod.name}`)
       return
     }
 
-    console.log(`[Module Bodies] Generating ${articles.length} bodies for ${module.name}...`)
+    console.log(`[Module Bodies] Generating ${articles.length} bodies for ${mod.name}...`)
 
     const BATCH_SIZE = 2
     for (let i = 0; i < articles.length; i += BATCH_SIZE) {
@@ -4157,10 +4157,10 @@ export class RSSProcessor {
             source_url: post.source_url || ''
           }
 
-          // Generate body using module-specific prompt or default
+          // Generate body using mod-specific prompt or default
           let bodyResult
           if (bodyPrompt?.ai_prompt) {
-            // Use custom module prompt - interpolate variables into prompt
+            // Use custom mod prompt - interpolate variables into prompt
             const customPrompt = bodyPrompt.ai_prompt
               .replace('{{title}}', postData.title)
               .replace('{{headline}}', article.headline)
@@ -4247,18 +4247,18 @@ export class RSSProcessor {
       }
     }
 
-    console.log(`[Module Bodies] ✓ Generated bodies for ${module.name}`)
+    console.log(`[Module Bodies] ✓ Generated bodies for ${mod.name}`)
   }
 
   /**
-   * Fact-check articles for a module
+   * Fact-check articles for a mod
    */
   async factCheckArticlesForModule(issueId: string, moduleId: string): Promise<void> {
     const { ArticleModuleSelector } = await import('@/lib/article-modules')
     const newsletterId = await this.getNewsletterIdFromissue(issueId)
 
-    const module = await ArticleModuleSelector.getModule(moduleId)
-    if (!module) {
+    const mod = await ArticleModuleSelector.getModule(moduleId)
+    if (!mod) {
       console.log(`[Module Fact-Check] Module ${moduleId} not found`)
       return
     }
@@ -4274,11 +4274,11 @@ export class RSSProcessor {
       .is('fact_check_score', null)
 
     if (!articles || articles.length === 0) {
-      console.log(`[Module Fact-Check] No articles awaiting fact-check for ${module.name}`)
+      console.log(`[Module Fact-Check] No articles awaiting fact-check for ${mod.name}`)
       return
     }
 
-    console.log(`[Module Fact-Check] Checking ${articles.length} articles for ${module.name}...`)
+    console.log(`[Module Fact-Check] Checking ${articles.length} articles for ${mod.name}...`)
 
     const BATCH_SIZE = 3
     for (let i = 0; i < articles.length; i += BATCH_SIZE) {
@@ -4323,25 +4323,25 @@ export class RSSProcessor {
       }
     }
 
-    console.log(`[Module Fact-Check] ✓ Checked articles for ${module.name}`)
+    console.log(`[Module Fact-Check] ✓ Checked articles for ${mod.name}`)
   }
 
   /**
-   * Select top articles for a module and mark them as active
+   * Select top articles for a mod and mark them as active
    */
   async selectTopArticlesForModule(issueId: string, moduleId: string): Promise<{ selected: number }> {
     const { ArticleModuleSelector } = await import('@/lib/article-modules')
 
-    const module = await ArticleModuleSelector.getModule(moduleId)
-    if (!module) {
+    const mod = await ArticleModuleSelector.getModule(moduleId)
+    if (!mod) {
       console.log(`[Module Select] Module ${moduleId} not found`)
       return { selected: 0 }
     }
 
-    const limit = module.articles_count || 3
+    const limit = mod.articles_count || 3
     const result = await ArticleModuleSelector.activateTopArticles(issueId, moduleId, limit)
 
-    console.log(`[Module Select] Activated ${result.activated} articles for ${module.name}`)
+    console.log(`[Module Select] Activated ${result.activated} articles for ${mod.name}`)
     return { selected: result.activated }
   }
 

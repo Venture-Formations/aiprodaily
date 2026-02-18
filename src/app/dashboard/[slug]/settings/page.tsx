@@ -878,7 +878,7 @@ function RSSFeeds() {
         <div className="text-center py-12 text-gray-500">
           <div className="text-4xl mb-3">📡</div>
           <div className="font-medium">No RSS feeds configured</div>
-          <div className="text-sm">Click "Add Feed" to get started with Breaking News</div>
+          <div className="text-sm">Click &quot;Add Feed&quot; to get started with Breaking News</div>
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -2294,7 +2294,7 @@ function EmailSettings() {
         <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <h4 className="font-medium text-blue-900 mb-2">Review Workflow Overview</h4>
           <div className="text-sm text-blue-800 space-y-1">
-            <div>1. <strong>{settings.rssProcessingTime}</strong> - Create tomorrow's issue, process RSS feeds, and generate AI subject line</div>
+            <div>1. <strong>{settings.rssProcessingTime}</strong> - Create tomorrow&apos;s issue, process RSS feeds, and generate AI subject line</div>
             <div>2. <strong>{settings.issueCreationTime}</strong> - Create review campaign and schedule for delivery</div>
             <div>3. <strong>{settings.scheduledSendTime}</strong> - SendGrid sends review to review list only</div>
           </div>
@@ -2836,7 +2836,7 @@ function EmailSettings() {
             <strong>Current configuration:</strong> Checking {dedupLookbackDays} days of past newsletters with {Math.round(dedupStrictnessThreshold * 100)}% similarity threshold
           </p>
           <p className="text-xs text-blue-700 mt-2">
-            <strong>How it works:</strong> Stage 1 checks against articles used in the last {dedupLookbackDays} sent newsletters. Stages 2-4 check exact content matches (100% similarity), title similarity (&gt;{Math.round(dedupStrictnessThreshold * 100)}%), and AI semantic analysis (&gt;{Math.round(dedupStrictnessThreshold * 100)}%) within the current issue's articles.
+            <strong>How it works:</strong> Stage 1 checks against articles used in the last {dedupLookbackDays} sent newsletters. Stages 2-4 check exact content matches (100% similarity), title similarity (&gt;{Math.round(dedupStrictnessThreshold * 100)}%), and AI semantic analysis (&gt;{Math.round(dedupStrictnessThreshold * 100)}%) within the current issue&apos;s articles.
           </p>
         </div>
       </div>
@@ -5624,7 +5624,7 @@ function AdsSettings() {
           <li>• <strong>Monthly:</strong> Ad appears once per calendar month for the purchased number of months</li>
           <li>• Volume discounts apply automatically based on quantity purchased</li>
           <li>• All ads are reviewed before approval and must meet content guidelines</li>
-          <li>• Ads appear in the "Community Business Spotlight" section</li>
+          <li>• Ads appear in the &quot;Community Business Spotlight&quot; section</li>
         </ul>
       </div>
     </div>
@@ -6664,10 +6664,10 @@ function BlockedDomainsSettings() {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h4 className="font-semibold text-blue-900 mb-2">How Domain Blocking Works:</h4>
         <ul className="text-sm text-blue-800 space-y-1">
-          <li><strong>Blocked domains:</strong> Posts from these domains are completely skipped during RSS ingestion - they won't appear in your newsletter.</li>
+          <li><strong>Blocked domains:</strong> Posts from these domains are completely skipped during RSS ingestion - they won&apos;t appear in your newsletter.</li>
           <li><strong>Suggested domains:</strong> Domains that have had extraction failures (HTTP 403, paywall, login required, etc.) are shown as suggestions.</li>
-          <li><strong>Block vs Ignore:</strong> "Block" adds the domain to your blocked list. "Ignore" dismisses the suggestion without blocking.</li>
-          <li><strong>Domain matching:</strong> Blocking "example.com" also blocks "www.example.com" and "news.example.com".</li>
+          <li><strong>Block vs Ignore:</strong> &quot;Block&quot; adds the domain to your blocked list. &quot;Ignore&quot; dismisses the suggestion without blocking.</li>
+          <li><strong>Domain matching:</strong> Blocking &quot;example.com&quot; also blocks &quot;www.example.com&quot; and &quot;news.example.com&quot;.</li>
         </ul>
       </div>
     </div>
@@ -7164,7 +7164,7 @@ function IPExclusionSettings() {
           </h3>
           <p className="text-sm text-orange-800 mb-4">
             We detected activity from known email security services. These services scan links in emails
-            before delivery, creating false clicks. Click "Exclude All Ranges" to block all their IP ranges.
+            before delivery, creating false clicks. Click &quot;Exclude All Ranges&quot; to block all their IP ranges.
           </p>
 
           <div className="space-y-3">
@@ -7284,12 +7284,12 @@ function IPExclusionSettings() {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h4 className="font-semibold text-blue-900 mb-2">How IP Exclusion Works:</h4>
         <ul className="text-sm text-blue-800 space-y-1">
-          <li><strong>Activity is still recorded:</strong> Excluded IPs can still vote and click links, but their activity won't be counted in analytics.</li>
+          <li><strong>Activity is still recorded:</strong> Excluded IPs can still vote and click links, but their activity won&apos;t be counted in analytics.</li>
           <li><strong>Applies to:</strong> Both poll response analytics and link click analytics.</li>
           <li><strong>CIDR ranges:</strong> Use CIDR notation (e.g., 192.168.1.0/24) to exclude entire IP ranges.</li>
           <li><strong>Useful for:</strong> Filtering out spam clickers, auto-clickers, bots, or internal testing.</li>
           <li><strong>Per-publication:</strong> Each publication has its own exclusion list.</li>
-          <li><strong>Auditable:</strong> Click "See Emails" to view all email addresses associated with an IP.</li>
+          <li><strong>Auditable:</strong> Click &quot;See Emails&quot; to view all email addresses associated with an IP.</li>
           <li><strong>Suggestions:</strong> IPs with multiple emails interacting within seconds are flagged as likely email security scanners.</li>
         </ul>
       </div>
@@ -7548,7 +7548,7 @@ function FacebookSettings() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Find this in your Facebook Page settings under "Page transparency" or in the Page URL
+                Find this in your Facebook Page settings under &quot;Page transparency&quot; or in the Page URL
               </p>
             </div>
 
@@ -7702,7 +7702,7 @@ function FacebookSettings() {
             <strong>Generate Page Access Token:</strong> Use the Graph API Explorer to generate a long-lived Page Access Token
           </li>
           <li>
-            <strong>Find your Page ID:</strong> Go to your Facebook Page, click About, then scroll to find "Page ID"
+            <strong>Find your Page ID:</strong> Go to your Facebook Page, click About, then scroll to find &quot;Page ID&quot;
           </li>
           <li>
             <strong>Configure above:</strong> Enter your Page ID and Access Token, select your ad module, and set your preferred posting time

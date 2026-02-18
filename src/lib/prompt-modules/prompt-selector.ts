@@ -13,22 +13,22 @@ interface PromptSelectionResult {
 
 export class PromptModuleSelector {
   /**
-   * Get eligible prompts for a module
-   * If module has prompts assigned (via prompt_module_id), use those.
-   * Otherwise, use all prompts without a module assignment (null).
+   * Get eligible prompts for a mod
+   * If mod has prompts assigned (via prompt_module_id), use those.
+   * Otherwise, use all prompts without a mod assignment (null).
    */
   private static async getEligiblePrompts(
     moduleId: string,
     publicationId: string
   ): Promise<PromptIdea[]> {
-    // First check if any prompts are specifically assigned to this module
+    // First check if any prompts are specifically assigned to this mod
     const { data: modulePrompts } = await supabaseAdmin
       .from('prompt_ideas')
       .select('id')
       .eq('prompt_module_id', moduleId)
       .eq('is_active', true)
 
-    console.log(`[PromptSelector] Module ${moduleId}: ${modulePrompts?.length || 0} module-specific prompts found`)
+    console.log(`[PromptSelector] Module ${moduleId}: ${modulePrompts?.length || 0} mod-specific prompts found`)
 
     let query = supabaseAdmin
       .from('prompt_ideas')
@@ -37,11 +37,11 @@ export class PromptModuleSelector {
       .eq('is_active', true)
 
     if (modulePrompts && modulePrompts.length > 0) {
-      // Use module-specific prompts
-      console.log('[PromptSelector] Using module-specific prompts')
+      // Use mod-specific prompts
+      console.log('[PromptSelector] Using mod-specific prompts')
       query = query.eq('prompt_module_id', moduleId)
     } else {
-      // Use prompts without module assignment (available to all modules)
+      // Use prompts without mod assignment (available to all modules)
       console.log('[PromptSelector] Using prompts with null module_id')
       query = query.is('prompt_module_id', null)
     }
@@ -61,7 +61,7 @@ export class PromptModuleSelector {
   /**
    * Select prompt using Sequential mode (fixed order rotation)
    * Follows the display_order, cycling through in order.
-   * Uses the module's next_position to track which position to pick next.
+   * Uses the mod's next_position to track which position to pick next.
    */
   private static selectSequential(
     prompts: PromptIdea[],
@@ -133,13 +133,13 @@ export class PromptModuleSelector {
   }
 
   /**
-   * Select a prompt for a module based on its selection mode
+   * Select a prompt for a mod based on its selection mode
    */
   static async selectPrompt(
-    module: PromptModule,
+    mod: PromptModule,
     publicationId: string
   ): Promise<PromptSelectionResult> {
-    const selectionMode = module.selection_mode
+    const selectionMode = mod.selection_mode
 
     // Manual mode returns null - admin must pick
     if (selectionMode === 'manual') {
@@ -147,7 +147,7 @@ export class PromptModuleSelector {
     }
 
     // Get eligible prompts
-    const eligiblePrompts = await this.getEligiblePrompts(module.id, publicationId)
+    const eligiblePrompts = await this.getEligiblePrompts(mod.id, publicationId)
 
     if (eligiblePrompts.length === 0) {
       return { prompt: null, reason: 'No eligible prompts available' }
@@ -158,7 +158,7 @@ export class PromptModuleSelector {
 
     switch (selectionMode) {
       case 'sequential':
-        selected = this.selectSequential(eligiblePrompts, module.next_position || 1)
+        selected = this.selectSequential(eligiblePrompts, mod.next_position || 1)
         break
       case 'random':
         selected = this.selectRandom(eligiblePrompts)
@@ -212,15 +212,15 @@ export class PromptModuleSelector {
       return
     }
 
-    // Create empty selections for each module
-    for (const module of modules) {
+    // Create empty selections for each mod
+    for (const mod of modules) {
       await supabaseAdmin
         .from('issue_prompt_modules')
         .insert({
           issue_id: issueId,
-          prompt_module_id: module.id,
+          prompt_module_id: mod.id,
           prompt_id: null,
-          selection_mode: module.selection_mode
+          selection_mode: mod.selection_mode
         })
     }
 
@@ -260,26 +260,26 @@ export class PromptModuleSelector {
 
     const results: { moduleId: string; result: PromptSelectionResult }[] = []
 
-    // Select prompt for each module
-    for (const module of modules) {
-      const result = await this.selectPrompt(module as PromptModule, publicationId)
+    // Select prompt for each mod
+    for (const mod of modules) {
+      const result = await this.selectPrompt(mod as PromptModule, publicationId)
 
       // Store selection in database
       const { error: insertError } = await supabaseAdmin
         .from('issue_prompt_modules')
         .insert({
           issue_id: issueId,
-          prompt_module_id: module.id,
+          prompt_module_id: mod.id,
           prompt_id: result.prompt?.id || null,
-          selection_mode: module.selection_mode
+          selection_mode: mod.selection_mode
         })
 
       if (insertError) {
         console.error('[PromptSelector] Error storing selection:', insertError)
       }
 
-      results.push({ moduleId: module.id, result })
-      console.log(`[PromptSelector] Module "${module.name}": ${result.reason}`)
+      results.push({ moduleId: mod.id, result })
+      console.log(`[PromptSelector] Module "${mod.name}": ${result.reason}`)
     }
 
     return results
@@ -348,13 +348,13 @@ export class PromptModuleSelector {
   }
 
   /**
-   * Advance the next_position for a sequential module after a prompt is used
+   * Advance the next_position for a sequential mod after a prompt is used
    */
   private static async advanceSequentialPosition(
     moduleId: string,
     usedDisplayOrder: number
   ): Promise<void> {
-    // Get all active prompts for this module to find max position
+    // Get all active prompts for this mod to find max position
     const { data: prompts } = await supabaseAdmin
       .from('prompt_ideas')
       .select('display_order')
@@ -375,7 +375,7 @@ export class PromptModuleSelector {
       console.log(`[PromptSelector] Module ${moduleId}: Advancing to position ${nextPosition}`)
     }
 
-    // Update the module's next_position
+    // Update the mod's next_position
     await supabaseAdmin
       .from('prompt_modules')
       .update({
@@ -408,7 +408,7 @@ export class PromptModuleSelector {
   }
 
   /**
-   * Manually select a prompt for a module
+   * Manually select a prompt for a mod
    */
   static async manuallySelectPrompt(
     issueId: string,
@@ -437,7 +437,7 @@ export class PromptModuleSelector {
   }
 
   /**
-   * Clear a prompt selection for a module (set prompt_id to null)
+   * Clear a prompt selection for a mod (set prompt_id to null)
    */
   static async clearPromptSelection(
     issueId: string,
@@ -466,7 +466,7 @@ export class PromptModuleSelector {
   }
 
   /**
-   * Reset the next_position for a module to 1
+   * Reset the next_position for a mod to 1
    */
   static async resetPosition(moduleId: string): Promise<{ success: boolean; error?: string }> {
     const { error } = await supabaseAdmin
@@ -482,12 +482,12 @@ export class PromptModuleSelector {
       return { success: false, error: error.message }
     }
 
-    console.log(`[PromptSelector] Reset position to 1 for module ${moduleId}`)
+    console.log(`[PromptSelector] Reset position to 1 for mod ${moduleId}`)
     return { success: true }
   }
 
   /**
-   * Set a specific next_position for a module
+   * Set a specific next_position for a mod
    */
   static async setPosition(
     moduleId: string,
@@ -510,7 +510,7 @@ export class PromptModuleSelector {
       return { success: false, error: error.message }
     }
 
-    console.log(`[PromptSelector] Set position to ${position} for module ${moduleId}`)
+    console.log(`[PromptSelector] Set position to ${position} for mod ${moduleId}`)
     return { success: true }
   }
 }

@@ -57,7 +57,7 @@ interface RenderContext {
 }
 
 /**
- * Result of rendering an app module
+ * Result of rendering an app mod
  */
 interface RenderResult {
   html: string
@@ -113,7 +113,7 @@ function getAppEmoji(app: AIApplication): string {
  */
 export class AppModuleRenderer {
   /**
-   * Get effective setting from block_config or fall back to module-level setting
+   * Get effective setting from block_config or fall back to mod-level setting
    */
   private static getLogoStyle(styles: BlockStyleOptions): ProductCardLogoStyle {
     return styles.blockConfig.logo?.style || styles.logoStyle || 'square'
@@ -347,10 +347,10 @@ export class AppModuleRenderer {
   }
 
   /**
-   * Render an AI app module with its apps
+   * Render an AI app mod with its apps
    */
   static async renderModule(
-    module: AIAppModule,
+    mod: AIAppModule,
     apps: AIApplication[],
     publicationId: string,
     context: RenderContext = {}
@@ -359,7 +359,7 @@ export class AppModuleRenderer {
     if (!apps || apps.length === 0) {
       return {
         html: '',
-        moduleName: module.name,
+        moduleName: mod.name,
         appCount: 0
       }
     }
@@ -367,10 +367,10 @@ export class AppModuleRenderer {
     // Get publication styling
     const settings = await getBusinessSettings(publicationId)
 
-    // Merge default block config with module's block config
+    // Merge default block config with mod's block config
     const blockConfig: ProductCardBlockConfig = {
       ...DEFAULT_BLOCK_CONFIG,
-      ...(module.block_config || {})
+      ...(mod.block_config || {})
     }
 
     const styles: BlockStyleOptions = {
@@ -379,20 +379,20 @@ export class AppModuleRenderer {
       tertiaryColor: settings.tertiary_color,
       headingFont: settings.heading_font,
       bodyFont: settings.body_font,
-      // Layout settings from module (Product Cards)
-      layoutMode: module.layout_mode || 'inline',
+      // Layout settings from mod (Product Cards)
+      layoutMode: mod.layout_mode || 'inline',
       blockConfig,
       // Display settings (default true for backwards compatibility)
-      showEmoji: module.show_emoji !== false,
-      showNumbers: module.show_numbers !== false,
+      showEmoji: mod.show_emoji !== false,
+      showNumbers: mod.show_numbers !== false,
       // Legacy fallbacks
-      logoStyle: module.logo_style || 'square',
-      titleSize: module.title_size || 'medium',
-      descriptionSize: module.description_size || 'medium'
+      logoStyle: mod.logo_style || 'square',
+      titleSize: mod.title_size || 'medium',
+      descriptionSize: mod.description_size || 'medium'
     }
 
     // Render each app
-    const blockOrder = module.block_order as AIAppBlockType[]
+    const blockOrder = mod.block_order as AIAppBlockType[]
     let appsHtml = ''
 
     apps.forEach((app, index) => {
@@ -402,7 +402,7 @@ export class AppModuleRenderer {
       const trackedUrl = baseUrl !== '#' && context.issueDate
         ? wrapTrackingUrl(
             baseUrl,
-            module.name,
+            mod.name,
             context.issueDate,
             context.mailerliteIssueId,
             context.issueId,
@@ -414,11 +414,11 @@ export class AppModuleRenderer {
     })
 
     // Wrap in section container
-    const html = this.wrapInSection(module.name, appsHtml, styles)
+    const html = this.wrapInSection(mod.name, appsHtml, styles)
 
     return {
       html,
-      moduleName: module.name,
+      moduleName: mod.name,
       appCount: apps.length
     }
   }
@@ -437,9 +437,9 @@ export class AppModuleRenderer {
     // Sort modules by display_order
     const sortedModules = [...modules].sort((a, b) => a.display_order - b.display_order)
 
-    for (const module of sortedModules) {
-      const apps = appsMap.get(module.id) || []
-      const result = await this.renderModule(module, apps, publicationId, context)
+    for (const mod of sortedModules) {
+      const apps = appsMap.get(mod.id) || []
+      const result = await this.renderModule(mod, apps, publicationId, context)
       results.push(result)
     }
 
@@ -463,19 +463,19 @@ export class AppModuleRenderer {
   }
 
   /**
-   * Render a single module for preview (without tracking)
+   * Render a single mod for preview (without tracking)
    */
   static async renderForPreview(
-    module: AIAppModule,
+    mod: AIAppModule,
     apps: AIApplication[],
     publicationId: string
   ): Promise<string> {
     const settings = await getBusinessSettings(publicationId)
 
-    // Merge default block config with module's block config
+    // Merge default block config with mod's block config
     const blockConfig: ProductCardBlockConfig = {
       ...DEFAULT_BLOCK_CONFIG,
-      ...(module.block_config || {})
+      ...(mod.block_config || {})
     }
 
     const styles: BlockStyleOptions = {
@@ -484,23 +484,23 @@ export class AppModuleRenderer {
       tertiaryColor: settings.tertiary_color,
       headingFont: settings.heading_font,
       bodyFont: settings.body_font,
-      // Layout settings from module (Product Cards)
-      layoutMode: module.layout_mode || 'inline',
+      // Layout settings from mod (Product Cards)
+      layoutMode: mod.layout_mode || 'inline',
       blockConfig,
       // Display settings (default true for backwards compatibility)
-      showEmoji: module.show_emoji !== false,
-      showNumbers: module.show_numbers !== false,
+      showEmoji: mod.show_emoji !== false,
+      showNumbers: mod.show_numbers !== false,
       // Legacy fallbacks
-      logoStyle: module.logo_style || 'square',
-      titleSize: module.title_size || 'medium',
-      descriptionSize: module.description_size || 'medium'
+      logoStyle: mod.logo_style || 'square',
+      titleSize: mod.title_size || 'medium',
+      descriptionSize: mod.description_size || 'medium'
     }
 
     if (!apps || apps.length === 0) {
       return ''
     }
 
-    const blockOrder = module.block_order as AIAppBlockType[]
+    const blockOrder = mod.block_order as AIAppBlockType[]
     let appsHtml = ''
 
     apps.forEach((app, index) => {
@@ -508,7 +508,7 @@ export class AppModuleRenderer {
       appsHtml += this.renderAppItem(app, blockOrder, linkUrl, styles, index)
     })
 
-    return this.wrapInSection(module.name, appsHtml, styles)
+    return this.wrapInSection(mod.name, appsHtml, styles)
   }
 
   /**

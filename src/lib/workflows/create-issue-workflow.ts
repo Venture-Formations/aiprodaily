@@ -7,9 +7,9 @@ import { ArticleModuleSelector } from '@/lib/article-modules'
  * Runs after issue setup (AI selection, post assignment)
  *
  * Dynamic steps based on active article modules:
- * Step 1:  Deduplication (global, cross-module)
+ * Step 1:  Deduplication (global, cross-mod)
  *
- * For each active article module (sequentially):
+ * For each active article mod (sequentially):
  *   Step N+0: Assign posts and generate titles
  *   Step N+1: Generate bodies batch 1
  *   Step N+2: Generate bodies batch 2
@@ -41,21 +41,21 @@ export async function createIssueWorkflow(input: {
 
   console.log(`[Create Issue Workflow] Found ${moduleIds.length} active article modules`)
 
-  // Process each module sequentially
+  // Process each mod sequentially
   for (let i = 0; i < moduleIds.length; i++) {
     const moduleId = moduleIds[i]
     const moduleNum = i + 1
     const totalModules = moduleIds.length
     const stepOffset = 3 + (i * 4) // Start at 3 since we have dedup and getModules
 
-    // Generate titles for this module (also assigns posts)
+    // Generate titles for this mod (also assigns posts)
     await generateModuleTitles(issue_id, moduleId, moduleNum, totalModules, stepOffset)
 
     // Generate bodies in 2 batches
     await generateModuleBodiesBatch1(issue_id, moduleId, moduleNum, totalModules, stepOffset + 1)
     await generateModuleBodiesBatch2(issue_id, moduleId, moduleNum, totalModules, stepOffset + 2)
 
-    // Fact-check articles for this module
+    // Fact-check articles for this mod
     await factCheckModule(issue_id, moduleId, moduleNum, totalModules, stepOffset + 3)
   }
 
@@ -99,7 +99,7 @@ async function deduplicateIssue(issueId: string) {
   }
 }
 
-// Step 2: Get active article module IDs
+// Step 2: Get active article mod IDs
 async function getActiveModuleIds(publicationId: string): Promise<string[]> {
   "use step"
 
@@ -128,14 +128,14 @@ async function generateModuleTitles(
 
   while (retryCount <= maxRetries) {
     try {
-      const module = await ArticleModuleSelector.getModule(moduleId)
-      const moduleName = module?.name || `Module ${moduleNum}`
+      const mod = await ArticleModuleSelector.getModule(moduleId)
+      const moduleName = mod?.name || `Module ${moduleNum}`
 
       console.log(`[Workflow Step ${stepNum}] Generating titles for ${moduleName} (${moduleNum}/${totalModules})...`)
 
       const processor = new RSSProcessor()
 
-      // Assign posts to this module first
+      // Assign posts to this mod first
       const assignResult = await processor.assignPostsToModule(issueId, moduleId)
       console.log(`[Workflow Step ${stepNum}] Assigned ${assignResult.assigned} posts to ${moduleName}`)
 
@@ -179,8 +179,8 @@ async function generateModuleBodiesBatch1(
 
   while (retryCount <= maxRetries) {
     try {
-      const module = await ArticleModuleSelector.getModule(moduleId)
-      const moduleName = module?.name || `Module ${moduleNum}`
+      const mod = await ArticleModuleSelector.getModule(moduleId)
+      const moduleName = mod?.name || `Module ${moduleNum}`
 
       console.log(`[Workflow Step ${stepNum}] Generating bodies batch 1 for ${moduleName}...`)
 
@@ -225,8 +225,8 @@ async function generateModuleBodiesBatch2(
 
   while (retryCount <= maxRetries) {
     try {
-      const module = await ArticleModuleSelector.getModule(moduleId)
-      const moduleName = module?.name || `Module ${moduleNum}`
+      const mod = await ArticleModuleSelector.getModule(moduleId)
+      const moduleName = mod?.name || `Module ${moduleNum}`
 
       console.log(`[Workflow Step ${stepNum}] Generating bodies batch 2 for ${moduleName}...`)
 
@@ -271,8 +271,8 @@ async function factCheckModule(
 
   while (retryCount <= maxRetries) {
     try {
-      const module = await ArticleModuleSelector.getModule(moduleId)
-      const moduleName = module?.name || `Module ${moduleNum}`
+      const mod = await ArticleModuleSelector.getModule(moduleId)
+      const moduleName = mod?.name || `Module ${moduleNum}`
 
       console.log(`[Workflow Step ${stepNum}] Fact-checking ${moduleName}...`)
 
@@ -318,11 +318,11 @@ async function finalizeIssue(issueId: string, moduleIds: string[], stepNum: numb
 
       const processor = new RSSProcessor()
 
-      // Select top articles for each module and update issue_article_modules
+      // Select top articles for each mod and update issue_article_modules
       let totalSelected = 0
       for (const moduleId of moduleIds) {
-        const module = await ArticleModuleSelector.getModule(moduleId)
-        const articlesCount = module?.articles_count || 3
+        const mod = await ArticleModuleSelector.getModule(moduleId)
+        const articlesCount = mod?.articles_count || 3
 
         // Get top articles by score
         const { data: topArticles } = await supabaseAdmin
@@ -364,7 +364,7 @@ async function finalizeIssue(issueId: string, moduleIds: string[], stepNum: numb
           totalSelected += selectedIds.length
         }
 
-        console.log(`[Workflow Step ${stepNum}] Selected ${selectedIds.length} articles for ${module?.name}`)
+        console.log(`[Workflow Step ${stepNum}] Selected ${selectedIds.length} articles for ${mod?.name}`)
       }
 
       // Initialize and generate text box modules (replaces legacy welcome section)

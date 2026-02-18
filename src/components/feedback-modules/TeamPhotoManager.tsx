@@ -221,7 +221,7 @@ export function TeamPhotoManager({ photos, onChange, maxPhotos = 10, disabled = 
 
       {photos.length === 0 && (
         <p className="text-sm text-gray-400 italic">
-          No team photos added yet. Click "Add Team Photo" to add your first one.
+          No team photos added yet. Click &quot;Add Team Photo&quot; to add your first one.
         </p>
       )}
     </div>

@@ -282,7 +282,7 @@ export function SparkLoopModal({
 
         {/* Header */}
         <div className="px-6 pt-8 pb-4 text-center">
-          <h2 className="text-2xl font-bold text-gray-900">You're subscribed!</h2>
+          <h2 className="text-2xl font-bold text-gray-900">You&apos;re subscribed!</h2>
           <p className="mt-2 text-gray-500">
             {publicationName} recommends these newsletters:
           </p>

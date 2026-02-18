@@ -1001,7 +1001,7 @@ export function TextBoxModuleSettings({
             <div>
               <div className="font-medium text-gray-900">Show Section Name</div>
               <div className="text-sm text-gray-500">
-                Display the section header in the newsletter. Turn off for sections like "Welcome" that don't need a visible header.
+                Display the section header in the newsletter. Turn off for sections like &quot;Welcome&quot; that don&apos;t need a visible header.
               </div>
             </div>
             <button

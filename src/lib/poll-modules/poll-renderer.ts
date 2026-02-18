@@ -20,7 +20,7 @@ interface RenderContext {
 }
 
 /**
- * Result of rendering a poll module
+ * Result of rendering a poll mod
  */
 interface RenderResult {
   html: string
@@ -42,7 +42,7 @@ export class PollModuleRenderer {
     content: string,
     styles: BlockStyleOptions
   ): string {
-    // Note: sectionName is used for the module name, but the poll title/question
+    // Note: sectionName is used for the mod name, but the poll title/question
     // are rendered separately via block renderers
     return `
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
@@ -70,10 +70,10 @@ export class PollModuleRenderer {
   }
 
   /**
-   * Render a poll module with its blocks in the configured order
+   * Render a poll mod with its blocks in the configured order
    */
   static async renderPollModule(
-    module: PollModule,
+    mod: PollModule,
     poll: Poll | PollSnapshot | null,
     publicationId: string,
     context: RenderContext = {}
@@ -82,7 +82,7 @@ export class PollModuleRenderer {
     if (!poll) {
       return {
         html: '',
-        moduleName: module.name,
+        moduleName: mod.name,
         pollId: null
       }
     }
@@ -98,7 +98,7 @@ export class PollModuleRenderer {
     }
 
     // Render blocks in legacy poll style (not using generic block renderers)
-    const blockOrder = module.block_order as PollBlockType[]
+    const blockOrder = mod.block_order as PollBlockType[]
     let blocksHtml = ''
     const baseUrl = context.baseUrl || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.aiprodaily.com'
 
@@ -141,11 +141,11 @@ export class PollModuleRenderer {
     }
 
     // Wrap in section container
-    const html = this.wrapInSection(module.name, blocksHtml, styles)
+    const html = this.wrapInSection(mod.name, blocksHtml, styles)
 
     return {
       html,
-      moduleName: module.name,
+      moduleName: mod.name,
       pollId: poll.id
     }
   }
@@ -154,11 +154,11 @@ export class PollModuleRenderer {
    * Render for preview (same as normal, just without tracking)
    */
   static async renderForPreview(
-    module: PollModule,
+    mod: PollModule,
     poll: Poll | PollSnapshot,
     publicationId: string
   ): Promise<string> {
-    const result = await this.renderPollModule(module, poll, publicationId, {})
+    const result = await this.renderPollModule(mod, poll, publicationId, {})
     return result.html
   }
 
@@ -231,9 +231,9 @@ export class PollModuleRenderer {
     // Sort by display_order
     const sorted = [...modules].sort((a, b) => a.display_order - b.display_order)
 
-    for (const module of sorted) {
-      const poll = polls.get(module.id) || null
-      const result = await this.renderPollModule(module, poll, publicationId, context)
+    for (const mod of sorted) {
+      const poll = polls.get(mod.id) || null
+      const result = await this.renderPollModule(mod, poll, publicationId, context)
       results.push(result)
     }
 

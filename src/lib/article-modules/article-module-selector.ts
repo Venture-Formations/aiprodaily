@@ -44,7 +44,7 @@ export class ArticleModuleSelector {
   }
 
   /**
-   * Get a single article module by ID
+   * Get a single article mod by ID
    */
   static async getModule(moduleId: string): Promise<ArticleModule | null> {
     const { data, error } = await supabaseAdmin
@@ -54,7 +54,7 @@ export class ArticleModuleSelector {
       .single()
 
     if (error) {
-      console.error('[ArticleModuleSelector] Error fetching module:', error)
+      console.error('[ArticleModuleSelector] Error fetching mod:', error)
       return null
     }
 
@@ -62,7 +62,7 @@ export class ArticleModuleSelector {
   }
 
   /**
-   * Get criteria for a module
+   * Get criteria for a mod
    */
   static async getModuleCriteria(moduleId: string): Promise<CriteriaResult> {
     const { data, error } = await supabaseAdmin
@@ -84,7 +84,7 @@ export class ArticleModuleSelector {
   }
 
   /**
-   * Get prompts for a module (title and body)
+   * Get prompts for a mod (title and body)
    */
   static async getModulePrompts(moduleId: string): Promise<PromptsResult> {
     const { data, error } = await supabaseAdmin
@@ -104,7 +104,7 @@ export class ArticleModuleSelector {
   }
 
   /**
-   * Get RSS feeds assigned to a module
+   * Get RSS feeds assigned to a mod
    */
   static async getModuleFeeds(moduleId: string): Promise<string[]> {
     const { data, error } = await supabaseAdmin
@@ -122,28 +122,28 @@ export class ArticleModuleSelector {
   }
 
   /**
-   * Select top articles for a module based on score
-   * This is the main selection method - gets posts from module's feeds,
+   * Select top articles for a mod based on score
+   * This is the main selection method - gets posts from mod's feeds,
    * ranked by total_score from post_ratings
    */
   static async selectArticlesForModule(
-    module: ArticleModule,
+    mod: ArticleModule,
     issueId: string,
     publicationId: string
   ): Promise<ArticleSelectionResult> {
-    const selectionMode = module.selection_mode
+    const selectionMode = mod.selection_mode
 
     // Manual mode returns empty - admin must pick
     if (selectionMode === 'manual') {
       return { articles: [], reason: 'Manual selection required' }
     }
 
-    // Get existing articles for this module/issue
+    // Get existing articles for this mod/issue
     const { data: existingArticles, error: existingError } = await supabaseAdmin
       .from('module_articles')
       .select('*')
       .eq('issue_id', issueId)
-      .eq('article_module_id', module.id)
+      .eq('article_module_id', mod.id)
       .eq('is_active', true)
       .order('rank', { ascending: true })
 
@@ -193,15 +193,15 @@ export class ArticleModuleSelector {
       return
     }
 
-    // Create empty selections for each module
-    for (const module of modules) {
+    // Create empty selections for each mod
+    for (const mod of modules) {
       await supabaseAdmin
         .from('issue_article_modules')
         .insert({
           issue_id: issueId,
-          article_module_id: module.id,
+          article_module_id: mod.id,
           article_ids: [],
-          selection_mode: module.selection_mode
+          selection_mode: mod.selection_mode
         })
     }
 
@@ -209,7 +209,7 @@ export class ArticleModuleSelector {
   }
 
   /**
-   * Update article selections for a module after articles are generated
+   * Update article selections for a mod after articles are generated
    */
   static async updateArticleSelections(
     issueId: string,
@@ -232,19 +232,19 @@ export class ArticleModuleSelector {
       return { success: false, error: error.message }
     }
 
-    console.log(`[ArticleModuleSelector] Updated selections: ${articleIds.length} articles for module ${moduleId}`)
+    console.log(`[ArticleModuleSelector] Updated selections: ${articleIds.length} articles for mod ${moduleId}`)
     return { success: true }
   }
 
   /**
-   * Manually select articles for a module (swap articles)
+   * Manually select articles for a mod (swap articles)
    */
   static async manuallySelectArticles(
     issueId: string,
     moduleId: string,
     articleIds: string[]
   ): Promise<{ success: boolean; error?: string }> {
-    // First, deactivate all articles for this module/issue
+    // First, deactivate all articles for this mod/issue
     const { error: deactivateError } = await supabaseAdmin
       .from('module_articles')
       .update({ is_active: false, rank: null })
@@ -330,7 +330,7 @@ export class ArticleModuleSelector {
   }
 
   /**
-   * Get all articles (active and inactive) for a module in an issue
+   * Get all articles (active and inactive) for a mod in an issue
    * Useful for showing article swapping options
    */
   static async getAllArticlesForModule(
@@ -402,7 +402,7 @@ export class ArticleModuleSelector {
   }
 
   /**
-   * Activate top N articles by score for a module
+   * Activate top N articles by score for a mod
    * Called during workflow finalization
    * Now includes minimum score filtering per criterion
    */
@@ -434,7 +434,7 @@ export class ArticleModuleSelector {
       })
     }
 
-    // Get all articles for this module/issue sorted by post rating
+    // Get all articles for this mod/issue sorted by post rating
     const { data: articles, error } = await supabaseAdmin
       .from('module_articles')
       .select(`
@@ -520,8 +520,8 @@ export class ArticleModuleSelector {
 
     // Handle case where NO articles meet minimum requirements
     if (eligibleArticles.length === 0 && hasMinimumFilters) {
-      const module = await this.getModule(moduleId)
-      const moduleName = module?.name || 'Unknown'
+      const mod = await this.getModule(moduleId)
+      const moduleName = mod?.name || 'Unknown'
 
       const failedCriteriaList = Object.entries(failedCriteriaDetails)
         .map(([name, count]) => `${name} (${count} failed)`)
@@ -597,7 +597,7 @@ export class ArticleModuleSelector {
     // Update issue_article_modules with selected IDs
     await this.updateArticleSelections(issueId, moduleId, articleIds)
 
-    console.log(`[ArticleModuleSelector] Activated ${articleIds.length} articles for module ${moduleId}`)
+    console.log(`[ArticleModuleSelector] Activated ${articleIds.length} articles for mod ${moduleId}`)
     return { success: true, activated: articleIds.length }
   }
 }

@@ -19,7 +19,7 @@ interface RenderContext {
 }
 
 /**
- * Result of rendering an ad module
+ * Result of rendering an ad mod
  */
 interface RenderResult {
   html: string
@@ -91,10 +91,10 @@ export class AdModuleRenderer {
   }
 
   /**
-   * Render an ad module with its blocks in the configured order
+   * Render an ad mod with its blocks in the configured order
    */
   static async renderAdModule(
-    module: AdModule,
+    mod: AdModule,
     ad: ModuleAd | ModuleAdWithAdvertiser | null,
     publicationId: string,
     context: RenderContext = {}
@@ -103,7 +103,7 @@ export class AdModuleRenderer {
     if (!ad) {
       return {
         html: '',
-        moduleName: module.name,
+        moduleName: mod.name,
         adId: null
       }
     }
@@ -121,7 +121,7 @@ export class AdModuleRenderer {
     const trackedUrl = baseUrl !== '#' && context.issueDate
       ? wrapTrackingUrl(
           baseUrl,
-          module.name,
+          mod.name,
           context.issueDate,
           context.mailerliteIssueId,
           context.issueId,
@@ -130,7 +130,7 @@ export class AdModuleRenderer {
       : baseUrl
 
     // Render each block in the configured order using global block library
-    const blockOrder = module.block_order as AdBlockType[]
+    const blockOrder = mod.block_order as AdBlockType[]
     let blocksHtml = ''
 
     for (const blockType of blockOrder) {
@@ -138,11 +138,11 @@ export class AdModuleRenderer {
     }
 
     // Wrap in section container
-    const html = this.wrapInSection(module.name, blocksHtml, styles)
+    const html = this.wrapInSection(mod.name, blocksHtml, styles)
 
     return {
       html,
-      moduleName: module.name,
+      moduleName: mod.name,
       adId: ad.id
     }
   }
@@ -162,9 +162,9 @@ export class AdModuleRenderer {
     // Sort modules by display_order
     const sortedModules = [...modules].sort((a, b) => a.display_order - b.display_order)
 
-    for (const module of sortedModules) {
-      const ad = ads.get(module.id) || null
-      const result = await this.renderAdModule(module, ad, publicationId, context)
+    for (const mod of sortedModules) {
+      const ad = ads.get(mod.id) || null
+      const result = await this.renderAdModule(mod, ad, publicationId, context)
       results.push(result)
     }
 
@@ -189,11 +189,11 @@ export class AdModuleRenderer {
   }
 
   /**
-   * Render a single ad module for preview (without tracking)
+   * Render a single ad mod for preview (without tracking)
    * Used by the ad preview API
    */
   static async renderForPreview(
-    module: AdModule,
+    mod: AdModule,
     ad: ModuleAd | ModuleAdWithAdvertiser,
     publicationId: string
   ): Promise<string> {
@@ -208,14 +208,14 @@ export class AdModuleRenderer {
     const linkUrl = ad.button_url || '#'
 
     // Render blocks using global block library
-    const blockOrder = module.block_order as AdBlockType[]
+    const blockOrder = mod.block_order as AdBlockType[]
     let blocksHtml = ''
 
     for (const blockType of blockOrder) {
       blocksHtml += this.renderBlockFromRegistry(blockType, ad, linkUrl, styles)
     }
 
-    return this.wrapInSection(module.name, blocksHtml, styles)
+    return this.wrapInSection(mod.name, blocksHtml, styles)
   }
 
   /**

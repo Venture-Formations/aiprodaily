@@ -103,7 +103,7 @@ export class NewsletterArchiver {
         }
       }
 
-      // AI Apps section - using module system (structured like ad_modules)
+      // AI Apps section - using mod system (structured like ad_modules)
       // First get the AI_APPLICATIONS section display_order for proper positioning
       const { data: aiAppSection } = await supabaseAdmin
         .from('newsletter_sections')
@@ -129,8 +129,8 @@ export class NewsletterArchiver {
       // Filter to only modules with include_in_archive = true (or not set, for backwards compat)
       const archivableModules = aiAppModuleSelections?.filter((selection: any) => {
         const moduleData = selection.ai_app_module as any
-        const module = Array.isArray(moduleData) ? moduleData[0] : moduleData
-        return module?.include_in_archive !== false
+        const mod = Array.isArray(moduleData) ? moduleData[0] : moduleData
+        return mod?.include_in_archive !== false
       }) || []
 
       if (archivableModules.length > 0) {
@@ -154,23 +154,23 @@ export class NewsletterArchiver {
           }
         }
 
-        // Structure AI App modules like ad_modules (with display_order and apps per module)
+        // Structure AI App modules like ad_modules (with display_order and apps per mod)
         sections.ai_app_modules = archivableModules.map((selection: any) => {
           const moduleData = selection.ai_app_module as any
-          const module = Array.isArray(moduleData) ? moduleData[0] : moduleData
+          const mod = Array.isArray(moduleData) ? moduleData[0] : moduleData
           const appIds = selection.app_ids as string[] || []
 
-          // Get apps for this module in order
+          // Get apps for this mod in order
           const moduleApps = appIds
             .map(id => appsMap.get(id))
             .filter(Boolean)
 
           return {
-            module_id: module?.id,
-            module_name: module?.name,
+            module_id: mod?.id,
+            module_name: mod?.name,
             // Use newsletter_sections AI_APPLICATIONS display_order for proper positioning
             display_order: aiAppSectionOrder,
-            block_order: module?.block_order,
+            block_order: mod?.block_order,
             apps: moduleApps
           }
         })
@@ -397,8 +397,8 @@ export class NewsletterArchiver {
       if (articleModules && articleModules.length > 0) {
         const articleModulesWithArticles = []
 
-        for (const module of articleModules) {
-          // Fetch active articles for this module and issue
+        for (const mod of articleModules) {
+          // Fetch active articles for this mod and issue
           const { data: moduleArticles } = await supabaseAdmin
             .from('module_articles')
             .select(`
@@ -416,16 +416,16 @@ export class NewsletterArchiver {
               )
             `)
             .eq('issue_id', issueId)
-            .eq('article_module_id', module.id)
+            .eq('article_module_id', mod.id)
             .eq('is_active', true)
             .order('rank', { ascending: true })
 
           if (moduleArticles && moduleArticles.length > 0) {
             articleModulesWithArticles.push({
-              module_id: module.id,
-              module_name: module.name,
-              display_order: module.display_order,
-              block_order: module.block_order,
+              module_id: mod.id,
+              module_name: mod.name,
+              display_order: mod.display_order,
+              block_order: mod.block_order,
               articles: moduleArticles.map((article: any) => ({
                 id: article.id,
                 headline: article.headline,
@@ -455,12 +455,12 @@ export class NewsletterArchiver {
       if (textBoxModules && textBoxModules.length > 0) {
         const textBoxModulesWithContent = []
 
-        for (const module of textBoxModules) {
-          // Fetch blocks for this module
+        for (const mod of textBoxModules) {
+          // Fetch blocks for this mod
           const { data: blocks } = await supabaseAdmin
             .from('text_box_blocks')
             .select('id, block_type, display_order, is_active, static_content, text_size, ai_prompt_json, generation_timing, image_type, static_image_url, ai_image_prompt')
-            .eq('text_box_module_id', module.id)
+            .eq('text_box_module_id', mod.id)
             .eq('is_active', true)
             .order('display_order', { ascending: true })
 
@@ -476,10 +476,10 @@ export class NewsletterArchiver {
 
           if (blocks && blocks.length > 0) {
             textBoxModulesWithContent.push({
-              module_id: module.id,
-              module_name: module.name,
-              display_order: module.display_order,
-              show_name: module.show_name,
+              module_id: mod.id,
+              module_name: mod.name,
+              display_order: mod.display_order,
+              show_name: mod.show_name,
               blocks: blocks.map((block: any) => {
                 const issueBlock = issueBlocksMap.get(block.id)
                 return {

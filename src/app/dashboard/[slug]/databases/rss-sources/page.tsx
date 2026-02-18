@@ -95,7 +95,7 @@ export default function RssSourcesPage() {
             RSS Sources Management
           </h1>
           <p className="text-sm text-gray-600">
-            Block images from specific RSS sources. Posts from blocked sources will still be processed, but their images won't be used. This typically lowers their AI interest score, making them lower priority.
+            Block images from specific RSS sources. Posts from blocked sources will still be processed, but their images won&apos;t be used. This typically lowers their AI interest score, making them lower priority.
           </p>
         </div>
 

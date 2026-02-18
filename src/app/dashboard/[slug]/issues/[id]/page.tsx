@@ -751,7 +751,7 @@ function EventsManager({
   return (
     <div className="space-y-4">
       <div className="text-sm text-gray-600">
-        Select up to 8 events per day. Mark one event as "featured" to highlight it in the newsletter.
+        Select up to 8 events per day. Mark one event as &quot;featured&quot; to highlight it in the newsletter.
       </div>
 
       {/* 3-Column Layout */}

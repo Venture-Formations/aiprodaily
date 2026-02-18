@@ -673,7 +673,7 @@ export default function ImageReview({ uploadResults, onComplete, onClose, onUpda
                         onClick={() => addManualTag()}
                         className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 transition-colors"
                       >
-                        Add as typed: "{newTag}"
+                        Add as typed: &quot;{newTag}&quot;
                       </button>
                     </div>
                     <div className="flex flex-wrap gap-1">

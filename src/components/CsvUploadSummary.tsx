@@ -29,7 +29,7 @@ export default function CsvUploadSummary({ result, onClose, uploadType }: CsvUpl
             {uploadType} CSV Upload Complete
           </h3>
           <p className="text-sm text-gray-500 mt-1">
-            Upload finished. Here's a summary of the results.
+            Upload finished. Here&apos;s a summary of the results.
           </p>
         </div>
 

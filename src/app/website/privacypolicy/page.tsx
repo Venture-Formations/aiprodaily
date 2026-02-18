@@ -50,7 +50,7 @@ export default async function PrivacyPolicyPage() {
 
             {/* Intro paragraph */}
             <p className="text-gray-700 leading-relaxed mb-12">
-              AI Accounting Daily ("we," "our," or "us") is a division of Venture Formations
+              AI Accounting Daily (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) is a division of Venture Formations
               LLC. We operate daily email newsletters for professionals. This Privacy Policy explains
               how we collect, use, and protect your information when you subscribe to our newsletter
               or interact with our services.
@@ -233,7 +233,7 @@ export default async function PrivacyPolicyPage() {
               </h2>
               <p className="text-gray-700 leading-relaxed">
                 We may update this Privacy Policy from time to time. The latest version will always
-                be posted on our website with the "Last Updated" date.
+                be posted on our website with the &quot;Last Updated&quot; date.
               </p>
             </section>
 
