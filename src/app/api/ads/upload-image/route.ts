@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { Octokit } from '@octokit/rest'
+import { supabaseAdmin } from '@/lib/supabase'
 
 /**
- * Upload advertisement image to GitHub
+ * Upload advertisement image to Supabase Storage
  * POST /api/ads/upload-image
  *
  * Security:
@@ -52,52 +52,36 @@ export async function POST(request: NextRequest) {
     // Convert file to buffer
     const arrayBuffer = await imageFile.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
-    const base64Content = buffer.toString('base64')
 
     // Generate unique filename
     const timestamp = Date.now()
-    const filename = `ad-${timestamp}.jpg`
-    const path = `public/images/advertisements/${filename}`
+    const ext = imageFile.type === 'image/png' ? 'png' : imageFile.type === 'image/webp' ? 'webp' : 'jpg'
+    const filename = `ad-${timestamp}.${ext}`
 
-    // Upload to GitHub using Octokit
-    const githubToken = process.env.GITHUB_TOKEN
-    const githubOwner = process.env.GITHUB_OWNER || 'Venture-Formations'
-    const githubRepo = process.env.GITHUB_REPO || 'aiprodaily'
+    // Upload to Supabase Storage
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('ad-images')
+      .upload(filename, buffer, {
+        contentType: imageFile.type,
+        cacheControl: '31536000', // 1 year cache
+        upsert: false,
+      })
 
-    if (!githubToken) {
-      throw new Error('GitHub token not configured')
+    if (uploadError) {
+      console.error('Supabase Storage upload failed:', uploadError)
+      throw new Error(`Upload failed: ${uploadError.message}`)
     }
 
-    const octokit = new Octokit({
-      auth: githubToken,
-    })
+    // Get public URL
+    const { data: urlData } = supabaseAdmin.storage
+      .from('ad-images')
+      .getPublicUrl(filename)
 
-    // Parse repo path if it contains owner (e.g., "Venture-Formations/aiprodaily")
-    let owner = githubOwner
-    let repo = githubRepo
-
-    if (githubRepo.includes('/')) {
-      const parts = githubRepo.split('/')
-      owner = parts[0]
-      repo = parts[1]
+    if (!urlData?.publicUrl) {
+      throw new Error('Upload succeeded but no public URL returned')
     }
 
-    const uploadResponse = await octokit.repos.createOrUpdateFileContents({
-      owner,
-      repo,
-      path,
-      message: `Add advertisement image: ${filename}`,
-      content: base64Content,
-    })
-
-    if (!uploadResponse.data.content?.download_url) {
-      console.error('GitHub upload failed: No download URL returned')
-      throw new Error('GitHub upload failed: No download URL')
-    }
-
-    const imageUrl = uploadResponse.data.content.download_url
-
-    return NextResponse.json({ url: imageUrl })
+    return NextResponse.json({ url: urlData.publicUrl })
 
   } catch (error) {
     console.error('Image upload error:', error)

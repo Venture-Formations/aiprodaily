@@ -200,7 +200,7 @@ export function DatePicker({
           </div>
           <div className="flex-1">
             <span className="font-medium text-gray-900">Use next available dates</span>
-            <p className="text-sm text-gray-500">We'll schedule your ad for the next open slots</p>
+            <p className="text-sm text-gray-500">We&apos;ll schedule your ad for the next open slots</p>
             
             {/* Number of days input */}
             {useNextAvailable && (

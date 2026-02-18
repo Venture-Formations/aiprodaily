@@ -120,9 +120,9 @@ export default async function AdAnalyticsPage({ params }: PageProps) {
   // Build list of section names to look for
   const adSectionNames = ['Advertorial']
   if (adModules) {
-    for (const module of adModules) {
-      if (module.name && !adSectionNames.includes(module.name)) {
-        adSectionNames.push(module.name)
+    for (const adModule of adModules) {
+      if (adModule.name && !adSectionNames.includes(adModule.name)) {
+        adSectionNames.push(adModule.name)
       }
     }
   }

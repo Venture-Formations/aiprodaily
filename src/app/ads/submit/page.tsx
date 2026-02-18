@@ -135,7 +135,7 @@ export default function SubmitAdPage() {
             Submit Your Advertorial
           </h1>
           <p className="text-gray-600 mb-8">
-            Get featured in the newsletter's Advertorial section.
+            Get featured in the newsletter&apos;s Advertorial section.
             Your ad will reach thousands of subscribers! Submit your ad for review today.
           </p>
 
@@ -272,7 +272,7 @@ export default function SubmitAdPage() {
                     required
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    We'll use this email to notify you about your ad's status
+                    We&apos;ll use this email to notify you about your ad&apos;s status
                   </p>
                 </div>
               </div>
@@ -300,7 +300,7 @@ export default function SubmitAdPage() {
             <li>Our team will review your submission (typically within 1 business day)</li>
             <li>Once approved, your ad will be added to the rotation queue</li>
             <li>Your ad will appear in upcoming newsletters with a centered button linking to your destination</li>
-            <li>You'll receive notifications via email about your ad's status</li>
+            <li>You&apos;ll receive notifications via email about your ad&apos;s status</li>
           </ol>
         </div>
       </div>

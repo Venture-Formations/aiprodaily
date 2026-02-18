@@ -85,9 +85,9 @@ function AdSuccessContent() {
             <h2 className="text-xl font-semibold text-gray-900 mb-3">What Happens Next?</h2>
             <ol className="list-decimal list-inside space-y-2 text-gray-700">
               <li>Our team will review your advertisement submission</li>
-              <li>You'll receive an email notification once your ad is approved (typically within 1 business day)</li>
+              <li>You&apos;ll receive an email notification once your ad is approved (typically within 1 business day)</li>
               <li>Your ad will begin appearing in newsletters according to your selected schedule</li>
-              <li>You'll receive usage reports and completion notifications via email</li>
+              <li>You&apos;ll receive usage reports and completion notifications via email</li>
             </ol>
           </div>
 

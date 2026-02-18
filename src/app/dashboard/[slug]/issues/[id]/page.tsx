@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Layout from '@/components/Layout'
 import DeleteIssueModal from '@/components/DeleteIssueModal'
 import AdModulesPanel from '@/components/AdModulesPanel'
@@ -1268,7 +1269,7 @@ function SortableArticle({
   )
 }
 
-export default function issueDetailPage() {
+export default function IssueDetailPage() {
   const params = useParams()
   const router = useRouter()
   const [issue, setissue] = useState<issueWithArticles | null>(null)
@@ -2217,9 +2218,9 @@ export default function issueDetailPage() {
           <div className="text-red-600 mb-4">
             {error || 'issue not found'}
           </div>
-          <a href="/dashboard/issues" className="text-brand-primary hover:text-blue-700">
+          <Link href="/dashboard/issues" className="text-brand-primary hover:text-blue-700">
             Back to Campaigns
-          </a>
+          </Link>
         </div>
       </Layout>
     )

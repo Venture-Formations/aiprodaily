@@ -61,7 +61,7 @@ export default async function SettingsPage() {
           </div>
 
           <p className="text-xs text-slate-500 mt-4">
-            Your account is managed through Clerk. Click "Manage Account" to update your password, email, or connected accounts.
+            Your account is managed through Clerk. Click &quot;Manage Account&quot; to update your password, email, or connected accounts.
           </p>
         </div>
 

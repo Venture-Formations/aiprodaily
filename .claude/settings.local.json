@@ -119,7 +119,22 @@
       "mcp__mailerlite__get_subscriber",
       "mcp__supabase__search_docs",
       "Bash(git remote set-url:*)",
-      "Bash(git hash-object:*)"
+      "Bash(git hash-object:*)",
+      "Bash(where:*)",
+      "Bash(winget install:*)",
+      "Bash(export PATH=\"$PATH:/c/Program Files/GitHub CLI\")",
+      "Bash(gh:*)",
+      "Bash(echo:*)",
+      "Bash(git fetch:*)",
+      "Bash(git cherry-pick:*)",
+      "mcp__supabase__get_project_url",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" --version)",
+      "Bash(\"/c/Program Files \\(x86\\)/GitHub CLI/gh.exe\" --version)",
+      "Bash(sort:*)",
+      "Bash(tee:*)",
+      "Bash(wc:*)",
+      "Bash(xxd:*)",
+      "Bash(npx next lint)"
     ],
     "deny": [],
     "ask": []

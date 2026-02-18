@@ -389,7 +389,7 @@ export default function NewAdPage() {
             </label>
           )}
           <p className="mt-3 text-xs text-gray-500">
-            Upload your logo or a product image. We'll incorporate it into the final ad design.
+            Upload your logo or a product image. We&apos;ll incorporate it into the final ad design.
           </p>
         </div>
 
