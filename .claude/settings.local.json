@@ -134,7 +134,9 @@
       "Bash(tee:*)",
       "Bash(wc:*)",
       "Bash(xxd:*)",
-      "Bash(npx next lint)"
+      "Bash(npx next lint)",
+      "Bash(npx next build)",
+      "Bash(git rebase:*)"
     ],
     "deny": [],
     "ask": []
