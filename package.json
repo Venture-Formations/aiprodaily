@@ -8,6 +8,7 @@
     "build:all": "next build",
     "start": "next start",
     "lint": "next lint",
+    "type-check": "tsc --noEmit",
     "migrate:normalize-ads": "npx tsx scripts/migrate-normalize-ads.ts",
     "migrate:advertorial-to-module": "npx tsx scripts/migrate-advertorial-to-module.ts"
   },
