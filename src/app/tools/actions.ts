@@ -4,9 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase'
 import Stripe from 'stripe'
 import type { AIAppCategory } from '@/types/database'
-import { PUBLICATION_ID } from '@/lib/config'
-// Use SUPABASE_URL (server-side) instead of NEXT_PUBLIC_SUPABASE_URL
-const SUPABASE_STORAGE_URL = `${process.env.SUPABASE_URL}/storage/v1/object/public/tool-images/`
+import { PUBLICATION_ID, STORAGE_PUBLIC_URL } from '@/lib/config'
+const SUPABASE_STORAGE_URL = `${STORAGE_PUBLIC_URL}/tool-images/`
 
 // Initialize Stripe if key exists
 const stripe = process.env.STRIPE_SECRET_KEY

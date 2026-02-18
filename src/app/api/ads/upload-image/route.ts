@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { STORAGE_PUBLIC_URL } from '@/lib/config'
 
 /**
  * Upload advertisement image to Supabase Storage
@@ -72,16 +73,10 @@ export async function POST(request: NextRequest) {
       throw new Error(`Upload failed: ${uploadError.message}`)
     }
 
-    // Get public URL
-    const { data: urlData } = supabaseAdmin.storage
-      .from('ad-images')
-      .getPublicUrl(filename)
+    // Build public URL using custom domain if configured
+    const publicUrl = `${STORAGE_PUBLIC_URL}/ad-images/${filename}`
 
-    if (!urlData?.publicUrl) {
-      throw new Error('Upload succeeded but no public URL returned')
-    }
-
-    return NextResponse.json({ url: urlData.publicUrl })
+    return NextResponse.json({ url: publicUrl })
 
   } catch (error) {
     console.error('Image upload error:', error)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { STORAGE_PUBLIC_URL } from '@/lib/config'
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,15 +34,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Get public URL
-    const { data: urlData } = supabaseAdmin.storage
-      .from('tool-images')
-      .getPublicUrl(fileName)
+    // Build public URL using custom domain if configured
+    const publicUrl = `${STORAGE_PUBLIC_URL}/tool-images/${fileName}`
 
     return NextResponse.json({
       success: true,
       path: data.path,
-      url: urlData.publicUrl
+      url: publicUrl
     })
   } catch (error) {
     console.error('[Upload] Error:', error)
