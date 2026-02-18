@@ -79,8 +79,14 @@ export async function GET(request: NextRequest) {
           'mailerlite_group_id': 'mailerliteMainGroupId'
         }
         const uiKey = keyMap[row.key] || row.key.replace('mailerlite_', 'mailerlite')
-        // Don't overwrite if we already have a value (prefer new key over legacy)
-        if (!savedSettings[uiKey]) {
+        const isLegacyKey = row.key === 'mailerlite_group_id'
+        if (isLegacyKey) {
+          // Legacy key - only use as fallback if new key hasn't set this yet
+          if (!savedSettings[uiKey]) {
+            savedSettings[uiKey] = cleanValue
+          }
+        } else {
+          // New key - always use (overwrite legacy value if present)
           savedSettings[uiKey] = cleanValue
         }
       } else if (row.key.startsWith('email_')) {
