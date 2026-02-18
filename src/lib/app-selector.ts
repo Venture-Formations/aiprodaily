@@ -39,7 +39,7 @@ export class AppSelector {
    * Check if an affiliate app is within cooldown period
    * Cooldown is based on last_used_date which is set during send-final
    */
-  private static isInCooldown(app: AIApplication, cooldownDays: number): boolean {
+  static isInCooldown(app: AIApplication, cooldownDays: number): boolean {
     if (!app.is_affiliate || !app.last_used_date) {
       return false
     }
@@ -54,7 +54,7 @@ export class AppSelector {
   /**
    * Count how many apps from each category are already selected
    */
-  private static getCategoryCounts(selectedApps: AIApplication[]): Map<string, number> {
+  static getCategoryCounts(selectedApps: AIApplication[]): Map<string, number> {
     const counts = new Map<string, number>()
     for (const app of selectedApps) {
       const category = app.category || 'Unknown'
@@ -67,7 +67,7 @@ export class AppSelector {
   /**
    * Check if adding an app would exceed the category maximum
    */
-  private static wouldExceedCategoryMax(
+  static wouldExceedCategoryMax(
     app: AIApplication,
     selectedApps: AIApplication[],
     maxPerCategory: number

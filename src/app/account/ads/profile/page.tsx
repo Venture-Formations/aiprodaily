@@ -5,8 +5,7 @@ import { getCategoriesWithFeaturedTools, getDirectoryPricing } from '@/lib/direc
 import Link from 'next/link'
 import Image from 'next/image'
 import { Star, Check, TrendingUp, Eye, ArrowRight, Crown, Clock } from 'lucide-react'
-
-const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+import { PUBLICATION_ID } from '@/lib/config'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,12 +1,12 @@
 import { MetadataRoute } from 'next'
 import { supabaseAdmin } from '@/lib/supabase'
+import { PUBLICATION_ID, SITE_BASE_URL } from '@/lib/config'
 
 // Regenerate sitemap every hour (3600 seconds)
 // This ensures new tools, articles, and newsletters appear without redeploying
 export const revalidate = 3600
 
-const BASE_URL = 'https://aiaccountingdaily.com'
-const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+const BASE_URL = SITE_BASE_URL
 
 // Tool categories from directory.ts
 const TOOL_CATEGORIES = [
