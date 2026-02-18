@@ -37,11 +37,12 @@ curl -H "Authorization: Bearer $CRON_SECRET" https://yourdomain.com/api/cron/hea
 - **Confidence gate:** If uncertainty >20%, stop and ask for clarification. Offer options with pros/cons.
 
 ## 4. Git Workflow
-This project uses a **single branch** workflow:
-- **`master`** — Main branch, auto-deploys to production via Vercel
-- No separate `develop` or `main` branches
-- Push directly to `master` for all changes
-- Vercel automatically deploys on every push
+This project uses a **branch-based workflow** with pull requests:
+- **`master`** — Production branch, auto-deploys to Vercel on merge
+- All changes go through feature branches and PRs
+- Branch naming: `feature/`, `fix/`, `chore/` prefixes
+- CI runs on every PR (build, lint, type-check)
+- Require code review before merging to `master`
 
 ### Pre-Deployment Code Review (REQUIRED)
 **Before every `git push`, you MUST run a code review:**

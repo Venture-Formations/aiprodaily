@@ -1,227 +1,110 @@
-# St. Cloud Scoop Newsletter System
+# AIProDaily
 
-A complete automated newsletter generation and management system built with Next.js, Supabase, and AI.
+AI-powered newsletter platform that automates RSS ingestion, AI content generation, and email delivery via MailerLite. Built with Next.js 15, Supabase, and OpenAI.
 
-## Features
+## Prerequisites
 
-- **Automated RSS Processing**: Fetches and processes RSS feeds with AI content evaluation
-- **Smart Content Curation**: AI-powered rating system for local relevance and community impact
-- **Collaborative Review**: Team-based article management and approval workflow
-- **Email Campaign Management**: Integrated with MailerLite for professional email delivery
-- **Analytics Dashboard**: Performance tracking with open rates, click rates, and engagement metrics
-- **Error Monitoring**: Comprehensive error handling with Slack notifications
-- **Automated Scheduling**: Daily cron jobs for processing and sending newsletters
+- **Node.js** 18+ (LTS recommended)
+- **npm** 9+
+- **Supabase** project ([create one free](https://supabase.com/dashboard))
+- **OpenAI** API key
+- **MailerLite** account and API key
+- **GitHub** personal access token (for image uploads)
 
-## Tech Stack
-
-- **Frontend**: Next.js 15, React, Tailwind CSS
-- **Backend**: Next.js API Routes, TypeScript
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: NextAuth.js with Google OAuth
-- **AI**: OpenAI GPT-4 for content processing
-- **Email**: MailerLite API for campaign management
-- **Deployment**: Vercel with automated cron jobs
-- **Monitoring**: Slack webhooks for alerts
+Optional: Google OAuth credentials, Stripe keys, Clerk keys, SparkLoop API key.
 
 ## Getting Started
 
-### Prerequisites
-
-- Node.js 18+ and npm
-- Supabase account and project
-- OpenAI API key
-- MailerLite account and API key
-- Google OAuth credentials
-- Slack webhook URL (optional)
-
-### Installation
-
-1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd STC_Scoop
-```
+# 1. Clone the repo
+git clone <repo-url>
+cd ai-pros-newsletter
 
-2. Install dependencies:
-```bash
+# 2. Install dependencies
 npm install
-```
 
-3. Set up environment variables:
-```bash
+# 3. Set up environment variables
 cp .env.example .env.local
-```
+# Edit .env.local with your actual keys (see .env.example for details)
 
-4. Configure your environment variables in `.env.local` with your actual API keys and credentials.
-
-5. Set up the database schema:
-   - Go to your Supabase project
-   - Run the SQL commands from `database.sql` in the SQL editor
-
-6. Start the development server:
-```bash
+# 4. Run the dev server
 npm run dev
 ```
 
-Visit `http://localhost:3000` to access the application.
+The app will be available at [http://localhost:3000](http://localhost:3000).
+
+## Scripts
+
+| Command | Purpose |
+|---------|---------|
+| `npm run dev` | Start development server |
+| `npm run build` | Production build (run before pushing) |
+| `npm run lint` | ESLint checks |
+| `npm run type-check` | TypeScript type checking |
+
+## Project Structure
+
+```
+src/
+  app/
+    api/          # API routes (cron/, campaigns/, rss/, webhooks/, debug/)
+    dashboard/    # Admin dashboard (per-publication)
+    tools/        # Public AI Tools Directory
+    account/      # User accounts & advertiser portal
+    website/      # Marketing site
+  lib/            # Core business logic
+    rss-processor.ts    # RSS ingestion & AI content generation
+    app-selector.ts     # AI app rotation for newsletters
+    newsletter-templates.ts  # Email template rendering
+    directory.ts        # AI Tools Directory logic
+  components/     # Shared React components
+db/
+  migrations/     # SQL migration files
+docs/             # Architecture & workflow documentation
+```
 
 ## Database Setup
 
-The system requires a PostgreSQL database with the following main tables:
+This project uses Supabase (PostgreSQL). After creating a Supabase project:
 
-- `newsletter_campaigns` - Campaign management and status
-- `rss_feeds` - RSS feed configuration
-- `rss_posts` - Raw RSS content
-- `post_ratings` - AI evaluation scores
-- `articles` - Generated newsletter content
-- `manual_articles` - User-created content
-- `users` - Authentication and permissions
-- `email_metrics` - Performance analytics
-- `system_logs` - Error tracking and monitoring
+1. Copy your project URL, anon key, and service role key into `.env.local`
+2. Apply migrations from `db/migrations/` via the Supabase SQL Editor
+3. See `docs/architecture/system-overview.md` for schema details
 
-Run the complete schema from `database.sql` in your Supabase SQL editor.
+## Git Workflow
 
-## Configuration
+We use a **branch-based workflow** with pull requests:
 
-### RSS Feeds
+1. Create a feature branch from `master`: `git checkout -b feature/your-feature`
+2. Make your changes and commit
+3. Push and open a PR against `master`
+4. CI checks must pass (build, lint, type-check)
+5. Get a code review before merging
+6. Merging to `master` auto-deploys to production via Vercel
 
-Configure RSS feeds in the `rss_feeds` table or through the admin interface:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 
-```sql
-INSERT INTO rss_feeds (url, name, active) VALUES
-('https://your-rss-feed.com/feed.xml', 'Local News Source', true);
-```
+## Key Documentation
 
-### MailerLite Groups
+| Topic | File |
+|-------|------|
+| Operations guide (comprehensive) | [CLAUDE.md](CLAUDE.md) |
+| RSS workflow | [docs/workflows/rss-processing.md](docs/workflows/rss-processing.md) |
+| AI prompts & scoring | [docs/ai/prompt-system.md](docs/ai/prompt-system.md) |
+| Cron jobs | [docs/operations/cron-jobs.md](docs/operations/cron-jobs.md) |
+| System architecture | [docs/architecture/system-overview.md](docs/architecture/system-overview.md) |
+| Troubleshooting | [docs/troubleshooting/common-issues.md](docs/troubleshooting/common-issues.md) |
 
-Set up two subscriber groups in MailerLite:
-- Review group (for internal team)
-- Main subscriber group (for newsletter recipients)
+## Architecture Overview
 
-### Cron Schedule
+1. **RSS Ingestion** - Cron fetches RSS feeds into a post pool
+2. **Workflow** - 10-step pipeline scores, selects, and generates AI content for articles
+3. **Issue Review** - Dashboard surfaces drafts for human review
+4. **Send** - Final newsletter pushed to MailerLite, analytics tracked
+5. **Secondary Newsletter** - Optional secondary send with different content
 
-The system runs on the following schedule (all times in Central Time):
-
-- **8:30 PM**: RSS processing and AI evaluation
-- **9:00 PM**: Review campaign sent to team
-- **4:55 AM**: Final newsletter sent (if approved)
-- **6:00 AM**: Import performance metrics
-- **Every 15 minutes (8 AM - 10 PM)**: Health checks
-
-## AI Processing Pipeline
-
-1. **Content Evaluation**: Rates articles on interest level, local relevance, and community impact (1-10 scale each)
-2. **Duplicate Detection**: Identifies and groups similar stories
-3. **Article Generation**: Converts RSS content to newsletter format (40-75 words)
-4. **Fact Checking**: Validates accuracy against source content (minimum 20/30 score)
-5. **Subject Line Generation**: Creates engaging email subject lines
-
-## Deployment
-
-### Vercel Deployment
-
-1. Connect your repository to Vercel
-2. Configure environment variables in Vercel dashboard
-3. Set up the following environment variable mappings:
-   - `@supabase-url` → Your Supabase URL
-   - `@supabase-anon-key` → Your Supabase anon key
-   - `@supabase-service-role-key` → Your Supabase service role key
-   - `@openai-api-key` → Your OpenAI API key
-   - `@mailerlite-api-key` → Your MailerLite API key
-   - And so on...
-
-4. Deploy the application
-
-### Cron Jobs
-
-Cron jobs are automatically configured via `vercel.json`. Ensure your `CRON_SECRET` environment variable is set for security.
-
-## Usage
-
-### Daily Workflow
-
-1. **8:30 PM CT**: System automatically processes RSS feeds
-2. **9:00 PM CT**: Review team receives email with proposed articles
-3. **9:00 PM - 4:00 AM CT**: Team reviews and modifies article selection in dashboard
-4. **4:55 AM CT**: Final newsletter automatically sent to subscribers
-
-### Manual Operations
-
-- **Create Campaign**: Start a new newsletter campaign manually
-- **Add Manual Articles**: Include custom content alongside RSS articles
-- **Override Selections**: Toggle articles on/off for the newsletter
-- **Preview Newsletter**: See how the email will look before sending
-- **View Analytics**: Monitor performance metrics and trends
-
-### Team Management
-
-All team members with Google accounts can access the dashboard. User roles are managed in the `users` table:
-
-- **Reviewer**: Can review and modify article selections
-- **Admin**: Full system access (future enhancement)
-
-## Monitoring
-
-### Health Checks
-
-The system continuously monitors:
-- Database connectivity
-- RSS feed processing status
-- Recent campaign creation
-- Email delivery success rates
-
-### Error Handling
-
-- All errors are logged to the `system_logs` table
-- Critical errors trigger Slack notifications
-- Failed RSS feeds are automatically retried
-- Email delivery failures include fallback procedures
-
-### Analytics
-
-Track newsletter performance with:
-- Open rates and click rates
-- Subscriber growth and churn
-- Article engagement metrics
-- Historical performance trends
-
-## API Reference
-
-### Public Endpoints
-
-- `GET /api/health` - System health check
-- `POST /api/auth/[...nextauth]` - Authentication
-
-### Protected Endpoints
-
-- `GET /api/campaigns` - List newsletter campaigns
-- `GET /api/campaigns/[id]` - Get campaign details
-- `PATCH /api/campaigns/[id]/articles` - Update article selections
-- `POST /api/articles/manual` - Create manual article
-- `GET /api/analytics/[campaign]` - Get campaign metrics
-
-### Cron Endpoints
-
-- `POST /api/cron/process-rss` - Trigger RSS processing
-- `POST /api/cron/send-final` - Send final newsletter
-- `POST /api/cron/import-metrics` - Import performance metrics
-- `POST /api/cron/health-check` - Run health checks
-
-## Security
-
-- All API endpoints require authentication
-- Cron endpoints protected with secret tokens
-- Row-level security enabled in Supabase
-- Input validation and sanitization
-- No sensitive data in error messages
-
-## Support
-
-For issues and questions:
-1. Check the system logs in the dashboard
-2. Review error notifications in Slack
-3. Examine the `system_logs` table for detailed error information
+All data is multi-tenant, scoped by `publication_id`.
 
 ## License
 
-This project is proprietary software for St. Cloud Scoop newsletter operations.# Force deployment
+Proprietary. All rights reserved.

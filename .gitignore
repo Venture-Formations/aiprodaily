@@ -24,6 +24,25 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
+
+# Debug artifacts (screenshots, temp scripts, data dumps)
+/*.png
+/*.eml
+/screenshot*.js
+/analyze*.js
+/check_*.js
+/capture*.js
+/investigate*.js
+/verify*.js
+/resend*.js
+/test_*.js
+/get-*.js
+/final_*.js
+/sl_*.json
+/sparkloop*.json
+/offer_page.html
+/page-source.html
 
 # local env files
 .env*.local
