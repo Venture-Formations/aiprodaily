@@ -211,7 +211,7 @@ export class TextBoxGenerator {
     data.section_articles = {}
 
     if (articleModules && articleModules.length > 0) {
-      // Get all module articles for this issue
+      // Get all mod articles for this issue
       console.log(`[TextBoxGenerator] Fetching articles for issue: ${issueId}`)
       const { data: allModuleArticles, error: articlesError } = await supabaseAdmin
         .from('module_articles')
@@ -223,14 +223,14 @@ export class TextBoxGenerator {
       console.log(`[TextBoxGenerator] Found ${allModuleArticles?.length || 0} articles for issue ${issueId}`, articlesError ? `Error: ${articlesError.message}` : '')
 
       if (allModuleArticles) {
-        // Group articles by module
+        // Group articles by mod
         for (let i = 0; i < articleModules.length; i++) {
-          const module = articleModules[i]
+          const mod = articleModules[i]
           const sectionNum = i + 1
           const sectionKey = `section_${sectionNum}`
 
           const sectionArticles = allModuleArticles
-            .filter(a => a.article_module_id === module.id)
+            .filter(a => a.article_module_id === mod.id)
             .map(a => ({
               headline: a.headline || '',
               content: a.content || '',
@@ -238,7 +238,7 @@ export class TextBoxGenerator {
             }))
 
           data.section_articles[sectionKey] = {
-            name: module.name,
+            name: mod.name,
             articles: sectionArticles
           }
         }
@@ -251,7 +251,7 @@ export class TextBoxGenerator {
         }))
       }
     } else {
-      // Fallback: Get active module articles without section grouping
+      // Fallback: Get active mod articles without section grouping
       const { data: moduleArticles } = await supabaseAdmin
         .from('module_articles')
         .select('headline, content, rank')

@@ -10,13 +10,13 @@ import { ArticleModuleSelector } from '@/lib/article-modules'
  *
  * NEW STRUCTURE:
  * Step 1:  Setup (create issue, get article modules, assign posts)
- * Step 2:  Deduplication (global, cross-module)
+ * Step 2:  Deduplication (global, cross-mod)
  *
- * For each active article module (sequentially):
- *   Step N+0: Generate titles for module
- *   Step N+1: Generate bodies batch 1 for module
- *   Step N+2: Generate bodies batch 2 for module
- *   Step N+3: Fact-check articles for module
+ * For each active article mod (sequentially):
+ *   Step N+0: Generate titles for mod
+ *   Step N+1: Generate bodies batch 1 for mod
+ *   Step N+2: Generate bodies batch 2 for mod
+ *   Step N+3: Fact-check articles for mod
  *
  * Step FINAL: Finalize (select top articles, generate welcome, ads, polls)
  */
@@ -35,24 +35,24 @@ export async function processRSSWorkflow(input: {
   issueId = setupResult.issueId
   const moduleIds = setupResult.moduleIds
 
-  // STEP 2: Deduplication (global, cross-module)
+  // STEP 2: Deduplication (global, cross-mod)
   await deduplicateIssue(issueId)
 
-  // Process each article module sequentially
+  // Process each article mod sequentially
   for (let i = 0; i < moduleIds.length; i++) {
     const moduleId = moduleIds[i]
     const moduleNum = i + 1
     const totalModules = moduleIds.length
     const stepOffset = 3 + (i * 4) // Steps 3, 7, 11, etc.
 
-    // Generate titles for this module
+    // Generate titles for this mod
     await generateModuleTitles(issueId, moduleId, moduleNum, totalModules, stepOffset)
 
     // Generate bodies in 2 batches
     await generateModuleBodiesBatch1(issueId, moduleId, moduleNum, totalModules, stepOffset + 1)
     await generateModuleBodiesBatch2(issueId, moduleId, moduleNum, totalModules, stepOffset + 2)
 
-    // Fact-check articles for this module
+    // Fact-check articles for this mod
     await factCheckModule(issueId, moduleId, moduleNum, totalModules, stepOffset + 3)
   }
 
@@ -143,9 +143,9 @@ async function setupIssue(newsletterId: string): Promise<{ issueId: string; modu
         const { SparkLoopRecModuleSelector } = await import('@/lib/sparkloop-rec-modules')
         const slRecResults = await SparkLoopRecModuleSelector.selectRecsForIssue(issueId, newsletter.id)
         const modulesWithRecs = slRecResults.filter(s => s.refCodes.length > 0).length
-        console.log(`[Workflow Step 1] SparkLoop rec modules: ${modulesWithRecs} module(s) with selections`)
+        console.log(`[Workflow Step 1] SparkLoop rec modules: ${modulesWithRecs} mod(s) with selections`)
       } catch (slError) {
-        console.log('[Workflow Step 1] SparkLoop rec module selection failed (non-critical):', slError)
+        console.log('[Workflow Step 1] SparkLoop rec mod selection failed (non-critical):', slError)
       }
 
       // Get active article modules
@@ -154,7 +154,7 @@ async function setupIssue(newsletterId: string): Promise<{ issueId: string; modu
 
       console.log(`[Workflow Step 1] Found ${articleModules.length} active article modules`)
 
-      // Initialize article module selections
+      // Initialize article mod selections
       await ArticleModuleSelector.initializeSelectionsForIssue(issueId, newsletter.id)
 
       // Initialize text box modules and generate "before_articles" timing blocks
@@ -172,16 +172,16 @@ async function setupIssue(newsletterId: string): Promise<{ issueId: string; modu
           }
         }
       } catch (textBoxError) {
-        console.log('[Workflow Step 1] Text box module initialization failed (non-critical):', textBoxError)
-        // Don't fail workflow if text box module initialization fails
+        console.log('[Workflow Step 1] Text box mod initialization failed (non-critical):', textBoxError)
+        // Don't fail workflow if text box mod initialization fails
       }
 
-      // Assign posts to each article module
+      // Assign posts to each article mod
       let totalPostsAssigned = 0
-      for (const module of articleModules) {
-        const result = await processor.assignPostsToModule(issueId, module.id)
+      for (const mod of articleModules) {
+        const result = await processor.assignPostsToModule(issueId, mod.id)
         totalPostsAssigned += result.assigned
-        console.log(`[Workflow Step 1] Module "${module.name}": ${result.assigned} posts assigned`)
+        console.log(`[Workflow Step 1] Module "${mod.name}": ${result.assigned} posts assigned`)
       }
 
       console.log(`[Workflow Step 1] ✓ Setup complete. Total posts assigned: ${totalPostsAssigned}`)
@@ -233,7 +233,7 @@ async function deduplicateIssue(issueId: string) {
   }
 }
 
-// MODULE STEPS: Generate titles for a module
+// MODULE STEPS: Generate titles for a mod
 async function generateModuleTitles(
   issueId: string,
   moduleId: string,
@@ -248,8 +248,8 @@ async function generateModuleTitles(
 
   while (retryCount <= maxRetries) {
     try {
-      const module = await ArticleModuleSelector.getModule(moduleId)
-      const moduleName = module?.name || `Module ${moduleNum}`
+      const mod = await ArticleModuleSelector.getModule(moduleId)
+      const moduleName = mod?.name || `Module ${moduleNum}`
 
       console.log(`[Workflow Step ${stepNum}] Generating titles for ${moduleName} (${moduleNum}/${totalModules})...`)
 
@@ -278,7 +278,7 @@ async function generateModuleTitles(
   }
 }
 
-// MODULE STEPS: Generate bodies batch 1 for a module
+// MODULE STEPS: Generate bodies batch 1 for a mod
 async function generateModuleBodiesBatch1(
   issueId: string,
   moduleId: string,
@@ -293,8 +293,8 @@ async function generateModuleBodiesBatch1(
 
   while (retryCount <= maxRetries) {
     try {
-      const module = await ArticleModuleSelector.getModule(moduleId)
-      const moduleName = module?.name || `Module ${moduleNum}`
+      const mod = await ArticleModuleSelector.getModule(moduleId)
+      const moduleName = mod?.name || `Module ${moduleNum}`
 
       console.log(`[Workflow Step ${stepNum}] Generating bodies batch 1 for ${moduleName}...`)
 
@@ -324,7 +324,7 @@ async function generateModuleBodiesBatch1(
   }
 }
 
-// MODULE STEPS: Generate bodies batch 2 for a module
+// MODULE STEPS: Generate bodies batch 2 for a mod
 async function generateModuleBodiesBatch2(
   issueId: string,
   moduleId: string,
@@ -339,8 +339,8 @@ async function generateModuleBodiesBatch2(
 
   while (retryCount <= maxRetries) {
     try {
-      const module = await ArticleModuleSelector.getModule(moduleId)
-      const moduleName = module?.name || `Module ${moduleNum}`
+      const mod = await ArticleModuleSelector.getModule(moduleId)
+      const moduleName = mod?.name || `Module ${moduleNum}`
 
       console.log(`[Workflow Step ${stepNum}] Generating bodies batch 2 for ${moduleName}...`)
 
@@ -370,7 +370,7 @@ async function generateModuleBodiesBatch2(
   }
 }
 
-// MODULE STEPS: Fact-check articles for a module
+// MODULE STEPS: Fact-check articles for a mod
 async function factCheckModule(
   issueId: string,
   moduleId: string,
@@ -385,8 +385,8 @@ async function factCheckModule(
 
   while (retryCount <= maxRetries) {
     try {
-      const module = await ArticleModuleSelector.getModule(moduleId)
-      const moduleName = module?.name || `Module ${moduleNum}`
+      const mod = await ArticleModuleSelector.getModule(moduleId)
+      const moduleName = mod?.name || `Module ${moduleNum}`
 
       console.log(`[Workflow Step ${stepNum}] Fact-checking articles for ${moduleName}...`)
 
@@ -428,7 +428,7 @@ async function finalizeIssue(issueId: string, moduleIds: string[], stepNum: numb
       console.log(`[Workflow Step ${stepNum}] Finalizing issue...`)
       const processor = new RSSProcessor()
 
-      // Auto-select top articles for each module
+      // Auto-select top articles for each mod
       let totalSelected = 0
       for (const moduleId of moduleIds) {
         const result = await processor.selectTopArticlesForModule(issueId, moduleId)
@@ -436,7 +436,7 @@ async function finalizeIssue(issueId: string, moduleIds: string[], stepNum: numb
       }
       console.log(`[Workflow Step ${stepNum}] Selected ${totalSelected} total articles across ${moduleIds.length} modules`)
 
-      // Get active article counts per module for logging
+      // Get active article counts per mod for logging
       const moduleCounts: string[] = []
       for (const moduleId of moduleIds) {
         const { data: activeArticles } = await supabaseAdmin
@@ -446,12 +446,12 @@ async function finalizeIssue(issueId: string, moduleIds: string[], stepNum: numb
           .eq('article_module_id', moduleId)
           .eq('is_active', true)
 
-        const module = await ArticleModuleSelector.getModule(moduleId)
-        moduleCounts.push(`${module?.name || 'Unknown'}: ${activeArticles?.length || 0}`)
+        const mod = await ArticleModuleSelector.getModule(moduleId)
+        moduleCounts.push(`${mod?.name || 'Unknown'}: ${activeArticles?.length || 0}`)
       }
       console.log(`[Workflow Step ${stepNum}] Active articles: ${moduleCounts.join(', ')}`)
 
-      // Generate text box module blocks with "after_articles" timing (full newsletter context)
+      // Generate text box mod blocks with "after_articles" timing (full newsletter context)
       // This replaces the legacy welcome section - text box modules now handle welcome content
       try {
         const { TextBoxGenerator } = await import('@/lib/text-box-modules')
@@ -468,7 +468,7 @@ async function finalizeIssue(issueId: string, moduleIds: string[], stepNum: numb
         // Don't fail workflow if text box generation fails
       }
 
-      // Generate subject line based on top articles from first module
+      // Generate subject line based on top articles from first mod
       if (moduleIds.length > 0) {
         const { data: topArticles } = await supabaseAdmin
           .from('module_articles')
@@ -523,11 +523,11 @@ async function finalizeIssue(issueId: string, moduleIds: string[], stepNum: numb
           }
         }
       } catch (moduleAdError) {
-        console.log(`[Workflow Step ${stepNum}] Ad module selection failed (non-critical):`, moduleAdError)
-        // Don't fail workflow if ad module selection fails
+        console.log(`[Workflow Step ${stepNum}] Ad mod selection failed (non-critical):`, moduleAdError)
+        // Don't fail workflow if ad mod selection fails
       }
 
-      // Initialize poll module selections (empty - for manual picking)
+      // Initialize poll mod selections (empty - for manual picking)
       try {
         const { data: issueData } = await supabaseAdmin
           .from('publication_issues')
@@ -537,11 +537,11 @@ async function finalizeIssue(issueId: string, moduleIds: string[], stepNum: numb
 
         if (issueData) {
           await PollModuleSelector.initializeSelectionsForIssue(issueId, issueData.publication_id)
-          console.log(`[Workflow Step ${stepNum}] Poll module selections initialized (manual selection required)`)
+          console.log(`[Workflow Step ${stepNum}] Poll mod selections initialized (manual selection required)`)
         }
       } catch (pollModuleError) {
-        console.log(`[Workflow Step ${stepNum}] Poll module initialization failed (non-critical):`, pollModuleError)
-        // Don't fail workflow if poll module initialization fails
+        console.log(`[Workflow Step ${stepNum}] Poll mod initialization failed (non-critical):`, pollModuleError)
+        // Don't fail workflow if poll mod initialization fails
       }
 
       // Set status to draft

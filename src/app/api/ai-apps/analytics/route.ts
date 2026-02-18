@@ -135,17 +135,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: legacySelectionsError.message }, { status: 500 })
     }
 
-    // Fetch issue_ai_app_modules for new module system (selections stored as JSONB array)
+    // Fetch issue_ai_app_modules for new mod system (selections stored as JSONB array)
     const { data: moduleSelections, error: moduleSelectionsError } = await supabaseAdmin
       .from('issue_ai_app_modules')
       .select('id, issue_id, ai_app_module_id, app_ids')
 
     if (moduleSelectionsError) {
-      console.error('[AI Apps Analytics] Error fetching module selections:', moduleSelectionsError)
+      console.error('[AI Apps Analytics] Error fetching mod selections:', moduleSelectionsError)
       return NextResponse.json({ error: moduleSelectionsError.message }, { status: 500 })
     }
 
-    // Convert module selections to flat format (one entry per app_id)
+    // Convert mod selections to flat format (one entry per app_id)
     const appIdSet = new Set(apps.map(app => app.id))
     const moduleSelectionsFlat = (moduleSelections || []).flatMap((sel: any) => {
       const appIds = sel.app_ids || []
@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
         }))
     })
 
-    console.log(`[AI Apps Analytics] Found ${legacySelections?.length || 0} legacy selections, ${moduleSelectionsFlat.length} module selections`)
+    console.log(`[AI Apps Analytics] Found ${legacySelections?.length || 0} legacy selections, ${moduleSelectionsFlat.length} mod selections`)
 
     // Combine both selection sources
     const issueSelections = [
@@ -194,18 +194,18 @@ export async function GET(request: NextRequest) {
       campaign: campaignMap.get(selection.issue_id)
     }))
 
-    // Get all AI app module names for this publication (for link_section matching)
+    // Get all AI app mod names for this publication (for link_section matching)
     const { data: aiAppModules } = await supabaseAdmin
       .from('ai_app_modules')
       .select('name')
       .eq('publication_id', publicationId)
 
-    // Build list of section names to look for (legacy + all module names)
+    // Build list of section names to look for (legacy + all mod names)
     const aiAppSectionNames = ['AI Apps', 'AI Applications'] // Legacy names
     if (aiAppModules) {
-      for (const module of aiAppModules) {
-        if (module.name && !aiAppSectionNames.includes(module.name)) {
-          aiAppSectionNames.push(module.name)
+      for (const mod of aiAppModules) {
+        if (mod.name && !aiAppSectionNames.includes(mod.name)) {
+          aiAppSectionNames.push(mod.name)
         }
       }
     }

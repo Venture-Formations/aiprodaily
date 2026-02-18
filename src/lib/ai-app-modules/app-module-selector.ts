@@ -73,7 +73,7 @@ export class AppModuleSelector {
   }
 
   /**
-   * Get pinned apps for a module, considering global pins and per-issue overrides
+   * Get pinned apps for a mod, considering global pins and per-issue overrides
    * @param publicationId - Publication ID
    * @param moduleId - Module ID
    * @param issueId - Optional issue ID for per-issue overrides
@@ -172,11 +172,11 @@ export class AppModuleSelector {
    */
   private static async selectAffiliatePriority(
     allApps: AIApplication[],
-    module: AIAppModule,
+    mod: AIAppModule,
     issueDate: Date,
     pinnedApps: PinnedApp[] = []
   ): Promise<AIApplication[]> {
-    const { apps_count, max_per_category, affiliate_cooldown_days } = module
+    const { apps_count, max_per_category, affiliate_cooldown_days } = mod
 
     // Initialize array with null slots
     const selectedApps: (AIApplication | null)[] = new Array(apps_count).fill(null)
@@ -258,10 +258,10 @@ export class AppModuleSelector {
    */
   private static selectRandom(
     allApps: AIApplication[],
-    module: AIAppModule,
+    mod: AIAppModule,
     pinnedApps: PinnedApp[] = []
   ): AIApplication[] {
-    const { apps_count, max_per_category } = module
+    const { apps_count, max_per_category } = mod
 
     // Initialize array with null slots
     const selectedApps: (AIApplication | null)[] = new Array(apps_count).fill(null)
@@ -304,28 +304,28 @@ export class AppModuleSelector {
   }
 
   /**
-   * Select apps for a module based on its selection mode
+   * Select apps for a mod based on its selection mode
    */
   static async selectAppsForModule(
-    module: AIAppModule,
+    mod: AIAppModule,
     publicationId: string,
     issueDate: Date,
     issueId?: string
   ): Promise<AppSelectionResult> {
     // Manual mode returns empty - admin must pick
-    if (module.selection_mode === 'manual') {
+    if (mod.selection_mode === 'manual') {
       return { apps: [], reason: 'Manual selection required' }
     }
 
     // Get pinned apps first (global pins + per-issue overrides)
-    const pinnedApps = await this.getPinnedApps(publicationId, module.id, issueId)
+    const pinnedApps = await this.getPinnedApps(publicationId, mod.id, issueId)
     const pinnedCount = pinnedApps.length
     if (pinnedCount > 0) {
-      console.log(`[AppModuleSelector] Found ${pinnedCount} pinned app(s) for module ${module.name}`)
+      console.log(`[AppModuleSelector] Found ${pinnedCount} pinned app(s) for mod ${mod.name}`)
     }
 
     // Get all active apps for this publication
-    // For now, get all active apps - module filtering can be added later when apps are assigned to modules
+    // For now, get all active apps - mod filtering can be added later when apps are assigned to modules
     const { data: allApps, error } = await supabaseAdmin
       .from('ai_applications')
       .select('*')
@@ -345,21 +345,21 @@ export class AppModuleSelector {
 
     let selectedApps: AIApplication[]
 
-    switch (module.selection_mode) {
+    switch (mod.selection_mode) {
       case 'affiliate_priority':
-        selectedApps = await this.selectAffiliatePriority(allApps, module, issueDate, pinnedApps)
+        selectedApps = await this.selectAffiliatePriority(allApps, mod, issueDate, pinnedApps)
         break
       case 'random':
-        selectedApps = this.selectRandom(allApps, module, pinnedApps)
+        selectedApps = this.selectRandom(allApps, mod, pinnedApps)
         break
       default:
-        selectedApps = await this.selectAffiliatePriority(allApps, module, issueDate, pinnedApps)
+        selectedApps = await this.selectAffiliatePriority(allApps, mod, issueDate, pinnedApps)
     }
 
     const affiliateCount = selectedApps.filter(a => a.is_affiliate).length
     return {
       apps: selectedApps,
-      reason: `Selected ${selectedApps.length} apps via ${module.selection_mode} (${pinnedCount} pinned, ${affiliateCount} affiliates, ${selectedApps.length - affiliateCount - pinnedCount} others)`
+      reason: `Selected ${selectedApps.length} apps via ${mod.selection_mode} (${pinnedCount} pinned, ${affiliateCount} affiliates, ${selectedApps.length - affiliateCount - pinnedCount} others)`
     }
   }
 
@@ -402,13 +402,13 @@ export class AppModuleSelector {
       return []
     }
 
-    console.log(`[AppModuleSelector] Found ${modules.length} active module(s):`, modules.map(m => m.name))
+    console.log(`[AppModuleSelector] Found ${modules.length} active mod(s):`, modules.map(m => m.name))
 
     const results: { moduleId: string; result: AppSelectionResult }[] = []
 
-    for (const module of modules) {
+    for (const mod of modules) {
       const result = await this.selectAppsForModule(
-        module as AIAppModule,
+        mod as AIAppModule,
         publicationId,
         issueDate,
         issueId  // Pass issueId for per-issue pinning overrides
@@ -419,17 +419,17 @@ export class AppModuleSelector {
         .from('issue_ai_app_modules')
         .insert({
           issue_id: issueId,
-          ai_app_module_id: module.id,
+          ai_app_module_id: mod.id,
           app_ids: result.apps.map(a => a.id),
-          selection_mode: module.selection_mode
+          selection_mode: mod.selection_mode
         })
 
       if (insertError) {
         console.error('[AppModuleSelector] Error storing selection:', insertError)
       }
 
-      results.push({ moduleId: module.id, result })
-      console.log(`[AppModuleSelector] Module "${module.name}": ${result.reason}`)
+      results.push({ moduleId: mod.id, result })
+      console.log(`[AppModuleSelector] Module "${mod.name}": ${result.reason}`)
     }
 
     return results
@@ -483,7 +483,7 @@ export class AppModuleSelector {
       recorded++
     }
 
-    console.log(`[AppModuleSelector] Recorded usage for ${recorded} module selections`)
+    console.log(`[AppModuleSelector] Recorded usage for ${recorded} mod selections`)
     return { success: true, recorded }
   }
 
@@ -529,7 +529,7 @@ export class AppModuleSelector {
   }
 
   /**
-   * Manually select apps for a module
+   * Manually select apps for a mod
    */
   static async manuallySelectApps(
     issueId: string,
@@ -557,7 +557,7 @@ export class AppModuleSelector {
   }
 
   /**
-   * Clear app selection for a module (set app_ids to empty)
+   * Clear app selection for a mod (set app_ids to empty)
    */
   static async clearSelection(
     issueId: string,
@@ -583,7 +583,7 @@ export class AppModuleSelector {
   }
 
   /**
-   * Get available apps for a module (for dropdown selection)
+   * Get available apps for a mod (for dropdown selection)
    */
   static async getAvailableApps(
     publicationId: string,
@@ -634,16 +634,16 @@ export class AppModuleSelector {
     const existingModuleIds = new Set(existing?.map(e => e.ai_app_module_id) || [])
 
     // Create selections for modules without existing selections
-    for (const module of modules) {
-      if (existingModuleIds.has(module.id)) continue
+    for (const mod of modules) {
+      if (existingModuleIds.has(mod.id)) continue
 
       await supabaseAdmin
         .from('issue_ai_app_modules')
         .insert({
           issue_id: issueId,
-          ai_app_module_id: module.id,
+          ai_app_module_id: mod.id,
           app_ids: [],
-          selection_mode: module.selection_mode
+          selection_mode: mod.selection_mode
         })
     }
   }

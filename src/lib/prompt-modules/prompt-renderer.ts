@@ -18,7 +18,7 @@ interface RenderContext {
 }
 
 /**
- * Result of rendering a prompt module
+ * Result of rendering a prompt mod
  */
 interface RenderResult {
   html: string
@@ -92,10 +92,10 @@ export class PromptModuleRenderer {
   }
 
   /**
-   * Render a prompt module with its blocks in the configured order
+   * Render a prompt mod with its blocks in the configured order
    */
   static async renderPromptModule(
-    module: PromptModule,
+    mod: PromptModule,
     prompt: PromptIdea | null,
     publicationId: string,
     context: RenderContext = {}
@@ -104,7 +104,7 @@ export class PromptModuleRenderer {
     if (!prompt) {
       return {
         html: '',
-        moduleName: module.name,
+        moduleName: mod.name,
         promptId: null
       }
     }
@@ -120,7 +120,7 @@ export class PromptModuleRenderer {
     }
 
     // Render blocks in order
-    const blockOrder = module.block_order as PromptBlockType[]
+    const blockOrder = mod.block_order as PromptBlockType[]
     let blocksHtml = ''
 
     for (const blockType of blockOrder) {
@@ -133,11 +133,11 @@ export class PromptModuleRenderer {
     }
 
     // Wrap in section container
-    const html = this.wrapInSection(module.name, blocksHtml, styles)
+    const html = this.wrapInSection(mod.name, blocksHtml, styles)
 
     return {
       html,
-      moduleName: module.name,
+      moduleName: mod.name,
       promptId: prompt.id
     }
   }
@@ -146,11 +146,11 @@ export class PromptModuleRenderer {
    * Render for preview (same as normal)
    */
   static async renderForPreview(
-    module: PromptModule,
+    mod: PromptModule,
     prompt: PromptIdea,
     publicationId: string
   ): Promise<string> {
-    const result = await this.renderPromptModule(module, prompt, publicationId, {})
+    const result = await this.renderPromptModule(mod, prompt, publicationId, {})
     return result.html
   }
 
@@ -222,9 +222,9 @@ export class PromptModuleRenderer {
     // Sort by display_order
     const sorted = [...modules].sort((a, b) => a.display_order - b.display_order)
 
-    for (const module of sorted) {
-      const prompt = prompts.get(module.id) || null
-      const result = await this.renderPromptModule(module, prompt, publicationId, context)
+    for (const mod of sorted) {
+      const prompt = prompts.get(mod.id) || null
+      const result = await this.renderPromptModule(mod, prompt, publicationId, context)
       results.push(result)
     }
 

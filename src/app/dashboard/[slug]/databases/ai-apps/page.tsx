@@ -226,11 +226,11 @@ export default function AIApplicationsPage() {
     return matchesCategory && matchesAffiliate && matchesModule && matchesSearch
   })
 
-  // Helper to get module name by ID
+  // Helper to get mod name by ID
   const getModuleName = (moduleId: string | null) => {
     if (!moduleId) return null
-    const module = modules.find(m => m.id === moduleId)
-    return module?.name || 'Unknown'
+    const mod = modules.find(m => m.id === moduleId)
+    return mod?.name || 'Unknown'
   }
 
   // Categories matching AIAppCategory type from database.ts
@@ -344,7 +344,7 @@ export default function AIApplicationsPage() {
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div className="font-medium text-gray-900">Affiliate</div>
                       <div className="text-blue-600">Optional</div>
-                      <div className="text-gray-600">Enter "yes", "true", or "1" for affiliate programs</div>
+                      <div className="text-gray-600">Enter &quot;yes&quot;, &quot;true&quot;, or &quot;1&quot; for affiliate programs</div>
                     </div>
                   </div>
                 </div>
@@ -376,7 +376,7 @@ export default function AIApplicationsPage() {
                     ))}
                   </select>
                   <p className="text-sm text-gray-600 mt-2">
-                    Products without a module assignment will be assigned to the selected section.
+                    Products without a mod assignment will be assigned to the selected section.
                     Leave as &quot;Don&apos;t assign&quot; to keep them shared across all sections.
                   </p>
                 </div>
@@ -536,7 +536,7 @@ export default function AIApplicationsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Pinned Position {!addForm.ai_app_module_id && <span className="text-gray-400 font-normal">(requires module)</span>}
+                  Pinned Position {!addForm.ai_app_module_id && <span className="text-gray-400 font-normal">(requires mod)</span>}
                 </label>
                 <input
                   type="number"
@@ -548,10 +548,10 @@ export default function AIApplicationsPage() {
                     pinned_position: e.target.value ? parseInt(e.target.value) : null
                   })}
                   disabled={!addForm.ai_app_module_id}
-                  placeholder={addForm.ai_app_module_id ? "Not pinned" : "Select module first"}
+                  placeholder={addForm.ai_app_module_id ? "Not pinned" : "Select mod first"}
                   className={`w-full border border-gray-300 rounded px-3 py-2 ${!addForm.ai_app_module_id ? 'bg-gray-100 text-gray-400' : ''}`}
                 />
-                <p className="text-xs text-gray-500 mt-1">Pin to position 1-20 within the selected module</p>
+                <p className="text-xs text-gray-500 mt-1">Pin to position 1-20 within the selected mod</p>
               </div>
               <div className="flex items-center space-x-4">
                 <label className="flex items-center">
@@ -856,7 +856,7 @@ export default function AIApplicationsPage() {
                           className={`w-20 border border-gray-300 rounded px-2 py-1 text-sm ${!editForm.ai_app_module_id ? 'bg-gray-100 text-gray-400' : ''}`}
                         />
                         <p className="text-xs text-gray-500 mt-1">
-                          {editForm.ai_app_module_id ? '1-20' : 'Needs module'}
+                          {editForm.ai_app_module_id ? '1-20' : 'Needs mod'}
                         </p>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">

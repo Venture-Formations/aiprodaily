@@ -49,7 +49,7 @@ export default async function ContactUsPage() {
               Contact Us
             </h1>
             <p className="mt-4 text-lg tracking-tight text-blue-100">
-              Have questions or feedback? We'd love to hear from you.
+              Have questions or feedback? We&apos;d love to hear from you.
             </p>
           </div>
           <div className="mx-auto max-w-xl">

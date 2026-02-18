@@ -47,7 +47,7 @@ export function ContactForm() {
           Thank you for contacting us!
         </h2>
         <p className="text-green-700 mb-4">
-          We've received your message and will review it soon.
+          We&apos;ve received your message and will review it soon.
         </p>
         <button
           onClick={() => setSubmitted(false)}

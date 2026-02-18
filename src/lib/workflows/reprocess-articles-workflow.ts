@@ -4,14 +4,14 @@ import { ArticleModuleSelector } from '@/lib/article-modules'
 
 /**
  * Reprocess Articles Workflow (ARTICLE MODULES VERSION)
- * Regenerates all articles for an existing issue using the new module system
+ * Regenerates all articles for an existing issue using the new mod system
  *
  * Steps:
  * 1. Cleanup (delete module_articles, unassign posts, set processing status)
- * 2. Deduplication (global, cross-module)
+ * 2. Deduplication (global, cross-mod)
  * 3. Get active article modules
  *
- * For each active article module (sequentially):
+ * For each active article mod (sequentially):
  *   Step N+0: Assign posts and generate titles
  *   Step N+1: Generate bodies batch 1
  *   Step N+2: Generate bodies batch 2
@@ -46,21 +46,21 @@ export async function reprocessArticlesWorkflow(input: {
 
   console.log(`[Reprocess Workflow] Found ${moduleIds.length} active article modules`)
 
-  // Process each module sequentially
+  // Process each mod sequentially
   for (let i = 0; i < moduleIds.length; i++) {
     const moduleId = moduleIds[i]
     const moduleNum = i + 1
     const totalModules = moduleIds.length
     const stepOffset = 4 + (i * 4) // Start at 4 since we added a step
 
-    // Generate titles for this module
+    // Generate titles for this mod
     await generateModuleTitles(issue_id, moduleId, moduleNum, totalModules, stepOffset)
 
     // Generate bodies in 2 batches
     await generateModuleBodiesBatch1(issue_id, moduleId, moduleNum, totalModules, stepOffset + 1)
     await generateModuleBodiesBatch2(issue_id, moduleId, moduleNum, totalModules, stepOffset + 2)
 
-    // Fact-check articles for this module
+    // Fact-check articles for this mod
     await factCheckModule(issue_id, moduleId, moduleNum, totalModules, stepOffset + 3)
   }
 
@@ -73,7 +73,7 @@ export async function reprocessArticlesWorkflow(input: {
   return { issue_id, success: true }
 }
 
-// Step 3: Get active article module IDs
+// Step 3: Get active article mod IDs
 async function getActiveModuleIds(publicationId: string): Promise<string[]> {
   "use step"
 
@@ -158,14 +158,14 @@ async function generateModuleTitles(
 ) {
   "use step"
 
-  const module = await ArticleModuleSelector.getModule(moduleId)
-  const moduleName = module?.name || `Module ${moduleNum}`
+  const mod = await ArticleModuleSelector.getModule(moduleId)
+  const moduleName = mod?.name || `Module ${moduleNum}`
 
   console.log(`[Reprocess Step ${stepNum}] Generating titles for ${moduleName} (${moduleNum}/${totalModules})...`)
 
   const processor = new RSSProcessor()
 
-  // Assign posts to this module first
+  // Assign posts to this mod first
   const assignResult = await processor.assignPostsToModule(issueId, moduleId)
   console.log(`[Reprocess Step ${stepNum}] Assigned ${assignResult.assigned} posts to ${moduleName}`)
 
@@ -191,8 +191,8 @@ async function generateModuleBodiesBatch1(
 ) {
   "use step"
 
-  const module = await ArticleModuleSelector.getModule(moduleId)
-  const moduleName = module?.name || `Module ${moduleNum}`
+  const mod = await ArticleModuleSelector.getModule(moduleId)
+  const moduleName = mod?.name || `Module ${moduleNum}`
 
   console.log(`[Reprocess Step ${stepNum}] Generating bodies batch 1 for ${moduleName}...`)
 
@@ -218,8 +218,8 @@ async function generateModuleBodiesBatch2(
 ) {
   "use step"
 
-  const module = await ArticleModuleSelector.getModule(moduleId)
-  const moduleName = module?.name || `Module ${moduleNum}`
+  const mod = await ArticleModuleSelector.getModule(moduleId)
+  const moduleName = mod?.name || `Module ${moduleNum}`
 
   console.log(`[Reprocess Step ${stepNum}] Generating bodies batch 2 for ${moduleName}...`)
 
@@ -245,8 +245,8 @@ async function factCheckModule(
 ) {
   "use step"
 
-  const module = await ArticleModuleSelector.getModule(moduleId)
-  const moduleName = module?.name || `Module ${moduleNum}`
+  const mod = await ArticleModuleSelector.getModule(moduleId)
+  const moduleName = mod?.name || `Module ${moduleNum}`
 
   console.log(`[Reprocess Step ${stepNum}] Fact-checking ${moduleName}...`)
 
@@ -275,10 +275,10 @@ async function finalizeIssue(issueId: string, moduleIds: string[], stepNum: numb
 
   const processor = new RSSProcessor()
 
-  // Select top articles for each module and update issue_article_modules
+  // Select top articles for each mod and update issue_article_modules
   for (const moduleId of moduleIds) {
-    const module = await ArticleModuleSelector.getModule(moduleId)
-    const articlesCount = module?.articles_count || 3
+    const mod = await ArticleModuleSelector.getModule(moduleId)
+    const articlesCount = mod?.articles_count || 3
 
     // Get top articles by score
     const { data: topArticles } = await supabaseAdmin
@@ -318,7 +318,7 @@ async function finalizeIssue(issueId: string, moduleIds: string[], stepNum: numb
         .eq('article_module_id', moduleId)
     }
 
-    console.log(`[Reprocess Step ${stepNum}] Selected ${selectedIds.length} articles for ${module?.name}`)
+    console.log(`[Reprocess Step ${stepNum}] Selected ${selectedIds.length} articles for ${mod?.name}`)
   }
 
   // Initialize and generate text box modules (replaces legacy welcome section)

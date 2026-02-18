@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { ArticleModuleSelector } from '@/lib/article-modules'
 
 /**
- * GET /api/campaigns/[id]/article-modules - Get article module selections for an issue
+ * GET /api/campaigns/[id]/article-modules - Get article mod selections for an issue
  */
 export async function GET(
   request: NextRequest,
@@ -30,7 +30,7 @@ export async function GET(
       return NextResponse.json({ error: 'Issue not found' }, { status: 404 })
     }
 
-    // Get all article module selections for this issue
+    // Get all article mod selections for this issue
     let selections = await ArticleModuleSelector.getIssueArticleSelections(issueId)
 
     // If no selections exist and not a sent issue, initialize them
@@ -42,12 +42,12 @@ export async function GET(
     // Get all active article modules for the publication
     const modules = await ArticleModuleSelector.getActiveModules(issue.publication_id)
 
-    // Get criteria config for each module
+    // Get criteria config for each mod
     const modulesWithCriteria = await Promise.all(
-      (modules || []).map(async (module) => {
-        const { criteria } = await ArticleModuleSelector.getModuleCriteria(module.id)
+      (modules || []).map(async (mod) => {
+        const { criteria } = await ArticleModuleSelector.getModuleCriteria(mod.id)
         return {
-          ...module,
+          ...mod,
           criteria: criteria.map(c => ({
             id: c.id,
             name: c.name,
@@ -87,7 +87,7 @@ export async function GET(
 }
 
 /**
- * POST /api/campaigns/[id]/article-modules - Manually swap articles for a module
+ * POST /api/campaigns/[id]/article-modules - Manually swap articles for a mod
  * Body: { moduleId, articleIds } - array of article IDs to activate (in order)
  */
 export async function POST(
@@ -187,9 +187,9 @@ export async function PUT(
       return NextResponse.json({ error: 'Cannot modify articles for sent issues' }, { status: 400 })
     }
 
-    // Get module for articles_count limit
-    const module = await ArticleModuleSelector.getModule(moduleId)
-    if (!module) {
+    // Get mod for articles_count limit
+    const mod = await ArticleModuleSelector.getModule(moduleId)
+    if (!mod) {
       return NextResponse.json({ error: 'Module not found' }, { status: 404 })
     }
 
@@ -232,9 +232,9 @@ export async function PUT(
         }
       } else {
         // Activating - check limit
-        if (activeCount >= module.articles_count) {
+        if (activeCount >= mod.articles_count) {
           return NextResponse.json({
-            error: `Maximum ${module.articles_count} articles allowed for this section`
+            error: `Maximum ${mod.articles_count} articles allowed for this section`
           }, { status: 400 })
         }
 

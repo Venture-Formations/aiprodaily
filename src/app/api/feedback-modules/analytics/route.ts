@@ -8,7 +8,7 @@ export const maxDuration = 60
 // Fallback user ID for staging/unauthenticated access (must be valid UUID)
 const STAGING_USER_ID = '00000000-0000-0000-0000-000000000001'
 
-// GET /api/feedback-modules/analytics - Get feedback module analytics for dashboard
+// GET /api/feedback-modules/analytics - Get feedback mod analytics for dashboard
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -27,13 +27,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get the feedback module
-    const module = await FeedbackModuleSelector.getFeedbackModule(publicationId)
+    // Get the feedback mod
+    const mod = await FeedbackModuleSelector.getFeedbackModule(publicationId)
 
-    if (!module) {
+    if (!mod) {
       return NextResponse.json({
         success: true,
-        module: null,
+        mod: null,
         stats: [],
         recent_comments: [],
         summary: {
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      module,
+      mod,
       summary: {
         total_votes: totalVotes,
         average_score: overallAverage,

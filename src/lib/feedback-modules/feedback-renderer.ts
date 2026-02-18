@@ -22,7 +22,7 @@ interface RenderContext {
 }
 
 /**
- * Result of rendering a feedback module
+ * Result of rendering a feedback mod
  */
 interface RenderResult {
   html: string
@@ -190,18 +190,18 @@ export class FeedbackModuleRenderer {
   }
 
   /**
-   * Render a feedback module with its blocks in order
+   * Render a feedback mod with its blocks in order
    */
   static async renderFeedbackModule(
-    module: FeedbackModuleWithBlocks,
+    mod: FeedbackModuleWithBlocks,
     publicationId: string,
     context: RenderContext = {}
   ): Promise<RenderResult> {
-    // If module is not active, return empty
-    if (!module.is_active) {
+    // If mod is not active, return empty
+    if (!mod.is_active) {
       return {
         html: '',
-        moduleName: module.name
+        moduleName: mod.name
       }
     }
 
@@ -219,17 +219,17 @@ export class FeedbackModuleRenderer {
     const issueId = context.issueId || ''
 
     // Render blocks in order (blocks are already sorted by display_order)
-    const blocksHtml = module.blocks
+    const blocksHtml = mod.blocks
       .filter(block => block.is_enabled)
-      .map(block => this.renderBlock(block, module.id, issueId, styles, baseUrl))
+      .map(block => this.renderBlock(block, mod.id, issueId, styles, baseUrl))
       .join('')
 
     // Wrap in section container (no header shown for feedback)
-    const html = this.wrapInSection(module.name, blocksHtml, styles, false)
+    const html = this.wrapInSection(mod.name, blocksHtml, styles, false)
 
     return {
       html,
-      moduleName: module.name
+      moduleName: mod.name
     }
   }
 
@@ -237,10 +237,10 @@ export class FeedbackModuleRenderer {
    * Render for preview (same as normal render)
    */
   static async renderForPreview(
-    module: FeedbackModuleWithBlocks,
+    mod: FeedbackModuleWithBlocks,
     publicationId: string
   ): Promise<string> {
-    const result = await this.renderFeedbackModule(module, publicationId, {})
+    const result = await this.renderFeedbackModule(mod, publicationId, {})
     return result.html
   }
 
@@ -248,11 +248,11 @@ export class FeedbackModuleRenderer {
    * Render for archive (static HTML, no response links)
    */
   static async renderForArchive(
-    module: FeedbackModuleWithBlocks,
+    mod: FeedbackModuleWithBlocks,
     publicationId: string
   ): Promise<string> {
     // For archive, we render a static version without voting links
-    if (!module.is_active) {
+    if (!mod.is_active) {
       return ''
     }
 
@@ -267,7 +267,7 @@ export class FeedbackModuleRenderer {
 
     let blocksHtml = ''
 
-    for (const block of module.blocks) {
+    for (const block of mod.blocks) {
       if (!block.is_enabled) continue
 
       if (block.block_type === 'title') {
@@ -306,18 +306,18 @@ export class FeedbackModuleRenderer {
       }
     }
 
-    return this.wrapInSection(module.name, blocksHtml, styles, false)
+    return this.wrapInSection(mod.name, blocksHtml, styles, false)
   }
 
   /**
-   * Render by publication ID (fetches module with blocks)
+   * Render by publication ID (fetches mod with blocks)
    */
   static async renderByPublicationId(
     publicationId: string,
     context: RenderContext = {}
   ): Promise<RenderResult | null> {
-    const module = await FeedbackModuleSelector.getFeedbackModuleWithBlocks(publicationId)
-    if (!module) return null
-    return this.renderFeedbackModule(module, publicationId, context)
+    const mod = await FeedbackModuleSelector.getFeedbackModuleWithBlocks(publicationId)
+    if (!mod) return null
+    return this.renderFeedbackModule(mod, publicationId, context)
   }
 }

@@ -407,7 +407,7 @@ export default function PromptIdeasPage() {
 
           {prompts.length === 0 && (
             <div className="text-center py-12 text-gray-500">
-              No prompt ideas found. Click "Add Prompt" to get started.
+              No prompt ideas found. Click &quot;Add Prompt&quot; to get started.
             </div>
           )}
         </div>

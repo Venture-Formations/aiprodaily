@@ -34,17 +34,17 @@ export class TextBoxModuleSelector {
       return []
     }
 
-    // Sort blocks by display_order within each module
-    return (data || []).map(module => ({
-      ...module,
-      blocks: (module.blocks || []).sort((a: TextBoxBlock, b: TextBoxBlock) =>
+    // Sort blocks by display_order within each mod
+    return (data || []).map(mod => ({
+      ...mod,
+      blocks: (mod.blocks || []).sort((a: TextBoxBlock, b: TextBoxBlock) =>
         a.display_order - b.display_order
       )
     })) as TextBoxModuleWithBlocks[]
   }
 
   /**
-   * Get a single module with its blocks
+   * Get a single mod with its blocks
    */
   static async getModule(moduleId: string): Promise<TextBoxModuleWithBlocks | null> {
     const { data, error } = await supabaseAdmin
@@ -57,7 +57,7 @@ export class TextBoxModuleSelector {
       .single()
 
     if (error || !data) {
-      console.error('[TextBoxSelector] Error fetching module:', error)
+      console.error('[TextBoxSelector] Error fetching mod:', error)
       return null
     }
 
@@ -99,18 +99,18 @@ export class TextBoxModuleSelector {
 
       let blocksInitialized = 0
 
-      // Create issue module and block records
-      for (const module of modules) {
-        // Create issue module record
+      // Create issue mod and block records
+      for (const mod of modules) {
+        // Create issue mod record
         await supabaseAdmin
           .from('issue_text_box_modules')
           .insert({
             issue_id: issueId,
-            text_box_module_id: module.id
+            text_box_module_id: mod.id
           })
 
         // Create issue block records for each block
-        for (const block of module.blocks) {
+        for (const block of mod.blocks) {
           // Determine initial status based on block type
           // - static_text: completed (content is fixed)
           // - image with static type: completed (URL is fixed)
@@ -147,10 +147,10 @@ export class TextBoxModuleSelector {
   }
 
   /**
-   * Get issue text box module selections with full details
+   * Get issue text box mod selections with full details
    */
   static async getIssueSelections(issueId: string): Promise<{
-    module: TextBoxModule
+    mod: TextBoxModule
     blocks: TextBoxBlock[]
     issueBlocks: IssueTextBoxBlock[]
   }[]> {
@@ -186,8 +186,8 @@ export class TextBoxModuleSelector {
     }
 
     const results = issueModules.map(im => {
-      const module = im.text_box_module as any
-      const blocks = (module?.blocks || []).sort((a: TextBoxBlock, b: TextBoxBlock) =>
+      const mod = im.text_box_module as any
+      const blocks = (mod?.blocks || []).sort((a: TextBoxBlock, b: TextBoxBlock) =>
         a.display_order - b.display_order
       )
 
@@ -203,11 +203,11 @@ export class TextBoxModuleSelector {
       }
 
       return {
-        module: module as TextBoxModule,
+        mod: mod as TextBoxModule,
         blocks: blocks as TextBoxBlock[],
         issueBlocks: mappedIssueBlocks
       }
-    }).filter(item => item.module)
+    }).filter(item => item.mod)
 
     console.log(`[TextBoxSelector] Returning ${results.length} modules with selections`)
     return results
@@ -370,7 +370,7 @@ export class TextBoxModuleSelector {
   }
 
   /**
-   * Clear all text box module data for an issue (for re-initialization)
+   * Clear all text box mod data for an issue (for re-initialization)
    */
   static async clearIssueData(issueId: string): Promise<{ success: boolean }> {
     // Delete issue blocks first (due to no FK, but good practice)

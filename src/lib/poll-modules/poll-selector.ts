@@ -54,8 +54,8 @@ export class PollModuleSelector {
 
     const activePollId = activePoll?.id || null
 
-    // For each module, use the current active poll (or fall back to last used if still active)
-    for (const module of modules) {
+    // For each mod, use the current active poll (or fall back to last used if still active)
+    for (const mod of modules) {
       let selectedPollId = activePollId
 
       // If no active poll, check if the last used poll is still valid
@@ -63,7 +63,7 @@ export class PollModuleSelector {
         const { data: lastSelection } = await supabaseAdmin
           .from('issue_poll_modules')
           .select('poll_id, poll:polls!inner(is_active)')
-          .eq('poll_module_id', module.id)
+          .eq('poll_module_id', mod.id)
           .not('poll_id', 'is', null)
           .order('selected_at', { ascending: false })
           .limit(1)
@@ -79,7 +79,7 @@ export class PollModuleSelector {
         .from('issue_poll_modules')
         .insert({
           issue_id: issueId,
-          poll_module_id: module.id,
+          poll_module_id: mod.id,
           poll_id: selectedPollId,
           selected_at: selectedPollId ? new Date().toISOString() : null
         })
@@ -87,15 +87,15 @@ export class PollModuleSelector {
       if (insertError) {
         console.error('[PollSelector] Error creating selection:', insertError)
       } else if (selectedPollId) {
-        console.log(`[PollSelector] Selected active poll ${selectedPollId} for module ${module.name}`)
+        console.log(`[PollSelector] Selected active poll ${selectedPollId} for mod ${mod.name}`)
       }
     }
 
-    console.log(`[PollSelector] Initialized ${modules.length} poll module selections for issue ${issueId}`)
+    console.log(`[PollSelector] Initialized ${modules.length} poll mod selections for issue ${issueId}`)
   }
 
   /**
-   * Clear poll selection for a module (set to No Poll)
+   * Clear poll selection for a mod (set to No Poll)
    */
   static async clearPollSelection(
     issueId: string,
@@ -117,12 +117,12 @@ export class PollModuleSelector {
       return { success: false, error: error.message }
     }
 
-    console.log(`[PollSelector] Cleared poll for issue ${issueId}, module ${moduleId}`)
+    console.log(`[PollSelector] Cleared poll for issue ${issueId}, mod ${moduleId}`)
     return { success: true }
   }
 
   /**
-   * Manually select a poll for a module
+   * Manually select a poll for a mod
    */
   static async manuallySelectPoll(
     issueId: string,
@@ -140,14 +140,14 @@ export class PollModuleSelector {
       return { success: false, error: 'Poll not found' }
     }
 
-    // Verify the module exists and belongs to same publication
-    const { data: module } = await supabaseAdmin
+    // Verify the mod exists and belongs to same publication
+    const { data: mod } = await supabaseAdmin
       .from('poll_modules')
       .select('id, publication_id')
       .eq('id', moduleId)
       .single()
 
-    if (!module || module.publication_id !== poll.publication_id) {
+    if (!mod || mod.publication_id !== poll.publication_id) {
       return { success: false, error: 'Module and poll publication mismatch' }
     }
 
@@ -168,12 +168,12 @@ export class PollModuleSelector {
       return { success: false, error: error.message }
     }
 
-    console.log(`[PollSelector] Manual selection: issue ${issueId}, module ${moduleId}, poll ${pollId}`)
+    console.log(`[PollSelector] Manual selection: issue ${issueId}, mod ${moduleId}, poll ${pollId}`)
     return { success: true }
   }
 
   /**
-   * Get poll selections for an issue with poll and module details
+   * Get poll selections for an issue with poll and mod details
    */
   static async getIssuePollSelections(issueId: string): Promise<IssuePollModule[]> {
     // First get the selections
@@ -187,7 +187,7 @@ export class PollModuleSelector {
       return []
     }
 
-    // Get all related module IDs and poll IDs
+    // Get all related mod IDs and poll IDs
     const moduleIds = selections.map(s => s.poll_module_id).filter(Boolean)
     const pollIds = selections.filter(s => s.poll_id).map(s => s.poll_id)
 
@@ -225,7 +225,7 @@ export class PollModuleSelector {
       poll: s.poll_id ? pollsMap.get(s.poll_id) : undefined
     }))
 
-    // Sort by module display_order
+    // Sort by mod display_order
     result.sort((a, b) => {
       const orderA = a.poll_module?.display_order ?? 0
       const orderB = b.poll_module?.display_order ?? 0

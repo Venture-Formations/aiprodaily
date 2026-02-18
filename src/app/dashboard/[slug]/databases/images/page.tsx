@@ -581,7 +581,7 @@ export default function ImagesDatabasePage() {
                                       className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded hover:bg-gray-200"
                                       title="Add as typed"
                                     >
-                                      Add "{(newTagInput[image.id] || '').trim()}"
+                                      Add &quot;{(newTagInput[image.id] || '').trim()}&quot;
                                     </button>
                                     <button
                                       onClick={() => setTagSuggestions(prev => ({ ...prev, [image.id]: [] }))}

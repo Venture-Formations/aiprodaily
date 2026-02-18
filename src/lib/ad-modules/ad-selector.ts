@@ -89,7 +89,7 @@ export class ModuleAdSelector {
   }
 
   /**
-   * Get eligible companies for a module with their eligible ads.
+   * Get eligible companies for a mod with their eligible ads.
    * A company is eligible if: its advertiser is active, not already used in this issue,
    * and has at least one eligible ad.
    */
@@ -99,7 +99,7 @@ export class ModuleAdSelector {
     issueDate: Date,
     excludedAdvertiserIds: Set<string> = new Set()
   ): Promise<EligibleCompany[]> {
-    // Fetch junction entries for this module with advertiser details
+    // Fetch junction entries for this mod with advertiser details
     const { data: junctions, error: junctionError } = await supabaseAdmin
       .from('ad_module_advertisers')
       .select(`
@@ -114,7 +114,7 @@ export class ModuleAdSelector {
       return []
     }
 
-    // Fetch all active ads for this module
+    // Fetch all active ads for this mod
     const { data: allAds, error: adsError } = await supabaseAdmin
       .from('advertisements')
       .select(`
@@ -140,10 +140,10 @@ export class ModuleAdSelector {
       // Check advertiser is active
       if (!advertiser.is_active) continue
 
-      // Check advertiser not already selected in another module for this issue
+      // Check advertiser not already selected in another mod for this issue
       if (excludedAdvertiserIds.has(junction.advertiser_id)) continue
 
-      // Get this company's eligible ads in this module
+      // Get this company's eligible ads in this mod
       const companyAds = allAds
         .filter(ad => ad.advertiser_id === junction.advertiser_id)
         .filter(ad => this.isAdEligible(ad, issueDate)) as AdvertisementWithAdvertiser[]
@@ -163,7 +163,7 @@ export class ModuleAdSelector {
 
   /**
    * Select company using Sequential mode (fixed order rotation)
-   * Uses the module's next_position to track which company display_order to pick next.
+   * Uses the mod's next_position to track which company display_order to pick next.
    */
   private static selectCompanySequential(
     companies: EligibleCompany[],
@@ -259,17 +259,17 @@ export class ModuleAdSelector {
   }
 
   /**
-   * Select an ad for a module using two-tier selection:
-   * 1. Select a company (using module's selection mode)
+   * Select an ad for a mod using two-tier selection:
+   * 1. Select a company (using mod's selection mode)
    * 2. Select the next ad within that company (always sequential)
    */
   static async selectAd(
-    module: AdModule,
+    mod: AdModule,
     publicationId: string,
     issueDate: Date,
     excludedAdvertiserIds: Set<string> = new Set()
   ): Promise<AdSelectionResult> {
-    const selectionMode = module.selection_mode
+    const selectionMode = mod.selection_mode
 
     // Manual mode returns null - admin must pick
     if (selectionMode === 'manual') {
@@ -277,18 +277,18 @@ export class ModuleAdSelector {
     }
 
     // Get eligible companies (excluding ones already selected for this issue)
-    const eligibleCompanies = await this.getEligibleCompanies(module.id, publicationId, issueDate, excludedAdvertiserIds)
+    const eligibleCompanies = await this.getEligibleCompanies(mod.id, publicationId, issueDate, excludedAdvertiserIds)
 
     if (eligibleCompanies.length === 0) {
       return { ad: null, reason: 'No eligible companies available (all used in other modules or inactive)' }
     }
 
-    // Tier 1: Select company based on module's selection mode
+    // Tier 1: Select company based on mod's selection mode
     let selectedCompany: EligibleCompany | null = null
 
     switch (selectionMode) {
       case 'sequential':
-        selectedCompany = this.selectCompanySequential(eligibleCompanies, module.next_position || 1)
+        selectedCompany = this.selectCompanySequential(eligibleCompanies, mod.next_position || 1)
         break
       case 'random':
         selectedCompany = this.selectCompanyRandom(eligibleCompanies)
@@ -297,7 +297,7 @@ export class ModuleAdSelector {
         selectedCompany = this.selectCompanyPriority(eligibleCompanies)
         break
       default:
-        selectedCompany = this.selectCompanySequential(eligibleCompanies, module.next_position || 1)
+        selectedCompany = this.selectCompanySequential(eligibleCompanies, mod.next_position || 1)
     }
 
     if (!selectedCompany) {
@@ -352,16 +352,16 @@ export class ModuleAdSelector {
     const results: { moduleId: string; result: AdSelectionResult }[] = []
     const usedAdvertiserIds = new Set<string>()
 
-    // Select ad for each module, excluding companies already picked for this issue
-    for (const module of modules) {
+    // Select ad for each mod, excluding companies already picked for this issue
+    for (const mod of modules) {
       const result = await this.selectAd(
-        module as AdModule,
+        mod as AdModule,
         publicationId,
         issueDate,
         usedAdvertiserIds
       )
 
-      // Track the selected advertiser so it won't be picked by another module
+      // Track the selected advertiser so it won't be picked by another mod
       if (result.ad?.advertiser_id) {
         usedAdvertiserIds.add(result.ad.advertiser_id)
       }
@@ -371,17 +371,17 @@ export class ModuleAdSelector {
         .from('issue_module_ads')
         .insert({
           issue_id: issueId,
-          ad_module_id: module.id,
+          ad_module_id: mod.id,
           advertisement_id: result.ad?.id || null,
-          selection_mode: module.selection_mode
+          selection_mode: mod.selection_mode
         })
 
       if (insertError) {
         console.error('[AdSelector] Error storing selection:', insertError)
       }
 
-      results.push({ moduleId: module.id, result })
-      console.log(`[AdSelector] Module "${module.name}": ${result.reason}`)
+      results.push({ moduleId: mod.id, result })
+      console.log(`[AdSelector] Module "${mod.name}": ${result.reason}`)
     }
 
     return results
@@ -499,7 +499,7 @@ export class ModuleAdSelector {
     advertiserId: string,
     usedDisplayOrder: number
   ): Promise<void> {
-    // Get all active ads for this company in this module
+    // Get all active ads for this company in this mod
     const { data: ads } = await supabaseAdmin
       .from('advertisements')
       .select('display_order')
@@ -536,18 +536,18 @@ export class ModuleAdSelector {
       .eq('ad_module_id', moduleId)
       .eq('advertiser_id', advertiserId)
 
-    console.log(`[AdSelector] Company in module ${moduleId}: ad position -> ${nextAdPosition}, times_used -> ${(junction?.times_used || 0) + 1}`)
+    console.log(`[AdSelector] Company in mod ${moduleId}: ad position -> ${nextAdPosition}, times_used -> ${(junction?.times_used || 0) + 1}`)
   }
 
   /**
-   * Advance the company position for a sequential module after a company's ad is used.
+   * Advance the company position for a sequential mod after a company's ad is used.
    * Queries ad_module_advertisers for the next company in display_order.
    */
   private static async advanceCompanyPosition(
     moduleId: string,
     usedAdvertiserId: string
   ): Promise<void> {
-    // Get all junction entries for this module to find positions
+    // Get all junction entries for this mod to find positions
     const { data: junctions } = await supabaseAdmin
       .from('ad_module_advertisers')
       .select('advertiser_id, display_order')
@@ -572,7 +572,7 @@ export class ModuleAdSelector {
       console.log(`[AdSelector] Module ${moduleId}: Advancing to company position ${nextPosition}`)
     }
 
-    // Update the module's next_position (now tracks company position)
+    // Update the mod's next_position (now tracks company position)
     await supabaseAdmin
       .from('ad_modules')
       .update({
@@ -583,7 +583,7 @@ export class ModuleAdSelector {
   }
 
   /**
-   * Reset the next_position for a module to 1
+   * Reset the next_position for a mod to 1
    */
   static async resetPosition(moduleId: string): Promise<{ success: boolean; error?: string }> {
     const { error } = await supabaseAdmin
@@ -599,12 +599,12 @@ export class ModuleAdSelector {
       return { success: false, error: error.message }
     }
 
-    console.log(`[AdSelector] Reset position to 1 for module ${moduleId}`)
+    console.log(`[AdSelector] Reset position to 1 for mod ${moduleId}`)
     return { success: true }
   }
 
   /**
-   * Set a specific next_position for a module
+   * Set a specific next_position for a mod
    */
   static async setPosition(
     moduleId: string,
@@ -627,7 +627,7 @@ export class ModuleAdSelector {
       return { success: false, error: error.message }
     }
 
-    console.log(`[AdSelector] Set position to ${position} for module ${moduleId}`)
+    console.log(`[AdSelector] Set position to ${position} for mod ${moduleId}`)
     return { success: true }
   }
 
@@ -657,14 +657,14 @@ export class ModuleAdSelector {
   }
 
   /**
-   * Manually select an ad for a module (for manual mode)
+   * Manually select an ad for a mod (for manual mode)
    */
   static async manuallySelectAd(
     issueId: string,
     moduleId: string,
     adId: string
   ): Promise<{ success: boolean; error?: string }> {
-    // Verify the ad belongs to this module
+    // Verify the ad belongs to this mod
     const { data: ad } = await supabaseAdmin
       .from('advertisements')
       .select('id, ad_module_id')
@@ -672,7 +672,7 @@ export class ModuleAdSelector {
       .single()
 
     if (!ad || ad.ad_module_id !== moduleId) {
-      return { success: false, error: 'Ad does not belong to this module' }
+      return { success: false, error: 'Ad does not belong to this mod' }
     }
 
     // Upsert the selection

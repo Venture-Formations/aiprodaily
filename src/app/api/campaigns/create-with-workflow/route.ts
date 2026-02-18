@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
       // Non-critical - issue can proceed without ad
     }
 
-    // Step 5: Initialize article module selections and assign posts
+    // Step 5: Initialize article mod selections and assign posts
     const { ArticleModuleSelector } = await import('@/lib/article-modules')
 
     // Get active article modules for this publication
@@ -121,35 +121,35 @@ export async function POST(request: NextRequest) {
     // Initialize issue_article_modules entries
     await ArticleModuleSelector.initializeSelectionsForIssue(issueId, newsletterUuid)
 
-    // Get lookback window from first module (or default)
+    // Get lookback window from first mod (or default)
     const defaultLookbackHours = activeModules[0]?.lookback_hours || 72
     const lookbackDate = new Date()
     lookbackDate.setHours(lookbackDate.getHours() - defaultLookbackHours)
     const lookbackTimestamp = lookbackDate.toISOString()
 
-    // For each module, get feeds and assign top posts
+    // For each mod, get feeds and assign top posts
     let totalAssigned = 0
-    for (const module of activeModules) {
-      const lookbackHours = module.lookback_hours || 72
+    for (const mod of activeModules) {
+      const lookbackHours = mod.lookback_hours || 72
       const moduleLookbackDate = new Date()
       moduleLookbackDate.setHours(moduleLookbackDate.getHours() - lookbackHours)
       const moduleLookbackTimestamp = moduleLookbackDate.toISOString()
 
-      // Get feeds assigned to this module
+      // Get feeds assigned to this mod
       const { data: moduleFeeds } = await supabaseAdmin
         .from('rss_feeds')
         .select('id')
         .eq('active', true)
-        .eq('article_module_id', module.id)
+        .eq('article_module_id', mod.id)
 
       const feedIds = moduleFeeds?.map(f => f.id) || []
 
       if (feedIds.length === 0) {
-        console.log(`[Create issue] Module "${module.name}": No feeds assigned`)
+        console.log(`[Create issue] Module "${mod.name}": No feeds assigned`)
         continue
       }
 
-      // Get top posts for this module by score
+      // Get top posts for this mod by score
       const { data: modulePosts } = await supabaseAdmin
         .from('rss_posts')
         .select('id, post_ratings(total_score)')
@@ -173,14 +173,14 @@ export async function POST(request: NextRequest) {
           .from('rss_posts')
           .update({
             issue_id: issueId,
-            article_module_id: module.id
+            article_module_id: mod.id
           })
           .in('id', topPosts.map(p => p.id))
 
         totalAssigned += topPosts.length
-        console.log(`[Create issue] Module "${module.name}": Assigned ${topPosts.length} posts`)
+        console.log(`[Create issue] Module "${mod.name}": Assigned ${topPosts.length} posts`)
       } else {
-        console.log(`[Create issue] Module "${module.name}": No eligible posts found`)
+        console.log(`[Create issue] Module "${mod.name}": No eligible posts found`)
       }
     }
 

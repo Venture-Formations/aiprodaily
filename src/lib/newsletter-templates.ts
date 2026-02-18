@@ -324,7 +324,7 @@ async function fetchBusinessSettings(publication_id?: string): Promise<{
   bodyFont: string;
   websiteUrl: string;
 }> {
-  // If publication_id is provided, use the new helper module (with fallback logging)
+  // If publication_id is provided, use the new helper mod (with fallback logging)
   if (publication_id) {
     const settings = await getPublicationBusinessSettings(publication_id)
     return {
@@ -549,19 +549,19 @@ export async function generateArticleModuleSection(
   issue: any,
   moduleId: string
 ): Promise<string> {
-  // Fetch the article module
-  const { data: module } = await supabaseAdmin
+  // Fetch the article mod
+  const { data: mod } = await supabaseAdmin
     .from('article_modules')
     .select('*')
     .eq('id', moduleId)
     .single()
 
-  if (!module) {
+  if (!mod) {
     console.log(`[Article Module] Module ${moduleId} not found`)
     return ''
   }
 
-  // Fetch active articles for this module and issue
+  // Fetch active articles for this mod and issue
   const { data: articles } = await supabaseAdmin
     .from('module_articles')
     .select(`
@@ -584,15 +584,15 @@ export async function generateArticleModuleSection(
     .order('rank', { ascending: true })
 
   if (!articles || articles.length === 0) {
-    console.log(`[Article Module] No active articles for module ${module.name}`)
+    console.log(`[Article Module] No active articles for mod ${mod.name}`)
     return ''
   }
 
   // Fetch colors and fonts from business settings
   const { primaryColor, secondaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue.publication_id)
 
-  // Get block order from module settings
-  const blockOrder: ArticleBlockType[] = module.block_order || ['title', 'body']
+  // Get block order from mod settings
+  const blockOrder: ArticleBlockType[] = mod.block_order || ['title', 'body']
 
   const articlesHtml = articles.map((article: any) => {
     const headline = article.headline || 'No headline'
@@ -604,7 +604,7 @@ export async function generateArticleModuleSection(
     const emoji = getArticleEmoji(headline, content)
 
     // Wrap URL with tracking
-    const trackedUrl = sourceUrl !== '#' ? wrapTrackingUrl(sourceUrl, module.name, issue.date, issue.mailerlite_issue_id, issue.id) : '#'
+    const trackedUrl = sourceUrl !== '#' ? wrapTrackingUrl(sourceUrl, mod.name, issue.date, issue.mailerlite_issue_id, issue.id) : '#'
 
     // Convert newlines to <br> for proper HTML display
     const formattedContent = content.replace(/\n/g, '<br>')
@@ -652,7 +652,7 @@ export async function generateArticleModuleSection(
       <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #ddd; border-radius: 10px; margin-top: 10px; background-color: #fff; box-shadow:0 4px 12px rgba(0,0,0,.15);">
         <tr>
           <td style="padding: 8px; background-color: ${primaryColor}; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">${module.name}</h2>
+            <h2 style="font-size: 1.625em; line-height: 1.16em; font-family: ${headingFont}; color: #ffffff; margin: 0; padding: 0;">${mod.name}</h2>
           </td>
         </tr>
         <tr>
@@ -793,12 +793,12 @@ ${optionsHtml}
 // ==================== POLL MODULES SECTION ====================
 
 /**
- * Generate HTML for a single poll module.
+ * Generate HTML for a single poll mod.
  * This uses the new modular poll system with block ordering.
  *
  * @param issue - The issue data
- * @param moduleId - The poll module ID to render
- * @returns The generated HTML for the poll module
+ * @param moduleId - The poll mod ID to render
+ * @returns The generated HTML for the poll mod
  */
 export async function generatePollModulesSection(
   issue: { id: string; publication_id: string; status?: string },
@@ -810,15 +810,15 @@ export async function generatePollModulesSection(
     // Get all poll selections for this issue
     const selections = await PollModuleSelector.getIssuePollSelections(issue.id)
 
-    // Find the selection for this specific module
+    // Find the selection for this specific mod
     const selection = selections.find(s => s.poll_module_id === moduleId)
 
     if (!selection || !selection.poll || !selection.poll_module) {
-      console.log(`[PollModules] No selection/poll found for module ${moduleId} in issue ${issue.id}`)
+      console.log(`[PollModules] No selection/poll found for mod ${moduleId} in issue ${issue.id}`)
       return ''
     }
 
-    // Render the poll module
+    // Render the poll mod
     const result = await PollModuleRenderer.renderPollModule(
       selection.poll_module,
       selection.poll,
@@ -828,7 +828,7 @@ export async function generatePollModulesSection(
 
     return result.html
   } catch (error) {
-    console.error('[PollModules] Error generating poll module section:', error)
+    console.error('[PollModules] Error generating poll mod section:', error)
     return ''
   }
 }
@@ -1088,19 +1088,19 @@ export async function generateAdvertorialSection(issue: any, _recordUsage: boole
 // ==================== AD MODULES (DYNAMIC AD SECTIONS) ====================
 
 /**
- * Generate ad module sections for an issue
+ * Generate ad mod sections for an issue
  * Uses the block-based renderer for configurable ad layouts
  * @param issue - The issue data
- * @param moduleId - Optional: Generate only for a specific module (used for ordered rendering)
+ * @param moduleId - Optional: Generate only for a specific mod (used for ordered rendering)
  */
 export async function generateAdModulesSection(issue: any, moduleId?: string): Promise<string> {
   try {
-    console.log('Generating Ad Modules sections for issue:', issue?.id, moduleId ? `(module: ${moduleId})` : '(all modules)')
+    console.log('Generating Ad Modules sections for issue:', issue?.id, moduleId ? `(mod: ${moduleId})` : '(all modules)')
 
     // Fetch colors from business settings
     const { primaryColor, headingFont, bodyFont, websiteUrl } = await fetchBusinessSettings(issue?.publication_id)
 
-    // Build query for ad module selections
+    // Build query for ad mod selections
     // Uses unified advertisements table
     let query = supabaseAdmin
       .from('issue_module_ads')
@@ -1132,7 +1132,7 @@ export async function generateAdModulesSection(issue: any, moduleId?: string): P
       `)
       .eq('issue_id', issue.id)
 
-    // Filter to specific module if provided
+    // Filter to specific mod if provided
     if (moduleId) {
       query = query.eq('ad_module_id', moduleId)
     }
@@ -1140,48 +1140,48 @@ export async function generateAdModulesSection(issue: any, moduleId?: string): P
     const { data: selections, error } = await query.order('ad_module(display_order)', { ascending: true })
 
     if (error) {
-      console.error('Error fetching ad module selections:', error)
+      console.error('Error fetching ad mod selections:', error)
       return ''
     }
 
     if (!selections || selections.length === 0) {
-      console.log('No ad module selections found for issue')
+      console.log('No ad mod selections found for issue')
       return ''
     }
 
-    console.log(`Found ${selections.length} ad module selections`)
+    console.log(`Found ${selections.length} ad mod selections`)
 
-    // Generate HTML for each ad module
+    // Generate HTML for each ad mod
     const sectionsHtml: string[] = []
 
     for (const selection of selections) {
-      const module = selection.ad_module as any
+      const mod = selection.ad_module as any
       const ad = selection.advertisement as any
 
-      if (!module) {
-        console.log('Skipping selection without module')
+      if (!mod) {
+        console.log('Skipping selection without mod')
         continue
       }
 
       // If no ad selected (manual mode not filled), skip this section
       if (!ad) {
-        console.log(`No ad selected for module "${module.name}" (mode: ${selection.selection_mode})`)
+        console.log(`No ad selected for mod "${mod.name}" (mode: ${selection.selection_mode})`)
         continue
       }
 
       // Generate tracked URL for the ad
       const buttonUrl = ad.button_url || '#'
       const trackedUrl = buttonUrl !== '#'
-        ? wrapTrackingUrl(buttonUrl, module.name, issue.date, issue.mailerlite_issue_id, issue.id)
+        ? wrapTrackingUrl(buttonUrl, mod.name, issue.date, issue.mailerlite_issue_id, issue.id)
         : '#'
 
-      // Get block order from module config
-      const blockOrder = (module.block_order || ['title', 'image', 'body', 'button']) as AdBlockType[]
-      console.log(`[AdModules] Module "${module.name}" block_order:`, module.block_order, '-> using:', blockOrder)
+      // Get block order from mod config
+      const blockOrder = (mod.block_order || ['title', 'image', 'body', 'button']) as AdBlockType[]
+      console.log(`[AdModules] Module "${mod.name}" block_order:`, mod.block_order, '-> using:', blockOrder)
 
       // Use the AdModuleRenderer for block-based rendering
       const html = AdModuleRenderer.renderForArchive(
-        module.name,
+        mod.name,
         {
           title: ad.title,
           body: ad.body,
@@ -1437,24 +1437,24 @@ export async function generateAIAppsSection(issue: any): Promise<string> {
   try {
     console.log('Generating AI Apps section for issue:', issue?.id)
 
-    // Try new module-based rendering first
+    // Try new mod-based rendering first
     const { AppModuleSelector, AppModuleRenderer } = await import('./ai-app-modules')
 
     const moduleSelections = await AppModuleSelector.getIssueSelections(issue.id)
 
     if (moduleSelections && moduleSelections.length > 0) {
-      // Use new module-based rendering
-      console.log(`Found ${moduleSelections.length} AI app module(s) for issue`)
+      // Use new mod-based rendering
+      console.log(`Found ${moduleSelections.length} AI app mod(s) for issue`)
 
       let combinedHtml = ''
       for (const selection of moduleSelections) {
-        const module = selection.ai_app_module
+        const mod = selection.ai_app_module
         const apps = selection.apps || []
 
-        if (!module || apps.length === 0) continue
+        if (!mod || apps.length === 0) continue
 
         const result = await AppModuleRenderer.renderModule(
-          module,
+          mod,
           apps,
           issue.publication_id,
           {
@@ -1465,7 +1465,7 @@ export async function generateAIAppsSection(issue: any): Promise<string> {
         )
 
         combinedHtml += result.html
-        console.log(`Rendered module "${result.moduleName}" with ${result.appCount} apps`)
+        console.log(`Rendered mod "${result.moduleName}" with ${result.appCount} apps`)
       }
 
       if (combinedHtml) {
@@ -1486,7 +1486,7 @@ export async function generateAIAppsSection(issue: any): Promise<string> {
 // ==================== PROMPT IDEAS ====================
 
 /**
- * Generate a single prompt module section (module-based system)
+ * Generate a single prompt mod section (mod-based system)
  * Used when iterating through prompt_modules
  */
 export async function generatePromptModulesSection(
@@ -1496,7 +1496,7 @@ export async function generatePromptModulesSection(
   try {
     const { PromptModuleRenderer } = await import('./prompt-modules')
 
-    // Directly query the specific selection for this module
+    // Directly query the specific selection for this mod
     const { data: selection, error } = await supabaseAdmin
       .from('issue_prompt_modules')
       .select(`
@@ -1509,17 +1509,17 @@ export async function generatePromptModulesSection(
       .single()
 
     if (error) {
-      console.log(`[PromptModules] No selection found for module ${moduleId} in issue ${issue.id}: ${error.message}`)
+      console.log(`[PromptModules] No selection found for mod ${moduleId} in issue ${issue.id}: ${error.message}`)
       return ''
     }
 
     if (!selection || !selection.prompt || !selection.prompt_module) {
-      console.log(`[PromptModules] Selection exists but prompt/module is null for module ${moduleId} in issue ${issue.id}`)
+      console.log(`[PromptModules] Selection exists but prompt/mod is null for mod ${moduleId} in issue ${issue.id}`)
       console.log(`[PromptModules] Selection details: prompt_id=${selection?.prompt_id}, has_prompt=${!!selection?.prompt}, has_module=${!!selection?.prompt_module}`)
       return ''
     }
 
-    // Render the prompt module
+    // Render the prompt mod
     const result = await PromptModuleRenderer.renderPromptModule(
       selection.prompt_module,
       selection.prompt,
@@ -1529,15 +1529,15 @@ export async function generatePromptModulesSection(
 
     return result.html
   } catch (error) {
-    console.error('[PromptModules] Error generating prompt module section:', error)
+    console.error('[PromptModules] Error generating prompt mod section:', error)
     return ''
   }
 }
 
 /**
- * Generate all prompt module sections for an issue
+ * Generate all prompt mod sections for an issue
  * Legacy function - used for backward compatibility
- * @deprecated Use generatePromptModulesSection with individual module IDs instead
+ * @deprecated Use generatePromptModulesSection with individual mod IDs instead
  */
 export async function generatePromptIdeasSection(issue: any): Promise<string> {
   try {
@@ -1549,7 +1549,7 @@ export async function generatePromptIdeasSection(issue: any): Promise<string> {
     const selections = await PromptModuleSelector.getIssuePromptSelections(issue.id)
 
     if (!selections || selections.length === 0) {
-      console.log('No prompt module selections for this issue')
+      console.log('No prompt mod selections for this issue')
       return ''
     }
 
@@ -1578,7 +1578,7 @@ export async function generatePromptIdeasSection(issue: any): Promise<string> {
 // ==================== TEXT BOX MODULES SECTION ====================
 
 /**
- * Generate a single text box module section
+ * Generate a single text box mod section
  * Uses the new modular text box system with block rendering
  */
 export async function generateTextBoxModuleSection(
@@ -1591,11 +1591,11 @@ export async function generateTextBoxModuleSection(
     // Get all text box selections for this issue
     const selections = await TextBoxModuleSelector.getIssueSelections(issue.id)
 
-    // Find the selection for this specific module (match by module.id)
-    const selection = selections.find(s => s.module?.id === moduleId)
+    // Find the selection for this specific mod (match by mod.id)
+    const selection = selections.find(s => s.mod?.id === moduleId)
 
-    if (!selection || !selection.module) {
-      console.log(`[TextBoxModules] No selection/module found for module ${moduleId} in issue ${issue.id}`)
+    if (!selection || !selection.mod) {
+      console.log(`[TextBoxModules] No selection/mod found for mod ${moduleId} in issue ${issue.id}`)
       return ''
     }
 
@@ -1605,9 +1605,9 @@ export async function generateTextBoxModuleSection(
       issueBlocksMap.set(issueBlock.text_box_block_id, issueBlock)
     }
 
-    // Render the text box module
+    // Render the text box mod
     const result = await TextBoxModuleRenderer.renderModule(
-      selection.module,
+      selection.mod,
       selection.blocks || [],
       issueBlocksMap,
       issue.publication_id,
@@ -1616,7 +1616,7 @@ export async function generateTextBoxModuleSection(
 
     return result.html
   } catch (error) {
-    console.error('[TextBoxModules] Error generating text box module section:', error)
+    console.error('[TextBoxModules] Error generating text box mod section:', error)
     return ''
   }
 }
@@ -1630,24 +1630,24 @@ export async function generateFeedbackModuleSection(
   try {
     const { FeedbackModuleSelector, FeedbackModuleRenderer } = await import('./feedback-modules')
 
-    // Get the feedback module with blocks
-    const module = await FeedbackModuleSelector.getFeedbackModuleWithBlocks(issue.publication_id)
+    // Get the feedback mod with blocks
+    const mod = await FeedbackModuleSelector.getFeedbackModuleWithBlocks(issue.publication_id)
 
-    if (!module || module.id !== moduleId) {
-      console.log(`[FeedbackModules] No feedback module found for module ${moduleId} in publication ${issue.publication_id}`)
+    if (!mod || mod.id !== moduleId) {
+      console.log(`[FeedbackModules] No feedback mod found for mod ${moduleId} in publication ${issue.publication_id}`)
       return ''
     }
 
-    // Render the feedback module
+    // Render the feedback mod
     const result = await FeedbackModuleRenderer.renderFeedbackModule(
-      module,
+      mod,
       issue.publication_id,
       { issueId: issue.id }
     )
 
     return result.html
   } catch (error) {
-    console.error('[FeedbackModules] Error generating feedback module section:', error)
+    console.error('[FeedbackModules] Error generating feedback mod section:', error)
     return ''
   }
 }
@@ -1661,21 +1661,21 @@ export async function generateSparkLoopRecModuleSection(
   try {
     const { SparkLoopRecModuleSelector, SparkLoopRecModuleRenderer } = await import('./sparkloop-rec-modules')
 
-    // Get module config
-    const { data: module } = await supabaseAdmin
+    // Get mod config
+    const { data: mod } = await supabaseAdmin
       .from('sparkloop_rec_modules')
       .select('id, name, recs_count')
       .eq('id', moduleId)
       .single()
 
-    if (!module) return ''
+    if (!mod) return ''
 
     // Get issue selections
     const { selections } = await SparkLoopRecModuleSelector.getIssueSelections(issue.id)
     const sel = selections.find(s => s.sparkloop_rec_module_id === moduleId)
 
     if (!sel || sel.ref_codes.length === 0 || sel.recommendations.length === 0) {
-      console.log(`[SparkLoop Rec Module] No selections for module ${module.name} on issue ${issue.id}`)
+      console.log(`[SparkLoop Rec Module] No selections for mod ${mod.name} on issue ${issue.id}`)
       return ''
     }
 
@@ -1684,7 +1684,7 @@ export async function generateSparkLoopRecModuleSection(
 
     // Render cards
     const html = SparkLoopRecModuleRenderer.renderSection(
-      module.name,
+      mod.name,
       sel.recommendations.map(r => ({
         ref_code: r.ref_code,
         publication_name: r.publication_name,
@@ -1880,7 +1880,7 @@ export async function generateFullNewsletterHtml(
       .filter((article: any) => article.is_active)
       .sort((a: any, b: any) => (a.rank || 999) - (b.rank || 999))
 
-    console.log('Active module articles to render:', activeArticles.length)
+    console.log('Active mod articles to render:', activeArticles.length)
     console.log('Article order:', activeArticles.map((a: any) => `${a.headline} (rank: ${a.rank})`).join(', '))
 
     // Fetch newsletter sections order (exclude legacy article section types - now handled by article_modules)
@@ -1947,7 +1947,7 @@ export async function generateFullNewsletterHtml(
       .eq('is_active', true)
       .order('display_order', { ascending: true })
 
-    // Fetch feedback module (singleton per publication)
+    // Fetch feedback mod (singleton per publication)
     const { data: feedbackModules } = await supabaseAdmin
       .from('feedback_modules')
       .select('*')
@@ -2042,43 +2042,43 @@ export async function generateFullNewsletterHtml(
     let sectionsHtml = ''
     for (const item of allItems) {
       if (item.type === 'ad_module') {
-        // Generate single ad module section
+        // Generate single ad mod section
         const adModuleHtml = await generateAdModulesSection(issue, item.data.id)
         if (adModuleHtml) {
           sectionsHtml += adModuleHtml
         }
       } else if (item.type === 'poll_module') {
-        // Generate single poll module section
+        // Generate single poll mod section
         const pollModuleHtml = await generatePollModulesSection(issue, item.data.id)
         if (pollModuleHtml) {
           sectionsHtml += pollModuleHtml
         }
       } else if (item.type === 'prompt_module') {
-        // Generate single prompt module section
+        // Generate single prompt mod section
         const promptModuleHtml = await generatePromptModulesSection(issue, item.data.id)
         if (promptModuleHtml) {
           sectionsHtml += promptModuleHtml
         }
       } else if (item.type === 'article_module') {
-        // Generate single article module section
+        // Generate single article mod section
         const articleModuleHtml = await generateArticleModuleSection(issue, item.data.id)
         if (articleModuleHtml) {
           sectionsHtml += articleModuleHtml
         }
       } else if (item.type === 'text_box_module') {
-        // Generate single text box module section
+        // Generate single text box mod section
         const textBoxModuleHtml = await generateTextBoxModuleSection(issue, item.data.id)
         if (textBoxModuleHtml) {
           sectionsHtml += textBoxModuleHtml
         }
       } else if (item.type === 'feedback_module') {
-        // Generate feedback module section
+        // Generate feedback mod section
         const feedbackModuleHtml = await generateFeedbackModuleSection(issue, item.data.id)
         if (feedbackModuleHtml) {
           sectionsHtml += feedbackModuleHtml
         }
       } else if (item.type === 'sparkloop_rec_module') {
-        // Generate sparkloop recommendation module section
+        // Generate sparkloop recommendation mod section
         const slRecHtml = await generateSparkLoopRecModuleSection(issue, item.data.id)
         if (slRecHtml) {
           sectionsHtml += slRecHtml
