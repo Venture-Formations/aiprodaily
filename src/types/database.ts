@@ -53,7 +53,9 @@ export interface AIApplication {
   app_url: string
   tracked_link: string | null
   logo_url: string | null
+  logo_alt: string | null
   screenshot_url: string | null
+  screenshot_alt: string | null
   tool_type: ToolType | null
   category_priority: number
   is_featured: boolean
@@ -238,6 +240,7 @@ export interface RssPost {
   publication_date: string | null
   source_url: string | null
   image_url: string | null
+  image_alt: string | null
   processed_at: string
   breaking_news_score: number | null
   breaking_news_category: string | null
@@ -563,6 +566,7 @@ export interface Poll {
   question: string
   options: string[]
   image_url?: string
+  image_alt?: string | null
   is_active: boolean
   created_at: string
   updated_at: string
@@ -599,6 +603,7 @@ export interface PollSnapshot {
   question: string
   options: string[]
   image_url?: string
+  image_alt?: string | null
 }
 
 export interface IssuePollModule {
@@ -1183,6 +1188,7 @@ export interface Advertisement {
   button_text: string
   button_url: string
   image_url: string | null  // Optional cropped image (5:4 ratio)
+  image_alt: string | null
   frequency: AdFrequency
   times_paid: number
   times_used: number
@@ -1603,6 +1609,7 @@ export interface ModuleArticle {
   ai_summary: string | null
   ai_title: string | null
   ai_image_url: string | null
+  image_alt: string | null
   created_at: string
   updated_at: string
 }
@@ -1683,6 +1690,7 @@ export interface TextBoxBlock {
   image_type: ImageType | null
   static_image_url: string | null  // URL for static uploaded images
   ai_image_prompt: string | null  // Prompt for AI image generation
+  image_alt: string | null  // Alt text for the image (max 200 chars)
 
   // Common fields
   is_active: boolean
@@ -1714,6 +1722,7 @@ export interface IssueTextBoxBlock {
   // Manual override content (user can override AI content)
   override_content: string | null
   override_image_url: string | null
+  image_alt: string | null  // Alt text override for this issue's image
 
   // Status tracking
   generation_status: TextBoxGenerationStatus

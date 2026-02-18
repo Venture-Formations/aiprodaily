@@ -254,6 +254,7 @@ export function TextBoxModuleSettings({
   // Image editing
   const [editImageType, setEditImageType] = useState<'static' | 'ai_generated'>('static')
   const [editAiImagePrompt, setEditAiImagePrompt] = useState('')
+  const [editImageAlt, setEditImageAlt] = useState('')
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [crop, setCrop] = useState<Crop>()
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>()
@@ -446,6 +447,7 @@ export function TextBoxModuleSettings({
     } else if (block.block_type === 'image') {
       setEditImageType((block.image_type as any) || 'static')
       setEditAiImagePrompt(block.ai_image_prompt || '')
+      setEditImageAlt(block.image_alt || '')
       setSelectedImage(null)
       setCrop(undefined)
       setCompletedCrop(undefined)
@@ -592,6 +594,7 @@ export function TextBoxModuleSettings({
         updateData.is_italic = editIsItalic
       } else if (block.block_type === 'image') {
         updateData.image_type = editImageType
+        updateData.image_alt = editImageAlt || null
 
         if (editImageType === 'ai_generated') {
           updateData.ai_image_prompt = editAiImagePrompt
@@ -881,6 +884,18 @@ export function TextBoxModuleSettings({
                   )}
                 </div>
               )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Image Alt Text</label>
+                <input
+                  type="text"
+                  maxLength={200}
+                  value={editImageAlt}
+                  onChange={(e) => setEditImageAlt(e.target.value)}
+                  placeholder="Brief image description (max 200 chars)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">Accessible description for this image.</p>
+              </div>
               {editImageType === 'ai_generated' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">AI Image Prompt</label>

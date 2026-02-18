@@ -146,7 +146,7 @@ export class NewsletterArchiver {
         if (allAppIds.length > 0) {
           const { data: apps } = await supabaseAdmin
             .from('ai_applications')
-            .select('id, app_name, tagline, description, app_url, logo_url, category, tool_type')
+            .select('id, app_name, tagline, description, app_url, logo_url, logo_alt, screenshot_url, screenshot_alt, category, tool_type')
             .in('id', allAppIds)
 
           if (apps) {

@@ -28,6 +28,7 @@ export default function PollsPage() {
   const [formQuestion, setFormQuestion] = useState('')
   const [formOptions, setFormOptions] = useState<string[]>(['', '', ''])
   const [formImageUrl, setFormImageUrl] = useState('')
+  const [formImageAlt, setFormImageAlt] = useState('')
 
   // Extract publication slug from pathname and fetch publication ID
   useEffect(() => {
@@ -120,6 +121,7 @@ export default function PollsPage() {
           question: formQuestion,
           options: validOptions,
           image_url: formImageUrl || null,
+          image_alt: formImageAlt || null,
           is_active: false
         })
       })
@@ -157,7 +159,8 @@ export default function PollsPage() {
           title: formTitle,
           question: formQuestion,
           options: validOptions,
-          image_url: formImageUrl || null
+          image_url: formImageUrl || null,
+          image_alt: formImageAlt || null
         })
       })
 
@@ -239,6 +242,7 @@ export default function PollsPage() {
     setFormQuestion(poll.question)
     setFormOptions([...poll.options])
     setFormImageUrl(poll.image_url || '')
+    setFormImageAlt(poll.image_alt || '')
     setShowEditForm(true)
   }
 
@@ -390,6 +394,19 @@ export default function PollsPage() {
                   <p className="text-xs text-gray-500 mt-1">
                     Add an image to display with the poll (only shown if poll module has image block enabled)
                   </p>
+                  {formImageUrl && (
+                    <div className="mt-2">
+                      <label className="block text-sm font-medium mb-1">Image Alt Text</label>
+                      <input
+                        type="text"
+                        maxLength={200}
+                        value={formImageAlt}
+                        onChange={(e) => setFormImageAlt(e.target.value)}
+                        className="w-full border rounded px-3 py-2"
+                        placeholder="Brief image description (max 200 chars)"
+                      />
+                    </div>
+                  )}
                   {formImageUrl && (
                     <div className="mt-2">
                       <img

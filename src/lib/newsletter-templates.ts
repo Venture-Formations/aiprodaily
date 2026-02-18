@@ -3,6 +3,7 @@
 
 import { supabaseAdmin } from './supabase'
 import { wrapTrackingUrl } from './url-tracking'
+import { sanitizeAltText } from './utils/sanitize-alt-text'
 import { HONEYPOT_CONFIG } from './bot-detection'
 import { AdScheduler } from './ad-scheduler'
 import { normalizeEmailHtml } from './html-normalizer'
@@ -570,9 +571,11 @@ export async function generateArticleModuleSection(
       is_active,
       rank,
       ai_image_url,
+      image_alt,
       rss_post:rss_posts(
         source_url,
-        image_url
+        image_url,
+        image_alt
       )
     `)
     .eq('issue_id', issue.id)
@@ -610,15 +613,17 @@ export async function generateArticleModuleSection(
     const blocks: string[] = []
     for (const blockType of blockOrder) {
       if (blockType === 'source_image' && sourceImage) {
+        const sourceAlt = sanitizeAltText(article.image_alt || rssPost?.image_alt || headline)
         blocks.push(`
           <div style="margin-bottom: 12px;">
-            <img src="${sourceImage}" alt="${headline}" style="max-width: 100%; height: auto; border-radius: 8px;" />
+            <img src="${sourceImage}" alt="${sourceAlt}" style="max-width: 100%; height: auto; border-radius: 8px;" />
           </div>
         `)
       } else if (blockType === 'ai_image' && aiImage) {
+        const aiAlt = sanitizeAltText(article.image_alt || headline)
         blocks.push(`
           <div style="margin-bottom: 12px;">
-            <img src="${aiImage}" alt="${headline}" style="max-width: 100%; height: auto; border-radius: 8px;" />
+            <img src="${aiImage}" alt="${aiAlt}" style="max-width: 100%; height: auto; border-radius: 8px;" />
           </div>
         `)
       } else if (blockType === 'title') {
@@ -844,6 +849,7 @@ export interface AdvertorialAdData {
   body: string
   button_url: string
   image_url?: string
+  image_alt?: string | null
 }
 
 // Shared interface for advertorial styling options
@@ -868,8 +874,9 @@ export function generateAdvertorialHtml(
   const buttonUrl = linkUrl || ad.button_url || '#'
 
   // Generate clickable image HTML if valid URL exists
+  const adAltText = sanitizeAltText(ad.image_alt || ad.title)
   const imageHtml = ad.image_url
-    ? `<tr><td style='padding: 0 12px; text-align: center;'><a href='${buttonUrl}'><img src='${ad.image_url}' alt='${ad.title}' style='max-width: 100%; max-height: 500px; border-radius: 4px; display: block; margin: 0 auto;'></a></td></tr>`
+    ? `<tr><td style='padding: 0 12px; text-align: center;'><a href='${buttonUrl}'><img src='${ad.image_url}' alt='${adAltText}' style='max-width: 100%; max-height: 500px; border-radius: 4px; display: block; margin: 0 auto;'></a></td></tr>`
     : ''
 
   // Process ad body: normalize HTML for email compatibility, then make the last sentence a hyperlink
@@ -1061,7 +1068,8 @@ export async function generateAdvertorialSection(issue: any, _recordUsage: boole
         title: selectedAd.title,
         body: selectedAd.body || '',
         button_url: selectedAd.button_url || '#',
-        image_url: selectedAd.image_url
+        image_url: selectedAd.image_url,
+        image_alt: selectedAd.image_alt
       },
       {
         primaryColor,
@@ -1110,6 +1118,7 @@ export async function generateAdModulesSection(issue: any, moduleId?: string): P
           title,
           body,
           image_url,
+          image_alt,
           button_text,
           button_url,
           company_name,
@@ -1177,6 +1186,7 @@ export async function generateAdModulesSection(issue: any, moduleId?: string): P
           title: ad.title,
           body: ad.body,
           image_url: ad.image_url,
+          image_alt: ad.image_alt,
           button_text: ad.button_text,
           button_url: trackedUrl // Use tracked URL
         },

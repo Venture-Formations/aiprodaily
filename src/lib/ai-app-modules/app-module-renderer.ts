@@ -5,6 +5,7 @@
 
 import { wrapTrackingUrl, type LinkType } from '../url-tracking'
 import { getBusinessSettings } from '../publication-settings'
+import { sanitizeAltText } from '../utils/sanitize-alt-text'
 import type {
   AIAppModule,
   AIApplication,
@@ -167,18 +168,20 @@ export class AppModuleRenderer {
         if (!app.logo_url) return ''
         const logoStyle = this.getLogoStyle(styles)
         const borderRadius = logoStyle === 'round' ? '50%' : '8px'
+        const logoAlt = sanitizeAltText(app.logo_alt, app.app_name)
         return `<a href="${trackingUrl}">
-          <img src="${app.logo_url}" alt="${app.app_name}"
+          <img src="${app.logo_url}" alt="${logoAlt}"
             style="width: 48px; height: 48px; border-radius: ${borderRadius}; object-fit: cover; vertical-align: middle;" />
         </a>`
       }
 
       case 'image': {
         if (!app.screenshot_url) return ''
+        const screenshotAlt = sanitizeAltText(app.screenshot_alt, app.app_name)
         return `
           <div style="margin: 12px 0;">
             <a href="${trackingUrl}">
-              <img src="${app.screenshot_url}" alt="${app.app_name}"
+              <img src="${app.screenshot_url}" alt="${screenshotAlt}"
                 style="max-width: 100%; border-radius: 8px; border: 1px solid #e0e0e0;" />
             </a>
           </div>`
@@ -551,18 +554,20 @@ export class AppModuleRenderer {
           }
           case 'logo':
             if (app.logo_url) {
+              const archiveLogoAlt = sanitizeAltText((app as any).logo_alt, app.app_name)
               blocksHtml += `
                 <div style="margin: 8px 0;">
-                  <img src="${app.logo_url}" alt="${app.app_name}"
+                  <img src="${app.logo_url}" alt="${archiveLogoAlt}"
                     style="width: 48px; height: 48px; border-radius: 8px;" />
                 </div>`
             }
             break
           case 'image':
             if (app.screenshot_url) {
+              const archiveScreenshotAlt = sanitizeAltText((app as any).screenshot_alt, app.app_name)
               blocksHtml += `
                 <div style="margin: 12px 0;">
-                  <img src="${app.screenshot_url}" alt="${app.app_name}"
+                  <img src="${app.screenshot_url}" alt="${archiveScreenshotAlt}"
                     style="max-width: 100%; border-radius: 8px;" />
                 </div>`
             }

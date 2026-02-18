@@ -44,6 +44,7 @@ export class AdModuleRenderer {
       title: ad.title,
       body: ad.body,
       image_url: ad.image_url,
+      image_alt: (ad as any).image_alt || undefined,
       button_text: ad.button_text,
       button_url: ad.button_url,
       trackingUrl
@@ -227,6 +228,7 @@ export class AdModuleRenderer {
       title?: string
       body?: string
       image_url?: string
+      image_alt?: string | null
       button_text?: string
       button_url?: string
     },
@@ -240,6 +242,7 @@ export class AdModuleRenderer {
       title: ad.title,
       body: ad.body,
       image_url: ad.image_url,
+      image_alt: ad.image_alt || undefined,
       button_text: ad.button_text,
       button_url: ad.button_url,
       trackingUrl: linkUrl

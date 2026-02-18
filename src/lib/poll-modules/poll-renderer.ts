@@ -7,6 +7,7 @@
 
 import { getBusinessSettings } from '../publication-settings'
 import type { BlockStyleOptions } from '../blocks'
+import { sanitizeAltText } from '../utils/sanitize-alt-text'
 import type { PollModule, Poll, PollSnapshot, PollBlockType } from '@/types/database'
 
 /**
@@ -109,7 +110,8 @@ export class PollModuleRenderer {
         blocksHtml += `<p style="margin:0 0 14px 0; font-size:16px; color:#ffffff; text-align:center;">${poll.question}</p>`
       }
       else if (blockType === 'image' && poll.image_url) {
-        blocksHtml += `<img src="${poll.image_url}" alt="${poll.title || 'Poll image'}" style="max-width:100%; height:auto; border-radius:8px; margin:0 0 14px 0;" />`
+        const pollAlt = sanitizeAltText((poll as any).image_alt || poll.title, 'Poll image')
+        blocksHtml += `<img src="${poll.image_url}" alt="${pollAlt}" style="max-width:100%; height:auto; border-radius:8px; margin:0 0 14px 0;" />`
       }
       else if (blockType === 'options' && poll.options && poll.options.length > 0) {
         // Use tertiary color for button background, primary color for text
@@ -181,7 +183,8 @@ export class PollModuleRenderer {
         blocksHtml += `<p style="margin:0 0 14px 0; font-size:16px; color:#ffffff; text-align:center;">${pollSnapshot.question}</p>`
       }
       else if (blockType === 'image' && pollSnapshot.image_url) {
-        blocksHtml += `<img src="${pollSnapshot.image_url}" alt="${pollSnapshot.title || 'Poll image'}" style="max-width:100%; height:auto; border-radius:8px; margin:0 0 14px 0;" />`
+        const archivePollAlt = sanitizeAltText((pollSnapshot as any).image_alt || pollSnapshot.title, 'Poll image')
+        blocksHtml += `<img src="${pollSnapshot.image_url}" alt="${archivePollAlt}" style="max-width:100%; height:auto; border-radius:8px; margin:0 0 14px 0;" />`
       }
       else if (blockType === 'options' && pollSnapshot.options && pollSnapshot.options.length > 0) {
         // Static options display (no clickable links for archive)
