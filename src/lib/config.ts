@@ -21,3 +21,12 @@ export const PUBLICATION_ID: string = (() => {
 
 export const SITE_BASE_URL: string =
   process.env.NEXT_PUBLIC_SITE_URL || 'https://aiaccountingdaily.com'
+
+/**
+ * Base URL for Supabase Storage public objects.
+ * When a custom domain is configured (e.g. img.aiprodaily.com), set
+ * STORAGE_PUBLIC_URL to use it instead of the default Supabase project URL.
+ */
+export const STORAGE_PUBLIC_URL: string =
+  process.env.STORAGE_PUBLIC_URL ||
+  `${process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vsbdfrqfokoltgjyiivq.supabase.co'}/storage/v1/object/public`
