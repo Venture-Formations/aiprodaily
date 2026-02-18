@@ -1850,6 +1850,9 @@ ${socialMediaSection}
   </tr>
 </table>
 ${honeypotHtml}
+<div style="display:none;position:absolute;left:-9999px;visibility:hidden;height:0;width:0;overflow:hidden;">
+  <a href="{$unsubscribe}" tabindex="-1" aria-hidden="true">unsubscribe</a>
+</div>
   </div>
 </body>
 </html>`
