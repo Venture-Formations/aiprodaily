@@ -7,6 +7,7 @@
 
 import { getBusinessSettings } from '../publication-settings'
 import type { BlockStyleOptions } from '../blocks'
+import { sanitizeAltText } from '../utils/sanitize-alt-text'
 import type {
   TextBoxModule,
   TextBoxBlock,
@@ -213,10 +214,11 @@ export class TextBoxModuleRenderer {
       return ''
     }
 
+    const altText = sanitizeAltText(issueBlock?.image_alt || block.image_alt)
     return `
 <tr>
   <td align="center" style="padding: 16px 10px;">
-    <img src="${imageUrl}" alt="" style="max-width: 100%; height: auto; border-radius: 8px; display: block;" />
+    <img src="${imageUrl}" alt="${altText}" style="max-width: 100%; height: auto; border-radius: 8px; display: block;" />
   </td>
 </tr>`
   }
@@ -294,6 +296,7 @@ export class TextBoxModuleRenderer {
       type: 'static_text' | 'ai_prompt' | 'image'
       content?: string
       imageUrl?: string
+      imageAlt?: string
       textSize?: TextSize
       isBold?: boolean
       isItalic?: boolean
@@ -327,10 +330,11 @@ export class TextBoxModuleRenderer {
 </tr>`
         }
       } else if (block.type === 'image' && block.imageUrl) {
+        const blockAlt = sanitizeAltText(block.imageAlt)
         blocksHtml += `
 <tr>
   <td align="center" style="padding: 16px 10px;">
-    <img src="${block.imageUrl}" alt="" style="max-width: 100%; height: auto; border-radius: 8px; display: block;" />
+    <img src="${block.imageUrl}" alt="${blockAlt}" style="max-width: 100%; height: auto; border-radius: 8px; display: block;" />
   </td>
 </tr>`
       }

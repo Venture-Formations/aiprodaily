@@ -1039,7 +1039,8 @@ function AddAdModal({ onClose, onSuccess, publicationId, selectedSection, sectio
   const [formData, setFormData] = useState({
     title: '',
     body: '',
-    button_url: ''
+    button_url: '',
+    image_alt: ''
   })
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [crop, setCrop] = useState<Crop>()
@@ -1340,6 +1341,26 @@ function AddAdModal({ onClose, onSuccess, publicationId, selectedSection, sectio
             </div>
           )}
 
+          {/* Image Alt Text */}
+          {selectedImage && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Image Alt Text
+              </label>
+              <input
+                type="text"
+                maxLength={200}
+                value={formData.image_alt}
+                onChange={(e) => setFormData(prev => ({ ...prev, image_alt: e.target.value }))}
+                placeholder="Brief image description (max 200 chars)"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Accessible description for the ad image.
+              </p>
+            </div>
+          )}
+
           {/* URL */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1395,6 +1416,7 @@ function EditAdModal({ ad, onClose, onSuccess, publicationId }: { ad: AdWithRela
     title: ad.title,
     body: ad.body,
     button_url: ad.button_url,
+    image_alt: ad.image_alt || '',
     status: ad.status,
     paid: ad.paid || false,
     frequency: ad.frequency || 'weekly',
@@ -1722,6 +1744,26 @@ function EditAdModal({ ad, onClose, onSuccess, publicationId }: { ad: AdWithRela
               />
               <p className="text-xs text-gray-500 mt-1">
                 Upload an image for your ad. It will be cropped to 16:9 ratio.
+              </p>
+            </div>
+          )}
+
+          {/* Image Alt Text */}
+          {(ad.image_url || selectedImage) && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Image Alt Text
+              </label>
+              <input
+                type="text"
+                maxLength={200}
+                value={formData.image_alt}
+                onChange={(e) => setFormData(prev => ({ ...prev, image_alt: e.target.value }))}
+                placeholder="Brief image description (max 200 chars)"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Accessible description for the ad image. Keep it short and descriptive.
               </p>
             </div>
           )}

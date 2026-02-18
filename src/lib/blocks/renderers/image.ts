@@ -6,6 +6,7 @@
  */
 
 import type { BlockData, BlockStyleOptions, BlockRenderContext } from '../types'
+import { sanitizeAltText } from '../../utils/sanitize-alt-text'
 
 /**
  * Render an image block with optional link
@@ -23,7 +24,7 @@ export function renderImageBlock(
   if (!imageUrl) return ''
 
   const linkUrl = data.trackingUrl || data.button_url || '#'
-  const altText = data.title || data.headline || 'Image'
+  const altText = sanitizeAltText(data.image_alt || data.title || data.headline)
 
   const imageTag = `<img src='${imageUrl}' alt='${altText}' style='max-width: 100%; max-height: 500px; border-radius: 4px; display: block; margin: 0 auto;'>`
 

@@ -83,6 +83,7 @@ export interface BlockData {
 
   // Media
   image_url?: string
+  image_alt?: string
 
   // Links
   button_url?: string

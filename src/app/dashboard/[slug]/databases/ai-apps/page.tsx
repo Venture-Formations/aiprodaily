@@ -499,6 +499,21 @@ export default function AIApplicationsPage() {
                   placeholder="https://example.com/logo.png"
                 />
               </div>
+              {addForm.logo_url && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Logo Alt Text
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={200}
+                    value={addForm.logo_alt || ''}
+                    onChange={(e) => setAddForm({ ...addForm, logo_alt: e.target.value })}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                    placeholder="Brief logo description (max 200 chars)"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Assign to Module
