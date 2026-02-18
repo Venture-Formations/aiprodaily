@@ -4,8 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase'
 import Stripe from 'stripe'
 import type { AIAppCategory } from '@/types/database'
-
-const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+import { PUBLICATION_ID } from '@/lib/config'
 // Use SUPABASE_URL (server-side) instead of NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_STORAGE_URL = `${process.env.SUPABASE_URL}/storage/v1/object/public/tool-images/`
 

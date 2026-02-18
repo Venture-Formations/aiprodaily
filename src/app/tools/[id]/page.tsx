@@ -9,8 +9,7 @@ import { Container } from '@/components/salient/Container'
 import { Button } from '@/components/salient/Button'
 import { ToolClickTracker } from './ToolClickTracker'
 import { ClaimListingButton } from './ClaimListingButton'
-
-const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+import { PUBLICATION_ID } from '@/lib/config'
 
 interface ToolDetailPageProps {
   params: Promise<{ id: string }>

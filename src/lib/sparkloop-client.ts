@@ -31,8 +31,7 @@ function normalizeGmailAddress(email: string): string {
   return email
 }
 
-// Default publication ID for AI Pro Daily
-const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+import { PUBLICATION_ID } from './config'
 
 export class SparkLoopService {
   private apiKey: string
@@ -342,7 +341,7 @@ export class SparkLoopService {
    * Also fetches budget info to auto-exclude out-of-budget recommendations
    * Tracks deltas in confirms/rejections for timeframe-based RCR calculation
    */
-  async syncRecommendationsToDatabase(publicationId: string = DEFAULT_PUBLICATION_ID): Promise<{
+  async syncRecommendationsToDatabase(publicationId: string = PUBLICATION_ID): Promise<{
     synced: number
     created: number
     updated: number
@@ -598,7 +597,7 @@ export class SparkLoopService {
    * Get stored recommendations from our database
    * Falls back to API if no stored data
    */
-  async getStoredRecommendations(publicationId: string = DEFAULT_PUBLICATION_ID): Promise<StoredSparkLoopRecommendation[]> {
+  async getStoredRecommendations(publicationId: string = PUBLICATION_ID): Promise<StoredSparkLoopRecommendation[]> {
     const { data, error } = await supabaseAdmin
       .from('sparkloop_recommendations')
       .select('*')
@@ -627,7 +626,7 @@ export class SparkLoopService {
   /**
    * Increment impression count for recommendations shown in popup
    */
-  static async recordImpressions(refCodes: string[], publicationId: string = DEFAULT_PUBLICATION_ID): Promise<void> {
+  static async recordImpressions(refCodes: string[], publicationId: string = PUBLICATION_ID): Promise<void> {
     if (refCodes.length === 0) return
 
     const { error } = await supabaseAdmin.rpc('increment_sparkloop_impressions', {
@@ -645,7 +644,7 @@ export class SparkLoopService {
   /**
    * Increment selection count when user selects a recommendation
    */
-  static async recordSelections(refCodes: string[], publicationId: string = DEFAULT_PUBLICATION_ID): Promise<void> {
+  static async recordSelections(refCodes: string[], publicationId: string = PUBLICATION_ID): Promise<void> {
     if (refCodes.length === 0) return
 
     const { error } = await supabaseAdmin.rpc('increment_sparkloop_selections', {
@@ -661,7 +660,7 @@ export class SparkLoopService {
   /**
    * Increment submission count when user submits selections
    */
-  static async recordSubmissions(refCodes: string[], publicationId: string = DEFAULT_PUBLICATION_ID): Promise<void> {
+  static async recordSubmissions(refCodes: string[], publicationId: string = PUBLICATION_ID): Promise<void> {
     if (refCodes.length === 0) return
 
     const { error } = await supabaseAdmin.rpc('increment_sparkloop_submissions', {
@@ -679,7 +678,7 @@ export class SparkLoopService {
   /**
    * Record a confirmed referral (called from webhook handler)
    */
-  static async recordConfirm(refCode: string, publicationId: string = DEFAULT_PUBLICATION_ID): Promise<void> {
+  static async recordConfirm(refCode: string, publicationId: string = PUBLICATION_ID): Promise<void> {
     const { error } = await supabaseAdmin.rpc('record_sparkloop_confirm', {
       p_publication_id: publicationId,
       p_ref_code: refCode,
@@ -695,7 +694,7 @@ export class SparkLoopService {
   /**
    * Record a rejected referral (called from webhook handler)
    */
-  static async recordRejection(refCode: string, publicationId: string = DEFAULT_PUBLICATION_ID): Promise<void> {
+  static async recordRejection(refCode: string, publicationId: string = PUBLICATION_ID): Promise<void> {
     const { error } = await supabaseAdmin.rpc('record_sparkloop_rejection', {
       p_publication_id: publicationId,
       p_ref_code: refCode,
@@ -779,7 +778,7 @@ export class SparkLoopService {
   static async calculateRCRForTimeframe(
     refCode: string,
     days: number = 30,
-    publicationId: string = DEFAULT_PUBLICATION_ID
+    publicationId: string = PUBLICATION_ID
   ): Promise<number | null> {
     const since = new Date()
     since.setDate(since.getDate() - days)
@@ -820,7 +819,7 @@ export class SparkLoopService {
    */
   static async getRCRsForTimeframe(
     days: number = 30,
-    publicationId: string = DEFAULT_PUBLICATION_ID
+    publicationId: string = PUBLICATION_ID
   ): Promise<Map<string, number>> {
     const since = new Date()
     since.setDate(since.getDate() - days)
@@ -878,7 +877,7 @@ export class SparkLoopService {
    * Upserts one row per recommendation for today's date
    * Idempotent — last sync of the day wins
    */
-  async takeDailySnapshot(publicationId: string = DEFAULT_PUBLICATION_ID): Promise<number> {
+  async takeDailySnapshot(publicationId: string = PUBLICATION_ID): Promise<number> {
     const today = new Date().toISOString().split('T')[0]
 
     const { data: recs, error } = await supabaseAdmin
@@ -930,7 +929,7 @@ export class SparkLoopService {
    */
   static async calculateRollingWindowMetrics(
     windowDays: number = 14,
-    publicationId: string = DEFAULT_PUBLICATION_ID
+    publicationId: string = PUBLICATION_ID
   ): Promise<Map<string, {
     rcr: number | null
     slippage_rate: number | null
@@ -1084,7 +1083,7 @@ export class SparkLoopService {
    * Returns a map of ref_code -> metrics for use in scoring
    */
   static async getStoredMetrics(
-    publicationId: string = DEFAULT_PUBLICATION_ID
+    publicationId: string = PUBLICATION_ID
   ): Promise<Map<string, { our_cr: number | null; our_rcr: number | null }>> {
     const { data } = await supabaseAdmin
       .from('sparkloop_recommendations')

@@ -1,7 +1,6 @@
 import { supabaseAdmin } from './supabase'
+import { PUBLICATION_ID } from './config'
 import type { AIApplication, AIAppCategory } from '@/types/database'
-
-const PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf' // AI Accounting Daily
 
 // Categories derived from AIAppCategory type
 const CATEGORIES: { id: string; name: AIAppCategory; slug: string; description: string }[] = [
@@ -38,7 +37,7 @@ export interface DirectoryCategory {
 /**
  * Transform AIApplication to DirectoryApp format for UI compatibility
  */
-function transformApp(app: AIApplication): DirectoryApp {
+export function transformApp(app: AIApplication): DirectoryApp {
   const category = CATEGORIES.find(c => c.name === app.category) || CATEGORIES[4] // Default to Productivity
 
   return {

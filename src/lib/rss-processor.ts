@@ -71,7 +71,7 @@ export class RSSProcessor {
    * Detect AI refusal/apology messages that should never be stored as article content.
    * Returns the matched phrase if a refusal is detected, or null if content is valid.
    */
-  private static detectAIRefusal(content: string): string | null {
+  static detectAIRefusal(content: string): string | null {
     const lower = content.toLowerCase().trim()
     for (const phrase of RSSProcessor.AI_REFUSAL_PATTERNS) {
       if (lower.includes(phrase)) {

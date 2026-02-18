@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SparkLoopService } from '@/lib/sparkloop-client'
-
-// Default publication ID for AI Pro Daily
-const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+import { PUBLICATION_ID } from '@/lib/config'
 
 /**
  * POST /api/sparkloop/sync
@@ -27,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const service = new SparkLoopService()
-    const result = await service.syncRecommendationsToDatabase(DEFAULT_PUBLICATION_ID)
+    const result = await service.syncRecommendationsToDatabase(PUBLICATION_ID)
 
     return NextResponse.json({
       success: true,
@@ -55,7 +53,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const service = new SparkLoopService()
-    const stored = await service.getStoredRecommendations(DEFAULT_PUBLICATION_ID)
+    const stored = await service.getStoredRecommendations(PUBLICATION_ID)
 
     // Find oldest sync time
     const lastSyncTimes = stored

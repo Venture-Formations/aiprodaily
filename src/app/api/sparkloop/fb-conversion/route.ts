@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+import { PUBLICATION_ID } from '@/lib/config'
 
 /**
  * POST /api/sparkloop/fb-conversion
@@ -43,7 +42,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from('sparkloop_referrals')
       .update({ fb_conversion_sent_at: now, updated_at: now })
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('publication_id', PUBLICATION_ID)
       .eq('subscriber_email', email)
       .is('fb_conversion_sent_at', null)
       .select('id, ref_code')

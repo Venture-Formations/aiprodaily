@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-// Default publication ID for AI Pro Daily
-const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+import { PUBLICATION_ID } from '@/lib/config'
 const PAGE_SIZE = 1000
 
 /**
@@ -38,7 +36,7 @@ export async function GET(request: NextRequest) {
       const { data: page, error } = await supabaseAdmin
         .from('sparkloop_events')
         .select('raw_payload')
-        .eq('publication_id', DEFAULT_PUBLICATION_ID)
+        .eq('publication_id', PUBLICATION_ID)
         .eq('event_type', 'popup_opened')
         .gte('event_timestamp', startDate)
         .lte('event_timestamp', endDate)
@@ -71,7 +69,7 @@ export async function GET(request: NextRequest) {
       const { data: page, error } = await supabaseAdmin
         .from('sparkloop_referrals')
         .select('ref_code, status, source')
-        .eq('publication_id', DEFAULT_PUBLICATION_ID)
+        .eq('publication_id', PUBLICATION_ID)
         .in('source', ['custom_popup', 'recs_page'])
         .gte('subscribed_at', startDate)
         .lte('subscribed_at', endDate)
@@ -119,7 +117,7 @@ export async function GET(request: NextRequest) {
       const { data: page } = await supabaseAdmin
         .from('sparkloop_events')
         .select('raw_payload')
-        .eq('publication_id', DEFAULT_PUBLICATION_ID)
+        .eq('publication_id', PUBLICATION_ID)
         .eq('event_type', 'api_subscribe_confirmed')
         .gte('event_timestamp', startDate)
         .lte('event_timestamp', endDate)
@@ -148,7 +146,7 @@ export async function GET(request: NextRequest) {
       const { data: page } = await supabaseAdmin
         .from('sparkloop_events')
         .select('raw_payload')
-        .eq('publication_id', DEFAULT_PUBLICATION_ID)
+        .eq('publication_id', PUBLICATION_ID)
         .eq('event_type', 'subscriptions_success')
         .gte('event_timestamp', startDate)
         .lte('event_timestamp', endDate)

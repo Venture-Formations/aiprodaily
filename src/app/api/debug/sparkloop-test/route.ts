@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SparkLoopService } from '@/lib/sparkloop-client'
+import { PUBLICATION_ID } from '@/lib/config'
 
 /**
  * POST /api/debug/sparkloop-test
@@ -77,9 +78,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const service = new SparkLoopService()
-    const stored = await service.getStoredRecommendations(
-      'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
-    )
+    const stored = await service.getStoredRecommendations(PUBLICATION_ID)
 
     const active = stored.filter(r => r.status === 'active' && !(r as any).excluded)
 

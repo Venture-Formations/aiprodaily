@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicationSettings, updatePublicationSetting } from '@/lib/publication-settings'
 import { SparkLoopService } from '@/lib/sparkloop-client'
-
-// Default publication ID for AI Pro Daily
-const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+import { PUBLICATION_ID } from '@/lib/config'
 
 // Hardcoded fallbacks if no publication_settings exist
 const FALLBACK_DEFAULT_CR = 22
@@ -23,7 +21,7 @@ export async function GET(request: NextRequest) {
     let query = supabaseAdmin
       .from('sparkloop_recommendations')
       .select('*')
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('publication_id', PUBLICATION_ID)
 
     if (filter === 'active') {
       query = query.eq('status', 'active').or('excluded.is.null,excluded.eq.false')
@@ -40,7 +38,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Load configurable defaults from publication_settings
-    const defaults = await getPublicationSettings(DEFAULT_PUBLICATION_ID, [
+    const defaults = await getPublicationSettings(PUBLICATION_ID, [
       'sparkloop_default_cr',
       'sparkloop_default_rcr',
     ])
@@ -107,7 +105,7 @@ export async function GET(request: NextRequest) {
     const { data: allData } = await supabaseAdmin
       .from('sparkloop_recommendations')
       .select('status, excluded')
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('publication_id', PUBLICATION_ID)
 
     // Query unique IPs and avg offers from sparkloop_events
     let uniqueIpsByRefCode: Record<string, number> = {}
@@ -119,7 +117,7 @@ export async function GET(request: NextRequest) {
       const { data: subscribeEvents } = await supabaseAdmin
         .from('sparkloop_events')
         .select('raw_payload')
-        .eq('publication_id', DEFAULT_PUBLICATION_ID)
+        .eq('publication_id', PUBLICATION_ID)
         .eq('event_type', 'api_subscribe_confirmed')
 
       if (subscribeEvents && subscribeEvents.length > 0) {
@@ -153,7 +151,7 @@ export async function GET(request: NextRequest) {
       const { data: successEvents } = await supabaseAdmin
         .from('sparkloop_events')
         .select('raw_payload')
-        .eq('publication_id', DEFAULT_PUBLICATION_ID)
+        .eq('publication_id', PUBLICATION_ID)
         .eq('event_type', 'subscriptions_success')
 
       if (successEvents && successEvents.length > 0) {
@@ -183,8 +181,8 @@ export async function GET(request: NextRequest) {
 
     // Calculate rolling window metrics (14D and 30D) in parallel
     const [metrics14d, metrics30d] = await Promise.all([
-      SparkLoopService.calculateRollingWindowMetrics(14, DEFAULT_PUBLICATION_ID),
-      SparkLoopService.calculateRollingWindowMetrics(30, DEFAULT_PUBLICATION_ID),
+      SparkLoopService.calculateRollingWindowMetrics(14, PUBLICATION_ID),
+      SparkLoopService.calculateRollingWindowMetrics(30, PUBLICATION_ID),
     ])
 
     // Merge rolling metrics into each recommendation
@@ -261,7 +259,7 @@ export async function PATCH(request: NextRequest) {
             { status: 400 }
           )
         }
-        await updatePublicationSetting(DEFAULT_PUBLICATION_ID, 'sparkloop_default_cr', String(val))
+        await updatePublicationSetting(PUBLICATION_ID, 'sparkloop_default_cr', String(val))
         results.push(`CR=${val}%`)
       }
       if ('default_rcr' in body && body.default_rcr !== undefined) {
@@ -272,7 +270,7 @@ export async function PATCH(request: NextRequest) {
             { status: 400 }
           )
         }
-        await updatePublicationSetting(DEFAULT_PUBLICATION_ID, 'sparkloop_default_rcr', String(val))
+        await updatePublicationSetting(PUBLICATION_ID, 'sparkloop_default_rcr', String(val))
         results.push(`RCR=${val}%`)
       }
       console.log(`[SparkLoop Admin] Updated defaults: ${results.join(', ')}`)

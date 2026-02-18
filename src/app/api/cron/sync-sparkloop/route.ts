@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SparkLoopService } from '@/lib/sparkloop-client'
-
-// Default publication ID for AI Pro Daily
-const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+import { PUBLICATION_ID } from '@/lib/config'
 
 /**
  * GET /api/cron/sync-sparkloop
@@ -24,10 +22,10 @@ export async function GET(request: NextRequest) {
     console.log('[SparkLoop Cron] Starting sync...')
 
     const service = new SparkLoopService()
-    const result = await service.syncRecommendationsToDatabase(DEFAULT_PUBLICATION_ID)
+    const result = await service.syncRecommendationsToDatabase(PUBLICATION_ID)
 
     // Take daily snapshot after sync (idempotent — last sync of the day wins)
-    const snapshotCount = await service.takeDailySnapshot(DEFAULT_PUBLICATION_ID)
+    const snapshotCount = await service.takeDailySnapshot(PUBLICATION_ID)
 
     console.log(`[SparkLoop Cron] Completed: ${result.synced} synced, ${result.outOfBudget} auto-excluded, +${result.confirmDeltas} confirms, +${result.rejectionDeltas} rejections, ${snapshotCount} snapshot rows`)
 

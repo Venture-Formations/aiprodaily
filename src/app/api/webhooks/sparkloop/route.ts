@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SlackNotificationService } from '@/lib/slack'
-
-// Default publication ID (can be overridden via webhook payload or config)
-const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+import { PUBLICATION_ID } from '@/lib/config'
 
 // SparkLoop webhook event types
 const EVENT_TYPES = {
@@ -204,7 +202,7 @@ async function handlePartnerReferral(
     try {
       if (status === 'confirmed') {
         await supabaseAdmin.rpc('record_sparkloop_confirm', {
-          p_publication_id: DEFAULT_PUBLICATION_ID,
+          p_publication_id: PUBLICATION_ID,
           p_ref_code: refCode,
         })
         console.log(`[SparkLoop Webhook] Recorded confirm for ${refCode}`)
@@ -219,7 +217,7 @@ async function handlePartnerReferral(
         )
       } else if (status === 'rejected') {
         await supabaseAdmin.rpc('record_sparkloop_rejection', {
-          p_publication_id: DEFAULT_PUBLICATION_ID,
+          p_publication_id: PUBLICATION_ID,
           p_ref_code: refCode,
         })
         console.log(`[SparkLoop Webhook] Recorded rejection for ${refCode}`)
@@ -315,7 +313,7 @@ async function updateReferralTracking(
     const { data: updated } = await supabaseAdmin
       .from('sparkloop_referrals')
       .update({ status: 'pending', pending_at: now, updated_at: now })
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('publication_id', PUBLICATION_ID)
       .eq('subscriber_email', subscriberEmail)
       .eq('ref_code', refCode)
       .eq('source', 'custom_popup')
@@ -329,7 +327,7 @@ async function updateReferralTracking(
       const { error } = await supabaseAdmin
         .from('sparkloop_referrals')
         .upsert({
-          publication_id: DEFAULT_PUBLICATION_ID,
+          publication_id: PUBLICATION_ID,
           subscriber_email: subscriberEmail,
           ref_code: refCode,
           source: 'webhook_only',
@@ -348,7 +346,7 @@ async function updateReferralTracking(
     const { data: existing } = await supabaseAdmin
       .from('sparkloop_referrals')
       .select('id, source')
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('publication_id', PUBLICATION_ID)
       .eq('subscriber_email', subscriberEmail)
       .eq('ref_code', refCode)
       .limit(1)
@@ -363,7 +361,7 @@ async function updateReferralTracking(
       // Update aggregate columns if it was from our popup
       if (existing.source === 'custom_popup') {
         const { error: confirmErr } = await supabaseAdmin.rpc('record_our_confirm', {
-          p_publication_id: DEFAULT_PUBLICATION_ID,
+          p_publication_id: PUBLICATION_ID,
           p_ref_code: refCode,
         })
         if (confirmErr) console.error('[SparkLoop Webhook] Failed to record our confirm:', confirmErr)
@@ -374,7 +372,7 @@ async function updateReferralTracking(
       await supabaseAdmin
         .from('sparkloop_referrals')
         .upsert({
-          publication_id: DEFAULT_PUBLICATION_ID,
+          publication_id: PUBLICATION_ID,
           subscriber_email: subscriberEmail,
           ref_code: refCode,
           source: 'webhook_only',
@@ -389,7 +387,7 @@ async function updateReferralTracking(
     const { data: existing } = await supabaseAdmin
       .from('sparkloop_referrals')
       .select('id, source')
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('publication_id', PUBLICATION_ID)
       .eq('subscriber_email', subscriberEmail)
       .eq('ref_code', refCode)
       .limit(1)
@@ -403,7 +401,7 @@ async function updateReferralTracking(
 
       if (existing.source === 'custom_popup') {
         const { error: rejErr } = await supabaseAdmin.rpc('record_our_rejection', {
-          p_publication_id: DEFAULT_PUBLICATION_ID,
+          p_publication_id: PUBLICATION_ID,
           p_ref_code: refCode,
         })
         if (rejErr) console.error('[SparkLoop Webhook] Failed to record our rejection:', rejErr)
@@ -413,7 +411,7 @@ async function updateReferralTracking(
       await supabaseAdmin
         .from('sparkloop_referrals')
         .upsert({
-          publication_id: DEFAULT_PUBLICATION_ID,
+          publication_id: PUBLICATION_ID,
           subscriber_email: subscriberEmail,
           ref_code: refCode,
           source: 'webhook_only',
@@ -455,7 +453,7 @@ async function storeEvent(
   const { error } = await supabaseAdmin
     .from('sparkloop_events')
     .insert({
-      publication_id: DEFAULT_PUBLICATION_ID,
+      publication_id: PUBLICATION_ID,
       event_type: eventType,
       event_id: payload.id || payload.event_id,
       subscriber_email: subscriberEmail,

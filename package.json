@@ -8,6 +8,9 @@
     "build:all": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "type-check": "tsc --noEmit",
     "migrate:normalize-ads": "npx tsx scripts/migrate-normalize-ads.ts",
     "migrate:advertorial-to-module": "npx tsx scripts/migrate-advertorial-to-module.ts"
@@ -69,6 +72,9 @@
   },
   "devDependencies": {
     "@types/nodemailer": "^7.0.2",
-    "@types/uuid": "^9.0.8"
+    "@types/uuid": "^9.0.8",
+    "@vitest/coverage-v8": "^4.0.18",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.0.18"
   }
 }

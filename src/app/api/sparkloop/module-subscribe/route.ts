@@ -4,8 +4,7 @@ import { SparkLoopService } from '@/lib/sparkloop-client'
 import { supabaseAdmin } from '@/lib/supabase'
 import { checkUserAgent } from '@/lib/bot-detection'
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
-
-const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+import { PUBLICATION_ID } from '@/lib/config'
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.com'
 
 /**
@@ -48,7 +47,7 @@ export async function GET(request: NextRequest) {
     const { data: exclusions } = await supabaseAdmin
       .from('excluded_ips')
       .select('ip_address, is_range, cidr_prefix')
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('publication_id', PUBLICATION_ID)
 
     if (exclusions && ipAddress) {
       ipExcluded = isIPExcluded(ipAddress, exclusions as IPExclusion[])
@@ -65,7 +64,7 @@ export async function GET(request: NextRequest) {
     .from('sparkloop_module_clicks')
     .insert({
       id: clickRecordId,
-      publication_id: DEFAULT_PUBLICATION_ID,
+      publication_id: PUBLICATION_ID,
       subscriber_email: email,
       ref_code: refCode,
       issue_id: issueId || null,
@@ -90,7 +89,7 @@ export async function GET(request: NextRequest) {
     const { data: rec } = await supabaseAdmin
       .from('sparkloop_recommendations')
       .select('publication_name')
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('publication_id', PUBLICATION_ID)
       .eq('ref_code', refCode)
       .single()
 
@@ -104,7 +103,7 @@ export async function GET(request: NextRequest) {
     const { data: rec } = await supabaseAdmin
       .from('sparkloop_recommendations')
       .select('ref_code, publication_name, status, excluded')
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('publication_id', PUBLICATION_ID)
       .eq('ref_code', refCode)
       .single()
 
@@ -154,7 +153,7 @@ export async function GET(request: NextRequest) {
       await supabaseAdmin
         .from('sparkloop_referrals')
         .upsert({
-          publication_id: DEFAULT_PUBLICATION_ID,
+          publication_id: PUBLICATION_ID,
           subscriber_email: email,
           ref_code: refCode,
           source: 'newsletter_module',
@@ -171,7 +170,7 @@ export async function GET(request: NextRequest) {
     // Record event in sparkloop_events
     try {
       await supabaseAdmin.from('sparkloop_events').insert({
-        publication_id: DEFAULT_PUBLICATION_ID,
+        publication_id: PUBLICATION_ID,
         event_type: 'newsletter_module_subscribe',
         subscriber_email: email,
         raw_payload: {
@@ -191,7 +190,7 @@ export async function GET(request: NextRequest) {
     // Increment our_total_subscribes
     try {
       await supabaseAdmin.rpc('increment_our_subscribes', {
-        p_publication_id: DEFAULT_PUBLICATION_ID,
+        p_publication_id: PUBLICATION_ID,
         p_ref_codes: [refCode],
       })
     } catch (aggErr) {

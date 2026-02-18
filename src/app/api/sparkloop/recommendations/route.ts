@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { SparkLoopService } from '@/lib/sparkloop-client'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicationSettings } from '@/lib/publication-settings'
-
-// Default publication ID for AI Pro Daily
-const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+import { PUBLICATION_ID } from '@/lib/config'
 
 // Hardcoded fallbacks if no publication_settings exist
 const FALLBACK_DEFAULT_CR = 0.22
@@ -25,7 +23,7 @@ export async function GET(request: NextRequest) {
     const { data: recommendations, error } = await supabaseAdmin
       .from('sparkloop_recommendations')
       .select('*')
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('publication_id', PUBLICATION_ID)
       .eq('status', 'active')
       .or('excluded.is.null,excluded.eq.false') // Not excluded
       .not('cpa', 'is', null) // Must have CPA to be useful
@@ -37,13 +35,13 @@ export async function GET(request: NextRequest) {
     if (!recommendations || recommendations.length === 0) {
       console.log('[SparkLoop] No active recommendations in database, syncing from API...')
       const service = new SparkLoopService()
-      await service.syncRecommendationsToDatabase(DEFAULT_PUBLICATION_ID)
+      await service.syncRecommendationsToDatabase(PUBLICATION_ID)
 
       // Retry after sync
       const { data: refreshed } = await supabaseAdmin
         .from('sparkloop_recommendations')
         .select('*')
-        .eq('publication_id', DEFAULT_PUBLICATION_ID)
+        .eq('publication_id', PUBLICATION_ID)
         .eq('status', 'active')
         .not('cpa', 'is', null)
 
@@ -68,7 +66,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Load configurable defaults from publication_settings
-    const defaults = await getPublicationSettings(DEFAULT_PUBLICATION_ID, [
+    const defaults = await getPublicationSettings(PUBLICATION_ID, [
       'sparkloop_default_cr',
       'sparkloop_default_rcr',
     ])

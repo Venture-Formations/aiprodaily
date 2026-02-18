@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicationSettings } from '@/lib/publication-settings'
-
-// Default publication ID for AI Pro Daily
-const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+import { PUBLICATION_ID } from '@/lib/config'
 const FALLBACK_DEFAULT_RCR = 25
 
 interface DailyStats {
@@ -43,7 +41,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Load default RCR from publication_settings
-    const defaults = await getPublicationSettings(DEFAULT_PUBLICATION_ID, [
+    const defaults = await getPublicationSettings(PUBLICATION_ID, [
       'sparkloop_default_rcr',
     ])
     const defaultRcr = defaults.sparkloop_default_rcr
@@ -54,7 +52,7 @@ export async function GET(request: NextRequest) {
     const { data: recommendations } = await supabaseAdmin
       .from('sparkloop_recommendations')
       .select('ref_code, cpa, sparkloop_rcr, override_rcr, our_pending, our_confirms, our_rejections, our_total_subscribes, sparkloop_earnings')
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('publication_id', PUBLICATION_ID)
 
     // Build a lookup: ref_code -> { cpaDollars, rcr }
     const recLookup = new Map<string, { cpaDollars: number; rcr: number }>()
@@ -79,7 +77,7 @@ export async function GET(request: NextRequest) {
       const { data: page } = await supabaseAdmin
         .from('sparkloop_referrals')
         .select('ref_code, status, subscribed_at, confirmed_at')
-        .eq('publication_id', DEFAULT_PUBLICATION_ID)
+        .eq('publication_id', PUBLICATION_ID)
         .in('source', ['custom_popup', 'recs_page'])
         .gte('subscribed_at', fromDate.toISOString())
         .lte('subscribed_at', toDate.toISOString())
@@ -118,7 +116,7 @@ export async function GET(request: NextRequest) {
       const { data: snapPage } = await supabaseAdmin
         .from('sparkloop_daily_snapshots')
         .select('snapshot_date, sparkloop_pending, sparkloop_confirmed, sparkloop_rejected')
-        .eq('publication_id', DEFAULT_PUBLICATION_ID)
+        .eq('publication_id', PUBLICATION_ID)
         .gte('snapshot_date', snapshotFromDate.toISOString().split('T')[0])
         .lte('snapshot_date', toDate.toISOString().split('T')[0])
         .order('snapshot_date', { ascending: true })
@@ -202,7 +200,7 @@ export async function GET(request: NextRequest) {
     const { data: topRecs } = await supabaseAdmin
       .from('sparkloop_recommendations')
       .select('publication_name, publication_logo, our_confirms, sparkloop_earnings')
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('publication_id', PUBLICATION_ID)
       .gt('sparkloop_earnings', 0)
       .order('sparkloop_earnings', { ascending: false })
       .limit(9)

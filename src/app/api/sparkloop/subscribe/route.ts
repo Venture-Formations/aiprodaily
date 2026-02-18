@@ -3,9 +3,7 @@ import { createHash } from 'crypto'
 import { SparkLoopService } from '@/lib/sparkloop-client'
 import { supabaseAdmin } from '@/lib/supabase'
 import { MailerLiteService } from '@/lib/mailerlite'
-
-// Default publication ID for AI Pro Daily
-const DEFAULT_PUBLICATION_ID = 'eaaf8ba4-a3eb-4fff-9cad-6776acc36dcf'
+import { PUBLICATION_ID } from '@/lib/config'
 
 /**
  * POST /api/sparkloop/subscribe
@@ -52,7 +50,7 @@ export async function POST(request: NextRequest) {
     const { data: activeRecs } = await supabaseAdmin
       .from('sparkloop_recommendations')
       .select('ref_code')
-      .eq('publication_id', DEFAULT_PUBLICATION_ID)
+      .eq('publication_id', PUBLICATION_ID)
       .eq('status', 'active')
       .or('excluded.is.null,excluded.eq.false')
       .in('ref_code', refCodes)
@@ -102,7 +100,7 @@ export async function POST(request: NextRequest) {
     // Record the SparkLoop API confirmation as a server-side event
     try {
       await supabaseAdmin.from('sparkloop_events').insert({
-        publication_id: DEFAULT_PUBLICATION_ID,
+        publication_id: PUBLICATION_ID,
         event_type: 'api_subscribe_confirmed',
         subscriber_email: email,
         raw_payload: {
@@ -129,7 +127,7 @@ export async function POST(request: NextRequest) {
         ? 'increment_sparkloop_page_submissions'
         : 'increment_sparkloop_submissions'
       await supabaseAdmin.rpc(submissionRpc, {
-        p_publication_id: DEFAULT_PUBLICATION_ID,
+        p_publication_id: PUBLICATION_ID,
         p_ref_codes: activeRefCodes,
       })
       console.log(`[SparkLoop Subscribe] Recorded ${activeRefCodes.length} ${submissionSource === 'recs_page' ? 'page' : 'popup'} submissions`)
@@ -141,7 +139,7 @@ export async function POST(request: NextRequest) {
     // Record referral rows in sparkloop_referrals (one per ref_code)
     try {
       const referralRows = activeRefCodes.map((refCode: string) => ({
-        publication_id: DEFAULT_PUBLICATION_ID,
+        publication_id: PUBLICATION_ID,
         subscriber_email: email,
         ref_code: refCode,
         source: submissionSource,
@@ -158,7 +156,7 @@ export async function POST(request: NextRequest) {
       } else {
         // Increment our_total_subscribes and our_pending on recommendations
         const { error: aggError } = await supabaseAdmin.rpc('increment_our_subscribes', {
-          p_publication_id: DEFAULT_PUBLICATION_ID,
+          p_publication_id: PUBLICATION_ID,
           p_ref_codes: activeRefCodes,
         })
         if (aggError) {
