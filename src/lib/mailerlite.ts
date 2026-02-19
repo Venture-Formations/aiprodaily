@@ -572,7 +572,7 @@ United States
         name: `[TEST] ${newsletterName} Newsletter: ${issue.date}`,
         type: 'regular',
         emails: [{
-          subject: `[TEST] ${subjectEmoji} ${subjectLine}`,
+          subject: `${subjectEmoji} ${subjectLine}`,
           from_name: senderName,
           from: fromEmail,
           content: emailContent,
