@@ -72,7 +72,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Also alias module_articles as 'articles' for frontend compatibility
     const transformedIssue = {
       ...issue,
-      articles: issue.module_articles || [], // Frontend expects 'articles' property
+      articles: (issue.module_articles || []).filter((a: any) => a && a.id), // Frontend expects 'articles' property
       secondary_articles: [], // No longer used, but keep for compatibility
       email_metrics: Array.isArray(issue.email_metrics) && issue.email_metrics.length > 0
         ? issue.email_metrics[0]

@@ -547,7 +547,8 @@ export async function generateSecondaryArticlesSection(issue: any, sectionName: 
 
 export async function generateArticleModuleSection(
   issue: any,
-  moduleId: string
+  moduleId: string,
+  includeUnsubscribeLink: boolean = false
 ): Promise<string> {
   // Fetch the article mod
   const { data: mod } = await supabaseAdmin
@@ -660,6 +661,11 @@ export async function generateArticleModuleSection(
             ${articlesHtml}
           </td>
         </tr>
+        ${includeUnsubscribeLink ? `<tr>
+          <td style="text-align: center; padding: 4px 10px 8px 10px;">
+            <a href="{$unsubscribe}" style="font-size: 9px; color: #f3f3f3; text-decoration: none; font-family: ${bodyFont};">unsubscribe</a>
+          </td>
+        </tr>` : ''}
       </table>
     </td>
   </tr>
@@ -1591,11 +1597,11 @@ export async function generateTextBoxModuleSection(
     // Get all text box selections for this issue
     const selections = await TextBoxModuleSelector.getIssueSelections(issue.id)
 
-    // Find the selection for this specific mod (match by mod.id)
-    const selection = selections.find(s => s.mod?.id === moduleId)
+    // Find the selection for this specific module (match by module.id)
+    const selection = selections.find(s => s.module?.id === moduleId)
 
-    if (!selection || !selection.mod) {
-      console.log(`[TextBoxModules] No selection/mod found for mod ${moduleId} in issue ${issue.id}`)
+    if (!selection || !selection.module) {
+      console.log(`[TextBoxModules] No selection/module found for module ${moduleId} in issue ${issue.id}`)
       return ''
     }
 
@@ -1605,9 +1611,9 @@ export async function generateTextBoxModuleSection(
       issueBlocksMap.set(issueBlock.text_box_block_id, issueBlock)
     }
 
-    // Render the text box mod
+    // Render the text box module
     const result = await TextBoxModuleRenderer.renderModule(
-      selection.mod,
+      selection.module,
       selection.blocks || [],
       issueBlocksMap,
       issue.publication_id,
@@ -1825,15 +1831,23 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
   </tr>
 </table>` : ''
 
-  // Generate honeypot link for bot detection (invisible to humans)
+  // Generate honeypot link for bot detection (disguised as comma in address)
   const honeypotUrl = issueDate
     ? wrapTrackingUrl(HONEYPOT_CONFIG.DUMMY_URL, HONEYPOT_CONFIG.SECTION_NAME, issueDate, issueId)
     : null
 
-  const honeypotHtml = honeypotUrl ? `
-<div style="display:none;position:absolute;left:-9999px;visibility:hidden;height:0;width:0;overflow:hidden;">
-  <a href="${honeypotUrl}" tabindex="-1" aria-hidden="true">.</a>
-</div>` : ''
+  // Split address at "Saint Joseph," to embed honeypot as the comma
+  // The comma becomes an invisible-looking link that only bots will click
+  const addressParts = honeypotUrl ? (() => {
+    const commaTarget = 'Saint Joseph,'
+    const idx = businessAddress.indexOf(commaTarget)
+    if (idx !== -1) {
+      const before = businessAddress.slice(0, idx + 'Saint Joseph'.length)
+      const after = businessAddress.slice(idx + commaTarget.length)
+      return { before, after, found: true }
+    }
+    return { before: businessAddress, after: '', found: false }
+  })() : null
 
   return `
 ${socialMediaSection}
@@ -1845,14 +1859,10 @@ ${socialMediaSection}
         <a href="${websiteUrl}/unsubscribe?email={$email}" style='text-decoration: underline;'>Manage Preferences</a> | <a href="${websiteUrl}/unsubscribe?email={$email}" style='text-decoration: underline;'>Unsubscribe</a>
       </p>
       <p style="margin: 5px 0 0;text-align: center;">©${currentYear} {$account}, all rights reserved</p>
-      <p style="margin: 2px 0 0;text-align: center;">${businessAddress}</p>
+      <p style="margin: 2px 0 0;text-align: center;">${addressParts?.found ? `${addressParts.before}<a href="${honeypotUrl}" style="font-family: Arial, sans-serif; font-size: 12px; color: #777; text-decoration: none;">,</a>${addressParts.after}` : businessAddress}</p>
     </td>
   </tr>
 </table>
-${honeypotHtml}
-<div style="display:none;position:absolute;left:-9999px;visibility:hidden;height:0;width:0;overflow:hidden;">
-  <a href="{$unsubscribe}" tabindex="-1" aria-hidden="true">unsubscribe</a>
-</div>
   </div>
 </body>
 </html>`
@@ -2043,6 +2053,7 @@ export async function generateFullNewsletterHtml(
 
     // Generate sections in order based on merged configuration
     let sectionsHtml = ''
+    let articleModuleCount = 0
     for (const item of allItems) {
       if (item.type === 'ad_module') {
         // Generate single ad mod section
@@ -2063,8 +2074,9 @@ export async function generateFullNewsletterHtml(
           sectionsHtml += promptModuleHtml
         }
       } else if (item.type === 'article_module') {
-        // Generate single article mod section
-        const articleModuleHtml = await generateArticleModuleSection(issue, item.data.id)
+        // Generate single article mod section (second one / Updates in AI gets the unsubscribe link)
+        articleModuleCount++
+        const articleModuleHtml = await generateArticleModuleSection(issue, item.data.id, articleModuleCount === 2)
         if (articleModuleHtml) {
           sectionsHtml += articleModuleHtml
         }

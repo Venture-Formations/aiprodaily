@@ -1395,7 +1395,16 @@ export default function IssueDetailPage() {
         throw new Error('Failed to fetch issue')
       }
       const data = await response.json()
-      setissue(data.issue)
+      const issueData = data.issue
+      // Debug: log articles shape to help diagnose render crashes
+      if (issueData?.articles) {
+        const nullArticles = issueData.articles.filter((a: any) => !a || !a.id)
+        if (nullArticles.length > 0) {
+          console.error('[Issue Page] Found null/invalid articles in API response:', nullArticles.length)
+          issueData.articles = issueData.articles.filter((a: any) => a && a.id)
+        }
+      }
+      setissue(issueData)
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error')
     } finally {
@@ -2254,7 +2263,7 @@ export default function IssueDetailPage() {
                   {formatStatus(issue.status)}
                 </span>
                 <span className="text-sm text-gray-500">
-                  {issue.articles.filter(a => a.is_active && !a.skipped).length}/{totalMaxArticles} selected
+                  {(issue.articles || []).filter(a => a?.is_active && !a?.skipped).length}/{totalMaxArticles} selected
                 </span>
               </div>
             </div>
