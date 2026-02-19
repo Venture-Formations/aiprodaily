@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
           'sendgrid_review_list_id': 'sendgridReviewListId',
           'sendgrid_main_list_id': 'sendgridMainListId',
           'sendgrid_secondary_list_id': 'sendgridSecondaryListId',
+          'sendgrid_test_list_id': 'sendgridTestListId',
           'sendgrid_sender_id': 'sendgridSenderId',
           'sendgrid_unsubscribe_group_id': 'sendgridUnsubscribeGroupId'
         }
@@ -75,6 +76,7 @@ export async function GET(request: NextRequest) {
           'mailerlite_review_group_id': 'mailerliteReviewGroupId',
           'mailerlite_main_group_id': 'mailerliteMainGroupId',
           'mailerlite_secondary_group_id': 'mailerliteSecondaryGroupId',
+          'mailerlite_test_group_id': 'mailerliteTestGroupId',
           // Legacy key - map to main group
           'mailerlite_group_id': 'mailerliteMainGroupId'
         }
@@ -114,11 +116,13 @@ export async function GET(request: NextRequest) {
       mailerliteReviewGroupId: '',
       mailerliteMainGroupId: '',
       mailerliteSecondaryGroupId: '',
+      mailerliteTestGroupId: '',
 
       // SendGrid Settings
       sendgridReviewListId: '',
       sendgridMainListId: '',
       sendgridSecondaryListId: '',
+      sendgridTestListId: '',
       sendgridSenderId: '',
       sendgridUnsubscribeGroupId: '',
 
@@ -453,11 +457,13 @@ export async function POST(request: NextRequest) {
       { key: 'mailerlite_review_group_id', value: settings.mailerliteReviewGroupId || '' },
       { key: 'mailerlite_main_group_id', value: settings.mailerliteMainGroupId || '' },
       { key: 'mailerlite_secondary_group_id', value: settings.mailerliteSecondaryGroupId || '' },
+      { key: 'mailerlite_test_group_id', value: settings.mailerliteTestGroupId || '' },
 
       // SendGrid Settings
       { key: 'sendgrid_review_list_id', value: settings.sendgridReviewListId || '' },
       { key: 'sendgrid_main_list_id', value: settings.sendgridMainListId || '' },
       { key: 'sendgrid_secondary_list_id', value: settings.sendgridSecondaryListId || '' },
+      { key: 'sendgrid_test_list_id', value: settings.sendgridTestListId || '' },
       { key: 'sendgrid_sender_id', value: settings.sendgridSenderId || '' },
       { key: 'sendgrid_unsubscribe_group_id', value: settings.sendgridUnsubscribeGroupId || '' },
 

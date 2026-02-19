@@ -1315,11 +1315,13 @@ function EmailSettings() {
     mailerliteReviewGroupId: '',
     mailerliteMainGroupId: '',
     mailerliteSecondaryGroupId: '',
+    mailerliteTestGroupId: '',
 
     // SendGrid Settings
     sendgridReviewListId: '',
     sendgridMainListId: '',
     sendgridSecondaryListId: '',
+    sendgridTestListId: '',
     sendgridSenderId: '',
     sendgridUnsubscribeGroupId: '',
 
@@ -1923,6 +1925,19 @@ function EmailSettings() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
             />
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Test Group ID
+            </label>
+            <input
+              type="text"
+              value={settings.mailerliteTestGroupId}
+              onChange={(e) => handleChange('mailerliteTestGroupId', e.target.value)}
+              placeholder="MailerLite group ID for test sends"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+          </div>
         </div>
       </div>
 
@@ -1973,6 +1988,19 @@ function EmailSettings() {
               value={settings.sendgridSecondaryListId}
               onChange={(e) => handleChange('sendgridSecondaryListId', e.target.value)}
               placeholder="SendGrid list ID for secondary sends"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Test List ID
+            </label>
+            <input
+              type="text"
+              value={settings.sendgridTestListId}
+              onChange={(e) => handleChange('sendgridTestListId', e.target.value)}
+              placeholder="SendGrid list ID for test sends"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-primary"
             />
           </div>

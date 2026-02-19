@@ -551,6 +551,102 @@ United States
     }
   }
 
+  async createTestIssue(issue: issueWithEvents, testGroupId: string) {
+    try {
+      console.log(`[MailerLite] Creating test issue for ${issue.date}`)
+
+      // Get newsletter slug for issue naming
+      const { data: dbissue } = await supabaseAdmin
+        .from('publication_issues')
+        .select('newsletters(slug)')
+        .eq('id', issue.id)
+        .single()
+
+      const newsletterSlug = (dbissue as any)?.newsletters?.slug || 'newsletter'
+      const newsletterName = newsletterSlug.charAt(0).toUpperCase() + newsletterSlug.slice(1)
+
+      // Get sender settings from publication_settings
+      const emailSettings = await getEmailSettings(issue.publication_id)
+      const senderName = emailSettings.sender_name
+      const fromEmail = emailSettings.from_email
+      const subjectEmoji = emailSettings.subject_line_emoji || '🧮'
+
+      const emailContent = await this.generateEmailHTML(issue, false)
+
+      const subjectLine = issue.subject_line || `Newsletter - ${new Date(issue.date).toLocaleDateString()}`
+
+      const issueData = {
+        name: `[TEST] ${newsletterName} Newsletter: ${issue.date}`,
+        type: 'regular',
+        emails: [{
+          subject: `[TEST] ${subjectEmoji} ${subjectLine}`,
+          from_name: senderName,
+          from: fromEmail,
+          content: emailContent,
+        }],
+        groups: [testGroupId]
+      }
+
+      console.log('[MailerLite] Creating test campaign with data:', {
+        name: issueData.name,
+        subject: issueData.emails[0].subject,
+        groupId: testGroupId
+      })
+
+      const response = await mailerliteClient.post('/campaigns', issueData)
+
+      if (response.data && response.data.data && response.data.data.id) {
+        const campaignId = response.data.data.id
+        console.log('[MailerLite] Test campaign created:', campaignId)
+
+        // Push content with plain text
+        const plainText = await this.generatePlainText(issue.publication_id, senderName)
+        await this.pushCampaignContent(campaignId, emailContent, plainText)
+
+        // Schedule for now + 2 minutes
+        const timezoneIdStr = await getPublicationSetting(issue.publication_id, 'email_timezone_id')
+        const timezoneId = timezoneIdStr ? parseInt(timezoneIdStr, 10) : 157
+
+        const nowCentral = new Date().toLocaleString("en-US", { timeZone: "America/Chicago" })
+        const centralDate = new Date(nowCentral)
+        centralDate.setMinutes(centralDate.getMinutes() + 2)
+
+        const date = centralDate.toISOString().split('T')[0]
+        const hours = String(centralDate.getHours()).padStart(2, '0')
+        const minutes = String(centralDate.getMinutes()).padStart(2, '0')
+
+        const scheduleData = {
+          delivery: 'scheduled',
+          schedule: {
+            date,
+            hours,
+            minutes,
+            timezone_id: timezoneId
+          }
+        }
+
+        console.log('[MailerLite] Scheduling test campaign:', scheduleData)
+
+        try {
+          const scheduleResponse = await mailerliteClient.post(`/campaigns/${campaignId}/schedule`, scheduleData)
+          if (scheduleResponse.status === 200 || scheduleResponse.status === 201) {
+            console.log('[MailerLite] Test campaign scheduled successfully')
+          }
+        } catch (scheduleError: any) {
+          console.error('[MailerLite] Failed to schedule test campaign:', scheduleError?.response?.data || scheduleError)
+        }
+
+        return { success: true, campaignId }
+      }
+
+      throw new Error('Failed to create test campaign')
+
+    } catch (error) {
+      console.error('[MailerLite] Failed to create test issue:', error)
+      throw error
+    }
+  }
+
   async createFinalissue(issue: issueWithEvents, mainGroupId: string, isSecondary: boolean = false) {
     try {
       console.log(`Creating ${isSecondary ? 'secondary' : 'final'} issue for ${issue.date}`)
