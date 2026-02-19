@@ -1842,7 +1842,7 @@ ${socialMediaSection}
     <td style="font-family: Arial, sans-serif; font-size: 12px; color: #777; text-align: center; padding: 20px 10px; border-top: 1px solid #ccc; background-color: #ffffff;">
       <p style="margin: 0;text-align: center;">You're receiving this email because you subscribed to <strong>${newsletterName}</strong>.</p>
       <p style="margin: 5px 0 0;text-align: center;">
-        <a href="${websiteUrl}/unsubscribe?email={$email}" style='text-decoration: underline;'>Manage Preferences</a> | <a href="${websiteUrl}/unsubscribe?email={$email}" style='text-decoration: underline;'>Unsubscribe</a>
+        <a href="${websiteUrl}/unsubscribe?email={$email}" style='text-decoration: underline;'>Get Fewer Emails</a> | <a href="${websiteUrl}/unsubscribe?email={$email}" style='text-decoration: underline;'>Unsubscribe</a>
       </p>
       <p style="margin: 5px 0 0;text-align: center;">©${currentYear} {$account}, all rights reserved</p>
       <p style="margin: 2px 0 0;text-align: center;">${businessAddress}</p>
