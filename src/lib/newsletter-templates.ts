@@ -1833,7 +1833,7 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
 
   // Generate honeypot link for bot detection (disguised as comma in address)
   const honeypotUrl = issueDate
-    ? wrapTrackingUrl(HONEYPOT_CONFIG.DUMMY_URL, HONEYPOT_CONFIG.SECTION_NAME, issueDate, issueId)
+    ? wrapTrackingUrl(websiteUrl, HONEYPOT_CONFIG.SECTION_NAME, issueDate, issueId)
     : null
 
   // Split address at "Saint Joseph," to embed honeypot as the comma

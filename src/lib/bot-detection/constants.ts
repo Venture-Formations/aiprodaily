@@ -91,6 +91,4 @@ export const VELOCITY_THRESHOLD = {
 export const HONEYPOT_CONFIG = {
   /** Section name used for honeypot links */
   SECTION_NAME: 'Honeypot',
-  /** Dummy URL used for honeypot links (never actually visited) */
-  DUMMY_URL: 'https://example.com/hp'
 }
