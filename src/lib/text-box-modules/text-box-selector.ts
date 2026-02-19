@@ -150,7 +150,7 @@ export class TextBoxModuleSelector {
    * Get issue text box mod selections with full details
    */
   static async getIssueSelections(issueId: string): Promise<{
-    mod: TextBoxModule
+    module: TextBoxModule
     blocks: TextBoxBlock[]
     issueBlocks: IssueTextBoxBlock[]
   }[]> {
@@ -203,11 +203,11 @@ export class TextBoxModuleSelector {
       }
 
       return {
-        mod: mod as TextBoxModule,
+        module: mod as TextBoxModule,
         blocks: blocks as TextBoxBlock[],
         issueBlocks: mappedIssueBlocks
       }
-    }).filter(item => item.mod)
+    }).filter(item => item.module)
 
     console.log(`[TextBoxSelector] Returning ${results.length} modules with selections`)
     return results
