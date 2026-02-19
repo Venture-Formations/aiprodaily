@@ -1287,6 +1287,8 @@ export default function IssueDetailPage() {
   const [editingSubject, setEditingSubject] = useState(false)
   const [editSubjectValue, setEditSubjectValue] = useState('')
   const [savingSubject, setSavingSubject] = useState(false)
+  const [sendingTest, setSendingTest] = useState(false)
+  const [testSendStatus, setTestSendStatus] = useState('')
 
   // Events state
   const [issueEvents, setissueEvents] = useState<issueEvent[]>([])
@@ -1822,6 +1824,34 @@ export default function IssueDetailPage() {
     }
   }
 
+  const sendTestEmail = async () => {
+    if (!issue) return
+
+    setSendingTest(true)
+    setTestSendStatus('')
+    try {
+      const response = await fetch(`/api/campaigns/${issue.id}/send-test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || 'Failed to send test email')
+        return
+      }
+
+      setTestSendStatus('Test email scheduled! Check your inbox in ~2 minutes.')
+      setTimeout(() => setTestSendStatus(''), 10000)
+    } catch (err) {
+      alert('Failed to send test email. Check console for details.')
+      console.error('Send test email error:', err)
+    } finally {
+      setSendingTest(false)
+    }
+  }
+
   const processRSSFeeds = async () => {
     if (!issue) return
 
@@ -2269,6 +2299,13 @@ export default function IssueDetailPage() {
             </div>
             <div className="flex space-x-2">
               <button
+                onClick={sendTestEmail}
+                disabled={sendingTest || saving || issue.status === 'processing'}
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium"
+              >
+                {sendingTest ? 'Sending...' : 'Send Test Email'}
+              </button>
+              <button
                 onClick={processRSSFeeds}
                 disabled={processing || saving || generatingSubject || issue.status === 'processing'}
                 className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium"
@@ -2294,6 +2331,12 @@ export default function IssueDetailPage() {
           {processingStatus && (
             <div className="text-sm text-blue-600 font-medium mt-3 text-center">
               {processingStatus}
+            </div>
+          )}
+
+          {testSendStatus && (
+            <div className="text-sm text-green-600 font-medium mt-3 text-center">
+              {testSendStatus}
             </div>
           )}
 
