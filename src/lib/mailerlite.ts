@@ -105,15 +105,15 @@ United States
     try {
       console.log(`Creating review issue for ${issue.date}`)
 
-      // Get newsletter slug for issue naming
-      const { data: dbissue } = await supabaseAdmin
-        .from('publication_issues')
-        .select('newsletters(slug)')
-        .eq('id', issue.id)
+      // Get newsletter name from publications table
+      const { data: publication } = await supabaseAdmin
+        .from('publications')
+        .select('slug')
+        .eq('id', issue.publication_id)
         .single()
-
-      const newsletterSlug = (dbissue as any)?.newsletters?.slug || 'accounting'
-      const newsletterName = newsletterSlug.charAt(0).toUpperCase() + newsletterSlug.slice(1)
+      const newsletterName = publication?.slug
+        ? publication.slug.charAt(0).toUpperCase() + publication.slug.slice(1)
+        : 'Newsletter'
 
       // Get sender and group settings from publication_settings (with fallback to app_settings)
       const emailSettings = await getEmailSettings(issue.publication_id)
@@ -555,15 +555,15 @@ United States
     try {
       console.log(`[MailerLite] Creating test issue for ${issue.date}`)
 
-      // Get newsletter slug for issue naming
-      const { data: dbissue } = await supabaseAdmin
-        .from('publication_issues')
-        .select('newsletters(slug)')
-        .eq('id', issue.id)
+      // Get newsletter name from publications table
+      const { data: testPublication } = await supabaseAdmin
+        .from('publications')
+        .select('slug')
+        .eq('id', issue.publication_id)
         .single()
-
-      const newsletterSlug = (dbissue as any)?.newsletters?.slug || 'newsletter'
-      const newsletterName = newsletterSlug.charAt(0).toUpperCase() + newsletterSlug.slice(1)
+      const newsletterName = testPublication?.slug
+        ? testPublication.slug.charAt(0).toUpperCase() + testPublication.slug.slice(1)
+        : 'Newsletter'
 
       // Get sender settings from publication_settings
       const emailSettings = await getEmailSettings(issue.publication_id)
@@ -579,7 +579,7 @@ United States
         name: `[TEST] ${newsletterName} Newsletter: ${issue.date}`,
         type: 'regular',
         emails: [{
-          subject: `[TEST] ${subjectEmoji} ${subjectLine}`,
+          subject: `${subjectEmoji} ${subjectLine}`,
           from_name: senderName,
           from: fromEmail,
           content: emailContent,
@@ -651,15 +651,15 @@ United States
     try {
       console.log(`Creating ${isSecondary ? 'secondary' : 'final'} issue for ${issue.date}`)
 
-      // Get newsletter slug for issue naming
-      const { data: dbissue } = await supabaseAdmin
-        .from('publication_issues')
-        .select('newsletters(slug)')
-        .eq('id', issue.id)
+      // Get newsletter name from publications table
+      const { data: finalPublication } = await supabaseAdmin
+        .from('publications')
+        .select('slug')
+        .eq('id', issue.publication_id)
         .single()
-
-      const newsletterSlug = (dbissue as any)?.newsletters?.slug || 'accounting'
-      const newsletterName = newsletterSlug.charAt(0).toUpperCase() + newsletterSlug.slice(1)
+      const newsletterName = finalPublication?.slug
+        ? finalPublication.slug.charAt(0).toUpperCase() + finalPublication.slug.slice(1)
+        : 'Newsletter'
 
       // Get sender settings from publication_settings (with fallback to app_settings)
       const emailSettings = await getEmailSettings(issue.publication_id)
