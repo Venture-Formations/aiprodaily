@@ -260,7 +260,7 @@ export async function generateNewsletterHeader(formattedDate: string, issueDate?
       <table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif;">
         <tr>
           <td align="center" style="padding:0;background:${primaryColor};border-radius:10px;">
-            <img alt="${newsletterName}" src="${headerImageUrl}" style="display:block;width:100%;max-width:500px;height:auto;margin:0 auto;" />
+            ${headerImageUrl ? `<img alt="${newsletterName}" src="${headerImageUrl}" style="display:block;width:100%;max-width:500px;height:auto;margin:0 auto;" />` : `<div style="padding:20px 0;color:#fff;font-size:24px;font-weight:bold;">${newsletterName}</div>`}
           </td>
         </tr>
       </table>

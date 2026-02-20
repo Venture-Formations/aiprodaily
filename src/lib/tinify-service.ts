@@ -46,6 +46,7 @@ export async function optimizeBuffer(
       method: 'POST',
       headers: { Authorization: auth },
       body: new Uint8Array(buffer),
+      signal: AbortSignal.timeout(15_000),
     })
 
     if (!shrinkRes.ok) {
@@ -71,6 +72,7 @@ export async function optimizeBuffer(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ resize }),
+        signal: AbortSignal.timeout(15_000),
       })
 
       if (!resizeRes.ok) {
@@ -83,6 +85,7 @@ export async function optimizeBuffer(
 
     const downloadRes = await fetch(outputUrl, {
       headers: { Authorization: auth },
+      signal: AbortSignal.timeout(15_000),
     })
 
     if (!downloadRes.ok) {
