@@ -5,29 +5,41 @@ export async function POST(request: NextRequest) {
   try {
     console.log('=== SETTING UP SUPABASE STORAGE ===')
 
-    // Create the newsletter-images bucket
-    const { data: bucket, error: createError } = await supabaseAdmin.storage
-      .createBucket('newsletter-images', {
-        public: true,
-        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-        fileSizeLimit: 5242880 // 5MB
-      })
+    const bucketsToCreate = [
+      {
+        name: 'img',
+        options: {
+          public: true,
+          allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
+          fileSizeLimit: 10485760, // 10MB
+        }
+      },
+      {
+        name: 'newsletter-images',
+        options: {
+          public: true,
+          allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+          fileSizeLimit: 5242880, // 5MB
+        }
+      },
+    ]
 
-    if (createError && createError.message !== 'Bucket already exists') {
-      console.error('Failed to create bucket:', createError)
-      return NextResponse.json({
-        success: false,
-        error: createError.message
-      }, { status: 500 })
+    const results: Record<string, string> = {}
+
+    for (const { name, options } of bucketsToCreate) {
+      const { error } = await supabaseAdmin.storage.createBucket(name, options)
+
+      if (error && !error.message.includes('already exists')) {
+        results[name] = `Error: ${error.message}`
+      } else {
+        results[name] = error ? 'Already exists' : 'Created'
+      }
     }
-
-    console.log('Bucket created or already exists:', bucket)
 
     return NextResponse.json({
       success: true,
-      message: 'Supabase Storage bucket "newsletter-images" is ready',
-      bucket: bucket,
-      note: 'You can now process RSS feeds and images will be hosted in Supabase Storage'
+      message: 'Storage buckets configured',
+      buckets: results,
     })
 
   } catch (error) {

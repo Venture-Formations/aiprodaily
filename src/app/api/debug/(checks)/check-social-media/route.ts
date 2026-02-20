@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { STORAGE_PUBLIC_URL } from '@/lib/config'
 
 export async function GET() {
   try {
@@ -28,10 +29,10 @@ export async function GET() {
 
     // Test if images exist at GitHub URLs
     const imageUrls = [
-      'https://raw.githubusercontent.com/Venture-Formations/aiprodaily/refs/heads/main/facebook_light.png',
-      'https://raw.githubusercontent.com/Venture-Formations/aiprodaily/refs/heads/main/twitter_light.png',
-      'https://raw.githubusercontent.com/Venture-Formations/aiprodaily/refs/heads/main/linkedin_light.png',
-      'https://raw.githubusercontent.com/Venture-Formations/aiprodaily/refs/heads/main/instagram_light.png'
+      `${STORAGE_PUBLIC_URL}/img/s/facebook_light.png`,
+      `${STORAGE_PUBLIC_URL}/img/s/twitter_light.png`,
+      `${STORAGE_PUBLIC_URL}/img/s/linkedin_light.png`,
+      `${STORAGE_PUBLIC_URL}/img/s/instagram_light.png`
     ]
 
     const imageTests = await Promise.all(

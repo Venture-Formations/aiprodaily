@@ -2,7 +2,7 @@ import Parser from 'rss-parser'
 import { supabaseAdmin } from './supabase'
 import { AI_CALL, callAIWithPrompt, callWithStructuredPrompt, AI_PROMPTS, callOpenAI } from './openai'
 import { ErrorHandler, SlackNotificationService } from './slack'
-import { GitHubImageStorage } from './github-storage'
+import { SupabaseImageStorage } from './supabase-image-storage'
 import { ArticleArchiveService } from './article-archive'
 import { ArticleExtractor } from './article-extractor'
 import { Deduplicator } from './deduplicator'
@@ -31,7 +31,7 @@ const parser = new Parser({
 export class RSSProcessor {
   private errorHandler: ErrorHandler
   private slack: SlackNotificationService
-  private githubStorage: GitHubImageStorage
+  private imageStorage: SupabaseImageStorage
   private archiveService: ArticleArchiveService
   private articleExtractor: ArticleExtractor
 
@@ -62,7 +62,7 @@ export class RSSProcessor {
   constructor() {
     this.errorHandler = new ErrorHandler()
     this.slack = new SlackNotificationService()
-    this.githubStorage = new GitHubImageStorage()
+    this.imageStorage = new SupabaseImageStorage()
     this.archiveService = new ArticleArchiveService()
     this.articleExtractor = new ArticleExtractor()
   }
@@ -721,11 +721,11 @@ export class RSSProcessor {
         // Extract image URL
         let imageUrl = this.extractImageUrl(item)
 
-        // Re-host Facebook images
+        // Re-host Facebook CDN images (they expire) to Supabase
         if (!blockImages && imageUrl && imageUrl.includes('fbcdn.net')) {
           try {
-            const githubUrl = await this.githubStorage.uploadImage(imageUrl, item.title || 'Untitled')
-            if (githubUrl) imageUrl = githubUrl
+            const hostedUrl = await this.imageStorage.uploadImage(imageUrl, item.title || 'Untitled')
+            if (hostedUrl) imageUrl = hostedUrl
           } catch (error) {
             // Silent failure
           }
@@ -1673,14 +1673,13 @@ export class RSSProcessor {
             continue // Skip if already processed for this issue
           }
 
-          // Attempt to download and re-host image immediately if it's a Facebook URL
-          // But only if images are not blocked for this source
+          // Re-host Facebook CDN images (they expire) to Supabase
           let finalImageUrl = imageUrl
           if (!blockImages && imageUrl && imageUrl.includes('fbcdn.net')) {
             try {
-              const githubUrl = await this.githubStorage.uploadImage(imageUrl, item.title || 'Untitled')
-              if (githubUrl) {
-                finalImageUrl = githubUrl
+              const hostedUrl = await this.imageStorage.uploadImage(imageUrl, item.title || 'Untitled')
+              if (hostedUrl) {
+                finalImageUrl = hostedUrl
               }
             } catch (error) {
               // Silent failure
@@ -2704,19 +2703,18 @@ export class RSSProcessor {
 
           const originalImageUrl = rssPost.image_url
 
-          // Skip if already a GitHub URL
-          if (originalImageUrl.includes('github.com') || originalImageUrl.includes('githubusercontent.com')) {
+          // Skip if already hosted on Supabase
+          if (originalImageUrl.includes('supabase.co') || originalImageUrl.includes('img.aiprodaily.com')) {
             continue
           }
 
-          // Upload image to GitHub
-          const githubUrl = await this.githubStorage.uploadImage(originalImageUrl, rssPost.title)
+          // Upload image to Supabase (optimized via Tinify)
+          const hostedUrl = await this.imageStorage.uploadImage(originalImageUrl, rssPost.title)
 
-          if (githubUrl) {
-            // Update the RSS post with GitHub URL
+          if (hostedUrl) {
             await supabaseAdmin
               .from('rss_posts')
-              .update({ image_url: githubUrl })
+              .update({ image_url: hostedUrl })
               .eq('id', rssPost.id)
           }
 

@@ -6,6 +6,7 @@ import { Container } from "@/components/salient/Container"
 import { supabaseAdmin } from "@/lib/supabase"
 import { headers } from 'next/headers'
 import { getPublicationByDomain, getPublicationSettings } from '@/lib/publication-settings'
+import { STORAGE_PUBLIC_URL } from '@/lib/config'
 
 export const metadata: Metadata = {
   title: 'News - AI Accounting Daily',
@@ -125,7 +126,7 @@ export default async function NewsArchivePage({
   const { data: manualArticles } = await articlesQuery
 
   // Newsletter cover image (same as home page)
-  const newsletterCoverImage = "https://raw.githubusercontent.com/Venture-Formations/aiprodaily/master/public/images/accounting_website/ai_accounting_daily_cover_image.jpg"
+  const newsletterCoverImage = `${STORAGE_PUBLIC_URL}/img/c/ai_accounting_daily_cover_image.jpg`
 
   // Combine and format items
   const newsItems: NewsItem[] = []
