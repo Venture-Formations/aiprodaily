@@ -5,6 +5,7 @@ import { LatestNewsList } from "@/components/website/latest-news-list"
 import { supabaseAdmin } from "@/lib/supabase"
 import { headers } from 'next/headers'
 import { getPublicationByDomain, getPublicationSettings } from '@/lib/publication-settings'
+import { STORAGE_PUBLIC_URL } from '@/lib/config'
 
 // Force dynamic rendering to fetch fresh data
 export const dynamic = 'force-dynamic'
@@ -60,7 +61,7 @@ export default async function WebsiteHome() {
   const currentYear = new Date().getFullYear()
 
   // Newsletter cover image
-  const newsletterCoverImage = "https://raw.githubusercontent.com/Venture-Formations/aiprodaily/master/public/images/accounting_website/ai_accounting_daily_cover_image.jpg"
+  const newsletterCoverImage = `${STORAGE_PUBLIC_URL}/img/c/ai_accounting_daily_cover_image.jpg`
 
   // Fetch newsletters (filtered by publication)
   const { data: newsletters } = await supabaseAdmin

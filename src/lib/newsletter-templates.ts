@@ -9,6 +9,7 @@ import { AdScheduler } from './ad-scheduler'
 import { normalizeEmailHtml } from './html-normalizer'
 import { getBusinessSettings as getPublicationBusinessSettings } from './publication-settings'
 import { AdModuleRenderer } from './ad-modules'
+import { STORAGE_PUBLIC_URL } from './config'
 import type { AdBlockType, ArticleBlockType } from '@/types/database'
 
 // ==================== UTILITY FUNCTIONS ====================
@@ -178,7 +179,7 @@ export function getEventEmoji(title: string, venue: string): string {
 
 export async function generateNewsletterHeader(formattedDate: string, issueDate?: string, issueId?: string, publication_id?: string): Promise<string> {
   // Fetch business settings for header image, primary color, and website URL
-  let headerImageUrl = 'https://raw.githubusercontent.com/VFDavid/STCScoop/refs/heads/main/STCSCOOP_Logo_824X148_clear.png'
+  let headerImageUrl = '' // Must be set via publication_business_settings.header_image_url
   let primaryColor = '#1877F2'
   let newsletterName = 'St. Cloud Scoop'
   let websiteUrl = 'https://www.aiaccountingdaily.com'
@@ -1779,7 +1780,7 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
-          <img src="https://raw.githubusercontent.com/Venture-Formations/aiprodaily/master/public/images/social/facebook_light.png" alt="Facebook" width="24" height="24" style="border: none; display: block;">
+          <img src="${STORAGE_PUBLIC_URL}/img/s/facebook_light.png" alt="Facebook" width="24" height="24" style="border: none; display: block;">
         </a>
       </td>`)
   }
@@ -1790,7 +1791,7 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
-          <img src="https://raw.githubusercontent.com/Venture-Formations/aiprodaily/master/public/images/social/twitter_light.png" alt="Twitter/X" width="24" height="24" style="border: none; display: block;">
+          <img src="${STORAGE_PUBLIC_URL}/img/s/twitter_light.png" alt="Twitter/X" width="24" height="24" style="border: none; display: block;">
         </a>
       </td>`)
   }
@@ -1801,7 +1802,7 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
-          <img src="https://raw.githubusercontent.com/Venture-Formations/aiprodaily/master/public/images/social/linkedin_light.png" alt="LinkedIn" width="24" height="24" style="border: none; display: block;">
+          <img src="${STORAGE_PUBLIC_URL}/img/s/linkedin_light.png" alt="LinkedIn" width="24" height="24" style="border: none; display: block;">
         </a>
       </td>`)
   }
@@ -1812,7 +1813,7 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
-          <img src="https://raw.githubusercontent.com/Venture-Formations/aiprodaily/master/public/images/social/instagram_light.png" alt="Instagram" width="24" height="24" style="border: none; display: block;">
+          <img src="${STORAGE_PUBLIC_URL}/img/s/instagram_light.png" alt="Instagram" width="24" height="24" style="border: none; display: block;">
         </a>
       </td>`)
   }

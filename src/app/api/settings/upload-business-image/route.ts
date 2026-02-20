@@ -1,100 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { SupabaseImageStorage } from '@/lib/supabase-image-storage'
+import { PUBLICATION_ID } from '@/lib/config'
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🖼️ [Upload] Starting image upload...')
-
     const session = await getServerSession(authOptions)
     if (!session) {
-      console.log('❌ [Upload] Unauthorized - no session')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const formData = await request.formData()
     const file = formData.get('file') as File
-    const type = formData.get('type') as string // 'header', 'logo', or 'website_header'
-
-    console.log('📄 [Upload] File received:', file?.name, 'Type:', type)
+    const type = formData.get('type') as string
 
     if (!file) {
-      console.log('❌ [Upload] No file provided')
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
     if (!type || !['header', 'logo', 'website_header'].includes(type)) {
-      console.log('❌ [Upload] Invalid type parameter:', type)
       return NextResponse.json({ error: 'Invalid type parameter' }, { status: 400 })
     }
 
-    // Read file as base64
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
-    const base64Content = buffer.toString('base64')
 
-    console.log('📦 [Upload] File converted to base64, size:', buffer.length, 'bytes')
-
-    // Generate filename
-    const timestamp = Date.now()
-    const extension = file.name.split('.').pop()
-    const filename = `business-${type}-${timestamp}.${extension}`
-    const githubPath = `public/images/business/${filename}`
-
-    console.log('🏷️ [Upload] Generated filename:', filename)
-
-    // Upload to GitHub
-    const githubToken = process.env.GITHUB_TOKEN
-    const githubRepo = process.env.GITHUB_REPO || 'Venture-Formations/aiprodaily'
-    const githubBranch = process.env.GITHUB_BRANCH || 'master'
-
-    if (!githubToken) {
-      console.error('❌ [Upload] GITHUB_TOKEN not configured')
-      return NextResponse.json({ error: 'GitHub configuration missing' }, { status: 500 })
+    const MAX_FILE_SIZE = 5 * 1024 * 1024
+    if (buffer.length > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: 'File too large. Maximum size is 5MB.' },
+        { status: 400 }
+      )
     }
 
-    const githubUrl = `https://api.github.com/repos/${githubRepo}/contents/${githubPath}`
-    console.log('🚀 [Upload] Uploading to GitHub:', githubUrl)
+    const storage = new SupabaseImageStorage()
+    const publicUrl = await storage.uploadBusinessImage(
+      buffer,
+      type as 'header' | 'logo' | 'website_header',
+      PUBLICATION_ID
+    )
 
-    const githubResponse = await fetch(githubUrl, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `token ${githubToken}`,
-        'Accept': 'application/vnd.github.v3+json'
-      },
-      body: JSON.stringify({
-        message: `Upload ${type} image: ${filename}`,
-        content: base64Content,
-        branch: githubBranch
-      })
-    })
-
-    if (!githubResponse.ok) {
-      const errorText = await githubResponse.text()
-      console.error('❌ [Upload] GitHub upload failed:', githubResponse.status, errorText)
-      return NextResponse.json({
-        error: 'Failed to upload to GitHub',
-        details: errorText
-      }, { status: 500 })
+    if (!publicUrl) {
+      return NextResponse.json({ error: 'Failed to upload image' }, { status: 500 })
     }
-
-    const githubData = await githubResponse.json()
-    console.log('✅ [Upload] GitHub upload successful')
-
-    // Use the download_url from GitHub API response (works for private repos)
-    const publicUrl = githubData.content?.download_url ||
-                      `https://raw.githubusercontent.com/${githubRepo}/${githubBranch}/${githubPath}`
-    console.log('🔗 [Upload] Public URL:', publicUrl)
 
     return NextResponse.json({
       success: true,
       url: publicUrl,
-      message: `${type === 'header' ? 'Header' : 'Logo'} image uploaded successfully`
+      message: `${type === 'logo' ? 'Logo' : 'Header'} image uploaded successfully`
     })
 
   } catch (error) {
-    console.error('Image upload error:', error)
+    console.error('[Upload] Business image upload error:', error)
     return NextResponse.json({
       error: 'Failed to upload image',
       details: error instanceof Error ? error.message : 'Unknown error'

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { openai, AI_PROMPTS } from '@/lib/openai'
 import { ImageAnalysisResult, ImageTag } from '@/types/database'
-import { GitHubImageStorage } from '@/lib/github-storage'
+import { SupabaseImageStorage } from '@/lib/supabase-image-storage'
 import sharp from 'sharp'
 
 interface IngestRequest {
@@ -227,20 +227,19 @@ export async function POST(request: NextRequest) {
             .jpeg({ quality: 90, progressive: true })
             .toBuffer()
 
-          // Upload to GitHub
-          const githubStorage = new GitHubImageStorage()
-          const githubUrl = await githubStorage.uploadImageVariant(
+          // Upload variant to Supabase (optimized via Tinify)
+          const imageStorage = new SupabaseImageStorage()
+          const uploadedUrl = await imageStorage.uploadImageVariant(
             processedBuffer,
             image_id,
             '1200x675',
             'Generated 16:9 variant'
           )
 
-          if (githubUrl) {
-            variantUrl = githubStorage.getCdnUrl(image_id, '1200x675')
+          if (uploadedUrl) {
+            variantUrl = imageStorage.getCdnUrl(image_id, '1200x675')
 
-            // Update database with variant info
-            const variantKey = `images/variants/1200x675/${image_id}.jpg`
+            const variantKey = `v/1200x675/${image_id}.jpg`
             await supabaseAdmin
               .from('images')
               .update({

@@ -1,4 +1,4 @@
-import { GitHubImageStorage } from './github-storage'
+import { SupabaseImageStorage } from './supabase-image-storage'
 import crypto from 'crypto'
 import sharp from 'sharp'
 
@@ -71,21 +71,21 @@ export async function processVrboImage(
     const hash = crypto.createHash('sha1').update(originalImageUrl).digest('hex').slice(0, 16)
     const filename = `vrbo-${hash}.jpg`
 
-    // Upload to GitHub
-    const githubStorage = new GitHubImageStorage()
-    const githubUrl = await githubStorage.uploadBuffer(resizedBuffer, filename, `VRBO: ${listingTitle}`)
+    // Upload to Supabase (Tinify optimization applied automatically)
+    const storage = new SupabaseImageStorage()
+    const publicUrl = await storage.uploadBuffer(resizedBuffer, filename, `VRBO: ${listingTitle}`)
 
-    if (githubUrl) {
-      console.log(`VRBO image processed and uploaded to GitHub: ${githubUrl}`)
+    if (publicUrl) {
+      console.log(`VRBO image processed and uploaded: ${publicUrl}`)
       return {
         success: true,
-        adjusted_image_url: githubUrl
+        adjusted_image_url: publicUrl
       }
     } else {
       console.error('VRBO image upload failed')
       return {
         success: false,
-        error: 'Failed to upload processed image to GitHub'
+        error: 'Failed to upload processed image'
       }
     }
 

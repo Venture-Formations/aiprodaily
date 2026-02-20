@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { GitHubImageStorage } from '@/lib/github-storage'
+import { SupabaseImageStorage } from '@/lib/supabase-image-storage'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     console.log('=== MANUAL IMAGE PROCESSING DEBUG ===')
     console.log('issue ID:', issueId)
 
-    const githubStorage = new GitHubImageStorage()
+    const imageStorage = new SupabaseImageStorage()
 
     // Get active articles with their RSS post image URLs
     const { data: articles, error } = await supabaseAdmin
@@ -58,32 +58,33 @@ export async function GET(request: NextRequest) {
         const originalImageUrl = rssPost.image_url
         console.log(`Processing image for article ${article.id}: ${originalImageUrl}`)
 
-        // Skip if already a GitHub URL
-        if (originalImageUrl.includes('github.com') || originalImageUrl.includes('githubusercontent.com')) {
+        // Skip if already hosted on Supabase
+        let isHosted = false
+        try { const h = new URL(originalImageUrl).hostname.toLowerCase(); isHosted = h.endsWith('.supabase.co') || h === 'img.aiprodaily.com' } catch {}
+        if (isHosted) {
           results.push({
             articleId: article.id,
             status: 'skipped',
-            reason: 'Already GitHub URL',
+            reason: 'Already hosted on Supabase',
             currentUrl: originalImageUrl
           })
           continue
         }
 
-        // Upload image to GitHub
-        const githubUrl = await githubStorage.uploadImage(originalImageUrl, rssPost.title)
+        // Upload image to Supabase (optimized via Tinify)
+        const hostedUrl = await imageStorage.uploadImage(originalImageUrl, rssPost.title)
 
-        if (githubUrl) {
-          // Update the RSS post with GitHub URL
+        if (hostedUrl) {
           await supabaseAdmin
             .from('rss_posts')
-            .update({ image_url: githubUrl })
+            .update({ image_url: hostedUrl })
             .eq('id', rssPost.id)
 
           results.push({
             articleId: article.id,
             status: 'success',
             originalUrl: originalImageUrl,
-            githubUrl: githubUrl
+            hostedUrl
           })
         } else {
           results.push({

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { GitHubImageStorage } from '@/lib/github-storage'
+import { SupabaseImageStorage } from '@/lib/supabase-image-storage'
 import { ImageReviewRequest } from '@/types/database'
 import sharp from 'sharp'
 
@@ -134,19 +134,18 @@ export async function POST(request: NextRequest) {
             .jpeg({ quality: 85 })
             .toBuffer()
 
-          // Upload to GitHub
-          const githubStorage = new GitHubImageStorage()
-          const githubUrl = await githubStorage.uploadImageVariant(
+          // Upload variant to Supabase (optimized via Tinify)
+          const imageStorage = new SupabaseImageStorage()
+          const uploadedUrl = await imageStorage.uploadImageVariant(
             croppedBuffer,
             image_id,
             '1200x675',
             ai_caption || 'Image library variant'
           )
 
-          if (githubUrl) {
-            // Update database with variant URLs
-            const variantKey = `images/variants/1200x675/${image_id}.jpg`
-            const cdnUrl = githubStorage.getCdnUrl(image_id, '1200x675')
+          if (uploadedUrl) {
+            const variantKey = `v/1200x675/${image_id}.jpg`
+            const cdnUrl = imageStorage.getCdnUrl(image_id, '1200x675')
 
             await supabaseAdmin
               .from('images')

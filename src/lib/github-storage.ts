@@ -1,6 +1,12 @@
+/**
+ * @deprecated Use SupabaseImageStorage from './supabase-image-storage' instead.
+ * This module is retained only for the migration period while GitHub images
+ * are being copied to Supabase. It will be removed once GitHub goes private.
+ */
 import { Octokit } from '@octokit/rest'
 import crypto from 'crypto'
 
+/** @deprecated Use SupabaseImageStorage instead */
 export class GitHubImageStorage {
   private octokit: Octokit | null
   private owner: string
