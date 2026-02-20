@@ -107,7 +107,7 @@ export async function GET(
     // Fetch all active ads for this module grouped by advertiser
     const { data: ads, error: adsError } = await supabaseAdmin
       .from('advertisements')
-      .select('id, title, advertiser_id, display_order, status, times_used, last_used_date, paid, frequency, times_paid, image_url, body, button_url, priority')
+      .select('id, title, advertiser_id, display_order, status, times_used, last_used_date, paid, frequency, times_paid, image_url, image_alt, body, button_url, priority')
       .eq('ad_module_id', moduleId)
       .eq('publication_id', adModule.publication_id)
       .eq('status', 'active')
