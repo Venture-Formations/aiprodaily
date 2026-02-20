@@ -191,6 +191,7 @@ export async function POST(request: NextRequest) {
         payment_status: body.payment_status || 'paid',
         paid: body.paid !== undefined ? body.paid : true,
         image_url: body.image_url || null,
+        image_alt: body.image_alt || null,
         submission_date: new Date().toISOString(),
         publication_id: newsletterId, // Associate ad with newsletter
         ad_module_id: body.ad_module_id || null, // Optional ad module assignment
