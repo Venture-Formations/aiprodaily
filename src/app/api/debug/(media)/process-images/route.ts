@@ -59,7 +59,9 @@ export async function GET(request: NextRequest) {
         console.log(`Processing image for article ${article.id}: ${originalImageUrl}`)
 
         // Skip if already hosted on Supabase
-        if (originalImageUrl.includes('supabase.co') || originalImageUrl.includes('img.aiprodaily.com')) {
+        let isHosted = false
+        try { const h = new URL(originalImageUrl).hostname.toLowerCase(); isHosted = h.endsWith('.supabase.co') || h === 'img.aiprodaily.com' } catch {}
+        if (isHosted) {
           results.push({
             articleId: article.id,
             status: 'skipped',

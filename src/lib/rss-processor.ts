@@ -2704,9 +2704,10 @@ export class RSSProcessor {
           const originalImageUrl = rssPost.image_url
 
           // Skip if already hosted on Supabase
-          if (originalImageUrl.includes('supabase.co') || originalImageUrl.includes('img.aiprodaily.com')) {
-            continue
-          }
+          try {
+            const host = new URL(originalImageUrl).hostname.toLowerCase()
+            if (host.endsWith('.supabase.co') || host === 'img.aiprodaily.com') continue
+          } catch { /* not a valid URL, proceed with upload */ }
 
           // Upload image to Supabase (optimized via Tinify)
           const hostedUrl = await this.imageStorage.uploadImage(originalImageUrl, rssPost.title)

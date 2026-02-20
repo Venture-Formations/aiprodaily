@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SupabaseImageStorage } from '@/lib/supabase-image-storage'
-import { STORAGE_PUBLIC_URL } from '@/lib/config'
 
 export const maxDuration = 300
 
@@ -28,7 +27,16 @@ function isGitHubUrl(url: string | null): boolean {
 
 function isAlreadyMigrated(url: string | null): boolean {
   if (!url) return false
-  return url.includes('supabase.co') || url.includes('img.aiprodaily.com')
+  try {
+    const hostname = new URL(url).hostname.toLowerCase()
+    return (
+      hostname === 'supabase.co' ||
+      hostname.endsWith('.supabase.co') ||
+      hostname === 'img.aiprodaily.com'
+    )
+  } catch {
+    return false
+  }
 }
 
 /**
