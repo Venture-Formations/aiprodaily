@@ -63,11 +63,9 @@ export async function GET(request: NextRequest) {
       imageColumns: string[]
     }> = [
       { table: 'rss_posts', idColumn: 'id', imageColumns: ['image_url'] },
-      { table: 'images', idColumn: 'id', imageColumns: ['variant_16x9_url'] },
       { table: 'manual_articles', idColumn: 'id', imageColumns: ['image_url'] },
       { table: 'polls', idColumn: 'id', imageColumns: ['image_url'] },
-      { table: 'text_box_modules', idColumn: 'id', imageColumns: ['static_image_url', 'generated_image_url'] },
-      { table: 'feedback_module_members', idColumn: 'id', imageColumns: ['image_url'] },
+      { table: 'advertisements', idColumn: 'id', imageColumns: ['image_url'] },
       { table: 'events', idColumn: 'id', imageColumns: ['image_url', 'original_image_url', 'cropped_image_url'] },
       { table: 'sparkloop_recommendations', idColumn: 'id', imageColumns: ['publication_logo'] },
     ]
@@ -79,9 +77,15 @@ export async function GET(request: NextRequest) {
     for (const { table, idColumn, imageColumns } of filteredTables) {
       const selectCols = [idColumn, ...imageColumns].join(', ')
 
+      const orFilter = imageColumns
+        .flatMap(col => GITHUB_URL_PATTERNS.map(p => `${col}.like.%${p}%`))
+        .join(',')
+
       const { data: rows, error } = await supabaseAdmin
         .from(table)
         .select(selectCols)
+        .or(orFilter)
+        .order(idColumn)
         .limit(batchSize)
 
       if (error) {
@@ -189,16 +193,24 @@ export async function GET(request: NextRequest) {
               const newUrl = await storage.uploadBusinessImage(buffer, type, row.publication_id)
 
               if (newUrl) {
-                await supabaseAdmin
+                const { error: updateError } = await supabaseAdmin
                   .from('publication_business_settings')
                   .update({ [col]: newUrl })
                   .eq('publication_id', row.publication_id)
 
-                results.push({
-                  table: 'publication_business_settings', column: col,
-                  id: row.publication_id, oldUrl: currentUrl, newUrl,
-                  status: 'success'
-                })
+                if (updateError) {
+                  results.push({
+                    table: 'publication_business_settings', column: col,
+                    id: row.publication_id, oldUrl: currentUrl, newUrl, status: 'failed',
+                    error: `DB update failed: ${updateError.message}`
+                  })
+                } else {
+                  results.push({
+                    table: 'publication_business_settings', column: col,
+                    id: row.publication_id, oldUrl: currentUrl, newUrl,
+                    status: 'success'
+                  })
+                }
               }
             } catch (err) {
               results.push({
@@ -238,16 +250,24 @@ export async function GET(request: NextRequest) {
           try {
             const newUrl = await storage.uploadImage(setting.value, `Migration: app_settings.${setting.key}`)
             if (newUrl) {
-              await supabaseAdmin
+              const { error: updateError } = await supabaseAdmin
                 .from('app_settings')
                 .update({ value: newUrl })
                 .eq('key', setting.key)
 
-              results.push({
-                table: 'app_settings', column: 'value',
-                id: setting.key, oldUrl: setting.value, newUrl,
-                status: 'success'
-              })
+              if (updateError) {
+                results.push({
+                  table: 'app_settings', column: 'value',
+                  id: setting.key, oldUrl: setting.value, newUrl, status: 'failed',
+                  error: `DB update failed: ${updateError.message}`
+                })
+              } else {
+                results.push({
+                  table: 'app_settings', column: 'value',
+                  id: setting.key, oldUrl: setting.value, newUrl,
+                  status: 'success'
+                })
+              }
             }
           } catch (err) {
             results.push({

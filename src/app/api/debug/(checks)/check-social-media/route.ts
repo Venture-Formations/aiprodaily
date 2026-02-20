@@ -27,7 +27,7 @@ export async function GET() {
       settingsMap[setting.key] = setting.value
     })
 
-    // Test if images exist at GitHub URLs
+    // Test if images exist at Supabase Storage URLs
     const imageUrls = [
       `${STORAGE_PUBLIC_URL}/img/s/facebook_light.png`,
       `${STORAGE_PUBLIC_URL}/img/s/twitter_light.png`,
