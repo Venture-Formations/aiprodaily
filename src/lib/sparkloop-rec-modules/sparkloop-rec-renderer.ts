@@ -71,15 +71,13 @@ export class SparkLoopRecModuleRenderer {
           <td style="padding: 12px 0; border-bottom: 1px solid #e0e0e0; font-family: ${bodyFont}; font-size: 16px; line-height: 24px; color: #333;">
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
-                <td width="60" valign="top" style="padding-right: 12px;">
+                <td width="60" valign="middle" style="padding-right: 12px;">
                   ${logoHtml}
                 </td>
-                <td valign="middle" style="padding-right: 12px;">
+                <td valign="middle">
                   <p style="margin: 0 0 4px 0; font-size: 16px; font-weight: bold; color: #333; font-family: ${bodyFont};">${name}</p>
-                  <p style="margin: 0; font-size: 14px; color: #666; line-height: 24px; font-family: ${bodyFont};">${desc}</p>
-                </td>
-                <td width="100" valign="middle" align="right">
-                  <a href="${subscribeUrl}" style="display: inline-block; padding: 8px 16px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-align: center; font-family: ${bodyFont};">Subscribe</a>
+                  <p style="margin: 0 0 8px 0; font-size: 14px; color: #666; line-height: 20px; font-family: ${bodyFont};">${desc}</p>
+                  <div style="text-align: center;"><a href="${subscribeUrl}" style="display: inline-block; padding: 8px 16px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-align: center; font-family: ${bodyFont};">Subscribe</a></div>
                 </td>
               </tr>
             </table>
