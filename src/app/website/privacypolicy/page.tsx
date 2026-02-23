@@ -141,12 +141,22 @@ export default async function PrivacyPolicyPage() {
                 4. Cookies & Tracking Technologies
               </h2>
               <p className="text-gray-700 leading-relaxed mb-4">
-                We may use cookies, pixels, and similar tools to:
+                We use cookies, pixels, web beacons, and similar technologies on our website.
+                In addition, third-party vendors, including Google, may place and read cookies
+                on your browser, or use web beacons and IP addresses to collect information, as
+                a result of ad serving on our website.
+              </p>
+
+              <h3 className="text-xl font-semibold text-gray-900 mt-6 mb-3">
+                Our cookies
+              </h3>
+              <p className="text-gray-700 leading-relaxed mb-4">
+                We use cookies and similar tools to:
               </p>
               <ul className="space-y-3 text-gray-700 leading-relaxed ml-6">
                 <li className="flex">
                   <span className="mr-3 text-gray-400">●</span>
-                  <span>Measure email engagement.</span>
+                  <span>Measure email engagement (open rates, click-through rates).</span>
                 </li>
                 <li className="flex">
                   <span className="mr-3 text-gray-400">●</span>
@@ -154,11 +164,94 @@ export default async function PrivacyPolicyPage() {
                 </li>
                 <li className="flex">
                   <span className="mr-3 text-gray-400">●</span>
-                  <span>Personalize content and ads (if applicable).</span>
+                  <span>Remember your preferences and improve your experience.</span>
                 </li>
               </ul>
-              <p className="text-gray-700 leading-relaxed mt-4">
-                You can adjust your browser settings to block cookies, but this may affect your experience.
+
+              <h3 className="text-xl font-semibold text-gray-900 mt-6 mb-3">
+                Third-party advertising cookies
+              </h3>
+              <p className="text-gray-700 leading-relaxed mb-4">
+                We use <strong>Google AdSense</strong> to display advertisements on our website.
+                Google and its advertising partners may place and read cookies on your browser, or use
+                web beacons to collect information, in order to serve personalized ads based on your
+                prior visits to this or other websites. This information may include your IP address,
+                browser type, and browsing activity.
+              </p>
+              <p className="text-gray-700 leading-relaxed mb-4">
+                You can learn more about how Google uses your data by visiting{' '}
+                <a
+                  href="https://policies.google.com/technologies/partner-sites"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  How Google uses data when you use our partners&apos; sites or apps
+                </a>.
+                You may opt out of personalized advertising by visiting{' '}
+                <a
+                  href="https://www.google.com/settings/ads"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  Google Ads Settings
+                </a>{' '}
+                or{' '}
+                <a
+                  href="https://optout.aboutads.info/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  www.aboutads.info
+                </a>.
+              </p>
+
+              <h3 className="text-xl font-semibold text-gray-900 mt-6 mb-3">
+                Analytics and marketing cookies
+              </h3>
+              <p className="text-gray-700 leading-relaxed mb-4">
+                We use <strong>Meta (Facebook) Pixel</strong> to measure the effectiveness
+                of our advertising campaigns and to understand how visitors interact with our
+                website. Meta may collect information such as your IP address, browser type,
+                and pages visited, and may use cookies to serve targeted ads on Meta platforms.
+                You can learn more and manage your preferences at{' '}
+                <a
+                  href="https://www.facebook.com/privacy/policies/cookies/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  Meta&apos;s Cookie Policy
+                </a>.
+              </p>
+
+              <h3 className="text-xl font-semibold text-gray-900 mt-6 mb-3">
+                Managing cookies
+              </h3>
+              <p className="text-gray-700 leading-relaxed">
+                You can adjust your browser settings to block or delete cookies at any time,
+                but this may affect your experience on our website. Most browsers allow you
+                to manage cookie preferences through their settings menus. You may also opt
+                out of interest-based advertising from participating companies through the{' '}
+                <a
+                  href="https://optout.aboutads.info/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  Digital Advertising Alliance
+                </a>{' '}
+                or the{' '}
+                <a
+                  href="https://optout.networkadvertising.org/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  Network Advertising Initiative
+                </a>.
               </p>
             </section>
 

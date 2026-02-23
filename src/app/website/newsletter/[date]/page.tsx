@@ -218,7 +218,7 @@ export default async function NewsletterPage({ params }: PageProps) {
 
       return processedBody.replace(
         arrowCtaPattern,
-        `${openingTag}${arrow}${closingStrongTag || '</strong>'}<a href="${url}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; font-weight: bold;">${ctaText}</a>${closingPTag}${trailingSpace}`
+        `${openingTag}${arrow}${closingStrongTag || '</strong>'}<a href="${url}" target="_blank" rel="noopener noreferrer sponsored" style="text-decoration: underline; font-weight: bold;">${ctaText}</a>${closingPTag}${trailingSpace}`
       )
     }
 
@@ -258,7 +258,7 @@ export default async function NewsletterPage({ params }: PageProps) {
 
         return processedBody.replace(
           sentenceRegex,
-          `<a href="${url}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; font-weight: bold;">$&</a>`
+          `<a href="${url}" target="_blank" rel="noopener noreferrer sponsored" style="text-decoration: underline; font-weight: bold;">$&</a>`
         )
       }
     } else {
@@ -272,7 +272,7 @@ export default async function NewsletterPage({ params }: PageProps) {
 
         return processedBody.replace(
           textRegex,
-          `<a href="${url}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; font-weight: bold;">$&</a>`
+          `<a href="${url}" target="_blank" rel="noopener noreferrer sponsored" style="text-decoration: underline; font-weight: bold;">$&</a>`
         )
       }
     }
@@ -538,7 +538,7 @@ export default async function NewsletterPage({ params }: PageProps) {
                             if (!ad.image_url) return null
                             return ad.button_url ? (
                               <div key="image" className="mb-4">
-                                <a href={ad.button_url} target="_blank" rel="noopener noreferrer">
+                                <a href={ad.button_url} target="_blank" rel="noopener noreferrer sponsored">
                                   <img
                                     src={ad.image_url}
                                     alt={ad.title || adModule.module_name}
@@ -571,7 +571,7 @@ export default async function NewsletterPage({ params }: PageProps) {
                                 <a
                                   href={ad.button_url}
                                   target="_blank"
-                                  rel="noopener noreferrer"
+                                  rel="noopener noreferrer sponsored"
                                   className="inline-block px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors"
                                 >
                                   {ad.button_text || 'Learn More'}
@@ -691,7 +691,7 @@ export default async function NewsletterPage({ params }: PageProps) {
                           <a
                             href={app.app_url}
                             target="_blank"
-                            rel="noopener noreferrer"
+                            rel="noopener noreferrer sponsored"
                             className="text-red-600 hover:text-red-700 underline font-bold"
                           >
                             {app.app_name}
@@ -918,7 +918,7 @@ export default async function NewsletterPage({ params }: PageProps) {
                         <p key={app.id || index} className="py-3 text-base leading-relaxed">
                           <span className="font-bold">{index + 1}.</span> {getAppEmoji(app)}{' '}
                           {app.app_url ? (
-                            <a href={app.app_url} target="_blank" rel="noopener noreferrer"
+                            <a href={app.app_url} target="_blank" rel="noopener noreferrer sponsored"
                               className="text-red-600 hover:text-red-700 underline font-bold">
                               {app.app_name}
                             </a>
@@ -970,7 +970,7 @@ export default async function NewsletterPage({ params }: PageProps) {
                     <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4">{advertorial.title}</h3>
                     {advertorial.image_url && advertorial.button_url ? (
                       <div className="mb-4">
-                        <a href={advertorial.button_url} target="_blank" rel="noopener noreferrer">
+                        <a href={advertorial.button_url} target="_blank" rel="noopener noreferrer sponsored">
                           <img
                             src={advertorial.image_url}
                             alt={advertorial.title}

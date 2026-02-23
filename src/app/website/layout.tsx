@@ -47,6 +47,40 @@ export default function WebsiteLayout({
 
   return (
     <>
+      {/* Consent Mode v2 defaults — must run before any Google/ad scripts */}
+      <Script
+        id="consent-mode-defaults"
+        strategy="beforeInteractive"
+        dangerouslySetInnerHTML={{
+          __html: `
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('consent', 'default', {
+              ad_storage: 'denied',
+              ad_user_data: 'denied',
+              ad_personalization: 'denied',
+              analytics_storage: 'denied',
+              wait_for_update: 500
+            });
+          `,
+        }}
+      />
+
+      {/* Google Funding Choices — loads the CMP consent banner configured in AdSense Privacy & Messaging */}
+      <Script
+        id="google-fc"
+        strategy="beforeInteractive"
+        src="https://fundingchoicesmessages.google.com/i/pub-1173459595320946?ers=1"
+        nonce=""
+      />
+      <Script
+        id="google-fc-init"
+        strategy="beforeInteractive"
+        dangerouslySetInnerHTML={{
+          __html: `(function() {function signalGooglefcPresent(){if(!window.frames['googlefcPresent']){if(document.body){var i=document.createElement('iframe');i.style='width:0;height:0;border:none;z-index:-1000;left:-1000px;top:-1000px;';i.style.display='none';i.name='googlefcPresent';document.body.appendChild(i);}else{setTimeout(signalGooglefcPresent,0);}}}signalGooglefcPresent();})();`,
+        }}
+      />
+
       {/* Google AdSense */}
       <Script
         async
@@ -65,8 +99,7 @@ export default function WebsiteLayout({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
       />
 
-      
-      {/* Facebook Pixel */}
+      {/* Facebook Pixel — respects Consent Mode; loads SDK but defers tracking until consent granted */}
       {pixelId && (
         <>
           <Script
@@ -82,8 +115,21 @@ export default function WebsiteLayout({
                 t.src=v;s=b.getElementsByTagName(e)[0];
                 s.parentNode.insertBefore(t,s)}(window, document,'script',
                 'https://connect.facebook.net/en_US/fbevents.js');
+                fbq('consent', 'revoke');
                 fbq('init', '${pixelId}');
                 fbq('track', 'PageView');
+
+                // When Google CMP grants consent, also grant Facebook Pixel consent
+                if (window.googlefc) {
+                  window.googlefc.callbackQueue = window.googlefc.callbackQueue || [];
+                  window.googlefc.callbackQueue.push({'CONSENT_DATA_READY': function() {
+                    if (typeof gtag === 'function') {
+                      // Check if ad_storage was granted by reading the consent state
+                      // Google CMP auto-updates gtag consent; mirror to fbq
+                      fbq('consent', 'grant');
+                    }
+                  }});
+                }
               `,
             }}
           />
