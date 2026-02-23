@@ -69,20 +69,32 @@ export class SparkLoopRecModuleRenderer {
     return `
         <tr>
           <td style="padding: 12px 0; border-bottom: 1px solid #e0e0e0; font-family: ${bodyFont}; font-size: 16px; line-height: 24px; color: #333;">
-            <table width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td width="60" valign="top" style="padding-right: 12px;">
-                  ${logoHtml}
-                </td>
-                <td valign="middle" style="padding-right: 12px;">
-                  <p style="margin: 0 0 4px 0; font-size: 16px; font-weight: bold; color: #333; font-family: ${bodyFont};">${name}</p>
-                  <p style="margin: 0; font-size: 14px; color: #666; line-height: 24px; font-family: ${bodyFont};">${desc}</p>
-                </td>
-                <td width="100" valign="middle" align="right">
-                  <a href="${subscribeUrl}" style="display: inline-block; padding: 8px 16px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-align: center; font-family: ${bodyFont};">Subscribe</a>
-                </td>
-              </tr>
-            </table>
+            <!--[if mso]>
+            <table width="100%" cellpadding="0" cellspacing="0"><tr>
+              <td width="60" valign="middle" style="padding-right:12px;">${logoHtml}</td>
+              <td valign="middle" style="padding-right:12px;">
+                <p style="margin:0 0 4px 0;font-size:16px;font-weight:bold;color:#333;font-family:${bodyFont};">${name}</p>
+                <p style="margin:0;font-size:14px;color:#666;line-height:24px;font-family:${bodyFont};">${desc}</p>
+              </td>
+              <td width="110" valign="middle" align="right">
+                <a href="${subscribeUrl}" style="display:inline-block;padding:8px 16px;background-color:${primaryColor};color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;text-align:center;font-family:${bodyFont};">Subscribe</a>
+              </td>
+            </tr></table>
+            <![endif]-->
+            <!--[if !mso]><!-->
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <div style="flex-shrink:0;">
+                ${logoHtml}
+              </div>
+              <div style="flex:1;min-width:150px;">
+                <p style="margin: 0 0 4px 0; font-size: 16px; font-weight: bold; color: #333; font-family: ${bodyFont};">${name}</p>
+                <p style="margin: 0; font-size: 14px; color: #666; line-height: 24px; font-family: ${bodyFont};">${desc}</p>
+              </div>
+              <div style="flex-shrink:0;">
+                <a href="${subscribeUrl}" style="display: inline-block; padding: 8px 16px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-align: center; font-family: ${bodyFont}; white-space: nowrap;">Subscribe</a>
+              </div>
+            </div>
+            <!--<![endif]-->
           </td>
         </tr>`
   }
