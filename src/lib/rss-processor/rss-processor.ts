@@ -1,18 +1,18 @@
 import Parser from 'rss-parser'
-import { supabaseAdmin } from './supabase'
-import { AI_CALL, callAIWithPrompt, callWithStructuredPrompt, AI_PROMPTS, callOpenAI } from './openai'
-import { ErrorHandler, SlackNotificationService } from './slack'
-import { SupabaseImageStorage } from './supabase-image-storage'
-import { ArticleArchiveService } from './article-archive'
-import { ArticleExtractor } from './article-extractor'
-import { Deduplicator } from './deduplicator'
+import { supabaseAdmin } from '../supabase'
+import { AI_CALL, callAIWithPrompt, callWithStructuredPrompt, AI_PROMPTS, callOpenAI } from '../openai'
+import { ErrorHandler, SlackNotificationService } from '../slack'
+import { SupabaseImageStorage } from '../supabase-image-storage'
+import { ArticleArchiveService } from '../article-archive'
+import { ArticleExtractor } from '../article-extractor'
+import { Deduplicator } from '../deduplicator'
 import {
   getArticleSettings,
   getExcludedRssSources,
   getBlockedDomains,
   getCriteriaSettings,
   getPublicationSettings
-} from './publication-settings'
+} from '../publication-settings'
 import type {
   RssFeed,
   RssPost,
@@ -988,8 +988,8 @@ export class RSSProcessor {
       console.log('[Step 2/10] Selecting AI apps and prompts...')
 
       try {
-        const { AppModuleSelector } = await import('./ai-app-modules')
-        const { PromptSelector } = await import('./prompt-selector')
+        const { AppModuleSelector } = await import('../ai-app-modules')
+        const { PromptSelector } = await import('../prompt-selector')
         const { data: newsletter } = await supabaseAdmin
           .from('publications')
           .select('id, name, slug')
@@ -1527,8 +1527,8 @@ export class RSSProcessor {
 
     // Initialize AI Applications and Prompt Ideas if not already done
     try {
-      const { AppModuleSelector } = await import('./ai-app-modules')
-      const { PromptSelector } = await import('./prompt-selector')
+      const { AppModuleSelector } = await import('../ai-app-modules')
+      const { PromptSelector } = await import('../prompt-selector')
 
       // Check if AI Apps already selected (check new mod system)
       const { data: existingApps } = await supabaseAdmin

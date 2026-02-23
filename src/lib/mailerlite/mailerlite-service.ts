@@ -1,9 +1,9 @@
 import axios from 'axios'
-import { supabaseAdmin } from './supabase'
-import { ErrorHandler, SlackNotificationService } from './slack'
+import { supabaseAdmin } from '../supabase'
+import { ErrorHandler, SlackNotificationService } from '../slack'
 import type { issueWithArticles, issueWithEvents, Article } from '@/types/database'
-import { generateFullNewsletterHtml } from './newsletter-templates'
-import { getEmailSettings, getScheduleSettings, getPublicationSetting, getPublicationSettings } from './publication-settings'
+import { generateFullNewsletterHtml } from '../newsletter-templates'
+import { getEmailSettings, getScheduleSettings, getPublicationSetting, getPublicationSettings } from '../publication-settings'
 
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
 
@@ -304,10 +304,10 @@ United States
       }
 
       const mailerliteCampaignId = metrics.mailerlite_issue_id
-      
+
       // Try multiple possible endpoints for campaign reports
       let response
-      
+
       // Try endpoint 1: /campaigns/{id}/reports
       try {
         response = await mailerliteClient.get(`/campaigns/${mailerliteCampaignId}/reports`)
@@ -407,7 +407,7 @@ United States
       if (error && typeof error === 'object' && 'skipped' in error) {
         throw error
       }
-      
+
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       await this.logError('Failed to import issue metrics', {
         issueId,
