@@ -146,7 +146,7 @@ export async function GET(request: NextRequest) {
     // Only include deltas for ref_codes present on BOTH consecutive days
     // so newly-synced recommendations don't dump lifetime totals into one day.
     const newPendingByDate = new Map<string, number>()
-    for (const [, refMap] of snapshotsByRefCode) {
+    Array.from(snapshotsByRefCode.values()).forEach(refMap => {
       const dates = Array.from(refMap.keys()).sort()
       for (let i = 1; i < dates.length; i++) {
         const prev = refMap.get(dates[i - 1])!
@@ -155,13 +155,13 @@ export async function GET(request: NextRequest) {
         const currDate = dates[i]
         newPendingByDate.set(currDate, (newPendingByDate.get(currDate) || 0) + delta)
       }
-    }
+    })
 
-    for (const [dateKey, delta] of newPendingByDate) {
+    Array.from(newPendingByDate.entries()).forEach(([dateKey, delta]) => {
       if (dailyMap.has(dateKey)) {
         dailyMap.get(dateKey)!.newPending = Math.max(0, delta)
       }
-    }
+    })
 
     // Process each referral
     for (const ref of referrals) {

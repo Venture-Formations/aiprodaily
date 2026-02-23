@@ -1,182 +1,6 @@
-import OpenAI from 'openai'
-import Anthropic from '@anthropic-ai/sdk'
-import { supabaseAdmin } from './supabase'
-
-export const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
-
-export const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-})
-
-// Helper function to fetch prompt from database with code fallback
-async function getPrompt(key: string, fallback: string): Promise<string> {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('app_settings')
-      .select('value')
-      .eq('key', key)
-      .single()
-
-    if (error || !data) {
-      console.warn(`⚠️  [AI-PROMPT] FALLBACK USED: ${key} (not found in database)`)
-      console.warn(`⚠️  [AI-PROMPT] Run migration: GET /api/debug/migrate-ai-prompts?dry_run=false`)
-      return fallback
-    }
-
-    return data.value
-  } catch (error) {
-    console.error(`❌ [AI-PROMPT] ERROR fetching ${key}, using fallback:`, error)
-    return fallback
-  }
-}
-
-// Helper function to fetch complete JSON API request from database
-// Returns the prompt exactly as stored (complete JSON with model, messages, temperature, etc.)
-async function getPromptJSON(key: string, newsletterId: string, fallbackText?: string): Promise<any> {
-  try {
-    // Try publication_settings first (with ai_provider column)
-    const { data, error } = await supabaseAdmin
-      .from('publication_settings')
-      .select('value')
-      .eq('publication_id', newsletterId)
-      .eq('key', key)
-      .single()
-
-    if (error || !data) {
-      // Fallback to app_settings with WARNING log
-      const { data: fallbackData, error: fallbackError } = await supabaseAdmin
-        .from('app_settings')
-        .select('value')
-        .eq('key', key)
-        .single()
-
-      if (fallbackError || !fallbackData) {
-        console.warn(`⚠️  [AI-PROMPT] FALLBACK USED: ${key} (not found in database)`)
-        console.warn(`⚠️  [AI-PROMPT] Run migration: GET /api/debug/migrate-ai-prompts?dry_run=false`)
-
-        if (!fallbackText) {
-          throw new Error(`Prompt ${key} not found and no fallback provided`)
-        }
-
-        // Wrap fallback text in minimal JSON structure
-        return {
-          model: 'gpt-4o',
-          messages: [{ role: 'user', content: fallbackText }],
-          _provider: 'openai'
-        }
-      }
-
-      console.warn(`[SETTINGS FALLBACK] Using app_settings for key="${key}" (publication=${newsletterId}). Migrate this setting!`)
-      // Use fallback data
-      const valueToProcess = fallbackData.value
-      let promptJSON: any
-      if (typeof valueToProcess === 'string') {
-        try {
-          promptJSON = JSON.parse(valueToProcess)
-        } catch (parseError) {
-          throw new Error(`Prompt ${key} is not valid JSON. It must be structured JSON with a 'messages' array. Error: ${parseError instanceof Error ? parseError.message : 'Parse failed'}`)
-        }
-      } else if (typeof valueToProcess === 'object' && valueToProcess !== null) {
-        promptJSON = valueToProcess
-      } else {
-        throw new Error(`Prompt ${key} has invalid format. Expected structured JSON with a 'messages' array, got ${typeof valueToProcess}`)
-      }
-
-      if (!promptJSON.messages && !promptJSON.input) {
-        throw new Error(`Prompt ${key} is missing 'messages' or 'input' array.`)
-      }
-      if (promptJSON.input && !promptJSON.messages) {
-        promptJSON.messages = promptJSON.input
-      }
-      promptJSON._provider = 'openai'
-      return promptJSON
-    }
-
-    // Parse value - must be valid structured JSON
-    let promptJSON: any
-    if (typeof data.value === 'string') {
-      try {
-        promptJSON = JSON.parse(data.value)
-      } catch (parseError) {
-        // Not JSON - this is an error, prompt must be structured
-        throw new Error(`Prompt ${key} is not valid JSON. It must be structured JSON with a 'messages' array. Error: ${parseError instanceof Error ? parseError.message : 'Parse failed'}`)
-      }
-    } else if (typeof data.value === 'object' && data.value !== null) {
-      // Already an object (JSONB was auto-parsed)
-      promptJSON = data.value
-    } else {
-      // Unknown format - this is an error
-      throw new Error(`Prompt ${key} has invalid format. Expected structured JSON with a 'messages' array, got ${typeof data.value}`)
-    }
-
-    // Validate structure - must have messages OR input array (OpenAI Responses API uses 'input', we normalize to 'messages')
-    // Check for both 'messages' (standard format) and 'input' (OpenAI Responses API format)
-    if (!promptJSON.messages && !promptJSON.input) {
-      throw new Error(`Prompt ${key} is missing 'messages' or 'input' array. It must be structured JSON like: { "model": "...", "messages": [...] } or { "model": "...", "input": [...] }`)
-    }
-
-    if (promptJSON.messages && !Array.isArray(promptJSON.messages)) {
-      throw new Error(`Prompt ${key} has 'messages' but it's not an array. It must be an array of message objects.`)
-    }
-
-    if (promptJSON.input && !Array.isArray(promptJSON.input)) {
-      throw new Error(`Prompt ${key} has 'input' but it's not an array. It must be an array of message objects.`)
-    }
-
-    // Normalize: If it has 'input' but not 'messages', convert 'input' to 'messages' for internal use
-    // This allows database to store either format (Settings saves with 'input', but we use 'messages' internally)
-    if (promptJSON.input && !promptJSON.messages) {
-      promptJSON.messages = promptJSON.input
-      // Don't delete 'input' - keep it so it can be used directly if needed
-    }
-
-    // Auto-detect provider from model name
-    const modelName = (promptJSON.model || '').toLowerCase()
-    if (modelName.includes('claude') || modelName.includes('sonnet') || modelName.includes('opus') || modelName.includes('haiku')) {
-      promptJSON._provider = 'claude'
-      console.log(`[AI] Auto-detected Claude provider from model: ${promptJSON.model}`)
-    } else {
-      promptJSON._provider = 'openai'
-    }
-
-    return promptJSON
-  } catch (error) {
-    console.error(`❌ [AI-PROMPT] ERROR fetching ${key}:`, error)
-
-    if (!fallbackText) {
-      throw error
-    }
-
-    // Return fallback wrapped in minimal JSON
-    return {
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: fallbackText }],
-      _provider: 'openai'
-    }
-  }
-}
-
-// Legacy function - DEPRECATED, use getPromptJSON instead
-async function getPromptWithProvider(key: string, fallback: string): Promise<{ prompt: string; provider: 'openai' | 'claude' }> {
-  console.warn(`⚠️  [DEPRECATED] getPromptWithProvider() is deprecated. Use getPromptJSON() instead for ${key}`)
-  try {
-    const promptJSON = await getPromptJSON(key, fallback)
-    const provider = promptJSON._provider || 'openai'
-
-    // Return just the content from first user message for backward compat
-    let promptText = fallback
-    if (promptJSON.messages && promptJSON.messages.length > 0) {
-      const userMsg = promptJSON.messages.find((m: any) => m.role === 'user')
-      promptText = userMsg?.content || fallback
-    }
-
-    return { prompt: promptText, provider }
-  } catch (error) {
-    return { prompt: fallback, provider: 'openai' }
-  }
-}
+import { supabaseAdmin } from '@/lib/supabase'
+import { getPrompt, callWithStructuredPrompt } from './core'
+import type { StructuredPromptConfig } from './types'
 
 // AI Prompts - Static fallbacks when database is unavailable
 const FALLBACK_PROMPTS = {
@@ -209,7 +33,7 @@ LOW SCORING (1-6): Individual achievements with limited community effect, intern
 BONUS: Add 2 extra points to total_score for stories mentioning multiple local communities or regional impact.
 
 BLANK RATING CONDITIONS: Leave all fields blank if:
-- Description contains ≤10 words
+- Description contains \u226410 words
 - Post is about weather happening today/tomorrow
 - Post is written before an event happening "today"/"tonight"/"this evening"
 - Post mentions events happening "today", "tonight", or "this evening" (we do not include same-day events)
@@ -236,10 +60,10 @@ You are identifying duplicate stories for a NEWSLETTER. Your goal is to prevent 
 
 CRITICAL DEDUPLICATION RULES:
 1. **SAME STORY = DUPLICATE**: Articles covering the SAME news story from different sources are DUPLICATES
-   - Example: "OpenAI Restructures, Unlocks Capital" + "OpenAI Restructures, Eases Capital Constraints" → DUPLICATES (same OpenAI $500B restructure story)
+   - Example: "OpenAI Restructures, Unlocks Capital" + "OpenAI Restructures, Eases Capital Constraints" \u2192 DUPLICATES (same OpenAI $500B restructure story)
 
 2. **SHARED KEY FACTS = DUPLICATE**: If articles share 3+ key facts (companies, people, amounts, events), they are DUPLICATES
-   - Example: Both mention "OpenAI", "$500 billion", "Microsoft 27%", "Sam Altman" → DUPLICATES
+   - Example: Both mention "OpenAI", "$500 billion", "Microsoft 27%", "Sam Altman" \u2192 DUPLICATES
 
 3. **SAME TYPE OF EVENT = DUPLICATE**: Multiple similar events (fire dept open houses, school meetings, business openings)
 
@@ -250,10 +74,10 @@ CRITICAL DEDUPLICATION RULES:
 6. **KEEP BEST VERSION**: For each group, keep the article with the MOST SPECIFIC details (names, dates, locations, quotes)
 
 EXAMPLES OF DUPLICATES:
-- "OpenAI valued at $500B" + "OpenAI restructures with Microsoft stake" → DUPLICATES (same company restructure story)
-- "Company announces layoffs" + "Employees let go at Company" → DUPLICATES (same layoff event)
-- "Sartell Fire Dept Open House Oct 12" + "St. Cloud Fire Station Open House Oct 12" → DUPLICATES (same type of event)
-- "School board meeting tonight" + "Board to discuss budget tonight" → DUPLICATES (same event)
+- "OpenAI valued at $500B" + "OpenAI restructures with Microsoft stake" \u2192 DUPLICATES (same company restructure story)
+- "Company announces layoffs" + "Employees let go at Company" \u2192 DUPLICATES (same layoff event)
+- "Sartell Fire Dept Open House Oct 12" + "St. Cloud Fire Station Open House Oct 12" \u2192 DUPLICATES (same type of event)
+- "School board meeting tonight" + "Board to discuss budget tonight" \u2192 DUPLICATES (same event)
 
 Articles to analyze (array indices are 0-based - first article is index 0):
 ${posts.map((post, i) => `
@@ -286,13 +110,13 @@ Description: ${post.description || 'No description available'}
 Content: ${post.content || 'No additional content'}
 
 MANDATORY STRICT CONTENT RULES - FOLLOW EXACTLY:
-1. Articles must be COMPLETELY REWRITTEN and summarized — similar phrasing is acceptable but NO exact copying
-2. Use ONLY information contained in the source post above — DO NOT add any external information
+1. Articles must be COMPLETELY REWRITTEN and summarized \u2014 similar phrasing is acceptable but NO exact copying
+2. Use ONLY information contained in the source post above \u2014 DO NOT add any external information
 3. DO NOT add numbers, dates, quotes, or details not explicitly stated in the original
-4. NEVER use 'today,' 'tomorrow,' 'yesterday' — use actual day of week if date reference needed
+4. NEVER use 'today,' 'tomorrow,' 'yesterday' \u2014 use actual day of week if date reference needed
 5. NO emojis, hashtags (#), or URLs anywhere in headlines or article content
-6. Stick to facts only — NO editorial commentary, opinions, or speculation
-7. Write from THIRD-PARTY PERSPECTIVE — never use "we," "our," or "us" unless referring to the community as a whole
+6. Stick to facts only \u2014 NO editorial commentary, opinions, or speculation
+7. Write from THIRD-PARTY PERSPECTIVE \u2014 never use "we," "our," or "us" unless referring to the community as a whole
 
 HEADLINE REQUIREMENTS - MUST FOLLOW:
 - NEVER reuse or slightly reword the original title
@@ -305,17 +129,17 @@ ARTICLE REQUIREMENTS:
 - Length: EXACTLY 40-75 words
 - Structure: One concise paragraph only
 - Style: Informative, engaging, locally relevant
-- REWRITE completely — do not copy phrases from original
+- REWRITE completely \u2014 do not copy phrases from original
 
 BEFORE RESPONDING: Double-check that you have:
-✓ Completely rewritten the content (similar phrasing OK, no exact copying)
-✓ Used only information from the source post
-✓ Created a new headline (not modified original)
-✓ Stayed between 40-75 words
-✓ Removed all emojis, hashtags (#), and URLs
-✓ Used third-party perspective (no "we/our/us" unless community-wide)
-✓ Avoided all prohibited words and phrases
-✓ Included no editorial commentary
+\u2713 Completely rewritten the content (similar phrasing OK, no exact copying)
+\u2713 Used only information from the source post
+\u2713 Created a new headline (not modified original)
+\u2713 Stayed between 40-75 words
+\u2713 Removed all emojis, hashtags (#), and URLs
+\u2713 Used third-party perspective (no "we/our/us" unless community-wide)
+\u2713 Avoided all prohibited words and phrases
+\u2713 Included no editorial commentary
 
 Respond with valid JSON in this exact format:
 {
@@ -406,18 +230,18 @@ Headline: ${top_article.headline}
 Content: ${top_article.content}
 
 HARD RULES:
-- ≤ 40 characters (count every space and punctuation) - this allows room for ice cream emoji prefix
+- \u2264 40 characters (count every space and punctuation) - this allows room for ice cream emoji prefix
 - Title Case; avoid ALL-CAPS words
 - Omit the year
-- No em dashes (—)
+- No em dashes (\u2014)
 - No colons (:) or other punctuation that splits the headline into two parts
-- Return only the headline text—nothing else (no emoji, that will be added automatically)
+- Return only the headline text\u2014nothing else (no emoji, that will be added automatically)
 
 IMPACT CHECKLIST:
 - Lead with a power verb
-- Local pride—include place name if it adds punch
-- Trim fluff—every word earns its spot
-- Character audit—recount after final trim
+- Local pride\u2014include place name if it adds punch
+- Trim fluff\u2014every word earns its spot
+- Character audit\u2014recount after final trim
 
 STYLE GUIDANCE: Write the headline as if the event just happened, not as a historical reflection or anniversary. Avoid words like 'Legacy,' 'Honors,' 'Remembers,' or 'Celebrates History.' Use an urgent, active voice suitable for a breaking news front page.
 
@@ -530,7 +354,7 @@ Analyze this image for a St. Cloud, Minnesota local newsletter. Focus on identif
 Return strict JSON:
 {
   "caption": "...",
-  "alt_text": "10–14 words, descriptive, no quotes",
+  "alt_text": "10\u201314 words, descriptive, no quotes",
   "tags_scored": [
     {"type":"scene","name":"warehouse","conf":0.95},
     {"type":"object","name":"golf_cart","conf":0.98},
@@ -915,10 +739,10 @@ HEADLINE REQUIREMENTS - MUST FOLLOW:
 - Style: Active voice, compelling, news-worthy
 
 BEFORE RESPONDING: Double-check that you have:
-✓ Created a new headline (not modified original)
-✓ Used powerful verbs and emotional adjectives
-✓ Avoided all prohibited words and punctuation
-✓ Removed all emojis, hashtags (#), and URLs
+\u2713 Created a new headline (not modified original)
+\u2713 Used powerful verbs and emotional adjectives
+\u2713 Avoided all prohibited words and punctuation
+\u2713 Removed all emojis, hashtags (#), and URLs
 
 Respond with ONLY the headline text - no JSON, no quotes, no extra formatting. Just the headline itself.`,
 
@@ -934,28 +758,28 @@ Description: ${post.description || 'No description available'}
 Content: ${post.content || 'No additional content'}
 
 MANDATORY STRICT CONTENT RULES:
-1. Articles must be COMPLETELY REWRITTEN and summarized — similar phrasing is acceptable but NO exact copying
-2. Use ONLY information contained in the source post above — DO NOT add any external information
+1. Articles must be COMPLETELY REWRITTEN and summarized \u2014 similar phrasing is acceptable but NO exact copying
+2. Use ONLY information contained in the source post above \u2014 DO NOT add any external information
 3. DO NOT add numbers, dates, quotes, or details not explicitly stated in the original
-4. NEVER use 'today,' 'tomorrow,' 'yesterday' — use actual day of week if date reference needed
+4. NEVER use 'today,' 'tomorrow,' 'yesterday' \u2014 use actual day of week if date reference needed
 5. NO emojis, hashtags (#), or URLs anywhere in article content
-6. Stick to facts only — NO editorial commentary, opinions, or speculation
-7. Write from THIRD-PARTY PERSPECTIVE — never use "we," "our," or "us" unless referring to the community as a whole
+6. Stick to facts only \u2014 NO editorial commentary, opinions, or speculation
+7. Write from THIRD-PARTY PERSPECTIVE \u2014 never use "we," "our," or "us" unless referring to the community as a whole
 
 ARTICLE REQUIREMENTS:
 - Length: EXACTLY 40-75 words
 - Structure: One concise paragraph only
 - Style: Informative, engaging, locally relevant
-- REWRITE completely — do not copy phrases from original
+- REWRITE completely \u2014 do not copy phrases from original
 
 BEFORE RESPONDING: Double-check that you have:
-✓ Completely rewritten the content (similar phrasing OK, no exact copying)
-✓ Used only information from the source post
-✓ Stayed between 40-75 words
-✓ Removed all emojis, hashtags (#), and URLs
-✓ Used third-party perspective (no "we/our/us" unless community-wide)
-✓ Avoided all prohibited words and phrases
-✓ Included no editorial commentary
+\u2713 Completely rewritten the content (similar phrasing OK, no exact copying)
+\u2713 Used only information from the source post
+\u2713 Stayed between 40-75 words
+\u2713 Removed all emojis, hashtags (#), and URLs
+\u2713 Used third-party perspective (no "we/our/us" unless community-wide)
+\u2713 Avoided all prohibited words and phrases
+\u2713 Included no editorial commentary
 
 Respond with valid JSON in this exact format:
 {
@@ -982,10 +806,10 @@ HEADLINE REQUIREMENTS - MUST FOLLOW:
 - Style: Active voice, compelling, news-worthy
 
 BEFORE RESPONDING: Double-check that you have:
-✓ Created a new headline (not modified original)
-✓ Used powerful verbs and emotional adjectives
-✓ Avoided all prohibited words and punctuation
-✓ Removed all emojis, hashtags (#), and URLs
+\u2713 Created a new headline (not modified original)
+\u2713 Used powerful verbs and emotional adjectives
+\u2713 Avoided all prohibited words and punctuation
+\u2713 Removed all emojis, hashtags (#), and URLs
 
 Respond with ONLY the headline text - no JSON, no quotes, no extra formatting. Just the headline itself.`,
 
@@ -1016,13 +840,13 @@ ARTICLE REQUIREMENTS:
 - REWRITE completely - do not copy phrases
 
 BEFORE RESPONDING: Double-check that you have:
-✓ Completely rewritten the content (similar phrasing OK, no exact copying)
-✓ Used only information from the source post
-✓ Stayed between 75-150 words
-✓ Removed all emojis, hashtags (#), and URLs
-✓ Used third-party perspective (no "we/our/us" unless community-wide)
-✓ Avoided all prohibited words and phrases
-✓ Included no editorial commentary
+\u2713 Completely rewritten the content (similar phrasing OK, no exact copying)
+\u2713 Used only information from the source post
+\u2713 Stayed between 75-150 words
+\u2713 Removed all emojis, hashtags (#), and URLs
+\u2713 Used third-party perspective (no "we/our/us" unless community-wide)
+\u2713 Avoided all prohibited words and phrases
+\u2713 Included no editorial commentary
 
 Respond with valid JSON in this exact format:
 {
@@ -1696,1012 +1520,5 @@ ${i}. Title: ${post.title}
       console.error('Error fetching secondaryArticleBody prompt, using fallback:', error)
       return FALLBACK_PROMPTS.secondaryArticleBody(post, headline)
     }
-  }
-}
-
-// This function is no longer needed since we use web scraping instead of AI
-export async function callOpenAIWithWeb(userPrompt: string, maxTokens = 1000, temperature = 0) {
-  throw new Error('Web-enabled AI calls have been replaced with direct web scraping. Use wordle-scraper.ts instead.')
-}
-
-// Special function for road work generation using Responses API with web search
-export async function callOpenAIWithWebSearch(systemPrompt: string, userPrompt: string): Promise<any> {
-  const controller = new AbortController()
-  try {
-    console.log('Making OpenAI Responses API request with web search...')
-    console.log('System prompt length:', systemPrompt.length)
-    console.log('User prompt length:', userPrompt.length)
-
-    const timeoutId = setTimeout(() => controller.abort(), 180000) // 180s (3min) timeout for web search
-
-    try {
-      console.log('Using GPT-4o model with web search tools...')
-
-      // Use the Responses API with web tools as provided by the user
-      const response = await (openai as any).responses.create({
-        model: 'gpt-4o',
-        tools: [{ type: 'web_search_preview' }], // correct web search tool type
-        input: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0
-      }, {
-        signal: controller.signal
-      })
-
-      clearTimeout(timeoutId)
-
-      // Log the full response structure for debugging
-      console.log('Full response structure:', JSON.stringify(response, null, 2).substring(0, 1000))
-
-      // Extract the response text using the format from the user's example
-      // For GPT-5 (reasoning model), search for json_schema content item explicitly
-      // since reasoning block may be first item (empty, redacted)
-      const outputArray = response.output?.[0]?.content
-      const jsonSchemaItem = outputArray?.find((c: any) => c.type === "json_schema")
-      const textItem = outputArray?.find((c: any) => c.type === "text")
-
-      const text = jsonSchemaItem?.json ??                         // JSON schema response (GPT-5 compatible)
-        jsonSchemaItem?.input_json ??                             // Alternative JSON location
-        response.output?.[0]?.content?.[0]?.json ??              // Fallback: first content item (GPT-4o)
-        response.output?.[0]?.content?.[0]?.input_json ??         // Fallback: first input_json
-        textItem?.text ??                                         // Text from text content item
-        response.output?.[0]?.content?.[0]?.text ??              // Fallback: first text
-        ""
-
-      if (!text) {
-        console.error('No text found in response. Response keys:', Object.keys(response))
-        throw new Error('No response from OpenAI Responses API')
-      }
-
-      console.log('OpenAI Responses API response received, length:', text.length)
-      console.log('Response preview:', text.substring(0, 500))
-
-      // Extract JSON array from the response
-      const start = text.indexOf("[")
-      const end = text.lastIndexOf("]")
-
-      if (start === -1 || end === -1) {
-        console.warn('No JSON array found in response')
-        console.warn('Full response text:', text.substring(0, 1000))
-        return { raw: text }
-      }
-
-      const jsonString = text.slice(start, end + 1)
-      console.log('Extracted JSON string length:', jsonString.length)
-      console.log('JSON preview:', jsonString.substring(0, 300))
-
-      try {
-        const parsedData = JSON.parse(jsonString)
-        console.log('Successfully parsed road work data:', parsedData.length, 'items')
-        if (parsedData.length > 0) {
-          console.log('First item:', JSON.stringify(parsedData[0], null, 2))
-        }
-        return parsedData
-      } catch (parseError) {
-        console.error('Failed to parse extracted JSON:', parseError)
-        console.error('JSON string:', jsonString.substring(0, 500))
-        return { raw: text }
-      }
-
-    } catch (error) {
-      clearTimeout(timeoutId)
-      throw error
-    }
-  } catch (error) {
-    const errorMsg = error instanceof Error 
-      ? error.message 
-      : typeof error === 'object' && error !== null
-        ? JSON.stringify(error, null, 2)
-        : String(error)
-    console.error('OpenAI Responses API error:', errorMsg)
-    if (error instanceof Error) {
-      console.error('Error details:', error.message)
-      console.error('Error name:', error.name)
-    }
-    throw error
-  }
-}
-
-function parseJSONResponse(content: string) {
-  try {
-    // Clean the content - remove any text before/after JSON (support both objects {} and arrays [])
-    const objectMatch = content.match(/\{[\s\S]*\}/)
-    const arrayMatch = content.match(/\[[\s\S]*\]/)
-
-    if (objectMatch) {
-      // Prefer object match to preserve full response structure (e.g., {"bullet_hooks":[],"summary":""})
-      return JSON.parse(objectMatch[0])
-    } else if (arrayMatch) {
-      // Use array match only if no object wraps it
-      return JSON.parse(arrayMatch[0])
-    } else {
-      // Try parsing the entire content
-      return JSON.parse(content.trim())
-    }
-  } catch (parseError) {
-    // Not an error - many prompts return plain text, not JSON
-    // Wrap in { raw: content } for calling code to extract
-    return { raw: content }
-  }
-}
-
-// Enhanced OpenAI call with support for structured prompts (system + examples + user)
-export interface OpenAICallOptions {
-  systemPrompt?: string
-  examples?: Array<{ role: 'assistant', content: string }>
-  userPrompt?: string
-  maxTokens?: number
-  temperature?: number
-  topP?: number
-  presencePenalty?: number
-  frequencyPenalty?: number
-}
-
-// Interface for structured prompt stored in database
-export interface StructuredPromptConfig {
-  model?: string
-  max_output_tokens?: number
-  temperature?: number
-  top_p?: number
-  response_format?: any  // Allow any response_format structure
-  text?: any  // OpenAI Responses API format (for JSON schema, etc.)
-  messages?: Array<{
-    role: 'system' | 'assistant' | 'user'
-    content: string | any  // Allow string or array (Responses API format)
-  }>
-  input?: Array<{
-    role: 'system' | 'assistant' | 'user'
-    content: string | any  // Responses API uses content as array
-  }>  // OpenAI Responses API uses 'input' instead of 'messages'
-}
-
-// Helper function to call OpenAI or Claude with structured prompt from database
-// Sends the JSON prompt EXACTLY as-is (with placeholder replacement only)
-export async function callWithStructuredPrompt(
-  promptConfig: StructuredPromptConfig,
-  placeholders: Record<string, string> = {},
-  provider: 'openai' | 'claude' = 'openai',
-  promptKey?: string
-): Promise<any> {
-  // Validate promptConfig structure
-  if (!promptConfig || typeof promptConfig !== 'object') {
-    throw new Error('Invalid promptConfig: must be an object')
-  }
-  
-  // Accept either 'input' (Responses API format) or 'messages' (standard format)
-  // Normalize to 'messages' internally for processing
-  const messagesArray = promptConfig.messages || promptConfig.input
-  if (!messagesArray || !Array.isArray(messagesArray)) {
-    throw new Error('Invalid promptConfig: must have either "messages" or "input" array')
-  }
-  
-  // If promptConfig has 'input' but not 'messages', normalize it to 'messages' for internal use
-  // We'll convert back to 'input' when sending to Responses API if needed
-  if (!promptConfig.messages && promptConfig.input) {
-    promptConfig.messages = promptConfig.input
-  }
-  
-
-  // Deep clone the entire config to avoid mutating the original
-  const apiRequest = JSON.parse(JSON.stringify(promptConfig))
-
-  // Replace placeholders recursively in the entire object
-  function replacePlaceholders(obj: any): any {
-    if (typeof obj === 'string') {
-      // First replace named placeholders
-      let result = Object.entries(placeholders).reduce(
-        (str, [key, value]) => str.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value),
-        obj
-      )
-      // Then replace random integer placeholders: {{random_X-Y}}
-      result = result.replace(/\{\{random_(\d+)-(\d+)\}\}/g, (match, minStr, maxStr) => {
-        const min = parseInt(minStr, 10)
-        const max = parseInt(maxStr, 10)
-        if (isNaN(min) || isNaN(max) || min > max) {
-          console.warn(`[AI] Invalid random placeholder: ${match}`)
-          return match // Return unchanged if invalid
-        }
-        return String(Math.floor(Math.random() * (max - min + 1)) + min)
-      })
-      return result
-    }
-    if (Array.isArray(obj)) {
-      return obj.map(item => replacePlaceholders(item))
-    }
-    if (typeof obj === 'object' && obj !== null) {
-      const result: any = {}
-      for (const key in obj) {
-        result[key] = replacePlaceholders(obj[key])
-      }
-      return result
-    }
-    return obj
-  }
-
-  // Replace all placeholders in the entire config
-  const processedRequest = replacePlaceholders(apiRequest)
-
-  // Remove custom application fields that are not valid API parameters
-  // These fields are used by our application logic but should not be sent to the API
-  const customFields = ['response_field', 'provider', 'input'] // 'input' is handled separately below
-  for (const field of customFields) {
-    if (field in processedRequest) {
-      delete processedRequest[field]
-    }
-  }
-
-  // Add timeout
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 180000) // 180s (3min) for GPT-5
-
-  try {
-    let content: string = ''
-
-    if (provider === 'claude') {
-      // Claude API - send exactly as-is (messages stays as messages)
-      console.log(`[AI] Using Claude API for prompt (provider: ${provider})`)
-
-      const response = await anthropic.messages.create(processedRequest, {
-        signal: controller.signal
-      } as any)
-
-      clearTimeout(timeoutId)
-
-      // Extract content from Claude response
-      const textContent = response.content.find((c: any) => c.type === 'text')
-      content = textContent && 'text' in textContent ? textContent.text : ''
-
-      // Debug: Log raw Claude response to check for newlines
-      console.log(`[AI][Claude] Raw response length: ${content.length}`)
-      console.log(`[AI][Claude] Contains \\n: ${content.includes('\n')}`)
-      console.log(`[AI][Claude] Contains \\n\\n: ${content.includes('\n\n')}`)
-      console.log(`[AI][Claude] Contains literal backslash-n: ${content.includes('\\n')}`)
-      console.log(`[AI][Claude] First 500 chars: ${content.substring(0, 500)}`)
-
-      if (!content) {
-        throw new Error('No response from Claude')
-      }
-    } else {
-      // OpenAI Responses API - only rename messages to input (API requirement)
-      console.log(`[AI] Using OpenAI API for prompt (provider: ${provider})`)
-      if (processedRequest.messages) {
-        processedRequest.input = processedRequest.messages
-        delete processedRequest.messages
-      }
-
-      const response = await (openai as any).responses.create(processedRequest, {
-        signal: controller.signal
-      })
-
-      clearTimeout(timeoutId)
-
-      // Extract content from Responses API format
-      // For GPT-5 (reasoning model), search for json_schema content item explicitly
-      // since reasoning block may be first item (empty, redacted)
-      const outputArray = response.output?.[0]?.content
-      const jsonSchemaItem = outputArray?.find((c: any) => c.type === "json_schema")
-      const textItem = outputArray?.find((c: any) => c.type === "text")
-
-      let rawContent = jsonSchemaItem?.json ??                    // JSON schema response (GPT-5 compatible)
-        jsonSchemaItem?.input_json ??                             // Alternative JSON location
-        response.output?.[0]?.content?.[0]?.json ??              // Fallback: first content item (GPT-4o)
-        response.output?.[0]?.content?.[0]?.input_json ??        // Fallback: first input_json
-        textItem?.text ??                                         // Text from text content item
-        response.output?.[0]?.content?.[0]?.text ??              // Fallback: first text
-        response.output_text ??                                   // Legacy location
-        response.text ??
-        ""
-
-      if (!rawContent || (typeof rawContent === 'string' && rawContent === '')) {
-        console.error('[AI] No content found in OpenAI response:', JSON.stringify({
-          hasOutput: !!response.output,
-          outputLength: response.output?.length,
-          outputText: response.output_text,
-          responseKeys: Object.keys(response || {})
-        }, null, 2))
-        throw new Error('No response from OpenAI')
-      }
-
-      // If rawContent is already a parsed object/array (from JSON schema), use it directly
-      // This matches the test endpoint behavior - if it's an object, use it as-is
-      if (typeof rawContent === 'object' && rawContent !== null && !Array.isArray(rawContent)) {
-        // Check if it's the response wrapper (has 'output', 'output_text', 'id')
-        if ('output' in rawContent || 'output_text' in rawContent || 'id' in rawContent) {
-          // This is the response wrapper - try to extract actual content
-          const extracted = rawContent.output_text ?? rawContent.text
-          if (extracted && typeof extracted !== 'object') {
-            // Extracted content is a string, continue to parsing
-            rawContent = extracted
-          } else if (extracted && typeof extracted === 'object') {
-            // Extracted content is already parsed, use it
-            return extracted
-          } else {
-            // Can't extract, might be valid response structure
-            return rawContent
-          }
-        } else {
-          // Already the parsed AI response content (from JSON schema)
-          return rawContent
-        }
-      } else if (Array.isArray(rawContent)) {
-        // Already a parsed array (from JSON schema)
-        return rawContent
-      }
-      
-      // Otherwise, it's a string that needs parsing
-      content = typeof rawContent === 'string' ? rawContent : String(rawContent)
-    }
-
-    // Try to parse as JSON, fallback to raw content (same for both providers)
-    try {
-      // Ensure content is defined and is a string (should be set in if/else above)
-      if (typeof content === 'undefined') {
-        console.error('[AI] Content variable is undefined - this should not happen')
-        return { raw: 'Content was undefined' }
-      }
-
-      // Validate content is a string
-      if (!content || typeof content !== 'string') {
-        console.error('[AI] Invalid content type for parsing:', typeof content, content)
-        return { raw: content }
-      }
-
-      let cleanedContent: string = String(content) // Ensure it's definitely a string
-      try {
-        const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
-        if (codeFenceMatch && codeFenceMatch[1] !== undefined) {
-          cleanedContent = codeFenceMatch[1]
-        }
-      } catch (matchError) {
-        // If regex matching fails, use original content
-        console.warn('[AI] Regex match failed, using original content:', matchError)
-        cleanedContent = String(content)
-      }
-
-      // Validate cleanedContent is still a string
-      if (!cleanedContent || typeof cleanedContent !== 'string') {
-        console.error('[AI] Invalid cleanedContent after code fence removal:', typeof cleanedContent, cleanedContent)
-        return { raw: content }
-      }
-
-      // Ensure cleanedContent is still a valid string before calling .match()
-      if (!cleanedContent || typeof cleanedContent !== 'string') {
-        console.error('[AI] cleanedContent is not a string before regex matching:', typeof cleanedContent, cleanedContent)
-        return { raw: content }
-      }
-
-      let objectMatch: RegExpMatchArray | null = null
-      let arrayMatch: RegExpMatchArray | null = null
-      
-      try {
-        objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
-      } catch (matchError) {
-        console.warn('[AI] Object match failed:', matchError)
-      }
-      
-      try {
-        arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
-      } catch (matchError) {
-        console.warn('[AI] Array match failed:', matchError)
-      }
-
-      // Prefer object match to preserve full response structure (e.g., {"bullet_hooks":[],"summary":""})
-      let parsed: any
-      if (objectMatch && Array.isArray(objectMatch) && objectMatch[0]) {
-        parsed = JSON.parse(objectMatch[0])
-      } else if (arrayMatch && Array.isArray(arrayMatch) && arrayMatch[0]) {
-        parsed = JSON.parse(arrayMatch[0])
-      } else {
-        parsed = JSON.parse(cleanedContent.trim())
-      }
-
-      // Debug: Log parsed content to check newlines preservation
-      if (parsed && parsed.content) {
-        console.log(`[AI][Parsed] Content length: ${parsed.content.length}`)
-        console.log(`[AI][Parsed] Contains \\n: ${parsed.content.includes('\n')}`)
-        console.log(`[AI][Parsed] Contains \\n\\n: ${parsed.content.includes('\n\n')}`)
-        console.log(`[AI][Parsed] First 300 chars: ${parsed.content.substring(0, 300)}`)
-      }
-
-      return parsed
-    } catch (parseError) {
-      // Return raw content wrapped in object
-      return { raw: content }
-    }
-  } catch (error) {
-    clearTimeout(timeoutId)
-    throw error
-  }
-}
-
-/**
- * Universal AI caller - loads prompt from database and calls AI
- * This is the NEW standard way to call AI - prompts are complete JSON stored in database
- *
- * @param promptKey - Key in app_settings table (e.g. 'ai_prompt_primary_article_title')
- * @param placeholders - Object with placeholder values (e.g. {title: '...', content: '...'})
- * @param fallbackText - Optional fallback text if prompt not in database
- * @returns Parsed JSON response from AI
- */
-export async function callAIWithPrompt(
-  promptKey: string,
-  newsletterId: string,
-  placeholders: Record<string, string> = {},
-  fallbackText?: string
-): Promise<any> {
-  // Load complete JSON prompt from database
-  const promptJSON = await getPromptJSON(promptKey, newsletterId, fallbackText)
-
-  // Extract provider info
-  const provider = promptJSON._provider || 'openai'
-
-  // Remove internal fields before sending to API
-  delete promptJSON._provider
-
-  // Call AI with complete structured prompt (pass promptKey for subject line logging)
-  return await callWithStructuredPrompt(promptJSON, placeholders, provider, promptKey)
-}
-
-export async function callOpenAIStructured(options: OpenAICallOptions) {
-  try {
-    const {
-      systemPrompt,
-      examples = [],
-      userPrompt,
-      maxTokens = 1000,
-      temperature = 0.3,
-      topP,
-      presencePenalty,
-      frequencyPenalty
-    } = options
-
-    // Build messages array
-    const messages: Array<{ role: 'system' | 'assistant' | 'user', content: string }> = []
-
-    if (systemPrompt) {
-      messages.push({ role: 'system', content: systemPrompt })
-    }
-
-    // Add few-shot examples
-    examples.forEach(example => {
-      messages.push(example)
-    })
-
-    if (userPrompt) {
-      messages.push({ role: 'user', content: userPrompt })
-    }
-
-    // Add timeout to prevent hanging
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 180000) // 180s (3min) for GPT-5 // 30 second timeout
-
-    try {
-      const requestOptions: any = {
-        model: 'gpt-4o',
-        messages,
-        max_output_tokens: maxTokens,
-        temperature
-      }
-
-      // Add optional parameters if provided
-      if (topP !== undefined) requestOptions.top_p = topP
-      if (presencePenalty !== undefined) requestOptions.presence_penalty = presencePenalty
-      if (frequencyPenalty !== undefined) requestOptions.frequency_penalty = frequencyPenalty
-
-      // Debug: Log what we're actually sending to OpenAI
-      console.log('[AI] Sending to OpenAI - messages count:', messages.length)
-      messages.forEach((msg, i) => {
-        console.log(`[AI] Final message ${i} - role: ${msg.role}, content type: ${typeof msg.content}, content preview:`,
-          typeof msg.content === 'string' ? msg.content.substring(0, 50) : JSON.stringify(msg.content).substring(0, 50))
-      })
-
-      // Convert messages format to input format for Responses API
-      const inputMessages = requestOptions.messages.map((msg: any) => ({
-        role: msg.role,
-        content: msg.content
-      }))
-
-      const response = await (openai as any).responses.create({
-        model: requestOptions.model,
-        input: inputMessages,
-        temperature: requestOptions.temperature,
-        max_output_tokens: requestOptions.max_output_tokens,
-        ...(requestOptions.top_p !== undefined && { top_p: requestOptions.top_p }),
-        ...(requestOptions.presence_penalty !== undefined && { presence_penalty: requestOptions.presence_penalty }),
-        ...(requestOptions.frequency_penalty !== undefined && { frequency_penalty: requestOptions.frequency_penalty })
-      }, {
-        signal: controller.signal
-      })
-
-      clearTimeout(timeoutId)
-
-      // Extract content from Responses API format
-      // For GPT-5 (reasoning model), search for json_schema content item explicitly
-      // since reasoning block may be first item (empty, redacted)
-      const outputArray = response.output?.[0]?.content
-      const jsonSchemaItem = outputArray?.find((c: any) => c.type === "json_schema")
-      const textItem = outputArray?.find((c: any) => c.type === "text")
-
-      let rawContent = jsonSchemaItem?.json ??                    // JSON schema response (GPT-5 compatible)
-        jsonSchemaItem?.input_json ??                             // Alternative JSON location
-        response.output?.[0]?.content?.[0]?.json ??              // Fallback: first content item (GPT-4o)
-        response.output?.[0]?.content?.[0]?.input_json ??        // Fallback: first input_json
-        textItem?.text ??                                         // Text from text content item
-        response.output?.[0]?.content?.[0]?.text ??              // Fallback: first text
-        response.output_text ??                                   // Legacy location
-        response.text ??
-        ""
-      
-      if (!rawContent || (typeof rawContent === 'string' && rawContent === '')) {
-        console.error('[AI] No content found in OpenAI response:', JSON.stringify({
-          hasOutput: !!response.output,
-          outputLength: response.output?.length,
-          outputText: response.output_text,
-          responseKeys: Object.keys(response || {})
-        }, null, 2))
-        throw new Error('No response from OpenAI')
-      }
-
-      // If rawContent is already a parsed object/array (from JSON schema), use it directly
-      if (typeof rawContent === 'object' && rawContent !== null && !Array.isArray(rawContent)) {
-        // Check if it's the response wrapper (has 'output', 'output_text', 'id')
-        if ('output' in rawContent || 'output_text' in rawContent || 'id' in rawContent) {
-          // This is the response wrapper - try to extract actual content
-          const extracted = rawContent.output_text ?? rawContent.text
-          if (extracted && typeof extracted !== 'object') {
-            rawContent = extracted
-          } else if (extracted && typeof extracted === 'object') {
-            return extracted
-          } else {
-            return rawContent
-          }
-        } else {
-          // Already the parsed AI response content (from JSON schema)
-          return rawContent
-        }
-      } else if (Array.isArray(rawContent)) {
-        // Already a parsed array (from JSON schema)
-        return rawContent
-      }
-
-      // Otherwise, it's a string that needs parsing
-      const content = typeof rawContent === 'string' ? rawContent : String(rawContent)
-
-      // Try to parse as JSON, fallback to raw content
-      try {
-        // Validate content is a string
-        if (!content || typeof content !== 'string') {
-          console.error('[AI] Invalid content type for parsing:', typeof content, content)
-          return { raw: content }
-        }
-
-        // Strip markdown code fences first
-        let cleanedContent: string = String(content) // Ensure it's definitely a string
-        try {
-          const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
-          if (codeFenceMatch && codeFenceMatch[1] !== undefined) {
-            cleanedContent = codeFenceMatch[1]
-          }
-        } catch (matchError) {
-          // If regex matching fails, use original content
-          console.warn('[AI] Regex match failed in callOpenAIWithStructuredOptions, using original content:', matchError)
-          cleanedContent = String(content)
-        }
-
-        // Validate cleanedContent is still a string
-        if (!cleanedContent || typeof cleanedContent !== 'string') {
-          console.error('[AI] Invalid cleanedContent after code fence removal:', typeof cleanedContent, cleanedContent)
-          return { raw: content }
-        }
-
-        // Ensure cleanedContent is still a valid string before calling .match()
-        if (!cleanedContent || typeof cleanedContent !== 'string') {
-          console.error('[AI] cleanedContent is not a string before regex matching in callOpenAI:', typeof cleanedContent, cleanedContent)
-          return { raw: content }
-        }
-
-        let objectMatch: RegExpMatchArray | null = null
-        let arrayMatch: RegExpMatchArray | null = null
-        
-        try {
-          objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
-        } catch (matchError) {
-          console.warn('[AI] Object match failed in callOpenAI:', matchError)
-        }
-        
-        try {
-          arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
-        } catch (matchError) {
-          console.warn('[AI] Array match failed in callOpenAI:', matchError)
-        }
-
-        if (objectMatch && Array.isArray(objectMatch) && objectMatch[0]) {
-          // Prefer object match to preserve full response structure
-          return JSON.parse(objectMatch[0])
-        } else if (arrayMatch && Array.isArray(arrayMatch) && arrayMatch[0]) {
-          return JSON.parse(arrayMatch[0])
-        } else {
-          return JSON.parse(cleanedContent.trim())
-        }
-      } catch (parseError) {
-        // Return plain text wrapped in object
-        return { raw: content }
-      }
-    } catch (error) {
-      clearTimeout(timeoutId)
-      throw error
-    }
-  } catch (error) {
-    const errorMsg = error instanceof Error
-      ? error.message
-      : typeof error === 'object' && error !== null
-        ? JSON.stringify(error, null, 2)
-        : String(error)
-    console.error('OpenAI API error (structured):', errorMsg)
-    throw error
-  }
-}
-
-// Original function - kept for backward compatibility
-export async function callOpenAI(prompt: string, maxTokens = 1000, temperature = 0.3) {
-  try {
-    // console.log('Calling OpenAI API...') // Commented out to reduce log count
-
-    // Add timeout to prevent hanging
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 180000) // 180s (3min) for GPT-5 // 30 second timeout
-
-    try {
-      // console.log('Using GPT-4o model with improved JSON parsing...') // Commented out to reduce log count
-      const response = await (openai as any).responses.create({
-        model: 'gpt-4o',
-        input: [{ role: 'user', content: prompt }],
-        max_output_tokens: maxTokens,
-        temperature: temperature,
-      }, {
-        signal: controller.signal
-      })
-
-      clearTimeout(timeoutId)
-
-      // Extract content from Responses API format
-      // For GPT-5 (reasoning model), search for json_schema content item explicitly
-      // since reasoning block may be first item (empty, redacted)
-      const outputArray = response.output?.[0]?.content
-      const jsonSchemaItem = outputArray?.find((c: any) => c.type === "json_schema")
-      const textItem = outputArray?.find((c: any) => c.type === "text")
-
-      let rawContent = jsonSchemaItem?.json ??                    // JSON schema response (GPT-5 compatible)
-        jsonSchemaItem?.input_json ??                             // Alternative JSON location
-        response.output?.[0]?.content?.[0]?.json ??              // Fallback: first content item (GPT-4o)
-        response.output?.[0]?.content?.[0]?.input_json ??        // Fallback: first input_json
-        textItem?.text ??                                         // Text from text content item
-        response.output?.[0]?.content?.[0]?.text ??              // Fallback: first text
-        response.output_text ??                                   // Legacy location
-        response.text ??
-        ""
-
-      if (!rawContent || (typeof rawContent === 'string' && rawContent === '')) {
-        console.error('[AI] No content found in OpenAI response:', JSON.stringify({
-          hasOutput: !!response.output,
-          outputLength: response.output?.length,
-          outputText: response.output_text,
-          responseKeys: Object.keys(response || {})
-        }, null, 2))
-        throw new Error('No response from OpenAI')
-      }
-
-      // If rawContent is already a parsed object/array (from JSON schema), use it directly
-      // This matches the test endpoint behavior - if it's an object, use it as-is
-      if (typeof rawContent === 'object' && rawContent !== null && !Array.isArray(rawContent)) {
-        // Check if it's the response wrapper (has 'output', 'output_text', 'id')
-        if ('output' in rawContent || 'output_text' in rawContent || 'id' in rawContent) {
-          // This is the response wrapper - try to extract actual content
-          const extracted = rawContent.output_text ?? rawContent.text
-          if (extracted && typeof extracted !== 'object') {
-            // Extracted content is a string, continue to parsing
-            rawContent = extracted
-          } else if (extracted && typeof extracted === 'object') {
-            // Extracted content is already parsed, use it
-            return extracted
-          } else {
-            // Can't extract, might be valid response structure
-            return rawContent
-          }
-        } else {
-          // Already the parsed AI response content (from JSON schema)
-          return rawContent
-        }
-      } else if (Array.isArray(rawContent)) {
-        // Already a parsed array (from JSON schema)
-        return rawContent
-      }
-
-      // console.log('OpenAI response received') // Commented out to reduce log count
-
-      // Otherwise, it's a string that needs parsing
-      const content = typeof rawContent === 'string' ? rawContent : String(rawContent)
-
-      // Try to parse as JSON, fallback to raw content
-      try {
-        // Validate content is a string
-        if (!content || typeof content !== 'string') {
-          console.error('[AI] Invalid content type for parsing:', typeof content, content)
-          return { raw: content }
-        }
-
-        // Strip markdown code fences first (```json ... ``` or ``` ... ```)
-        // Match test endpoint logic exactly - it doesn't validate codeFenceMatch[1]
-        let cleanedContent: string = String(content) // Ensure it's definitely a string
-        try {
-          const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
-          if (codeFenceMatch && codeFenceMatch[1] !== undefined) {
-            cleanedContent = codeFenceMatch[1]
-          }
-        } catch (matchError) {
-          // If regex matching fails, use original content
-          console.warn('[AI] Regex match failed in callOpenAI, using original content:', matchError)
-          cleanedContent = String(content)
-        }
-
-        // Validate cleanedContent is still a string
-        if (!cleanedContent || typeof cleanedContent !== 'string') {
-          console.error('[AI] Invalid cleanedContent after code fence removal:', typeof cleanedContent, cleanedContent)
-          return { raw: content }
-        }
-
-        // Clean the content - remove any text before/after JSON (support both objects {} and arrays [])
-        // Match test endpoint logic exactly
-        // Ensure cleanedContent is still a valid string before calling .match()
-        if (!cleanedContent || typeof cleanedContent !== 'string') {
-          console.error('[AI] cleanedContent is not a string before regex matching:', typeof cleanedContent, cleanedContent)
-          return { raw: content }
-        }
-
-        let objectMatch: RegExpMatchArray | null = null
-        let arrayMatch: RegExpMatchArray | null = null
-        
-        try {
-          objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
-        } catch (matchError) {
-          console.warn('[AI] Object match failed in callWithStructuredPrompt:', matchError)
-        }
-        
-        try {
-          arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
-        } catch (matchError) {
-          console.warn('[AI] Array match failed in callWithStructuredPrompt:', matchError)
-        }
-
-        if (objectMatch && Array.isArray(objectMatch) && objectMatch[0]) {
-          // Prefer object match to preserve full response structure (e.g., {"bullet_hooks":[],"summary":""})
-          return JSON.parse(objectMatch[0])
-        } else if (arrayMatch && Array.isArray(arrayMatch) && arrayMatch[0]) {
-          // Use array match only if no object wraps it
-          return JSON.parse(arrayMatch[0])
-        } else {
-          // Try parsing the entire content
-          return JSON.parse(cleanedContent.trim())
-        }
-      } catch (parseError) {
-        // Not an error - many prompts return plain text, not JSON
-        // Wrap in { raw: content } for calling code to extract
-        return { raw: content }
-      }
-    } catch (error) {
-      clearTimeout(timeoutId)
-      throw error
-    }
-  } catch (error) {
-    console.error('OpenAI API error with GPT-5:', error)
-    if (error instanceof Error) {
-      console.error('Error details:', error.message)
-      console.error('Error name:', error.name)
-      console.error('Error stack:', error.stack)
-    }
-    // Log additional error details for debugging
-    if (typeof error === 'object' && error !== null) {
-      console.error('Full error object:', JSON.stringify(error, null, 2))
-    }
-    throw error
-  }
-}
-
-// Unified AI caller - routes to OpenAI or Claude based on provider
-export async function callAI(prompt: string, maxTokens = 1000, temperature = 0.3, provider: 'openai' | 'claude' = 'openai') {
-  if (provider === 'claude') {
-    // Claude API call
-    try {
-      const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5-20250929',
-        max_tokens: maxTokens,
-        temperature: temperature,
-        messages: [{ role: 'user', content: prompt }]
-      })
-
-      const textContent = response.content.find(c => c.type === 'text')
-      const content = textContent && 'text' in textContent ? textContent.text : ''
-
-      if (!content) {
-        throw new Error('No response from Claude')
-      }
-
-      // Try to parse as JSON, fallback to raw content (same logic as OpenAI)
-      try {
-        // Validate content is a string
-        if (!content || typeof content !== 'string') {
-          console.error('[AI] Invalid content type for parsing in callAI (Claude):', typeof content, content)
-          return { raw: content }
-        }
-
-        // Strip markdown code fences first
-        let cleanedContent: string = String(content) // Ensure it's definitely a string
-        try {
-          const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
-          if (codeFenceMatch && codeFenceMatch[1] !== undefined) {
-            cleanedContent = codeFenceMatch[1]
-          }
-        } catch (matchError) {
-          console.warn('[AI] Regex match failed in callAI (Claude), using original content:', matchError)
-          cleanedContent = String(content)
-        }
-
-        // Validate cleanedContent is still a string
-        if (!cleanedContent || typeof cleanedContent !== 'string') {
-          console.error('[AI] Invalid cleanedContent after code fence removal in callAI (Claude):', typeof cleanedContent, cleanedContent)
-          return { raw: content }
-        }
-
-        // Ensure cleanedContent is still a valid string before calling .match()
-        if (!cleanedContent || typeof cleanedContent !== 'string') {
-          console.error('[AI] cleanedContent is not a string before regex matching in callAI (Claude):', typeof cleanedContent, cleanedContent)
-          return { raw: content }
-        }
-
-        let objectMatch: RegExpMatchArray | null = null
-        let arrayMatch: RegExpMatchArray | null = null
-        
-        try {
-          objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
-        } catch (matchError) {
-          console.warn('[AI] Object match failed in callAI (Claude):', matchError)
-        }
-        
-        try {
-          arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
-        } catch (matchError) {
-          console.warn('[AI] Array match failed in callAI (Claude):', matchError)
-        }
-
-        if (objectMatch && Array.isArray(objectMatch) && objectMatch[0]) {
-          // Prefer object match to preserve full response structure
-          return JSON.parse(objectMatch[0])
-        } else if (arrayMatch && Array.isArray(arrayMatch) && arrayMatch[0]) {
-          return JSON.parse(arrayMatch[0])
-        } else {
-          return JSON.parse(cleanedContent.trim())
-        }
-      } catch (parseError) {
-        // Return raw content wrapped in object
-        return { raw: content }
-      }
-    } catch (error) {
-      const errorMsg = error instanceof Error
-        ? error.message
-        : typeof error === 'object' && error !== null
-          ? JSON.stringify(error, null, 2)
-          : String(error)
-      console.error('Claude API error:', errorMsg)
-      throw error
-    }
-  } else {
-    // OpenAI API call (default)
-    return callOpenAI(prompt, maxTokens, temperature)
-  }
-}
-
-// Complete AI call interface - fetches prompt+provider, replaces placeholders, calls AI
-export const AI_CALL = {
-  contentEvaluator: async (post: { title: string; description: string; content?: string; hasImage?: boolean }, newsletterId: string, maxTokens = 1000, temperature = 0.3) => {
-    const imagePenaltyText = post.hasImage
-      ? 'This post HAS an image.'
-      : 'This post has NO image - subtract 5 points from interest_level.'
-
-    // Use callAIWithPrompt to load complete config from database
-    return callAIWithPrompt('ai_prompt_content_evaluator', newsletterId, {
-      title: post.title,
-      description: post.description || 'No description available',
-      content: post.content ? post.content.substring(0, 1000) + '...' : 'No content available',
-      imagePenalty: imagePenaltyText
-    })
-  },
-
-  primaryArticleTitle: async (post: { title: string; description: string; content?: string; source_url?: string }, newsletterId: string, maxTokens = 200, temperature = 0.7) => {
-    // Use callAIWithPrompt to load complete config from database
-    return callAIWithPrompt('ai_prompt_primary_article_title', newsletterId, {
-      title: post.title,
-      description: post.description || 'No description available',
-      content: post.content ? post.content.substring(0, 1500) + '...' : 'No additional content',
-      url: post.source_url || ''
-    })
-  },
-
-  primaryArticleBody: async (post: { title: string; description: string; content?: string; source_url?: string }, newsletterId: string, headline: string, maxTokens = 500, temperature = 0.7) => {
-    // Use callAIWithPrompt to load complete config from database
-    return callAIWithPrompt('ai_prompt_primary_article_body', newsletterId, {
-      title: post.title,
-      description: post.description || 'No description available',
-      content: post.content ? post.content.substring(0, 1500) + '...' : 'No additional content',
-      url: post.source_url || '',
-      headline: headline
-    })
-  },
-
-  secondaryArticleTitle: async (post: { title: string; description: string; content?: string; source_url?: string }, newsletterId: string, maxTokens = 200, temperature = 0.7) => {
-    // Use callAIWithPrompt to load complete config from database
-    return callAIWithPrompt('ai_prompt_secondary_article_title', newsletterId, {
-      title: post.title,
-      description: post.description || 'No description available',
-      content: post.content ? post.content.substring(0, 1500) + '...' : 'No additional content',
-      url: post.source_url || ''
-    })
-  },
-
-  secondaryArticleBody: async (post: { title: string; description: string; content?: string; source_url?: string }, newsletterId: string, headline: string, maxTokens = 500, temperature = 0.7) => {
-    // Use callAIWithPrompt to load complete config from database
-    return callAIWithPrompt('ai_prompt_secondary_article_body', newsletterId, {
-      title: post.title,
-      description: post.description || 'No description available',
-      content: post.content ? post.content.substring(0, 1500) + '...' : 'No additional content',
-      url: post.source_url || '',
-      headline: headline
-    })
-  },
-
-  subjectLineGenerator: async (top_article: { headline: string; content: string }, newsletterId: string, maxTokens = 100, temperature = 0.8) => {
-    // Use callAIWithPrompt to load complete config from database
-    // Pass both title and headline for prompt compatibility
-    return callAIWithPrompt('ai_prompt_subject_line', newsletterId, {
-      title: top_article.headline,
-      headline: top_article.headline,
-      content: top_article.content
-    })
-  },
-
-  welcomeSection: async (articles: Array<{ headline: string; content: string }>, newsletterId: string, maxTokens = 500, temperature = 0.8) => {
-    // Format articles as JSON string for placeholder replacement
-    const articlesJson = JSON.stringify(articles.map(a => ({
-      headline: a.headline,
-      content: a.content.substring(0, 1000) + (a.content.length > 1000 ? '...' : '')
-    })))
-
-    // Use callAIWithPrompt to load complete config from database
-    return callAIWithPrompt('ai_prompt_welcome_section', newsletterId, {
-      articles: articlesJson
-    })
-  },
-
-  topicDeduper: async (posts: Array<{ title: string; description: string; full_article_text: string }>, newsletterId: string, maxTokens = 1000, temperature = 0.3) => {
-    // Format posts as numbered list for placeholder replacement
-    const postsFormatted = posts.map((post, i) =>
-      `${i}. Title: ${post.title}\n   Description: ${post.description || 'No description'}\n   Full Article: ${post.full_article_text ? post.full_article_text.substring(0, 1500) + (post.full_article_text.length > 1500 ? '...' : '') : 'No full text available'}`
-    ).join('\n\n')
-
-    // Use callAIWithPrompt to load complete config from database
-    // Support both {{articles}} and {{posts}} placeholders for compatibility
-    return callAIWithPrompt('ai_prompt_topic_deduper', newsletterId, {
-      articles: postsFormatted,
-      posts: postsFormatted  // Also support {{posts}} placeholder
-    })
-  },
-
-  factChecker: async (newsletterContent: string, originalContent: string, newsletterId: string, maxTokens = 1000, temperature = 0.3) => {
-    // Use callAIWithPrompt to load complete config from database
-    return callAIWithPrompt('ai_prompt_fact_checker', newsletterId, {
-      newsletter_content: newsletterContent,
-      original_content: originalContent
-    })
   }
 }
