@@ -81,6 +81,8 @@ export async function GET(request: NextRequest) {
         .in('source', ['custom_popup', 'recs_page'])
         .gte('subscribed_at', fromDate.toISOString())
         .lte('subscribed_at', toDate.toISOString())
+        .order('subscribed_at', { ascending: true })
+        .order('ref_code', { ascending: true })
         .range(pageFrom, pageFrom + pageSize - 1)
       if (!page || page.length === 0) break
       referrals = referrals.concat(page)
@@ -120,6 +122,7 @@ export async function GET(request: NextRequest) {
         .gte('snapshot_date', snapshotFromDate.toISOString().split('T')[0])
         .lte('snapshot_date', toDate.toISOString().split('T')[0])
         .order('snapshot_date', { ascending: true })
+        .order('ref_code', { ascending: true })
         .range(snapPageFrom, snapPageFrom + pageSize - 1)
       if (!snapPage || snapPage.length === 0) break
       snapshots = snapshots.concat(snapPage)
