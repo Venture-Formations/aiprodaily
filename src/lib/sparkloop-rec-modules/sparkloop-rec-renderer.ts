@@ -77,7 +77,7 @@ export class SparkLoopRecModuleRenderer {
                 <td valign="middle">
                   <p style="margin: 0 0 4px 0; font-size: 16px; font-weight: bold; color: #333; font-family: ${bodyFont};">${name}</p>
                   <p style="margin: 0 0 8px 0; font-size: 14px; color: #666; line-height: 20px; font-family: ${bodyFont};">${desc}</p>
-                  <a href="${subscribeUrl}" style="display: inline-block; padding: 8px 16px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-align: center; font-family: ${bodyFont};">Subscribe</a>
+                  <div style="text-align: center;"><a href="${subscribeUrl}" style="display: inline-block; padding: 8px 16px; background-color: ${primaryColor}; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-align: center; font-family: ${bodyFont};">Subscribe</a></div>
                 </td>
               </tr>
             </table>
