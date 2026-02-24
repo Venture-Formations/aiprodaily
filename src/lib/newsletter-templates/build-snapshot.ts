@@ -98,13 +98,190 @@ export async function buildIssueSnapshot(
   // Format date using local date parsing
   const formattedDate = formatIssueDate(issue.date)
 
+  // Phase 2.3: Pre-fetch all per-issue content in parallel
+  // Dynamic imports match existing pattern in sections.ts to avoid circular deps
+  const [
+    { PollModuleSelector },
+    { AppModuleSelector },
+    { TextBoxModuleSelector },
+    { FeedbackModuleSelector },
+    { SparkLoopRecModuleSelector },
+  ] = await Promise.all([
+    import('../poll-modules'),
+    import('../ai-app-modules'),
+    import('../text-box-modules'),
+    import('../feedback-modules'),
+    import('../sparkloop-rec-modules'),
+  ])
+
+  const [
+    pollSelections,
+    promptSelections,
+    aiAppSelections,
+    textBoxSelections,
+    feedbackModule,
+    sparkloopRecResult,
+    adSelections,
+    articleSelectionsRaw,
+    breakingNewsArticles,
+    beyondFeedArticles,
+  ] = await Promise.all([
+    PollModuleSelector.getIssuePollSelections(issue.id),
+    fetchPromptSelections(issue.id),
+    AppModuleSelector.getIssueSelections(issue.id),
+    TextBoxModuleSelector.getIssueSelections(issue.id),
+    FeedbackModuleSelector.getFeedbackModuleWithBlocks(issue.publication_id),
+    SparkLoopRecModuleSelector.getIssueSelections(issue.id),
+    fetchAdSelections(issue.id),
+    fetchArticleSelections(issue.id),
+    fetchBreakingNews(issue.id),
+    fetchBeyondFeed(issue.id),
+  ])
+
+  // Group articles by module ID
+  const articlesByModule: Record<string, any[]> = {}
+  for (const article of articleSelectionsRaw) {
+    const moduleId = article.article_module_id
+    if (!articlesByModule[moduleId]) {
+      articlesByModule[moduleId] = []
+    }
+    articlesByModule[moduleId].push(article)
+  }
+
   return {
     issue,
     formattedDate,
     businessSettings,
     sortedSections,
     isReview,
+    pollSelections,
+    promptSelections,
+    aiAppSelections,
+    textBoxSelections,
+    feedbackModule,
+    sparkloopRecSelections: sparkloopRecResult.selections || [],
+    adSelections,
+    articlesByModule,
+    breakingNewsArticles,
+    beyondFeedArticles,
   }
+}
+
+// ==================== PRE-FETCH HELPERS ====================
+
+async function fetchPromptSelections(issueId: string) {
+  const { data } = await supabaseAdmin
+    .from('issue_prompt_modules')
+    .select(`
+      *,
+      prompt_module:prompt_modules(*),
+      prompt:prompt_ideas(*)
+    `)
+    .eq('issue_id', issueId)
+  return data || []
+}
+
+async function fetchAdSelections(issueId: string) {
+  const { data } = await supabaseAdmin
+    .from('issue_module_ads')
+    .select(`
+      selection_mode,
+      selected_at,
+      ad_module_id,
+      ad_module:ad_modules(
+        id,
+        name,
+        display_order,
+        block_order
+      ),
+      advertisement:advertisements(
+        id,
+        title,
+        body,
+        image_url,
+        image_alt,
+        button_text,
+        button_url,
+        company_name,
+        advertiser:advertisers(
+          id,
+          company_name,
+          logo_url,
+          website_url
+        )
+      )
+    `)
+    .eq('issue_id', issueId)
+    .order('ad_module(display_order)', { ascending: true })
+  return data || []
+}
+
+async function fetchArticleSelections(issueId: string) {
+  const { data } = await supabaseAdmin
+    .from('module_articles')
+    .select(`
+      id,
+      headline,
+      content,
+      is_active,
+      rank,
+      ai_image_url,
+      image_alt,
+      article_module_id,
+      rss_post:rss_posts(
+        source_url,
+        image_url,
+        image_alt
+      )
+    `)
+    .eq('issue_id', issueId)
+    .eq('is_active', true)
+    .order('rank', { ascending: true })
+  return data || []
+}
+
+async function fetchBreakingNews(issueId: string) {
+  const { data } = await supabaseAdmin
+    .from('issue_breaking_news')
+    .select(`
+      *,
+      post:rss_posts(
+        id,
+        title,
+        ai_title,
+        ai_summary,
+        description,
+        source_url,
+        breaking_news_score
+      )
+    `)
+    .eq('issue_id', issueId)
+    .eq('section', 'breaking')
+    .order('position', { ascending: true })
+    .limit(3)
+  return data || []
+}
+
+async function fetchBeyondFeed(issueId: string) {
+  const { data } = await supabaseAdmin
+    .from('issue_breaking_news')
+    .select(`
+      *,
+      post:rss_posts(
+        id,
+        title,
+        ai_title,
+        ai_summary,
+        description,
+        source_url,
+        breaking_news_score
+      )
+    `)
+    .eq('issue_id', issueId)
+    .eq('section', 'beyond_feed')
+    .order('position', { ascending: true })
+    .limit(3)
+  return data || []
 }
 
 function formatIssueDate(dateString: string): string {

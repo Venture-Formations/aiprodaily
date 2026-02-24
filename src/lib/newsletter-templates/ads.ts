@@ -269,55 +269,41 @@ export async function generateAdvertorialSection(issue: any, _recordUsage: boole
  * @param issue - The issue data
  * @param moduleId - Optional: Generate only for a specific mod (used for ordered rendering)
  */
-export async function generateAdModulesSection(issue: any, moduleId?: string, businessSettings?: BusinessSettings): Promise<string> {
+export async function generateAdModulesSection(issue: any, moduleId?: string, businessSettings?: BusinessSettings, adSelections?: any[]): Promise<string> {
   try {
     console.log('Generating Ad Modules sections for issue:', issue?.id, moduleId ? `(mod: ${moduleId})` : '(all modules)')
 
-    // Fetch colors from business settings (use passed-in settings if available)
     const { primaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue?.publication_id)
 
-    // Build query for ad mod selections
-    // Uses unified advertisements table
-    let query = supabaseAdmin
-      .from('issue_module_ads')
-      .select(`
-        selection_mode,
-        selected_at,
-        ad_module:ad_modules(
-          id,
-          name,
-          display_order,
-          block_order
-        ),
-        advertisement:advertisements(
-          id,
-          title,
-          body,
-          image_url,
-          image_alt,
-          button_text,
-          button_url,
-          company_name,
-          advertiser:advertisers(
-            id,
-            company_name,
-            logo_url,
-            website_url
-          )
-        )
-      `)
-      .eq('issue_id', issue.id)
-
-    // Filter to specific mod if provided
-    if (moduleId) {
-      query = query.eq('ad_module_id', moduleId)
-    }
-
-    const { data: selections, error } = await query.order('ad_module(display_order)', { ascending: true })
-
-    if (error) {
-      console.error('Error fetching ad mod selections:', error)
-      return ''
+    // Use pre-fetched data or fall back to DB query (legacy callers)
+    let selections: any[]
+    if (adSelections && moduleId) {
+      // Filter pre-fetched selections to this specific module
+      selections = adSelections.filter((s: any) => {
+        const mod = s.ad_module as any
+        return mod?.id === moduleId
+      })
+    } else {
+      let query = supabaseAdmin
+        .from('issue_module_ads')
+        .select(`
+          selection_mode,
+          selected_at,
+          ad_module_id,
+          ad_module:ad_modules(id, name, display_order, block_order),
+          advertisement:advertisements(id, title, body, image_url, image_alt, button_text, button_url, company_name,
+            advertiser:advertisers(id, company_name, logo_url, website_url))
+        `)
+        .eq('issue_id', issue.id)
+      if (moduleId) {
+        query = query.eq('ad_module_id', moduleId)
+      }
+      const { data, error } = await query.order('ad_module(display_order)', { ascending: true })
+      if (error) {
+        console.error('Error fetching ad mod selections:', error)
+        return ''
+      }
+      selections = data || []
     }
 
     if (!selections || selections.length === 0) {

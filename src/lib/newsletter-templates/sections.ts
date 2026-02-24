@@ -172,16 +172,17 @@ ${optionsHtml}
 export async function generatePollModulesSection(
   issue: { id: string; publication_id: string; status?: string },
   moduleId: string,
-  businessSettings?: BusinessSettings
+  businessSettings?: BusinessSettings,
+  pollSelections?: any[]
 ): Promise<string> {
   try {
     const { PollModuleSelector, PollModuleRenderer } = await import('../poll-modules')
 
-    // Get all poll selections for this issue
-    const selections = await PollModuleSelector.getIssuePollSelections(issue.id)
+    // Use pre-fetched data or fall back to DB query (legacy callers)
+    const allSelections = pollSelections ?? await PollModuleSelector.getIssuePollSelections(issue.id)
 
     // Find the selection for this specific mod
-    const selection = selections.find(s => s.poll_module_id === moduleId)
+    const selection = allSelections.find(s => s.poll_module_id === moduleId)
 
     if (!selection || !selection.poll || !selection.poll_module) {
       console.log(`[PollModules] No selection/poll found for mod ${moduleId} in issue ${issue.id}`)
@@ -206,32 +207,24 @@ export async function generatePollModulesSection(
 
 // ==================== BREAKING NEWS ====================
 
-export async function generateBreakingNewsSection(issue: any, businessSettings?: BusinessSettings): Promise<string> {
+export async function generateBreakingNewsSection(issue: any, businessSettings?: BusinessSettings, breakingNewsArticles?: any[]): Promise<string> {
   try {
     console.log('Generating Breaking News section for issue:', issue?.id)
 
-    // Fetch colors from business settings (use passed-in settings if available)
     const { primaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue?.publication_id)
 
-    // Fetch selected Breaking News articles
-    const { data: selections } = await supabaseAdmin
-      .from('issue_breaking_news')
-      .select(`
-        *,
-        post:rss_posts(
-          id,
-          title,
-          ai_title,
-          ai_summary,
-          description,
-          source_url,
-          breaking_news_score
-        )
-      `)
-      .eq('issue_id', issue.id)
-      .eq('section', 'breaking')
-      .order('position', { ascending: true })
-      .limit(3)
+    // Use pre-fetched data or fall back to DB query (legacy callers)
+    let selections = breakingNewsArticles
+    if (!selections) {
+      const { data } = await supabaseAdmin
+        .from('issue_breaking_news')
+        .select(`*, post:rss_posts(id, title, ai_title, ai_summary, description, source_url, breaking_news_score)`)
+        .eq('issue_id', issue.id)
+        .eq('section', 'breaking')
+        .order('position', { ascending: true })
+        .limit(3)
+      selections = data || []
+    }
 
     if (!selections || selections.length === 0) {
       console.log('No Breaking News articles selected, skipping section')
@@ -289,32 +282,24 @@ export async function generateBreakingNewsSection(issue: any, businessSettings?:
 
 // ==================== BEYOND THE FEED ====================
 
-export async function generateBeyondTheFeedSection(issue: any, businessSettings?: BusinessSettings): Promise<string> {
+export async function generateBeyondTheFeedSection(issue: any, businessSettings?: BusinessSettings, beyondFeedArticles?: any[]): Promise<string> {
   try {
     console.log('Generating Beyond the Feed section for issue:', issue?.id)
 
-    // Fetch colors from business settings (use passed-in settings if available)
     const { primaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue?.publication_id)
 
-    // Fetch selected Beyond the Feed articles
-    const { data: selections } = await supabaseAdmin
-      .from('issue_breaking_news')
-      .select(`
-        *,
-        post:rss_posts(
-          id,
-          title,
-          ai_title,
-          ai_summary,
-          description,
-          source_url,
-          breaking_news_score
-        )
-      `)
-      .eq('issue_id', issue.id)
-      .eq('section', 'beyond_feed')
-      .order('position', { ascending: true })
-      .limit(3)
+    // Use pre-fetched data or fall back to DB query (legacy callers)
+    let selections = beyondFeedArticles
+    if (!selections) {
+      const { data } = await supabaseAdmin
+        .from('issue_breaking_news')
+        .select(`*, post:rss_posts(id, title, ai_title, ai_summary, description, source_url, breaking_news_score)`)
+        .eq('issue_id', issue.id)
+        .eq('section', 'beyond_feed')
+        .order('position', { ascending: true })
+        .limit(3)
+      selections = data || []
+    }
 
     if (!selections || selections.length === 0) {
       console.log('No Beyond the Feed articles selected, skipping section')
@@ -372,14 +357,14 @@ export async function generateBeyondTheFeedSection(issue: any, businessSettings?
 
 // ==================== AI APPS ====================
 
-export async function generateAIAppsSection(issue: any, businessSettings?: BusinessSettings): Promise<string> {
+export async function generateAIAppsSection(issue: any, businessSettings?: BusinessSettings, aiAppSelections?: any[]): Promise<string> {
   try {
     console.log('Generating AI Apps section for issue:', issue?.id)
 
-    // Try new mod-based rendering first
     const { AppModuleSelector, AppModuleRenderer } = await import('../ai-app-modules')
 
-    const moduleSelections = await AppModuleSelector.getIssueSelections(issue.id)
+    // Use pre-fetched data or fall back to DB query (legacy callers)
+    const moduleSelections = aiAppSelections ?? await AppModuleSelector.getIssueSelections(issue.id)
 
     if (moduleSelections && moduleSelections.length > 0) {
       // Use new mod-based rendering
@@ -432,31 +417,28 @@ export async function generateAIAppsSection(issue: any, businessSettings?: Busin
 export async function generatePromptModulesSection(
   issue: { id: string; publication_id: string; status?: string },
   moduleId: string,
-  businessSettings?: BusinessSettings
+  businessSettings?: BusinessSettings,
+  promptSelections?: any[]
 ): Promise<string> {
   try {
     const { PromptModuleRenderer } = await import('../prompt-modules')
 
-    // Directly query the specific selection for this mod
-    const { data: selection, error } = await supabaseAdmin
-      .from('issue_prompt_modules')
-      .select(`
-        *,
-        prompt_module:prompt_modules(*),
-        prompt:prompt_ideas(*)
-      `)
-      .eq('issue_id', issue.id)
-      .eq('prompt_module_id', moduleId)
-      .single()
-
-    if (error) {
-      console.log(`[PromptModules] No selection found for mod ${moduleId} in issue ${issue.id}: ${error.message}`)
-      return ''
+    // Use pre-fetched data or fall back to DB query (legacy callers)
+    let selection
+    if (promptSelections) {
+      selection = promptSelections.find(s => s.prompt_module_id === moduleId)
+    } else {
+      const { data } = await supabaseAdmin
+        .from('issue_prompt_modules')
+        .select(`*, prompt_module:prompt_modules(*), prompt:prompt_ideas(*)`)
+        .eq('issue_id', issue.id)
+        .eq('prompt_module_id', moduleId)
+        .single()
+      selection = data
     }
 
     if (!selection || !selection.prompt || !selection.prompt_module) {
-      console.log(`[PromptModules] Selection exists but prompt/mod is null for mod ${moduleId} in issue ${issue.id}`)
-      console.log(`[PromptModules] Selection details: prompt_id=${selection?.prompt_id}, has_prompt=${!!selection?.prompt}, has_module=${!!selection?.prompt_module}`)
+      console.log(`[PromptModules] No selection/prompt found for mod ${moduleId} in issue ${issue.id}`)
       return ''
     }
 
@@ -526,16 +508,17 @@ export async function generatePromptIdeasSection(issue: any): Promise<string> {
 export async function generateTextBoxModuleSection(
   issue: { id: string; publication_id: string; status?: string },
   moduleId: string,
-  businessSettings?: BusinessSettings
+  businessSettings?: BusinessSettings,
+  textBoxSelections?: any[]
 ): Promise<string> {
   try {
     const { TextBoxModuleSelector, TextBoxModuleRenderer } = await import('../text-box-modules')
 
-    // Get all text box selections for this issue
-    const selections = await TextBoxModuleSelector.getIssueSelections(issue.id)
+    // Use pre-fetched data or fall back to DB query (legacy callers)
+    const allSelections = textBoxSelections ?? await TextBoxModuleSelector.getIssueSelections(issue.id)
 
-    // Find the selection for this specific module (match by module.id)
-    const selection = selections.find(s => s.module?.id === moduleId)
+    // Find the selection for this specific module
+    const selection = allSelections.find(s => s.module?.id === moduleId)
 
     if (!selection || !selection.module) {
       console.log(`[TextBoxModules] No selection/module found for module ${moduleId} in issue ${issue.id}`)
@@ -570,13 +553,14 @@ export async function generateTextBoxModuleSection(
 export async function generateFeedbackModuleSection(
   issue: { id: string; publication_id: string; status?: string },
   moduleId: string,
-  businessSettings?: BusinessSettings
+  businessSettings?: BusinessSettings,
+  feedbackModule?: any | null
 ): Promise<string> {
   try {
     const { FeedbackModuleSelector, FeedbackModuleRenderer } = await import('../feedback-modules')
 
-    // Get the feedback mod with blocks
-    const mod = await FeedbackModuleSelector.getFeedbackModuleWithBlocks(issue.publication_id)
+    // Use pre-fetched feedback module or fall back to DB query (legacy callers)
+    const mod = feedbackModule !== undefined ? feedbackModule : await FeedbackModuleSelector.getFeedbackModuleWithBlocks(issue.publication_id)
 
     if (!mod || mod.id !== moduleId) {
       console.log(`[FeedbackModules] No feedback mod found for mod ${moduleId} in publication ${issue.publication_id}`)
@@ -603,36 +587,32 @@ export async function generateFeedbackModuleSection(
 export async function generateSparkLoopRecModuleSection(
   issue: { id: string; publication_id: string; status?: string },
   moduleId: string,
-  businessSettings?: BusinessSettings
+  businessSettings?: BusinessSettings,
+  sparkloopRecSelections?: any[]
 ): Promise<string> {
   try {
     const { SparkLoopRecModuleSelector, SparkLoopRecModuleRenderer } = await import('../sparkloop-rec-modules')
 
-    // Get mod config
-    const { data: mod } = await supabaseAdmin
-      .from('sparkloop_rec_modules')
-      .select('id, name, recs_count')
-      .eq('id', moduleId)
-      .single()
+    // Use pre-fetched data or fall back to DB query (legacy callers)
+    let allSelections = sparkloopRecSelections
+    if (!allSelections) {
+      const result = await SparkLoopRecModuleSelector.getIssueSelections(issue.id)
+      allSelections = result.selections || []
+    }
 
-    if (!mod) return ''
-
-    // Get issue selections
-    const { selections } = await SparkLoopRecModuleSelector.getIssueSelections(issue.id)
-    const sel = selections.find(s => s.sparkloop_rec_module_id === moduleId)
+    const sel = allSelections.find(s => s.sparkloop_rec_module_id === moduleId)
 
     if (!sel || sel.ref_codes.length === 0 || sel.recommendations.length === 0) {
-      console.log(`[SparkLoop Rec Module] No selections for mod ${mod.name} on issue ${issue.id}`)
+      console.log(`[SparkLoop Rec Module] No selections for mod ${moduleId} on issue ${issue.id}`)
       return ''
     }
 
-    // Fetch business settings for consistent section styling (use passed-in settings if available)
     const { primaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue.publication_id)
 
     // Render cards
     const html = SparkLoopRecModuleRenderer.renderSection(
-      mod.name,
-      sel.recommendations.map(r => ({
+      (sel.sparkloop_rec_module as any)?.name || 'Recommended Newsletters',
+      sel.recommendations.map((r: any) => ({
         ref_code: r.ref_code,
         publication_name: r.publication_name,
         publication_logo: r.publication_logo,
