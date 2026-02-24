@@ -39,4 +39,16 @@ export interface IssueSnapshot {
   businessSettings: BusinessSettings
   sortedSections: SectionItem[]
   isReview: boolean
+
+  // Pre-fetched content (Phase 2.3 — near-zero DB calls during render)
+  pollSelections: any[]
+  promptSelections: any[]
+  aiAppSelections: any[]
+  textBoxSelections: any[]
+  feedbackModule: any | null
+  sparkloopRecSelections: any[]
+  adSelections: any[]
+  articlesByModule: Record<string, any[]>
+  breakingNewsArticles: any[]
+  beyondFeedArticles: any[]
 }

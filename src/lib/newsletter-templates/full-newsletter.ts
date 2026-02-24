@@ -40,17 +40,19 @@ export async function generateFullNewsletterHtml(
 
 /**
  * Render a newsletter from a pre-built snapshot.
- * The snapshot contains all module configs and business settings,
- * so this function does not fetch them again.
- *
- * Note: Still async because individual section generators make their own
- * content-specific DB calls (e.g., polls fetch poll options, ads fetch ad content).
- * Making those pure is Phase 2.2b.
+ * The snapshot contains all module configs, business settings, and pre-fetched content,
+ * so this function is a near-pure HTML-generation function.
+ * Remaining DB calls: header/footer settings (Phase 2.4), legacy generatePromptIdeasSection.
  */
 export async function renderNewsletterFromSnapshot(
   snapshot: IssueSnapshot
 ): Promise<string> {
-  const { issue, formattedDate, businessSettings, sortedSections, isReview } = snapshot
+  const {
+    issue, formattedDate, businessSettings, sortedSections, isReview,
+    pollSelections, promptSelections, aiAppSelections, textBoxSelections,
+    feedbackModule, sparkloopRecSelections, adSelections, articlesByModule,
+    breakingNewsArticles, beyondFeedArticles,
+  } = snapshot
 
   try {
     console.log('Generating full newsletter HTML for issue:', issue?.id, isReview ? '(review)' : '(final)')
@@ -69,7 +71,7 @@ export async function renderNewsletterFromSnapshot(
 
     console.log('Formatted date:', formattedDate)
 
-    // Generate header and footer with tracking parameters
+    // Generate header and footer with tracking parameters (still fetch own settings — Phase 2.4)
     const mailerliteId = issue.mailerlite_issue_id || undefined
     const header = await generateNewsletterHeader(formattedDate, issue.date, mailerliteId, issue.publication_id)
     const footer = await generateNewsletterFooter(issue.date, mailerliteId, issue.publication_id)
@@ -95,49 +97,54 @@ export async function renderNewsletterFromSnapshot(
     }
 
     // Generate sections in order based on merged configuration
+    // All content is pre-fetched in snapshot — generators are pure HTML renderers
+    // (Exception: legacy generatePromptIdeasSection and header/footer still query DB)
     let sectionsHtml = ''
     let articleModuleCount = 0
     for (const item of sortedSections) {
       if (item.type === 'ad_module') {
-        const adModuleHtml = await generateAdModulesSection(issue, item.data.id, businessSettings)
+        const adModuleHtml = await generateAdModulesSection(issue, item.data.id, businessSettings, adSelections)
         if (adModuleHtml) {
           sectionsHtml += adModuleHtml
         }
       } else if (item.type === 'poll_module') {
-        const pollModuleHtml = await generatePollModulesSection(issue, item.data.id, businessSettings)
+        const pollModuleHtml = await generatePollModulesSection(issue, item.data.id, businessSettings, pollSelections)
         if (pollModuleHtml) {
           sectionsHtml += pollModuleHtml
         }
       } else if (item.type === 'prompt_module') {
-        const promptModuleHtml = await generatePromptModulesSection(issue, item.data.id, businessSettings)
+        const promptModuleHtml = await generatePromptModulesSection(issue, item.data.id, businessSettings, promptSelections)
         if (promptModuleHtml) {
           sectionsHtml += promptModuleHtml
         }
       } else if (item.type === 'article_module') {
         articleModuleCount++
-        const articleModuleHtml = await generateArticleModuleSection(issue, item.data.id, articleModuleCount === 2, businessSettings)
+        const articleModuleHtml = await generateArticleModuleSection(
+          issue, item.data.id, articleModuleCount === 2, businessSettings,
+          articlesByModule[item.data.id] || [], item.data
+        )
         if (articleModuleHtml) {
           sectionsHtml += articleModuleHtml
         }
       } else if (item.type === 'text_box_module') {
-        const textBoxModuleHtml = await generateTextBoxModuleSection(issue, item.data.id, businessSettings)
+        const textBoxModuleHtml = await generateTextBoxModuleSection(issue, item.data.id, businessSettings, textBoxSelections)
         if (textBoxModuleHtml) {
           sectionsHtml += textBoxModuleHtml
         }
       } else if (item.type === 'feedback_module') {
-        const feedbackModuleHtml = await generateFeedbackModuleSection(issue, item.data.id, businessSettings)
+        const feedbackModuleHtml = await generateFeedbackModuleSection(issue, item.data.id, businessSettings, feedbackModule)
         if (feedbackModuleHtml) {
           sectionsHtml += feedbackModuleHtml
         }
       } else if (item.type === 'sparkloop_rec_module') {
-        const slRecHtml = await generateSparkLoopRecModuleSection(issue, item.data.id, businessSettings)
+        const slRecHtml = await generateSparkLoopRecModuleSection(issue, item.data.id, businessSettings, sparkloopRecSelections)
         if (slRecHtml) {
           sectionsHtml += slRecHtml
         }
       } else {
         const section = item.data
         if (section.section_type === 'ai_applications' || section.id === SECTION_IDS.AI_APPLICATIONS) {
-          const aiAppsHtml = await generateAIAppsSection(issue, businessSettings)
+          const aiAppsHtml = await generateAIAppsSection(issue, businessSettings, aiAppSelections)
           if (aiAppsHtml) {
             sectionsHtml += aiAppsHtml
           }
@@ -149,13 +156,13 @@ export async function renderNewsletterFromSnapshot(
           }
         }
         else if (section.section_type === 'breaking_news') {
-          const breakingNewsHtml = await generateBreakingNewsSection(issue, businessSettings)
+          const breakingNewsHtml = await generateBreakingNewsSection(issue, businessSettings, breakingNewsArticles)
           if (breakingNewsHtml) {
             sectionsHtml += breakingNewsHtml
           }
         }
         else if (section.section_type === 'beyond_the_feed') {
-          const beyondFeedHtml = await generateBeyondTheFeedSection(issue, businessSettings)
+          const beyondFeedHtml = await generateBeyondTheFeedSection(issue, businessSettings, beyondFeedArticles)
           if (beyondFeedHtml) {
             sectionsHtml += beyondFeedHtml
           }

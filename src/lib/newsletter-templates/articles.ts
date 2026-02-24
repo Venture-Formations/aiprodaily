@@ -13,48 +13,44 @@ export async function generateArticleModuleSection(
   issue: any,
   moduleId: string,
   includeUnsubscribeLink: boolean = false,
-  businessSettings?: BusinessSettings
+  businessSettings?: BusinessSettings,
+  moduleArticles?: any[],
+  moduleConfig?: any
 ): Promise<string> {
-  // Fetch the article mod
-  const { data: mod } = await supabaseAdmin
-    .from('article_modules')
-    .select('*')
-    .eq('id', moduleId)
-    .single()
-
+  // Use pre-fetched module config or fall back to DB query (legacy callers)
+  let mod = moduleConfig
+  if (!mod) {
+    const { data } = await supabaseAdmin
+      .from('article_modules')
+      .select('*')
+      .eq('id', moduleId)
+      .single()
+    mod = data
+  }
   if (!mod) {
     console.log(`[Article Module] Module ${moduleId} not found`)
     return ''
   }
 
-  // Fetch active articles for this mod and issue
-  const { data: articles } = await supabaseAdmin
-    .from('module_articles')
-    .select(`
-      id,
-      headline,
-      content,
-      is_active,
-      rank,
-      ai_image_url,
-      image_alt,
-      rss_post:rss_posts(
-        source_url,
-        image_url,
-        image_alt
-      )
-    `)
-    .eq('issue_id', issue.id)
-    .eq('article_module_id', moduleId)
-    .eq('is_active', true)
-    .order('rank', { ascending: true })
+  // Use pre-fetched articles or fall back to DB query (legacy callers)
+  let articles = moduleArticles
+  if (!articles) {
+    const { data } = await supabaseAdmin
+      .from('module_articles')
+      .select(`id, headline, content, is_active, rank, ai_image_url, image_alt,
+        rss_post:rss_posts(source_url, image_url, image_alt)`)
+      .eq('issue_id', issue.id)
+      .eq('article_module_id', moduleId)
+      .eq('is_active', true)
+      .order('rank', { ascending: true })
+    articles = data || []
+  }
 
   if (!articles || articles.length === 0) {
     console.log(`[Article Module] No active articles for mod ${mod.name}`)
     return ''
   }
 
-  // Fetch colors and fonts from business settings (use passed-in settings if available)
   const { primaryColor, secondaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue.publication_id)
 
   // Get block order from mod settings

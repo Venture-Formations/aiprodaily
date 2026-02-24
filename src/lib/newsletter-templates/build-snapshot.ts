@@ -98,13 +98,174 @@ export async function buildIssueSnapshot(
   // Format date using local date parsing
   const formattedDate = formatIssueDate(issue.date)
 
+  // Phase 2.3: Pre-fetch all per-issue content in parallel
+  // Dynamic imports match existing pattern in sections.ts to avoid circular deps
+  const [
+    { PollModuleSelector },
+    { AppModuleSelector },
+    { TextBoxModuleSelector },
+    { FeedbackModuleSelector },
+    { SparkLoopRecModuleSelector },
+  ] = await Promise.all([
+    import('../poll-modules'),
+    import('../ai-app-modules'),
+    import('../text-box-modules'),
+    import('../feedback-modules'),
+    import('../sparkloop-rec-modules'),
+  ])
+
+  // Each fetch has a .catch() so one failure doesn't abort the entire snapshot.
+  // Generators handle empty arrays/null gracefully (return '' for missing sections).
+  const [
+    pollSelections,
+    promptSelections,
+    aiAppSelections,
+    textBoxSelections,
+    feedbackModule,
+    sparkloopRecResult,
+    adSelections,
+    articleSelectionsRaw,
+    breakingNewsArticles,
+    beyondFeedArticles,
+  ] = await Promise.all([
+    PollModuleSelector.getIssuePollSelections(issue.id).catch(e => { console.error('[Snapshot] pollSelections failed:', e.message); return [] }),
+    fetchPromptSelections(issue.id).catch(e => { console.error('[Snapshot] promptSelections failed:', e.message); return [] }),
+    AppModuleSelector.getIssueSelections(issue.id).catch(e => { console.error('[Snapshot] aiAppSelections failed:', e.message); return [] }),
+    TextBoxModuleSelector.getIssueSelections(issue.id).catch(e => { console.error('[Snapshot] textBoxSelections failed:', e.message); return [] }),
+    FeedbackModuleSelector.getFeedbackModuleWithBlocks(issue.publication_id).catch(e => { console.error('[Snapshot] feedbackModule failed:', e.message); return null }),
+    SparkLoopRecModuleSelector.getIssueSelections(issue.id).catch(e => { console.error('[Snapshot] sparkloopRecSelections failed:', e.message); return { selections: [] } }),
+    fetchAdSelections(issue.id).catch(e => { console.error('[Snapshot] adSelections failed:', e.message); return [] }),
+    fetchArticleSelections(issue.id).catch(e => { console.error('[Snapshot] articleSelections failed:', e.message); return [] }),
+    fetchIssueNewsBySection(issue.id, 'breaking').catch(e => { console.error('[Snapshot] breakingNews failed:', e.message); return [] }),
+    fetchIssueNewsBySection(issue.id, 'beyond_feed').catch(e => { console.error('[Snapshot] beyondFeed failed:', e.message); return [] }),
+  ])
+
+  // Group articles by module ID
+  const articlesByModule: Record<string, any[]> = {}
+  for (const article of articleSelectionsRaw) {
+    const moduleId = article.article_module_id
+    if (!articlesByModule[moduleId]) {
+      articlesByModule[moduleId] = []
+    }
+    articlesByModule[moduleId].push(article)
+  }
+
   return {
     issue,
     formattedDate,
     businessSettings,
     sortedSections,
     isReview,
+    pollSelections,
+    promptSelections,
+    aiAppSelections,
+    textBoxSelections,
+    feedbackModule,
+    sparkloopRecSelections: sparkloopRecResult.selections || [],
+    adSelections,
+    articlesByModule,
+    breakingNewsArticles,
+    beyondFeedArticles,
   }
+}
+
+// ==================== PRE-FETCH HELPERS ====================
+
+async function fetchPromptSelections(issueId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('issue_prompt_modules')
+    .select(`
+      *,
+      prompt_module:prompt_modules(*),
+      prompt:prompt_ideas(*)
+    `)
+    .eq('issue_id', issueId)
+  if (error) console.error('[Snapshot] fetchPromptSelections error:', error.message)
+  return data || []
+}
+
+async function fetchAdSelections(issueId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('issue_module_ads')
+    .select(`
+      selection_mode,
+      selected_at,
+      ad_module_id,
+      ad_module:ad_modules(
+        id,
+        name,
+        display_order,
+        block_order
+      ),
+      advertisement:advertisements(
+        id,
+        title,
+        body,
+        image_url,
+        image_alt,
+        button_text,
+        button_url,
+        company_name,
+        advertiser:advertisers(
+          id,
+          company_name,
+          logo_url,
+          website_url
+        )
+      )
+    `)
+    .eq('issue_id', issueId)
+    .order('ad_module(display_order)', { ascending: true })
+  if (error) console.error('[Snapshot] fetchAdSelections error:', error.message)
+  return data || []
+}
+
+async function fetchArticleSelections(issueId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('module_articles')
+    .select(`
+      id,
+      headline,
+      content,
+      is_active,
+      rank,
+      ai_image_url,
+      image_alt,
+      article_module_id,
+      rss_post:rss_posts(
+        source_url,
+        image_url,
+        image_alt
+      )
+    `)
+    .eq('issue_id', issueId)
+    .eq('is_active', true)
+    .order('rank', { ascending: true })
+  if (error) console.error('[Snapshot] fetchArticleSelections error:', error.message)
+  return data || []
+}
+
+async function fetchIssueNewsBySection(issueId: string, section: string) {
+  const { data, error } = await supabaseAdmin
+    .from('issue_breaking_news')
+    .select(`
+      *,
+      post:rss_posts(
+        id,
+        title,
+        ai_title,
+        ai_summary,
+        description,
+        source_url,
+        breaking_news_score
+      )
+    `)
+    .eq('issue_id', issueId)
+    .eq('section', section)
+    .order('position', { ascending: true })
+    .limit(3)
+  if (error) console.error(`[Snapshot] fetchIssueNewsBySection(${section}) error:`, error.message)
+  return data || []
 }
 
 function formatIssueDate(dateString: string): string {
