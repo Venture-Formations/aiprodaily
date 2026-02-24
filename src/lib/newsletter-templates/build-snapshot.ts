@@ -114,6 +114,8 @@ export async function buildIssueSnapshot(
     import('../sparkloop-rec-modules'),
   ])
 
+  // Each fetch has a .catch() so one failure doesn't abort the entire snapshot.
+  // Generators handle empty arrays/null gracefully (return '' for missing sections).
   const [
     pollSelections,
     promptSelections,
@@ -126,16 +128,16 @@ export async function buildIssueSnapshot(
     breakingNewsArticles,
     beyondFeedArticles,
   ] = await Promise.all([
-    PollModuleSelector.getIssuePollSelections(issue.id),
-    fetchPromptSelections(issue.id),
-    AppModuleSelector.getIssueSelections(issue.id),
-    TextBoxModuleSelector.getIssueSelections(issue.id),
-    FeedbackModuleSelector.getFeedbackModuleWithBlocks(issue.publication_id),
-    SparkLoopRecModuleSelector.getIssueSelections(issue.id),
-    fetchAdSelections(issue.id),
-    fetchArticleSelections(issue.id),
-    fetchBreakingNews(issue.id),
-    fetchBeyondFeed(issue.id),
+    PollModuleSelector.getIssuePollSelections(issue.id).catch(e => { console.error('[Snapshot] pollSelections failed:', e.message); return [] }),
+    fetchPromptSelections(issue.id).catch(e => { console.error('[Snapshot] promptSelections failed:', e.message); return [] }),
+    AppModuleSelector.getIssueSelections(issue.id).catch(e => { console.error('[Snapshot] aiAppSelections failed:', e.message); return [] }),
+    TextBoxModuleSelector.getIssueSelections(issue.id).catch(e => { console.error('[Snapshot] textBoxSelections failed:', e.message); return [] }),
+    FeedbackModuleSelector.getFeedbackModuleWithBlocks(issue.publication_id).catch(e => { console.error('[Snapshot] feedbackModule failed:', e.message); return null }),
+    SparkLoopRecModuleSelector.getIssueSelections(issue.id).catch(e => { console.error('[Snapshot] sparkloopRecSelections failed:', e.message); return { selections: [] } }),
+    fetchAdSelections(issue.id).catch(e => { console.error('[Snapshot] adSelections failed:', e.message); return [] }),
+    fetchArticleSelections(issue.id).catch(e => { console.error('[Snapshot] articleSelections failed:', e.message); return [] }),
+    fetchBreakingNews(issue.id).catch(e => { console.error('[Snapshot] breakingNews failed:', e.message); return [] }),
+    fetchBeyondFeed(issue.id).catch(e => { console.error('[Snapshot] beyondFeed failed:', e.message); return [] }),
   ])
 
   // Group articles by module ID

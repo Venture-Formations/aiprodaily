@@ -41,8 +41,8 @@ export async function generateFullNewsletterHtml(
 /**
  * Render a newsletter from a pre-built snapshot.
  * The snapshot contains all module configs, business settings, and pre-fetched content,
- * so this function is a pure HTML-generation function with zero DB calls.
- * (Exception: header/footer still fetch their own settings — Phase 2.4)
+ * so this function is a near-pure HTML-generation function.
+ * Remaining DB calls: header/footer settings (Phase 2.4), legacy generatePromptIdeasSection.
  */
 export async function renderNewsletterFromSnapshot(
   snapshot: IssueSnapshot
@@ -98,6 +98,7 @@ export async function renderNewsletterFromSnapshot(
 
     // Generate sections in order based on merged configuration
     // All content is pre-fetched in snapshot — generators are pure HTML renderers
+    // (Exception: legacy generatePromptIdeasSection and header/footer still query DB)
     let sectionsHtml = ''
     let articleModuleCount = 0
     for (const item of sortedSections) {
