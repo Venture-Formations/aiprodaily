@@ -6,6 +6,7 @@
 import { wrapTrackingUrl, type LinkType } from '../url-tracking'
 import { getBusinessSettings } from '../publication-settings'
 import { sanitizeAltText } from '../utils/sanitize-alt-text'
+import type { BusinessSettings } from '../newsletter-templates/types'
 import type {
   AIAppModule,
   AIApplication,
@@ -353,7 +354,8 @@ export class AppModuleRenderer {
     mod: AIAppModule,
     apps: AIApplication[],
     publicationId: string,
-    context: RenderContext = {}
+    context: RenderContext = {},
+    businessSettings?: BusinessSettings
   ): Promise<RenderResult> {
     // If no apps, return empty result
     if (!apps || apps.length === 0) {
@@ -364,8 +366,10 @@ export class AppModuleRenderer {
       }
     }
 
-    // Get publication styling
-    const settings = await getBusinessSettings(publicationId)
+    // Get publication styling (use passed-in settings if available)
+    const baseStyles = businessSettings
+      ? { primaryColor: businessSettings.primaryColor, secondaryColor: businessSettings.secondaryColor, tertiaryColor: businessSettings.tertiaryColor, headingFont: businessSettings.headingFont, bodyFont: businessSettings.bodyFont }
+      : await getBusinessSettings(publicationId).then(s => ({ primaryColor: s.primary_color, secondaryColor: s.secondary_color, tertiaryColor: s.tertiary_color, headingFont: s.heading_font, bodyFont: s.body_font }))
 
     // Merge default block config with mod's block config
     const blockConfig: ProductCardBlockConfig = {
@@ -374,11 +378,11 @@ export class AppModuleRenderer {
     }
 
     const styles: BlockStyleOptions = {
-      primaryColor: settings.primary_color,
-      secondaryColor: settings.secondary_color,
-      tertiaryColor: settings.tertiary_color,
-      headingFont: settings.heading_font,
-      bodyFont: settings.body_font,
+      primaryColor: baseStyles.primaryColor,
+      secondaryColor: baseStyles.secondaryColor,
+      tertiaryColor: baseStyles.tertiaryColor,
+      headingFont: baseStyles.headingFont,
+      bodyFont: baseStyles.bodyFont,
       // Layout settings from mod (Product Cards)
       layoutMode: mod.layout_mode || 'inline',
       blockConfig,
@@ -468,9 +472,12 @@ export class AppModuleRenderer {
   static async renderForPreview(
     mod: AIAppModule,
     apps: AIApplication[],
-    publicationId: string
+    publicationId: string,
+    businessSettings?: BusinessSettings
   ): Promise<string> {
-    const settings = await getBusinessSettings(publicationId)
+    const baseStyles = businessSettings
+      ? { primaryColor: businessSettings.primaryColor, secondaryColor: businessSettings.secondaryColor, tertiaryColor: businessSettings.tertiaryColor, headingFont: businessSettings.headingFont, bodyFont: businessSettings.bodyFont }
+      : await getBusinessSettings(publicationId).then(s => ({ primaryColor: s.primary_color, secondaryColor: s.secondary_color, tertiaryColor: s.tertiary_color, headingFont: s.heading_font, bodyFont: s.body_font }))
 
     // Merge default block config with mod's block config
     const blockConfig: ProductCardBlockConfig = {
@@ -479,11 +486,11 @@ export class AppModuleRenderer {
     }
 
     const styles: BlockStyleOptions = {
-      primaryColor: settings.primary_color,
-      secondaryColor: settings.secondary_color,
-      tertiaryColor: settings.tertiary_color,
-      headingFont: settings.heading_font,
-      bodyFont: settings.body_font,
+      primaryColor: baseStyles.primaryColor,
+      secondaryColor: baseStyles.secondaryColor,
+      tertiaryColor: baseStyles.tertiaryColor,
+      headingFont: baseStyles.headingFont,
+      bodyFont: baseStyles.bodyFont,
       // Layout settings from mod (Product Cards)
       layoutMode: mod.layout_mode || 'inline',
       blockConfig,

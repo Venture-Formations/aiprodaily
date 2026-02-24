@@ -104,12 +104,12 @@ export async function renderNewsletterFromSnapshot(
           sectionsHtml += adModuleHtml
         }
       } else if (item.type === 'poll_module') {
-        const pollModuleHtml = await generatePollModulesSection(issue, item.data.id)
+        const pollModuleHtml = await generatePollModulesSection(issue, item.data.id, businessSettings)
         if (pollModuleHtml) {
           sectionsHtml += pollModuleHtml
         }
       } else if (item.type === 'prompt_module') {
-        const promptModuleHtml = await generatePromptModulesSection(issue, item.data.id)
+        const promptModuleHtml = await generatePromptModulesSection(issue, item.data.id, businessSettings)
         if (promptModuleHtml) {
           sectionsHtml += promptModuleHtml
         }
@@ -120,12 +120,12 @@ export async function renderNewsletterFromSnapshot(
           sectionsHtml += articleModuleHtml
         }
       } else if (item.type === 'text_box_module') {
-        const textBoxModuleHtml = await generateTextBoxModuleSection(issue, item.data.id)
+        const textBoxModuleHtml = await generateTextBoxModuleSection(issue, item.data.id, businessSettings)
         if (textBoxModuleHtml) {
           sectionsHtml += textBoxModuleHtml
         }
       } else if (item.type === 'feedback_module') {
-        const feedbackModuleHtml = await generateFeedbackModuleSection(issue, item.data.id)
+        const feedbackModuleHtml = await generateFeedbackModuleSection(issue, item.data.id, businessSettings)
         if (feedbackModuleHtml) {
           sectionsHtml += feedbackModuleHtml
         }
@@ -137,7 +137,7 @@ export async function renderNewsletterFromSnapshot(
       } else {
         const section = item.data
         if (section.section_type === 'ai_applications' || section.id === SECTION_IDS.AI_APPLICATIONS) {
-          const aiAppsHtml = await generateAIAppsSection(issue)
+          const aiAppsHtml = await generateAIAppsSection(issue, businessSettings)
           if (aiAppsHtml) {
             sectionsHtml += aiAppsHtml
           }

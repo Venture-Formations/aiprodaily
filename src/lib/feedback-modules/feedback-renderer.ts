@@ -12,6 +12,7 @@ import { getBusinessSettings } from '../publication-settings'
 import type { BlockStyleOptions } from '../blocks'
 import type { FeedbackModuleWithBlocks, FeedbackBlock, FeedbackVoteOption, FeedbackTeamMember } from '@/types/database'
 import { FeedbackModuleSelector } from './feedback-selector'
+import type { BusinessSettings } from '../newsletter-templates/types'
 
 /**
  * Context for rendering (issue info for response URLs)
@@ -195,7 +196,8 @@ export class FeedbackModuleRenderer {
   static async renderFeedbackModule(
     mod: FeedbackModuleWithBlocks,
     publicationId: string,
-    context: RenderContext = {}
+    context: RenderContext = {},
+    businessSettings?: BusinessSettings
   ): Promise<RenderResult> {
     // If mod is not active, return empty
     if (!mod.is_active) {
@@ -205,15 +207,10 @@ export class FeedbackModuleRenderer {
       }
     }
 
-    // Get publication styling
-    const settings = await getBusinessSettings(publicationId)
-    const styles: BlockStyleOptions = {
-      primaryColor: settings.primary_color,
-      secondaryColor: settings.secondary_color || '#764ba2',
-      tertiaryColor: settings.tertiary_color || '#ffffff',
-      headingFont: settings.heading_font,
-      bodyFont: settings.body_font
-    }
+    // Get publication styling (use passed-in settings if available)
+    const styles: BlockStyleOptions = businessSettings
+      ? { primaryColor: businessSettings.primaryColor, secondaryColor: businessSettings.secondaryColor, tertiaryColor: businessSettings.tertiaryColor, headingFont: businessSettings.headingFont, bodyFont: businessSettings.bodyFont }
+      : await getBusinessSettings(publicationId).then(s => ({ primaryColor: s.primary_color, secondaryColor: s.secondary_color || '#764ba2', tertiaryColor: s.tertiary_color || '#ffffff', headingFont: s.heading_font, bodyFont: s.body_font }))
 
     const baseUrl = context.baseUrl || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.aiprodaily.com'
     const issueId = context.issueId || ''
@@ -249,21 +246,17 @@ export class FeedbackModuleRenderer {
    */
   static async renderForArchive(
     mod: FeedbackModuleWithBlocks,
-    publicationId: string
+    publicationId: string,
+    businessSettings?: BusinessSettings
   ): Promise<string> {
     // For archive, we render a static version without voting links
     if (!mod.is_active) {
       return ''
     }
 
-    const settings = await getBusinessSettings(publicationId)
-    const styles: BlockStyleOptions = {
-      primaryColor: settings.primary_color,
-      secondaryColor: settings.secondary_color || '#764ba2',
-      tertiaryColor: settings.tertiary_color || '#ffffff',
-      headingFont: settings.heading_font,
-      bodyFont: settings.body_font
-    }
+    const styles: BlockStyleOptions = businessSettings
+      ? { primaryColor: businessSettings.primaryColor, secondaryColor: businessSettings.secondaryColor, tertiaryColor: businessSettings.tertiaryColor, headingFont: businessSettings.headingFont, bodyFont: businessSettings.bodyFont }
+      : await getBusinessSettings(publicationId).then(s => ({ primaryColor: s.primary_color, secondaryColor: s.secondary_color || '#764ba2', tertiaryColor: s.tertiary_color || '#ffffff', headingFont: s.heading_font, bodyFont: s.body_font }))
 
     let blocksHtml = ''
 

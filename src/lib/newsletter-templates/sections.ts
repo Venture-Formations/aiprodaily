@@ -171,7 +171,8 @@ ${optionsHtml}
  */
 export async function generatePollModulesSection(
   issue: { id: string; publication_id: string; status?: string },
-  moduleId: string
+  moduleId: string,
+  businessSettings?: BusinessSettings
 ): Promise<string> {
   try {
     const { PollModuleSelector, PollModuleRenderer } = await import('../poll-modules')
@@ -192,7 +193,8 @@ export async function generatePollModulesSection(
       selection.poll_module,
       selection.poll,
       issue.publication_id,
-      { issueId: issue.id }
+      { issueId: issue.id },
+      businessSettings
     )
 
     return result.html
@@ -370,7 +372,7 @@ export async function generateBeyondTheFeedSection(issue: any, businessSettings?
 
 // ==================== AI APPS ====================
 
-export async function generateAIAppsSection(issue: any): Promise<string> {
+export async function generateAIAppsSection(issue: any, businessSettings?: BusinessSettings): Promise<string> {
   try {
     console.log('Generating AI Apps section for issue:', issue?.id)
 
@@ -398,7 +400,8 @@ export async function generateAIAppsSection(issue: any): Promise<string> {
             issueDate: issue.date,
             issueId: issue.id,
             mailerliteIssueId: issue.mailerlite_issue_id
-          }
+          },
+          businessSettings
         )
 
         combinedHtml += result.html
@@ -428,7 +431,8 @@ export async function generateAIAppsSection(issue: any): Promise<string> {
  */
 export async function generatePromptModulesSection(
   issue: { id: string; publication_id: string; status?: string },
-  moduleId: string
+  moduleId: string,
+  businessSettings?: BusinessSettings
 ): Promise<string> {
   try {
     const { PromptModuleRenderer } = await import('../prompt-modules')
@@ -461,7 +465,8 @@ export async function generatePromptModulesSection(
       selection.prompt_module,
       selection.prompt,
       issue.publication_id,
-      { issueId: issue.id }
+      { issueId: issue.id },
+      businessSettings
     )
 
     return result.html
@@ -520,7 +525,8 @@ export async function generatePromptIdeasSection(issue: any): Promise<string> {
  */
 export async function generateTextBoxModuleSection(
   issue: { id: string; publication_id: string; status?: string },
-  moduleId: string
+  moduleId: string,
+  businessSettings?: BusinessSettings
 ): Promise<string> {
   try {
     const { TextBoxModuleSelector, TextBoxModuleRenderer } = await import('../text-box-modules')
@@ -548,7 +554,8 @@ export async function generateTextBoxModuleSection(
       selection.blocks || [],
       issueBlocksMap,
       issue.publication_id,
-      { issueId: issue.id }
+      { issueId: issue.id },
+      businessSettings
     )
 
     return result.html
@@ -562,7 +569,8 @@ export async function generateTextBoxModuleSection(
 
 export async function generateFeedbackModuleSection(
   issue: { id: string; publication_id: string; status?: string },
-  moduleId: string
+  moduleId: string,
+  businessSettings?: BusinessSettings
 ): Promise<string> {
   try {
     const { FeedbackModuleSelector, FeedbackModuleRenderer } = await import('../feedback-modules')
@@ -579,7 +587,8 @@ export async function generateFeedbackModuleSection(
     const result = await FeedbackModuleRenderer.renderFeedbackModule(
       mod,
       issue.publication_id,
-      { issueId: issue.id }
+      { issueId: issue.id },
+      businessSettings
     )
 
     return result.html
