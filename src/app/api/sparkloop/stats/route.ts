@@ -81,6 +81,8 @@ export async function GET(request: NextRequest) {
         .in('source', ['custom_popup', 'recs_page'])
         .gte('subscribed_at', fromDate.toISOString())
         .lte('subscribed_at', toDate.toISOString())
+        .order('subscribed_at', { ascending: true })
+        .order('ref_code', { ascending: true })
         .range(pageFrom, pageFrom + pageSize - 1)
       if (!page || page.length === 0) break
       referrals = referrals.concat(page)
@@ -110,16 +112,17 @@ export async function GET(request: NextRequest) {
     // We need one extra day before the range to compute the first day's delta
     const snapshotFromDate = new Date(fromDate)
     snapshotFromDate.setDate(snapshotFromDate.getDate() - 1)
-    let snapshots: { snapshot_date: string; sparkloop_pending: number; sparkloop_confirmed: number; sparkloop_rejected: number }[] = []
+    let snapshots: { ref_code: string; snapshot_date: string; sparkloop_pending: number; sparkloop_confirmed: number; sparkloop_rejected: number }[] = []
     let snapPageFrom = 0
     while (true) {
       const { data: snapPage } = await supabaseAdmin
         .from('sparkloop_daily_snapshots')
-        .select('snapshot_date, sparkloop_pending, sparkloop_confirmed, sparkloop_rejected')
+        .select('ref_code, snapshot_date, sparkloop_pending, sparkloop_confirmed, sparkloop_rejected')
         .eq('publication_id', PUBLICATION_ID)
         .gte('snapshot_date', snapshotFromDate.toISOString().split('T')[0])
         .lte('snapshot_date', toDate.toISOString().split('T')[0])
         .order('snapshot_date', { ascending: true })
+        .order('ref_code', { ascending: true })
         .range(snapPageFrom, snapPageFrom + pageSize - 1)
       if (!snapPage || snapPage.length === 0) break
       snapshots = snapshots.concat(snapPage)
@@ -127,29 +130,41 @@ export async function GET(request: NextRequest) {
       snapPageFrom += pageSize
     }
 
-    // Aggregate snapshots by date (sum across all ref_codes)
-    const snapshotByDate = new Map<string, { pending: number; confirmed: number; rejected: number }>()
+    // Group snapshots by ref_code, then by date
+    const snapshotsByRefCode = new Map<string, Map<string, { pending: number; confirmed: number; rejected: number }>>()
     for (const snap of snapshots || []) {
-      const dateKey = snap.snapshot_date
-      const existing = snapshotByDate.get(dateKey) || { pending: 0, confirmed: 0, rejected: 0 }
-      existing.pending += snap.sparkloop_pending || 0
-      existing.confirmed += snap.sparkloop_confirmed || 0
-      existing.rejected += snap.sparkloop_rejected || 0
-      snapshotByDate.set(dateKey, existing)
+      let refMap = snapshotsByRefCode.get(snap.ref_code)
+      if (!refMap) {
+        refMap = new Map()
+        snapshotsByRefCode.set(snap.ref_code, refMap)
+      }
+      refMap.set(snap.snapshot_date, {
+        pending: snap.sparkloop_pending || 0,
+        confirmed: snap.sparkloop_confirmed || 0,
+        rejected: snap.sparkloop_rejected || 0,
+      })
     }
 
-    // Compute new pending: delta_pending + delta_confirmed + delta_rejected
-    // This accounts for referrals that moved out of pending into confirmed/rejected
-    const sortedSnapshotDates = Array.from(snapshotByDate.keys()).sort()
-    for (let i = 1; i < sortedSnapshotDates.length; i++) {
-      const prev = snapshotByDate.get(sortedSnapshotDates[i - 1])!
-      const curr = snapshotByDate.get(sortedSnapshotDates[i])!
-      const newPending = (curr.pending - prev.pending) + (curr.confirmed - prev.confirmed) + (curr.rejected - prev.rejected)
-      const currDate = sortedSnapshotDates[i]
-      if (dailyMap.has(currDate)) {
-        dailyMap.get(currDate)!.newPending = Math.max(0, newPending)
+    // Compute new pending per ref_code, then sum into daily totals.
+    // Only include deltas for ref_codes present on BOTH consecutive days
+    // so newly-synced recommendations don't dump lifetime totals into one day.
+    const newPendingByDate = new Map<string, number>()
+    Array.from(snapshotsByRefCode.values()).forEach(refMap => {
+      const dates = Array.from(refMap.keys()).sort()
+      for (let i = 1; i < dates.length; i++) {
+        const prev = refMap.get(dates[i - 1])!
+        const curr = refMap.get(dates[i])!
+        const delta = (curr.pending - prev.pending) + (curr.confirmed - prev.confirmed) + (curr.rejected - prev.rejected)
+        const currDate = dates[i]
+        newPendingByDate.set(currDate, (newPendingByDate.get(currDate) || 0) + delta)
       }
-    }
+    })
+
+    Array.from(newPendingByDate.entries()).forEach(([dateKey, delta]) => {
+      if (dailyMap.has(dateKey)) {
+        dailyMap.get(dateKey)!.newPending = Math.max(0, delta)
+      }
+    })
 
     // Process each referral
     for (const ref of referrals) {

@@ -459,8 +459,8 @@ export default function SparkLoopAdminPage() {
                       dataKey="date"
                       tick={{ fontSize: 11 }}
                       tickFormatter={(value) => {
-                        const date = new Date(value)
-                        return `${date.getMonth() + 1}/${date.getDate()}`
+                        const [, m, d] = value.split('-')
+                        return `${parseInt(m)}/${parseInt(d)}`
                       }}
                     />
                     <YAxis tick={{ fontSize: 12 }} />

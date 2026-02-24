@@ -31,7 +31,7 @@ function normalizeGmailAddress(email: string): string {
   return email
 }
 
-import { PUBLICATION_ID } from './config'
+import { PUBLICATION_ID } from '../config'
 
 export class SparkLoopService {
   private apiKey: string

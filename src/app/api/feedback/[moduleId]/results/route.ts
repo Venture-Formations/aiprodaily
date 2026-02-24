@@ -36,7 +36,7 @@ export async function GET(
 
     // Add 5 phantom five-star votes to the voter-facing display
     // This only affects the results shown after voting, not admin analytics
-    const PHANTOM_5STAR_COUNT = 5
+    const PHANTOM_5STAR_COUNT = 10
     const boostedResults = { ...results }
     boostedResults.total_votes = results.total_votes + PHANTOM_5STAR_COUNT
 
