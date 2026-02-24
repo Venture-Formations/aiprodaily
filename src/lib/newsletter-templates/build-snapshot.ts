@@ -136,8 +136,8 @@ export async function buildIssueSnapshot(
     SparkLoopRecModuleSelector.getIssueSelections(issue.id).catch(e => { console.error('[Snapshot] sparkloopRecSelections failed:', e.message); return { selections: [] } }),
     fetchAdSelections(issue.id).catch(e => { console.error('[Snapshot] adSelections failed:', e.message); return [] }),
     fetchArticleSelections(issue.id).catch(e => { console.error('[Snapshot] articleSelections failed:', e.message); return [] }),
-    fetchBreakingNews(issue.id).catch(e => { console.error('[Snapshot] breakingNews failed:', e.message); return [] }),
-    fetchBeyondFeed(issue.id).catch(e => { console.error('[Snapshot] beyondFeed failed:', e.message); return [] }),
+    fetchIssueNewsBySection(issue.id, 'breaking').catch(e => { console.error('[Snapshot] breakingNews failed:', e.message); return [] }),
+    fetchIssueNewsBySection(issue.id, 'beyond_feed').catch(e => { console.error('[Snapshot] beyondFeed failed:', e.message); return [] }),
   ])
 
   // Group articles by module ID
@@ -172,7 +172,7 @@ export async function buildIssueSnapshot(
 // ==================== PRE-FETCH HELPERS ====================
 
 async function fetchPromptSelections(issueId: string) {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('issue_prompt_modules')
     .select(`
       *,
@@ -180,11 +180,12 @@ async function fetchPromptSelections(issueId: string) {
       prompt:prompt_ideas(*)
     `)
     .eq('issue_id', issueId)
+  if (error) console.error('[Snapshot] fetchPromptSelections error:', error.message)
   return data || []
 }
 
 async function fetchAdSelections(issueId: string) {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('issue_module_ads')
     .select(`
       selection_mode,
@@ -215,11 +216,12 @@ async function fetchAdSelections(issueId: string) {
     `)
     .eq('issue_id', issueId)
     .order('ad_module(display_order)', { ascending: true })
+  if (error) console.error('[Snapshot] fetchAdSelections error:', error.message)
   return data || []
 }
 
 async function fetchArticleSelections(issueId: string) {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('module_articles')
     .select(`
       id,
@@ -239,11 +241,12 @@ async function fetchArticleSelections(issueId: string) {
     .eq('issue_id', issueId)
     .eq('is_active', true)
     .order('rank', { ascending: true })
+  if (error) console.error('[Snapshot] fetchArticleSelections error:', error.message)
   return data || []
 }
 
-async function fetchBreakingNews(issueId: string) {
-  const { data } = await supabaseAdmin
+async function fetchIssueNewsBySection(issueId: string, section: string) {
+  const { data, error } = await supabaseAdmin
     .from('issue_breaking_news')
     .select(`
       *,
@@ -258,31 +261,10 @@ async function fetchBreakingNews(issueId: string) {
       )
     `)
     .eq('issue_id', issueId)
-    .eq('section', 'breaking')
+    .eq('section', section)
     .order('position', { ascending: true })
     .limit(3)
-  return data || []
-}
-
-async function fetchBeyondFeed(issueId: string) {
-  const { data } = await supabaseAdmin
-    .from('issue_breaking_news')
-    .select(`
-      *,
-      post:rss_posts(
-        id,
-        title,
-        ai_title,
-        ai_summary,
-        description,
-        source_url,
-        breaking_news_score
-      )
-    `)
-    .eq('issue_id', issueId)
-    .eq('section', 'beyond_feed')
-    .order('position', { ascending: true })
-    .limit(3)
+  if (error) console.error(`[Snapshot] fetchIssueNewsBySection(${section}) error:`, error.message)
   return data || []
 }
 

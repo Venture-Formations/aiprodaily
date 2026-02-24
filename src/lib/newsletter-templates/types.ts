@@ -40,7 +40,7 @@ export interface IssueSnapshot {
   sortedSections: SectionItem[]
   isReview: boolean
 
-  // Pre-fetched content (Phase 2.3 — zero DB calls during render)
+  // Pre-fetched content (Phase 2.3 — near-zero DB calls during render)
   pollSelections: any[]
   promptSelections: any[]
   aiAppSelections: any[]

@@ -307,27 +307,19 @@ export async function generateAdModulesSection(issue: any, moduleId?: string, bu
     }
 
     if (!selections || selections.length === 0) {
-      console.log('No ad mod selections found for issue')
       return ''
     }
 
-    console.log(`Found ${selections.length} ad mod selections`)
-
     // Generate HTML for each ad mod
     const sectionsHtml: string[] = []
+    let skipped = 0
 
     for (const selection of selections) {
       const mod = selection.ad_module as any
       const ad = selection.advertisement as any
 
-      if (!mod) {
-        console.log('Skipping selection without mod')
-        continue
-      }
-
-      // If no ad selected (manual mode not filled), skip this section
-      if (!ad) {
-        console.log(`No ad selected for mod "${mod.name}" (mode: ${selection.selection_mode})`)
+      if (!mod || !ad) {
+        skipped++
         continue
       }
 
@@ -339,7 +331,6 @@ export async function generateAdModulesSection(issue: any, moduleId?: string, bu
 
       // Get block order from mod config
       const blockOrder = (mod.block_order || ['title', 'image', 'body', 'button']) as AdBlockType[]
-      console.log(`[AdModules] Module "${mod.name}" block_order:`, mod.block_order, '-> using:', blockOrder)
 
       // Use the AdModuleRenderer for block-based rendering
       const html = AdModuleRenderer.renderForArchive(
@@ -362,6 +353,8 @@ export async function generateAdModulesSection(issue: any, moduleId?: string, bu
 
       sectionsHtml.push(html)
     }
+
+    console.log(`[AdModules] Rendered ${sectionsHtml.length} ad modules${skipped ? `, skipped ${skipped}` : ''}`)
 
     return sectionsHtml.join('')
 
