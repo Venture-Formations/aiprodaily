@@ -4,13 +4,19 @@ import { supabaseAdmin } from '@/lib/supabase'
 import type { User } from '@/types/database'
 import { shouldBypassAuth, getMockSession } from '@/lib/auth-bypass'
 
-export const authOptions: NextAuthOptions = {
-  providers: [
+// Only register GoogleProvider when credentials are configured
+const providers: NextAuthOptions['providers'] = []
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  providers.push(
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || 'dummy-client-id',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'dummy-client-secret',
-    }),
-  ],
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    })
+  )
+}
+
+export const authOptions: NextAuthOptions = {
+  providers,
   callbacks: {
     async signIn({ user, account, profile }) {
       console.log('SignIn callback triggered:', {
@@ -22,24 +28,20 @@ export const authOptions: NextAuthOptions = {
       if (account?.provider === 'google') {
         console.log('Processing Google OAuth sign-in for:', user.email)
 
-        // Email validation for production (bypass in staging)
-        if (!shouldBypassAuth()) {
-          const allowedEmails = process.env.ALLOWED_ADMIN_EMAILS?.split(',').map(e => e.trim()) || []
+        // Email validation — always enforced on real sign-ins
+        const allowedEmails = process.env.ALLOWED_ADMIN_EMAILS?.split(',').map(e => e.trim()) || []
 
-          if (allowedEmails.length === 0) {
-            console.error('[Auth] ALLOWED_ADMIN_EMAILS not configured - blocking all access')
-            return false
-          }
-
-          if (!allowedEmails.includes(user.email!)) {
-            console.log('[Auth] Access denied for email:', user.email)
-            return false
-          }
-
-          console.log('[Auth] Email validated successfully:', user.email)
-        } else {
-          console.log('[Auth] Staging environment - skipping email validation')
+        if (allowedEmails.length === 0) {
+          console.error('[Auth] ALLOWED_ADMIN_EMAILS not configured - blocking all access')
+          return false
         }
+
+        if (!allowedEmails.includes(user.email!)) {
+          console.log('[Auth] Access denied for email:', user.email)
+          return false
+        }
+
+        console.log('[Auth] Email validated successfully:', user.email)
 
         try {
           // Mobile-safe Supabase user creation with retry logic
@@ -162,9 +164,9 @@ export const authOptions: NextAuthOptions = {
       return token
     },
     async session({ session, token }) {
-      // Bypass authentication for staging environment
+      // Local dev bypass via ALLOW_AUTH_BYPASS env var
       if (shouldBypassAuth()) {
-        console.log('[Auth] Staging environment detected - using mock session')
+        console.log('[Auth] ALLOW_AUTH_BYPASS active — using mock session')
         return getMockSession() as any
       }
 

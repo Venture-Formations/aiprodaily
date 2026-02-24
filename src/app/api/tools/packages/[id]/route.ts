@@ -41,21 +41,12 @@ export async function PUT(
 ) {
   const { id } = await params
 
-  const host = request.headers.get('host') || ''
-  const isStaging = host.includes('localhost') ||
-                    host.includes('staging') ||
-                    process.env.VERCEL_GIT_COMMIT_REF === 'staging'
-
-  if (!isStaging) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const allowedEmails = process.env.ALLOWED_ADMIN_EMAILS?.split(',') || []
-    if (!allowedEmails.includes(session.user.email)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if ((session.user as any).role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   try {
@@ -112,21 +103,12 @@ export async function DELETE(
 ) {
   const { id } = await params
 
-  const host = request.headers.get('host') || ''
-  const isStaging = host.includes('localhost') ||
-                    host.includes('staging') ||
-                    process.env.VERCEL_GIT_COMMIT_REF === 'staging'
-
-  if (!isStaging) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const allowedEmails = process.env.ALLOWED_ADMIN_EMAILS?.split(',') || []
-    if (!allowedEmails.includes(session.user.email)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if ((session.user as any).role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   try {

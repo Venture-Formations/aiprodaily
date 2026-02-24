@@ -1,53 +1,36 @@
 /**
- * Authentication Bypass for Staging Environment
+ * Authentication Bypass — Local Development Only
  *
- * This utility allows testing on staging without OAuth configuration.
+ * Controlled via ALLOW_AUTH_BYPASS=true in .env.local.
+ * Never set this on Vercel (staging or production).
  */
 
-export function isStagingEnvironment(): boolean {
-  // Check Vercel environment variables
-  if (process.env.VERCEL_ENV === 'preview') return true
-  if (process.env.VERCEL_GIT_COMMIT_REF === 'staging') return true
-
-  // Check hostname patterns
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname
-    if (hostname.includes('staging') || hostname.includes('git-staging')) {
-      return true
-    }
-  }
-
-  // Check for explicit staging flag
-  if (process.env.NEXT_PUBLIC_STAGING === 'true') return true
-
-  return false
-}
-
 export function shouldBypassAuth(): boolean {
-  // Bypass auth if staging environment
-  if (isStagingEnvironment()) return true
-
-  // Also bypass auth if Google OAuth credentials are not configured
-  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-    console.log('[Auth Bypass] Google OAuth credentials not configured - bypassing authentication')
+  if (process.env.ALLOW_AUTH_BYPASS === 'true') {
+    if (process.env.VERCEL) {
+      console.error('[SECURITY] ALLOW_AUTH_BYPASS is set on Vercel! Remove it immediately.')
+    }
     return true
   }
-
   return false
 }
 
 /**
- * Mock session for staging environment
+ * Mock session for local development when bypass is active.
  */
 export function getMockSession() {
+  if (!shouldBypassAuth()) {
+    throw new Error('getMockSession() called without ALLOW_AUTH_BYPASS — this is a bug')
+  }
+
   return {
     user: {
-      email: 'staging@test.com',
-      name: 'Staging Test User',
+      email: 'dev@localhost',
+      name: 'Dev Mode',
       role: 'admin',
       isActive: true,
       image: null
     },
-    expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+    expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
   }
 }
