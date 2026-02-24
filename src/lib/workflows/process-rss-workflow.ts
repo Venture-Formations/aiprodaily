@@ -97,18 +97,11 @@ async function setupIssue(newsletterId: string): Promise<{ issueId: string; modu
       centralDate.setHours(centralDate.getHours() + 12)
       const issueDate = centralDate.toISOString().split('T')[0]
 
-      // Create new issue with publication_id
-      const { data: newIssue, error: createError } = await supabaseAdmin
-        .from('publication_issues')
-        .insert([{
-          date: issueDate,
-          status: 'processing',
-          publication_id: newsletter.id
-        }])
-        .select('id')
-        .single()
+      // Create new issue via DAL (dynamic import: pino uses Node.js modules not available in workflow context)
+      const { createIssue } = await import('@/lib/dal')
+      const newIssue = await createIssue(newsletter.id, issueDate, 'processing')
 
-      if (createError || !newIssue) {
+      if (!newIssue) {
         throw new Error('Failed to create issue')
       }
 
@@ -553,11 +546,9 @@ async function finalizeIssue(issueId: string, moduleIds: string[], stepNum: numb
         // Don't fail workflow if poll mod initialization fails
       }
 
-      // Set status to draft
-      await supabaseAdmin
-        .from('publication_issues')
-        .update({ status: 'draft' })
-        .eq('id', issueId)
+      // Set status to draft via DAL (dynamic import: pino uses Node.js modules)
+      const { updateIssueStatus } = await import('@/lib/dal')
+      await updateIssueStatus(issueId, 'draft')
 
       // Stage 1 unassignment - unassign posts that didn't get articles
       const unassignResult = await processor.unassignUnusedPosts(issueId)

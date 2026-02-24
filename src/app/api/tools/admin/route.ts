@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { declareRoute } from '@/lib/auth-tiers'
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const routeConfig = declareRoute({
+  authTier: 'admin',
+  description: 'Admin tools management'
+})
 
 // Categories mapping for ai_applications
 const CATEGORIES = [

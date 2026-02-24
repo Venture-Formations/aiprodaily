@@ -178,6 +178,7 @@ export interface PublicationIssue {
     options: string[]
   } | null
   mailerlite_issue_id: string | null
+  failure_alerted_at: string | null
   created_at: string
   updated_at: string
 }
