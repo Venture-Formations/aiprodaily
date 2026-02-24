@@ -6,21 +6,12 @@ import { PUBLICATION_ID } from '@/lib/config'
 
 // GET - Fetch all customer entitlements
 export async function GET(request: NextRequest) {
-  const host = request.headers.get('host') || ''
-  const isStaging = host.includes('localhost') ||
-                    host.includes('staging') ||
-                    process.env.VERCEL_GIT_COMMIT_REF === 'staging'
-
-  if (!isStaging) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const allowedEmails = process.env.ALLOWED_ADMIN_EMAILS?.split(',') || []
-    if (!allowedEmails.includes(session.user.email)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if ((session.user as any).role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   try {
@@ -63,26 +54,15 @@ export async function GET(request: NextRequest) {
 
 // POST - Grant a new entitlement (manual grant by admin)
 export async function POST(request: NextRequest) {
-  const host = request.headers.get('host') || ''
-  const isStaging = host.includes('localhost') ||
-                    host.includes('staging') ||
-                    process.env.VERCEL_GIT_COMMIT_REF === 'staging'
-
-  let grantedBy: string | null = null
-
-  if (!isStaging) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const allowedEmails = process.env.ALLOWED_ADMIN_EMAILS?.split(',') || []
-    if (!allowedEmails.includes(session.user.email)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    grantedBy = session.user.email
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  if ((session.user as any).role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const grantedBy = session.user.email
 
   try {
     const body = await request.json()

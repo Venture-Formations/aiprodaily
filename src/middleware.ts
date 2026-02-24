@@ -26,33 +26,6 @@ async function customMiddleware(request: NextRequest): Promise<NextResponse> {
   const hostname = request.headers.get('host') || ''
   const url = request.nextUrl
 
-  // Detect staging environment - VERY strict, only for actual staging deployments
-  // NEVER treat production domains as staging
-  const isProductionDomain = hostname === 'aiprodaily.com' ||
-                             hostname === 'www.aiprodaily.com' ||
-                             hostname === 'aiaccountingdaily.com' ||
-                             hostname === 'www.aiaccountingdaily.com'
-
-  const isStaging = !isProductionDomain && (
-    process.env.VERCEL_GIT_COMMIT_REF === 'staging' ||
-    hostname.includes('git-staging') ||
-    hostname.includes('-staging-')
-  )
-
-  // Skip authentication for staging environment
-  if (isStaging) {
-    console.log('[Middleware] Staging environment detected - authentication bypassed', {
-      vercelEnv: process.env.VERCEL_ENV,
-      gitRef: process.env.VERCEL_GIT_COMMIT_REF,
-      hostname
-    })
-    // Redirect signin page to dashboard when in staging mode
-    if (url.pathname === '/auth/signin') {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
-    return NextResponse.next()
-  }
-
   // Check if this is a newsletter website domain (takes priority over subdomain logic)
   const newsletterSlug = NEWSLETTER_DOMAINS[hostname]
 
