@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      mod
+      module: mod
     })
   } catch (error) {
     console.error('[FeedbackModules] Error in GET:', error)
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      mod
+      module: mod
     })
   } catch (error) {
     console.error('[FeedbackModules] Error in POST:', error)
@@ -127,7 +127,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      mod: moduleWithBlocks
+      module: moduleWithBlocks
     })
   } catch (error) {
     console.error('[FeedbackModules] Error in PATCH:', error)
