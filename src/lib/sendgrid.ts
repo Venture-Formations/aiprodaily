@@ -916,19 +916,9 @@ export class SendGridService {
           }
         }
         // Note: 'poll' section_type is deprecated - polls are now handled via poll_modules
-        else if (section.section_type === 'breaking_news') {
-          const { generateBreakingNewsSection } = await import('./newsletter-templates')
-          const breakingNewsHtml = await generateBreakingNewsSection(issue)
-          if (breakingNewsHtml) {
-            sectionsHtml += breakingNewsHtml
-          }
-        }
-        else if (section.section_type === 'beyond_the_feed') {
-          const { generateBeyondTheFeedSection } = await import('./newsletter-templates')
-          const beyondFeedHtml = await generateBeyondTheFeedSection(issue)
-          if (beyondFeedHtml) {
-            sectionsHtml += beyondFeedHtml
-          }
+        // Breaking News / Beyond the Feed sections are not used — skip
+        else if (section.section_type === 'breaking_news' || section.section_type === 'beyond_the_feed') {
+          // no-op
         }
         // Note: 'advertorial' section_type is deprecated - ads are now handled via ad_modules
       }

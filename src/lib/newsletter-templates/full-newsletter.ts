@@ -7,8 +7,6 @@ import {
 } from './ads'
 import {
   generatePollModulesSection,
-  generateBreakingNewsSection,
-  generateBeyondTheFeedSection,
   generateAIAppsSection,
   generatePromptModulesSection,
   generatePromptIdeasSection,
@@ -51,7 +49,6 @@ export async function renderNewsletterFromSnapshot(
     issue, formattedDate, businessSettings, sortedSections, isReview,
     pollSelections, promptSelections, aiAppSelections, textBoxSelections,
     feedbackModule, sparkloopRecSelections, adSelections, articlesByModule,
-    breakingNewsArticles, beyondFeedArticles,
   } = snapshot
 
   try {
@@ -155,17 +152,9 @@ export async function renderNewsletterFromSnapshot(
             sectionsHtml += promptHtml
           }
         }
-        else if (section.section_type === 'breaking_news') {
-          const breakingNewsHtml = await generateBreakingNewsSection(issue, businessSettings, breakingNewsArticles)
-          if (breakingNewsHtml) {
-            sectionsHtml += breakingNewsHtml
-          }
-        }
-        else if (section.section_type === 'beyond_the_feed') {
-          const beyondFeedHtml = await generateBeyondTheFeedSection(issue, businessSettings, beyondFeedArticles)
-          if (beyondFeedHtml) {
-            sectionsHtml += beyondFeedHtml
-          }
+        // Breaking News / Beyond the Feed sections are not used — skip (no HTML)
+        else if (section.section_type === 'breaking_news' || section.section_type === 'beyond_the_feed') {
+          // no-op
         }
       }
     }

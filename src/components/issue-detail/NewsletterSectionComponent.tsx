@@ -2,7 +2,6 @@
 
 import type { issueWithArticles, NewsletterSection } from '@/types/database'
 import PromptIdeasSection from './PromptIdeasSection'
-import BreakingNewsSection from './BreakingNewsSection'
 import PollSection from './PollSection'
 
 export default function NewsletterSectionComponent({
@@ -43,15 +42,10 @@ export default function NewsletterSectionComponent({
       case 'Poll':
         return <PollSection issue={issue} />
       case 'Breaking News':
-        return <BreakingNewsSection issue={issue} />
       case 'Beyond the Feed':
         return (
           <div className="text-center py-8 text-gray-500">
-            Beyond the Feed articles are managed in the Breaking News section
-            <br />
-            <span className="text-sm text-gray-400">
-              Both Breaking News and Beyond the Feed are selected together
-            </span>
+            This section is not used. Content will be generated automatically from your other modules.
           </div>
         )
       default:

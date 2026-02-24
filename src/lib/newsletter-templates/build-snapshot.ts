@@ -136,8 +136,8 @@ export async function buildIssueSnapshot(
     SparkLoopRecModuleSelector.getIssueSelections(issue.id).catch(e => { console.error('[Snapshot] sparkloopRecSelections failed:', e.message); return { selections: [] } }),
     fetchAdSelections(issue.id).catch(e => { console.error('[Snapshot] adSelections failed:', e.message); return [] }),
     fetchArticleSelections(issue.id).catch(e => { console.error('[Snapshot] articleSelections failed:', e.message); return [] }),
-    fetchIssueNewsBySection(issue.id, 'breaking').catch(e => { console.error('[Snapshot] breakingNews failed:', e.message); return [] }),
-    fetchIssueNewsBySection(issue.id, 'beyond_feed').catch(e => { console.error('[Snapshot] beyondFeed failed:', e.message); return [] }),
+    Promise.resolve([] as any[]),
+    Promise.resolve([] as any[]),
   ])
 
   // Group articles by module ID
@@ -242,29 +242,6 @@ async function fetchArticleSelections(issueId: string) {
     .eq('is_active', true)
     .order('rank', { ascending: true })
   if (error) console.error('[Snapshot] fetchArticleSelections error:', error.message)
-  return data || []
-}
-
-async function fetchIssueNewsBySection(issueId: string, section: string) {
-  const { data, error } = await supabaseAdmin
-    .from('issue_breaking_news')
-    .select(`
-      *,
-      post:rss_posts(
-        id,
-        title,
-        ai_title,
-        ai_summary,
-        description,
-        source_url,
-        breaking_news_score
-      )
-    `)
-    .eq('issue_id', issueId)
-    .eq('section', section)
-    .order('position', { ascending: true })
-    .limit(3)
-  if (error) console.error(`[Snapshot] fetchIssueNewsBySection(${section}) error:`, error.message)
   return data || []
 }
 
