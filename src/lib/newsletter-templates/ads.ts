@@ -7,6 +7,7 @@ import { normalizeEmailHtml } from '../html-normalizer'
 import { AdModuleRenderer } from '../ad-modules'
 import { fetchBusinessSettings } from './helpers'
 import type { AdBlockType } from '@/types/database'
+import type { BusinessSettings } from './types'
 
 // ==================== DINING DEALS ====================
 // Feature not needed in this newsletter
@@ -203,14 +204,14 @@ export function generateAdvertorialHtml(
 <br>`
 }
 
-export async function generateAdvertorialSection(issue: any, _recordUsage: boolean = false, sectionName: string = 'Advertorial'): Promise<string> {
+export async function generateAdvertorialSection(issue: any, _recordUsage: boolean = false, sectionName: string = 'Advertorial', businessSettings?: BusinessSettings): Promise<string> {
   // Note: _recordUsage parameter is deprecated - ad usage is now tracked exclusively
   // by AdScheduler.recordAdUsage() in send-final/route.ts to prevent double-counting
   try {
     console.log('Generating Advertorial section for issue:', issue?.id)
 
-    // Fetch colors from business settings (using publication_id if available)
-    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue?.publication_id)
+    // Fetch colors from business settings (use passed-in settings if available)
+    const { primaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue?.publication_id)
 
     // Check if ad already selected for this issue
     const { data: existingAd } = await supabaseAdmin
@@ -268,12 +269,12 @@ export async function generateAdvertorialSection(issue: any, _recordUsage: boole
  * @param issue - The issue data
  * @param moduleId - Optional: Generate only for a specific mod (used for ordered rendering)
  */
-export async function generateAdModulesSection(issue: any, moduleId?: string): Promise<string> {
+export async function generateAdModulesSection(issue: any, moduleId?: string, businessSettings?: BusinessSettings): Promise<string> {
   try {
     console.log('Generating Ad Modules sections for issue:', issue?.id, moduleId ? `(mod: ${moduleId})` : '(all modules)')
 
-    // Fetch colors from business settings
-    const { primaryColor, headingFont, bodyFont, websiteUrl } = await fetchBusinessSettings(issue?.publication_id)
+    // Fetch colors from business settings (use passed-in settings if available)
+    const { primaryColor, headingFont, bodyFont, websiteUrl } = businessSettings || await fetchBusinessSettings(issue?.publication_id)
 
     // Build query for ad mod selections
     // Uses unified advertisements table

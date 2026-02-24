@@ -55,4 +55,10 @@ export {
 } from './sections'
 
 // Full newsletter orchestrator
-export { generateFullNewsletterHtml } from './full-newsletter'
+export { generateFullNewsletterHtml, renderNewsletterFromSnapshot } from './full-newsletter'
+
+// Snapshot builder
+export { buildIssueSnapshot } from './build-snapshot'
+
+// Types
+export type { IssueSnapshot, BusinessSettings, SectionItem, SectionItemType, ModuleConfig } from './types'
