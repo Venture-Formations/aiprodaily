@@ -6,7 +6,6 @@ import SystemStatus from '@/components/settings/SystemStatus'
 import BusinessSettings from '@/components/settings/BusinessSettings'
 import NewsletterSettings from '@/components/settings/NewsletterSettings'
 import EmailSettings from '@/components/settings/EmailSettings'
-import RSSFeeds from '@/components/settings/RSSFeeds'
 import BlockedDomainsSettings from '@/components/settings/BlockedDomainsSettings'
 import IPExclusionSettings from '@/components/settings/IPExclusionSettings'
 import Notifications from '@/components/settings/Notifications'
@@ -32,7 +31,6 @@ export default function SettingsPage() {
                 { id: 'business', name: 'Publication Settings' },
                 { id: 'newsletter', name: 'Sections' },
                 { id: 'email', name: 'Email' },
-                { id: 'rss', name: 'RSS Feeds' },
                 { id: 'blocked-domains', name: 'Blocked Domains' },
                 { id: 'ip-exclusion', name: 'IP Exclusion' },
                 { id: 'notifications', name: 'Notifications' },
@@ -61,7 +59,6 @@ export default function SettingsPage() {
           {activeTab === 'business' && <BusinessSettings />}
           {activeTab === 'newsletter' && <NewsletterSettings />}
           {activeTab === 'email' && <EmailSettings />}
-          {activeTab === 'rss' && <RSSFeeds />}
           {activeTab === 'blocked-domains' && <BlockedDomainsSettings />}
           {activeTab === 'ip-exclusion' && <IPExclusionSettings />}
           {activeTab === 'notifications' && <Notifications />}

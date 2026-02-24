@@ -176,6 +176,15 @@ async function setupIssue(newsletterId: string): Promise<{ issueId: string; modu
         // Don't fail workflow if text box mod initialization fails
       }
 
+      // Ensure feedback module exists
+      try {
+        const { FeedbackModuleSelector } = await import('@/lib/feedback-modules')
+        await FeedbackModuleSelector.ensureFeedbackModule(newsletter.id)
+        console.log('[Workflow Step 1] Feedback module ensured')
+      } catch (feedbackError) {
+        console.log('[Workflow Step 1] Feedback module init failed (non-critical):', feedbackError)
+      }
+
       // Assign posts to each article mod
       let totalPostsAssigned = 0
       for (const mod of articleModules) {
