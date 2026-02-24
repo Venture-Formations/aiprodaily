@@ -8,6 +8,19 @@ export interface BusinessSettings {
   headingFont: string
   bodyFont: string
   websiteUrl: string
+  // Header fields
+  headerImageUrl: string
+  newsletterName: string
+  // Footer fields
+  businessName: string
+  facebookEnabled: boolean
+  facebookUrl: string
+  twitterEnabled: boolean
+  twitterUrl: string
+  linkedinEnabled: boolean
+  linkedinUrl: string
+  instagramEnabled: boolean
+  instagramUrl: string
 }
 
 export interface ModuleConfig {
