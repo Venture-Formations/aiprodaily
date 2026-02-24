@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
+import { NextResponse } from 'next/server'
 import { BreakingNewsProcessor } from '@/lib/breaking-news-processor'
 import { supabaseAdmin } from '@/lib/supabase'
 
@@ -16,20 +17,11 @@ import { supabaseAdmin } from '@/lib/supabase'
  * 1. Vercel cron (automated)
  * 2. Manual testing with secret parameter
  */
-export async function GET(request: NextRequest) {
-  try {
-    const searchParams = request.nextUrl.searchParams
-    const secret = searchParams.get('secret')
 
-    // For manual testing with secret parameter
-    if (secret !== process.env.CRON_SECRET && secret !== null) {
-      return NextResponse.json(
-        { error: 'Invalid secret' },
-        { status: 401 }
-      )
-    }
-
-    console.log('Starting Breaking News RSS processing...')
+const handler = withApiHandler(
+  { authTier: 'system', logContext: 'process-breaking-news' },
+  async ({ logger }) => {
+    logger.info('Starting Breaking News RSS processing...')
 
     // Get the latest draft issue for AI Accounting newsletter
     const { data: issue, error: issueError } = await supabaseAdmin
@@ -41,7 +33,7 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (issueError || !issue) {
-      console.log('No draft issue found for Breaking News processing')
+      logger.info('No draft issue found for Breaking News processing')
       return NextResponse.json({
         success: false,
         message: 'No draft issue found',
@@ -49,13 +41,13 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    console.log(`Processing Breaking News for issue ${issue.id} (date: ${issue.date})`)
+    logger.info(`Processing Breaking News for issue ${issue.id} (date: ${issue.date})`)
 
     // Initialize and run Breaking News processor
     const processor = new BreakingNewsProcessor()
     await processor.processBreakingNewsFeeds(issue.id)
 
-    console.log('Breaking News RSS processing completed successfully')
+    logger.info('Breaking News RSS processing completed successfully')
 
     return NextResponse.json({
       success: true,
@@ -64,18 +56,8 @@ export async function GET(request: NextRequest) {
       issue_date: issue.date,
       timestamp: new Date().toISOString()
     })
-
-  } catch (error) {
-    console.error('Error in Breaking News RSS processing:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
-    }, { status: 500 })
   }
-}
+)
 
-// Support POST for manual triggering
-export async function POST(request: NextRequest) {
-  return GET(request)
-}
+export const GET = handler
+export const POST = handler

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
 
@@ -371,17 +372,13 @@ async function processMailerLiteUpdates() {
   }
 }
 
-// Handle GET requests from Vercel cron
-export async function GET(request: NextRequest) {
-  const searchParams = new URL(request.url).searchParams
-  const secret = searchParams.get('secret')
-  const forceSync = searchParams.get('sync_real_click') === 'true'
+// GET has extra Real_Click sync logic based on time or sync_real_click param
+export const GET = withApiHandler(
+  { authTier: 'system', logContext: 'process-mailerlite-updates' },
+  async ({ request }) => {
+    const searchParams = new URL(request.url).searchParams
+    const forceSync = searchParams.get('sync_real_click') === 'true'
 
-  if (secret && secret !== process.env.CRON_SECRET) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  try {
     let realClickSyncResult = null
 
     // Run Real_Click sync every 2 hours or when forced
@@ -403,33 +400,14 @@ export async function GET(request: NextRequest) {
       ...result,
       realClickSync: realClickSyncResult
     })
-  } catch (error) {
-    console.error('[MailerLite Updates] Cron error:', error)
-    return NextResponse.json({
-      error: 'MailerLite updates processing failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
-    }, { status: 500 })
   }
-}
+)
 
-// Handle POST requests for manual triggers with auth header
-export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get('Authorization')
-
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  try {
+// POST just processes the queue
+export const POST = withApiHandler(
+  { authTier: 'system', logContext: 'process-mailerlite-updates' },
+  async () => {
     const result = await processMailerLiteUpdates()
     return NextResponse.json(result)
-  } catch (error) {
-    console.error('[MailerLite Updates] Manual trigger error:', error)
-    return NextResponse.json({
-      error: 'MailerLite updates processing failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
-    }, { status: 500 })
   }
-}
+)

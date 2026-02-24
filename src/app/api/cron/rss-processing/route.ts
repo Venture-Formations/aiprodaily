@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { ScheduleChecker } from '@/lib/schedule-checker'
 import { PromptSelector } from '@/lib/prompt-selector'
 
-async function processRSSWorkflow(request: NextRequest, force: boolean = false) {
+async function processRSSWorkflow(force: boolean = false) {
   let issueId: string | undefined
 
   // TODO: This legacy route should be deprecated in favor of trigger-workflow
@@ -118,17 +119,17 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
   // Phase 1: Archive, Fetch+Extract, Score (steps 1-3)
   console.log(`[Cron] Phase 1 starting for issue: ${issueId}`)
   console.log(`[Cron] Using baseUrl: ${baseUrl}`)
-  
+
   const phase1Url = `${baseUrl}/api/rss/process-phase1`
   console.log(`[Cron] Calling: ${phase1Url}`)
-  
+
   let phase1Response: Response
   try {
     console.log(`[Cron] Making Phase 1 fetch request at ${new Date().toISOString()}`)
     // Use AbortController with a 10-minute timeout (600 seconds) to match Vercel function timeout
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 600000) // 10 minutes
-    
+
     try {
       phase1Response = await fetch(phase1Url, {
         method: 'POST',
@@ -160,7 +161,7 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
   // Check if response is JSON or HTML (error page)
   const contentType = phase1Response.headers.get('content-type') || ''
   let phase1Result: any
-  
+
   try {
     if (contentType.includes('application/json')) {
       phase1Result = await phase1Response.json()
@@ -187,18 +188,18 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
   // Trigger Phase 2 immediately after Phase 1 completes
   console.log(`[Cron] Phase 2 starting for issue: ${issueId}`)
   console.log(`[Cron] Preparing Phase 2 request...`)
-  
+
   const phase2Url = `${baseUrl}/api/rss/process-phase2`
   console.log(`[Cron] Phase 2 URL: ${phase2Url}`)
   console.log(`[Cron] Making Phase 2 fetch request at ${new Date().toISOString()}...`)
-  
+
   let phase2Response: Response
   try {
     console.log(`[Cron] Making Phase 2 fetch request at ${new Date().toISOString()}`)
     // Use AbortController with a 10-minute timeout (600 seconds) to match Vercel function timeout
     const controller2 = new AbortController()
     const timeoutId2 = setTimeout(() => controller2.abort(), 600000) // 10 minutes
-    
+
     try {
       phase2Response = await fetch(phase2Url, {
         method: 'POST',
@@ -230,7 +231,7 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
   // Check if response is JSON or HTML (error page)
   const contentType2 = phase2Response.headers.get('content-type') || ''
   let phase2Result: any
-  
+
   if (contentType2.includes('application/json')) {
     phase2Result = await phase2Response.json()
   } else {
@@ -260,105 +261,48 @@ async function processRSSWorkflow(request: NextRequest, force: boolean = false) 
   }
 }
 
-export async function POST(request: NextRequest) {
-  let issueId: string | undefined
+const handler = withApiHandler(
+  { authTier: 'system', logContext: 'rss-processing' },
+  async ({ request }) => {
+    let issueId: string | undefined
 
-  try {
-    // Verify this is a legitimate cron request
-    const authHeader = request.headers.get('authorization')
+    try {
+      const searchParams = new URL(request.url).searchParams
+      const forceParam = searchParams.get('force')
+      const force = forceParam === 'true'
 
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check for force parameter in URL or body
-    const searchParams = new URL(request.url).searchParams
-    const forceParam = searchParams.get('force')
-    const force = forceParam === 'true'
-
-    const result = await processRSSWorkflow(request, force)
-    if (result.skipped) {
-      return result.response
-    }
-    
-    issueId = result.issueId
-    return result.response
-
-  } catch (error) {
-    console.error('RSS processing failed:', error instanceof Error ? error.message : 'Unknown error')
-
-    // Try to mark issue as failed if issueId is available
-    if (issueId) {
-      try {
-        await supabaseAdmin
-          .from('publication_issues')
-          .update({ status: 'failed' })
-          .eq('id', issueId)
-      } catch (updateError) {
-        console.error('Failed to update issue status:', updateError)
+      const result = await processRSSWorkflow(force)
+      if (result.skipped) {
+        return result.response
       }
-    }
 
-    return NextResponse.json({
-      success: false,
-      error: 'RSS processing failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      issue_id: issueId,
-      timestamp: new Date().toISOString()
-    }, { status: 500 })
-  }
-}
-
-// Handle GET requests from Vercel cron (no auth header, uses URL secret)
-export async function GET(request: NextRequest) {
-  let issueId: string | undefined
-
-  try {
-    // For Vercel cron: check secret in URL params, for manual: require secret param
-    const searchParams = new URL(request.url).searchParams
-    const secret = searchParams.get('secret')
-
-    // Allow both manual testing (with secret param) and Vercel cron (no auth needed)
-    const isVercelCron = !secret && !searchParams.has('secret')
-    const isManualTest = secret === process.env.CRON_SECRET
-
-    if (!isVercelCron && !isManualTest) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check for force parameter to bypass schedule check
-    const forceParam = searchParams.get('force')
-    const force = forceParam === 'true'
-
-    const result = await processRSSWorkflow(request, force)
-    if (result.skipped) {
+      issueId = result.issueId
       return result.response
-    }
-    
-    issueId = result.issueId
-    return result.response
+    } catch (error) {
+      console.error('RSS processing failed:', error instanceof Error ? error.message : 'Unknown error')
 
-  } catch (error) {
-    console.error('RSS processing failed:', error instanceof Error ? error.message : 'Unknown error')
-
-    // Try to mark issue as failed if issueId is available
-    if (issueId) {
-      try {
-        await supabaseAdmin
-          .from('publication_issues')
-          .update({ status: 'failed' })
-          .eq('id', issueId)
-      } catch (updateError) {
-        console.error('Failed to update issue status:', updateError)
+      // Try to mark issue as failed if issueId is available
+      if (issueId) {
+        try {
+          await supabaseAdmin
+            .from('publication_issues')
+            .update({ status: 'failed' })
+            .eq('id', issueId)
+        } catch (updateError) {
+          console.error('Failed to update issue status:', updateError)
+        }
       }
-    }
 
-    return NextResponse.json({
-      success: false,
-      error: 'RSS processing failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      issue_id: issueId,
-      timestamp: new Date().toISOString()
-    }, { status: 500 })
+      return NextResponse.json({
+        success: false,
+        error: 'RSS processing failed',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        issue_id: issueId,
+        timestamp: new Date().toISOString()
+      }, { status: 500 })
+    }
   }
-}
+)
+
+export const POST = handler
+export const GET = handler

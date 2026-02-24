@@ -66,6 +66,14 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+    // Reject replayed events older than 5 minutes
+    const tolerance = 300 // 5 minutes in seconds
+    const timestampAge = Math.floor(Date.now() / 1000) - parseInt(timestamp, 10)
+    if (isNaN(timestampAge) || timestampAge > tolerance) {
+      console.error('[Webhook] Timestamp outside tolerance:', timestampAge, 'seconds')
+      return NextResponse.json({ error: 'Timestamp too old' }, { status: 400 })
+    }
+
     // Construct the signed payload
     const signedPayload = `${timestamp}.${rawBody}`
 

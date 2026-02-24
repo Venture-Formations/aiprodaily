@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SendGridService } from '@/lib/sendgrid'
 
@@ -128,45 +129,13 @@ async function processSendGridUpdates() {
   }
 }
 
-// Handle GET requests from Vercel cron
-export async function GET(request: NextRequest) {
-  const searchParams = new URL(request.url).searchParams
-  const secret = searchParams.get('secret')
-
-  if (secret && secret !== process.env.CRON_SECRET) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  try {
+const handler = withApiHandler(
+  { authTier: 'system', logContext: 'process-sendgrid-updates' },
+  async () => {
     const result = await processSendGridUpdates()
     return NextResponse.json(result)
-  } catch (error) {
-    console.error('[SendGrid Updates] Cron error:', error)
-    return NextResponse.json({
-      error: 'SendGrid updates processing failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
-    }, { status: 500 })
   }
-}
+)
 
-// Handle POST requests for manual triggers with auth header
-export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get('Authorization')
-
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  try {
-    const result = await processSendGridUpdates()
-    return NextResponse.json(result)
-  } catch (error) {
-    console.error('[SendGrid Updates] Manual trigger error:', error)
-    return NextResponse.json({
-      error: 'SendGrid updates processing failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
-    }, { status: 500 })
-  }
-}
+export const GET = handler
+export const POST = handler

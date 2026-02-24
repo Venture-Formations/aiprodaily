@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SlackNotificationService } from '@/lib/slack'
 
@@ -8,20 +9,10 @@ import { SlackNotificationService } from '@/lib/slack'
  * Runs every 5 minutes to check for failed workflows and send Slack alerts
  * Prevents duplicate alerts by tracking which failures have been notified
  */
-export async function GET(request: NextRequest) {
-  try {
-    // For Vercel cron: check secret in URL params
-    const searchParams = new URL(request.url).searchParams
-    const secret = searchParams.get('secret')
-
-    const isVercelCron = !secret && !searchParams.has('secret')
-    const isManualTest = secret === process.env.CRON_SECRET
-
-    if (!isVercelCron && !isManualTest) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    console.log('[Workflow Monitor] Checking for failed workflows...')
+export const GET = withApiHandler(
+  { authTier: 'system', logContext: 'monitor-workflows' },
+  async ({ logger }) => {
+    logger.info('Checking for failed workflows...')
 
     // Find issues that failed but haven't been alerted yet
     const { data: failedIssues, error: queryError } = await supabaseAdmin
@@ -33,7 +24,7 @@ export async function GET(request: NextRequest) {
       .limit(10) // Process up to 10 at a time
 
     if (queryError) {
-      console.error('[Workflow Monitor] Query error:', queryError)
+      logger.error({ err: queryError }, 'Query error')
       return NextResponse.json({
         error: 'Failed to query issues',
         message: queryError.message
@@ -41,7 +32,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (!failedIssues || failedIssues.length === 0) {
-      console.log('[Workflow Monitor] No new failures to report')
+      logger.info('No new failures to report')
       return NextResponse.json({
         success: true,
         message: 'No new workflow failures',
@@ -50,7 +41,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    console.log(`[Workflow Monitor] Found ${failedIssues.length} failed issue(s) to alert`)
+    logger.info(`Found ${failedIssues.length} failed issue(s) to alert`)
 
     const slack = new SlackNotificationService()
     const alertedIssues: string[] = []
@@ -87,10 +78,10 @@ export async function GET(request: NextRequest) {
           .eq('id', issue.id)
 
         alertedIssues.push(issue.id)
-        console.log(`[Workflow Monitor] ✓ Alerted for issue ${issue.id}`)
+        logger.info(`Alerted for issue ${issue.id}`)
 
       } catch (alertError) {
-        console.error(`[Workflow Monitor] Failed to alert for issue ${issue.id}:`, alertError)
+        logger.error({ err: alertError, issueId: issue.id }, 'Failed to alert for issue')
         // Continue with next issue even if one fails
       }
     }
@@ -101,14 +92,7 @@ export async function GET(request: NextRequest) {
       alertedIssues,
       timestamp: new Date().toISOString()
     })
-
-  } catch (error) {
-    console.error('[Workflow Monitor] Fatal error:', error)
-    return NextResponse.json({
-      error: 'Workflow monitor failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
 export const maxDuration = 60
