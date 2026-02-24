@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { declareRoute } from '@/lib/auth-tiers'
+
+declareRoute({
+  authTier: 'admin',
+  description: 'Admin tools management'
+})
 
 // Categories mapping for ai_applications
 const CATEGORIES = [

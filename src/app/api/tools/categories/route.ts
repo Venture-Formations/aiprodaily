@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { declareRoute } from '@/lib/auth-tiers'
+
+declareRoute({
+  authTier: 'public',
+  description: 'Returns static tool categories list'
+})
 
 // Categories from directory.ts - single source of truth
 const CATEGORIES = [

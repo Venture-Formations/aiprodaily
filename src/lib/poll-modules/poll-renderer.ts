@@ -9,6 +9,7 @@ import { getBusinessSettings } from '../publication-settings'
 import type { BlockStyleOptions } from '../blocks'
 import { sanitizeAltText } from '../utils/sanitize-alt-text'
 import type { PollModule, Poll, PollSnapshot, PollBlockType } from '@/types/database'
+import type { BusinessSettings } from '../newsletter-templates/types'
 
 /**
  * Context for rendering (issue info for response URLs)
@@ -76,7 +77,8 @@ export class PollModuleRenderer {
     mod: PollModule,
     poll: Poll | PollSnapshot | null,
     publicationId: string,
-    context: RenderContext = {}
+    context: RenderContext = {},
+    businessSettings?: BusinessSettings
   ): Promise<RenderResult> {
     // If no poll, return empty result
     if (!poll) {
@@ -87,15 +89,10 @@ export class PollModuleRenderer {
       }
     }
 
-    // Get publication styling
-    const settings = await getBusinessSettings(publicationId)
-    const styles: BlockStyleOptions = {
-      primaryColor: settings.primary_color,
-      secondaryColor: settings.secondary_color || '#764ba2',
-      tertiaryColor: settings.tertiary_color || '#ffffff',
-      headingFont: settings.heading_font,
-      bodyFont: settings.body_font
-    }
+    // Get publication styling (use passed-in settings if available)
+    const styles: BlockStyleOptions = businessSettings
+      ? { primaryColor: businessSettings.primaryColor, secondaryColor: businessSettings.secondaryColor, tertiaryColor: businessSettings.tertiaryColor, headingFont: businessSettings.headingFont, bodyFont: businessSettings.bodyFont }
+      : await getBusinessSettings(publicationId).then(s => ({ primaryColor: s.primary_color, secondaryColor: s.secondary_color || '#764ba2', tertiaryColor: s.tertiary_color || '#ffffff', headingFont: s.heading_font, bodyFont: s.body_font }))
 
     // Render blocks in legacy poll style (not using generic block renderers)
     const blockOrder = mod.block_order as PollBlockType[]

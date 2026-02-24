@@ -3,6 +3,13 @@ import { ScheduleChecker } from '@/lib/schedule-checker'
 import { start } from 'workflow/api'
 import { processRSSWorkflow } from '@/lib/workflows/process-rss-workflow'
 import { supabaseAdmin } from '@/lib/supabase'
+import { createLogger } from '@/lib/logger'
+import { declareRoute } from '@/lib/auth-tiers'
+
+declareRoute({
+  authTier: 'system',
+  description: 'Triggers RSS processing workflow on schedule'
+})
 
 /**
  * Workflow Trigger Cron
@@ -12,6 +19,8 @@ import { supabaseAdmin } from '@/lib/supabase'
  * Multi-tenant: Each newsletter has its own schedule in app_settings
  */
 export async function GET(request: NextRequest) {
+  const log = createLogger({ cronName: 'trigger-workflow' })
+
   try {
     // For Vercel cron: check secret in URL params, for manual: require secret param
     const searchParams = new URL(request.url).searchParams
@@ -32,7 +41,7 @@ export async function GET(request: NextRequest) {
       .eq('is_active', true)
 
     if (newslettersError || !newsletters || newsletters.length === 0) {
-      console.log('[Workflow Trigger] No active newsletters found')
+      log.info('No active newsletters found')
       return NextResponse.json({
         success: true,
         message: 'No active newsletters',
@@ -41,7 +50,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    console.log(`[Workflow Trigger] Checking schedules for ${newsletters.length} newsletters`)
+    log.info({ count: newsletters.length }, 'Checking schedules')
 
     // RECOVERY: Check for campaigns stuck in 'processing' due to OIDC errors
     const { data: stuckCampaigns } = await supabaseAdmin
@@ -51,7 +60,7 @@ export async function GET(request: NextRequest) {
       .lt('created_at', new Date(Date.now() - 30 * 60 * 1000).toISOString()) // Older than 30 mins
 
     if (stuckCampaigns && stuckCampaigns.length > 0) {
-      console.log(`[Workflow Trigger] Found ${stuckCampaigns.length} stuck campaigns - checking for OIDC recovery`)
+      log.info({ count: stuckCampaigns.length }, 'Found stuck campaigns - checking for OIDC recovery')
 
       for (const campaign of stuckCampaigns) {
         // Check if articles were actually generated despite OIDC error
@@ -64,7 +73,7 @@ export async function GET(request: NextRequest) {
 
         // If sufficient articles exist, the work completed but OIDC failed - manually finalize
         if (articleCount && articleCount >= 3) {
-          console.log(`[Workflow Trigger] Campaign ${campaign.id} has ${articleCount} articles - attempting recovery`)
+          log.info({ campaignId: campaign.id, articleCount }, 'Campaign has articles - attempting recovery')
 
           // Check if welcome section exists (indicates finalize step ran)
           const { data: campaignData } = await supabaseAdmin
@@ -74,14 +83,13 @@ export async function GET(request: NextRequest) {
             .single()
 
           if (campaignData?.welcome_section) {
-            // Finalize step completed, just update status
-            console.log(`[Workflow Trigger] Campaign ${campaign.id} is complete - updating to draft`)
+            log.info({ campaignId: campaign.id }, 'Campaign complete - updating to draft')
             await supabaseAdmin
               .from('newsletter_campaigns')
               .update({ status: 'draft' })
               .eq('id', campaign.id)
           } else {
-            console.log(`[Workflow Trigger] Campaign ${campaign.id} incomplete - leaving as processing for retry`)
+            log.info({ campaignId: campaign.id }, 'Campaign incomplete - leaving as processing for retry')
           }
         }
       }
@@ -94,7 +102,7 @@ export async function GET(request: NextRequest) {
       const shouldRun = await ScheduleChecker.shouldRunRSSProcessing(newsletter.id)
 
       if (shouldRun) {
-        console.log(`[Workflow Trigger] Starting workflow for ${newsletter.name} (${newsletter.id})`)
+        log.info({ newsletter: newsletter.name, publicationId: newsletter.id }, 'Starting workflow')
 
         await start(processRSSWorkflow, [{
           trigger: 'cron',
@@ -103,7 +111,7 @@ export async function GET(request: NextRequest) {
 
         startedWorkflows.push(newsletter.name)
       } else {
-        console.log(`[Workflow Trigger] Not time yet for ${newsletter.name}`)
+        log.debug({ newsletter: newsletter.name }, 'Not time yet')
       }
     }
 
@@ -116,7 +124,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    console.log(`[Workflow Trigger] Started workflows for: ${startedWorkflows.join(', ')}`)
+    log.info({ started: startedWorkflows }, 'Workflows started')
 
     return NextResponse.json({
       success: true,
@@ -126,7 +134,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('[Workflow Trigger] Failed:', error)
+    log.error({ err: error }, 'Workflow trigger failed')
     return NextResponse.json({
       error: 'Workflow trigger failed',
       message: error instanceof Error ? error.message : 'Unknown error'

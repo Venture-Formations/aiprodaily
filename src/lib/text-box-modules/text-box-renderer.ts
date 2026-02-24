@@ -14,6 +14,7 @@ import type {
   IssueTextBoxBlock,
   TextSize
 } from '@/types/database'
+import type { BusinessSettings } from '../newsletter-templates/types'
 
 /**
  * Context for rendering
@@ -231,17 +232,13 @@ export class TextBoxModuleRenderer {
     blocks: TextBoxBlock[],
     issueBlocks: Map<string, IssueTextBoxBlock>,
     publicationId: string,
-    context: RenderContext = {}
+    context: RenderContext = {},
+    businessSettings?: BusinessSettings
   ): Promise<RenderResult> {
-    // Get publication styling
-    const settings = await getBusinessSettings(publicationId)
-    const styles: BlockStyleOptions = {
-      primaryColor: settings.primary_color,
-      secondaryColor: settings.secondary_color || '#764ba2',
-      tertiaryColor: settings.tertiary_color || '#ffffff',
-      headingFont: settings.heading_font,
-      bodyFont: settings.body_font
-    }
+    // Get publication styling (use passed-in settings if available)
+    const styles: BlockStyleOptions = businessSettings
+      ? { primaryColor: businessSettings.primaryColor, secondaryColor: businessSettings.secondaryColor, tertiaryColor: businessSettings.tertiaryColor, headingFont: businessSettings.headingFont, bodyFont: businessSettings.bodyFont }
+      : await getBusinessSettings(publicationId).then(s => ({ primaryColor: s.primary_color, secondaryColor: s.secondary_color || '#764ba2', tertiaryColor: s.tertiary_color || '#ffffff', headingFont: s.heading_font, bodyFont: s.body_font }))
 
     // Render blocks in order
     const activeBlocks = blocks.filter(b => b.is_active)

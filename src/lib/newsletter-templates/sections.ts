@@ -3,6 +3,7 @@
 import { supabaseAdmin } from '../supabase'
 import { wrapTrackingUrl } from '../url-tracking'
 import { fetchBusinessSettings, getBreakingNewsEmoji } from './helpers'
+import type { BusinessSettings } from './types'
 
 // ==================== WELCOME SECTION ====================
 
@@ -10,7 +11,8 @@ export async function generateWelcomeSection(
   intro: string | null,
   tagline: string | null,
   summary: string | null,
-  publication_id?: string
+  publication_id?: string,
+  businessSettings?: BusinessSettings
 ): Promise<string> {
   // Skip if all 3 parts are empty
   if ((!intro || intro.trim() === '') &&
@@ -19,8 +21,8 @@ export async function generateWelcomeSection(
     return ''
   }
 
-  // Fetch fonts from business settings
-  const { bodyFont } = await fetchBusinessSettings(publication_id)
+  // Fetch fonts from business settings (use passed-in settings if available)
+  const { bodyFont } = businessSettings || await fetchBusinessSettings(publication_id)
 
   // Prepend personalized greeting to intro
   const greeting = `Hey, {$name|default('Accounting Pro')}!`
@@ -60,10 +62,10 @@ export async function generateWelcomeSection(
 
 // ==================== POLL SECTION ====================
 
-export async function generatePollSection(issue: { id: string; publication_id: string; status?: string; poll_id?: string | null }): Promise<string> {
+export async function generatePollSection(issue: { id: string; publication_id: string; status?: string; poll_id?: string | null }, businessSettings?: BusinessSettings): Promise<string> {
   try {
-    // Fetch colors and website URL from business settings (using publication_id)
-    const { primaryColor, tertiaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue.publication_id)
+    // Fetch colors and website URL from business settings (use passed-in settings if available)
+    const { primaryColor, tertiaryColor } = businessSettings || await fetchBusinessSettings(issue.publication_id)
     // Use the main app domain for poll responses (where the poll pages are hosted)
     const baseUrl = process.env.NEXTAUTH_URL || 'https://www.aiprodaily.com'
 
@@ -169,7 +171,8 @@ ${optionsHtml}
  */
 export async function generatePollModulesSection(
   issue: { id: string; publication_id: string; status?: string },
-  moduleId: string
+  moduleId: string,
+  businessSettings?: BusinessSettings
 ): Promise<string> {
   try {
     const { PollModuleSelector, PollModuleRenderer } = await import('../poll-modules')
@@ -190,7 +193,8 @@ export async function generatePollModulesSection(
       selection.poll_module,
       selection.poll,
       issue.publication_id,
-      { issueId: issue.id }
+      { issueId: issue.id },
+      businessSettings
     )
 
     return result.html
@@ -202,12 +206,12 @@ export async function generatePollModulesSection(
 
 // ==================== BREAKING NEWS ====================
 
-export async function generateBreakingNewsSection(issue: any): Promise<string> {
+export async function generateBreakingNewsSection(issue: any, businessSettings?: BusinessSettings): Promise<string> {
   try {
     console.log('Generating Breaking News section for issue:', issue?.id)
 
-    // Fetch colors from business settings (using publication_id if available)
-    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue?.publication_id)
+    // Fetch colors from business settings (use passed-in settings if available)
+    const { primaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue?.publication_id)
 
     // Fetch selected Breaking News articles
     const { data: selections } = await supabaseAdmin
@@ -285,12 +289,12 @@ export async function generateBreakingNewsSection(issue: any): Promise<string> {
 
 // ==================== BEYOND THE FEED ====================
 
-export async function generateBeyondTheFeedSection(issue: any): Promise<string> {
+export async function generateBeyondTheFeedSection(issue: any, businessSettings?: BusinessSettings): Promise<string> {
   try {
     console.log('Generating Beyond the Feed section for issue:', issue?.id)
 
-    // Fetch colors from business settings (using publication_id if available)
-    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue?.publication_id)
+    // Fetch colors from business settings (use passed-in settings if available)
+    const { primaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue?.publication_id)
 
     // Fetch selected Beyond the Feed articles
     const { data: selections } = await supabaseAdmin
@@ -368,7 +372,7 @@ export async function generateBeyondTheFeedSection(issue: any): Promise<string> 
 
 // ==================== AI APPS ====================
 
-export async function generateAIAppsSection(issue: any): Promise<string> {
+export async function generateAIAppsSection(issue: any, businessSettings?: BusinessSettings): Promise<string> {
   try {
     console.log('Generating AI Apps section for issue:', issue?.id)
 
@@ -396,7 +400,8 @@ export async function generateAIAppsSection(issue: any): Promise<string> {
             issueDate: issue.date,
             issueId: issue.id,
             mailerliteIssueId: issue.mailerlite_issue_id
-          }
+          },
+          businessSettings
         )
 
         combinedHtml += result.html
@@ -426,7 +431,8 @@ export async function generateAIAppsSection(issue: any): Promise<string> {
  */
 export async function generatePromptModulesSection(
   issue: { id: string; publication_id: string; status?: string },
-  moduleId: string
+  moduleId: string,
+  businessSettings?: BusinessSettings
 ): Promise<string> {
   try {
     const { PromptModuleRenderer } = await import('../prompt-modules')
@@ -459,7 +465,8 @@ export async function generatePromptModulesSection(
       selection.prompt_module,
       selection.prompt,
       issue.publication_id,
-      { issueId: issue.id }
+      { issueId: issue.id },
+      businessSettings
     )
 
     return result.html
@@ -518,7 +525,8 @@ export async function generatePromptIdeasSection(issue: any): Promise<string> {
  */
 export async function generateTextBoxModuleSection(
   issue: { id: string; publication_id: string; status?: string },
-  moduleId: string
+  moduleId: string,
+  businessSettings?: BusinessSettings
 ): Promise<string> {
   try {
     const { TextBoxModuleSelector, TextBoxModuleRenderer } = await import('../text-box-modules')
@@ -546,7 +554,8 @@ export async function generateTextBoxModuleSection(
       selection.blocks || [],
       issueBlocksMap,
       issue.publication_id,
-      { issueId: issue.id }
+      { issueId: issue.id },
+      businessSettings
     )
 
     return result.html
@@ -560,7 +569,8 @@ export async function generateTextBoxModuleSection(
 
 export async function generateFeedbackModuleSection(
   issue: { id: string; publication_id: string; status?: string },
-  moduleId: string
+  moduleId: string,
+  businessSettings?: BusinessSettings
 ): Promise<string> {
   try {
     const { FeedbackModuleSelector, FeedbackModuleRenderer } = await import('../feedback-modules')
@@ -577,7 +587,8 @@ export async function generateFeedbackModuleSection(
     const result = await FeedbackModuleRenderer.renderFeedbackModule(
       mod,
       issue.publication_id,
-      { issueId: issue.id }
+      { issueId: issue.id },
+      businessSettings
     )
 
     return result.html
@@ -591,7 +602,8 @@ export async function generateFeedbackModuleSection(
 
 export async function generateSparkLoopRecModuleSection(
   issue: { id: string; publication_id: string; status?: string },
-  moduleId: string
+  moduleId: string,
+  businessSettings?: BusinessSettings
 ): Promise<string> {
   try {
     const { SparkLoopRecModuleSelector, SparkLoopRecModuleRenderer } = await import('../sparkloop-rec-modules')
@@ -614,8 +626,8 @@ export async function generateSparkLoopRecModuleSection(
       return ''
     }
 
-    // Fetch business settings for consistent section styling
-    const { primaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue.publication_id)
+    // Fetch business settings for consistent section styling (use passed-in settings if available)
+    const { primaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue.publication_id)
 
     // Render cards
     const html = SparkLoopRecModuleRenderer.renderSection(

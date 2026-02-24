@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { authOptions } from '@/lib/auth'
+import { declareRoute } from '@/lib/auth-tiers'
+import { getIssueById } from '@/lib/dal'
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const routeConfig = declareRoute({
+  authTier: 'authenticated',
+  description: 'Get/update a single issue by ID'
+})
 
 interface RouteParams {
   params: Promise<{

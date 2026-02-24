@@ -5,13 +5,15 @@ import { wrapTrackingUrl } from '../url-tracking'
 import { sanitizeAltText } from '../utils/sanitize-alt-text'
 import { fetchBusinessSettings, getArticleEmoji } from './helpers'
 import type { ArticleBlockType } from '@/types/database'
+import type { BusinessSettings } from './types'
 
 // ==================== ARTICLE MODULE SECTION ====================
 
 export async function generateArticleModuleSection(
   issue: any,
   moduleId: string,
-  includeUnsubscribeLink: boolean = false
+  includeUnsubscribeLink: boolean = false,
+  businessSettings?: BusinessSettings
 ): Promise<string> {
   // Fetch the article mod
   const { data: mod } = await supabaseAdmin
@@ -52,8 +54,8 @@ export async function generateArticleModuleSection(
     return ''
   }
 
-  // Fetch colors and fonts from business settings
-  const { primaryColor, secondaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue.publication_id)
+  // Fetch colors and fonts from business settings (use passed-in settings if available)
+  const { primaryColor, secondaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue.publication_id)
 
   // Get block order from mod settings
   const blockOrder: ArticleBlockType[] = mod.block_order || ['title', 'body']
@@ -139,13 +141,13 @@ export async function generateArticleModuleSection(
 // ==================== PRIMARY ARTICLES SECTION ====================
 // @deprecated Use generateArticleModuleSection instead - this function is for backward compatibility only
 
-export async function generatePrimaryArticlesSection(articles: any[], issueDate: string, issueId: string | undefined, sectionName: string, publication_id?: string, mailerliteIssueId?: string): Promise<string> {
+export async function generatePrimaryArticlesSection(articles: any[], issueDate: string, issueId: string | undefined, sectionName: string, publication_id?: string, mailerliteIssueId?: string, businessSettings?: BusinessSettings): Promise<string> {
   if (!articles || articles.length === 0) {
     return ''
   }
 
-  // Fetch colors and fonts from business settings
-  const { primaryColor, secondaryColor, headingFont, bodyFont } = await fetchBusinessSettings(publication_id)
+  // Fetch colors and fonts from business settings (use passed-in settings if available)
+  const { primaryColor, secondaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(publication_id)
 
   const articlesHtml = articles.map((article) => {
     const headline = article.headline || 'No headline'
@@ -193,7 +195,7 @@ export async function generatePrimaryArticlesSection(articles: any[], issueDate:
 // ==================== SECONDARY ARTICLES SECTION ====================
 // @deprecated Use generateArticleModuleSection instead - this function queries legacy secondary_articles table
 
-export async function generateSecondaryArticlesSection(issue: any, sectionName: string): Promise<string> {
+export async function generateSecondaryArticlesSection(issue: any, sectionName: string, businessSettings?: BusinessSettings): Promise<string> {
   console.warn('[DEPRECATED] generateSecondaryArticlesSection called - use article modules instead')
   // Fetch secondary articles for this issue
   const { data: secondaryArticles } = await supabaseAdmin
@@ -216,8 +218,8 @@ export async function generateSecondaryArticlesSection(issue: any, sectionName: 
     return ''
   }
 
-  // Fetch colors and fonts from business settings (using publication_id if available)
-  const { primaryColor, secondaryColor, headingFont, bodyFont } = await fetchBusinessSettings(issue?.publication_id)
+  // Fetch colors and fonts from business settings (use passed-in settings if available)
+  const { primaryColor, secondaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue?.publication_id)
 
   const articlesHtml = secondaryArticles.map((article) => {
     const headline = article.headline || 'No headline'

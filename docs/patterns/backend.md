@@ -1,6 +1,6 @@
 # Backend Patterns & Templates
 
-_Last updated: 2025-11-28_
+_Last updated: 2026-02-24_
 
 ## When to use this
 - You are creating a new API route, server action, or cron handler
@@ -12,7 +12,65 @@ Related references:
 - @docs/operations/cron-jobs.md — Scheduling constraints and timeouts
 - @docs/troubleshooting/common-issues.md — Recovery steps when things go wrong
 
-## API Route Template
+## API Route Template (with `withApiHandler`)
+
+**Preferred pattern** — use `withApiHandler` for new routes. Centralizes auth, validation, logging.
+
+```typescript
+// app/api/<feature>/route.ts
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
+import { declareRoute } from '@/lib/auth-tiers'
+import { z } from 'zod'
+
+export const routeConfig = declareRoute({
+  authTier: 'authenticated',
+  description: 'Brief description of what this route does'
+})
+
+const inputSchema = z.object({
+  issueId: z.string().uuid(),
+  publicationId: z.string().uuid(),
+})
+
+export const POST = withApiHandler(
+  {
+    authTier: 'authenticated',
+    inputSchema,
+    requirePublicationId: true,
+    logContext: 'my-feature',
+  },
+  async ({ session, input, publicationId, logger }) => {
+    logger.info({ issueId: input.issueId }, 'Processing request')
+
+    // Domain logic here — publicationId is guaranteed non-null
+
+    return NextResponse.json({ success: true })
+  }
+)
+
+export const maxDuration = 600
+```
+
+### Auth Tiers
+| Tier | Check | Use for |
+|------|-------|---------|
+| `public` | None | Public-facing APIs (categories, directory) |
+| `authenticated` | NextAuth session | Dashboard routes, user actions |
+| `admin` | Session + role=admin | Admin tools, settings management |
+| `system` | CRON_SECRET bearer/param | Cron jobs, internal triggers |
+
+### Key practices
+- Export `maxDuration` to control Vercel runtime budget.
+- Always validate inputs with Zod schemas for request bodies.
+- Declare `routeConfig` with `declareRoute()` for documentation and future enforcement.
+- Use `requirePublicationId: true` for tenant-scoped routes.
+- The wrapper handles auth, validation errors, and unhandled exceptions automatically.
+
+## Legacy API Route Template
+
+For routes not yet migrated to `withApiHandler`:
+
 ```typescript
 // app/api/<feature>/route.ts
 import { NextRequest, NextResponse } from 'next/server'
@@ -56,11 +114,42 @@ export async function POST(request: NextRequest) {
 }
 ```
 
-### Key practices
-- Export `maxDuration` to control Vercel runtime budget.
-- Always validate inputs and respond with explicit errors (400/404/500).
-- Never log secrets; prefer structured, high-level messages.
-- Reuse helpers in `src/lib` for shared logic and Supabase interactions.
+## Data Access Layer (DAL)
+
+**Prefer DAL functions** over inline Supabase queries for `publication_issues`:
+
+```typescript
+import { getIssueById, createIssue, updateIssueStatus } from '@/lib/dal'
+
+// Read
+const issue = await getIssueById(issueId, publicationId)
+
+// Create
+const newIssue = await createIssue(publicationId, '2026-02-24', 'processing')
+
+// Update status
+await updateIssueStatus(issueId, 'draft')
+```
+
+See `src/lib/dal/issues.ts` for all available methods. Key features:
+- Every method applies `publication_id` filter for multi-tenant safety
+- Explicit column lists (no `select('*')`)
+- Errors logged with pino, never thrown — callers receive null/empty on failure
+- Returns typed results using `PublicationIssue` from `@/types/database`
+
+## Structured Logging
+
+**New routes** should use pino logger from `src/lib/logger.ts`:
+
+```typescript
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger({ cronName: 'my-cron', publicationId })
+log.info({ count: items.length }, 'Processing batch')
+log.error({ err }, 'Step failed')
+```
+
+**Existing routes** using `console.log` with `[Tag]` prefixes continue to work — migrate incrementally.
 
 ## Database Query Pattern
 ```typescript
@@ -140,8 +229,9 @@ async function withRetries<T>(taskName: string, fn: () => Promise<T>): Promise<T
 Use for long-running steps (workflow tasks, AI batches) to gracefully recover from transient issues.
 
 ## Logging Conventions
-- Prefix logs with domain tags (`[Workflow]`, `[RSS]`, `[AI]`, `[DB]`, `[CRON]`).
+- **New code:** Use `createLogger()` from `@/lib/logger` for structured JSON logging.
+- **Existing code:** Prefix logs with domain tags (`[Workflow]`, `[RSS]`, `[AI]`, `[DB]`, `[CRON]`).
 - Prefer single summary line per operation to stay under 10MB limit.
-- Use `console.error` for actionable errors; rely on Slack hooks or monitoring for escalations.
+- Use `log.error({ err }, 'message')` for actionable errors; rely on Slack hooks or monitoring for escalations.
 
 These patterns help Claude apply consistent, production-safe practices when extending backend features.
