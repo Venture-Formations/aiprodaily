@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     if (!mod) {
       return NextResponse.json({
         success: true,
-        mod: null,
+        module: null,
         stats: [],
         recent_comments: [],
         summary: {
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      mod,
+      module: mod,
       summary: {
         total_votes: totalVotes,
         average_score: overallAverage,
