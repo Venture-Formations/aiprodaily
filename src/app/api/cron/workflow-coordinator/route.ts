@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { STEP_ENDPOINTS } from '@/types/workflow-states'
 
@@ -15,9 +16,10 @@ import { STEP_ENDPOINTS } from '@/types/workflow-states'
  *
  * This avoids chained HTTP calls that trigger Vercel's loop detection.
  */
-export async function GET(request: NextRequest) {
-  try {
-    console.log('[Workflow Coordinator] Starting workflow state check')
+export const GET = withApiHandler(
+  { authTier: 'system', logContext: 'workflow-coordinator' },
+  async ({ logger }) => {
+    logger.info('Starting workflow state check')
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
 
@@ -38,7 +40,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: true })
 
     if (error) {
-      console.error('[Workflow Coordinator] Failed to fetch issues:', error)
+      logger.error({ err: error }, 'Failed to fetch issues')
       return NextResponse.json({
         error: 'Failed to fetch issues',
         message: error.message
@@ -46,14 +48,14 @@ export async function GET(request: NextRequest) {
     }
 
     if (!issues || issues.length === 0) {
-      console.log('[Workflow Coordinator] No issues ready for processing')
+      logger.info('No issues ready for processing')
       return NextResponse.json({
         message: 'No issues ready for processing',
         processed: 0
       })
     }
 
-    console.log(`[Workflow Coordinator] Found ${issues.length} issue(s) ready for processing`)
+    logger.info(`Found ${issues.length} issue(s) ready for processing`)
 
     const results = []
 
@@ -62,13 +64,13 @@ export async function GET(request: NextRequest) {
       const endpoint = STEP_ENDPOINTS[issue.workflow_state]
 
       if (!endpoint) {
-        console.error(`[Workflow Coordinator] Unknown state: ${issue.workflow_state} for issue ${issue.id}`)
+        logger.error({ workflowState: issue.workflow_state, issueId: issue.id }, 'Unknown state')
         continue
       }
 
       const stepUrl = `${baseUrl}${endpoint}`
 
-      console.log(`[Workflow Coordinator] Triggering ${issue.workflow_state} for issue ${issue.id} (${issue.date})`)
+      logger.info({ issueId: issue.id, date: issue.date, state: issue.workflow_state }, 'Triggering step')
 
       try {
         // Trigger the step endpoint
@@ -79,7 +81,7 @@ export async function GET(request: NextRequest) {
         })
 
         if (response.ok) {
-          console.log(`[Workflow Coordinator] ✅ Successfully triggered ${issue.workflow_state} for issue ${issue.id}`)
+          logger.info({ issueId: issue.id, state: issue.workflow_state }, 'Successfully triggered step')
           results.push({
             issue_id: issue.id,
             state: issue.workflow_state,
@@ -88,7 +90,7 @@ export async function GET(request: NextRequest) {
           })
         } else {
           const errorText = await response.text()
-          console.error(`[Workflow Coordinator] ❌ Step returned ${response.status} for issue ${issue.id}:`, errorText)
+          logger.error({ issueId: issue.id, status: response.status, error: errorText }, 'Step returned error')
 
           // Mark issue as failed if step returns error
           await supabaseAdmin
@@ -107,7 +109,7 @@ export async function GET(request: NextRequest) {
           })
         }
       } catch (fetchError) {
-        console.error(`[Workflow Coordinator] Failed to trigger step for issue ${issue.id}:`, fetchError)
+        logger.error({ err: fetchError, issueId: issue.id }, 'Failed to trigger step')
 
         results.push({
           issue_id: issue.id,
@@ -132,8 +134,8 @@ export async function GET(request: NextRequest) {
       .lt('workflow_state_started_at', fifteenMinutesAgo.toISOString())
 
     if (stuckCampaigns && stuckCampaigns.length > 0) {
-      console.warn(`[Workflow Coordinator] ⚠️ Found ${stuckCampaigns.length} stuck issue(s):`,
-        stuckCampaigns.map(c => `${c.id} (${c.workflow_state} since ${c.workflow_state_started_at})`))
+      logger.warn({ stuck: stuckCampaigns.map(c => `${c.id} (${c.workflow_state} since ${c.workflow_state_started_at})`) },
+        `Found ${stuckCampaigns.length} stuck issue(s)`)
     }
 
     return NextResponse.json({
@@ -142,12 +144,5 @@ export async function GET(request: NextRequest) {
       results,
       stuck_issues: stuckCampaigns?.length || 0
     })
-
-  } catch (error) {
-    console.error('[Workflow Coordinator] Fatal error:', error)
-    return NextResponse.json({
-      error: 'Workflow coordinator failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

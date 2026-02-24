@@ -1,12 +1,6 @@
 import { NextResponse } from 'next/server'
 import { RSSProcessor } from '@/lib/rss-processor'
 import { withApiHandler } from '@/lib/api-handler'
-import { declareRoute } from '@/lib/auth-tiers'
-
-declareRoute({
-  authTier: 'system',
-  description: 'RSS ingestion cron (runs every 15 minutes)'
-})
 
 /**
  * RSS Ingestion Cron (runs every 15 minutes)

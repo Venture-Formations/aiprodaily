@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
@@ -12,20 +13,10 @@ import { supabaseAdmin } from '@/lib/supabase'
  *
  * Scheduled to run daily at 2:00 AM CT via Vercel cron
  */
-export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-
-  // Verify cron secret for manual testing
-  // Vercel cron requests come without auth header
-  if (authHeader) {
-    const token = authHeader.replace('Bearer ', '')
-    if (token !== process.env.CRON_SECRET) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-  }
-
-  try {
-    console.log('[Cleanup Cron] Starting cleanup of expired pending submissions')
+export const GET = withApiHandler(
+  { authTier: 'system', logContext: 'cleanup-pending-submissions' },
+  async ({ logger }) => {
+    logger.info('Starting cleanup of expired pending submissions')
 
     // Delete expired, unprocessed submissions
     const { data: deletedRecords, error: deleteError } = await supabaseAdmin
@@ -36,22 +27,23 @@ export async function GET(request: NextRequest) {
       .select()
 
     if (deleteError) {
-      console.error('[Cleanup Cron] Error deleting expired submissions:', deleteError)
+      logger.error({ err: deleteError }, 'Error deleting expired submissions')
       throw deleteError
     }
 
     const deletedCount = deletedRecords?.length || 0
-    console.log(`[Cleanup Cron] Deleted ${deletedCount} expired pending submission(s)`)
+    logger.info(`Deleted ${deletedCount} expired pending submission(s)`)
 
     if (deletedCount > 0) {
       // Log the deleted submissions for debugging
       deletedRecords.forEach(record => {
-        console.log(`[Cleanup Cron] Deleted expired submission:`)
-        console.log(`  - Session ID: ${record.stripe_session_id}`)
-        console.log(`  - Submitter: ${record.submitter_name} (${record.submitter_email})`)
-        console.log(`  - Events: ${record.events_data.length}`)
-        console.log(`  - Created: ${record.created_at}`)
-        console.log(`  - Expired: ${record.expires_at}`)
+        logger.info({
+          sessionId: record.stripe_session_id,
+          submitter: `${record.submitter_name} (${record.submitter_email})`,
+          events: record.events_data.length,
+          created: record.created_at,
+          expired: record.expires_at
+        }, 'Deleted expired submission')
       })
     }
 
@@ -60,13 +52,5 @@ export async function GET(request: NextRequest) {
       deleted_count: deletedCount,
       message: `Cleaned up ${deletedCount} expired pending submission(s)`
     })
-
-  } catch (error) {
-    console.error('[Cleanup Cron] Cleanup failed:', error)
-    return NextResponse.json({
-      success: false,
-      error: 'Cleanup failed',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
