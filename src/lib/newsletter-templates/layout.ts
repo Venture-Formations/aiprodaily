@@ -5,25 +5,31 @@ import { wrapTrackingUrl } from '../url-tracking'
 import { HONEYPOT_CONFIG } from '../bot-detection'
 import { STORAGE_PUBLIC_URL } from '../config'
 import { getBusinessSettings as getPublicationBusinessSettings } from '../publication-settings'
+import type { BusinessSettings } from './types'
 
 // ==================== HEADER ====================
 
-export async function generateNewsletterHeader(formattedDate: string, issueDate?: string, issueId?: string, publication_id?: string): Promise<string> {
-  // Fetch business settings for header image, primary color, and website URL
-  let headerImageUrl = '' // Must be set via publication_business_settings.header_image_url
+export async function generateNewsletterHeader(formattedDate: string, issueDate?: string, issueId?: string, publication_id?: string, businessSettings?: BusinessSettings): Promise<string> {
+  let headerImageUrl = ''
   let primaryColor = '#1877F2'
-  let newsletterName = 'St. Cloud Scoop'
-  let websiteUrl = 'https://www.aiaccountingdaily.com'
+  let newsletterName = 'Newsletter'
+  let websiteUrl = 'https://www.example.com'
 
-  if (publication_id) {
+  if (businessSettings) {
+    // Use pre-fetched settings from snapshot (zero DB calls)
+    headerImageUrl = businessSettings.headerImageUrl || headerImageUrl
+    primaryColor = businessSettings.primaryColor || primaryColor
+    newsletterName = businessSettings.newsletterName || newsletterName
+    websiteUrl = businessSettings.websiteUrl || websiteUrl
+  } else if (publication_id) {
+    // Legacy path: fetch from DB
     const settings = await getPublicationBusinessSettings(publication_id)
     headerImageUrl = settings.header_image_url || headerImageUrl
     primaryColor = settings.primary_color || primaryColor
     newsletterName = settings.newsletter_name || newsletterName
     websiteUrl = settings.website_url || websiteUrl
   } else {
-    // Fallback to old behavior (logs warning so we know what to update)
-    console.warn('[SETTINGS] generateNewsletterHeader called without publication_id - update caller')
+    console.warn('[SETTINGS] generateNewsletterHeader called without publication_id or businessSettings')
     const { data: settingsData } = await supabaseAdmin
       .from('app_settings')
       .select('key, value')
@@ -112,63 +118,99 @@ export async function generateNewsletterHeader(formattedDate: string, issueDate?
 
 // ==================== FOOTER ====================
 
-export async function generateNewsletterFooter(issueDate?: string, issueId?: string, publication_id?: string): Promise<string> {
-  // Fetch business settings for primary color, newsletter name, business name, and social media settings
-  let settingsMap: Record<string, string> = {}
+export async function generateNewsletterFooter(issueDate?: string, issueId?: string, publication_id?: string, businessSettings?: BusinessSettings): Promise<string> {
+  let primaryColor: string
+  let newsletterName: string
+  let businessName: string
+  let websiteUrl: string
+  let fbEnabled: boolean
+  let fbUrl: string
+  let twEnabled: boolean
+  let twUrl: string
+  let liEnabled: boolean
+  let liUrl: string
+  let igEnabled: boolean
+  let igUrl: string
 
-  if (publication_id) {
-    const { data: settings } = await supabaseAdmin
-      .from('publication_settings')
-      .select('key, value')
-      .eq('publication_id', publication_id)
-      .in('key', [
-        'primary_color', 'newsletter_name', 'business_name', 'website_url',
-        'facebook_enabled', 'facebook_url',
-        'twitter_enabled', 'twitter_url',
-        'linkedin_enabled', 'linkedin_url',
-        'instagram_enabled', 'instagram_url'
-      ])
-
-    settings?.forEach(setting => {
-      // Strip extra quotes if value was JSON stringified (e.g., '"true"' -> 'true')
-      let cleanValue = setting.value
-      if (cleanValue && cleanValue.startsWith('"') && cleanValue.endsWith('"') && cleanValue.length > 2) {
-        cleanValue = cleanValue.slice(1, -1)
-      }
-      settingsMap[setting.key] = cleanValue
-    })
+  if (businessSettings) {
+    // Use pre-fetched settings from snapshot (zero DB calls)
+    primaryColor = businessSettings.primaryColor || '#1877F2'
+    newsletterName = businessSettings.newsletterName || 'Newsletter'
+    businessName = businessSettings.businessName || 'Business'
+    websiteUrl = businessSettings.websiteUrl || 'https://www.example.com'
+    fbEnabled = businessSettings.facebookEnabled
+    fbUrl = businessSettings.facebookUrl
+    twEnabled = businessSettings.twitterEnabled
+    twUrl = businessSettings.twitterUrl
+    liEnabled = businessSettings.linkedinEnabled
+    liUrl = businessSettings.linkedinUrl
+    igEnabled = businessSettings.instagramEnabled
+    igUrl = businessSettings.instagramUrl
   } else {
-    // Fallback to old behavior (logs warning so we know what to update)
-    console.warn('[SETTINGS] generateNewsletterFooter called without publication_id - update caller')
-    const { data: settings } = await supabaseAdmin
-      .from('app_settings')
-      .select('key, value')
-      .in('key', [
-        'primary_color', 'newsletter_name', 'business_name', 'website_url',
-        'facebook_enabled', 'facebook_url',
-        'twitter_enabled', 'twitter_url',
-        'linkedin_enabled', 'linkedin_url',
-        'instagram_enabled', 'instagram_url'
-      ])
+    // Legacy path: fetch from DB
+    const settingsMap: Record<string, string> = {}
 
-    settings?.forEach(setting => {
-      settingsMap[setting.key] = setting.value
-    })
+    if (publication_id) {
+      const { data: settings } = await supabaseAdmin
+        .from('publication_settings')
+        .select('key, value')
+        .eq('publication_id', publication_id)
+        .in('key', [
+          'primary_color', 'newsletter_name', 'business_name', 'website_url',
+          'facebook_enabled', 'facebook_url',
+          'twitter_enabled', 'twitter_url',
+          'linkedin_enabled', 'linkedin_url',
+          'instagram_enabled', 'instagram_url'
+        ])
+
+      settings?.forEach(setting => {
+        let cleanValue = setting.value
+        if (cleanValue && cleanValue.startsWith('"') && cleanValue.endsWith('"') && cleanValue.length > 2) {
+          cleanValue = cleanValue.slice(1, -1)
+        }
+        settingsMap[setting.key] = cleanValue
+      })
+    } else {
+      console.warn('[SETTINGS] generateNewsletterFooter called without publication_id or businessSettings')
+      const { data: settings } = await supabaseAdmin
+        .from('app_settings')
+        .select('key, value')
+        .in('key', [
+          'primary_color', 'newsletter_name', 'business_name', 'website_url',
+          'facebook_enabled', 'facebook_url',
+          'twitter_enabled', 'twitter_url',
+          'linkedin_enabled', 'linkedin_url',
+          'instagram_enabled', 'instagram_url'
+        ])
+
+      settings?.forEach(setting => {
+        settingsMap[setting.key] = setting.value
+      })
+    }
+
+    primaryColor = settingsMap.primary_color || '#1877F2'
+    newsletterName = settingsMap.newsletter_name || 'Newsletter'
+    businessName = settingsMap.business_name || 'Business'
+    websiteUrl = settingsMap.website_url || 'https://www.example.com'
+    fbEnabled = settingsMap.facebook_enabled === 'true'
+    fbUrl = settingsMap.facebook_url || ''
+    twEnabled = settingsMap.twitter_enabled === 'true'
+    twUrl = settingsMap.twitter_url || ''
+    liEnabled = settingsMap.linkedin_enabled === 'true'
+    liUrl = settingsMap.linkedin_url || ''
+    igEnabled = settingsMap.instagram_enabled === 'true'
+    igUrl = settingsMap.instagram_url || ''
   }
 
-  const primaryColor = settingsMap.primary_color || '#1877F2'
-  const newsletterName = settingsMap.newsletter_name || 'St. Cloud Scoop'
-  const businessName = settingsMap.business_name || 'Venture Formations LLC'
-  const businessAddress = settingsMap.business_address || '8250 Delta Circle, Saint Joseph, MN 56374'
-  const websiteUrl = settingsMap.website_url || 'https://www.aiaccountingdaily.com'
+  const businessAddress = '8250 Delta Circle, Saint Joseph, MN 56374'
   const currentYear = new Date().getFullYear()
 
   // Build social media icons array (only include if enabled and URL exists)
   const socialIcons = []
 
   // Facebook
-  if (settingsMap.facebook_enabled === 'true' && settingsMap.facebook_url) {
-    const trackedUrl = issueDate ? wrapTrackingUrl(settingsMap.facebook_url, 'Footer', issueDate, issueId) : settingsMap.facebook_url
+  if (fbEnabled && fbUrl) {
+    const trackedUrl = issueDate ? wrapTrackingUrl(fbUrl, 'Footer', issueDate, issueId) : fbUrl
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
@@ -178,8 +220,8 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
   }
 
   // Twitter/X
-  if (settingsMap.twitter_enabled === 'true' && settingsMap.twitter_url) {
-    const trackedUrl = issueDate ? wrapTrackingUrl(settingsMap.twitter_url, 'Footer', issueDate, issueId) : settingsMap.twitter_url
+  if (twEnabled && twUrl) {
+    const trackedUrl = issueDate ? wrapTrackingUrl(twUrl, 'Footer', issueDate, issueId) : twUrl
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
@@ -189,8 +231,8 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
   }
 
   // LinkedIn
-  if (settingsMap.linkedin_enabled === 'true' && settingsMap.linkedin_url) {
-    const trackedUrl = issueDate ? wrapTrackingUrl(settingsMap.linkedin_url, 'Footer', issueDate, issueId) : settingsMap.linkedin_url
+  if (liEnabled && liUrl) {
+    const trackedUrl = issueDate ? wrapTrackingUrl(liUrl, 'Footer', issueDate, issueId) : liUrl
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
@@ -200,8 +242,8 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
   }
 
   // Instagram
-  if (settingsMap.instagram_enabled === 'true' && settingsMap.instagram_url) {
-    const trackedUrl = issueDate ? wrapTrackingUrl(settingsMap.instagram_url, 'Footer', issueDate, issueId) : settingsMap.instagram_url
+  if (igEnabled && igUrl) {
+    const trackedUrl = issueDate ? wrapTrackingUrl(igUrl, 'Footer', issueDate, issueId) : igUrl
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">

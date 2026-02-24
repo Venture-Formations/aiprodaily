@@ -7,8 +7,6 @@ import {
 } from './ads'
 import {
   generatePollModulesSection,
-  generateBreakingNewsSection,
-  generateBeyondTheFeedSection,
   generateAIAppsSection,
   generatePromptModulesSection,
   generatePromptIdeasSection,
@@ -41,8 +39,8 @@ export async function generateFullNewsletterHtml(
 /**
  * Render a newsletter from a pre-built snapshot.
  * The snapshot contains all module configs, business settings, and pre-fetched content,
- * so this function is a near-pure HTML-generation function.
- * Remaining DB calls: header/footer settings (Phase 2.4), legacy generatePromptIdeasSection.
+ * so this function is a near-pure HTML-generation function with zero DB calls.
+ * (Exception: legacy generatePromptIdeasSection still queries DB.)
  */
 export async function renderNewsletterFromSnapshot(
   snapshot: IssueSnapshot
@@ -51,7 +49,6 @@ export async function renderNewsletterFromSnapshot(
     issue, formattedDate, businessSettings, sortedSections, isReview,
     pollSelections, promptSelections, aiAppSelections, textBoxSelections,
     feedbackModule, sparkloopRecSelections, adSelections, articlesByModule,
-    breakingNewsArticles, beyondFeedArticles,
   } = snapshot
 
   try {
@@ -71,10 +68,10 @@ export async function renderNewsletterFromSnapshot(
 
     console.log('Formatted date:', formattedDate)
 
-    // Generate header and footer with tracking parameters (still fetch own settings — Phase 2.4)
+    // Generate header and footer using pre-fetched businessSettings (zero DB calls)
     const mailerliteId = issue.mailerlite_issue_id || undefined
-    const header = await generateNewsletterHeader(formattedDate, issue.date, mailerliteId, issue.publication_id)
-    const footer = await generateNewsletterFooter(issue.date, mailerliteId, issue.publication_id)
+    const header = await generateNewsletterHeader(formattedDate, issue.date, mailerliteId, issue.publication_id, businessSettings)
+    const footer = await generateNewsletterFooter(issue.date, mailerliteId, issue.publication_id, businessSettings)
 
     // Review banner for review emails
     const reviewBanner = isReview ? `
@@ -98,7 +95,7 @@ export async function renderNewsletterFromSnapshot(
 
     // Generate sections in order based on merged configuration
     // All content is pre-fetched in snapshot — generators are pure HTML renderers
-    // (Exception: legacy generatePromptIdeasSection and header/footer still query DB)
+    // (Exception: legacy generatePromptIdeasSection still queries DB)
     let sectionsHtml = ''
     let articleModuleCount = 0
     for (const item of sortedSections) {
@@ -155,17 +152,9 @@ export async function renderNewsletterFromSnapshot(
             sectionsHtml += promptHtml
           }
         }
-        else if (section.section_type === 'breaking_news') {
-          const breakingNewsHtml = await generateBreakingNewsSection(issue, businessSettings, breakingNewsArticles)
-          if (breakingNewsHtml) {
-            sectionsHtml += breakingNewsHtml
-          }
-        }
-        else if (section.section_type === 'beyond_the_feed') {
-          const beyondFeedHtml = await generateBeyondTheFeedSection(issue, businessSettings, beyondFeedArticles)
-          if (beyondFeedHtml) {
-            sectionsHtml += beyondFeedHtml
-          }
+        // Breaking News / Beyond the Feed sections are not used — skip (no HTML)
+        else if (section.section_type === 'breaking_news' || section.section_type === 'beyond_the_feed') {
+          // no-op
         }
       }
     }

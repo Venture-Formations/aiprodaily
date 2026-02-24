@@ -218,7 +218,7 @@ export async function generateBreakingNewsSection(issue: any, businessSettings?:
     if (!selections) {
       const { data } = await supabaseAdmin
         .from('issue_breaking_news')
-        .select(`*, post:rss_posts(id, title, ai_title, ai_summary, description, source_url, breaking_news_score)`)
+        .select(`*, post:rss_posts(id, title, ai_title, ai_summary, description, source_url)`)
         .eq('issue_id', issue.id)
         .eq('section', 'breaking')
         .order('position', { ascending: true })
@@ -293,7 +293,7 @@ export async function generateBeyondTheFeedSection(issue: any, businessSettings?
     if (!selections) {
       const { data } = await supabaseAdmin
         .from('issue_breaking_news')
-        .select(`*, post:rss_posts(id, title, ai_title, ai_summary, description, source_url, breaking_news_score)`)
+        .select(`*, post:rss_posts(id, title, ai_title, ai_summary, description, source_url)`)
         .eq('issue_id', issue.id)
         .eq('section', 'beyond_feed')
         .order('position', { ascending: true })

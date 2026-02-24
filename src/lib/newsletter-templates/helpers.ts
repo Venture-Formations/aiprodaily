@@ -2,6 +2,7 @@
 
 import { supabaseAdmin } from '../supabase'
 import { getBusinessSettings as getPublicationBusinessSettings } from '../publication-settings'
+import type { BusinessSettings } from './types'
 
 // ==================== UTILITY FUNCTIONS ====================
 
@@ -203,18 +204,30 @@ export function getArticleEmoji(headline: string, content: string): string {
 
 // ==================== HELPER: FETCH COLORS & FONTS ====================
 
-export async function fetchBusinessSettings(publication_id?: string): Promise<{
-  primaryColor: string;
-  secondaryColor: string;
-  tertiaryColor: string;
-  quaternaryColor: string;
-  headingFont: string;
-  bodyFont: string;
-  websiteUrl: string;
-}> {
+export async function fetchBusinessSettings(publication_id?: string): Promise<BusinessSettings> {
   // If publication_id is provided, use the new helper mod (with fallback logging)
   if (publication_id) {
     const settings = await getPublicationBusinessSettings(publication_id)
+
+    // Fetch social media fields (not in getBusinessSettings yet)
+    const { data: socialSettings } = await supabaseAdmin
+      .from('publication_settings')
+      .select('key, value')
+      .eq('publication_id', publication_id)
+      .in('key', [
+        'facebook_enabled', 'facebook_url',
+        'twitter_enabled', 'twitter_url',
+        'linkedin_enabled', 'linkedin_url',
+        'instagram_enabled', 'instagram_url'
+      ])
+
+    const socialMap: Record<string, string> = {}
+    socialSettings?.forEach(s => {
+      let v = s.value
+      if (v && v.startsWith('"') && v.endsWith('"') && v.length > 2) v = v.slice(1, -1)
+      socialMap[s.key] = v
+    })
+
     return {
       primaryColor: settings.primary_color,
       secondaryColor: settings.secondary_color,
@@ -223,6 +236,17 @@ export async function fetchBusinessSettings(publication_id?: string): Promise<{
       headingFont: settings.heading_font,
       bodyFont: settings.body_font,
       websiteUrl: settings.website_url,
+      headerImageUrl: settings.header_image_url,
+      newsletterName: settings.newsletter_name,
+      businessName: settings.business_name,
+      facebookEnabled: socialMap.facebook_enabled === 'true',
+      facebookUrl: socialMap.facebook_url || '',
+      twitterEnabled: socialMap.twitter_enabled === 'true',
+      twitterUrl: socialMap.twitter_url || '',
+      linkedinEnabled: socialMap.linkedin_enabled === 'true',
+      linkedinUrl: socialMap.linkedin_url || '',
+      instagramEnabled: socialMap.instagram_enabled === 'true',
+      instagramUrl: socialMap.instagram_url || '',
     }
   }
 
@@ -232,7 +256,12 @@ export async function fetchBusinessSettings(publication_id?: string): Promise<{
   const { data: settings } = await supabaseAdmin
     .from('app_settings')
     .select('key, value')
-    .in('key', ['primary_color', 'secondary_color', 'tertiary_color', 'quaternary_color', 'heading_font', 'body_font', 'website_url'])
+    .in('key', [
+      'primary_color', 'secondary_color', 'tertiary_color', 'quaternary_color',
+      'heading_font', 'body_font', 'website_url', 'header_image_url', 'newsletter_name',
+      'business_name', 'facebook_enabled', 'facebook_url', 'twitter_enabled', 'twitter_url',
+      'linkedin_enabled', 'linkedin_url', 'instagram_enabled', 'instagram_url'
+    ])
 
   const settingsMap: Record<string, string> = {}
   settings?.forEach(setting => {
@@ -246,7 +275,18 @@ export async function fetchBusinessSettings(publication_id?: string): Promise<{
     quaternaryColor: settingsMap.quaternary_color || '#8B5CF6',
     headingFont: settingsMap.heading_font || 'Arial, sans-serif',
     bodyFont: settingsMap.body_font || 'Arial, sans-serif',
-    websiteUrl: settingsMap.website_url || 'https://www.aiaccountingdaily.com'
+    websiteUrl: settingsMap.website_url || 'https://www.aiaccountingdaily.com',
+    headerImageUrl: settingsMap.header_image_url || '',
+    newsletterName: settingsMap.newsletter_name || 'Newsletter',
+    businessName: settingsMap.business_name || 'Business',
+    facebookEnabled: settingsMap.facebook_enabled === 'true',
+    facebookUrl: settingsMap.facebook_url || '',
+    twitterEnabled: settingsMap.twitter_enabled === 'true',
+    twitterUrl: settingsMap.twitter_url || '',
+    linkedinEnabled: settingsMap.linkedin_enabled === 'true',
+    linkedinUrl: settingsMap.linkedin_url || '',
+    instagramEnabled: settingsMap.instagram_enabled === 'true',
+    instagramUrl: settingsMap.instagram_url || '',
   }
 }
 
