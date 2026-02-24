@@ -3,8 +3,7 @@ import { RSSProcessor } from '@/lib/rss-processor'
 import { withApiHandler } from '@/lib/api-handler'
 import { declareRoute } from '@/lib/auth-tiers'
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const routeConfig = declareRoute({
+declareRoute({
   authTier: 'system',
   description: 'RSS ingestion cron (runs every 15 minutes)'
 })

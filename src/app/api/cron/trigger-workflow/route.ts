@@ -6,8 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { createLogger } from '@/lib/logger'
 import { declareRoute } from '@/lib/auth-tiers'
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const routeConfig = declareRoute({
+declareRoute({
   authTier: 'system',
   description: 'Triggers RSS processing workflow on schedule'
 })

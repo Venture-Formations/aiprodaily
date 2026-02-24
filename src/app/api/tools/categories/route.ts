@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { declareRoute } from '@/lib/auth-tiers'
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const routeConfig = declareRoute({
+declareRoute({
   authTier: 'public',
   description: 'Returns static tool categories list'
 })

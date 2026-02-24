@@ -274,7 +274,7 @@ export async function generateAdModulesSection(issue: any, moduleId?: string, bu
     console.log('Generating Ad Modules sections for issue:', issue?.id, moduleId ? `(mod: ${moduleId})` : '(all modules)')
 
     // Fetch colors from business settings (use passed-in settings if available)
-    const { primaryColor, headingFont, bodyFont, websiteUrl } = businessSettings || await fetchBusinessSettings(issue?.publication_id)
+    const { primaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue?.publication_id)
 
     // Build query for ad mod selections
     // Uses unified advertisements table

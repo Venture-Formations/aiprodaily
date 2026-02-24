@@ -65,7 +65,7 @@ export async function generateWelcomeSection(
 export async function generatePollSection(issue: { id: string; publication_id: string; status?: string; poll_id?: string | null }, businessSettings?: BusinessSettings): Promise<string> {
   try {
     // Fetch colors and website URL from business settings (use passed-in settings if available)
-    const { primaryColor, tertiaryColor, headingFont, bodyFont } = businessSettings || await fetchBusinessSettings(issue.publication_id)
+    const { primaryColor, tertiaryColor } = businessSettings || await fetchBusinessSettings(issue.publication_id)
     // Use the main app domain for poll responses (where the poll pages are hosted)
     const baseUrl = process.env.NEXTAUTH_URL || 'https://www.aiprodaily.com'
 
