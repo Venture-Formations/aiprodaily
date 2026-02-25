@@ -30,9 +30,9 @@ export const POST = withApiHandler(
       return NextResponse.json({ error: 'issue not found' }, { status: 404 })
     }
 
-    if (issue.status !== 'approved' && issue.status !== 'in_review') {
+    if (issue.status !== 'in_review' && issue.status !== 'changes_made') {
       return NextResponse.json({
-        error: 'issue must be approved before sending final version'
+        error: 'Issue must be in review or have changes made before sending'
       }, { status: 400 })
     }
 

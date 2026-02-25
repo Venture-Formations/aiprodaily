@@ -185,25 +185,6 @@ async function handleFinalSend(): Promise<NextResponse> {
     const shouldRun = await ScheduleChecker.shouldRunFinalSend(activeNewsletter.id)
 
     if (!shouldRun) {
-      // Check if there's a issue that's ready to send but missed its window
-      const { data: readyIssues } = await supabaseAdmin
-        .from('publication_issues')
-        .select('id, date, status, created_at')
-        .eq('status', 'ready_to_send')
-        .order('created_at', { ascending: false })
-        .limit(5)
-
-      if (readyIssues && readyIssues.length > 0) {
-        // There are issues ready but we're not sending - this could indicate a timing issue
-        const slack = new SlackNotificationService()
-
-        await slack.sendAlert(
-          `⏰ Scheduled Send Check: Found ${readyIssues.length} issues with 'ready_to_send' status but shouldRun returned false. This may indicate a timing configuration issue.`,
-          'warn',
-          'scheduled_send_timing'
-        )
-      }
-
       return NextResponse.json({
         success: true,
         message: 'Not time to run final send or already ran today',
