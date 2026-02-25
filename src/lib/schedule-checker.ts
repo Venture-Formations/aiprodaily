@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabase'
+import { getScheduleConfig } from './settings/schedule-settings'
 
 interface ScheduleSettings {
   reviewScheduleEnabled: boolean
@@ -12,38 +13,15 @@ interface ScheduleSettings {
 
 export class ScheduleChecker {
   public static async getScheduleSettings(newsletterId: string): Promise<ScheduleSettings> {
-    const { data: settings } = await supabaseAdmin
-      .from('publication_settings')
-      .select('key, value')
-      .eq('publication_id', newsletterId)
-      .in('key', [
-        'email_reviewScheduleEnabled',
-        'email_dailyScheduleEnabled',
-        'email_rssProcessingTime',
-        'email_issueCreationTime',
-        'email_scheduledSendTime',
-        'email_dailyissueCreationTime',
-        'email_dailyScheduledSendTime'
-      ])
-
-    const settingsMap = (settings || []).reduce((acc, setting) => {
-      // Strip extra quotes if value was JSON stringified (e.g., '"true"' -> 'true')
-      let cleanValue = setting.value
-      if (cleanValue && cleanValue.startsWith('"') && cleanValue.endsWith('"') && cleanValue.length > 2) {
-        cleanValue = cleanValue.slice(1, -1)
-      }
-      acc[setting.key] = cleanValue
-      return acc
-    }, {} as Record<string, string>)
-
+    const config = await getScheduleConfig(newsletterId)
     return {
-      reviewScheduleEnabled: settingsMap['email_reviewScheduleEnabled'] === 'true',
-      dailyScheduleEnabled: settingsMap['email_dailyScheduleEnabled'] === 'true',
-      rssProcessingTime: settingsMap['email_rssProcessingTime'] || '20:30',
-      issueCreationTime: settingsMap['email_issueCreationTime'] || '20:50',
-      scheduledSendTime: settingsMap['email_scheduledSendTime'] || '21:00',
-      dailyissueCreationTime: settingsMap['email_dailyissueCreationTime'] || '04:30',
-      dailyScheduledSendTime: settingsMap['email_dailyScheduledSendTime'] || '04:55'
+      reviewScheduleEnabled: config.reviewScheduleEnabled,
+      dailyScheduleEnabled: config.dailyScheduleEnabled,
+      rssProcessingTime: config.rssProcessingTime,
+      issueCreationTime: config.issueCreationTime,
+      scheduledSendTime: config.scheduledSendTime,
+      dailyissueCreationTime: config.dailyIssueCreationTime,
+      dailyScheduledSendTime: config.dailyScheduledSendTime,
     }
   }
 

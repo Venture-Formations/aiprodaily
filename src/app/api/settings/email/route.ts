@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
+import { updateScheduleConfig, type ScheduleConfig } from '@/lib/settings/schedule-settings'
 
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/email' },
@@ -339,71 +340,23 @@ export const POST = withApiHandler(
                             !settings.fromEmail && !settings.senderName
 
     if (isScheduleUpdate) {
-      // Validate time formats (HH:MM)
-      const timeFields = ['rssProcessingTime', 'issueCreationTime', 'scheduledSendTime',
-                         'dailyissueCreationTime', 'dailyScheduledSendTime',
-                         'secondaryissueCreationTime', 'secondaryScheduledSendTime']
-      for (const field of timeFields) {
-        if (settings[field] && !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(settings[field])) {
-          return NextResponse.json({
-            error: `Invalid time format for ${field}. Use HH:MM format.`
-          }, { status: 400 })
-        }
-      }
+      // Map UI field names (with legacy casing) to ScheduleConfig fields
+      const update: Partial<ScheduleConfig> = {}
+      if (settings.reviewScheduleEnabled !== undefined) update.reviewScheduleEnabled = !!settings.reviewScheduleEnabled
+      if (settings.dailyScheduleEnabled !== undefined) update.dailyScheduleEnabled = !!settings.dailyScheduleEnabled
+      if (settings.rssProcessingTime !== undefined) update.rssProcessingTime = settings.rssProcessingTime
+      if (settings.issueCreationTime !== undefined) update.issueCreationTime = settings.issueCreationTime
+      if (settings.scheduledSendTime !== undefined) update.scheduledSendTime = settings.scheduledSendTime
+      if (settings.dailyissueCreationTime !== undefined) update.dailyIssueCreationTime = settings.dailyissueCreationTime
+      if (settings.dailyScheduledSendTime !== undefined) update.dailyScheduledSendTime = settings.dailyScheduledSendTime
+      if (settings.secondaryScheduleEnabled !== undefined) update.secondaryScheduleEnabled = !!settings.secondaryScheduleEnabled
+      if (settings.secondaryissueCreationTime !== undefined) update.secondaryIssueCreationTime = settings.secondaryissueCreationTime
+      if (settings.secondaryScheduledSendTime !== undefined) update.secondaryScheduledSendTime = settings.secondaryScheduledSendTime
+      if (settings.secondarySendDays !== undefined) update.secondarySendDays = settings.secondarySendDays
 
-      // Save only schedule settings
-      const settingsToSave = []
-      if (settings.rssProcessingTime !== undefined) {
-        settingsToSave.push({ key: 'email_rssProcessingTime', value: settings.rssProcessingTime })
-      }
-      if (settings.issueCreationTime !== undefined) {
-        settingsToSave.push({ key: 'email_issueCreationTime', value: settings.issueCreationTime })
-      }
-      if (settings.scheduledSendTime !== undefined) {
-        settingsToSave.push({ key: 'email_scheduledSendTime', value: settings.scheduledSendTime })
-      }
-      if (settings.dailyissueCreationTime !== undefined) {
-        settingsToSave.push({ key: 'email_dailyissueCreationTime', value: settings.dailyissueCreationTime })
-      }
-      if (settings.dailyScheduledSendTime !== undefined) {
-        settingsToSave.push({ key: 'email_dailyScheduledSendTime', value: settings.dailyScheduledSendTime })
-      }
-      if (settings.secondaryissueCreationTime !== undefined) {
-        settingsToSave.push({ key: 'email_secondaryissueCreationTime', value: settings.secondaryissueCreationTime })
-      }
-      if (settings.secondaryScheduledSendTime !== undefined) {
-        settingsToSave.push({ key: 'email_secondaryScheduledSendTime', value: settings.secondaryScheduledSendTime })
-      }
-      if (settings.reviewScheduleEnabled !== undefined) {
-        settingsToSave.push({ key: 'email_reviewScheduleEnabled', value: settings.reviewScheduleEnabled ? 'true' : 'false' })
-      }
-      if (settings.dailyScheduleEnabled !== undefined) {
-        settingsToSave.push({ key: 'email_dailyScheduleEnabled', value: settings.dailyScheduleEnabled ? 'true' : 'false' })
-      }
-      if (settings.secondaryScheduleEnabled !== undefined) {
-        settingsToSave.push({ key: 'email_secondaryScheduleEnabled', value: settings.secondaryScheduleEnabled ? 'true' : 'false' })
-      }
-      if (settings.secondarySendDays !== undefined) {
-        settingsToSave.push({ key: 'secondary_send_days', value: JSON.stringify(settings.secondarySendDays) })
-      }
-
-      // Upsert schedule settings
-      for (const setting of settingsToSave) {
-        const { error } = await supabaseAdmin
-          .from('publication_settings')
-          .upsert({
-            key: setting.key,
-            value: setting.value,
-            publication_id: newsletterId,
-            description: `Email schedule: ${setting.key.replace('email_', '')}`,
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'publication_id,key'
-          })
-
-        if (error) {
-          throw error
-        }
+      const result = await updateScheduleConfig(newsletterId, update)
+      if (!result.success) {
+        return NextResponse.json({ error: result.error }, { status: 400 })
       }
 
       return NextResponse.json({
@@ -429,9 +382,8 @@ export const POST = withApiHandler(
       }
     }
 
-    // Save settings as individual key-value pairs
-    // Supports both MailerLite and SendGrid configurations
-    const settingsToSave = [
+    // Save non-schedule settings as individual key-value pairs
+    const nonScheduleSettings = [
       // Email Provider Toggle
       { key: 'email_provider', value: settings.emailProvider || 'mailerlite' },
 
@@ -449,28 +401,15 @@ export const POST = withApiHandler(
       { key: 'sendgrid_sender_id', value: settings.sendgridSenderId || '' },
       { key: 'sendgrid_unsubscribe_group_id', value: settings.sendgridUnsubscribeGroupId || '' },
 
-      // Common Email Settings
+      // Common Email Settings (non-schedule)
       { key: 'email_fromEmail', value: settings.fromEmail },
       { key: 'email_senderName', value: settings.senderName },
-      { key: 'email_reviewScheduleEnabled', value: settings.reviewScheduleEnabled ? 'true' : 'false' },
-      { key: 'email_rssProcessingTime', value: settings.rssProcessingTime },
-      { key: 'email_issueCreationTime', value: settings.issueCreationTime },
-      { key: 'email_scheduledSendTime', value: settings.scheduledSendTime },
-      { key: 'email_dailyScheduleEnabled', value: settings.dailyScheduleEnabled ? 'true' : 'false' },
-      { key: 'email_dailyissueCreationTime', value: settings.dailyissueCreationTime },
-      { key: 'email_dailyScheduledSendTime', value: settings.dailyScheduledSendTime },
-      { key: 'email_secondaryScheduleEnabled', value: settings.secondaryScheduleEnabled ? 'true' : 'false' },
-      { key: 'email_secondaryissueCreationTime', value: settings.secondaryissueCreationTime },
-      { key: 'email_secondaryScheduledSendTime', value: settings.secondaryScheduledSendTime },
-      { key: 'secondary_send_days', value: JSON.stringify(settings.secondarySendDays || [1, 2, 3, 4, 5]) }
     ]
 
-    // Upsert each setting
-    console.log('BACKEND: Saving settings to database:', settingsToSave)
-    const savedKeys: string[] = []
-    for (const setting of settingsToSave) {
-      console.log(`BACKEND: Upserting ${setting.key} = ${setting.value}`)
-      const { error, data } = await supabaseAdmin
+    // Upsert non-schedule settings
+    console.log('BACKEND: Saving non-schedule settings to database')
+    for (const setting of nonScheduleSettings) {
+      const { error } = await supabaseAdmin
         .from('publication_settings')
         .upsert({
           key: setting.key,
@@ -481,16 +420,33 @@ export const POST = withApiHandler(
         }, {
           onConflict: 'publication_id,key'
         })
-        .select()
 
       if (error) {
         console.error(`BACKEND: Error saving ${setting.key}:`, error)
         throw error
       }
-      console.log(`BACKEND: Successfully saved ${setting.key} = ${setting.value}`)
-      savedKeys.push(setting.key)
     }
-    console.log('BACKEND: All settings saved. Keys:', savedKeys)
+
+    // Save schedule settings via Zod-validated module
+    const scheduleUpdate: Partial<ScheduleConfig> = {
+      reviewScheduleEnabled: !!settings.reviewScheduleEnabled,
+      dailyScheduleEnabled: !!settings.dailyScheduleEnabled,
+      rssProcessingTime: settings.rssProcessingTime,
+      issueCreationTime: settings.issueCreationTime,
+      scheduledSendTime: settings.scheduledSendTime,
+      dailyIssueCreationTime: settings.dailyissueCreationTime,
+      dailyScheduledSendTime: settings.dailyScheduledSendTime,
+      secondaryScheduleEnabled: !!settings.secondaryScheduleEnabled,
+      secondaryIssueCreationTime: settings.secondaryissueCreationTime,
+      secondaryScheduledSendTime: settings.secondaryScheduledSendTime,
+      secondarySendDays: settings.secondarySendDays || [1, 2, 3, 4, 5],
+    }
+
+    const scheduleResult = await updateScheduleConfig(newsletterId, scheduleUpdate)
+    if (!scheduleResult.success) {
+      return NextResponse.json({ error: scheduleResult.error }, { status: 400 })
+    }
+    console.log('BACKEND: All settings saved.')
 
     // Log the settings update
     if (session.user?.email) {

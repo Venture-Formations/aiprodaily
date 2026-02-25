@@ -453,23 +453,20 @@ export async function getCriteriaSettings(publicationId: string): Promise<{
 }
 
 /**
- * Get email schedule settings for a publication
+ * Get email schedule settings for a publication.
+ * Delegates to the Zod-validated schedule settings module.
  */
 export async function getScheduleSettings(publicationId: string): Promise<{
   review_send_time: string
   final_send_time: string
   timezone_id: number
 }> {
-  const settings = await getPublicationSettings(publicationId, [
-    'email_scheduledSendTime',
-    'email_dailyScheduledSendTime',
-    'email_timezone_id',
-  ])
-
+  const { getScheduleConfig } = await import('./settings/schedule-settings')
+  const config = await getScheduleConfig(publicationId)
   return {
-    review_send_time: settings.email_scheduledSendTime || '21:00',
-    final_send_time: settings.email_dailyScheduledSendTime || '04:55',
-    timezone_id: parseInt(settings.email_timezone_id || '157', 10), // 157 = Central Time
+    review_send_time: config.scheduledSendTime,
+    final_send_time: config.dailyScheduledSendTime,
+    timezone_id: config.timezoneId,
   }
 }
 
