@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(campaign)/complete-campaign' },
+  async ({ request, logger }) => {
     console.log('=== COMPLETING INTERRUPTED issue ===')
 
     // Get the issue ID from request body or find latest
@@ -119,12 +121,5 @@ export async function POST(request: NextRequest) {
       fixesApplied: fixes,
       timestamp: new Date().toISOString()
     })
-
-  } catch (error) {
-    console.error('Complete issue error:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

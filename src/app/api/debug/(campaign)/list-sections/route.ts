@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(campaign)/list-sections' },
+  async () => {
     const { data: sections, error } = await supabaseAdmin
       .from('newsletter_sections')
       .select('*')
@@ -16,10 +18,5 @@ export async function GET() {
       sections: sections || [],
       total: sections?.length || 0
     })
-  } catch (error) {
-    console.error('List sections error:', error)
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

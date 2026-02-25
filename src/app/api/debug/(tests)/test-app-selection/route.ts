@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AppSelector } from '@/lib/app-selector'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-app-selection' },
+  async ({ logger }) => {
   try {
     // Step 1: Check newsletters
     const { data: newsletters, error: newsletterError } = await supabaseAdmin
@@ -97,4 +100,5 @@ export async function GET(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

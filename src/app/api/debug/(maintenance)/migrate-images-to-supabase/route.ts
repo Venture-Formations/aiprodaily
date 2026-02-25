@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SupabaseImageStorage } from '@/lib/supabase-image-storage'
 
@@ -47,7 +48,9 @@ function isAlreadyMigrated(url: string | null): boolean {
  * GET /api/debug/(maintenance)/migrate-images-to-supabase?dry_run=true
  * GET /api/debug/(maintenance)/migrate-images-to-supabase?dry_run=false&batch_size=50
  */
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/migrate-images-to-supabase' },
+  async ({ request, logger }) => {
   try {
     const { searchParams } = new URL(request.url)
     const dryRun = searchParams.get('dry_run') !== 'false'
@@ -314,7 +317,8 @@ export async function GET(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)
 
 async function downloadImage(url: string): Promise<Buffer | null> {
   try {

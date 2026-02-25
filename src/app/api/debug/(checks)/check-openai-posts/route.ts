@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export const maxDuration = 600
@@ -8,15 +9,16 @@ export const maxDuration = 600
  *
  * Usage: GET /api/debug/check-openai-posts?issueId=XXX
  */
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const issueId = searchParams.get('issue_id')
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-openai-posts' },
+  async ({ request, logger }) => {
+    const { searchParams } = new URL(request.url)
+    const issueId = searchParams.get('issue_id')
 
-  if (!issueId) {
-    return NextResponse.json({ error: 'issueId required' }, { status: 400 })
-  }
+    if (!issueId) {
+      return NextResponse.json({ error: 'issueId required' }, { status: 400 })
+    }
 
-  try {
     // Get all posts with "OpenAI" in title
     const { data: posts, error } = await supabaseAdmin
       .from('rss_posts')
@@ -61,12 +63,5 @@ export async function GET(request: NextRequest) {
       success_rate: `${Math.round((withFullText / posts.length) * 100)}%`,
       posts: analysis
     })
-
-  } catch (error) {
-    console.error('[CHECK-OPENAI] Error:', error)
-    return NextResponse.json({
-      status: 'error',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

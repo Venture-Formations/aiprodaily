@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-positions' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const issueId = searchParams.get('issue_id')
 
@@ -73,12 +75,5 @@ export async function GET(request: NextRequest) {
         positions_working: (articles?.filter(a => a.review_position !== null).length || 0) > 0
       }
     })
-
-  } catch (error) {
-    console.error('Position check error:', error)
-    return NextResponse.json({
-      error: 'Failed to check article positions',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { headers } from 'next/headers'
 import axios from 'axios'
 import { getPublicationByDomain, getEmailProviderSettings } from '@/lib/publication-settings'
@@ -22,8 +23,9 @@ const mailerliteClient = axios.create({
  * Supports email correction if original_email is provided
  * Dynamically selects email provider (MailerLite or SendGrid)
  */
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'public', logContext: 'subscribe-personalize' },
+  async ({ request, logger }) => {
     const body = await request.json()
     const { email, original_email, name, last_name, job_type, yearly_clients } = body
 
@@ -161,13 +163,5 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Personalization saved successfully!'
     })
-
-  } catch (error: any) {
-    console.error('[Personalize] Failed to update subscriber:', error.message)
-
-    return NextResponse.json({
-      error: 'Failed to save personalization',
-      message: error.message || 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

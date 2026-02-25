@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AppSelector } from '@/lib/app-selector'
 
-export async function GET() {
-  try {
-    console.log('=== AI APPS STATUS DEBUG ===')
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(ai)/ai-apps-status' },
+  async ({ logger }) => {
+    logger.info('=== AI APPS STATUS DEBUG ===')
 
     // 1. Check if AI applications exist
     const { data: allApps, error: appsError } = await supabaseAdmin
@@ -12,9 +14,9 @@ export async function GET() {
       .select('id, app_name, publication_id, is_active')
       .order('app_name')
 
-    console.log('Total AI apps in database:', allApps?.length || 0)
+    logger.info({ count: allApps?.length || 0 }, 'Total AI apps in database')
     if (appsError) {
-      console.error('Error fetching apps:', appsError)
+      logger.error({ err: appsError }, 'Error fetching apps')
     }
 
     // 2. Get latest issue
@@ -25,9 +27,9 @@ export async function GET() {
       .limit(1)
       .single()
 
-    console.log('Latest issue:', latestissue)
+    logger.info({ latestissue }, 'Latest issue')
     if (issueError) {
-      console.error('Error fetching issue:', issueError)
+      logger.error({ err: issueError }, 'Error fetching issue')
     }
 
     // 3. Check selections for latest issue
@@ -42,9 +44,9 @@ export async function GET() {
         .eq('issue_id', latestissue.id)
         .order('selection_order')
 
-      console.log('Selections for latest issue:', selections?.length || 0)
+      logger.info({ count: selections?.length || 0 }, 'Selections for latest issue')
       if (selectionsError) {
-        console.error('Error fetching selections:', selectionsError)
+        logger.error({ err: selectionsError }, 'Error fetching selections')
       }
       issueSelections = selections
 
@@ -56,11 +58,11 @@ export async function GET() {
         .single()
 
       newsletterInfo = newsletter
-      console.log('Newsletter info:', newsletter)
+      logger.info({ newsletter }, 'Newsletter info')
 
       // 5. Try to manually select apps
       if (newsletter && (!selections || selections.length === 0)) {
-        console.log('Attempting manual app selection...')
+        logger.info('Attempting manual app selection...')
         try {
           const selectedApps = await AppSelector.selectAppsForissue(latestissue.id, newsletter.id)
           manualSelectionResult = {
@@ -72,14 +74,14 @@ export async function GET() {
               category: app.category
             }))
           }
-          console.log('Manual selection successful:', selectedApps.length, 'apps')
+          logger.info({ count: selectedApps.length }, 'Manual selection successful')
         } catch (error) {
           manualSelectionResult = {
             success: false,
             error: error instanceof Error ? error.message : 'Unknown error',
             stack: error instanceof Error ? error.stack : undefined
           }
-          console.error('Manual selection failed:', error)
+          logger.error({ err: error }, 'Manual selection failed')
         }
 
         // Fetch selections again after manual selection
@@ -90,7 +92,7 @@ export async function GET() {
           .order('selection_order')
 
         issueSelections = newSelections
-        console.log('Selections after manual attempt:', newSelections?.length || 0)
+        logger.info({ count: newSelections?.length || 0 }, 'Selections after manual attempt')
       }
     }
 
@@ -128,13 +130,5 @@ export async function GET() {
         issue_error: issueError?.message
       }
     })
-
-  } catch (error) {
-    console.error('AI apps status error:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
-    }, { status: 500 })
   }
-}
+)

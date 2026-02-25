@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { PUBLICATION_ID as EXPECTED_PUBLICATION_ID } from '@/lib/config'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-tool-visibility' },
+  async ({ request, logger }) => {
     // Get all ai_applications ordered by most recent
     const { data: allApps, error: allError } = await supabaseAdmin
       .from('ai_applications')
@@ -59,10 +61,5 @@ export async function GET(request: NextRequest) {
         }))
       }
     })
-  } catch (error) {
-    return NextResponse.json({
-      error: 'Failed to check tool visibility',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

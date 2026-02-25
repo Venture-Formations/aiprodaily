@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
-import { validateDebugAuth } from '@/lib/debug-auth'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST() {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/fix-all-prompts' },
+  async ({ logger }) => {
   try {
     console.log('Deleting outdated AI prompts from database...')
 
@@ -42,4 +44,5 @@ export async function POST() {
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { checkUserAgent } from '@/lib/bot-detection'
 
@@ -10,7 +11,9 @@ import { checkUserAgent } from '@/lib/bot-detection'
  * 1. Updates existing link_clicks with bot UA flags
  * 2. Identifies IPs with velocity patterns and auto-excludes them
  */
-export async function POST(request: NextRequest) {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/backfill-bot-detection' },
+  async ({ request, logger }) => {
   try {
     // Verify cron secret for security
     const authHeader = request.headers.get('authorization')
@@ -204,13 +207,16 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+  }
+)
 
 /**
  * DELETE - Remove velocity-based exclusions (rollback)
  * These were too aggressive and may have caught legitimate users
  */
-export async function DELETE(request: NextRequest) {
+export const DELETE = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/backfill-bot-detection' },
+  async ({ request, logger }) => {
   try {
     const authHeader = request.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
@@ -251,12 +257,15 @@ export async function DELETE(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+  }
+)
 
 /**
  * GET - Check backfill status / preview what would be processed
  */
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/backfill-bot-detection' },
+  async ({ request, logger }) => {
   try {
     const authHeader = request.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
@@ -316,4 +325,5 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+  }
+)

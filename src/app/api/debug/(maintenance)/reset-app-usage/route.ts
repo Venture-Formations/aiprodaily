@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
@@ -11,7 +12,9 @@ import { supabaseAdmin } from '@/lib/supabase'
  * - appIds: (optional) Array of app IDs to reset (when mode='specific')
  * - clearSelections: (optional) Also clear issue_ai_app_selections
  */
-export async function POST(request: NextRequest) {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/reset-app-usage' },
+  async ({ request, logger }) => {
   try {
     const body = await request.json()
     const { mode = 'all', appIds = [], clearSelections = false } = body
@@ -140,6 +143,7 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+  }
+)
 
 export const maxDuration = 600

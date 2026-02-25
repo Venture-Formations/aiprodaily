@@ -1,19 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: issueId } = await params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/secondary-articles/reorder' },
+  async ({ params, session, request }) => {
+    const issueId = params.id
     const body = await request.json()
     const { articleOrders } = body
 
@@ -90,12 +82,5 @@ export async function POST(
       success: true,
       message: 'Secondary articles reordered successfully'
     })
-
-  } catch (error) {
-    console.error('Failed to reorder secondary articles:', error)
-    return NextResponse.json({
-      error: 'Failed to reorder secondary articles',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

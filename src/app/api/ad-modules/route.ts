@@ -1,12 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET /api/ad-modules - List ad modules for a publication
  * Query params: publication_id (required)
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ad-modules' },
+  async ({ request, logger }) => {
     const publicationId = request.nextUrl.searchParams.get('publication_id')
 
     if (!publicationId) {
@@ -28,21 +30,15 @@ export async function GET(request: NextRequest) {
       success: true,
       modules: modules || []
     })
-
-  } catch (error: any) {
-    console.error('[AdModules] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch ad modules', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST /api/ad-modules - Create new ad module
  */
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ad-modules' },
+  async ({ request, logger }) => {
     const body = await request.json()
 
     // Validate required fields
@@ -85,22 +81,16 @@ export async function POST(request: NextRequest) {
       success: true,
       module
     }, { status: 201 })
-
-  } catch (error: any) {
-    console.error('[AdModules] Failed to create:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create ad module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/ad-modules - Reorder modules (bulk update display_order)
  * Body: { modules: [{ id, display_order }] }
  */
-export async function PATCH(request: NextRequest) {
-  try {
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ad-modules' },
+  async ({ request, logger }) => {
     const body = await request.json()
 
     if (!body.modules || !Array.isArray(body.modules)) {
@@ -131,12 +121,5 @@ export async function PATCH(request: NextRequest) {
       success: true,
       message: 'Module order updated'
     })
-
-  } catch (error: any) {
-    console.error('[AdModules] Failed to reorder:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to reorder modules', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-website-header' },
+  async ({ logger }) => {
     // Check if website_header_url exists in database
     const { data: settings, error } = await supabaseAdmin
       .from('app_settings')
@@ -24,11 +26,5 @@ export async function GET() {
       },
       raw_settings: settings
     })
-  } catch (error) {
-    console.error('Error checking settings:', error)
-    return NextResponse.json({
-      error: 'Failed to check settings',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

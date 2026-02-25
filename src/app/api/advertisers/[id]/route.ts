@@ -1,18 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-
-type RouteParams = Promise<{ id: string }>
 
 /**
  * GET /api/advertisers/[id] - Get specific advertiser with their ads
  */
-export async function GET(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id } = params
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'advertisers/[id]' },
+  async ({ params }) => {
+    const id = params.id
 
     const { data: advertiser, error } = await supabaseAdmin
       .from('advertisers')
@@ -44,26 +40,16 @@ export async function GET(
       success: true,
       advertiser
     })
-
-  } catch (error: any) {
-    console.error('[Advertisers] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch advertiser', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/advertisers/[id] - Update advertiser
  */
-export async function PATCH(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id } = params
+export const PATCH = withApiHandler(
+  { authTier: 'admin', logContext: 'advertisers/[id]' },
+  async ({ params, request, logger }) => {
+    const id = params.id
     const body = await request.json()
 
     // Build update object
@@ -88,33 +74,23 @@ export async function PATCH(
 
     if (error) throw error
 
-    console.log(`[Advertisers] Updated: ${advertiser.company_name}`)
+    logger.info({ advertiserId: id, name: advertiser.company_name }, 'Updated advertiser')
 
     return NextResponse.json({
       success: true,
       advertiser
     })
-
-  } catch (error: any) {
-    console.error('[Advertisers] Failed to update:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update advertiser', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * DELETE /api/advertisers/[id] - Delete advertiser
  * Note: This will CASCADE delete all ads for this advertiser
  */
-export async function DELETE(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id } = params
+export const DELETE = withApiHandler(
+  { authTier: 'admin', logContext: 'advertisers/[id]' },
+  async ({ params, logger }) => {
+    const id = params.id
 
     // Get advertiser info and ad count for logging
     const { data: advertiser } = await supabaseAdmin
@@ -136,19 +112,12 @@ export async function DELETE(
 
     if (error) throw error
 
-    console.log(`[Advertisers] Deleted: ${advertiser?.company_name} and ${count || 0} ads`)
+    logger.info({ advertiserId: id, name: advertiser?.company_name, deletedAds: count || 0 }, 'Deleted advertiser')
 
     return NextResponse.json({
       success: true,
       message: 'Advertiser deleted successfully',
       deleted_ads: count || 0
     })
-
-  } catch (error: any) {
-    console.error('[Advertisers] Failed to delete:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete advertiser', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

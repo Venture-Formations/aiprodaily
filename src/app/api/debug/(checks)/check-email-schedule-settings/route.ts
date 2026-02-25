@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-email-schedule-settings' },
+  async () => {
     // Get all email-related settings from database
     const { data: settings, error } = await supabaseAdmin
       .from('app_settings')
@@ -22,11 +24,5 @@ export async function GET() {
         s.key.includes('Time') || s.key.includes('Enabled')
       ) || []
     })
-
-  } catch (error) {
-    return NextResponse.json({
-      error: 'Failed to check email schedule settings',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

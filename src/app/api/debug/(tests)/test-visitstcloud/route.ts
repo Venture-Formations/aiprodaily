@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-visitstcloud' },
+  async ({ logger }) => {
   try {
     console.log('Testing VisitStCloud API access...')
 
@@ -67,4 +70,5 @@ export async function GET(request: NextRequest) {
       error_name: error instanceof Error ? error.name : 'Unknown'
     })
   }
-}
+  }
+)

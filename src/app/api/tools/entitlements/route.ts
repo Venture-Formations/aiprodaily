@@ -1,20 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { PUBLICATION_ID } from '@/lib/config'
 
 // GET - Fetch all customer entitlements
-export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  if ((session.user as any).role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'tools/entitlements' },
+  async ({ request, logger }) => {
     // Optional: filter by clerk_user_id
     const url = new URL(request.url)
     const clerkUserId = url.searchParams.get('clerk_user_id')
@@ -35,7 +27,7 @@ export async function GET(request: NextRequest) {
     const { data: entitlements, error } = await query
 
     if (error) {
-      console.error('[Entitlements] Error fetching entitlements:', error)
+      logger.error({ err: error }, 'Error fetching entitlements')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
@@ -46,25 +38,15 @@ export async function GET(request: NextRequest) {
     }))
 
     return NextResponse.json({ success: true, entitlements: entitlementsWithRemaining })
-  } catch (error) {
-    console.error('[Entitlements] Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)
 
 // POST - Grant a new entitlement (manual grant by admin)
-export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  if ((session.user as any).role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'tools/entitlements' },
+  async ({ request, session, logger }) => {
+    const grantedBy = session.user.email
 
-  const grantedBy = session.user.email
-
-  try {
     const body = await request.json()
     const {
       clerk_user_id,
@@ -112,15 +94,12 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('[Entitlements] Error creating entitlement:', error)
+      logger.error({ err: error }, 'Error creating entitlement')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log('[Entitlements] Entitlement granted:', newEntitlement.id, 'to', userId)
+    logger.info({ entitlementId: newEntitlement.id, userId }, 'Entitlement granted')
 
     return NextResponse.json({ success: true, entitlement: newEntitlement })
-  } catch (error) {
-    console.error('[Entitlements] Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)

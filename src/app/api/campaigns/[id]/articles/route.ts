@@ -1,22 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
+import { withApiHandler } from '@/lib/api-handler'
 
-interface RouteParams {
-  params: Promise<{
-    id: string
-  }>
-}
-
-export async function PATCH(request: NextRequest, { params }: RouteParams) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id } = await params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/articles' },
+  async ({ params, session, request }) => {
+    const id = params.id
 
     const body = await request.json()
     const { article_updates } = body
@@ -77,12 +66,5 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     })
 
     return NextResponse.json({ success: true, updated: article_updates.length })
-
-  } catch (error) {
-    console.error('Failed to update articles:', error)
-    return NextResponse.json({
-      error: 'Failed to update articles',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

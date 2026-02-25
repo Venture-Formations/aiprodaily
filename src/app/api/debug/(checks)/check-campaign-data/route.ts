@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: Request) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-campaign-data' },
+  async ({ request, logger }) => {
     const url = new URL(request.url)
     const issueId = url.searchParams.get('issue_id')
 
@@ -96,13 +98,5 @@ export async function GET(request: Request) {
         }
       }
     })
-
-  } catch (error) {
-    console.error('Check issue data error:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
-    }, { status: 500 })
   }
-}
+)

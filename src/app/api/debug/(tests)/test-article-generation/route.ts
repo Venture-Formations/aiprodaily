@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 
-export async function GET() {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-article-generation' },
+  async ({ logger }) => {
   try {
     const issueId = '3c1c8063-806a-483d-a00a-0eab54d721a5'
 
@@ -149,4 +152,5 @@ export async function GET() {
       stack: error instanceof Error ? error.stack : undefined
     }, { status: 500 })
   }
-}
+  }
+)

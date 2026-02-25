@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-campaign-ids' },
+  async ({ request, logger }) => {
     const issueIds = [
       'bd08af8d-e2c1-40e3-bf94-bd4af912639e',
       'c8750496-9cf2-4f68-85fe-86dae32f226a'
@@ -32,10 +34,5 @@ export async function GET(request: NextRequest) {
       allCampaignsCreatedToday: todaysCampaigns || [],
       todaysCampaignsCount: todaysCampaigns?.length || 0
     })
-
-  } catch (error) {
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

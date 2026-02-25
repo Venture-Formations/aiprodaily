@@ -1,13 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const resolvedParams = await params
-    const issueId = resolvedParams.id
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/delete' },
+  async ({ params }) => {
+    const issueId = params.id
 
     // Verify issue exists before deletion
     const { data: issue, error: fetchError } = await supabaseAdmin
@@ -217,15 +215,5 @@ export async function DELETE(
         status: issue.status
       }
     })
-
-  } catch (error) {
-    console.error('issue deletion error:', error)
-    return NextResponse.json(
-      {
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)

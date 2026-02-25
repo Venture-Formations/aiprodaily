@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { GoogleVisionService } from '@/lib/google-vision'
 
-export async function POST(request: NextRequest) {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-raw-vision' },
+  async ({ request, logger }) => {
   try {
     const { imageUrl } = await request.json()
 
@@ -33,4 +36,5 @@ export async function POST(request: NextRequest) {
       stack: error instanceof Error ? error.stack : undefined
     })
   }
-}
+  }
+)

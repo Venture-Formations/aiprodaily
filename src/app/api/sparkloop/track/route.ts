@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { createHash } from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase'
 import { PUBLICATION_ID } from '@/lib/config'
@@ -11,8 +12,9 @@ import type { SparkLoopPopupEvent } from '@/types/sparkloop'
  * Stores events in sparkloop_events table
  * Also updates recommendation metrics (impressions, selections)
  */
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'public', logContext: 'sparkloop-track' },
+  async ({ request, logger }) => {
     const event: SparkLoopPopupEvent & { source?: string } = await request.json()
 
     if (!event.event_type || !event.subscriber_email) {
@@ -59,7 +61,7 @@ export async function POST(request: NextRequest) {
     if (event.ref_codes && event.ref_codes.length > 0) {
       try {
         if (eventType === 'popup_opened') {
-          // Record impressions — route to popup or page column based on source
+          // Record impressions -- route to popup or page column based on source
           const isRecsPage = event.source === 'recs_page'
           const rpcName = isRecsPage
             ? 'increment_sparkloop_page_impressions'
@@ -86,10 +88,5 @@ export async function POST(request: NextRequest) {
     console.log(`[SparkLoop Track] Recorded: ${eventType} for ${event.subscriber_email}`)
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('[SparkLoop Track] Error:', error)
-
-    // Don't fail the user experience for tracking errors
-    return NextResponse.json({ success: false, error: 'Tracking failed' })
   }
-}
+)

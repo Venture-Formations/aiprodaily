@@ -1,16 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
 
 // PATCH - Update criteria weight
-export async function PATCH(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/criteria-weights' },
+  async ({ request }) => {
     const body = await request.json()
     const { criteriaNumber, weight, type, newsletterSlug } = body
 
@@ -76,15 +71,5 @@ export async function PATCH(request: NextRequest) {
       success: true,
       message: `Weight for ${type === 'secondary' ? 'secondary ' : ''}criteria ${criteriaNumber} updated to ${weight}`
     })
-
-  } catch (error) {
-    console.error('Failed to update criteria weight:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)

@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
 
@@ -17,14 +16,9 @@ import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
  * - end_date: Optional - End date (YYYY-MM-DD format)
  * - days: Optional - Number of days to look back (default: 7, ignored if start_date provided)
  */
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai-apps/analytics' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const newsletterSlug = searchParams.get('newsletter_slug')
     const affiliateFilter = searchParams.get('affiliate')
@@ -51,7 +45,7 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (newsletterError || !newsletter) {
-      console.error('[AI Apps Analytics] Newsletter not found:', newsletterSlug)
+      logger.error({ slug: newsletterSlug }, 'Newsletter not found')
       return NextResponse.json(
         { error: 'Newsletter not found' },
         { status: 404 }
@@ -113,7 +107,7 @@ export async function GET(request: NextRequest) {
     const { data: apps, error: appsError } = await appsQuery
 
     if (appsError) {
-      console.error('[AI Apps Analytics] Error fetching apps:', appsError)
+      logger.error({ err: appsError }, 'Error fetching apps')
       return NextResponse.json({ error: appsError.message }, { status: 500 })
     }
 
@@ -131,7 +125,7 @@ export async function GET(request: NextRequest) {
       .in('app_id', apps.map(app => app.id))
 
     if (legacySelectionsError) {
-      console.error('[AI Apps Analytics] Error fetching legacy selections:', legacySelectionsError)
+      logger.error({ err: legacySelectionsError }, 'Error fetching legacy selections')
       return NextResponse.json({ error: legacySelectionsError.message }, { status: 500 })
     }
 
@@ -141,7 +135,7 @@ export async function GET(request: NextRequest) {
       .select('id, issue_id, ai_app_module_id, app_ids')
 
     if (moduleSelectionsError) {
-      console.error('[AI Apps Analytics] Error fetching mod selections:', moduleSelectionsError)
+      logger.error({ err: moduleSelectionsError }, 'Error fetching mod selections')
       return NextResponse.json({ error: moduleSelectionsError.message }, { status: 500 })
     }
 
@@ -181,7 +175,7 @@ export async function GET(request: NextRequest) {
       .lte('date', endDateStr)
 
     if (campaignsError) {
-      console.error('[AI Apps Analytics] Error fetching campaigns:', campaignsError)
+      logger.error({ err: campaignsError }, 'Error fetching campaigns')
     }
 
     const campaignMap = new Map((campaigns || []).map(c => [c.id, c]))
@@ -216,7 +210,7 @@ export async function GET(request: NextRequest) {
     // Fetch in batches to avoid pagination limits
     let allLinkClicks: any[] = []
     let hasMore = true
-    let offset = 0
+    let clickOffset = 0
     const batchSize = 1000
 
     while (hasMore) {
@@ -226,11 +220,11 @@ export async function GET(request: NextRequest) {
         .in('link_section', aiAppSectionNames)
         .gte('issue_date', startDateStr)
         .lte('issue_date', endDateStr)
-        .range(offset, offset + batchSize - 1)
+        .range(clickOffset, clickOffset + batchSize - 1)
         .order('clicked_at', { ascending: false })
 
       if (clicksError) {
-        console.error('[AI Apps Analytics] Error fetching link clicks:', clicksError)
+        logger.error({ err: clicksError }, 'Error fetching link clicks')
         return NextResponse.json({ error: clicksError.message }, { status: 500 })
       }
 
@@ -238,7 +232,7 @@ export async function GET(request: NextRequest) {
         hasMore = false
       } else {
         allLinkClicks = allLinkClicks.concat(linkClicksBatch)
-        offset += batchSize
+        clickOffset += batchSize
         hasMore = linkClicksBatch.length === batchSize
       }
     }
@@ -270,7 +264,7 @@ export async function GET(request: NextRequest) {
       .eq('status', 'sent')
 
     if (issuesError) {
-      console.error('[AI Apps Analytics] Error fetching issues:', issuesError)
+      logger.error({ err: issuesError }, 'Error fetching issues')
     }
 
     // Transform email_metrics from array to single object (Supabase returns it as array)
@@ -297,7 +291,7 @@ export async function GET(request: NextRequest) {
       const issuesUsedIn = appIssues.length
 
       // Get unique issue IDs and dates
-      const issueIds = new Set(appIssues.map((sel: any) => sel.issue_id))
+      const appIssueIds = new Set(appIssues.map((sel: any) => sel.issue_id))
       const issueDates = Array.from(new Set(appIssues.map((sel: any) => sel.campaign?.date).filter(Boolean))).sort()
 
       // Match clicks to this app by URL
@@ -345,7 +339,7 @@ export async function GET(request: NextRequest) {
       if (issuesUsedIn > 0 && issues) {
         // Sum up recipients from issues where this app appeared
         issues.forEach(issue => {
-          if (issueIds.has(issue.id) && issue.email_metrics?.sent_count) {
+          if (appIssueIds.has(issue.id) && issue.email_metrics?.sent_count) {
             totalRecipients += issue.email_metrics.sent_count
           }
         })
@@ -358,7 +352,7 @@ export async function GET(request: NextRequest) {
         if (apps.indexOf(app) === 0) {
           console.log(`[AI Apps Analytics] CTR Debug for "${app.app_name}":`, {
             issuesUsedIn,
-            issueIdsCount: issueIds.size,
+            issueIdsCount: appIssueIds.size,
             totalIssuesAvailable: issues.length,
             totalRecipients,
             uniqueClickers,
@@ -403,12 +397,5 @@ export async function GET(request: NextRequest) {
       },
       apps: appAnalytics
     })
-
-  } catch (error) {
-    console.error('[AI Apps Analytics] Error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

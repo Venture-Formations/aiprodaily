@@ -1,16 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SupabaseImageStorage } from '@/lib/supabase-image-storage'
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(media)/process-images' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const issueId = searchParams.get('issue_id')
 
@@ -18,8 +13,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'issueId parameter required' }, { status: 400 })
     }
 
-    console.log('=== MANUAL IMAGE PROCESSING DEBUG ===')
-    console.log('issue ID:', issueId)
+    logger.info({ issueId }, 'Manual image processing started')
 
     const imageStorage = new SupabaseImageStorage()
 
@@ -44,7 +38,7 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
-    console.log(`Found ${articles.length} active articles to process`)
+    logger.info(`Found ${articles.length} active articles to process`)
 
     const results = []
 
@@ -63,7 +57,6 @@ export async function POST(request: NextRequest) {
         }
 
         const originalImageUrl = rssPost.image_url
-        console.log(`Processing image for article ${article.id}: ${originalImageUrl}`)
 
         // Skip if already hosted on Supabase
         let isHosted = false
@@ -125,12 +118,5 @@ export async function POST(request: NextRequest) {
       },
       timestamp: new Date().toISOString()
     })
-
-  } catch (error) {
-    console.error('Manual image processing error:', error)
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : 'Unknown error',
-      debug: 'Failed to process images'
-    }, { status: 500 })
   }
-}
+)

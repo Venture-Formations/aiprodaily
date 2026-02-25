@@ -1,16 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { AI_PROMPTS } from '@/lib/openai'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai/load-prompt-template' },
+  async ({ request, logger }) => {
     const body = await request.json()
     const { promptType } = body
 
@@ -38,7 +33,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle()
 
       if (moduleError) {
-        console.error('[API] Error loading module prompt template:', moduleError)
+        logger.error({ err: moduleError }, 'Error loading module prompt template')
         return NextResponse.json(
           { error: 'Failed to load module prompt', details: moduleError.message },
           { status: 500 }
@@ -60,73 +55,56 @@ export async function POST(request: NextRequest) {
 
     let templatePrompt = ''
 
-    try {
-      // Load templates with placeholders (don't inject actual data)
-      // Placeholders: {{title}}, {{description}}, {{content}}, {{headline}}, {{url}}
+    // Load templates with placeholders (don't inject actual data)
+    // Placeholders: {{title}}, {{description}}, {{content}}, {{headline}}, {{url}}
 
-      if (promptType === 'primary-title') {
-        templatePrompt = await AI_PROMPTS.primaryArticleTitle({
-          title: '{{title}}',
-          description: '{{description}}',
-          content: '{{content}}'
-        })
-      } else if (promptType === 'primary-body') {
-        templatePrompt = await AI_PROMPTS.primaryArticleBody({
-          title: '{{title}}',
-          description: '{{description}}',
-          content: '{{content}}',
-          source_url: '{{url}}'
-        }, '{{headline}}')
-      } else if (promptType === 'secondary-title') {
-        templatePrompt = await AI_PROMPTS.secondaryArticleTitle({
-          title: '{{title}}',
-          description: '{{description}}',
-          content: '{{content}}'
-        })
-      } else if (promptType === 'secondary-body') {
-        templatePrompt = await AI_PROMPTS.secondaryArticleBody({
-          title: '{{title}}',
-          description: '{{description}}',
-          content: '{{content}}',
-          source_url: '{{url}}'
-        }, '{{headline}}')
-      } else if (promptType === 'post-scorer') {
-        templatePrompt = await AI_PROMPTS.criteria1Evaluator({
-          title: '{{title}}',
-          description: '{{description}}',
-          content: '{{content}}'
-        })
-      } else if (promptType === 'subject-line') {
-        templatePrompt = await AI_PROMPTS.subjectLineGenerator({
-          headline: '{{headline}}',
-          content: '{{content}}'
-        })
-      } else {
-        return NextResponse.json(
-          { error: 'Invalid prompt type' },
-          { status: 400 }
-        )
-      }
-
-      return NextResponse.json({
-        success: true,
-        prompt: templatePrompt
+    if (promptType === 'primary-title') {
+      templatePrompt = await AI_PROMPTS.primaryArticleTitle({
+        title: '{{title}}',
+        description: '{{description}}',
+        content: '{{content}}'
       })
-    } catch (error) {
-      console.error('[API] Error generating prompt template:', error)
+    } else if (promptType === 'primary-body') {
+      templatePrompt = await AI_PROMPTS.primaryArticleBody({
+        title: '{{title}}',
+        description: '{{description}}',
+        content: '{{content}}',
+        source_url: '{{url}}'
+      }, '{{headline}}')
+    } else if (promptType === 'secondary-title') {
+      templatePrompt = await AI_PROMPTS.secondaryArticleTitle({
+        title: '{{title}}',
+        description: '{{description}}',
+        content: '{{content}}'
+      })
+    } else if (promptType === 'secondary-body') {
+      templatePrompt = await AI_PROMPTS.secondaryArticleBody({
+        title: '{{title}}',
+        description: '{{description}}',
+        content: '{{content}}',
+        source_url: '{{url}}'
+      }, '{{headline}}')
+    } else if (promptType === 'post-scorer') {
+      templatePrompt = await AI_PROMPTS.criteria1Evaluator({
+        title: '{{title}}',
+        description: '{{description}}',
+        content: '{{content}}'
+      })
+    } else if (promptType === 'subject-line') {
+      templatePrompt = await AI_PROMPTS.subjectLineGenerator({
+        headline: '{{headline}}',
+        content: '{{content}}'
+      })
+    } else {
       return NextResponse.json(
-        { error: 'Failed to generate prompt template' },
-        { status: 500 }
+        { error: 'Invalid prompt type' },
+        { status: 400 }
       )
     }
-  } catch (error) {
-    console.error('[API] Error in load-prompt-template:', error)
-    return NextResponse.json(
-      {
-        error: 'Failed to load prompt template',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
+
+    return NextResponse.json({
+      success: true,
+      prompt: templatePrompt
+    })
   }
-}
+)

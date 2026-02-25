@@ -1,18 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-type RouteParams = Promise<{ id: string }>
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET /api/ad-modules/[id] - Get specific ad module
  */
-export async function GET(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id } = params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ad-modules/[id]' },
+  async ({ params }) => {
+    const id = params.id
 
     const { data: module, error } = await supabaseAdmin
       .from('ad_modules')
@@ -34,26 +30,16 @@ export async function GET(
       success: true,
       module
     })
-
-  } catch (error: any) {
-    console.error('[AdModules] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch ad module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/ad-modules/[id] - Update ad module
  */
-export async function PATCH(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id } = params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ad-modules/[id]' },
+  async ({ params, request }) => {
+    const id = params.id
     const body = await request.json()
 
     // Build update object, only including provided fields
@@ -90,27 +76,17 @@ export async function PATCH(
       success: true,
       module
     })
-
-  } catch (error: any) {
-    console.error('[AdModules] Failed to update:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update ad module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * DELETE /api/ad-modules/[id] - Delete ad module
  * Note: Ads will be orphaned (ad_module_id set to NULL), not deleted
  */
-export async function DELETE(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id } = params
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ad-modules/[id]' },
+  async ({ params }) => {
+    const id = params.id
 
     // First, get module info for logging
     const { data: module } = await supabaseAdmin
@@ -141,12 +117,5 @@ export async function DELETE(
       message: 'Ad module deleted successfully',
       orphaned_ads: count || 0
     })
-
-  } catch (error: any) {
-    console.error('[AdModules] Failed to delete:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete ad module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

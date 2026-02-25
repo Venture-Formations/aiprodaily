@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { ArticleArchiveService } from '@/lib/article-archive'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(campaign)/archived-articles' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const issueId = searchParams.get('issue_id')
     const startDate = searchParams.get('start_date')
@@ -91,13 +93,5 @@ export async function GET(request: NextRequest) {
       },
       timestamp: new Date().toISOString()
     })
-
-  } catch (error) {
-    console.error('Archived articles API error:', error)
-    return NextResponse.json({
-      success: false,
-      error: 'Failed to fetch archived articles',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

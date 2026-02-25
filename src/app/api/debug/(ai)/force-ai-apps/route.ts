@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AppSelector } from '@/lib/app-selector'
 
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(ai)/force-ai-apps' },
+  async ({ logger }) => {
     // Get the latest issue
     const { data: issue, error: issueError } = await supabaseAdmin
       .from('publication_issues')
@@ -39,7 +41,7 @@ export async function GET() {
       .select('*')
       .eq('issue_id', issue.id)
 
-    console.log(`Existing selections for issue ${issue.id}:`, existingSelections?.length || 0)
+    logger.info({ issueId: issue.id, count: existingSelections?.length || 0 }, 'Existing selections for issue')
 
     // Force select apps for this issue
     const selectedApps = await AppSelector.selectAppsForissue(issue.id, newsletter.id)
@@ -73,13 +75,5 @@ export async function GET() {
         selection_order: s.selection_order
       }))
     })
-
-  } catch (error) {
-    console.error('Force AI apps error:', error)
-    return NextResponse.json({
-      error: 'Failed to force AI app selection',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
-    }, { status: 500 })
   }
-}
+)

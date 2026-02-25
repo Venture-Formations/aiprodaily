@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
@@ -9,13 +8,9 @@ import { supabaseAdmin } from '@/lib/supabase'
  * Fetches the live/production prompt from publication_settings table
  * based on the prompt type and AI provider selected in the playground
  */
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai/load-live-prompt' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const publication_id = searchParams.get('publication_id')
     const provider = searchParams.get('provider')
@@ -45,7 +40,7 @@ export async function GET(request: NextRequest) {
         .maybeSingle()
 
       if (moduleError) {
-        console.error('[API] Error loading module prompt:', moduleError)
+        logger.error({ err: moduleError }, 'Error loading module prompt')
         return NextResponse.json(
           { error: 'Failed to load module prompt', details: moduleError.message },
           { status: 500 }
@@ -121,7 +116,7 @@ export async function GET(request: NextRequest) {
       .maybeSingle()
 
     if (error) {
-      console.error('[API] Error loading live prompt:', error)
+      logger.error({ err: error }, 'Error loading live prompt')
       return NextResponse.json(
         { error: 'Failed to load live prompt', details: error.message },
         { status: 500 }
@@ -152,14 +147,5 @@ export async function GET(request: NextRequest) {
         provider_matches: providerMatches
       }
     })
-  } catch (error) {
-    console.error('[API] Error in load-live-prompt:', error)
-    return NextResponse.json(
-      {
-        error: 'Failed to load live prompt',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)

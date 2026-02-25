@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { incrementToolClicks, incrementToolViews } from '@/lib/directory'
 import { PUBLICATION_ID } from '@/lib/config'
@@ -17,8 +18,9 @@ interface TrackClickPayload {
   destinationUrl?: string
 }
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'public', logContext: 'tools-track-click' },
+  async ({ request, logger }) => {
     const payload: TrackClickPayload = await request.json()
 
     // Extract request metadata
@@ -95,11 +97,5 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('[Tools Track Click] Error tracking click:', error)
-    return NextResponse.json(
-      { error: 'Failed to track click' },
-      { status: 500 }
-    )
   }
-}
+)

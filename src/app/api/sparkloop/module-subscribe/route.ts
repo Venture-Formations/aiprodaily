@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { createHash } from 'crypto'
 import { SparkLoopService } from '@/lib/sparkloop-client'
 import { supabaseAdmin } from '@/lib/supabase'
@@ -13,92 +14,93 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.com'
  * One-click subscribe from newsletter email. Email links can't POST,
  * so this is a GET that performs the subscribe and redirects to confirmation.
  */
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const email = searchParams.get('email')
-  const refCode = searchParams.get('ref_code')
-  const issueId = searchParams.get('issue_id')
+export const GET = withApiHandler(
+  { authTier: 'public', logContext: 'sparkloop-module-subscribe' },
+  async ({ request, logger }) => {
+    const { searchParams } = new URL(request.url)
+    const email = searchParams.get('email')
+    const refCode = searchParams.get('ref_code')
+    const issueId = searchParams.get('issue_id')
 
-  // Validate required params
-  if (!email || !refCode) {
-    return NextResponse.redirect(
-      `${BASE_URL}/website/subscribe/module-confirmed?error=missing_params`
-    )
-  }
-
-  // Check for MailerLite merge variable not being replaced (link opened in browser directly)
-  if (email === '{$email}' || email.includes('{$')) {
-    return NextResponse.redirect(
-      `${BASE_URL}/website/subscribe/module-confirmed?error=invalid_email`
-    )
-  }
-
-  // Extract request metadata early (needed for bot detection + tracking)
-  const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || undefined
-  const userAgent = request.headers.get('user-agent') || undefined
-  const countryCode = request.headers.get('x-vercel-ip-country') || 'US'
-
-  // Bot detection
-  const uaCheck = checkUserAgent(userAgent || null)
-
-  // IP exclusion check (fail-open: if check fails, allow the subscribe)
-  let ipExcluded = false
-  try {
-    const { data: exclusions } = await supabaseAdmin
-      .from('excluded_ips')
-      .select('ip_address, is_range, cidr_prefix')
-      .eq('publication_id', PUBLICATION_ID)
-
-    if (exclusions && ipAddress) {
-      ipExcluded = isIPExcluded(ipAddress, exclusions as IPExclusion[])
+    // Validate required params
+    if (!email || !refCode) {
+      return NextResponse.redirect(
+        `${BASE_URL}/website/subscribe/module-confirmed?error=missing_params`
+      )
     }
-  } catch (exErr) {
-    console.error('[SparkLoop Module Subscribe] IP exclusion check failed (fail-open):', exErr)
-  }
 
-  const shouldBlock = uaCheck.isBot || ipExcluded
+    // Check for MailerLite merge variable not being replaced (link opened in browser directly)
+    if (email === '{$email}' || email.includes('{$')) {
+      return NextResponse.redirect(
+        `${BASE_URL}/website/subscribe/module-confirmed?error=invalid_email`
+      )
+    }
 
-  // Record every click attempt (fire-and-forget)
-  const clickRecordId = crypto.randomUUID()
-  supabaseAdmin
-    .from('sparkloop_module_clicks')
-    .insert({
-      id: clickRecordId,
-      publication_id: PUBLICATION_ID,
-      subscriber_email: email,
-      ref_code: refCode,
-      issue_id: issueId || null,
-      ip_address: ipAddress || null,
-      user_agent: userAgent || null,
-      country_code: countryCode,
-      is_bot_ua: uaCheck.isBot,
-      bot_ua_reason: uaCheck.reason,
-      is_ip_excluded: ipExcluded,
-      sparkloop_called: false,
-    })
-    .then(({ error }) => {
-      if (error) console.error('[SparkLoop Module Subscribe] Failed to record click:', error)
-    })
+    // Extract request metadata early (needed for bot detection + tracking)
+    const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || undefined
+    const userAgent = request.headers.get('user-agent') || undefined
+    const countryCode = request.headers.get('x-vercel-ip-country') || 'US'
 
-  // If blocked, redirect to confirmation but skip SparkLoop API calls
-  if (shouldBlock) {
-    const reason = uaCheck.isBot ? `bot_ua: ${uaCheck.reason}` : 'ip_excluded'
-    console.log(`[SparkLoop Module Subscribe] Blocked ${email} (${reason}) - redirecting without SparkLoop call`)
+    // Bot detection
+    const uaCheck = checkUserAgent(userAgent || null)
 
-    // Still redirect to confirmation page (don't break UX)
-    const { data: rec } = await supabaseAdmin
-      .from('sparkloop_recommendations')
-      .select('publication_name')
-      .eq('publication_id', PUBLICATION_ID)
-      .eq('ref_code', refCode)
-      .single()
+    // IP exclusion check (fail-open: if check fails, allow the subscribe)
+    let ipExcluded = false
+    try {
+      const { data: exclusions } = await supabaseAdmin
+        .from('excluded_ips')
+        .select('ip_address, is_range, cidr_prefix')
+        .eq('publication_id', PUBLICATION_ID)
 
-    const confirmUrl = new URL(`${BASE_URL}/website/subscribe/module-confirmed`)
-    if (rec) confirmUrl.searchParams.set('name', rec.publication_name)
-    return NextResponse.redirect(confirmUrl.toString())
-  }
+      if (exclusions && ipAddress) {
+        ipExcluded = isIPExcluded(ipAddress, exclusions as IPExclusion[])
+      }
+    } catch (exErr) {
+      console.error('[SparkLoop Module Subscribe] IP exclusion check failed (fail-open):', exErr)
+    }
 
-  try {
+    const shouldBlock = uaCheck.isBot || ipExcluded
+
+    // Record every click attempt (fire-and-forget)
+    const clickRecordId = crypto.randomUUID()
+    supabaseAdmin
+      .from('sparkloop_module_clicks')
+      .insert({
+        id: clickRecordId,
+        publication_id: PUBLICATION_ID,
+        subscriber_email: email,
+        ref_code: refCode,
+        issue_id: issueId || null,
+        ip_address: ipAddress || null,
+        user_agent: userAgent || null,
+        country_code: countryCode,
+        is_bot_ua: uaCheck.isBot,
+        bot_ua_reason: uaCheck.reason,
+        is_ip_excluded: ipExcluded,
+        sparkloop_called: false,
+      })
+      .then(({ error }) => {
+        if (error) console.error('[SparkLoop Module Subscribe] Failed to record click:', error)
+      })
+
+    // If blocked, redirect to confirmation but skip SparkLoop API calls
+    if (shouldBlock) {
+      const reason = uaCheck.isBot ? `bot_ua: ${uaCheck.reason}` : 'ip_excluded'
+      console.log(`[SparkLoop Module Subscribe] Blocked ${email} (${reason}) - redirecting without SparkLoop call`)
+
+      // Still redirect to confirmation page (don't break UX)
+      const { data: rec } = await supabaseAdmin
+        .from('sparkloop_recommendations')
+        .select('publication_name')
+        .eq('publication_id', PUBLICATION_ID)
+        .eq('ref_code', refCode)
+        .single()
+
+      const confirmUrl = new URL(`${BASE_URL}/website/subscribe/module-confirmed`)
+      if (rec) confirmUrl.searchParams.set('name', rec.publication_name)
+      return NextResponse.redirect(confirmUrl.toString())
+    }
+
     // Verify ref_code is active and non-excluded
     const { data: rec } = await supabaseAdmin
       .from('sparkloop_recommendations')
@@ -203,21 +205,5 @@ export async function GET(request: NextRequest) {
     const confirmUrl = new URL(`${BASE_URL}/website/subscribe/module-confirmed`)
     confirmUrl.searchParams.set('name', rec.publication_name)
     return NextResponse.redirect(confirmUrl.toString())
-
-  } catch (error) {
-    console.error('[SparkLoop Module Subscribe] Failed:', error)
-
-    // Update click record on error (fire-and-forget)
-    supabaseAdmin
-      .from('sparkloop_module_clicks')
-      .update({ sparkloop_called: true, sparkloop_success: false })
-      .eq('id', clickRecordId)
-      .then(({ error: updateErr }) => {
-        if (updateErr) console.error('[SparkLoop Module Subscribe] Failed to update click error record:', updateErr)
-      })
-
-    return NextResponse.redirect(
-      `${BASE_URL}/website/subscribe/module-confirmed?error=failed`
-    )
   }
-}
+)

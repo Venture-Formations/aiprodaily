@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { start } from 'workflow/api'
 import { processRSSWorkflow } from '@/lib/workflows/process-rss-workflow'
 
@@ -6,7 +7,9 @@ import { processRSSWorkflow } from '@/lib/workflows/process-rss-workflow'
  * Debug endpoint to manually trigger RSS workflow for testing
  * Uses query parameter authentication like other cron endpoints
  */
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/trigger-workflow-test' },
+  async ({ request, logger }) => {
   try {
     const searchParams = new URL(request.url).searchParams
     const secret = searchParams.get('secret')
@@ -46,6 +49,7 @@ export async function GET(request: NextRequest) {
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)
 
 export const maxDuration = 60

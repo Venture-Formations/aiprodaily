@@ -65,7 +65,12 @@ async function handleCreateCampaign(logger: Logger) {
     }, { status: 404 })
   }
 
+  // #region agent log
+  fetch('http://127.0.0.1:7480/ingest/f406adfc-ffdb-40d4-977a-b384a849804a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'00d517'},body:JSON.stringify({sessionId:'00d517',location:'create-campaign/route.ts:pre-issue-query',message:'Before publication_issues query',data:{issueDate,newsletterId:newsletter?.id},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+
   // Find tomorrow's issue with module articles
+  // Use maybeSingle() so 0 rows returns null instead of Supabase 406 (PGRST116)
   const { data: issue, error: issueError } = await supabaseAdmin
     .from('publication_issues')
     .select(`
@@ -82,14 +87,24 @@ async function handleCreateCampaign(logger: Logger) {
     `)
     .eq('publication_id', newsletter.id)
     .eq('date', issueDate)
-    .single()
+    .maybeSingle()
+
+  // #region agent log
+  fetch('http://127.0.0.1:7480/ingest/f406adfc-ffdb-40d4-977a-b384a849804a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'00d517'},body:JSON.stringify({sessionId:'00d517',location:'create-campaign/route.ts:after-issue-query',message:'After publication_issues query',data:{issueErrorCode:issueError?.code,issueErrorMessage:issueError?.message,issueId:issue?.id,issueDate,newsletterId:newsletter?.id,hasIssue:!!issue},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
 
   if (issueError || !issue) {
+    // #region agent log
+    fetch('http://127.0.0.1:7480/ingest/f406adfc-ffdb-40d4-977a-b384a849804a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'00d517'},body:JSON.stringify({sessionId:'00d517',location:'create-campaign/route.ts:return-no-issue',message:'No issue yet - returning 200 skipped',data:{issueErrorCode:issueError?.code},timestamp:Date.now(),hypothesisId:'B',runId:'post-fix'})}).catch(()=>{});
+    // #endregion
+    // Issue not created yet (workflow runs at rssProcessingTime; ensure issueCreationTime is after that)
+    console.log('[create-campaign] No issue for date yet:', issueDate, issueError?.code ? `Supabase error: ${issueError.code}` : 'no row')
     return NextResponse.json({
-      success: false,
-      error: 'No issue found for tomorrow',
-      issueDate: issueDate
-    }, { status: 404 })
+      success: true,
+      skipped: true,
+      message: 'No issue found for date yet; workflow may run later or still processing.',
+      issueDate
+    })
   }
 
   console.log('Found issue:', issue.id, 'Status:', issue.status)

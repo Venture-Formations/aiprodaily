@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * Add secondary article writer prompt by copying from primary
  */
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/add-secondary-article-writer' },
+  async ({ logger }) => {
   try {
     // Get the primary article writer prompt
     const { data: primaryPrompt, error: fetchError } = await supabaseAdmin
@@ -68,4 +71,5 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+  }
+)

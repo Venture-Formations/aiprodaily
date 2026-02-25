@@ -1,25 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import OpenAI from 'openai'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    console.log('🤖 Testing GPT-5 directly...')
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-gpt5' },
+  async ({ logger }) => {
+    logger.info('Testing GPT-5 directly...')
 
     const testPrompt = "Respond with exactly: GPT-5 is working"
 
     try {
-      console.log('Making direct GPT-5 API call using Responses API...')
+      logger.info('Making direct GPT-5 API call using Responses API...')
       const response = await (openai as any).responses.create({
         model: 'gpt-5',
         input: [{ role: 'user', content: testPrompt }],
@@ -27,9 +22,8 @@ export async function GET(request: NextRequest) {
         temperature: 0.1,
       })
 
-      // Extract content from Responses API format
       const content = response.output_text ?? response.output?.[0]?.content?.[0]?.text ?? ""
-      console.log('GPT-5 direct test successful:', content)
+      logger.info({ content }, 'GPT-5 direct test successful')
 
       return NextResponse.json({
         success: true,
@@ -39,7 +33,7 @@ export async function GET(request: NextRequest) {
         usage: response.usage
       })
     } catch (openaiError: any) {
-      console.error('GPT-5 direct test failed:', openaiError)
+      logger.error({ err: openaiError }, 'GPT-5 direct test failed')
 
       return NextResponse.json({
         success: false,
@@ -50,12 +44,5 @@ export async function GET(request: NextRequest) {
         message: 'GPT-5 test failed - see error details'
       })
     }
-
-  } catch (error) {
-    console.error('GPT-5 debug endpoint error:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'public', logContext: 'ads-checkout' },
+  async ({ request, logger }) => {
     const body = await request.json()
     const {
       title,
@@ -122,12 +124,5 @@ export async function POST(request: NextRequest) {
       sessionId: session.id,
       adId: ad?.id
     })
-
-  } catch (error) {
-    console.error('Checkout creation failed:', error)
-    return NextResponse.json({
-      error: 'Failed to create checkout session',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { STORAGE_PUBLIC_URL } from '@/lib/config'
 
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-social-media' },
+  async ({ logger }) => {
     console.log('Checking social media settings...')
 
     // Fetch all social media settings
@@ -92,12 +94,5 @@ export async function GET() {
         missingImages: imageTests.filter(t => !t.exists).map(t => t.url)
       }
     })
-
-  } catch (error) {
-    console.error('Failed to check social media settings:', error)
-    return NextResponse.json({
-      error: 'Failed to check social media settings',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

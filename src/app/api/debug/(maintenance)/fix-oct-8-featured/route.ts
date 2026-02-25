@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST() {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/fix-oct-8-featured' },
+  async ({ logger }) => {
   try {
     const issueId = '90d64237-fd7e-4dd8-a17a-342ad86a83db'
 
@@ -104,4 +107,5 @@ export async function POST() {
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

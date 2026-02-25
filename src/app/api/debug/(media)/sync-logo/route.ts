@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(media)/sync-logo' },
+  async ({ logger }) => {
   try {
     // Get logo_url from app_settings
     const { data: logoSetting, error: logoError } = await supabaseAdmin
@@ -45,4 +48,5 @@ export async function GET() {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

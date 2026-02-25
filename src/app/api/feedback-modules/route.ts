@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { FeedbackModuleSelector } from '@/lib/feedback-modules'
+import { withApiHandler } from '@/lib/api-handler'
 
 export const maxDuration = 30
 
 // GET /api/feedback-modules?publication_id={id} - Get feedback mod for publication (with blocks)
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'feedback-modules' },
+  async ({ request }) => {
     const publicationId = request.nextUrl.searchParams.get('publication_id')
 
     if (!publicationId) {
@@ -22,18 +24,13 @@ export async function GET(request: NextRequest) {
       success: true,
       module: mod
     })
-  } catch (error) {
-    console.error('[FeedbackModules] Error in GET:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch feedback mod' },
-      { status: 500 }
-    )
   }
-}
+)
 
 // POST /api/feedback-modules - Create or update feedback mod (returns with blocks)
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'feedback-modules' },
+  async ({ request }) => {
     const body = await request.json()
     const { publication_id, ...updates } = body
 
@@ -64,18 +61,13 @@ export async function POST(request: NextRequest) {
       success: true,
       module: mod
     })
-  } catch (error) {
-    console.error('[FeedbackModules] Error in POST:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create/update feedback mod' },
-      { status: 500 }
-    )
   }
-}
+)
 
 // PATCH /api/feedback-modules - Update feedback mod (returns with blocks)
-export async function PATCH(request: NextRequest) {
-  try {
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'feedback-modules' },
+  async ({ request }) => {
     const body = await request.json()
     const { id, publication_id, ...updates } = body
 
@@ -129,11 +121,5 @@ export async function PATCH(request: NextRequest) {
       success: true,
       module: moduleWithBlocks
     })
-  } catch (error) {
-    console.error('[FeedbackModules] Error in PATCH:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update feedback mod' },
-      { status: 500 }
-    )
   }
-}
+)

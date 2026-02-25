@@ -1,20 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({
-        authenticated: false,
-        session: null,
-        message: 'No session found'
-      })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(integrations)/auth-status' },
+  async ({ session, logger }) => {
     // Check if user exists in Supabase auth
     const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers()
     const authUser = authUsers.users.find(u => u.email === session.user.email)
@@ -45,12 +35,5 @@ export async function GET(request: NextRequest) {
       },
       timestamp: new Date().toISOString()
     })
-
-  } catch (error) {
-    console.error('Auth status check error:', error)
-    return NextResponse.json({
-      error: 'Failed to check auth status',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

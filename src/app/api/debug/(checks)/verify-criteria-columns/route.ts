@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/verify-criteria-columns' },
+  async ({ request, logger }) => {
     console.log('[Verify] Checking if criteria columns exist in post_ratings...')
 
     // Try to select criteria columns to verify they exist
@@ -40,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Criteria columns exist in post_ratings table ✅',
+      message: 'Criteria columns exist in post_ratings table',
       columns_verified: [
         'criteria_1_score', 'criteria_1_reason', 'criteria_1_weight',
         'criteria_2_score', 'criteria_2_reason', 'criteria_2_weight',
@@ -51,12 +53,5 @@ export async function GET(request: NextRequest) {
       sample_data_count: withScores?.length || 0,
       sample_data: withScores?.slice(0, 2) || []
     })
-
-  } catch (error) {
-    console.error('[Verify] Error:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

@@ -1,20 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { PUBLICATION_ID } from '@/lib/config'
 
 // GET - Fetch all sponsorship packages
-export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  if ((session.user as any).role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'tools/packages' },
+  async ({ logger }) => {
     const { data: packages, error } = await supabaseAdmin
       .from('sponsorship_packages')
       .select('*')
@@ -23,28 +15,18 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: true })
 
     if (error) {
-      console.error('[Packages] Error fetching packages:', error)
+      logger.error({ err: error }, 'Error fetching packages')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, packages: packages || [] })
-  } catch (error) {
-    console.error('[Packages] Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)
 
 // POST - Create a new sponsorship package
-export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  if ((session.user as any).role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
-  try {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'tools/packages' },
+  async ({ request, logger }) => {
     const body = await request.json()
     const {
       name,
@@ -83,15 +65,12 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('[Packages] Error creating package:', error)
+      logger.error({ err: error }, 'Error creating package')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log('[Packages] Package created:', newPackage.id)
+    logger.info({ packageId: newPackage.id }, 'Package created')
 
     return NextResponse.json({ success: true, package: newPackage })
-  } catch (error) {
-    console.error('[Packages] Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)

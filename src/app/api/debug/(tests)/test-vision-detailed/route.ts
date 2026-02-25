@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { GoogleVisionService } from '@/lib/google-vision'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-vision-detailed' },
+  async ({ request, logger }) => {
   try {
     const { searchParams } = new URL(request.url)
     const imageUrl = searchParams.get('imageUrl') || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400'
@@ -73,9 +76,12 @@ export async function GET(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error'
     })
   }
-}
+  }
+)
 
-export async function POST(request: NextRequest) {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-vision-detailed' },
+  async ({ request, logger }) => {
   try {
     const { imageUrl } = await request.json()
 
@@ -103,4 +109,5 @@ export async function POST(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error'
     })
   }
-}
+  }
+)

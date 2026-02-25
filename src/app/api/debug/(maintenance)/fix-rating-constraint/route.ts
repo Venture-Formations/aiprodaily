@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
-import { validateDebugAuth } from '@/lib/debug-auth'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST() {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/fix-rating-constraint' },
+  async ({ logger }) => {
   try {
     console.log('Updating post_ratings table constraint to allow interest_level 1-20...')
 
@@ -40,4 +42,5 @@ export async function POST() {
       instructions: 'Please run this SQL manually in Supabase SQL Editor:\n\nALTER TABLE post_ratings DROP CONSTRAINT IF EXISTS post_ratings_interest_level_check;\nALTER TABLE post_ratings ADD CONSTRAINT post_ratings_interest_level_check CHECK (interest_level >= 1 AND interest_level <= 20);'
     }, { status: 500 })
   }
-}
+  }
+)

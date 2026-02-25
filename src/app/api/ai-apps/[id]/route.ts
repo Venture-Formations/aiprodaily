@@ -1,17 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-
-type RouteParams = Promise<{ id: string }>
 
 /**
  * GET /api/ai-apps/[id] - Get specific AI application
  */
-export async function GET(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai-apps/[id]' },
+  async ({ params }) => {
     const { id } = params
 
     const { data: app, error } = await supabaseAdmin
@@ -34,25 +30,15 @@ export async function GET(
       success: true,
       app
     })
-
-  } catch (error: any) {
-    console.error('Failed to fetch AI application:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch AI application', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/ai-apps/[id] - Update AI application
  */
-export async function PATCH(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai-apps/[id]' },
+  async ({ request, params }) => {
     const { id } = params
     const body = await request.json()
 
@@ -91,25 +77,15 @@ export async function PATCH(
       success: true,
       app
     })
-
-  } catch (error: any) {
-    console.error('Failed to update AI application:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update AI application', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * DELETE /api/ai-apps/[id] - Delete AI application
  */
-export async function DELETE(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai-apps/[id]' },
+  async ({ params }) => {
     const { id } = params
 
     const { error } = await supabaseAdmin
@@ -123,12 +99,5 @@ export async function DELETE(
       success: true,
       message: 'AI application deleted successfully'
     })
-
-  } catch (error: any) {
-    console.error('Failed to delete AI application:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete AI application', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

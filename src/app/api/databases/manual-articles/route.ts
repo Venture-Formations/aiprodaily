@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // Helper to get active publication
@@ -22,8 +23,9 @@ function generateSlug(title: string): string {
 }
 
 // GET - List all manual articles
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'databases/manual-articles' },
+  async ({ request, logger }) => {
     const activeNewsletter = await getActivePublication()
     if (!activeNewsletter) {
       return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
@@ -48,7 +50,7 @@ export async function GET(request: NextRequest) {
     const { data: articles, error } = await query
 
     if (error) {
-      console.error('[API] Error fetching manual articles:', error.message)
+      logger.error({ err: error }, 'Error fetching manual articles')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
@@ -56,15 +58,13 @@ export async function GET(request: NextRequest) {
       articles,
       website_domain: activeNewsletter.website_domain
     })
-  } catch (error: any) {
-    console.error('[API] Manual articles GET error:', error.message)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)
 
 // POST - Create a new manual article
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'databases/manual-articles' },
+  async ({ request, logger }) => {
     const activeNewsletter = await getActivePublication()
     if (!activeNewsletter) {
       return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
@@ -133,13 +133,10 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('[API] Error creating manual article:', error.message)
+      logger.error({ err: error }, 'Error creating manual article')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ article }, { status: 201 })
-  } catch (error: any) {
-    console.error('[API] Manual articles POST error:', error.message)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)

@@ -1,23 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AI_CALL } from '@/lib/openai'
-import { authOptions } from '@/lib/auth'
+import { withApiHandler } from '@/lib/api-handler'
 
-interface RouteParams {
-  params: Promise<{
-    id: string
-  }>
-}
-
-export async function POST(request: NextRequest, { params }: RouteParams) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id } = await params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/generate-subject' },
+  async ({ params, session }) => {
+    const id = params.id
 
     // Fetch issue with publication_id
     const { data: issue, error } = await supabaseAdmin
@@ -166,13 +155,5 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       top_article_used: topArticle.headline,
       top_article_score: topArticle.rss_post?.[0]?.post_rating?.[0]?.total_score || 0
     })
-
-  } catch (error) {
-    console.error('Failed to generate subject line:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({
-      error: `Failed to generate subject line: ${errorMessage}`,
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-prompts' },
+  async ({ logger }) => {
     // Check total prompts
     const { data: allPrompts, count: totalCount } = await supabaseAdmin
       .from('prompt_ideas')
@@ -51,12 +53,5 @@ export async function GET() {
         created_at: s.created_at
       }))
     })
-
-  } catch (error) {
-    console.error('Error checking prompts:', error)
-    return NextResponse.json({
-      error: 'Failed to check prompts',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

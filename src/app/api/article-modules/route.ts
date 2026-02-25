@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { withApiHandler } from '@/lib/api-handler'
 
 // Default prompts for new article modules
 const DEFAULT_CRITERIA_PROMPTS = [
@@ -73,8 +74,9 @@ const DEFAULT_BODY_PROMPT = JSON.stringify({
  * GET /api/article-modules - List article modules for a publication
  * Query params: publication_id (required) - can be UUID or slug
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'article-modules' },
+  async ({ request }) => {
     const publicationIdOrSlug = request.nextUrl.searchParams.get('publication_id')
 
     if (!publicationIdOrSlug) {
@@ -122,22 +124,16 @@ export async function GET(request: NextRequest) {
       success: true,
       modules: modules || []
     })
-
-  } catch (error: any) {
-    console.error('[ArticleModules] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch article modules', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST /api/article-modules - Create new article module
  * Creates module with default criteria and prompts from template
  */
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'article-modules' },
+  async ({ request }) => {
     const body = await request.json()
 
     // Validate required fields
@@ -231,22 +227,16 @@ export async function POST(request: NextRequest) {
       success: true,
       module: completeModule
     }, { status: 201 })
-
-  } catch (error: any) {
-    console.error('[ArticleModules] Failed to create:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create article module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/article-modules - Reorder modules (bulk update display_order)
  * Body: { modules: [{ id, display_order }] }
  */
-export async function PATCH(request: NextRequest) {
-  try {
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'article-modules' },
+  async ({ request }) => {
     const body = await request.json()
 
     if (!body.modules || !Array.isArray(body.modules)) {
@@ -273,12 +263,5 @@ export async function PATCH(request: NextRequest) {
       success: true,
       message: `Updated ${body.modules.length} modules`
     })
-
-  } catch (error: any) {
-    console.error('[ArticleModules] Failed to reorder:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to reorder modules', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

@@ -1,25 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
 
-interface RouteParams {
-  params: Promise<{
-    id: string
-  }>
-}
-
-export async function PATCH(
-  request: NextRequest,
-  { params }: RouteParams
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id } = await params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/subject-line' },
+  async ({ params, request, logger }) => {
+    const id = params.id
     const { subject_line } = await request.json()
 
     if (!subject_line || typeof subject_line !== 'string') {
@@ -48,7 +34,7 @@ export async function PATCH(
       .single()
 
     if (error) {
-      console.error('Database error updating subject line:', error)
+      logger.error({ err: error }, 'Database error updating subject line')
       return NextResponse.json({
         error: 'Failed to update subject line'
       }, { status: 500 })
@@ -65,11 +51,5 @@ export async function PATCH(
       subject_line: data.subject_line,
       message: 'Subject line updated successfully'
     })
-
-  } catch (error) {
-    console.error('Error updating subject line:', error)
-    return NextResponse.json({
-      error: 'Internal server error'
-    }, { status: 500 })
   }
-}
+)

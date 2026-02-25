@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-subject' },
+  async ({ logger }) => {
   try {
     console.log('=== TESTING SUBJECT LINE GENERATION ===')
 
@@ -47,4 +50,5 @@ export async function GET(request: NextRequest) {
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

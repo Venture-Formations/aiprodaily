@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-image-analysis' },
+  async ({ logger }) => {
   try {
     console.log('Testing image analysis database columns...')
 
@@ -50,9 +53,12 @@ export async function GET(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)
 
-export async function POST(request: NextRequest) {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-image-analysis' },
+  async ({ request, logger }) => {
   try {
     const { secret } = await request.json()
 
@@ -116,4 +122,5 @@ ADD COLUMN IF NOT EXISTS signage_conf FLOAT;
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

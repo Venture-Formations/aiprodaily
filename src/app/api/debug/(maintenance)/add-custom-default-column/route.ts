@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
-import { validateDebugAuth } from '@/lib/debug-auth'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // This endpoint adds a custom_default column to app_settings table
 // Run once to enable "Save as Default" functionality for AI prompts
-export async function GET() {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/add-custom-default-column' },
+  async ({ logger }) => {
   try {
     console.log('Adding custom_default column to app_settings table...')
 
@@ -53,4 +55,5 @@ export async function GET() {
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

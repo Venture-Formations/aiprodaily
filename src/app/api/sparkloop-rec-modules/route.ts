@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { withApiHandler } from '@/lib/api-handler'
 
 export const maxDuration = 30
 
@@ -7,8 +8,9 @@ export const maxDuration = 30
  * GET /api/sparkloop-rec-modules - List sparkloop rec modules for a publication
  * Query params: publication_id (required)
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'sparkloop-rec-modules' },
+  async ({ request }) => {
     const publicationId = request.nextUrl.searchParams.get('publication_id')
 
     if (!publicationId) {
@@ -30,20 +32,15 @@ export async function GET(request: NextRequest) {
       success: true,
       modules: modules || []
     })
-  } catch (error: any) {
-    console.error('[SparkLoopRecModules] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch sparkloop rec modules', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST /api/sparkloop-rec-modules - Create new sparkloop rec module
  */
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'sparkloop-rec-modules' },
+  async ({ request }) => {
     const body = await request.json()
 
     if (!body.publication_id || !body.name) {
@@ -86,21 +83,16 @@ export async function POST(request: NextRequest) {
       success: true,
       module
     }, { status: 201 })
-  } catch (error: any) {
-    console.error('[SparkLoopRecModules] Failed to create:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create sparkloop rec module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/sparkloop-rec-modules - Reorder modules (bulk update display_order)
  * Body: { modules: [{ id, display_order }] }
  */
-export async function PATCH(request: NextRequest) {
-  try {
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'sparkloop-rec-modules' },
+  async ({ request }) => {
     const body = await request.json()
 
     if (!body.modules || !Array.isArray(body.modules)) {
@@ -130,11 +122,5 @@ export async function PATCH(request: NextRequest) {
       success: true,
       message: 'Module order updated'
     })
-  } catch (error: any) {
-    console.error('[SparkLoopRecModules] Failed to reorder:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to reorder modules', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

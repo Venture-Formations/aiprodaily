@@ -1,14 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'articles/manual' },
+  async ({ request, session }) => {
     const body = await request.json()
     const { issue_id, title, content, image_url, source_url, rank } = body
 
@@ -60,23 +56,12 @@ export async function POST(request: NextRequest) {
       }])
 
     return NextResponse.json({ article }, { status: 201 })
-
-  } catch (error) {
-    console.error('Failed to create manual article:', error)
-    return NextResponse.json({
-      error: 'Failed to create manual article',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'articles/manual' },
+  async ({ request }) => {
     const url = new URL(request.url)
     const issue_id = url.searchParams.get('issue_id')
 
@@ -95,12 +80,5 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ articles: articles || [] })
-
-  } catch (error) {
-    console.error('Failed to fetch manual articles:', error)
-    return NextResponse.json({
-      error: 'Failed to fetch manual articles',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

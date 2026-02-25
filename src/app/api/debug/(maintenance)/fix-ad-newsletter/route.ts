@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
@@ -6,7 +7,9 @@ import { supabaseAdmin } from '@/lib/supabase'
  *
  * This fixes ads that were created without publication_id (NULL values)
  */
-export async function POST() {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/fix-ad-newsletter' },
+  async ({ logger }) => {
   try {
     // Get accounting newsletter UUID
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
@@ -80,6 +83,7 @@ export async function POST() {
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)
 
 export const maxDuration = 60

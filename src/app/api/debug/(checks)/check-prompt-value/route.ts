@@ -1,13 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * Debug endpoint to check what's actually stored in the database for a prompt
- * 
+ *
  * GET /api/debug/check-prompt-value?key=ai_prompt_criteria_1
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-prompt-value' },
+  async ({ request, logger }) => {
     const searchParams = request.nextUrl.searchParams
     const key = searchParams.get('key') || 'ai_prompt_criteria_1'
 
@@ -60,8 +62,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Get first 500 chars of value for preview
-    const valuePreview = isString 
-      ? data.value.substring(0, 500) 
+    const valuePreview = isString
+      ? data.value.substring(0, 500)
       : JSON.stringify(data.value).substring(0, 500)
 
     return NextResponse.json({
@@ -91,18 +93,9 @@ export async function GET(request: NextRequest) {
         hasMessagesArray: hasMessages && messagesIsArray,
         isValidStructure: !parseError && hasMessages && messagesIsArray
       },
-      error: !parseError && hasMessages && messagesIsArray 
-        ? null 
+      error: !parseError && hasMessages && messagesIsArray
+        ? null
         : `Prompt is ${parseError ? 'not valid JSON' : !hasMessages ? 'missing messages property' : !messagesIsArray ? 'has messages but it\'s not an array' : 'invalid'}`
     })
-
-  } catch (error) {
-    console.error('[DEBUG] Error checking prompt value:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
-    }, { status: 500 })
   }
-}
-
+)

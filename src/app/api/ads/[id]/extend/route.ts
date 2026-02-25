@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
@@ -8,17 +7,10 @@ import { supabaseAdmin } from '@/lib/supabase'
  * Add weeks to an existing ad's times_paid
  * Also reactivates the ad if it was completed due to exhaustion
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id } = await params
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'ads/[id]/extend' },
+  async ({ params, request, logger }) => {
+    const id = params.id
     const { weeks } = await request.json()
 
     if (!weeks || typeof weeks !== 'number' || weeks <= 0) {
@@ -55,7 +47,7 @@ export async function POST(
       .eq('id', id)
 
     if (updateError) {
-      console.error('[Ads Extend] Error updating ad:', updateError)
+      logger.error({ err: updateError }, 'Error updating ad')
       return NextResponse.json({ error: updateError.message }, { status: 500 })
     }
 
@@ -66,12 +58,5 @@ export async function POST(
       new_times_paid: newTimesPaid,
       reactivated: ad.status === 'completed'
     })
-
-  } catch (error) {
-    console.error('[Ads Extend] Error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

@@ -1,12 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * Debug endpoint to assign a specific ad to a issue for testing
  * Does NOT update ad usage statistics
  */
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(campaign)/assign-test-ad' },
+  async ({ request, logger }) => {
     const body = await request.json()
     const { issueId, adId } = body
 
@@ -87,11 +89,5 @@ export async function POST(request: NextRequest) {
         adId
       })
     }
-  } catch (error) {
-    console.error('Error assigning test ad:', error)
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET /api/text-box-modules - List text box modules for a publication
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'text-box-modules' },
+  async ({ request }) => {
     const { searchParams } = new URL(request.url)
     const publicationId = searchParams.get('publicationId') || searchParams.get('publication_id')
 
@@ -39,21 +41,15 @@ export async function GET(request: NextRequest) {
       success: true,
       modules: sortedModules
     })
-
-  } catch (error: any) {
-    console.error('[TextBoxModules] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch text box modules', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST /api/text-box-modules - Create a new text box module
  */
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'text-box-modules' },
+  async ({ request }) => {
     const body = await request.json()
     const { name, showName, displayOrder, isActive, config } = body
     // Accept both camelCase and snake_case for publication ID
@@ -107,22 +103,16 @@ export async function POST(request: NextRequest) {
       success: true,
       module
     })
-
-  } catch (error: any) {
-    console.error('[TextBoxModules] Failed to create:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create text box module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/text-box-modules - Bulk update display_order for multiple modules
  * Body: { modules: [{ id: string, display_order: number }] }
  */
-export async function PATCH(request: NextRequest) {
-  try {
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'text-box-modules' },
+  async ({ request }) => {
     const body = await request.json()
     const { modules } = body
 
@@ -155,12 +145,5 @@ export async function PATCH(request: NextRequest) {
       success: true,
       updated: modules.length
     })
-
-  } catch (error: any) {
-    console.error('[TextBoxModules] Failed to update order:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update module order', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

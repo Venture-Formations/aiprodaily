@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { GoogleVisionService } from '@/lib/google-vision'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-vision-simple' },
+  async ({ logger }) => {
   try {
     console.log('=== Simple Google Vision Test ===')
 
@@ -58,4 +61,5 @@ export async function GET(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error'
     })
   }
-}
+  }
+)

@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { openai, AI_PROMPTS } from '@/lib/openai'
 import { ImageAnalysisResult, ImageTag } from '@/types/database'
 import { SupabaseImageStorage } from '@/lib/supabase-image-storage'
 import sharp from 'sharp'
+import { withApiHandler } from '@/lib/api-handler'
 
 interface IngestRequest {
   image_id: string
@@ -13,8 +14,9 @@ interface IngestRequest {
   location?: string
 }
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'images/ingest' },
+  async ({ request }) => {
     const body: IngestRequest = await request.json()
     const { image_id, source_url, license, credit, location } = body
 
@@ -104,8 +106,6 @@ export async function POST(request: NextRequest) {
       }
 
       // Extract image dimensions from the image file
-      // Note: In a real implementation, you'd want to get these from the actual image
-      // For now, we'll use placeholder values that should be replaced with actual image analysis
       const width = 1920 // Placeholder - should be extracted from image
       const height = 1080 // Placeholder - should be extracted from image
       const aspectRatio = width / height
@@ -288,12 +288,5 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
-
-  } catch (error) {
-    console.error('Image ingest API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
   }
-}
+)

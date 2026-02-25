@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { callAIWithPrompt } from '@/lib/openai'
 
 /**
@@ -8,7 +9,9 @@ import { callAIWithPrompt } from '@/lib/openai'
  * POST /api/debug/test-ai-criteria
  * Body: { criterion: 1, title: "...", description: "...", content: "..." }
  */
-export async function POST(request: NextRequest) {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-ai-criteria' },
+  async ({ request, logger }) => {
   try {
     const body = await request.json()
     const { criterion = 1, publication_id, title = 'Test Article Title', description = 'Test description', content = 'Test article content here...' } = body
@@ -83,12 +86,15 @@ export async function POST(request: NextRequest) {
       stack: error instanceof Error ? error.stack : undefined
     }, { status: 500 })
   }
-}
+  }
+)
 
 /**
  * GET endpoint with sample data for quick testing
  */
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-ai-criteria' },
+  async ({ request, logger }) => {
   const searchParams = request.nextUrl.searchParams
   const criterion = parseInt(searchParams.get('criterion') || '1')
   const publication_id = searchParams.get('publication_id')
@@ -143,5 +149,6 @@ export async function GET(request: NextRequest) {
       input: sampleData
     }, { status: 500 })
   }
-}
+  }
+)
 

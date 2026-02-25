@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { PUBLICATION_ID } from '@/lib/config'
 
@@ -10,8 +11,9 @@ import { PUBLICATION_ID } from '@/lib/config'
  *
  * Query params: ref_code, start (YYYY-MM-DD), end (YYYY-MM-DD)
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'sparkloop/admin/submissions' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const refCode = searchParams.get('ref_code')
     const start = searchParams.get('start')
@@ -63,18 +65,12 @@ export async function GET(request: NextRequest) {
       else bucket.pending++
     }
 
-    console.log(`[SparkLoop Admin] Submissions for ${refCode} (${start} to ${end}): ${referrals?.length || 0} total`)
+    logger.info({ refCode, start, end, total: referrals?.length || 0 }, 'Submissions query completed')
 
     return NextResponse.json({
       success: true,
       referrals: referrals || [],
       summary,
     })
-  } catch (error) {
-    console.error('[SparkLoop Admin] Submissions query failed:', error)
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

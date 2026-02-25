@@ -1,15 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/newsletter-sections' },
+  async () => {
     // Fetch all newsletter sections ordered by display_order
     const { data: sections, error } = await supabaseAdmin
       .from('newsletter_sections')
@@ -23,23 +18,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       sections: sections || []
     })
-
-  } catch (error) {
-    console.error('Failed to fetch newsletter sections:', error)
-    return NextResponse.json({
-      error: 'Failed to fetch newsletter sections',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
-export async function PATCH(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/newsletter-sections' },
+  async ({ request }) => {
     const body = await request.json()
 
     // Handle section order updates
@@ -117,23 +101,12 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({
       error: 'Invalid request body. Expected sections array or section_id with is_active.'
     }, { status: 400 })
-
-  } catch (error) {
-    console.error('Failed to update newsletter sections:', error)
-    return NextResponse.json({
-      error: 'Failed to update newsletter sections',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
-export async function DELETE(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/newsletter-sections' },
+  async ({ request }) => {
     const { searchParams } = new URL(request.url)
     const sectionId = searchParams.get('id')
 
@@ -164,23 +137,12 @@ export async function DELETE(request: NextRequest) {
       success: true,
       message: `Section "${section?.name || sectionId}" deleted successfully`
     })
-
-  } catch (error) {
-    console.error('Failed to delete newsletter section:', error)
-    return NextResponse.json({
-      error: 'Failed to delete newsletter section',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/newsletter-sections' },
+  async ({ request }) => {
     const body = await request.json()
     const { name, display_order = 999, is_active = true } = body
 
@@ -223,12 +185,5 @@ export async function POST(request: NextRequest) {
       section: newSection,
       message: 'Newsletter section created successfully'
     })
-
-  } catch (error) {
-    console.error('Failed to create newsletter section:', error)
-    return NextResponse.json({
-      error: 'Failed to create newsletter section',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

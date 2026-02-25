@@ -1,26 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-
-type RouteParams = {
-  params: Promise<{
-    id: string
-  }>
-}
 
 /**
  * GET - Fetch a single RSS feed
  */
-export async function GET(request: NextRequest, props: RouteParams) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const params = await props.params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'rss-feeds/[id]' },
+  async ({ params }) => {
     const { id } = params
 
     const { data: feed, error } = await supabaseAdmin
@@ -42,28 +29,15 @@ export async function GET(request: NextRequest, props: RouteParams) {
       success: true,
       feed
     })
-
-  } catch (error) {
-    console.error('Get RSS feed error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH - Update an RSS feed
  */
-export async function PATCH(request: NextRequest, props: RouteParams) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const params = await props.params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'rss-feeds/[id]' },
+  async ({ params, request }) => {
     const { id } = params
     const body = await request.json()
 
@@ -96,28 +70,15 @@ export async function PATCH(request: NextRequest, props: RouteParams) {
       message: 'RSS feed updated successfully',
       feed
     })
-
-  } catch (error) {
-    console.error('Update RSS feed error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * DELETE - Delete an RSS feed
  */
-export async function DELETE(request: NextRequest, props: RouteParams) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const params = await props.params
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'rss-feeds/[id]' },
+  async ({ params }) => {
     const { id } = params
 
     const { error } = await supabaseAdmin
@@ -134,12 +95,5 @@ export async function DELETE(request: NextRequest, props: RouteParams) {
       success: true,
       message: 'RSS feed deleted successfully'
     })
-
-  } catch (error) {
-    console.error('Delete RSS feed error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(rss)/trace-rss-processing' },
+  async ({ logger }) => {
   try {
     console.log('=== RSS Processing Trace Started ===')
 
@@ -116,4 +119,5 @@ export async function GET() {
       { status: 500 }
     )
   }
-}
+  }
+)

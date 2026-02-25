@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { withApiHandler } from '@/lib/api-handler';
 import { createClient } from '@supabase/supabase-js';
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'public', logContext: 'databases-stats' },
+  async ({ request, logger }) => {
     const supabase = createClient(
       process.env.SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -87,11 +89,5 @@ export async function GET(request: NextRequest) {
     ];
 
     return NextResponse.json({ databases });
-  } catch (error: any) {
-    console.error('[API] Database stats error:', error.message);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
   }
-}
+);

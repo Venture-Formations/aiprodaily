@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-upload-url' },
+  async ({ logger }) => {
   try {
     console.log('Testing upload URL generation...')
 
@@ -39,4 +42,5 @@ export async function GET(request: NextRequest) {
       details: error instanceof Error ? error.message : error
     }, { status: 500 })
   }
-}
+  }
+)

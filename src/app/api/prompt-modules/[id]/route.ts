@@ -1,18 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-type RouteParams = Promise<{ id: string }>
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET /api/prompt-modules/[id] - Get specific prompt module
  */
-export async function GET(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id } = params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'prompt-modules/[id]' },
+  async ({ params }) => {
+    const id = params.id
 
     const { data: module, error } = await supabaseAdmin
       .from('prompt_modules')
@@ -34,26 +30,16 @@ export async function GET(
       success: true,
       module
     })
-
-  } catch (error: any) {
-    console.error('[PromptModules] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch prompt module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/prompt-modules/[id] - Update prompt module
  */
-export async function PATCH(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id } = params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'prompt-modules/[id]' },
+  async ({ params, request }) => {
+    const id = params.id
     const body = await request.json()
 
     // Build update object, only including provided fields
@@ -87,27 +73,17 @@ export async function PATCH(
       success: true,
       module
     })
-
-  } catch (error: any) {
-    console.error('[PromptModules] Failed to update:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update prompt module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * DELETE /api/prompt-modules/[id] - Delete prompt module
  * Note: issue_prompt_modules entries will be deleted via CASCADE
  */
-export async function DELETE(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id } = params
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'prompt-modules/[id]' },
+  async ({ params }) => {
+    const id = params.id
 
     // First, get module info for logging
     const { data: module } = await supabaseAdmin
@@ -130,12 +106,5 @@ export async function DELETE(
       success: true,
       message: 'Prompt module deleted successfully'
     })
-
-  } catch (error: any) {
-    console.error('[PromptModules] Failed to delete:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete prompt module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

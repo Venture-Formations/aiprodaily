@@ -1,17 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { PUBLICATION_ID } from '@/lib/config'
 
 // GET - Fetch a single entitlement by ID
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'tools/entitlements/[id]' },
+  async ({ params }) => {
+    const id = params.id
 
-  try {
     const { data: entitlement, error } = await supabaseAdmin
       .from('customer_entitlements')
       .select(`
@@ -26,7 +23,6 @@ export async function GET(
       if (error.code === 'PGRST116') {
         return NextResponse.json({ error: 'Entitlement not found' }, { status: 404 })
       }
-      console.error('[Entitlements] Error fetching entitlement:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
@@ -37,28 +33,14 @@ export async function GET(
         quantity_remaining: entitlement.quantity_total - entitlement.quantity_used
       }
     })
-  } catch (error) {
-    console.error('[Entitlements] Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)
 
 // PUT - Update an entitlement (status, quantity, etc.)
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params
-
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  if ((session.user as any).role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
-  try {
+export const PUT = withApiHandler(
+  { authTier: 'admin', logContext: 'tools/entitlements/[id]' },
+  async ({ params, request, logger }) => {
+    const id = params.id
     const body = await request.json()
 
     // Build update object with only provided fields
@@ -107,35 +89,22 @@ export async function PUT(
       if (error.code === 'PGRST116') {
         return NextResponse.json({ error: 'Entitlement not found' }, { status: 404 })
       }
-      console.error('[Entitlements] Error updating entitlement:', error)
+      logger.error({ err: error }, 'Error updating entitlement')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log('[Entitlements] Entitlement updated:', id)
+    logger.info({ entitlementId: id }, 'Entitlement updated')
 
     return NextResponse.json({ success: true, entitlement: updatedEntitlement })
-  } catch (error) {
-    console.error('[Entitlements] Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)
 
 // DELETE - Delete an entitlement
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params
+export const DELETE = withApiHandler(
+  { authTier: 'admin', logContext: 'tools/entitlements/[id]' },
+  async ({ params, logger }) => {
+    const id = params.id
 
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  if ((session.user as any).role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
-  try {
     const { error } = await supabaseAdmin
       .from('customer_entitlements')
       .delete()
@@ -143,15 +112,12 @@ export async function DELETE(
       .eq('publication_id', PUBLICATION_ID)
 
     if (error) {
-      console.error('[Entitlements] Error deleting entitlement:', error)
+      logger.error({ err: error }, 'Error deleting entitlement')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log('[Entitlements] Entitlement deleted:', id)
+    logger.info({ entitlementId: id }, 'Entitlement deleted')
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('[Entitlements] Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)

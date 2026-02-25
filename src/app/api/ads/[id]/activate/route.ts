@@ -1,12 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await context.params
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'ads/[id]/activate' },
+  async ({ params }) => {
+    const id = params.id
 
     // Get all active ads to determine next display_order
     const { data: activeAds, error: fetchError } = await supabaseAdmin
@@ -37,11 +36,5 @@ export async function POST(
     if (error) throw error
 
     return NextResponse.json({ success: true, display_order: nextOrder })
-  } catch (error) {
-    console.error('Activate error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to activate ad' },
-      { status: 500 }
-    )
   }
-}
+)

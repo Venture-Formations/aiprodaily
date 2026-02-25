@@ -1,16 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    console.log('Analyzing newsletter sections for duplicates...')
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/cleanup-duplicate-sections' },
+  async ({ logger }) => {
+    logger.info('Analyzing newsletter sections for duplicates...')
 
     // Get all sections
     const { data: allSections, error: fetchError } = await supabaseAdmin
@@ -61,7 +56,6 @@ export async function GET(request: NextRequest) {
       const expectedOrder = expectedSections[name as keyof typeof expectedSections]
 
       if (expectedOrder) {
-        // Keep the one with the correct display order, or the first one if none match
         const correctSection = sections.find(s => s.display_order === expectedOrder)
         const sectionToKeep = correctSection || sections[0]
         const sectionsToDelete = sections.filter(s => s.id !== sectionToKeep.id)
@@ -69,7 +63,6 @@ export async function GET(request: NextRequest) {
         analysis.sectionsToKeep.push(sectionToKeep)
         analysis.sectionsToDelete.push(...sectionsToDelete)
       } else {
-        // Unknown section - keep the first one
         analysis.sectionsToKeep.push(sections[0])
         analysis.sectionsToDelete.push(...sections.slice(1))
       }
@@ -80,27 +73,16 @@ export async function GET(request: NextRequest) {
       message: 'Newsletter sections analysis completed',
       analysis
     })
-
-  } catch (error) {
-    console.error('Cleanup analysis error:', error)
-    return NextResponse.json({
-      error: 'Analysis failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    console.log('Cleaning up duplicate newsletter sections...')
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/cleanup-duplicate-sections' },
+  async ({ request, logger }) => {
+    logger.info('Cleaning up duplicate newsletter sections...')
 
     // First run the analysis to determine what to delete
-    const analysisResponse = await GET(request)
+    const analysisResponse = await GET(request, { params: Promise.resolve({}) })
     const analysisData = await analysisResponse.json()
 
     if (!analysisData.success) {
@@ -120,7 +102,7 @@ export async function POST(request: NextRequest) {
     // Delete duplicate sections
     let deletedCount = 0
     for (const section of sectionsToDelete) {
-      console.log(`Deleting duplicate section: ${section.name} (ID: ${section.id}, Order: ${section.display_order})`)
+      logger.info(`Deleting duplicate section: ${section.name} (ID: ${section.id}, Order: ${section.display_order})`)
 
       const { error } = await supabaseAdmin
         .from('newsletter_sections')
@@ -128,7 +110,7 @@ export async function POST(request: NextRequest) {
         .eq('id', section.id)
 
       if (error) {
-        console.error(`Error deleting section ${section.id}:`, error.message)
+        logger.error(`Error deleting section ${section.id}: ${error.message}`)
       } else {
         deletedCount++
       }
@@ -150,12 +132,5 @@ export async function POST(request: NextRequest) {
       deletedCount,
       finalSections: finalSections || []
     })
-
-  } catch (error) {
-    console.error('Cleanup error:', error)
-    return NextResponse.json({
-      error: 'Cleanup failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

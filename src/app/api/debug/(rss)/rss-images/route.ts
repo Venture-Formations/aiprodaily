@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(rss)/rss-images' },
+  async ({ logger }) => {
   try {
     console.log('=== RSS IMAGES DEBUG ===')
 
@@ -63,4 +66,5 @@ export async function GET(request: NextRequest) {
       debug: 'Failed to query database'
     }, { status: 500 })
   }
-}
+  }
+)

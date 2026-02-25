@@ -1,15 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'dining/upload-csv' },
+  async ({ request, logger }) => {
     const formData = await request.formData()
     const file = formData.get('file') as File
 
@@ -189,12 +184,8 @@ export async function POST(request: NextRequest) {
       message: 'CSV upload completed',
       results
     })
-
-  } catch (error) {
-    console.error('CSV upload error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)
 
 // Helper function to parse CSV line with proper comma handling
 function parseCSVLine(line: string): string[] {

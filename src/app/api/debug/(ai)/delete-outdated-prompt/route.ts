@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST() {
-  try {
-    console.log('Deleting outdated ai_prompt_newsletter_writer from database...')
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(ai)/delete-outdated-prompt' },
+  async ({ logger }) => {
+    logger.info('Deleting outdated ai_prompt_newsletter_writer from database...')
 
     const { error } = await supabaseAdmin
       .from('app_settings')
@@ -21,12 +23,5 @@ export async function POST() {
       success: true,
       message: 'Deleted ai_prompt_newsletter_writer - will now use code fallback'
     })
-
-  } catch (error) {
-    console.error('Delete prompt error:', error)
-    return NextResponse.json({
-      error: 'Failed to delete prompt',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

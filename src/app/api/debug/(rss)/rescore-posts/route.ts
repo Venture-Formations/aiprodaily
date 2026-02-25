@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { callAIWithPrompt } from '@/lib/openai'
 
@@ -33,7 +34,9 @@ interface CriteriaScore {
  * - dry_run: boolean (optional, default: true) - if true, don't actually update
  * - limit: number (optional, default: 50) - max posts to process
  */
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(rss)/rescore-posts' },
+  async ({ request, logger }) => {
   const { searchParams } = new URL(request.url)
   const since = searchParams.get('since')
   const publicationId = searchParams.get('publication_id')
@@ -269,4 +272,5 @@ export async function GET(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

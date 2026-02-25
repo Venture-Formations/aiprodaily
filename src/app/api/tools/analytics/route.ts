@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { PUBLICATION_ID } from '@/lib/config'
 
@@ -14,14 +13,9 @@ import { PUBLICATION_ID } from '@/lib/config'
  * - tool_id: Filter by specific tool (optional)
  * - category_slug: Filter by category (optional)
  */
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'tools/analytics' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const days = parseInt(searchParams.get('days') || '30')
     const clickTypeFilter = searchParams.get('click_type')
@@ -33,7 +27,7 @@ export async function GET(request: NextRequest) {
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
 
-    console.log(`[Tools Analytics] Fetching analytics for last ${days} days`)
+    logger.info({ days }, '[Tools Analytics] Fetching analytics')
 
     // Build the query
     let query = supabaseAdmin
@@ -65,7 +59,7 @@ export async function GET(request: NextRequest) {
       const { data: clicks, error } = await query.range(offset, offset + BATCH_SIZE - 1)
 
       if (error) {
-        console.error('[Tools Analytics] Error fetching clicks:', error)
+        logger.error({ err: error }, '[Tools Analytics] Error fetching clicks')
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
 
@@ -78,7 +72,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log(`[Tools Analytics] Fetched ${allClicks.length} clicks`)
+    logger.info({ count: allClicks.length }, '[Tools Analytics] Fetched clicks')
 
     // Calculate total clicks
     const totalClicks = allClicks.length
@@ -200,12 +194,5 @@ export async function GET(request: NextRequest) {
         }
       }
     })
-
-  } catch (error) {
-    console.error('[Tools Analytics] Error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

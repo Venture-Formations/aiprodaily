@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
 
@@ -8,13 +7,9 @@ import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
  * Debug endpoint to investigate feedback vote filtering
  * GET /api/debug/feedback-exclusion-debug?publication_id=...
  */
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/feedback-exclusion-debug' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const publicationId = searchParams.get('publication_id')
 
@@ -103,12 +98,5 @@ export async function GET(request: NextRequest) {
         reason: ip.reason?.substring(0, 50)
       }))
     })
-
-  } catch (error) {
-    console.error('[Debug] Feedback exclusion debug error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

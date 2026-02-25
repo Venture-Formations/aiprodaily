@@ -1,19 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-type RouteParams = Promise<{ id: string }>
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * POST /api/ad-modules/[id]/companies/reorder
  * Reorder companies (advertisers) within a module.
  * Body: { order: [{ advertiser_id: string, display_order: number }] }
  */
-export async function POST(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ad-modules/[id]/companies/reorder' },
+  async ({ params, request }) => {
     const moduleId = params.id
     const body = await request.json()
     const { order } = body
@@ -44,11 +40,5 @@ export async function POST(
     console.log(`[AdModules] Reordered ${order.length} companies in module ${moduleId}`)
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
-    console.error('[AdModules] Failed to reorder companies:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to reorder companies', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

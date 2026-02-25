@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-newsletters' },
+  async ({ request, logger }) => {
     const { data: newsletters, error } = await supabaseAdmin
       .from('publications')
       .select('*')
@@ -17,12 +19,5 @@ export async function GET(request: NextRequest) {
       count: newsletters?.length || 0,
       newsletters: newsletters || []
     })
-
-  } catch (error) {
-    console.error('Error checking newsletters:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

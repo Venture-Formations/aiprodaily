@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(ai)/check-prompt-provider' },
+  async ({ request }) => {
     const { searchParams } = new URL(request.url)
     const promptKey = searchParams.get('key') || 'ai_prompt_primary_article_title'
     const publicationSlug = searchParams.get('publication') // Optional publication slug
@@ -119,12 +121,5 @@ export async function GET(request: NextRequest) {
         ? `Falling back to app_settings. Provider auto-detected from model "${effectiveAnalysis.model}" as "${effectiveAnalysis.detectedProvider}"`
         : 'No prompt found in either table!'
     })
-
-  } catch (error) {
-    console.error('Error checking prompt provider:', error)
-    return NextResponse.json({
-      error: 'Failed to check prompt provider',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

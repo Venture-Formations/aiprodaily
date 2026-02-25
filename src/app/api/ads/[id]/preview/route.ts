@@ -1,15 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { generateAdvertorialHtml } from '@/lib/newsletter-templates'
 import { getBusinessSettings } from '@/lib/publication-settings'
 
 // GET - Generate ad preview HTML using the shared generateAdvertorialHtml function
-export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await context.params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ads/[id]/preview' },
+  async ({ params, logger }) => {
+    const id = params.id
 
     // Fetch the ad
     const { data: ad, error } = await supabaseAdmin
@@ -90,11 +89,5 @@ export async function GET(
 </html>`
 
     return NextResponse.json({ html, ad })
-  } catch (error) {
-    console.error('Failed to generate ad preview:', error)
-    return NextResponse.json({
-      error: 'Failed to generate ad preview',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

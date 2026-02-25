@@ -1,18 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-type RouteParams = Promise<{ id: string }>
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * PATCH /api/sparkloop-rec-modules/[id] - Update sparkloop rec module
  */
-export async function PATCH(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id } = params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'sparkloop-rec-modules/[id]' },
+  async ({ params, request }) => {
+    const id = params.id
     const body = await request.json()
 
     const updates: Record<string, unknown> = {
@@ -43,25 +39,16 @@ export async function PATCH(
       success: true,
       module
     })
-  } catch (error: any) {
-    console.error('[SparkLoopRecModules] Failed to update:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update sparkloop rec module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * DELETE /api/sparkloop-rec-modules/[id] - Delete sparkloop rec module
  */
-export async function DELETE(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id } = params
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'sparkloop-rec-modules/[id]' },
+  async ({ params }) => {
+    const id = params.id
 
     const { data: module } = await supabaseAdmin
       .from('sparkloop_rec_modules')
@@ -82,11 +69,5 @@ export async function DELETE(
       success: true,
       message: 'SparkLoop rec module deleted successfully'
     })
-  } catch (error: any) {
-    console.error('[SparkLoopRecModules] Failed to delete:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete sparkloop rec module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-colors' },
+  async ({ logger }) => {
     // Fetch color settings from app_settings table (global business settings)
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('app_settings')
@@ -39,11 +41,5 @@ export async function GET() {
       recommended_fix: 'Either: (1) Update app_settings values, OR (2) Modify template functions to check newsletters table',
       message: 'Your business settings show primary=#1C293D and secondary=#3370ff, but templates may be using defaults'
     })
-
-  } catch (error) {
-    return NextResponse.json({
-      error: 'Failed to check colors',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

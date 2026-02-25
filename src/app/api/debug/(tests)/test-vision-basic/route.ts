@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { ImageAnnotatorClient } from '@google-cloud/vision'
 import { GoogleAuth } from 'google-auth-library'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-vision-basic' },
+  async ({ logger }) => {
   try {
     console.log('=== Basic Vision API Test ===')
 
@@ -85,4 +88,5 @@ export async function GET(request: NextRequest) {
       stack: error instanceof Error ? error.stack : undefined
     })
   }
-}
+  }
+)

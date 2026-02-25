@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 const CRITERIA_PROMPTS = [
@@ -268,9 +269,10 @@ Response format:
   }
 ]
 
-export async function GET() {
-  try {
-    console.log('Initializing criteria scoring AI prompts...')
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(ai)/initialize-criteria-prompts' },
+  async ({ logger }) => {
+    logger.info('Initializing criteria scoring AI prompts...')
 
     const results = []
 
@@ -283,7 +285,7 @@ export async function GET() {
         .single()
 
       if (existing) {
-        console.log(`Prompt ${prompt.key} already exists, updating...`)
+        logger.info({ key: prompt.key }, 'Prompt already exists, updating...')
         const { data, error } = await supabaseAdmin
           .from('app_settings')
           .update({
@@ -296,13 +298,13 @@ export async function GET() {
           .single()
 
         if (error) {
-          console.error(`Error updating ${prompt.key}:`, error)
+          logger.error({ key: prompt.key, err: error }, 'Error updating prompt')
           results.push({ key: prompt.key, status: 'error', error: error.message })
         } else {
           results.push({ key: prompt.key, status: 'updated', name: prompt.name })
         }
       } else {
-        console.log(`Creating new prompt: ${prompt.key}`)
+        logger.info({ key: prompt.key }, 'Creating new prompt')
         const { data, error } = await supabaseAdmin
           .from('app_settings')
           .insert({
@@ -314,7 +316,7 @@ export async function GET() {
           .single()
 
         if (error) {
-          console.error(`Error creating ${prompt.key}:`, error)
+          logger.error({ key: prompt.key, err: error }, 'Error creating prompt')
           results.push({ key: prompt.key, status: 'error', error: error.message })
         } else {
           results.push({ key: prompt.key, status: 'created', name: prompt.name })
@@ -369,15 +371,5 @@ export async function GET() {
         criteria_3: 1.0
       }
     })
-
-  } catch (error) {
-    console.error('Error initializing criteria prompts:', error)
-    return NextResponse.json(
-      {
-        error: 'Failed to initialize prompts',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)

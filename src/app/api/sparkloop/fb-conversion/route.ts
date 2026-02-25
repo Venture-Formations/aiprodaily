@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { PUBLICATION_ID } from '@/lib/config'
 
@@ -13,19 +14,20 @@ import { PUBLICATION_ID } from '@/lib/config'
  *   "email": "subscriber@example.com"
  * }
  *
- * Auth: Bearer token via MAKE_WEBHOOK_SECRET env var
+ * Auth: System tier via withApiHandler + additional MAKE_WEBHOOK_SECRET check
  */
-export async function POST(request: NextRequest) {
-  // Verify auth
-  const authHeader = request.headers.get('authorization')
-  const expectedSecret = process.env.MAKE_WEBHOOK_SECRET
-  if (expectedSecret) {
-    if (!authHeader || authHeader !== `Bearer ${expectedSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+export const POST = withApiHandler(
+  { authTier: 'system', logContext: 'sparkloop/fb-conversion' },
+  async ({ request }) => {
+    // Additional auth: verify MAKE_WEBHOOK_SECRET (kept inside handler per migration notes)
+    const authHeader = request.headers.get('authorization')
+    const expectedSecret = process.env.MAKE_WEBHOOK_SECRET
+    if (expectedSecret) {
+      if (!authHeader || authHeader !== `Bearer ${expectedSecret}`) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
     }
-  }
 
-  try {
     const body = await request.json()
     const email = body.email || body.subscriber_email
 
@@ -63,11 +65,5 @@ export async function POST(request: NextRequest) {
       updated: count,
       referrals: data?.map(r => r.ref_code) || [],
     })
-  } catch (error) {
-    console.error('[SparkLoop FB] Failed:', error)
-    return NextResponse.json(
-      { error: 'Failed to update', details: error instanceof Error ? error.message : 'Unknown' },
-      { status: 500 }
-    )
   }
-}
+)

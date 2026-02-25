@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import { FeedbackModuleSelector } from '@/lib/feedback-modules'
+import { withApiHandler } from '@/lib/api-handler'
 
 export const maxDuration = 30
 
@@ -9,9 +8,9 @@ export const maxDuration = 30
 const STAGING_USER_ID = '00000000-0000-0000-0000-000000000001'
 
 // POST /api/feedback-modules/comments/read - Mark comment(s) as read
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'feedback-modules/comments/read' },
+  async ({ request, session }) => {
     // Use session user ID or fallback to staging user for unauthenticated access
     const userId = session?.user?.id || STAGING_USER_ID
 
@@ -55,19 +54,13 @@ export async function POST(request: NextRequest) {
       count: idsToMark.length,
       errors: errors.length > 0 ? errors : undefined
     })
-  } catch (error) {
-    console.error('[FeedbackComments] Error marking as read:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to mark as read' },
-      { status: 500 }
-    )
   }
-}
+)
 
 // DELETE /api/feedback-modules/comments/read - Mark comment(s) as unread
-export async function DELETE(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'feedback-modules/comments/read' },
+  async ({ request, session }) => {
     // Use session user ID or fallback to staging user for unauthenticated access
     const userId = session?.user?.id || STAGING_USER_ID
 
@@ -90,11 +83,5 @@ export async function DELETE(request: NextRequest) {
       success: result.success,
       error: result.error
     })
-  } catch (error) {
-    console.error('[FeedbackComments] Error marking as unread:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to mark as unread' },
-      { status: 500 }
-    )
   }
-}
+)

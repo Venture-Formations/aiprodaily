@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const sessionId = searchParams.get('session_id')
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-webhook-logs' },
+  async ({ request, logger }) => {
+    const { searchParams } = new URL(request.url)
+    const sessionId = searchParams.get('session_id')
 
-  try {
     if (!sessionId) {
       return NextResponse.json({
         error: 'Please provide ?session_id=cs_...'
@@ -43,22 +45,15 @@ export async function GET(request: Request) {
       events_error: eventsError?.message || null,
       environment_variables: envVars,
       diagnosis: !pending
-        ? '❌ No pending submission found - checkout may have failed or session ID is wrong'
+        ? 'No pending submission found - checkout may have failed or session ID is wrong'
         : pending.processed
-          ? '✅ Already processed successfully'
-          : '⚠️ Pending submission exists but not processed - webhook likely failed',
+          ? 'Already processed successfully'
+          : 'Pending submission exists but not processed - webhook likely failed',
       next_steps: !pending
-        ? 'Check Stripe Dashboard → Payments to verify payment succeeded'
+        ? 'Check Stripe Dashboard > Payments to verify payment succeeded'
         : !pending.processed
           ? 'Check Vercel logs for webhook errors. Try manually resending webhook from Stripe Dashboard.'
           : 'Everything looks good!'
     })
-
-  } catch (error) {
-    console.error('Check webhook logs error:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

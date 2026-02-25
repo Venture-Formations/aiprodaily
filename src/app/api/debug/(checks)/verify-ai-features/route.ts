@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * Debug endpoint to verify AI features database setup
  * GET /api/debug/verify-ai-features
  */
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/verify-ai-features' },
+  async ({ logger }) => {
     const results: any = {
       timestamp: new Date().toISOString(),
       tables: {},
@@ -76,12 +78,5 @@ export async function GET() {
       : 'Some AI feature tables are missing.'
 
     return NextResponse.json(results)
-
-  } catch (error: any) {
-    return NextResponse.json({
-      status: 'ERROR',
-      error: error.message,
-      timestamp: new Date().toISOString()
-    }, { status: 500 })
   }
-}
+)

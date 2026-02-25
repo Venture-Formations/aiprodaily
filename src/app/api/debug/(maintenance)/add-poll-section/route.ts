@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
-import { validateDebugAuth } from '@/lib/debug-auth'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/add-poll-section' },
+  async ({ logger }) => {
   try {
     // Check if Poll section already exists
     const { data: existing } = await supabaseAdmin
@@ -50,4 +52,5 @@ export async function GET() {
       { status: 500 }
     )
   }
-}
+  }
+)

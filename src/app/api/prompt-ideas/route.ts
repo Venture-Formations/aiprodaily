@@ -1,29 +1,29 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // GET - List all prompt ideas
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'prompt-ideas' },
+  async ({ logger }) => {
     const { data: prompts, error } = await supabaseAdmin
       .from('prompt_ideas')
       .select('*')
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Error fetching prompt ideas:', error)
+      logger.error({ err: error }, 'Error fetching prompt ideas')
       return NextResponse.json({ error: 'Failed to fetch prompt ideas' }, { status: 500 })
     }
 
     return NextResponse.json({ prompts: prompts || [] })
-  } catch (error) {
-    console.error('Prompt ideas GET error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)
 
 // POST - Create new prompt idea
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'prompt-ideas' },
+  async ({ request, logger }) => {
     const body = await request.json()
 
     // Get accounting newsletter ID
@@ -56,13 +56,10 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Error creating prompt idea:', error)
+      logger.error({ err: error }, 'Error creating prompt idea')
       return NextResponse.json({ error: 'Failed to create prompt idea' }, { status: 500 })
     }
 
     return NextResponse.json({ prompt }, { status: 201 })
-  } catch (error) {
-    console.error('Prompt ideas POST error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)

@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SendGridService } from '@/lib/sendgrid'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'public', logContext: 'feedback-track' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const date = searchParams.get('date')
     const choice = searchParams.get('choice')
@@ -105,9 +107,5 @@ export async function GET(request: NextRequest) {
 
     console.log('Feedback processing complete, redirecting to thank you page')
     return NextResponse.redirect(thankYouUrl)
-
-  } catch (error) {
-    console.error('Feedback tracking error:', error)
-    return NextResponse.redirect(new URL('/feedback/error?reason=server-error', request.url))
   }
-}
+)

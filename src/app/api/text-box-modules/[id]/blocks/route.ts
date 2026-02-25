@@ -1,16 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-interface RouteContext {
-  params: Promise<{ id: string }>
-}
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET /api/text-box-modules/[id]/blocks - Get all blocks for a module
  */
-export async function GET(request: NextRequest, context: RouteContext) {
-  try {
-    const { id } = await context.params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'text-box-modules/[id]/blocks' },
+  async ({ params }) => {
+    const id = params.id
 
     const { data: blocks, error } = await supabaseAdmin
       .from('text_box_blocks')
@@ -24,22 +22,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
       success: true,
       blocks: blocks || []
     })
-
-  } catch (error: any) {
-    console.error('[TextBoxBlocks] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch blocks', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST /api/text-box-modules/[id]/blocks - Create a new block
  */
-export async function POST(request: NextRequest, context: RouteContext) {
-  try {
-    const { id: moduleId } = await context.params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'text-box-modules/[id]/blocks' },
+  async ({ params, request }) => {
+    const moduleId = params.id
     const body = await request.json()
 
     // Accept both camelCase and snake_case parameter names
@@ -119,23 +111,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
       success: true,
       block
     })
-
-  } catch (error: any) {
-    console.error('[TextBoxBlocks] Failed to create:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create block', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/text-box-modules/[id]/blocks - Reorder blocks
  * Body: { order: [{ id: string, display_order: number }] }
  */
-export async function PATCH(request: NextRequest, context: RouteContext) {
-  try {
-    const { id: moduleId } = await context.params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'text-box-modules/[id]/blocks' },
+  async ({ params, request }) => {
+    const moduleId = params.id
     const body = await request.json()
     const { order } = body
 
@@ -173,12 +159,5 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       success: true,
       blocks: blocks || []
     })
-
-  } catch (error: any) {
-    console.error('[TextBoxBlocks] Failed to reorder:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to reorder blocks', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

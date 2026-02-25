@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { ScheduleChecker } from '@/lib/schedule-checker'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-campaign-schedule' },
+  async ({ request, logger }) => {
     console.log('=== issue SCHEDULE DEBUG ===')
 
     // TODO: This legacy route should be deprecated in favor of trigger-workflow
@@ -90,10 +92,5 @@ export async function GET(request: NextRequest) {
       } : null,
       issueError: issueError?.message
     })
-  } catch (error) {
-    console.error('Debug error:', error)
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

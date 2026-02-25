@@ -1,22 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { SupabaseImageStorage } from '@/lib/supabase-image-storage'
 
 /**
  * Upload manual article image to Supabase Storage (optimized via Tinify)
  * POST /api/databases/manual-articles/upload-image
  */
-export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) {
-    return NextResponse.json(
-      { error: 'Unauthorized. Please log in to upload images.' },
-      { status: 401 }
-    )
-  }
-
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'databases/manual-articles/upload-image' },
+  async ({ request, logger }) => {
     const formData = await request.formData()
     const imageFile = formData.get('image') as File
 
@@ -55,12 +47,5 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ url: imageUrl })
-
-  } catch (error) {
-    console.error('[Upload] Manual article image error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to upload image' },
-      { status: 500 }
-    )
   }
-}
+)

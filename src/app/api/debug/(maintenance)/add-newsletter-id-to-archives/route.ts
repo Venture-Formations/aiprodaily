@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/add-newsletter-id-to-archives' },
+  async ({ logger }) => {
   try {
     console.log('[MIGRATION] Checking if publication_id column exists...')
 
@@ -64,4 +67,5 @@ ON archived_newsletters(publication_id);`
       details: error.message
     }, { status: 500 })
   }
-}
+  }
+)

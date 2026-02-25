@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 
 export const maxDuration = 600
 
-export async function GET() {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-simple-deduper' },
+  async ({ logger }) => {
   try {
     // Test with the three fire department articles
     const testPosts = [
@@ -83,4 +86,5 @@ export async function GET() {
       stack: error instanceof Error ? error.stack : undefined
     }, { status: 500 })
   }
-}
+  }
+)

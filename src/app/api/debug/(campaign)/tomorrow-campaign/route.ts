@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(campaign)/tomorrow-campaign' },
+  async () => {
     // Get tomorrow's date
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
@@ -71,12 +73,5 @@ export async function GET(request: NextRequest) {
         'No active articles found' :
         'issue appears ready for creation'
     })
-
-  } catch (error) {
-    console.error('Tomorrow issue debug error:', error)
-    return NextResponse.json({
-      debug: 'Tomorrow issue Check',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

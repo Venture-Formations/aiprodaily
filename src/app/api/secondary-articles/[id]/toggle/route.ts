@@ -1,19 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: articleId } = await params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'secondary-articles/[id]/toggle' },
+  async ({ request, params, session }) => {
+    const articleId = params.id
     const body = await request.json()
     const { is_active } = body
 
@@ -89,12 +81,5 @@ export async function POST(
         is_active
       }
     })
-
-  } catch (error) {
-    console.error('Secondary article toggle failed:', error)
-    return NextResponse.json({
-      error: 'Failed to toggle secondary article',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

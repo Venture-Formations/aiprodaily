@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { ImageSearchFilters } from '@/types/database'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'images' },
+  async ({ request }) => {
     const { searchParams } = new URL(request.url)
 
     // Parse search filters from query params
@@ -82,12 +84,5 @@ export async function GET(request: NextRequest) {
       images: images || [],
       count: images?.length || 0
     })
-
-  } catch (error) {
-    console.error('Images API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
   }
-}
+)

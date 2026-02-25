@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-checkout' },
+  async ({ logger }) => {
   const results: any = {
     timestamp: new Date().toISOString(),
     checks: {}
@@ -72,4 +75,5 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json(results, { status: 200 })
-}
+  }
+)

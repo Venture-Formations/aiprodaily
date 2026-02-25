@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(integrations)/oauth-config' },
+  async ({ request, logger }) => {
   try {
     const url = new URL(request.url)
     const userAgent = request.headers.get('user-agent') || 'Unknown'
@@ -38,4 +41,5 @@ export async function GET(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

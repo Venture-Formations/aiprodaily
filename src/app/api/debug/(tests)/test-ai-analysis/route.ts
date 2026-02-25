@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { openai, AI_PROMPTS } from '@/lib/openai'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-ai-analysis' },
+  async ({ logger }) => {
   try {
     console.log('Testing AI analysis...')
 
@@ -119,4 +122,5 @@ export async function GET(request: NextRequest) {
       details: error instanceof Error ? error.message : error
     }, { status: 500 })
   }
-}
+  }
+)

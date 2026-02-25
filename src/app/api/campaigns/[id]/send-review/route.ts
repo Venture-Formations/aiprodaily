@@ -1,23 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SendGridService } from '@/lib/sendgrid'
-import { authOptions } from '@/lib/auth'
+import { withApiHandler } from '@/lib/api-handler'
 
-interface RouteParams {
-  params: Promise<{
-    id: string
-  }>
-}
-
-export async function POST(request: NextRequest, { params }: RouteParams) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id } = await params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/send-review' },
+  async ({ params, session, request }) => {
+    const id = params.id
     const body = await request.json().catch(() => ({}))
     const forcedSubjectLine = body.force_subject_line
 
@@ -108,10 +97,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         .eq('id', activeArticles[i].id)
 
       if (updateError) {
-        console.error(`❌ Failed to update review position for article ${activeArticles[i].id}:`, updateError)
+        console.error(`Failed to update review position for article ${activeArticles[i].id}:`, updateError)
         positionErrors.push(`Article ${activeArticles[i].id}: ${updateError.message}`)
       } else {
-        console.log(`✅ Set review position ${position} for article: ${activeArticles[i].headline}`)
+        console.log(`Set review position ${position} for article: ${activeArticles[i].headline}`)
       }
     }
 
@@ -124,10 +113,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         .eq('id', activeManualArticles[i].id)
 
       if (updateError) {
-        console.error(`❌ Failed to update review position for manual article ${activeManualArticles[i].id}:`, updateError)
+        console.error(`Failed to update review position for manual article ${activeManualArticles[i].id}:`, updateError)
         positionErrors.push(`Manual Article ${activeManualArticles[i].id}: ${updateError.message}`)
       } else {
-        console.log(`✅ Set review position ${position} for manual article: ${activeManualArticles[i].title}`)
+        console.log(`Set review position ${position} for manual article: ${activeManualArticles[i].title}`)
       }
     }
 
@@ -189,12 +178,5 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       message: 'Review campaign sent successfully via SendGrid',
       sendgrid_campaign_id: result.campaignId
     })
-
-  } catch (error) {
-    console.error('Failed to send review issue:', error)
-    return NextResponse.json({
-      error: 'Failed to send review issue',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

@@ -1,7 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/env-check' },
+  async ({ request, logger }) => {
     // Original env check functionality
     const hasApiKey = !!process.env.HTML_CSS_TO_IMAGE_API_KEY
     const apiKeyLength = process.env.HTML_CSS_TO_IMAGE_API_KEY?.length || 0
@@ -21,9 +23,5 @@ export async function GET(request: NextRequest) {
         `${process.env.HTML_CSS_TO_IMAGE_USER_ID.substring(0, 8)}...` :
         'Not set'
     })
-  } catch (error) {
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

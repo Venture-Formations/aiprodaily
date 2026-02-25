@@ -1,12 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * GET /api/advertisers - List advertisers
  * Query params: publication_id (required)
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'advertisers' },
+  async ({ request }) => {
     const publicationId = request.nextUrl.searchParams.get('publication_id')
 
     if (!publicationId) {
@@ -28,21 +30,15 @@ export async function GET(request: NextRequest) {
       success: true,
       advertisers: advertisers || []
     })
-
-  } catch (error: any) {
-    console.error('[Advertisers] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch advertisers', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST /api/advertisers - Create new advertiser
  */
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'advertisers' },
+  async ({ request, logger }) => {
     const body = await request.json()
 
     // Validate required fields
@@ -70,18 +66,11 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
-    console.log(`[Advertisers] Created: ${advertiser.company_name} (${advertiser.id})`)
+    logger.info({ advertiserId: advertiser.id, name: advertiser.company_name }, 'Created advertiser')
 
     return NextResponse.json({
       success: true,
       advertiser
     }, { status: 201 })
-
-  } catch (error: any) {
-    console.error('[Advertisers] Failed to create:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create advertiser', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

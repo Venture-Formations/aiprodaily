@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * Validate IP address format (IPv4 or IPv6)
@@ -32,14 +31,9 @@ function normalizeIP(ip: string): string {
  * GET - Fetch all excluded IPs for a publication
  * Query params: publication_id (required)
  */
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'polls/excluded-ips' },
+  async ({ request }) => {
     const { searchParams } = new URL(request.url)
     const publicationId = searchParams.get('publication_id')
 
@@ -65,28 +59,16 @@ export async function GET(request: NextRequest) {
       success: true,
       ips: excludedIps || []
     })
-
-  } catch (error) {
-    console.error('[Polls] Excluded IPs GET error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST - Add an IP to the exclusion list
  * Body: { publication_id, ip_address, reason? }
  */
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'polls/excluded-ips' },
+  async ({ request, session }) => {
     const body = await request.json()
     const { publication_id, ip_address, reason } = body
 
@@ -160,28 +142,16 @@ export async function POST(request: NextRequest) {
       added: inserted,
       ips: excludedIps || []
     })
-
-  } catch (error) {
-    console.error('[Polls] Excluded IPs POST error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * DELETE - Remove an IP from the exclusion list
  * Body: { publication_id, ip_address }
  */
-export async function DELETE(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'polls/excluded-ips' },
+  async ({ request }) => {
     const body = await request.json()
     const { publication_id, ip_address } = body
 
@@ -227,12 +197,5 @@ export async function DELETE(request: NextRequest) {
       message: `IP "${normalizedIP}" removed from exclusion list`,
       ips: excludedIps || []
     })
-
-  } catch (error) {
-    console.error('[Polls] Excluded IPs DELETE error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

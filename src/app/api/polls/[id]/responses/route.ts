@@ -1,14 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
+import { withApiHandler } from '@/lib/api-handler'
 
 // GET /api/polls/[id]/responses - Get responses for a poll with analytics
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'polls/[id]/responses' },
+  async ({ request, params }) => {
+    const id = params.id
     const searchParams = request.nextUrl.searchParams
     const publicationId = searchParams.get('publication_id')
 
@@ -82,22 +81,14 @@ export async function GET(
         excluded_count: (responsesRaw?.length || 0) - totalResponses
       }
     })
-  } catch (error) {
-    console.error('[Polls] Error in GET /api/polls/[id]/responses:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch poll responses' },
-      { status: 500 }
-    )
   }
-}
+)
 
 // POST /api/polls/[id]/responses - Record a poll response
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'polls/[id]/responses' },
+  async ({ request, params }) => {
+    const id = params.id
     const body = await request.json()
     const { subscriber_email, selected_option, issue_id } = body
 
@@ -160,11 +151,5 @@ export async function POST(
 
     console.log(`[Polls] Recorded response from ${subscriber_email} for poll ${id}`)
     return NextResponse.json({ response }, { status: 201 })
-  } catch (error) {
-    console.error('[Polls] Error in POST /api/polls/[id]/responses:', error)
-    return NextResponse.json(
-      { error: 'Failed to record poll response' },
-      { status: 500 }
-    )
   }
-}
+)

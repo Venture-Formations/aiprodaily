@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { newsletterArchiver } from '@/lib/newsletter-archiver'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(campaign)/archive-campaign' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const issueId = searchParams.get('issueId')
     const issueDate = searchParams.get('date')
@@ -158,12 +160,5 @@ export async function GET(request: NextRequest) {
       },
       note: 'Newsletter should now appear at /website/newsletters'
     })
-
-  } catch (error: any) {
-    console.error('[ARCHIVE] Error:', error)
-    return NextResponse.json({
-      error: 'Failed to archive issue',
-      details: error.message
-    }, { status: 500 })
   }
-}
+)

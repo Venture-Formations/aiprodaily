@@ -20,13 +20,7 @@ Related references:
 // app/api/<feature>/route.ts
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
-import { declareRoute } from '@/lib/auth-tiers'
 import { z } from 'zod'
-
-export const routeConfig = declareRoute({
-  authTier: 'authenticated',
-  description: 'Brief description of what this route does'
-})
 
 const inputSchema = z.object({
   issueId: z.string().uuid(),
@@ -63,8 +57,8 @@ export const maxDuration = 600
 ### Key practices
 - Export `maxDuration` to control Vercel runtime budget.
 - Always validate inputs with Zod schemas for request bodies.
-- Declare `routeConfig` with `declareRoute()` for documentation and future enforcement.
 - Use `requirePublicationId: true` for tenant-scoped routes.
+- For dynamic routes with `[id]`, access `params.id` from handler context.
 - The wrapper handles auth, validation errors, and unhandled exceptions automatically.
 
 ## Legacy API Route Template

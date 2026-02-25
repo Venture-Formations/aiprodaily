@@ -1,18 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-
-type RouteParams = Promise<{ id: string }>
 
 /**
  * GET /api/prompt-ideas/[id] - Get specific prompt idea
  */
-export async function GET(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id } = params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'prompt-ideas/[id]' },
+  async ({ params, logger }) => {
+    const id = params.id
 
     const { data: prompt, error } = await supabaseAdmin
       .from('prompt_ideas')
@@ -34,26 +30,16 @@ export async function GET(
       success: true,
       prompt
     })
-
-  } catch (error: any) {
-    console.error('Failed to fetch prompt idea:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch prompt idea', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/prompt-ideas/[id] - Update prompt idea
  */
-export async function PATCH(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id } = params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'prompt-ideas/[id]' },
+  async ({ params, request, logger }) => {
+    const id = params.id
     const body = await request.json()
 
     const { data: prompt, error } = await supabaseAdmin
@@ -72,26 +58,16 @@ export async function PATCH(
       success: true,
       prompt
     })
-
-  } catch (error: any) {
-    console.error('Failed to update prompt idea:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update prompt idea', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * DELETE /api/prompt-ideas/[id] - Delete prompt idea
  */
-export async function DELETE(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id } = params
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'prompt-ideas/[id]' },
+  async ({ params, logger }) => {
+    const id = params.id
 
     const { error } = await supabaseAdmin
       .from('prompt_ideas')
@@ -104,12 +80,5 @@ export async function DELETE(
       success: true,
       message: 'Prompt idea deleted successfully'
     })
-
-  } catch (error: any) {
-    console.error('Failed to delete prompt idea:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete prompt idea', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

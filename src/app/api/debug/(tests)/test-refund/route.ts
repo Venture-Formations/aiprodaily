@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-refund' },
+  async ({ request, logger }) => {
   try {
     const testMode = request.nextUrl.searchParams.get('mode') || 'dry-run'
     const checkoutSessionId = request.nextUrl.searchParams.get('session_id')
@@ -193,4 +196,5 @@ export async function GET(request: NextRequest) {
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

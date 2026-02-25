@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { SupabaseImageStorage } from '@/lib/supabase-image-storage'
 
 /**
  * Test Supabase image upload (replaces old GitHub upload test)
  */
-export async function POST(request: NextRequest) {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-github-upload' },
+  async ({ logger }) => {
   try {
     console.log('=== TESTING SUPABASE IMAGE UPLOAD ===')
 
@@ -32,4 +35,5 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     }, { status: 500 })
   }
-}
+  }
+)

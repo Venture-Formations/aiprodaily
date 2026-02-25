@@ -1,12 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id: imageId } = await params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'images/[id]' },
+  async ({ params }) => {
+    const imageId = params.id
 
     const { data: image, error } = await supabaseAdmin
       .from('images')
@@ -22,22 +21,13 @@ export async function GET(
     }
 
     return NextResponse.json(image)
-
-  } catch (error) {
-    console.error('Image get API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
   }
-}
+)
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id: imageId } = await params
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'images/[id]' },
+  async ({ params }) => {
+    const imageId = params.id
 
     // Get image data first to get the object key for storage deletion
     const { data: image, error: fetchError } = await supabaseAdmin
@@ -86,12 +76,5 @@ export async function DELETE(
       success: true,
       message: 'Image deleted successfully'
     })
-
-  } catch (error) {
-    console.error('Image delete API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
   }
-}
+)

@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'public', logContext: 'ads-verify-payment' },
+  async ({ request, logger }) => {
     const { sessionId } = await request.json()
 
     if (!sessionId) {
@@ -59,12 +61,5 @@ export async function POST(request: NextRequest) {
         status: ad.status
       }
     })
-
-  } catch (error) {
-    console.error('Payment verification failed:', error)
-    return NextResponse.json({
-      error: 'Failed to verify payment',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

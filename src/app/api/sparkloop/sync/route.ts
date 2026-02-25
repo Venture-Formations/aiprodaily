@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { SparkLoopService } from '@/lib/sparkloop-client'
 import { PUBLICATION_ID } from '@/lib/config'
 
@@ -9,21 +10,9 @@ import { PUBLICATION_ID } from '@/lib/config'
  * Updates existing records with latest data from SparkLoop
  * Can be called manually or via cron job
  */
-export async function POST(request: NextRequest) {
-  try {
-    // Verify cron secret for automated calls (skip for browser requests with cookies)
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET
-    const hasCookie = request.headers.get('cookie')
-
-    // Allow browser calls (have cookies from logged-in dashboard session)
-    // Require Bearer token for headless/cron calls
-    if (!hasCookie && process.env.NODE_ENV === 'production' && cronSecret) {
-      if (authHeader !== `Bearer ${cronSecret}`) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'system', logContext: 'sparkloop/sync' },
+  async () => {
     const service = new SparkLoopService()
     const result = await service.syncRecommendationsToDatabase(PUBLICATION_ID)
 
@@ -32,26 +21,17 @@ export async function POST(request: NextRequest) {
       ...result,
       message: `Synced ${result.synced} recommendations (${result.created} new, ${result.updated} updated, ${result.outOfBudget} auto-excluded for budget)`,
     })
-  } catch (error) {
-    console.error('[SparkLoop Sync] Failed:', error)
-
-    return NextResponse.json(
-      {
-        error: 'Sync failed',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * GET /api/sparkloop/sync
  *
  * Get sync status and last sync time
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'system', logContext: 'sparkloop/sync' },
+  async () => {
     const service = new SparkLoopService()
     const stored = await service.getStoredRecommendations(PUBLICATION_ID)
 
@@ -71,8 +51,8 @@ export async function GET(request: NextRequest) {
         publication_name: r.publication_name,
         cpa: r.cpa,
         sparkloop_rcr: r.sparkloop_rcr,
-        our_cr: r.our_cr, // Conversion Rate: submissions/impressions
-        our_rcr: r.our_rcr, // Referral Confirmation Rate: confirms/(confirms+rejections)
+        our_cr: r.our_cr,
+        our_rcr: r.our_rcr,
         impressions: r.impressions,
         selections: r.selections,
         submissions: r.submissions,
@@ -82,12 +62,5 @@ export async function GET(request: NextRequest) {
         last_synced_at: r.last_synced_at,
       })),
     })
-  } catch (error) {
-    console.error('[SparkLoop Sync] Failed to get status:', error)
-
-    return NextResponse.json(
-      { error: 'Failed to get sync status' },
-      { status: 500 }
-    )
   }
-}
+)

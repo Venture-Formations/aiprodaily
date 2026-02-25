@@ -177,7 +177,8 @@ export interface PublicationIssue {
     question: string
     options: string[]
   } | null
-  mailerlite_issue_id: string | null
+  /** MailerLite campaign ID when sent; may be on email_metrics only (not on publication_issues in all envs) */
+  mailerlite_issue_id?: string | null
   failure_alerted_at: string | null
   created_at: string
   updated_at: string

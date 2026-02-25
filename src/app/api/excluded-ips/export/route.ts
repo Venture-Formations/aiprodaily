@@ -1,21 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { parseCIDR, ipMatchesCIDR } from '@/lib/ip-utils'
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET - Export all excluded IPs with associated email addresses as CSV
  * Query params: publication_id (required)
  */
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'excluded-ips/export' },
+  async ({ request }) => {
     const { searchParams } = new URL(request.url)
     const publicationId = searchParams.get('publication_id')
 
@@ -232,15 +226,8 @@ export async function GET(request: NextRequest) {
         'Content-Disposition': `attachment; filename="excluded-ips-export-${new Date().toISOString().split('T')[0]}.csv"`
       }
     })
-
-  } catch (error) {
-    console.error('[IP Exclusion Export] Error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * Escape a value for CSV (handle commas, quotes, newlines)

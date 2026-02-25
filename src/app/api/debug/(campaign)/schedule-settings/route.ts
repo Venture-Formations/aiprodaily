@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
-
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(campaign)/schedule-settings' },
+  async () => {
     // Get all email schedule settings
     const { data: settings } = await supabaseAdmin
       .from('app_settings')
@@ -38,11 +39,5 @@ export async function GET(request: NextRequest) {
       lastRuns: lastRuns || [],
       today: new Date().toISOString().split('T')[0]
     })
-
-  } catch (error) {
-    return NextResponse.json({
-      error: 'Failed to get schedule settings',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

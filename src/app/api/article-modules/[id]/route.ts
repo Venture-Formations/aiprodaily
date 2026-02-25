@@ -1,16 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-interface RouteContext {
-  params: Promise<{ id: string }>
-}
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET /api/article-modules/[id] - Get single article module with criteria and prompts
  */
-export async function GET(request: NextRequest, context: RouteContext) {
-  try {
-    const { id } = await context.params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'article-modules/[id]' },
+  async ({ params }) => {
+    const id = params.id
 
     const { data: module, error } = await supabaseAdmin
       .from('article_modules')
@@ -36,22 +34,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
       success: true,
       module
     })
-
-  } catch (error: any) {
-    console.error('[ArticleModules] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch article module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/article-modules/[id] - Update article module
  */
-export async function PATCH(request: NextRequest, context: RouteContext) {
-  try {
-    const { id } = await context.params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'article-modules/[id]' },
+  async ({ params, request }) => {
+    const id = params.id
     const body = await request.json()
 
     // Build update object with only allowed fields
@@ -175,23 +167,17 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       module,
       adjustedIssues: adjustedIssueCount
     })
-
-  } catch (error: any) {
-    console.error('[ArticleModules] Failed to update:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update article module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * DELETE /api/article-modules/[id] - Delete article module
  * Also deletes associated criteria, prompts (via CASCADE)
  */
-export async function DELETE(request: NextRequest, context: RouteContext) {
-  try {
-    const { id } = await context.params
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'article-modules/[id]' },
+  async ({ params }) => {
+    const id = params.id
 
     // First, get the module to log info
     const { data: module } = await supabaseAdmin
@@ -227,12 +213,5 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       success: true,
       message: 'Article module deleted'
     })
-
-  } catch (error: any) {
-    console.error('[ArticleModules] Failed to delete:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete article module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

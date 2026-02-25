@@ -1,15 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai/save-prompt' },
+  async ({ session, request, logger }) => {
     const body = await request.json()
     const {
       publication_id,
@@ -46,7 +41,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('[API] Error saving prompt:', error)
+      logger.error({ err: error }, 'Error saving prompt')
       return NextResponse.json(
         { error: 'Failed to save prompt', details: error.message },
         { status: 500 }
@@ -57,14 +52,5 @@ export async function POST(request: NextRequest) {
       success: true,
       data
     })
-  } catch (error) {
-    console.error('[API] Error in save-prompt:', error)
-    return NextResponse.json(
-      {
-        error: 'Failed to save prompt',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)

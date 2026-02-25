@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { STORAGE_PUBLIC_URL } from '@/lib/config'
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'tools/upload-image' },
+  async ({ request, logger }) => {
     const fileName = request.nextUrl.searchParams.get('fileName')
 
     if (!fileName) {
@@ -30,7 +32,7 @@ export async function POST(request: NextRequest) {
       })
 
     if (error) {
-      console.error('[Upload] Supabase storage error:', error)
+      logger.error({ err: error }, '[Upload] Supabase storage error')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
@@ -42,11 +44,5 @@ export async function POST(request: NextRequest) {
       path: data.path,
       url: publicUrl
     })
-  } catch (error) {
-    console.error('[Upload] Error:', error)
-    return NextResponse.json(
-      { error: 'Failed to upload image' },
-      { status: 500 }
-    )
   }
-}
+)

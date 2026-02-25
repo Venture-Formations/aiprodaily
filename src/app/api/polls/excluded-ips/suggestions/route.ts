@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET - Get suggested IPs to exclude based on suspicious voting patterns
@@ -13,14 +12,9 @@ import { supabaseAdmin } from '@/lib/supabase'
  *
  * Query params: publication_id (required)
  */
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'polls/excluded-ips/suggestions' },
+  async ({ request }) => {
     const { searchParams } = new URL(request.url)
     const publicationId = searchParams.get('publication_id')
 
@@ -148,12 +142,5 @@ export async function GET(request: NextRequest) {
       success: true,
       suggestions
     })
-
-  } catch (error) {
-    console.error('[Polls] Excluded IPs suggestions error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

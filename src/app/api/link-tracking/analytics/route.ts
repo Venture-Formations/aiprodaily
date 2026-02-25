@@ -1,8 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * Link Click Analytics Endpoint
@@ -12,14 +11,9 @@ import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
  * - newsletter_slug: Required - Filter by publication (multi-tenant isolation)
  * - days: Number of days to look back (default: 30)
  */
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'link-tracking/analytics' },
+  async ({ request }) => {
     const { searchParams } = new URL(request.url)
     const newsletterSlug = searchParams.get('newsletter_slug')
     const days = parseInt(searchParams.get('days') || '30')
@@ -224,12 +218,5 @@ export async function GET(request: NextRequest) {
         } : null
       }
     })
-
-  } catch (error) {
-    console.error('Link click analytics error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

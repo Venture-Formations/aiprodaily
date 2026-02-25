@@ -6,11 +6,13 @@
  * This migrates the legacy AI Apps settings to the new module system.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'ai-app-modules/initialize' },
+  async ({ request, logger }) => {
     const { publication_id } = await request.json()
 
     if (!publication_id) {
@@ -60,14 +62,14 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (createError) {
-      console.error('[AI App Modules Initialize] Error creating module:', createError)
+      logger.error({ err: createError }, 'Error creating module')
       return NextResponse.json(
         { error: 'Failed to create module', details: createError.message },
         { status: 500 }
       )
     }
 
-    console.log('[AI App Modules Initialize] Created default module:', newModule.id)
+    logger.info({ moduleId: newModule.id }, 'Created default module')
 
     return NextResponse.json({
       message: 'AI App module created successfully',
@@ -78,22 +80,16 @@ export async function POST(request: NextRequest) {
         affiliate_cooldown_days: newModule.affiliate_cooldown_days
       }
     })
-
-  } catch (error) {
-    console.error('[AI App Modules Initialize] Error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * Initialize AI App modules for ALL publications
  * GET /api/ai-app-modules/initialize
  */
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'ai-app-modules/initialize' },
+  async ({ logger }) => {
     // Get all publications
     const { data: publications, error: pubError } = await supabaseAdmin
       .from('publications')
@@ -175,12 +171,5 @@ export async function GET() {
       message: 'Initialization complete',
       results
     })
-
-  } catch (error) {
-    console.error('[AI App Modules Initialize] Error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
   }
-}
+)

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AppSelector } from '@/lib/app-selector'
 import type { AIApplication } from '@/types/database'
@@ -84,7 +85,9 @@ async function simulateAppSelection(issueId: string, newsletterId: string): Prom
  * - reset: (optional) Set to 'true' to clear existing selections first
  * - dryRun: (optional) Set to 'true' to simulate without updating database
  */
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-affiliate-selection' },
+  async ({ request, logger }) => {
   try {
     const { searchParams } = new URL(request.url)
     const issueId = searchParams.get('issueId')
@@ -251,6 +254,7 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+  }
+)
 
 export const maxDuration = 600

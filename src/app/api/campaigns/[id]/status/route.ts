@@ -1,19 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
+import { withApiHandler } from '@/lib/api-handler'
 import { SlackNotificationService } from '@/lib/slack'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/status' },
+  async ({ params, session, request }) => {
     const { action } = await request.json()
 
     if (!action || action !== 'changes_made') {
@@ -22,7 +14,7 @@ export async function POST(
       }, { status: 400 })
     }
 
-    const { id: issueId } = await params
+    const issueId = params.id
 
     // Get current issue
     const { data: issue, error: issueError } = await supabaseAdmin
@@ -123,12 +115,5 @@ export async function POST(
         last_action_by: session.user?.email
       }
     })
-
-  } catch (error) {
-    console.error('issue status update failed:', error)
-    return NextResponse.json({
-      error: 'Failed to update issue status',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

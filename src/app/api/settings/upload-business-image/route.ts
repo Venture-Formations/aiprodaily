@@ -1,16 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { SupabaseImageStorage } from '@/lib/supabase-image-storage'
 import { PUBLICATION_ID } from '@/lib/config'
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/upload-business-image' },
+  async ({ request }) => {
     const formData = await request.formData()
     const file = formData.get('file') as File
     const type = formData.get('type') as string
@@ -58,12 +53,5 @@ export async function POST(request: NextRequest) {
       url: publicUrl,
       message: `${type === 'logo' ? 'Logo' : type === 'website_header' ? 'Website header' : 'Header'} image uploaded successfully`
     })
-
-  } catch (error) {
-    console.error('[Upload] Business image upload error:', error)
-    return NextResponse.json({
-      error: 'Failed to upload image',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

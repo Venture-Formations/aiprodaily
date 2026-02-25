@@ -1,19 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    console.log('[API] Session check:', session ? 'Authenticated' : 'Not authenticated')
-
-    if (!session) {
-      console.log('[API] No session found, returning 401')
-      return NextResponse.json({ error: 'Unauthorized - Please log in' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'rss/recent-posts' },
+  async ({ logger, request }) => {
     const { searchParams } = new URL(request.url)
     const newsletterId = searchParams.get('publication_id')
     const limit = parseInt(searchParams.get('limit') || '50')
@@ -22,7 +13,7 @@ export async function GET(request: NextRequest) {
     const source = searchParams.get('source') || 'recent' // 'recent' or 'sent'
     const days = parseInt(searchParams.get('days') || '5')
 
-    console.log('[API] Fetching posts for newsletter slug:', newsletterId, 'limit:', limit, 'module_id:', moduleId, 'section:', section, 'source:', source)
+    logger.info(`[API] Fetching posts for newsletter slug: ${newsletterId}, limit: ${limit}, module_id: ${moduleId}, section: ${section}, source: ${source}`)
 
     if (!newsletterId) {
       return NextResponse.json(
@@ -39,14 +30,14 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (newsletterError || !newsletter) {
-      console.error('[API] Newsletter not found for slug:', newsletterId, newsletterError)
+      logger.error({ slug: newsletterId, err: newsletterError }, '[API] Newsletter not found for slug')
       return NextResponse.json(
         { error: 'Newsletter not found' },
         { status: 404 }
       )
     }
 
-    console.log('[API] Found newsletter UUID:', newsletter.id)
+    logger.info(`[API] Found newsletter UUID: ${newsletter.id}`)
 
     // If source is 'sent', fetch posts that were actually used in sent issues
     if (source === 'sent') {
@@ -54,7 +45,7 @@ export async function GET(request: NextRequest) {
       cutoffDate.setDate(cutoffDate.getDate() - days)
       const cutoffDateStr = cutoffDate.toISOString().split('T')[0]
 
-      console.log('[API] Fetching posts from sent issues since:', cutoffDateStr, 'module_id:', moduleId)
+      logger.info(`[API] Fetching posts from sent issues since: ${cutoffDateStr}, module_id: ${moduleId}`)
 
       // First get the issue IDs that match our criteria (sent, within date range, for this publication)
       const { data: sentIssues, error: issuesError } = await supabaseAdmin
@@ -66,7 +57,7 @@ export async function GET(request: NextRequest) {
         .order('date', { ascending: false })
 
       if (issuesError) {
-        console.error('[API] Error fetching sent issues:', issuesError)
+        logger.error({ err: issuesError }, '[API] Error fetching sent issues')
         return NextResponse.json(
           { error: 'Failed to fetch sent issues', details: issuesError.message },
           { status: 500 }
@@ -74,7 +65,7 @@ export async function GET(request: NextRequest) {
       }
 
       const sentIssueIds = sentIssues?.map(i => i.id) || []
-      console.log('[API] Found', sentIssueIds.length, 'sent issues in date range')
+      logger.info(`[API] Found ${sentIssueIds.length} sent issues in date range`)
 
       if (sentIssueIds.length === 0) {
         return NextResponse.json({
@@ -118,14 +109,14 @@ export async function GET(request: NextRequest) {
       const { data: usedPosts, error: usedPostsError } = await query.limit(500)
 
       if (usedPostsError) {
-        console.error('[API] Error fetching posts from sent issues:', usedPostsError)
+        logger.error({ err: usedPostsError }, '[API] Error fetching posts from sent issues')
         return NextResponse.json(
           { error: 'Failed to fetch posts from sent issues', details: usedPostsError.message },
           { status: 500 }
         )
       }
 
-      console.log('[API] Found', usedPosts?.length || 0, 'module_articles records')
+      logger.info(`[API] Found ${usedPosts?.length || 0} module_articles records`)
 
       // Get issue dates for display
       const issuesById = new Map<string, string>()
@@ -172,7 +163,7 @@ export async function GET(request: NextRequest) {
       }
 
       const posts = Array.from(postsMap.values()).slice(0, limit)
-      console.log('[API] Found', posts.length, 'posts from sent issues')
+      logger.info(`[API] Found ${posts.length} posts from sent issues`)
 
       return NextResponse.json({
         success: true,
@@ -194,7 +185,7 @@ export async function GET(request: NextRequest) {
         .eq(sectionField, true)
 
       if (feedsError) {
-        console.error('[API] Error fetching feeds:', feedsError)
+        logger.error({ err: feedsError }, '[API] Error fetching feeds')
         return NextResponse.json(
           { error: 'Failed to fetch feeds', details: feedsError.message },
           { status: 500 }
@@ -202,10 +193,10 @@ export async function GET(request: NextRequest) {
       }
 
       feedIds = feeds ? feeds.map(f => f.id) : []
-      console.log('[API] Found', feedIds.length, section, 'feeds')
+      logger.info(`[API] Found ${feedIds.length} ${section} feeds`)
 
       if (feedIds.length === 0) {
-        console.log('[API] No', section, 'feeds found')
+        logger.info(`[API] No ${section} feeds found`)
         return NextResponse.json({
           success: true,
           posts: [],
@@ -223,7 +214,7 @@ export async function GET(request: NextRequest) {
       .limit(10) // Get last 10 issues
 
     if (issuesError) {
-      console.error('[API] Error fetching issues:', issuesError)
+      logger.error({ err: issuesError }, '[API] Error fetching issues')
       return NextResponse.json(
         { error: 'Failed to fetch issues', details: issuesError.message },
         { status: 500 }
@@ -231,7 +222,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (!issues || issues.length === 0) {
-      console.log('[API] No issues found for newsletter:', newsletterId)
+      logger.info(`[API] No issues found for newsletter: ${newsletterId}`)
       return NextResponse.json({
         success: true,
         posts: [],
@@ -247,11 +238,11 @@ export async function GET(request: NextRequest) {
       .select('post_id')
 
     if (duplicatesError) {
-      console.error('[API] Error fetching duplicates:', duplicatesError)
+      logger.error({ err: duplicatesError }, '[API] Error fetching duplicates')
     }
 
     const duplicatePostIds = duplicatePosts?.map(d => d.post_id) || []
-    console.log('[API] Excluding', duplicatePostIds.length, 'duplicate posts')
+    logger.info(`[API] Excluding ${duplicatePostIds.length} duplicate posts`)
 
     // Fetch recent RSS posts from these campaigns, filtered by section if specified
     let query = supabaseAdmin
@@ -275,28 +266,19 @@ export async function GET(request: NextRequest) {
       .limit(limit)
 
     if (error) {
-      console.error('[API] Error fetching recent posts:', error)
+      logger.error({ err: error }, '[API] Error fetching recent posts')
       return NextResponse.json(
         { error: 'Failed to fetch recent posts', details: error.message },
         { status: 500 }
       )
     }
 
-    console.log('[API] Found', posts?.length || 0, 'posts')
+    logger.info(`[API] Found ${posts?.length || 0} posts`)
 
     return NextResponse.json({
       success: true,
       posts: posts || [],
       count: posts?.length || 0
     })
-  } catch (error) {
-    console.error('[API] Error in recent-posts:', error)
-    return NextResponse.json(
-      {
-        error: 'Failed to fetch recent posts',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)

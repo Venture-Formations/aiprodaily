@@ -1,17 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { PUBLICATION_ID } from '@/lib/config'
 
 // GET - Fetch a single package by ID
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'tools/packages/[id]' },
+  async ({ params }) => {
+    const id = params.id
 
-  try {
     const { data: pkg, error } = await supabaseAdmin
       .from('sponsorship_packages')
       .select('*')
@@ -23,33 +20,18 @@ export async function GET(
       if (error.code === 'PGRST116') {
         return NextResponse.json({ error: 'Package not found' }, { status: 404 })
       }
-      console.error('[Packages] Error fetching package:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, package: pkg })
-  } catch (error) {
-    console.error('[Packages] Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)
 
 // PUT - Update a package
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params
-
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  if ((session.user as any).role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
-  try {
+export const PUT = withApiHandler(
+  { authTier: 'admin', logContext: 'tools/packages/[id]' },
+  async ({ params, request, logger }) => {
+    const id = params.id
     const body = await request.json()
 
     // Build update object with only provided fields
@@ -83,35 +65,22 @@ export async function PUT(
       if (error.code === 'PGRST116') {
         return NextResponse.json({ error: 'Package not found' }, { status: 404 })
       }
-      console.error('[Packages] Error updating package:', error)
+      logger.error({ err: error }, 'Error updating package')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log('[Packages] Package updated:', id)
+    logger.info({ packageId: id }, 'Package updated')
 
     return NextResponse.json({ success: true, package: updatedPackage })
-  } catch (error) {
-    console.error('[Packages] Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)
 
 // DELETE - Delete a package
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params
+export const DELETE = withApiHandler(
+  { authTier: 'admin', logContext: 'tools/packages/[id]' },
+  async ({ params, logger }) => {
+    const id = params.id
 
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  if ((session.user as any).role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
-  try {
     // Check if package has any active entitlements before deleting
     const { count: entitlementCount } = await supabaseAdmin
       .from('customer_entitlements')
@@ -132,15 +101,12 @@ export async function DELETE(
       .eq('publication_id', PUBLICATION_ID)
 
     if (error) {
-      console.error('[Packages] Error deleting package:', error)
+      logger.error({ err: error }, 'Error deleting package')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log('[Packages] Package deleted:', id)
+    logger.info({ packageId: id }, 'Package deleted')
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('[Packages] Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)

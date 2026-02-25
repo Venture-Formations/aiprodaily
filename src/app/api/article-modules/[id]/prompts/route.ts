@@ -1,16 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-interface RouteContext {
-  params: Promise<{ id: string }>
-}
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET /api/article-modules/[id]/prompts - List prompts for a module
  */
-export async function GET(request: NextRequest, context: RouteContext) {
-  try {
-    const { id: moduleId } = await context.params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'article-modules/[id]/prompts' },
+  async ({ params }) => {
+    const moduleId = params.id
 
     const { data: prompts, error } = await supabaseAdmin
       .from('article_module_prompts')
@@ -24,23 +22,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
       success: true,
       prompts: prompts || []
     })
-
-  } catch (error: any) {
-    console.error('[ArticleModulePrompts] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch prompts', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST /api/article-modules/[id]/prompts - Create a new prompt
  * Prompt types: article_title, article_body
  */
-export async function POST(request: NextRequest, context: RouteContext) {
-  try {
-    const { id: moduleId } = await context.params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'article-modules/[id]/prompts' },
+  async ({ params, request }) => {
+    const moduleId = params.id
     const body = await request.json()
 
     // Validate required fields
@@ -98,23 +90,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
       success: true,
       prompt
     }, { status: 201 })
-
-  } catch (error: any) {
-    console.error('[ArticleModulePrompts] Failed to create:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create prompt', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/article-modules/[id]/prompts - Update a prompt
  * Body: { prompt_id or prompt_type, ...updates }
  */
-export async function PATCH(request: NextRequest, context: RouteContext) {
-  try {
-    const { id: moduleId } = await context.params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'article-modules/[id]/prompts' },
+  async ({ params, request }) => {
+    const moduleId = params.id
     const body = await request.json()
 
     // Must have either prompt_id or prompt_type to identify the prompt
@@ -172,12 +158,5 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       success: true,
       prompt
     })
-
-  } catch (error: any) {
-    console.error('[ArticleModulePrompts] Failed to update:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update prompt', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import type { AIAppCategory, ToolType } from '@/types/database'
 
@@ -9,21 +10,22 @@ import type { AIAppCategory, ToolType } from '@/types/database'
  * Tool Name, Category, Tool Type, Link, Description, Tagline, Affiliate
  *
  * Column Mappings:
- * - Tool Name → app_name (used to match existing apps - case insensitive)
- * - Category → category (must match: Payroll, HR, Accounting System, Finance, Productivity, Client Management, Banking)
- * - Tool Type → tool_type (must be: Client or Firm)
- * - Link → app_url (also accepts: Home Page, URL)
- * - Description → description
- * - Tagline → tagline
- * - Affiliate → is_affiliate (optional: yes/true/1 = affiliate, anything else = non-affiliate)
+ * - Tool Name -> app_name (used to match existing apps - case insensitive)
+ * - Category -> category (must match: Payroll, HR, Accounting System, Finance, Productivity, Client Management, Banking)
+ * - Tool Type -> tool_type (must be: Client or Firm)
+ * - Link -> app_url (also accepts: Home Page, URL)
+ * - Description -> description
+ * - Tagline -> tagline
+ * - Affiliate -> is_affiliate (optional: yes/true/1 = affiliate, anything else = non-affiliate)
  *
  * Behavior:
  * - If an app with the same name exists (case-insensitive match), it will be UPDATED with new data
  * - If an app doesn't exist, it will be INSERTED as a new record
  * - Returns counts for both inserted and updated apps
  */
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai-apps/upload' },
+  async ({ request }) => {
     const formData = await request.formData()
     const file = formData.get('file') as File
     const moduleId = formData.get('module_id') as string | null
@@ -212,15 +214,8 @@ export async function POST(request: NextRequest) {
       total: lines.length - 1,
       errors: errors.length > 0 ? errors : undefined
     })
-
-  } catch (error: any) {
-    console.error('CSV upload error:', error)
-    return NextResponse.json(
-      { error: 'Failed to process CSV file', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * Parse a CSV line handling quoted fields

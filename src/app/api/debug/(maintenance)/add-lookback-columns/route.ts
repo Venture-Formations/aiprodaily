@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase';
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/add-lookback-columns' },
+  async ({ logger }) => {
   try {
     const supabase = supabaseAdmin;
 
@@ -78,4 +81,5 @@ export async function GET(request: NextRequest) {
     console.error('Error adding lookback columns:', error);
     return NextResponse.json({ error: 'Failed to add lookback columns', details: error.message }, { status: 500 });
   }
-}
+  }
+)

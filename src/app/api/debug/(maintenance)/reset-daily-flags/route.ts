@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { validateDebugAuth } from '@/lib/debug-auth'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST(request: NextRequest) {
-  // Validate authentication
-  const authResult = validateDebugAuth(request)
-  if (!authResult.authorized) {
-    return authResult.response
-  }
-
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/reset-daily-flags' },
+  async ({ request, logger }) => {
   try {
     const today = new Date().toISOString().split('T')[0]
 
@@ -47,4 +43,5 @@ export async function POST(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

@@ -1,15 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'rss-posts/recent' },
+  async ({ request }) => {
     const url = new URL(request.url)
     const limit = parseInt(url.searchParams.get('limit') || '50')
     const section = url.searchParams.get('section') // 'primary' or 'secondary'
@@ -75,12 +70,5 @@ export async function GET(request: NextRequest) {
       posts: posts,
       total: posts.length
     })
-
-  } catch (error: any) {
-    console.error('[API] Failed to fetch RSS posts:', error)
-    return NextResponse.json({
-      error: 'Failed to fetch RSS posts',
-      message: error.message
-    }, { status: 500 })
   }
-}
+)

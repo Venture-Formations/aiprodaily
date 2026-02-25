@@ -1,16 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
-    // Check if secret parameter is provided
-    const { searchParams } = new URL(request.url)
-    const secret = searchParams.get('secret')
-
-    if (secret !== process.env.CRON_SECRET) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'test/database' },
+  async () => {
     // Test database schema - check if new columns exist
     let columns = null
     let columnsError = null
@@ -52,13 +46,5 @@ export async function GET(request: NextRequest) {
       migration_needed: !!schemaError || !!constraintError,
       timestamp: new Date().toISOString()
     })
-
-  } catch (error) {
-    console.error('Database test failed:', error)
-    return NextResponse.json({
-      success: false,
-      error: 'Database test failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

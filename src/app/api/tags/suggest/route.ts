@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { openai } from '@/lib/openai'
 
 interface TagSuggestion {
@@ -7,8 +8,9 @@ interface TagSuggestion {
   confidence: number
 }
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'tags/suggest' },
+  async ({ request, logger }) => {
     const { input, existing_tags = [] } = await request.json()
 
     if (!input || typeof input !== 'string') {
@@ -101,7 +103,7 @@ Return valid JSON array only, no other text.`
       return NextResponse.json({ suggestions: finalSuggestions })
 
     } catch (parseError) {
-      console.error('Failed to parse AI tag suggestions:', parseError)
+      logger.error({ err: parseError }, 'Failed to parse AI tag suggestions')
       console.error('AI response:', content)
 
       // Fallback: If AI parsing fails, return contextual suggestions based on common patterns
@@ -141,12 +143,5 @@ Return valid JSON array only, no other text.`
         fallback: true
       })
     }
-
-  } catch (error) {
-    console.error('Tag suggestion API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
   }
-}
+)

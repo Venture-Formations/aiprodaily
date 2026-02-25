@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
 
@@ -15,14 +14,9 @@ import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
  * - end_date: Optional - End date (YYYY-MM-DD format)
  * - days: Optional - Number of days to look back (default: 30, ignored if start_date provided)
  */
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ads/analytics' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const newsletterSlug = searchParams.get('newsletter_slug')
     const adIdFilter = searchParams.get('ad_id')
@@ -445,12 +439,5 @@ export async function GET(request: NextRequest) {
       ad_modules: availableAdModules,
       ads: adAnalytics
     })
-
-  } catch (error) {
-    console.error('[Ads Analytics] Error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

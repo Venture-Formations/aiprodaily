@@ -1,15 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { FeedbackModuleSelector } from '@/lib/feedback-modules'
+import { withApiHandler } from '@/lib/api-handler'
 
 export const maxDuration = 30
 
 // GET /api/feedback/[moduleId]/results - Get feedback results for an issue
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ moduleId: string }> }
-) {
-  try {
-    const { moduleId } = await params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'feedback/[moduleId]/results' },
+  async ({ request, params }) => {
+    const moduleId = params.moduleId
     const searchParams = request.nextUrl.searchParams
     const issueId = searchParams.get('issue_id')
     const email = searchParams.get('email')
@@ -74,11 +73,5 @@ export async function GET(
       results: boostedResults,
       config: resultsPageConfig
     })
-  } catch (error) {
-    console.error('[Feedback] Error in GET results:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch results' },
-      { status: 500 }
-    )
   }
-}
+)

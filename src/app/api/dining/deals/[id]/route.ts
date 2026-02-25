@@ -1,18 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function PATCH(
-  request: NextRequest,
-  props: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await props.params
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'dining/deals/[id]' },
+  async ({ params, request, logger }) => {
+    const id = params.id
 
     const body = await request.json()
     const updateData: any = {}
@@ -44,7 +37,7 @@ export async function PATCH(
       .single()
 
     if (error) {
-      console.error('Error updating dining deal:', error)
+      logger.error({ err: error }, 'Error updating dining deal')
       return NextResponse.json({ error: 'Failed to update deal' }, { status: 500 })
     }
 
@@ -53,22 +46,13 @@ export async function PATCH(
     }
 
     return NextResponse.json({ deal })
-  } catch (error) {
-    console.error('Dining deal update error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)
 
-export async function DELETE(
-  request: NextRequest,
-  props: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await props.params
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'dining/deals/[id]' },
+  async ({ params, logger }) => {
+    const id = params.id
 
     // Check if deal exists
     const { data: existingDeal, error: fetchError } = await supabaseAdmin
@@ -88,13 +72,10 @@ export async function DELETE(
       .eq('id', id)
 
     if (deleteError) {
-      console.error('Error deleting dining deal:', deleteError)
+      logger.error({ err: deleteError }, 'Error deleting dining deal')
       return NextResponse.json({ error: 'Failed to delete deal' }, { status: 500 })
     }
 
     return NextResponse.json({ message: 'Deal deleted successfully' })
-  } catch (error) {
-    console.error('Dining deal deletion error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)

@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
+import { withApiHandler } from '@/lib/api-handler'
 import { AppModuleSelector } from '@/lib/ai-app-modules'
 import { ArticleModuleSelector } from '@/lib/article-modules'
 
@@ -72,13 +71,9 @@ async function initializeTextBoxModules(issueId: string, publicationId: string) 
   }
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns' },
+  async ({ request }) => {
     const url = new URL(request.url)
     const limit = parseInt(url.searchParams.get('limit') || '10')
     const offset = parseInt(url.searchParams.get('offset') || '0')
@@ -165,23 +160,12 @@ export async function GET(request: NextRequest) {
       issues: transformedCampaigns,
       total: transformedCampaigns.length
     })
-
-  } catch (error) {
-    console.error('[API] Failed to fetch issues:', error)
-    return NextResponse.json({
-      error: 'Failed to fetch issues',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns' },
+  async ({ request }) => {
     const body = await request.json()
     const { date } = body
 
@@ -231,12 +215,5 @@ export async function POST(request: NextRequest) {
     console.log('issue content initialization completed')
 
     return NextResponse.json({ issue }, { status: 201 })
-
-  } catch (error) {
-    console.error('Failed to create issue:', error)
-    return NextResponse.json({
-      error: 'Failed to create issue',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

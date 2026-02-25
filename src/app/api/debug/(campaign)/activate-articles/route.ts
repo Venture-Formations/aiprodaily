@@ -1,15 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { validateDebugAuth } from '@/lib/debug-auth'
 
-export async function POST(request: NextRequest) {
-  // Validate authentication
-  const authResult = validateDebugAuth(request)
-  if (!authResult.authorized) {
-    return authResult.response
-  }
-
-  try {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(campaign)/activate-articles' },
+  async ({ request, logger }) => {
     console.log('=== ACTIVATING TOP ARTICLES ===')
 
     // Get latest issue or specified issue ID
@@ -117,12 +112,5 @@ export async function POST(request: NextRequest) {
       })),
       timestamp: new Date().toISOString()
     })
-
-  } catch (error) {
-    console.error('Article activation error:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { start } from 'workflow/api'
 import { reprocessArticlesWorkflow } from '@/lib/workflows/reprocess-articles-workflow'
 import { supabaseAdmin } from '@/lib/supabase'
@@ -15,18 +14,10 @@ import { supabaseAdmin } from '@/lib/supabase'
  * 4. Regenerates all articles
  * 5. Regenerates welcome section
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    // Auth check
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: issueId } = await params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/reprocess' },
+  async ({ params }) => {
+    const issueId = params.id
 
     if (!issueId) {
       return NextResponse.json({ error: 'issue ID required' }, { status: 400 })
@@ -64,14 +55,7 @@ export async function POST(
       message: 'Reprocess workflow started',
       issue_id: issueId
     })
-
-  } catch (error) {
-    console.error('[Reprocess API] Failed:', error)
-    return NextResponse.json({
-      error: 'Failed to start reprocess workflow',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
 export const maxDuration = 60

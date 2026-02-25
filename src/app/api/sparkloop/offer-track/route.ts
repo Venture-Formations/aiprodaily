@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { PUBLICATION_ID } from '@/lib/config'
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'public', logContext: 'sparkloop-offer-track' },
+  async ({ request, logger }) => {
     const body = await request.json()
     const { event_type, email, offer_id } = body
 
@@ -35,8 +37,5 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true })
-  } catch (err) {
-    console.error('[OfferTrack] Error:', err)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
-}
+)

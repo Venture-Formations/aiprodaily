@@ -1,15 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { FeedbackModuleSelector } from '@/lib/feedback-modules'
 
 export const maxDuration = 30
 
 // GET /api/feedback/[moduleId]/respond - Handle feedback vote from email link
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ moduleId: string }> }
-) {
-  try {
-    const { moduleId } = await params
+export const GET = withApiHandler(
+  { authTier: 'public', logContext: 'feedback-respond' },
+  async ({ request, params, logger }) => {
+    const moduleId = params.moduleId
     const searchParams = request.nextUrl.searchParams
     const valueStr = searchParams.get('value')
     const label = searchParams.get('label')
@@ -64,10 +63,5 @@ export async function GET(
     }
 
     return NextResponse.redirect(resultsUrl)
-  } catch (error) {
-    console.error('[Feedback] Error in GET /api/feedback/[moduleId]/respond:', error)
-    return NextResponse.redirect(
-      new URL('/feedback/error?message=An unexpected error occurred', request.url)
-    )
   }
-}
+)

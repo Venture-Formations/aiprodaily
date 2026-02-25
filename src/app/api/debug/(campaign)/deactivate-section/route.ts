@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // Debug endpoint to deactivate a newsletter section by display_order
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(campaign)/deactivate-section' },
+  async ({ request, logger }) => {
     const { display_order } = await request.json()
 
     if (!display_order) {
@@ -52,12 +54,5 @@ export async function POST(request: NextRequest) {
         now_active: false
       }
     })
-
-  } catch (error) {
-    console.error('Error deactivating section:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

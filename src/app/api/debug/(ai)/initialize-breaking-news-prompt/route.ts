@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * Initialize Breaking News Scorer AI Prompt in database
  * GET /api/debug/initialize-breaking-news-prompt
  */
-export async function GET() {
-  try {
-    console.log('Initializing Breaking News Scorer AI Prompt...')
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(ai)/initialize-breaking-news-prompt' },
+  async ({ logger }) => {
+    logger.info('Initializing Breaking News Scorer AI Prompt...')
 
     const breakingNewsScorerPrompt = `You are evaluating a news article for inclusion in the AI Accounting Professionals newsletter's "Breaking News" section.
 
@@ -86,7 +88,7 @@ Response format:
       })
 
     if (error) {
-      console.error('Error initializing Breaking News Scorer prompt:', error)
+      logger.error({ err: error }, 'Error initializing Breaking News Scorer prompt')
       return NextResponse.json({
         success: false,
         error: error.message
@@ -98,12 +100,5 @@ Response format:
       message: 'Breaking News Scorer prompt initialized successfully',
       prompt_key: 'ai_prompt_breaking_news_scorer'
     })
-
-  } catch (error) {
-    console.error('Failed to initialize Breaking News Scorer prompt:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

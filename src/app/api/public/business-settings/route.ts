@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { headers } from 'next/headers'
 import { getPublicationByDomain, getPublicationSettings } from '@/lib/publication-settings'
 
@@ -14,8 +14,9 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders })
 }
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'public', logContext: 'public-business-settings' },
+  async ({ request, logger }) => {
     // Get domain from headers (Next.js 15 requires await)
     const headersList = await headers()
     const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'aiaccountingdaily.com'
@@ -61,16 +62,5 @@ export async function GET(request: NextRequest) {
     }, {
       headers: corsHeaders
     })
-
-  } catch (error) {
-    console.error('Failed to fetch public business settings:', error)
-    return NextResponse.json({
-      success: false,
-      error: 'Failed to fetch business settings',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, {
-      status: 500,
-      headers: corsHeaders
-    })
   }
-}
+)

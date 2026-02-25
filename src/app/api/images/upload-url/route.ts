@@ -1,10 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { ImageUploadRequest, ImageUploadResponse } from '@/types/database'
 import { v4 as uuidv4 } from 'uuid'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'images/upload-url' },
+  async ({ request }) => {
     const body: ImageUploadRequest = await request.json()
     const { filename, content_type, size } = body
 
@@ -79,12 +81,5 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(response)
-
-  } catch (error) {
-    console.error('Upload URL API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
   }
-}
+)
