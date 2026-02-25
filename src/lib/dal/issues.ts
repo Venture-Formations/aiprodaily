@@ -10,6 +10,7 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { createLogger } from '@/lib/logger'
 import type { PublicationIssue, IssueStatus } from '@/types/database'
+import { canTransition } from '@/types/issue-states'
 
 const log = createLogger({ module: 'dal:issues' })
 
@@ -263,6 +264,13 @@ export async function createIssue(
 
 /**
  * Update an issue's status with optional metadata.
+ *
+ * When `expectedCurrentStatus` is provided:
+ * 1. Validates the transition against the state machine
+ * 2. Uses atomic compare-and-swap (only updates if current status matches)
+ * 3. Returns false if the row's status didn't match (CAS failure)
+ *
+ * Without `expectedCurrentStatus`, behaves as before (unconditional update).
  */
 export async function updateIssueStatus(
   issueId: string,
@@ -271,9 +279,21 @@ export async function updateIssueStatus(
     lastAction?: string
     lastActionBy?: string
     statusBeforeSend?: IssueStatus
+    expectedCurrentStatus?: IssueStatus
   }
 ): Promise<boolean> {
   try {
+    // Validate transition if expected status is provided
+    if (meta?.expectedCurrentStatus) {
+      if (!canTransition(meta.expectedCurrentStatus, status)) {
+        log.warn(
+          { issueId, from: meta.expectedCurrentStatus, to: status },
+          'updateIssueStatus: invalid transition'
+        )
+        return false
+      }
+    }
+
     const updateData: Record<string, any> = { status }
 
     if (meta?.lastAction) {
@@ -283,10 +303,34 @@ export async function updateIssueStatus(
     if (meta?.lastActionBy) updateData.last_action_by = meta.lastActionBy
     if (meta?.statusBeforeSend) updateData.status_before_send = meta.statusBeforeSend
 
-    const { error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('publication_issues')
       .update(updateData)
       .eq('id', issueId)
+
+    // Atomic compare-and-swap: only update if current status matches
+    if (meta?.expectedCurrentStatus) {
+      query = query.eq('status', meta.expectedCurrentStatus)
+      const { data, error } = await query.select('id').single()
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No row matched — CAS failure (status already changed)
+          log.warn(
+            { issueId, expected: meta.expectedCurrentStatus, to: status },
+            'updateIssueStatus: CAS failed — status already changed'
+          )
+          return false
+        }
+        log.error({ err: error, issueId, status }, 'updateIssueStatus failed')
+        return false
+      }
+
+      return !!data
+    }
+
+    // Unconditional update (backward-compatible path)
+    const { error } = await query
 
     if (error) {
       log.error({ err: error, issueId, status }, 'updateIssueStatus failed')

@@ -1,4 +1,5 @@
-export type IssueStatus = 'draft' | 'in_review' | 'changes_made' | 'sent' | 'failed' | 'processing'
+import type { IssueStatus } from './issue-states'
+export type { IssueStatus } from './issue-states'
 export type UserRole = 'admin' | 'reviewer'
 export type LogLevel = 'info' | 'warn' | 'error' | 'debug'
 

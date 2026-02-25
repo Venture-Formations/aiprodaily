@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
+import { updateIssueStatus } from '@/lib/dal/issues'
 import type { Logger } from '@/lib/logger'
 
 /**
@@ -41,11 +42,15 @@ async function handleTriggerPhase2(logger: Logger) {
   for (const issue of issues) {
     console.log(`[Cron] Triggering Phase 2 for issue: ${issue.id}`)
 
-    // Mark as processing to prevent duplicate triggers
-    await supabaseAdmin
-      .from('publication_issues')
-      .update({ status: 'processing' })
-      .eq('id', issue.id)
+    // Mark as processing to prevent duplicate triggers (atomic CAS)
+    const transitioned = await updateIssueStatus(issue.id, 'processing', {
+      expectedCurrentStatus: 'pending_phase2',
+    })
+    if (!transitioned) {
+      console.log(`[Cron] Issue ${issue.id} status already changed, skipping`)
+      results.push({ issue_id: issue.id, status: 'skipped', message: 'Status already changed' })
+      continue
+    }
 
     // Trigger Phase 2
     const baseUrl = process.env.NEXTAUTH_URL ||

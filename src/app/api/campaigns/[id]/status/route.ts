@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { withApiHandler } from '@/lib/api-handler'
+import { updateIssueStatus } from '@/lib/dal/issues'
 import { SlackNotificationService } from '@/lib/slack'
+import type { IssueStatus } from '@/types/issue-states'
 
 export const POST = withApiHandler(
   { authTier: 'authenticated', logContext: 'campaigns/[id]/status' },
@@ -29,24 +31,19 @@ export const POST = withApiHandler(
       }, { status: 404 })
     }
 
-    // Update issue status to changes_made and record the action
-    const { error: updateError } = await supabaseAdmin
-      .from('publication_issues')
-      .update({
-        status: 'changes_made',
-        last_action: action,
-        last_action_at: new Date().toISOString(),
-        last_action_by: session.user?.email || 'unknown'
-      })
-      .eq('id', issueId)
+    // Update issue status to changes_made with transition validation
+    const updated = await updateIssueStatus(issueId, 'changes_made', {
+      expectedCurrentStatus: issue.status as IssueStatus,
+      lastAction: action,
+      lastActionBy: session.user?.email || 'unknown',
+    })
 
-    if (updateError) {
-      console.error('Failed to update issue status:', updateError)
+    if (!updated) {
+      console.error('Failed to update issue status — transition rejected or CAS failed')
       return NextResponse.json({
         error: 'Failed to update issue status',
-        details: updateError.message || 'Unknown database error',
-        code: updateError.code || 'UNKNOWN'
-      }, { status: 500 })
+        details: `Cannot transition from '${issue.status}' to 'changes_made'`,
+      }, { status: 409 })
     }
 
     // Send Slack notification for changes made

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
+import { updateIssueStatus } from '@/lib/dal/issues'
 import { executeStep1 } from '../combined-steps/step1-archive'
 import { executeStep2 } from '../combined-steps/step2-fetch-extract'
 import { executeStep3 } from '../combined-steps/step3-score'
@@ -73,14 +74,9 @@ export const POST = withApiHandler(
 
     // Update issue status to pending_phase2
     // Phase 2 will be triggered by a separate cron job after delay
-    const { supabaseAdmin } = await import('@/lib/supabase')
-    await supabaseAdmin
-      .from('publication_issues')
-      .update({
-        status: 'pending_phase2',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', issue_id)
+    await updateIssueStatus(issue_id, 'pending_phase2', {
+      expectedCurrentStatus: 'processing',
+    })
 
     logger.info(`[RSS Phase 1] issue marked as pending_phase2 - Phase 2 will start automatically after delay`)
 
