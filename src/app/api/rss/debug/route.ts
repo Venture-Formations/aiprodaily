@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import Parser from 'rss-parser'
 
@@ -10,13 +9,9 @@ const parser = new Parser({
   }
 })
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'rss/debug' },
+  async ({ logger }) => {
     // Get RSS feeds
     const { data: feeds, error: feedsError } = await supabaseAdmin
       .from('rss_feeds')
@@ -83,12 +78,5 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
       results
     })
-
-  } catch (error) {
-    console.error('RSS debug failed:', error)
-    return NextResponse.json({
-      error: 'RSS debug failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

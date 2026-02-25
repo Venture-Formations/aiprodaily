@@ -1,14 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { SlackNotificationService } from '@/lib/slack'
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'notifications/slack' },
+  async ({ request }) => {
     const body = await request.json()
     const { message, level = 'info', context } = body
 
@@ -23,13 +19,5 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Slack notification sent successfully'
     })
-
-  } catch (error) {
-    console.error('Failed to send Slack notification:', error)
-
-    return NextResponse.json({
-      error: 'Failed to send Slack notification',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

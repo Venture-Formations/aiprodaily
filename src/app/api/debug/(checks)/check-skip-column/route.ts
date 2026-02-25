@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-skip-column' },
+  async ({ logger }) => {
     // First, let's test selecting an article without the skipped column
     console.log('Testing article query without skipped column...')
     const { data: articlesBasic, error: basicError } = await supabaseAdmin
@@ -70,12 +72,5 @@ export async function GET() {
       basicQuery: { success: true, data: articlesBasic },
       skippedQuery: { success: true, data: articlesWithSkipped }
     })
-
-  } catch (error) {
-    console.error('Debug check failed:', error)
-    return NextResponse.json({
-      error: 'Debug check failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    })
   }
-}
+)

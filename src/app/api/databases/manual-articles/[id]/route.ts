@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // Helper to get active publication
@@ -22,12 +23,10 @@ function generateSlug(title: string): string {
 }
 
 // GET - Get a single article
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'databases/manual-articles/[id]' },
+  async ({ params, logger }) => {
+    const id = params.id
 
     const { data: article, error } = await supabaseAdmin
       .from('manual_articles')
@@ -39,7 +38,7 @@ export async function GET(
       .single()
 
     if (error) {
-      console.error('[API] Error fetching manual article:', error.message)
+      logger.error({ err: error }, 'Error fetching manual article')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
@@ -48,19 +47,14 @@ export async function GET(
     }
 
     return NextResponse.json({ article })
-  } catch (error: any) {
-    console.error('[API] Manual article GET error:', error.message)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)
 
 // PATCH - Update an article
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'databases/manual-articles/[id]' },
+  async ({ params, request, logger }) => {
+    const id = params.id
     const body = await request.json()
 
     const activeNewsletter = await getActivePublication()
@@ -155,24 +149,19 @@ export async function PATCH(
       .single()
 
     if (error) {
-      console.error('[API] Error updating manual article:', error.message)
+      logger.error({ err: error }, 'Error updating manual article')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ article })
-  } catch (error: any) {
-    console.error('[API] Manual article PATCH error:', error.message)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)
 
 // DELETE - Delete an article
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'databases/manual-articles/[id]' },
+  async ({ params, logger }) => {
+    const id = params.id
 
     // Get existing article
     const { data: existing, error: fetchError } = await supabaseAdmin
@@ -196,13 +185,10 @@ export async function DELETE(
       .eq('id', id)
 
     if (error) {
-      console.error('[API] Error deleting manual article:', error.message)
+      logger.error({ err: error }, 'Error deleting manual article')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
-    console.error('[API] Manual article DELETE error:', error.message)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)

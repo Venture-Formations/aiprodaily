@@ -1,19 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
 
 /**
  * GET /api/settings/publication - Get individual publication setting
  * Query params: key (required), publication_id (optional - defaults to active publication)
  */
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/publication' },
+  async ({ request }) => {
     const key = request.nextUrl.searchParams.get('key')
     let publicationId = request.nextUrl.searchParams.get('publication_id')
 
@@ -53,27 +48,16 @@ export async function GET(request: NextRequest) {
       value: setting?.value || null,
       publication_id: publicationId
     })
-
-  } catch (error: any) {
-    console.error('[PublicationSettings] Failed to fetch:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch setting', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/settings/publication - Update publication setting
  * Body: { key, value, publication_id? }
  */
-export async function PATCH(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/publication' },
+  async ({ request }) => {
     const body = await request.json()
     const { key, value } = body
     let publicationId = body.publication_id
@@ -125,12 +109,5 @@ export async function PATCH(request: NextRequest) {
       value: String(value),
       publication_id: publicationId
     })
-
-  } catch (error: any) {
-    console.error('[PublicationSettings] Failed to update:', error)
-    return NextResponse.json(
-      { error: 'Failed to update setting', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicationSettings } from '@/lib/publication-settings'
 import { PUBLICATION_ID } from '@/lib/config'
@@ -18,11 +19,10 @@ interface DailyStats {
  * GET /api/sparkloop/stats
  *
  * Fetches SparkLoop statistics for charts and summaries.
- * Uses sparkloop_referrals joined with sparkloop_recommendations
- * to calculate per-referral projected and confirmed earnings.
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'sparkloop/stats' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const days = parseInt(searchParams.get('days') || '30')
     const startDate = searchParams.get('start')
@@ -61,7 +61,6 @@ export async function GET(request: NextRequest) {
       const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
       const hasSLRcr = slRcr !== null && slRcr > 0
       const hasOverrideRcr = rec.override_rcr !== null && rec.override_rcr !== undefined
-      // RCR priority: override > sparkloop > default
       const rcr = hasOverrideRcr ? Number(rec.override_rcr) / 100
         : hasSLRcr ? slRcr! / 100
         : defaultRcr
@@ -109,7 +108,6 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch daily snapshots for new pending calculation
-    // We need one extra day before the range to compute the first day's delta
     const snapshotFromDate = new Date(fromDate)
     snapshotFromDate.setDate(snapshotFromDate.getDate() - 1)
     let snapshots: { ref_code: string; snapshot_date: string; sparkloop_pending: number; sparkloop_confirmed: number; sparkloop_rejected: number }[] = []
@@ -145,9 +143,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Compute new pending per ref_code, then sum into daily totals.
-    // Only include deltas for ref_codes present on BOTH consecutive days
-    // so newly-synced recommendations don't dump lifetime totals into one day.
+    // Compute new pending per ref_code, then sum into daily totals
     const newPendingByDate = new Map<string, number>()
     Array.from(snapshotsByRefCode.values()).forEach(refMap => {
       const dates = Array.from(refMap.keys()).sort()
@@ -242,11 +238,5 @@ export async function GET(request: NextRequest) {
         to: toDate.toISOString().split('T')[0],
       },
     })
-  } catch (error) {
-    console.error('[SparkLoop Stats] Failed:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch stats', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

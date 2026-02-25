@@ -1,13 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // GET single ad
-export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await context.params
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'ads/[id]' },
+  async ({ params }) => {
+    const id = params.id
 
     const { data: ad, error } = await supabaseAdmin
       .from('advertisements')
@@ -24,27 +23,19 @@ export async function GET(
     }
 
     return NextResponse.json({ ad })
-  } catch (error) {
-    return NextResponse.json({
-      error: 'Failed to fetch ad',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
 // PATCH - Update ad
-export async function PATCH(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await context.params
+export const PATCH = withApiHandler(
+  { authTier: 'admin', logContext: 'ads/[id]' },
+  async ({ params, request, logger }) => {
+    const id = params.id
     const body = await request.json()
 
-    console.log('[Ads] PATCH request for id:', id)
-    console.log('[Ads] Update fields:', Object.keys(body))
+    logger.info({ adId: id, fields: Object.keys(body) }, 'PATCH request')
     if (body.body) {
-      console.log('[Ads] Body content length:', body.body.length, 'chars')
+      logger.info({ bodyLength: body.body.length }, 'Body content length')
     }
 
     // Validate required fields if they're being updated
@@ -72,11 +63,9 @@ export async function PATCH(
       .single()
 
     if (fetchError || !existingAd) {
-      console.error('[Ads] Ad not found for update:', id, fetchError)
+      logger.error({ adId: id, err: fetchError }, 'Ad not found for update')
       return NextResponse.json({ error: 'Advertisement not found' }, { status: 404 })
     }
-
-    console.log('[Ads] Existing body length:', existingAd.body?.length || 0, 'chars')
 
     // Perform the update
     const { data: ad, error } = await supabaseAdmin
@@ -90,41 +79,31 @@ export async function PATCH(
       .single()
 
     if (error) {
-      console.error('[Ads] Update error:', error)
+      logger.error({ err: error }, 'Update error')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     if (!ad) {
-      console.error('[Ads] Update returned no data for id:', id)
+      logger.error({ adId: id }, 'Update returned no data')
       return NextResponse.json({ error: 'Update failed - no data returned' }, { status: 500 })
     }
 
-    console.log('[Ads] Successfully updated ad:', id, 'New body length:', ad.body?.length || 0, 'chars')
+    logger.info({ adId: id, newBodyLength: ad.body?.length || 0 }, 'Successfully updated ad')
 
     // Verify the update actually took effect
     if (body.body && ad.body !== body.body) {
-      console.warn('[Ads] WARNING: Body mismatch after update!')
-      console.warn('[Ads] Sent:', body.body.substring(0, 100))
-      console.warn('[Ads] Got:', ad.body?.substring(0, 100))
+      logger.warn({ adId: id }, 'Body mismatch after update')
     }
 
     return NextResponse.json({ ad })
-  } catch (error) {
-    console.error('[Ads] PATCH exception:', error)
-    return NextResponse.json({
-      error: 'Failed to update ad',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
 // DELETE - Delete ad
-export async function DELETE(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await context.params
+export const DELETE = withApiHandler(
+  { authTier: 'admin', logContext: 'ads/[id]' },
+  async ({ params }) => {
+    const id = params.id
 
     const { error } = await supabaseAdmin
       .from('advertisements')
@@ -136,10 +115,5 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    return NextResponse.json({
-      error: 'Failed to delete ad',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

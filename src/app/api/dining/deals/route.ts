@@ -1,40 +1,27 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { DiningDeal } from '@/types/database'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'dining/deals' },
+  async ({ logger }) => {
     const { data: deals, error } = await supabaseAdmin
       .from('dining_deals')
       .select('*')
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Error fetching dining deals:', error)
+      logger.error({ err: error }, 'Error fetching dining deals')
       return NextResponse.json({ error: 'Failed to fetch deals' }, { status: 500 })
     }
 
     return NextResponse.json({ deals: deals || [] })
-  } catch (error) {
-    console.error('Dining deals API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'dining/deals' },
+  async ({ request, logger }) => {
     const body = await request.json()
     const {
       business_name,
@@ -78,13 +65,10 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Error creating dining deal:', error)
+      logger.error({ err: error }, 'Error creating dining deal')
       return NextResponse.json({ error: 'Failed to create deal' }, { status: 500 })
     }
 
     return NextResponse.json({ deal }, { status: 201 })
-  } catch (error) {
-    console.error('Dining deal creation error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)

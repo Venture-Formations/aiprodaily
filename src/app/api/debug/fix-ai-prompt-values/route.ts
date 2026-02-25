@@ -1,15 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/fix-ai-prompt-values' },
+  async ({ logger }) => {
     // Get the active publication
     const { data: newsletter } = await supabaseAdmin
       .from('publications')
@@ -143,12 +138,5 @@ export async function GET(request: NextRequest) {
       totalPrompts: prompts?.length || 0,
       diagnostics
     })
-
-  } catch (error) {
-    console.error('Error fixing AI prompts:', error)
-    return NextResponse.json({
-      error: 'Failed to fix AI prompts',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

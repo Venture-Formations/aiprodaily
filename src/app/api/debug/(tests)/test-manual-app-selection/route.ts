@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-manual-app-selection' },
+  async ({ logger }) => {
   const logs: string[] = []
 
   try {
@@ -139,4 +142,5 @@ export async function GET(request: NextRequest) {
       logs
     }, { status: 500 })
   }
-}
+  }
+)

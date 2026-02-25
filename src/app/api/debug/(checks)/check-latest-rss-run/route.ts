@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-latest-rss-run' },
+  async ({ logger }) => {
     // Get the most recent issue
     const { data: recentCampaigns } = await supabaseAdmin
       .from('publication_issues')
@@ -87,12 +89,5 @@ export async function GET() {
         context: l.context
       }))
     })
-
-  } catch (error) {
-    console.error('Error checking latest RSS run:', error)
-    return NextResponse.json({
-      error: 'Failed to check latest RSS run',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { BreakingNewsProcessor } from '@/lib/breaking-news-processor'
 import { supabaseAdmin } from '@/lib/supabase'
 
@@ -11,7 +12,9 @@ import { supabaseAdmin } from '@/lib/supabase'
  * - Generates AI summaries and titles
  * - Categorizes articles by relevance score
  */
-export async function GET() {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-breaking-news' },
+  async ({ logger }) => {
   try {
     console.log('=== Breaking News Processor Test ===')
 
@@ -109,4 +112,5 @@ export async function GET() {
       stack: error instanceof Error ? error.stack : undefined
     }, { status: 500 })
   }
-}
+  }
+)

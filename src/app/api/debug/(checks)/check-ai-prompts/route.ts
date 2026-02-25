@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-ai-prompts' },
+  async ({ logger }) => {
     // Get all AI prompts from database
     const { data: prompts, error } = await supabaseAdmin
       .from('app_settings')
@@ -24,12 +26,5 @@ export async function GET() {
         preview: p.value?.substring(0, 200) + '...'
       }))
     })
-
-  } catch (error) {
-    console.error('Check AI prompts error:', error)
-    return NextResponse.json({
-      error: 'Failed to check AI prompts',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

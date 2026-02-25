@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // GET all ads with optional status and ad_module_id filters
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'ads' },
+  async ({ request }) => {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const adModuleId = searchParams.get('ad_module_id')
@@ -58,17 +60,13 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ ads })
-  } catch (error) {
-    return NextResponse.json({
-      error: 'Failed to fetch ads',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
 // POST - Create new ad (admin only)
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'ads' },
+  async ({ request, logger }) => {
     const body = await request.json()
     const {
       title,
@@ -124,7 +122,7 @@ export async function POST(request: NextRequest) {
           .maybeSingle()
 
         if (settingsError) {
-          console.error('Error fetching next_ad_position:', settingsError)
+          logger.error({ err: settingsError }, 'Error fetching next_ad_position')
         }
 
         const nextAdPosition = settingsData ? parseInt(settingsData.value) : 1
@@ -140,7 +138,7 @@ export async function POST(request: NextRequest) {
           .not('display_order', 'is', null)
 
         if (fetchAdsError) {
-          console.error('Error fetching ads to shift:', fetchAdsError)
+          logger.error({ err: fetchAdsError }, 'Error fetching ads to shift')
         }
 
         // Increment display_order for each ad that needs to shift
@@ -165,7 +163,7 @@ export async function POST(request: NextRequest) {
           .limit(1)
 
         if (fetchError) {
-          console.error('Error fetching active ads:', fetchError)
+          logger.error({ err: fetchError }, 'Error fetching active ads')
         }
 
         // Set display_order to next available position
@@ -204,12 +202,12 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('[Ads] Insert error:', error)
+      logger.error({ err: error }, 'Insert error')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     if (!ad) {
-      console.error('[Ads] Insert returned no data')
+      logger.error('Insert returned no data')
       return NextResponse.json({ error: 'Failed to create ad - no data returned' }, { status: 500 })
     }
 
@@ -240,18 +238,13 @@ export async function POST(request: NextRequest) {
         })
 
       if (junctionError) {
-        console.error('[Ads] Failed to upsert junction entry:', junctionError)
+        logger.error({ err: junctionError }, 'Failed to upsert junction entry')
       } else {
-        console.log(`[Ads] Ensured junction entry for module=${ad.ad_module_id}, advertiser=${ad.advertiser_id}`)
+        logger.info({ moduleId: ad.ad_module_id, advertiserId: ad.advertiser_id }, 'Ensured junction entry')
       }
     }
 
-    console.log('[Ads] Successfully created ad:', ad.id)
+    logger.info({ adId: ad.id }, 'Successfully created ad')
     return NextResponse.json({ ad })
-  } catch (error) {
-    return NextResponse.json({
-      error: 'Failed to create ad',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

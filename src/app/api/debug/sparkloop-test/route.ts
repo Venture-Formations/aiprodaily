@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { SparkLoopService } from '@/lib/sparkloop-client'
 import { PUBLICATION_ID } from '@/lib/config'
 
@@ -10,17 +11,9 @@ import { PUBLICATION_ID } from '@/lib/config'
  *
  * Returns SparkLoop's response for verification
  */
-export async function POST(request: NextRequest) {
-  // Only allow in development or with CRON_SECRET
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-  const isDev = process.env.NODE_ENV === 'development'
-
-  if (!isDev && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  try {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/sparkloop-test' },
+  async ({ request, logger }) => {
     const { email, refCodes } = await request.json()
 
     if (!email || !refCodes || !Array.isArray(refCodes)) {
@@ -32,9 +25,7 @@ export async function POST(request: NextRequest) {
 
     const service = new SparkLoopService()
 
-    console.log('[SparkLoop Test] Testing subscription...')
-    console.log('[SparkLoop Test] Email:', email)
-    console.log('[SparkLoop Test] Ref codes:', refCodes)
+    logger.info({ email, refCodes }, '[SparkLoop Test] Testing subscription...')
 
     const result = await service.subscribeToNewsletters({
       subscriber_email: email,
@@ -49,34 +40,17 @@ export async function POST(request: NextRequest) {
       sparkloopResponse: result.response,
       testData: { email, refCodes },
     })
-  } catch (error) {
-    console.error('[SparkLoop Test] Error:', error)
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * GET /api/debug/sparkloop-test
  *
  * Get current recommendations from our database for testing
  */
-export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-  const isDev = process.env.NODE_ENV === 'development'
-
-  if (!isDev && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/sparkloop-test' },
+  async ({ logger }) => {
     const service = new SparkLoopService()
     const stored = await service.getStoredRecommendations(PUBLICATION_ID)
 
@@ -98,10 +72,5 @@ export async function GET(request: NextRequest) {
         },
       },
     })
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

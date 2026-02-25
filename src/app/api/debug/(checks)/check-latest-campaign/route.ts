@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-latest-campaign' },
+  async ({ logger }) => {
     // Get latest issue
     const { data: issue, error: issueError } = await supabaseAdmin
       .from('publication_issues')
@@ -74,10 +76,5 @@ export async function GET() {
       },
       recent_logs: logs || []
     })
-
-  } catch (error) {
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

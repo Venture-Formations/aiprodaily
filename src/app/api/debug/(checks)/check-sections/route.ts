@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
@@ -6,8 +7,9 @@ import { supabaseAdmin } from '@/lib/supabase'
  *
  * Ensures Advertorial section exists for accounting newsletter
  */
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-sections' },
+  async ({ logger }) => {
     // Get accounting newsletter
     const { data: newsletter } = await supabaseAdmin
       .from('publications')
@@ -39,22 +41,15 @@ export async function GET() {
       has_advertorial: !!advertorialSection,
       advertorial_section: advertorialSection
     })
-
-  } catch (error) {
-    console.error('[Check Sections] Error:', error)
-    return NextResponse.json({
-      success: false,
-      error: 'Check failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
 /**
  * POST to add Advertorial section if missing
  */
-export async function POST() {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-sections' },
+  async ({ logger }) => {
     // Get accounting newsletter
     const { data: newsletter } = await supabaseAdmin
       .from('publications')
@@ -115,15 +110,7 @@ export async function POST() {
       message: 'Advertorial section added successfully',
       section: newSection
     })
-
-  } catch (error) {
-    console.error('[Check Sections] Error:', error)
-    return NextResponse.json({
-      success: false,
-      error: 'Failed to add section',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
 export const maxDuration = 60

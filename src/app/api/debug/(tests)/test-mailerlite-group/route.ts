@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-mailerlite-group' },
+  async ({ logger }) => {
   try {
     // Get the review group ID from settings
     const { data: setting } = await supabaseAdmin
@@ -67,4 +70,5 @@ export async function GET(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

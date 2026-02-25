@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-featured-query' },
+  async ({ logger }) => {
   try {
     // Test the exact query used in event population for Oct 9
     const startDate = '2025-10-09'
@@ -78,4 +81,5 @@ export async function GET() {
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

@@ -1,15 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { FeedbackModuleSelector } from '@/lib/feedback-modules'
 
 export const maxDuration = 30
 
 // POST /api/feedback/[moduleId]/comment - Submit additional feedback
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ moduleId: string }> }
-) {
-  try {
-    const { moduleId } = await params
+export const POST = withApiHandler(
+  { authTier: 'public', logContext: 'feedback-comment' },
+  async ({ request, params, logger }) => {
+    const moduleId = params.moduleId
     const body = await request.json()
     const { issue_id, email, comment_text, vote_id } = body
 
@@ -69,11 +68,5 @@ export async function POST(
       success: true,
       comment_id: result.commentId
     })
-  } catch (error) {
-    console.error('[Feedback] Error in POST comment:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to submit comment' },
-      { status: 500 }
-    )
   }
-}
+)

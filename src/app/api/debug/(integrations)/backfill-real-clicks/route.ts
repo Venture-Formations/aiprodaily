@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
 
@@ -52,7 +53,9 @@ async function updateMailerLiteField(
 /**
  * Backfill Real_Click field for all subscribers with valid clicks
  */
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(integrations)/backfill-real-clicks' },
+  async ({ request, logger }) => {
   const authHeader = request.headers.get('Authorization')
   const searchParams = request.nextUrl.searchParams
   const secret = searchParams.get('secret')
@@ -213,4 +216,5 @@ export async function GET(request: NextRequest) {
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

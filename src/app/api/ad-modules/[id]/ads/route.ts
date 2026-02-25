@@ -1,18 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-type RouteParams = Promise<{ id: string }>
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET /api/ad-modules/[id]/ads - List ads for a specific module
  */
-export async function GET(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id } = params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ad-modules/[id]/ads' },
+  async ({ params }) => {
+    const id = params.id
 
     const { data: ads, error } = await supabaseAdmin
       .from('advertisements')
@@ -30,26 +26,16 @@ export async function GET(
       success: true,
       ads: ads || []
     })
-
-  } catch (error: any) {
-    console.error('[ModuleAds] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch module ads', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST /api/ad-modules/[id]/ads - Create new ad for module
  */
-export async function POST(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id: moduleId } = params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ad-modules/[id]/ads' },
+  async ({ params, request }) => {
+    const moduleId = params.id
     const body = await request.json()
 
     // Validate required fields
@@ -104,12 +90,5 @@ export async function POST(
       success: true,
       ad
     }, { status: 201 })
-
-  } catch (error: any) {
-    console.error('[ModuleAds] Failed to create:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create ad', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

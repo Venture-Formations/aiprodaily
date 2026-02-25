@@ -1,16 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-interface RouteContext {
-  params: Promise<{ id: string }>
-}
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET /api/article-modules/[id]/feeds - List feeds assigned to a module
  */
-export async function GET(request: NextRequest, context: RouteContext) {
-  try {
-    const { id: moduleId } = await context.params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'article-modules/[id]/feeds' },
+  async ({ params }) => {
+    const moduleId = params.id
 
     // Get module to verify it exists and get publication_id
     const { data: module, error: moduleError } = await supabaseAdmin
@@ -50,23 +48,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
       assigned: assignedFeeds || [],
       available: unassignedFeeds || []
     })
-
-  } catch (error: any) {
-    console.error('[ArticleModuleFeeds] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch feeds', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/article-modules/[id]/feeds - Assign or unassign feeds
  * Body: { assign: [feed_ids], unassign: [feed_ids] }
  */
-export async function PATCH(request: NextRequest, context: RouteContext) {
-  try {
-    const { id: moduleId } = await context.params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'article-modules/[id]/feeds' },
+  async ({ params, request }) => {
+    const moduleId = params.id
     const body = await request.json()
 
     // Verify module exists
@@ -134,12 +126,5 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       assigned: assignedFeeds || [],
       available: unassignedFeeds || []
     })
-
-  } catch (error: any) {
-    console.error('[ArticleModuleFeeds] Failed to update:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update feed assignments', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

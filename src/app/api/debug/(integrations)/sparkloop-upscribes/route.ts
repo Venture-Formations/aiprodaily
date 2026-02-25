@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 
 const SPARKLOOP_API_BASE = 'https://api.sparkloop.app/v2'
 
@@ -8,7 +9,9 @@ const SPARKLOOP_API_BASE = 'https://api.sparkloop.app/v2'
  * Debug endpoint to fetch all Upscribes from SparkLoop API
  * Used to find the correct Upscribe ID for configuration
  */
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(integrations)/sparkloop-upscribes' },
+  async ({ logger }) => {
   const apiKey = process.env.SPARKLOOP_API_KEY
 
   if (!apiKey) {
@@ -48,4 +51,5 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+  }
+)

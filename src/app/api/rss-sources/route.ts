@@ -1,19 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * GET - Fetch all RSS sources (authors) with post counts and image blocking status
  */
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'rss-sources' },
+  async () => {
     // Get all unique authors from rss_posts with their post counts
     const { data: posts, error: postsError } = await supabaseAdmin
       .from('rss_posts')
@@ -40,7 +34,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get excluded sources from settings table
-    const { data: excludedSettings, error: settingsError } = await supabaseAdmin
+    const { data: excludedSettings } = await supabaseAdmin
       .from('publication_settings')
       .select('value')
       .eq('publication_id', newsletter.id)
@@ -72,27 +66,15 @@ export async function GET(request: NextRequest) {
       success: true,
       sources
     })
-
-  } catch (error) {
-    console.error('RSS sources error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH - Update exclusion status for a source
  */
-export async function PATCH(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'rss-sources' },
+  async ({ request }) => {
     const body = await request.json()
     const { author, excluded } = body
 
@@ -119,20 +101,16 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Get current excluded sources
-    const { data: currentSettings, error: fetchError } = await supabaseAdmin
+    const { data: currentSettings } = await supabaseAdmin
       .from('publication_settings')
       .select('value')
       .eq('publication_id', newsletter.id)
       .eq('key', 'excluded_rss_sources')
       .maybeSingle()
 
-    console.log('Current settings fetch:', { currentSettings, fetchError })
-
     let excludedSources: string[] = currentSettings?.value
       ? JSON.parse(currentSettings.value)
       : []
-
-    console.log('Current excluded sources:', excludedSources)
 
     // Update the list
     if (excluded) {
@@ -144,8 +122,6 @@ export async function PATCH(request: NextRequest) {
       // Remove from excluded list
       excludedSources = excludedSources.filter(s => s !== author)
     }
-
-    console.log('Updated excluded sources:', excludedSources)
 
     // Save back to settings
     const { error: updateError } = await supabaseAdmin
@@ -169,12 +145,5 @@ export async function PATCH(request: NextRequest) {
       success: true,
       message: `Images from "${author}" ${excluded ? 'blocked' : 'unblocked'} successfully`
     })
-
-  } catch (error) {
-    console.error('Update RSS source error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

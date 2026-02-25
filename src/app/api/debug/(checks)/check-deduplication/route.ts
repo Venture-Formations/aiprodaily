@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
@@ -6,8 +7,9 @@ import { supabaseAdmin } from '@/lib/supabase'
  * Usage: GET /api/debug/check-deduplication?issueId=xxx
  * Or without issueId to check the most recent issue
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-deduplication' },
+  async ({ request }) => {
     const { searchParams } = new URL(request.url)
     let issueId = searchParams.get('issue_id')
 
@@ -126,8 +128,6 @@ export async function GET(request: NextRequest) {
         total_duplicate_groups: duplicateGroups?.length || 0,
         total_duplicate_posts: duplicatePosts?.length || 0,
         posts_filtered_correctly: duplicatePostIds.length - ((articlesFromDuplicates?.length || 0) + (secondaryArticlesFromDuplicates?.length || 0)),
-
-        // ⚠️ THIS SHOULD BE ZERO - If not, the filter is broken
         duplicate_posts_that_made_it_to_articles: (articlesFromDuplicates?.length || 0) + (secondaryArticlesFromDuplicates?.length || 0),
       },
       articles_count: {
@@ -137,8 +137,6 @@ export async function GET(request: NextRequest) {
         secondary_active: allSecondaryArticles?.filter(a => a.is_active).length || 0
       },
       duplicate_groups: groupsFormatted,
-
-      // ⚠️ THIS SHOULD BE EMPTY - If not, the filter is BROKEN
       warning_duplicates_in_articles: [
         ...(articlesFromDuplicates?.map(a => ({
           section: 'primary',
@@ -154,12 +152,5 @@ export async function GET(request: NextRequest) {
         })) || [])
       ]
     })
-
-  } catch (error) {
-    console.error('[DEBUG] Error checking deduplication:', error)
-    return NextResponse.json({
-      error: 'Failed to check deduplication',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

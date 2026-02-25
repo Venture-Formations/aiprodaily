@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 
-export async function GET() {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-newsletter-writer' },
+  async ({ logger }) => {
   try {
     const testPost = {
       title: "St. Cloud State University ranked in U.S. News & World Report",
@@ -41,4 +44,5 @@ export async function GET() {
       stack: error instanceof Error ? error.stack : undefined
     }, { status: 500 })
   }
-}
+  }
+)

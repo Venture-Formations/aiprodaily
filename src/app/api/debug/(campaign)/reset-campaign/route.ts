@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(campaign)/reset-campaign' },
+  async ({ request }) => {
     const body = await request.json()
     const issueId = body.issueId
 
@@ -21,7 +23,7 @@ export async function POST(request: NextRequest) {
     if (articlesError) {
       console.error('Error deleting articles:', articlesError)
     } else {
-      console.log('✓ Deleted articles')
+      console.log('Deleted articles')
     }
 
     // 2. Delete post ratings
@@ -41,7 +43,7 @@ export async function POST(request: NextRequest) {
       if (ratingsError) {
         console.error('Error deleting ratings:', ratingsError)
       } else {
-        console.log('✓ Deleted post ratings')
+        console.log('Deleted post ratings')
       }
     }
 
@@ -64,7 +66,7 @@ export async function POST(request: NextRequest) {
         .delete()
         .eq('issue_id', issueId)
 
-      console.log('✓ Deleted duplicate groups')
+      console.log('Deleted duplicate groups')
     }
 
     // 4. Delete RSS posts
@@ -76,7 +78,7 @@ export async function POST(request: NextRequest) {
     if (postsError) {
       console.error('Error deleting posts:', postsError)
     } else {
-      console.log('✓ Deleted RSS posts')
+      console.log('Deleted RSS posts')
     }
 
     // 5. Reset issue subject line
@@ -91,7 +93,7 @@ export async function POST(request: NextRequest) {
     if (issueError) {
       console.error('Error resetting issue:', issueError)
     } else {
-      console.log('✓ Reset issue subject line')
+      console.log('Reset issue subject line')
     }
 
     return NextResponse.json({
@@ -99,12 +101,5 @@ export async function POST(request: NextRequest) {
       message: 'issue reset - ready for fresh RSS processing with updated prompts',
       issue_id: issueId
     })
-
-  } catch (error) {
-    console.error('Reset issue error:', error)
-    return NextResponse.json({
-      error: 'Failed to reset issue',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

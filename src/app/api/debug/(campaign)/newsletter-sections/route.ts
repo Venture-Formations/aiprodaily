@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(campaign)/newsletter-sections' },
+  async () => {
     console.log('Debug: Fetching all newsletter sections...')
 
     // Fetch ALL newsletter sections (not just active ones)
@@ -34,13 +36,5 @@ export async function GET(request: NextRequest) {
       active_sections_list: activeSections || [],
       message: `Found ${allSections?.length || 0} total sections, ${activeSections?.length || 0} active sections`
     })
-
-  } catch (error) {
-    console.error('Failed to fetch newsletter sections:', error)
-    return NextResponse.json({
-      success: false,
-      error: 'Failed to fetch newsletter sections',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

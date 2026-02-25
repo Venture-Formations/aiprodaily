@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 import { TextBoxGenerator } from '@/lib/text-box-modules/text-box-generator'
@@ -73,13 +72,9 @@ function injectNewsletterContext(obj: any, data: TextBoxPlaceholderData): any {
   return obj
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai/test-prompt' },
+  async ({ request }) => {
     const body = await request.json()
     const { provider, promptJson, post, publication_id, isCustomFreeform } = body
 
@@ -254,14 +249,5 @@ export async function POST(request: NextRequest) {
       apiRequest, // Return the exact API request object
       fullApiResponse, // Return full API response for debugging
     })
-  } catch (error) {
-    console.error('[AI Test] Error:', error)
-    return NextResponse.json(
-      {
-        error: 'Failed to test prompt',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)

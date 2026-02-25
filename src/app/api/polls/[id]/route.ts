@@ -1,13 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { withApiHandler } from '@/lib/api-handler'
 
 // GET /api/polls/[id] - Get single poll
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'polls/[id]' },
+  async ({ request, params }) => {
+    const id = params.id
     const searchParams = request.nextUrl.searchParams
     const publicationId = searchParams.get('publication_id')
 
@@ -34,22 +33,14 @@ export async function GET(
     }
 
     return NextResponse.json({ poll })
-  } catch (error) {
-    console.error('[Polls] Error in GET /api/polls/[id]:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch poll' },
-      { status: 500 }
-    )
   }
-}
+)
 
 // PATCH /api/polls/[id] - Update poll
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'polls/[id]' },
+  async ({ request, params }) => {
+    const id = params.id
     const body = await request.json()
     const { publication_id, title, question, options, image_url, is_active } = body
 
@@ -103,22 +94,14 @@ export async function PATCH(
 
     console.log(`[Polls] Updated poll ${id} for publication ${publication_id}`)
     return NextResponse.json({ poll })
-  } catch (error) {
-    console.error('[Polls] Error in PATCH /api/polls/[id]:', error)
-    return NextResponse.json(
-      { error: 'Failed to update poll' },
-      { status: 500 }
-    )
   }
-}
+)
 
 // DELETE /api/polls/[id] - Delete poll
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'polls/[id]' },
+  async ({ request, params }) => {
+    const id = params.id
     const searchParams = request.nextUrl.searchParams
     const publicationId = searchParams.get('publication_id')
 
@@ -142,11 +125,5 @@ export async function DELETE(
 
     console.log(`[Polls] Deleted poll ${id} from publication ${publicationId}`)
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('[Polls] Error in DELETE /api/polls/[id]:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete poll' },
-      { status: 500 }
-    )
   }
-}
+)

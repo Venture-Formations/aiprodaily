@@ -1,24 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { MailerLiteService } from '@/lib/mailerlite'
-import { authOptions } from '@/lib/auth'
+import { withApiHandler } from '@/lib/api-handler'
 import { getPublicationSetting } from '@/lib/publication-settings'
 
-interface RouteParams {
-  params: Promise<{
-    id: string
-  }>
-}
-
-export async function POST(request: NextRequest, { params }: RouteParams) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id } = await params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/send-test' },
+  async ({ params }) => {
+    const id = params.id
 
     // Fetch issue with articles, manual articles, and events
     const { data: issue, error } = await supabaseAdmin
@@ -95,12 +84,5 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         error: 'SendGrid test send not yet implemented'
       }, { status: 501 })
     }
-
-  } catch (error) {
-    console.error('Failed to send test email:', error)
-    return NextResponse.json({
-      error: 'Failed to send test email',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

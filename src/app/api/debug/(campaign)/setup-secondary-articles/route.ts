@@ -1,12 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * Database setup endpoint for secondary articles feature
  * Run this endpoint to add the required columns and tables
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(campaign)/setup-secondary-articles' },
+  async () => {
     const results = {
       rss_feeds_columns: { success: false, message: '' },
       secondary_articles_table: { success: false, message: '' },
@@ -150,16 +152,5 @@ export async function GET(request: NextRequest) {
         : 'Some database changes failed - see details',
       details: results
     })
-
-  } catch (error: any) {
-    console.error('Setup error:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message,
-        note: 'You may need to run the SQL manually in Supabase SQL Editor. See database_migration_secondary_articles.sql file.'
-      },
-      { status: 500 }
-    )
   }
-}
+)

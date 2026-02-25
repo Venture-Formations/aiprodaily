@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * Reset a pending submission to allow reprocessing
  * Usage: /api/debug/reset-pending-submission?session_id=cs_test_...
  */
-export async function GET(request: Request) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/reset-pending-submission' },
+  async ({ request, logger }) => {
   const { searchParams } = new URL(request.url)
   const sessionId = searchParams.get('session_id')
 
@@ -53,4 +56,5 @@ export async function GET(request: Request) {
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: Request) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-logs' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const issueId = searchParams.get('issue_id')
     const limit = parseInt(searchParams.get('limit') || '50')
@@ -33,12 +35,5 @@ export async function GET(request: Request) {
         created_at: log.created_at
       })) || []
     })
-
-  } catch (error) {
-    console.error('Check logs error:', error)
-    return NextResponse.json({
-      error: 'Failed to check logs',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

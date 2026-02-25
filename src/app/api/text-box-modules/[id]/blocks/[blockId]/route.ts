@@ -1,16 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-interface RouteContext {
-  params: Promise<{ id: string; blockId: string }>
-}
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET /api/text-box-modules/[id]/blocks/[blockId] - Get a single block
  */
-export async function GET(request: NextRequest, context: RouteContext) {
-  try {
-    const { id: moduleId, blockId } = await context.params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'text-box-modules/[id]/blocks/[blockId]' },
+  async ({ params }) => {
+    const moduleId = params.id
+    const blockId = params.blockId
 
     const { data: block, error } = await supabaseAdmin
       .from('text_box_blocks')
@@ -33,22 +32,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
       success: true,
       block
     })
-
-  } catch (error: any) {
-    console.error('[TextBoxBlocks] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch block', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/text-box-modules/[id]/blocks/[blockId] - Update a block
  */
-export async function PATCH(request: NextRequest, context: RouteContext) {
-  try {
-    const { id: moduleId, blockId } = await context.params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'text-box-modules/[id]/blocks/[blockId]' },
+  async ({ params, request }) => {
+    const moduleId = params.id
+    const blockId = params.blockId
     const body = await request.json()
 
     // Build update object - accept both camelCase and snake_case
@@ -117,22 +111,17 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       success: true,
       block
     })
-
-  } catch (error: any) {
-    console.error('[TextBoxBlocks] Failed to update:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update block', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * DELETE /api/text-box-modules/[id]/blocks/[blockId] - Delete a block
  */
-export async function DELETE(request: NextRequest, context: RouteContext) {
-  try {
-    const { id: moduleId, blockId } = await context.params
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'text-box-modules/[id]/blocks/[blockId]' },
+  async ({ params }) => {
+    const moduleId = params.id
+    const blockId = params.blockId
 
     // Verify block exists and belongs to module
     const { data: block } = await supabaseAdmin
@@ -163,12 +152,5 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       success: true,
       message: 'Block deleted'
     })
-
-  } catch (error: any) {
-    console.error('[TextBoxBlocks] Failed to delete:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete block', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

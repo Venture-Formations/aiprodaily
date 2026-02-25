@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
@@ -6,8 +7,9 @@ import { supabaseAdmin } from '@/lib/supabase'
  * Query params:
  *   - ids: comma-separated list of app IDs to fetch
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai-apps' },
+  async ({ request }) => {
     const { searchParams } = new URL(request.url)
     const idsParam = searchParams.get('ids')
 
@@ -30,21 +32,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       apps: apps || []
     })
-
-  } catch (error: any) {
-    console.error('Failed to fetch AI applications:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch AI applications', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST /api/ai-apps - Create new AI application
  */
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai-apps' },
+  async ({ request }) => {
     const body = await request.json()
 
     // Get the accounting newsletter ID
@@ -83,12 +79,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       app
     }, { status: 201 })
-
-  } catch (error: any) {
-    console.error('Failed to create AI application:', error)
-    return NextResponse.json(
-      { error: 'Failed to create AI application', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

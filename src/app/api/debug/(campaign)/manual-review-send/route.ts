@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { MailerLiteService } from '@/lib/mailerlite'
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(campaign)/manual-review-send' },
+  async () => {
     console.log('=== MANUAL REVIEW SEND ===')
 
     // Get tomorrow's issue
@@ -99,16 +101,5 @@ export async function POST(request: NextRequest) {
       activeArticlesCount: activeArticles.length,
       timestamp: new Date().toISOString()
     })
-
-  } catch (error) {
-    console.error('=== MANUAL REVIEW SEND FAILED ===')
-    console.error('Error:', error)
-
-    return NextResponse.json({
-      success: false,
-      error: 'Manual review send failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
-    }, { status: 500 })
   }
-}
+)

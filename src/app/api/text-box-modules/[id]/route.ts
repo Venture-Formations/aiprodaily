@@ -1,16 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-interface RouteContext {
-  params: Promise<{ id: string }>
-}
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET /api/text-box-modules/[id] - Get a single text box module with blocks
  */
-export async function GET(request: NextRequest, context: RouteContext) {
-  try {
-    const { id } = await context.params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'text-box-modules/[id]' },
+  async ({ params }) => {
+    const id = params.id
 
     const { data: module, error } = await supabaseAdmin
       .from('text_box_modules')
@@ -43,22 +41,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
       success: true,
       module: sortedModule
     })
-
-  } catch (error: any) {
-    console.error('[TextBoxModules] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch text box module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/text-box-modules/[id] - Update a text box module
  */
-export async function PATCH(request: NextRequest, context: RouteContext) {
-  try {
-    const { id } = await context.params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'text-box-modules/[id]' },
+  async ({ params, request }) => {
+    const id = params.id
     const body = await request.json()
 
     // Build update object with only allowed fields
@@ -103,23 +95,17 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       success: true,
       module
     })
-
-  } catch (error: any) {
-    console.error('[TextBoxModules] Failed to update:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update text box module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * DELETE /api/text-box-modules/[id] - Delete a text box module
  * Also deletes associated blocks (via CASCADE)
  */
-export async function DELETE(request: NextRequest, context: RouteContext) {
-  try {
-    const { id } = await context.params
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'text-box-modules/[id]' },
+  async ({ params }) => {
+    const id = params.id
 
     // Get module info for logging
     const { data: module } = await supabaseAdmin
@@ -149,12 +135,5 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       success: true,
       message: 'Text box module deleted'
     })
-
-  } catch (error: any) {
-    console.error('[TextBoxModules] Failed to delete:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete text box module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

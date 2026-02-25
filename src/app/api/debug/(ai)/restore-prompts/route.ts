@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST() {
-  try {
-    console.log('Restoring AI prompts to database with correct 1-20 scale...')
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(ai)/restore-prompts' },
+  async ({ logger }) => {
+    logger.info('Restoring AI prompts to database with correct 1-20 scale...')
 
     const prompts: Array<{ key: string; description: string; value: string }> = [
       {
@@ -123,14 +125,14 @@ Respond with valid JSON in this exact format:
         })
 
       if (error) {
-        console.error(`Failed to restore ${prompt.key}:`, error)
+        logger.error({ key: prompt.key, err: error }, 'Failed to restore prompt')
         return NextResponse.json({
           success: false,
           error: `Failed to restore ${prompt.key}: ${error.message}`
         }, { status: 500 })
       }
 
-      console.log(`✓ Restored ${prompt.key}`)
+      logger.info({ key: prompt.key }, 'Restored prompt')
     }
 
     return NextResponse.json({
@@ -138,12 +140,5 @@ Respond with valid JSON in this exact format:
       message: 'Successfully restored AI prompts with correct 1-20 scale',
       prompts_restored: prompts.map(p => p.key)
     })
-
-  } catch (error) {
-    console.error('Restore prompts error:', error)
-    return NextResponse.json({
-      error: 'Failed to restore prompts',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

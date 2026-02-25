@@ -1,23 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
 
 /**
  * Check how many posts need criteria 1-3 backfilling
  * Provides recommendations on how to run the backfill
  */
-export async function POST(request: NextRequest) {
-  try {
-    // Check auth
-    const session = await getServerSession(authOptions)
-    const { searchParams } = new URL(request.url)
-    const secret = searchParams.get('secret')
-
-    if (!session && secret !== process.env.CRON_SECRET) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'backfill/criteria-1-2-3/check' },
+  async ({ request, logger }) => {
     const body = await request.json()
     const { newsletterId } = body
 
@@ -116,12 +107,5 @@ Split into two batches:
       totalPosts: total,
       shouldSplit: total > 75
     })
-
-  } catch (error) {
-    console.error('[Check C1-3] Error:', error)
-    return NextResponse.json({
-      error: 'Check failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

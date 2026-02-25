@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import { FeedbackModuleSelector } from '@/lib/feedback-modules'
+import { withApiHandler } from '@/lib/api-handler'
 
 export const maxDuration = 60
 
@@ -9,9 +8,9 @@ export const maxDuration = 60
 const STAGING_USER_ID = '00000000-0000-0000-0000-000000000001'
 
 // GET /api/feedback-modules/analytics - Get feedback mod analytics for dashboard
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'feedback-modules/analytics' },
+  async ({ request, session }) => {
     // Use session user ID or fallback to staging user
     const userId = session?.user?.id || STAGING_USER_ID
 
@@ -85,11 +84,5 @@ export async function GET(request: NextRequest) {
       stats,
       recent_comments: recentComments
     })
-  } catch (error) {
-    console.error('[FeedbackModules] Error in GET analytics:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch analytics' },
-      { status: 500 }
-    )
   }
-}
+)

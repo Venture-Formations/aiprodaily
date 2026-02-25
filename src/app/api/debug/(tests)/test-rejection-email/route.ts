@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { GmailService } from '@/lib/gmail-service'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-rejection-email' },
+  async ({ request, logger }) => {
   try {
     const gmail = new GmailService()
 
@@ -47,4 +50,5 @@ export async function GET(request: NextRequest) {
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

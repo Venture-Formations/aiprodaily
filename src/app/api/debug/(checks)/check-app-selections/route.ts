@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-app-selections' },
+  async ({ request, logger }) => {
     // Get the 5 most recent issues
     const { data: issues, error: issuesError } = await supabaseAdmin
       .from('publication_issues')
@@ -66,12 +68,5 @@ export async function GET(request: NextRequest) {
         campaigns_without_prompts: results.filter(r => !r.prompt_selected).length
       }
     })
-
-  } catch (error) {
-    console.error('Error checking app selections:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

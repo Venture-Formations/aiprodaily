@@ -1,16 +1,18 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AppSelector } from '@/lib/app-selector'
 
-export async function POST(request: Request) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(ai)/manual-select-apps' },
+  async ({ request, logger }) => {
     const { issueId } = await request.json()
 
     if (!issueId) {
       return NextResponse.json({ error: 'issueId required' }, { status: 400 })
     }
 
-    console.log('Manual AI app selection for issue:', issueId)
+    logger.info({ issueId }, 'Manual AI app selection for issue')
 
     // Get accounting newsletter ID
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
@@ -26,12 +28,12 @@ export async function POST(request: Request) {
       }, { status: 404 })
     }
 
-    console.log('Found newsletter:', newsletter.id)
+    logger.info({ newsletterId: newsletter.id }, 'Found newsletter')
 
     // Select apps for issue
     const selectedApps = await AppSelector.selectAppsForissue(issueId, newsletter.id)
 
-    console.log(`Selected ${selectedApps.length} AI applications`)
+    logger.info({ count: selectedApps.length }, 'Selected AI applications')
 
     return NextResponse.json({
       success: true,
@@ -44,12 +46,5 @@ export async function POST(request: Request) {
         category: app.category
       }))
     })
-
-  } catch (error) {
-    console.error('Manual app selection error:', error)
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
-    }, { status: 500 })
   }
-}
+)

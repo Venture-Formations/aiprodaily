@@ -1,7 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-env-vars' },
+  async () => {
     const envVars = {
       GOOGLE_CLOUD_TYPE: !!process.env.GOOGLE_CLOUD_TYPE,
       GOOGLE_CLOUD_PROJECT_ID: !!process.env.GOOGLE_CLOUD_PROJECT_ID,
@@ -33,11 +35,5 @@ export async function GET(request: NextRequest) {
       values: values,
       message: hasIndividualVars ? 'Individual variables detected' : 'No individual variables, falling back to JSON'
     })
-
-  } catch (error) {
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    })
   }
-}
+)

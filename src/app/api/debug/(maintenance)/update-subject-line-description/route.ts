@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/update-subject-line-description' },
+  async ({ logger }) => {
   try {
     // Update the subject line generator description
     const { error } = await supabaseAdmin
@@ -35,4 +38,5 @@ export async function GET() {
       details: error.message
     }, { status: 500 })
   }
-}
+  }
+)

@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { Poll } from '@/types/database'
+import { withApiHandler } from '@/lib/api-handler'
 
 // GET /api/polls - Get all polls for a publication
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'polls' },
+  async ({ request }) => {
     const searchParams = request.nextUrl.searchParams
     const publicationId = searchParams.get('publication_id')
     const activeOnly = searchParams.get('active') === 'true'
@@ -36,18 +37,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       polls: activeOnly ? (polls?.[0] || null) : polls
     })
-  } catch (error) {
-    console.error('[Polls] Error in GET /api/polls:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch polls' },
-      { status: 500 }
-    )
   }
-}
+)
 
 // POST /api/polls - Create new poll for a publication
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'polls' },
+  async ({ request }) => {
     const body = await request.json()
     const { publication_id, title, question, options, image_url, is_active } = body
 
@@ -101,11 +97,5 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Polls] Created poll "${title}" for publication ${publication_id}`)
     return NextResponse.json({ poll }, { status: 201 })
-  } catch (error) {
-    console.error('[Polls] Error in POST /api/polls:', error)
-    return NextResponse.json(
-      { error: 'Failed to create poll' },
-      { status: 500 }
-    )
   }
-}
+)

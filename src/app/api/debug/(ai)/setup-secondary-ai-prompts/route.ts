@@ -1,12 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * Initialize AI prompts for secondary articles section
  * Creates database entries with same prompts as primary section (can be customized later via UI)
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(ai)/setup-secondary-ai-prompts' },
+  async () => {
     // Get the primary section prompts to use as templates
     const { data: primaryPrompts, error: fetchError } = await supabaseAdmin
       .from('app_settings')
@@ -129,16 +131,5 @@ export async function GET(request: NextRequest) {
         : 'Some secondary article AI prompts failed - see details',
       results
     })
-
-  } catch (error: any) {
-    console.error('Setup error:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message,
-        note: 'Failed to initialize secondary article AI prompts'
-      },
-      { status: 500 }
-    )
   }
-}
+)

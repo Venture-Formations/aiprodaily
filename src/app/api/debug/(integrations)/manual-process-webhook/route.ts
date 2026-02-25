@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SlackNotificationService } from '@/lib/slack'
 
@@ -6,7 +7,9 @@ import { SlackNotificationService } from '@/lib/slack'
  * Manually process a pending submission
  * This bypasses webhook signature verification to test the processing logic
  */
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(integrations)/manual-process-webhook' },
+  async ({ request, logger }) => {
   const searchParams = request.nextUrl.searchParams
   const sessionId = searchParams.get('session_id')
 
@@ -147,4 +150,5 @@ export async function GET(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

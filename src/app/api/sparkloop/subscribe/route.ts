@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { createHash } from 'crypto'
 import { SparkLoopService } from '@/lib/sparkloop-client'
 import { supabaseAdmin } from '@/lib/supabase'
@@ -16,8 +17,9 @@ import { PUBLICATION_ID } from '@/lib/config'
  *
  * Country code is detected server-side from Vercel's x-vercel-ip-country header.
  */
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'public', logContext: 'sparkloop-subscribe' },
+  async ({ request, logger }) => {
     const body = await request.json()
     const { email, refCodes, source } = body
     const submissionSource = source === 'recs_page' ? 'recs_page' : 'custom_popup'
@@ -121,7 +123,7 @@ export async function POST(request: NextRequest) {
       console.error('[SparkLoop Subscribe] Failed to record API confirmation event:', eventError)
     }
 
-    // Record submissions in our metrics — route to popup or page column based on source
+    // Record submissions in our metrics -- route to popup or page column based on source
     try {
       const submissionRpc = submissionSource === 'recs_page'
         ? 'increment_sparkloop_page_submissions'
@@ -198,15 +200,5 @@ export async function POST(request: NextRequest) {
       success: true,
       subscribedCount: activeRefCodes.length,
     })
-  } catch (error) {
-    console.error('[SparkLoop Subscribe] Failed:', error)
-
-    return NextResponse.json(
-      {
-        error: 'Failed to subscribe to newsletters',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
   }
-}
+)

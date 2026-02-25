@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/update-topic-deduper-outputs' },
+  async ({ logger }) => {
   try {
     // Update the topic deduper expected outputs to match what the code actually uses
     const { error } = await supabaseAdmin
@@ -43,4 +46,5 @@ export async function GET() {
       details: error.message
     }, { status: 500 })
   }
-}
+  }
+)

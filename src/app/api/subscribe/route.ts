@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { headers } from 'next/headers'
 import axios from 'axios'
 import { getPublicationByDomain, getPublicationSetting, getEmailProviderSettings } from '@/lib/publication-settings'
@@ -22,8 +23,9 @@ const mailerliteClient = axios.create({
  * Used by website homepage subscribe form
  * Captures Facebook Pixel data for attribution tracking
  */
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'public', logContext: 'subscribe' },
+  async ({ request, logger }) => {
     const body = await request.json()
     const { email, facebook_pixel, name } = body
 
@@ -52,7 +54,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(response, { status: 400 })
       }
 
-      // deliverable, risky, unknown → proceed
+      // deliverable, risky, unknown -> proceed
       if (data.did_you_mean) {
         console.log(`[Subscribe] Kickbox suggested ${data.did_you_mean} for ${email}`)
       }
@@ -195,13 +197,5 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(successResponse)
-
-  } catch (error: any) {
-    console.error('[Subscribe] Subscription failed:', error)
-
-    return NextResponse.json({
-      error: 'Subscription failed',
-      message: error.message || 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

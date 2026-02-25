@@ -1,18 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-type RouteParams = Promise<{ id: string }>
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET /api/ad-modules/[id]/companies
  * List companies for a module with their ads, auto-creating junction entries for any missing ones.
  */
-export async function GET(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ad-modules/[id]/companies' },
+  async ({ params }) => {
     const moduleId = params.id
 
     // Get the module for context
@@ -145,11 +141,5 @@ export async function GET(
         selection_mode: adModule.selection_mode
       }
     })
-  } catch (error: any) {
-    console.error('[AdModules] Failed to fetch companies:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch companies', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

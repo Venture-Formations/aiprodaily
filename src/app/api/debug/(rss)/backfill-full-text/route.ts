@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { ArticleExtractor } from '@/lib/article-extractor'
 
@@ -14,7 +15,9 @@ export const maxDuration = 600 // 10 minutes for backfill
  * 2. Try to extract using ArticleExtractor (includes Jina AI fallback)
  * 3. Update database with successful extractions
  */
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(rss)/backfill-full-text' },
+  async ({ request, logger }) => {
   const { searchParams } = new URL(request.url)
   const issueId = searchParams.get('issue_id')
   const dryRun = searchParams.get('dry_run') !== 'false' // Default true
@@ -174,4 +177,5 @@ export async function GET(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

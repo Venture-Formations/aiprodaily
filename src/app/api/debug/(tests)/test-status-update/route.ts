@@ -1,17 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { validateDebugAuth } from '@/lib/debug-auth'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
 
-export async function GET(request: NextRequest) {
-  // Validate authentication
-  const authResult = validateDebugAuth(request)
-  if (!authResult.authorized) {
-    return authResult.response
-  }
-
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-status-update' },
+  async ({ request, session, logger }) => {
     const { searchParams } = new URL(request.url)
     const issueId = searchParams.get('issue_id')
 
@@ -19,19 +12,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'issueId parameter required' }, { status: 400 })
     }
 
-    console.log('=== STATUS UPDATE DEBUG ===')
-    console.log('issue ID:', issueId)
-
-    // Check session
-    const session = await getServerSession(authOptions)
-    console.log('Session:', {
-      exists: !!session,
-      user: session?.user?.email || 'none'
-    })
-
-    if (!session) {
-      return NextResponse.json({ error: 'No session found' }, { status: 401 })
-    }
+    logger.info({ issueId }, 'Status update debug')
 
     // Check if issue exists
     const { data: issue, error: issueError } = await supabaseAdmin
@@ -39,12 +20,6 @@ export async function GET(request: NextRequest) {
       .select('*')
       .eq('id', issueId)
       .single()
-
-    console.log('issue lookup:', {
-      found: !!issue,
-      error: issueError?.message || 'none',
-      status: issue?.status || 'none'
-    })
 
     if (issueError) {
       return NextResponse.json({
@@ -59,7 +34,6 @@ export async function GET(request: NextRequest) {
     }
 
     // Test the update operation
-    console.log('Testing status update...')
     const { error: updateError } = await supabaseAdmin
       .from('publication_issues')
       .update({
@@ -69,12 +43,6 @@ export async function GET(request: NextRequest) {
         last_action_by: session.user?.email || 'unknown'
       })
       .eq('id', issueId)
-
-    console.log('Update result:', {
-      success: !updateError,
-      error: updateError?.message || 'none',
-      code: updateError?.code || 'none'
-    })
 
     if (updateError) {
       return NextResponse.json({
@@ -94,13 +62,5 @@ export async function GET(request: NextRequest) {
         updated_status: 'changes_made'
       }
     })
-
-  } catch (error) {
-    console.error('Debug test failed:', error)
-    return NextResponse.json({
-      error: 'Debug test failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : 'none'
-    }, { status: 500 })
   }
-}
+)

@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(ai)/init-subject-line-prompt' },
+  async () => {
     // Check if subject line prompt already exists
     const { data: existing } = await supabaseAdmin
       .from('app_settings')
@@ -61,12 +63,5 @@ Respond with ONLY the headline text - no JSON, no quotes, no extra formatting. J
       message: 'Subject line prompt initialized successfully',
       action: 'created'
     })
-
-  } catch (error: any) {
-    console.error('Error initializing subject line prompt:', error)
-    return NextResponse.json({
-      error: 'Failed to initialize subject line prompt',
-      details: error.message
-    }, { status: 500 })
   }
-}
+)

@@ -1,22 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET /api/campaigns/[id]/ad-modules - Get ad mod selections for an issue
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: issueId } = await params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/ad-modules' },
+  async ({ params }) => {
+    const issueId = params.id
 
     // Get the issue to get publication_id
     const { data: issue, error: issueError } = await supabaseAdmin
@@ -202,31 +194,17 @@ export async function GET(
       modules: allModules || [],
       moduleAds
     })
-
-  } catch (error: any) {
-    console.error('[AdModules] Error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch ad modules', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST /api/campaigns/[id]/ad-modules - Manually select an ad for a mod
  * Body: { moduleId, adId }
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: issueId } = await params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/ad-modules' },
+  async ({ params, request }) => {
+    const issueId = params.id
     const body = await request.json()
     const { moduleId, adId } = body
 
@@ -244,12 +222,5 @@ export async function POST(
     }
 
     return NextResponse.json({ success: true })
-
-  } catch (error: any) {
-    console.error('[AdModules] Error selecting ad:', error)
-    return NextResponse.json(
-      { error: 'Failed to select ad', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

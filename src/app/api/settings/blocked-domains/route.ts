@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
@@ -13,14 +12,9 @@ function normalizeDomain(domain: string): string {
 /**
  * GET - Fetch all blocked domains for the publication
  */
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/blocked-domains' },
+  async () => {
     // Get the first active newsletter for publication_id
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
       .from('publications')
@@ -57,27 +51,15 @@ export async function GET(request: NextRequest) {
       success: true,
       domains: blockedDomains
     })
-
-  } catch (error) {
-    console.error('Blocked domains GET error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST - Add a domain to the blocked list
  */
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/blocked-domains' },
+  async ({ request }) => {
     const body = await request.json()
     const { domain } = body
 
@@ -160,27 +142,15 @@ export async function POST(request: NextRequest) {
       message: `Domain "${normalizedDomain}" blocked successfully`,
       domains: blockedDomains
     })
-
-  } catch (error) {
-    console.error('Blocked domains POST error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * DELETE - Remove a domain from the blocked list
  */
-export async function DELETE(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/blocked-domains' },
+  async ({ request }) => {
     const body = await request.json()
     const { domain } = body
 
@@ -248,12 +218,5 @@ export async function DELETE(request: NextRequest) {
       message: `Domain "${normalizedDomain}" unblocked successfully`,
       domains: blockedDomains
     })
-
-  } catch (error) {
-    console.error('Blocked domains DELETE error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

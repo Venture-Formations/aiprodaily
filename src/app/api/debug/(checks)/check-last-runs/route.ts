@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-last-runs' },
+  async ({ request, logger }) => {
     // Get all last run settings
     const { data: lastRuns } = await supabaseAdmin
       .from('app_settings')
@@ -29,12 +31,5 @@ export async function GET(request: NextRequest) {
       currentDate: new Date().toISOString().split('T')[0],
       currentTime: new Date().toISOString()
     })
-
-  } catch (error) {
-    console.error('Error checking last runs:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

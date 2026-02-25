@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { MailerLiteService } from '@/lib/mailerlite'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-mailerlite' },
+  async ({ logger }) => {
   try {
     console.log('Testing MailerLite integration...')
 
@@ -115,4 +118,5 @@ export async function GET(request: NextRequest) {
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

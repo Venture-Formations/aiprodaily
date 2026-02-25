@@ -1,15 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'logs' },
+  async ({ request }) => {
     const url = new URL(request.url)
     const since = url.searchParams.get('since') || new Date(Date.now() - 5 * 60 * 1000).toISOString() // Last 5 minutes
 
@@ -29,12 +24,5 @@ export async function GET(request: NextRequest) {
       logs: logs || [],
       timestamp: new Date().toISOString()
     })
-
-  } catch (error) {
-    console.error('Failed to get logs:', error)
-    return NextResponse.json({
-      error: 'Failed to get logs',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
@@ -18,14 +17,9 @@ function extractDomain(url: string): string | null {
 /**
  * GET - Fetch domains with extraction failures as suggestions
  */
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/blocked-domains/suggestions' },
+  async () => {
     // Get the first active newsletter for publication_id
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
       .from('publications')
@@ -155,27 +149,15 @@ export async function GET(request: NextRequest) {
       success: true,
       suggestions
     })
-
-  } catch (error) {
-    console.error('Blocked domains suggestions error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST - Ignore a domain suggestion (dismiss without blocking)
  */
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/blocked-domains/suggestions' },
+  async ({ request }) => {
     const body = await request.json()
     const { domain } = body
 
@@ -242,12 +224,5 @@ export async function POST(request: NextRequest) {
       success: true,
       message: `Domain "${normalizedDomain}" ignored`
     })
-
-  } catch (error) {
-    console.error('Ignore domain suggestion error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

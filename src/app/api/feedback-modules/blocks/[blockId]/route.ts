@@ -1,15 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { FeedbackModuleSelector } from '@/lib/feedback-modules'
+import { withApiHandler } from '@/lib/api-handler'
 
 export const maxDuration = 30
 
 // PATCH /api/feedback-modules/blocks/[blockId] - Update a feedback block
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ blockId: string }> }
-) {
-  try {
-    const { blockId } = await params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'feedback-modules/blocks/[blockId]' },
+  async ({ params, request }) => {
+    const blockId = params.blockId
     const body = await request.json()
 
     console.log('[FeedbackBlocks] Updating block:', blockId, body)
@@ -27,22 +26,14 @@ export async function PATCH(
       success: true,
       block: result.block
     })
-  } catch (error) {
-    console.error('[FeedbackBlocks] Error updating block:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update block' },
-      { status: 500 }
-    )
   }
-}
+)
 
 // DELETE /api/feedback-modules/blocks/[blockId] - Delete a feedback block
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ blockId: string }> }
-) {
-  try {
-    const { blockId } = await params
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'feedback-modules/blocks/[blockId]' },
+  async ({ params }) => {
+    const blockId = params.blockId
 
     console.log('[FeedbackBlocks] Deleting block:', blockId)
 
@@ -58,11 +49,5 @@ export async function DELETE(
     return NextResponse.json({
       success: true
     })
-  } catch (error) {
-    console.error('[FeedbackBlocks] Error deleting block:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete block' },
-      { status: 500 }
-    )
   }
-}
+)

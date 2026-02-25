@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
 import { callAIWithPrompt } from '@/lib/openai'
 
 /**
@@ -9,21 +8,10 @@ import { callAIWithPrompt } from '@/lib/openai'
  * Re-evaluates all posts from the last 36 hours with criteria 4
  * and updates total_score to include the new criteria
  */
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'backfill/criteria-4' },
+  async ({ request, logger }) => {
     console.log('[Backfill] Endpoint called')
-
-    // Check auth: either session or CRON_SECRET
-    const session = await getServerSession(authOptions)
-    const { searchParams } = new URL(request.url)
-    const secret = searchParams.get('secret')
-
-    console.log('[Backfill] Auth check:', { hasSession: !!session, hasSecret: !!secret })
-
-    if (!session && secret !== process.env.CRON_SECRET) {
-      console.log('[Backfill] Auth failed')
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     const body = await request.json()
     const { newsletterId, dryRun = false } = body
@@ -254,18 +242,7 @@ export async function POST(request: NextRequest) {
         dryRun
       }
     })
-
-  } catch (error) {
-    console.error('[Backfill] CRITICAL ERROR:', error)
-    console.error('[Backfill] Error stack:', error instanceof Error ? error.stack : 'No stack')
-    console.error('[Backfill] Error details:', JSON.stringify(error, null, 2))
-
-    return NextResponse.json({
-      error: 'Backfill failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      details: error instanceof Error ? error.stack : String(error)
-    }, { status: 500 })
   }
-}
+)
 
 export const maxDuration = 600 // 10 minutes

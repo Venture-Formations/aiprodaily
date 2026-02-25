@@ -1,16 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
 
 // GET - Fetch all AI prompts with weights for criteria
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/ai-prompts' },
+  async () => {
     // Get user's publication_id (use first active newsletter for now)
     const { data: newsletter } = await supabaseAdmin
       .from('publications')
@@ -98,27 +93,13 @@ export async function GET(request: NextRequest) {
       prompts: formattedPrompts,
       grouped
     })
-
-  } catch (error) {
-    console.error('Failed to fetch AI prompts:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)
 
 // PATCH - Update a specific AI prompt
-export async function PATCH(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/ai-prompts' },
+  async ({ request }) => {
     // Get user's publication_id (use first active newsletter for now)
     const { data: newsletter } = await supabaseAdmin
       .from('publications')
@@ -201,27 +182,13 @@ export async function PATCH(request: NextRequest) {
       success: true,
       message: 'Prompt updated successfully'
     })
-
-  } catch (error) {
-    console.error('Failed to update AI prompt:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)
 
 // POST - Reset prompt to default value (custom default if exists, otherwise code default)
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/ai-prompts' },
+  async ({ request }) => {
     // Get user's publication_id (use first active newsletter for now)
     const { data: newsletter } = await supabaseAdmin
       .from('publications')
@@ -370,18 +337,8 @@ export async function POST(request: NextRequest) {
         : 'Prompt reset to original code default',
       used_custom_default: usedCustomDefault
     })
-
-  } catch (error) {
-    console.error('Failed to process AI prompt action:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)
 
 // Helper function to get default prompts
 async function getDefaultPrompts() {

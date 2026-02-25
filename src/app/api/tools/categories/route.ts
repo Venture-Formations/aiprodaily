@@ -1,10 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { declareRoute } from '@/lib/auth-tiers'
-
-declareRoute({
-  authTier: 'public',
-  description: 'Returns static tool categories list'
-})
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 
 // Categories from directory.ts - single source of truth
 const CATEGORIES = [
@@ -21,8 +16,9 @@ const CATEGORIES = [
 
 // Simple endpoint that returns static categories
 // Featured tool restrictions are handled by the profile API when saving
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'public', logContext: 'tools-categories' },
+  async ({ request, logger }) => {
     // Return all categories - the profile API will validate featured restrictions on save
     const categoriesWithStatus = CATEGORIES.map(category => ({
       ...category,
@@ -32,9 +28,5 @@ export async function GET(request: NextRequest) {
     }))
 
     return NextResponse.json({ categories: categoriesWithStatus })
-  } catch (err) {
-    console.error('[Categories] Error:', err)
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error'
-    return NextResponse.json({ error: 'Failed to fetch categories', details: errorMessage }, { status: 500 })
   }
-}
+)

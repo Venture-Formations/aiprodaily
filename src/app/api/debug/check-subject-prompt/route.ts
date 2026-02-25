@@ -1,15 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/check-subject-prompt' },
+  async ({ logger }) => {
     // Get the active publication
     const { data: newsletter } = await supabaseAdmin
       .from('publications')
@@ -67,12 +62,5 @@ export async function GET(request: NextRequest) {
       issues,
       first_500_chars: prompt.value?.substring(0, 500)
     })
-
-  } catch (error) {
-    console.error('Error checking subject prompt:', error)
-    return NextResponse.json({
-      error: 'Failed to check subject prompt',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

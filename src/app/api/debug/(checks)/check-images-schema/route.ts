@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-images-schema' },
+  async ({ request, logger }) => {
     console.log('Checking images table schema...')
 
     // Get current table structure
@@ -49,15 +51,5 @@ export async function GET(request: NextRequest) {
       ] : [],
       timestamp: new Date().toISOString()
     })
-
-  } catch (error) {
-    console.error('Schema check API error:', error)
-    return NextResponse.json(
-      {
-        error: 'Schema check failed',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)

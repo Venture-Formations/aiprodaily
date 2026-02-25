@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // Debug endpoint to check what's preventing issue deletion
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-campaign-relations' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const issueId = searchParams.get('issue_id')
 
@@ -70,12 +72,5 @@ export async function GET(request: NextRequest) {
       },
       timestamp: new Date().toISOString()
     })
-
-  } catch (error) {
-    console.error('Error checking issue relations:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

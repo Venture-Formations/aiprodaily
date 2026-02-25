@@ -1,26 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
-
-interface RouteParams {
-  params: Promise<{
-    id: string
-  }>
-}
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET /api/campaigns/[id]/ai-app-modules
  * Fetches AI app module selections for an issue
  */
-export async function GET(request: NextRequest, { params }: RouteParams) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: issueId } = await params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/ai-app-modules' },
+  async ({ params }) => {
+    const issueId = params.id
 
     // Fetch all AI app modules for the publication
     const { data: issue } = await supabaseAdmin
@@ -113,12 +102,5 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       selections: finalSelections,
       apps
     })
-
-  } catch (error) {
-    console.error('Failed to fetch AI app modules:', error)
-    return NextResponse.json({
-      error: 'Failed to fetch AI app modules',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

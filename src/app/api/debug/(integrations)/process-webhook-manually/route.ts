@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SlackNotificationService } from '@/lib/slack'
 
@@ -6,7 +7,9 @@ import { SlackNotificationService } from '@/lib/slack'
  * Manually process a pending submission (for debugging webhook issues)
  * Usage: /api/debug/process-webhook-manually?session_id=cs_test_...
  */
-export async function GET(request: Request) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(integrations)/process-webhook-manually' },
+  async ({ request, logger }) => {
   const { searchParams } = new URL(request.url)
   const sessionId = searchParams.get('session_id')
 
@@ -184,4 +187,5 @@ export async function GET(request: Request) {
       error_type: error instanceof Error ? error.name : typeof error
     }, { status: 500 })
   }
-}
+  }
+)

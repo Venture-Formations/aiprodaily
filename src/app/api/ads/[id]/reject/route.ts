@@ -1,12 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await context.params
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'ads/[id]/reject' },
+  async ({ params, request }) => {
+    const id = params.id
     const body = await request.json()
     const { rejection_reason, rejected_by } = body
 
@@ -38,10 +37,5 @@ export async function POST(
       success: true,
       ad
     })
-  } catch (error) {
-    return NextResponse.json({
-      error: 'Failed to reject ad',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

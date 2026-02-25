@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export const maxDuration = 600
@@ -50,7 +51,9 @@ Respond with valid JSON in this exact format:
   "unique_articles": [<array of article indices that are unique (0-based)>]
 }`
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/update-topic-deduper' },
+  async ({ request, logger }) => {
   const { searchParams } = new URL(request.url)
   const dryRun = searchParams.get('dry_run') !== 'false' // Default true
 
@@ -131,4 +134,5 @@ export async function GET(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

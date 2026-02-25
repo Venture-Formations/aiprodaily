@@ -1,24 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
+import { withApiHandler } from '@/lib/api-handler'
 import { SparkLoopRecModuleSelector } from '@/lib/sparkloop-rec-modules'
 
 /**
  * GET /api/campaigns/[id]/sparkloop-rec-modules
  * Get sparkloop rec module selections for an issue
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: issueId } = await params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/sparkloop-rec-modules' },
+  async ({ params }) => {
+    const issueId = params.id
 
     // Get the issue
     const { data: issue, error: issueError } = await supabaseAdmin
@@ -50,32 +42,18 @@ export async function GET(
       modules: modules || [],
       eligibleRecs: eligible,
     })
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    console.error('[SparkLoop Rec Modules] Error:', message)
-    return NextResponse.json(
-      { error: 'Failed to fetch sparkloop rec modules', details: message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST /api/campaigns/[id]/sparkloop-rec-modules
  * Manually select recommendations for a module
  * Body: { moduleId, refCodes }
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: issueId } = await params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/sparkloop-rec-modules' },
+  async ({ params, request }) => {
+    const issueId = params.id
     const body = await request.json()
     const { moduleId, refCodes } = body
 
@@ -94,12 +72,5 @@ export async function POST(
     }
 
     return NextResponse.json({ success: true })
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    console.error('[SparkLoop Rec Modules] Error selecting recs:', message)
-    return NextResponse.json(
-      { error: 'Failed to select recommendations', details: message },
-      { status: 500 }
-    )
   }
-}
+)

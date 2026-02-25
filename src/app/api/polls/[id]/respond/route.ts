@@ -1,14 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SendGridService } from '@/lib/sendgrid'
 
 // GET /api/polls/[id]/respond - Handle poll response from email link
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
+export const GET = withApiHandler(
+  { authTier: 'public', logContext: 'polls-respond' },
+  async ({ request, params, logger }) => {
+    const id = params.id
     const searchParams = request.nextUrl.searchParams
     const option = searchParams.get('option')
     const email = searchParams.get('email')
@@ -111,10 +110,5 @@ export async function GET(
     return NextResponse.redirect(
       new URL('/poll/thank-you', request.url)
     )
-  } catch (error) {
-    console.error('[Polls] Error in GET /api/polls/[id]/respond:', error)
-    return NextResponse.redirect(
-      new URL('/poll/error?message=An unexpected error occurred', request.url)
-    )
   }
-}
+)

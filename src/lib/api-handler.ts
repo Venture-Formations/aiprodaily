@@ -33,6 +33,8 @@ export interface ApiHandlerContext<TInput = unknown> {
   logger: Logger
   /** The original request for accessing headers, params, etc. */
   request: NextRequest
+  /** Resolved dynamic route params (e.g. { id: '123' } for /api/campaigns/[id]) */
+  params: Record<string, string>
 }
 
 type ApiHandler<TInput = unknown> = (
@@ -55,7 +57,8 @@ export function withApiHandler<TInput = unknown>(
   config: ApiHandlerConfig<TInput>,
   handler: ApiHandler<TInput>
 ) {
-  return async (request: NextRequest): Promise<NextResponse> => {
+  return async (request: NextRequest, routeCtx: { params: Promise<Record<string, string>> }): Promise<NextResponse> => {
+    const resolvedParams = routeCtx?.params ? await routeCtx.params : {}
     const logger = createLogger({
       cronName: config.logContext,
     })
@@ -152,6 +155,7 @@ export function withApiHandler<TInput = unknown>(
         publicationId,
         logger,
         request,
+        params: resolvedParams,
       })
     } catch (error) {
       logger.error({ err: error }, 'Unhandled API error')

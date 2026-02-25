@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(campaign)/init-newsletter-archives' },
+  async ({ logger }) => {
     // Check if archived_newsletters table exists
     const { data: tables, error: tablesError } = await supabaseAdmin
       .from('information_schema.tables')
@@ -67,13 +69,5 @@ export async function GET() {
       action: 'created',
       note: 'Table includes indexes for fast date-based lookups'
     })
-
-  } catch (error: any) {
-    console.error('Error initializing newsletter archives:', error)
-    return NextResponse.json({
-      error: 'Failed to initialize newsletter archives',
-      details: error.message,
-      note: 'You may need to run the SQL manually in Supabase SQL Editor'
-    }, { status: 500 })
   }
-}
+)

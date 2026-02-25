@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST() {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/setup-advertisements' },
+  async ({ logger }) => {
   try {
     console.log('Setting up advertisements database schema...')
 
@@ -55,11 +58,15 @@ export async function POST() {
       note: 'You may need to run the SQL script manually in Supabase SQL Editor'
     }, { status: 500 })
   }
-}
+  }
+)
 
-export async function GET() {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/setup-advertisements' },
+  async ({ logger }) => {
   return NextResponse.json({
     message: 'Use POST method to set up advertisement tables',
     note: 'Or run database_migration_advertisements.sql manually in Supabase SQL Editor'
   })
-}
+  }
+)

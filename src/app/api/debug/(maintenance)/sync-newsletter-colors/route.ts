@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST() {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/sync-newsletter-colors' },
+  async ({ logger }) => {
   try {
     // Fetch colors from app_settings (business settings)
     const { data: settings, error: settingsError } = await supabaseAdmin
@@ -51,4 +54,5 @@ export async function POST() {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/add-phase2-statuses' },
+  async ({ logger }) => {
   try {
     // Drop the existing constraint
     const { error: dropError } = await supabaseAdmin.rpc('exec_sql', {
@@ -57,4 +60,5 @@ export async function GET() {
       instructions: 'Please run the SQL migration manually using the db/migrations/add_phase2_statuses.sql file'
     }, { status: 500 })
   }
-}
+  }
+)

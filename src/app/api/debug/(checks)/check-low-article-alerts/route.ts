@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-low-article-alerts' },
+  async ({ logger }) => {
     // Get last 10 days of campaigns
     const tenDaysAgo = new Date()
     tenDaysAgo.setDate(tenDaysAgo.getDate() - 10)
@@ -96,14 +98,5 @@ export async function GET() {
       issues: campaignsWithCounts,
       missed_alerts: missedAlerts
     })
-  } catch (error) {
-    console.error('Error checking low article alerts:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)

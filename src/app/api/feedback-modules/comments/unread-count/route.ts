@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import { FeedbackModuleSelector } from '@/lib/feedback-modules'
+import { withApiHandler } from '@/lib/api-handler'
 
 export const maxDuration = 30
 
@@ -9,8 +8,9 @@ export const maxDuration = 30
 const STAGING_USER_ID = '00000000-0000-0000-0000-000000000001'
 
 // GET /api/feedback-modules/comments/unread-count - Get unread comment count
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'feedback-modules/comments/unread-count' },
+  async ({ request, session }) => {
     const searchParams = request.nextUrl.searchParams
     const publicationId = searchParams.get('publication_id')
 
@@ -21,8 +21,6 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Try to get session for user-specific read tracking
-    const session = await getServerSession(authOptions)
     // Use session user ID or fallback to staging user
     const userId = session?.user?.id || STAGING_USER_ID
 
@@ -33,11 +31,5 @@ export async function GET(request: NextRequest) {
       success: true,
       count
     })
-  } catch (error) {
-    console.error('[FeedbackComments] Error getting unread count:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to get unread count' },
-      { status: 500 }
-    )
   }
-}
+)

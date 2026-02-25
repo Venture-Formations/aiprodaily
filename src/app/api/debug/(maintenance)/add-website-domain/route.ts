@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/add-website-domain' },
+  async ({ logger }) => {
   try {
     // Add website_domain column to newsletters table
     const { error: alterError } = await supabaseAdmin.rpc('exec_sql', {
@@ -62,4 +65,5 @@ WHERE slug = 'accounting';
       message: 'Please run the SQL above manually in Supabase SQL Editor'
     }, { status: 500 })
   }
-}
+  }
+)

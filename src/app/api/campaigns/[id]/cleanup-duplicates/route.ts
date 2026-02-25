@@ -1,13 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
-
-interface RouteParams {
-  params: Promise<{
-    id: string
-  }>
-}
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * Cleanup Duplicate Articles
@@ -18,14 +11,10 @@ interface RouteParams {
  * 3. Deletes subsequent duplicates
  * 4. If more than 6 unique articles remain, trims to top 6
  */
-export async function POST(request: NextRequest, { params }: RouteParams) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: issueId } = await params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/cleanup-duplicates' },
+  async ({ params, session }) => {
+    const issueId = params.id
 
     console.log(`[Cleanup] Starting duplicate cleanup for issue: ${issueId}`)
 
@@ -196,14 +185,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       remainingSecondary: (secondaryArticles?.length || 0) - deletedSecondary,
       message: `Cleaned up ${deletedPrimary} primary and ${deletedSecondary} secondary duplicate articles`
     })
-
-  } catch (error) {
-    console.error('[Cleanup] Failed to cleanup duplicates:', error)
-    return NextResponse.json({
-      error: 'Failed to cleanup duplicates',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
 export const maxDuration = 60

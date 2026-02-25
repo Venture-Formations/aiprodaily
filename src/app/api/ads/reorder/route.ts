@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'ads/reorder' },
+  async ({ request, logger }) => {
     const { updates } = await request.json()
 
     if (!updates || !Array.isArray(updates)) {
@@ -17,17 +19,11 @@ export async function POST(request: NextRequest) {
         .eq('id', update.id)
 
       if (error) {
-        console.error(`Error updating ad ${update.id}:`, error)
+        logger.error({ adId: update.id, err: error }, 'Error updating ad order')
         throw error
       }
     }
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Reorder error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to reorder ads' },
-      { status: 500 }
-    )
   }
-}
+)

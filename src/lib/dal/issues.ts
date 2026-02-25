@@ -13,7 +13,8 @@ import type { PublicationIssue, IssueStatus } from '@/types/database'
 
 const log = createLogger({ module: 'dal:issues' })
 
-// Column sets for consistent select lists
+// Column sets for consistent select lists (only columns that exist on publication_issues)
+// Note: mailerlite_issue_id lives in email_metrics; not on publication_issues
 const ISSUE_COLUMNS = `
   id, publication_id, date, status,
   subject_line, welcome_intro, welcome_tagline, welcome_summary,
@@ -21,7 +22,7 @@ const ISSUE_COLUMNS = `
   last_action, last_action_at, last_action_by,
   status_before_send, metrics,
   workflow_state, workflow_state_started_at, workflow_error,
-  poll_id, poll_snapshot, mailerlite_issue_id,
+  poll_id, poll_snapshot,
   failure_alerted_at,
   created_at, updated_at
 ` as const
@@ -389,8 +390,8 @@ export async function markIssueSent(
       updateData.review_sent_at = payload.reviewSentAt
       updateData.status = 'in_review'
     }
-    if (payload.mailerliteIssueId) updateData.mailerlite_issue_id = payload.mailerliteIssueId
     if (payload.statusBeforeSend) updateData.status_before_send = payload.statusBeforeSend
+    // MailerLite campaign ID is stored in email_metrics; publication_issues has no mailerlite_issue_id column
 
     const { error } = await supabaseAdmin
       .from('publication_issues')

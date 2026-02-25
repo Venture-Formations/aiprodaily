@@ -1,23 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
 import { AI_CALL } from '@/lib/openai'
+import { withApiHandler } from '@/lib/api-handler'
 
-interface RouteParams {
-  params: Promise<{
-    id: string
-  }>
-}
-
-export async function POST(request: NextRequest, { params }: RouteParams) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: issueId } = await params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/regenerate-welcome' },
+  async ({ params, session }) => {
+    const issueId = params.id
 
     console.log('[API] Regenerating welcome section for issue:', issueId)
 
@@ -133,14 +122,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       welcome_summary: welcomeSummary,
       article_count: moduleArticles.length
     })
-
-  } catch (error) {
-    console.error('[API] Failed to regenerate welcome section:', error)
-    return NextResponse.json({
-      error: 'Failed to regenerate welcome section',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
 export const maxDuration = 600

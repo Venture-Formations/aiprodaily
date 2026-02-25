@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * Debug endpoint to check RSS ingestion status
  * Shows recent posts, feed activity, and ingestion statistics
  */
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(rss)/rss-status' },
+  async ({ logger }) => {
   try {
     // Get total post count
     const { count: totalPosts } = await supabaseAdmin
@@ -93,6 +96,7 @@ export async function GET(request: NextRequest) {
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)
 
 export const maxDuration = 60

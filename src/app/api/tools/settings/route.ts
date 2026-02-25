@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { PUBLICATION_ID } from '@/lib/config'
 
@@ -12,16 +11,9 @@ const DEFAULT_SETTINGS = {
 }
 
 // GET - Fetch directory pricing settings
-export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  if ((session.user as any).role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'tools/settings' },
+  async ({ logger }) => {
     // Fetch settings from publication_settings
     const { data: settings, error } = await supabaseAdmin
       .from('publication_settings')
@@ -30,7 +22,7 @@ export async function GET(request: NextRequest) {
       .in('key', Object.keys(DEFAULT_SETTINGS))
 
     if (error) {
-      console.error('[Tools Settings] Error fetching settings:', error)
+      logger.error({ err: error }, 'Error fetching settings')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
@@ -50,23 +42,13 @@ export async function GET(request: NextRequest) {
         yearlyDiscountMonths: parseInt(settingsMap.directory_yearly_discount_months)
       }
     })
-  } catch (error) {
-    console.error('[Tools Settings] Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)
 
 // POST - Update directory pricing settings
-export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  if ((session.user as any).role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
-  try {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'tools/settings' },
+  async ({ request, logger }) => {
     const body = await request.json()
     const { paidPlacementPrice, featuredPrice, yearlyDiscountMonths } = body
 
@@ -108,16 +90,13 @@ export async function POST(request: NextRequest) {
         })
 
       if (error) {
-        console.error(`[Tools Settings] Error updating ${update.key}:`, error)
+        logger.error({ err: error, key: update.key }, 'Error updating setting')
         return NextResponse.json({ error: `Failed to update ${update.key}` }, { status: 500 })
       }
     }
 
-    console.log('[Tools Settings] Settings updated:', updates)
+    logger.info({ updates }, 'Settings updated')
 
     return NextResponse.json({ success: true, message: 'Settings updated successfully' })
-  } catch (error) {
-    console.error('[Tools Settings] Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { PUBLICATION_ID } from '@/lib/config'
 
@@ -6,8 +7,9 @@ import { PUBLICATION_ID } from '@/lib/config'
  * Get count of pending tool submissions
  * Used to show notification badge in navigation
  */
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'tools/pending-count' },
+  async ({ logger }) => {
     const { count, error } = await supabaseAdmin
       .from('ai_applications')
       .select('*', { count: 'exact', head: true })
@@ -16,13 +18,10 @@ export async function GET() {
       .eq('submission_status', 'pending')
 
     if (error) {
-      console.error('[Tools Pending Count] Error:', error)
+      logger.error({ err: error }, 'Error fetching pending count')
       return NextResponse.json({ count: 0 })
     }
 
     return NextResponse.json({ count: count || 0 })
-  } catch (error) {
-    console.error('[Tools Pending Count] Error:', error)
-    return NextResponse.json({ count: 0 })
   }
-}
+)

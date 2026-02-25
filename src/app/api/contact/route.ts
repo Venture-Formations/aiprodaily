@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import nodemailer from 'nodemailer'
 import { headers } from 'next/headers'
@@ -13,8 +14,9 @@ const gmailTransporter = nodemailer.createTransport({
   },
 })
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'public', logContext: 'contact' },
+  async ({ request, logger }) => {
     const body = await request.json()
     const { name, email, message } = body
 
@@ -107,15 +109,5 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Your message has been sent successfully!'
     })
-
-  } catch (error: any) {
-    console.error('[CONTACT] Error processing submission:', error)
-    return NextResponse.json(
-      {
-        error: 'Failed to process your submission. Please try again later.',
-        details: error.message
-      },
-      { status: 500 }
-    )
   }
-}
+)

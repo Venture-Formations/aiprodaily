@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // GET /api/polls/active - Get the currently active poll for a publication
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'public', logContext: 'polls-active' },
+  async ({ request, logger }) => {
     const searchParams = request.nextUrl.searchParams
     const publicationId = searchParams.get('publication_id')
 
@@ -34,15 +36,5 @@ export async function GET(request: NextRequest) {
       success: true,
       poll: poll || null
     })
-
-  } catch (error) {
-    console.error('[Polls] Failed to fetch active poll:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { getRoadWorkWithPerplexity } from '@/lib/perplexity'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-perplexity' },
+  async ({ request, logger }) => {
   const { searchParams } = new URL(request.url)
   const secret = searchParams.get('secret')
   const targetDate = searchParams.get('targetDate') || new Date().toISOString().split('T')[0]
@@ -38,4 +41,5 @@ export async function GET(request: NextRequest) {
       stack: error instanceof Error ? error.stack : undefined
     }, { status: 500 })
   }
-}
+  }
+)

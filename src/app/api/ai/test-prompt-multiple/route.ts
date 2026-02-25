@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 import { supabaseAdmin } from '@/lib/supabase'
@@ -65,13 +64,9 @@ function injectNewsletterContext(obj: any, data: TextBoxPlaceholderData): any {
   return obj
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai/test-prompt-multiple' },
+  async ({ request }) => {
     const body = await request.json()
     const { provider, promptJson, publication_id, prompt_type, module_id, limit = 10, offset = 0, isCustomFreeform } = body
 
@@ -302,16 +297,16 @@ export async function POST(request: NextRequest) {
           }
 
           const completion = await (openai as any).responses.create(apiRequest)
-          
+
           // Store the full API response for debugging
           fullApiResponse = completion
-          
+
           // For GPT-5 (reasoning model), search for json_schema content item explicitly
           // since reasoning block may be first item (empty, redacted)
           const outputArray = completion.output?.[0]?.content
           const jsonSchemaItem = outputArray?.find((c: any) => c.type === "json_schema")
           const textItem = outputArray?.find((c: any) => c.type === "text")
-          
+
           // Try to find JSON in any content item
           let foundJson: any = null
           if (outputArray && Array.isArray(outputArray)) {
@@ -326,7 +321,7 @@ export async function POST(request: NextRequest) {
               }
             }
           }
-          
+
           let rawResponse =
             foundJson ??                                                // JSON found in any content item
             jsonSchemaItem?.json ??                                    // JSON schema response (GPT-5 compatible)
@@ -338,7 +333,7 @@ export async function POST(request: NextRequest) {
             completion.output_text ??                                  // Legacy location
             completion.choices?.[0]?.message?.content ??               // Chat completions format
             'No response'
-          
+
           // If response is a JSON string, parse it; if it's already an object, use it directly
           if (typeof rawResponse === 'string' && rawResponse !== 'No response') {
             try {
@@ -356,15 +351,15 @@ export async function POST(request: NextRequest) {
             }
             response = 'No response'
           }
-          
+
           tokensUsed = completion.usage?.total_tokens || 0
         } else if (provider === 'claude') {
           // Send EXACTLY as-is
           const completion = await anthropic.messages.create(processedJson)
-          
+
           // Store the full API response for debugging
           fullApiResponse = completion
-          
+
           const textContent = completion.content.find(c => c.type === 'text')
           response = textContent && 'text' in textContent ? textContent.text : 'No response'
           tokensUsed = (completion.usage?.input_tokens || 0) + (completion.usage?.output_tokens || 0)
@@ -409,17 +404,8 @@ export async function POST(request: NextRequest) {
         publication_date: post.publication_date
       })), // Include source posts for reference
     })
-  } catch (error) {
-    console.error('[AI Test Multiple] Error:', error)
-    return NextResponse.json(
-      {
-        error: 'Failed to test prompt for multiple articles',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * Handle Custom/Freeform multiple testing - tests against multiple sent issues

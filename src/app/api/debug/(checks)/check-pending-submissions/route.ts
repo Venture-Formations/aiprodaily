@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-pending-submissions' },
+  async ({ request, logger }) => {
     // Check all pending submissions
     const { data: allSubmissions, error: allError } = await supabaseAdmin
       .from('pending_event_submissions')
@@ -43,10 +45,5 @@ export async function GET(request: NextRequest) {
         error: eventsError?.message || null
       }
     })
-  } catch (error) {
-    return NextResponse.json({
-      error: 'Failed to check submissions',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

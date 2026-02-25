@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { TextBoxGenerator } from '@/lib/text-box-modules'
+import { withApiHandler } from '@/lib/api-handler'
 import type { GenerationTiming } from '@/types/database'
 
 /**
@@ -7,8 +8,9 @@ import type { GenerationTiming } from '@/types/database'
  * Uses data from the last sent issue
  * Accepts prompt as JSON object or JSON string (will be parsed)
  */
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'text-box-modules/test-prompt' },
+  async ({ request }) => {
     const body = await request.json()
     const { publicationId, prompt, timing } = body
 
@@ -65,12 +67,5 @@ export async function POST(request: NextRequest) {
       result: result.result,
       timing: selectedTiming
     })
-
-  } catch (error: any) {
-    console.error('[TextBoxModules] Failed to test prompt:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to test prompt', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

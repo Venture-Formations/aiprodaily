@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { MailerLiteService } from '@/lib/mailerlite'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST(request: NextRequest) {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-mailerlite-campaign' },
+  async ({ logger }) => {
   try {
     console.log('Testing MailerLite issue creation with scheduling...')
 
@@ -49,4 +52,5 @@ export async function POST(request: NextRequest) {
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

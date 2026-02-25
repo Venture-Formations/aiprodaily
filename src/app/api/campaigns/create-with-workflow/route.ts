@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { withApiHandler } from '@/lib/api-handler'
 import { start } from 'workflow/api'
 import { createIssueWorkflow } from '@/lib/workflows/create-issue-workflow'
 
@@ -11,14 +10,9 @@ import { createIssueWorkflow } from '@/lib/workflows/create-issue-workflow'
  * Creates a issue for a specific date and triggers the full RSS workflow
  * Returns after issue is created so UI can redirect immediately
  */
-export async function POST(request: NextRequest) {
-  try {
-    // Auth check
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/create-with-workflow' },
+  async ({ request }) => {
     const body = await request.json()
     const { date, publication_id } = body
 
@@ -271,14 +265,7 @@ export async function POST(request: NextRequest) {
       issue_id: issueId,
       message: 'issue created and workflow started'
     })
-
-  } catch (error) {
-    console.error('[Create issue] Failed:', error)
-    return NextResponse.json({
-      error: 'Failed to create issue',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
 export const maxDuration = 60

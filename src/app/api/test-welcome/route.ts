@@ -1,12 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * Test endpoint for text box module generation
  * (Replaces legacy welcome section testing)
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'test-welcome' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const issueId = searchParams.get('issueId')
 
@@ -17,7 +19,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    console.log('[TEST] Testing text box modules for issue:', issueId)
+    logger.info({ issueId }, 'Testing text box modules for issue')
 
     // Get publication_id for the issue
     const { data: issue } = await supabaseAdmin
@@ -38,7 +40,7 @@ export async function GET(request: NextRequest) {
     await TextBoxModuleSelector.initializeForIssue(issueId, issue.publication_id)
     const result = await TextBoxGenerator.generateBlocksWithTiming(issueId, 'after_articles')
 
-    console.log('[TEST] Text box modules generated:', result)
+    logger.info({ result }, 'Text box modules generated')
 
     // Get the generated blocks
     const { data: issueBlocks } = await supabaseAdmin
@@ -67,13 +69,7 @@ export async function GET(request: NextRequest) {
         content_preview: b.generated_content?.substring(0, 200)
       }))
     })
-  } catch (error: any) {
-    console.error('[TEST] Error:', error)
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 export const maxDuration = 600

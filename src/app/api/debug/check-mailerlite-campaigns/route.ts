@@ -1,18 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import axios from 'axios'
 
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/check-mailerlite-campaigns' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const limit = parseInt(searchParams.get('limit') || '50')
 
@@ -28,7 +23,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: `Database error: ${dbError.message}` }, { status: 500 })
     }
 
-    console.log(`[Debug] Found ${storedMetrics?.length || 0} stored mailerlite_issue_ids`)
+    logger.info({ count: storedMetrics?.length || 0 }, '[Debug] Found stored mailerlite_issue_ids')
 
     // Query MailerLite API to list campaigns
     const mailerliteClient = axios.create({
@@ -40,12 +35,12 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    console.log('[Debug] Querying MailerLite API for campaigns...')
-    
+    logger.info('[Debug] Querying MailerLite API for campaigns...')
+
     let mailerliteCampaigns: any[] = []
     let page = 1
     const perPage = 100
-    
+
     try {
       while (true) {
         const response = await mailerliteClient.get('/campaigns', {
@@ -59,13 +54,13 @@ export async function GET(request: NextRequest) {
 
         if (response.data?.data && Array.isArray(response.data.data)) {
           mailerliteCampaigns = mailerliteCampaigns.concat(response.data.data)
-          
+
           // Check if there are more pages
           if (response.data.data.length < perPage) {
             break
           }
           page++
-          
+
           // Safety limit
           if (page > 10) break
         } else {
@@ -73,7 +68,7 @@ export async function GET(request: NextRequest) {
         }
       }
     } catch (error: any) {
-      console.error('[Debug] Error fetching campaigns from MailerLite:', error.response?.data || error.message)
+      logger.error({ err: error.response?.data || error.message }, '[Debug] Error fetching campaigns from MailerLite')
       return NextResponse.json({
         error: 'Failed to fetch campaigns from MailerLite',
         mailerliteError: error.response?.data || error.message,
@@ -81,19 +76,19 @@ export async function GET(request: NextRequest) {
       }, { status: 500 })
     }
 
-    console.log(`[Debug] Found ${mailerliteCampaigns.length} campaigns in MailerLite`)
+    logger.info({ count: mailerliteCampaigns.length }, '[Debug] Found campaigns in MailerLite')
 
     // Extract IDs from MailerLite campaigns
     const mailerliteIds = new Set(mailerliteCampaigns.map(c => String(c.id)))
-    
+
     // Compare stored IDs with MailerLite IDs
     const comparison = (storedMetrics || []).map(stored => {
       const storedId = String(stored.mailerlite_issue_id)
       const existsInMailerLite = mailerliteIds.has(storedId)
-      
+
       // Find matching campaign in MailerLite
       const mailerliteCampaign = mailerliteCampaigns.find(c => String(c.id) === storedId)
-      
+
       return {
         issue_id: stored.issue_id,
         stored_mailerlite_id: stored.mailerlite_issue_id,
@@ -137,13 +132,5 @@ export async function GET(request: NextRequest) {
         id_type: typeof m.mailerlite_issue_id
       }))
     })
-
-  } catch (error) {
-    console.error('[Debug] Error:', error)
-    return NextResponse.json({
-      error: 'Failed to check MailerLite campaigns',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
-
+)

@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * List all AI prompts in the database
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(ai)/list-ai-prompts' },
+  async () => {
     const { data: prompts, error } = await supabaseAdmin
       .from('app_settings')
       .select('key, description')
@@ -21,15 +23,5 @@ export async function GET(request: NextRequest) {
       count: prompts?.length || 0,
       prompts: prompts || []
     })
-
-  } catch (error: any) {
-    console.error('List error:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message
-      },
-      { status: 500 }
-    )
   }
-}
+)

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/add-full-article-text-column' },
+  async ({ logger }) => {
   try {
     console.log('Checking for full_article_text column in rss_posts table...')
 
@@ -47,4 +50,5 @@ export async function GET(request: NextRequest) {
       details: error.message
     }, { status: 500 })
   }
-}
+  }
+)

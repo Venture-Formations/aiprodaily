@@ -1,18 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-type RouteParams = Promise<{ id: string }>
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET /api/poll-modules/[id] - Get specific poll module
  */
-export async function GET(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id } = params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'poll-modules/[id]' },
+  async ({ params }) => {
+    const id = params.id
 
     const { data: module, error } = await supabaseAdmin
       .from('poll_modules')
@@ -34,26 +30,16 @@ export async function GET(
       success: true,
       module
     })
-
-  } catch (error: any) {
-    console.error('[PollModules] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch poll module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/poll-modules/[id] - Update poll module
  */
-export async function PATCH(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id } = params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'poll-modules/[id]' },
+  async ({ params, request }) => {
+    const id = params.id
     const body = await request.json()
 
     // Build update object, only including provided fields
@@ -85,27 +71,17 @@ export async function PATCH(
       success: true,
       module
     })
-
-  } catch (error: any) {
-    console.error('[PollModules] Failed to update:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update poll module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * DELETE /api/poll-modules/[id] - Delete poll module
  * Note: issue_poll_modules entries will be deleted via CASCADE
  */
-export async function DELETE(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
-    const { id } = params
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'poll-modules/[id]' },
+  async ({ params }) => {
+    const id = params.id
 
     // First, get module info for logging
     const { data: module } = await supabaseAdmin
@@ -128,12 +104,5 @@ export async function DELETE(
       success: true,
       message: 'Poll module deleted successfully'
     })
-
-  } catch (error: any) {
-    console.error('[PollModules] Failed to delete:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete poll module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

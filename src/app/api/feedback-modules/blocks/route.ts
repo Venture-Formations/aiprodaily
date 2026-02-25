@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { FeedbackModuleSelector } from '@/lib/feedback-modules'
+import { withApiHandler } from '@/lib/api-handler'
 
 export const maxDuration = 30
 
 // POST /api/feedback-modules/blocks - Create a new feedback block
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'feedback-modules/blocks' },
+  async ({ request }) => {
     const body = await request.json()
     const { module_id, block_type, display_order } = body
 
@@ -50,11 +52,5 @@ export async function POST(request: NextRequest) {
       success: true,
       block: result.block
     })
-  } catch (error) {
-    console.error('[FeedbackBlocks] Error creating block:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create block' },
-      { status: 500 }
-    )
   }
-}
+)

@@ -1,11 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SupabaseImageStorage } from '@/lib/supabase-image-storage'
-import { ImageReviewRequest } from '@/types/database'
 import sharp from 'sharp'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'images/review/commit' },
+  async ({ request }) => {
     const body = await request.json()
     const {
       image_id,
@@ -170,12 +171,5 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Image updated successfully'
     })
-
-  } catch (error) {
-    console.error('Image review commit API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
   }
-}
+)

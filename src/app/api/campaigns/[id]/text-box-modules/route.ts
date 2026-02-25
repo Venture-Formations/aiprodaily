@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import {
   TextBoxModuleSelector,
@@ -6,16 +7,13 @@ import {
 } from '@/lib/text-box-modules'
 import type { GenerationTiming } from '@/types/database'
 
-interface RouteContext {
-  params: Promise<{ id: string }>
-}
-
 /**
  * GET /api/campaigns/[id]/text-box-modules - Get text box modules for an issue
  */
-export async function GET(request: NextRequest, context: RouteContext) {
-  try {
-    const { id: issueId } = await context.params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/text-box-modules' },
+  async ({ params, logger }) => {
+    const issueId = params.id
 
     // Get issue to find publication_id
     const { data: issue, error: issueError } = await supabaseAdmin
@@ -36,7 +34,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     // If no selections exist, auto-initialize the text box modules
     if (selections.length === 0) {
-      console.log('[IssueTextBoxModules] No selections found, auto-initializing for issue:', issueId)
+      logger.info({ issueId }, '[IssueTextBoxModules] No selections found, auto-initializing')
       await TextBoxModuleSelector.initializeForIssue(issueId, issue.publication_id)
       // Fetch again after initialization
       selections = await TextBoxModuleSelector.getIssueSelections(issueId)
@@ -52,7 +50,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           issueBlock &&
           issueBlock.generation_status === 'pending'
         ) {
-          console.log(`[IssueTextBoxModules] Auto-fixing static image block ${block.id} status from pending to completed`)
+          logger.info({ blockId: block.id }, '[IssueTextBoxModules] Auto-fixing static image block status from pending to completed')
           await supabaseAdmin
             .from('issue_text_box_blocks')
             .update({
@@ -71,23 +69,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
       success: true,
       modules: selections
     })
-
-  } catch (error: any) {
-    console.error('[IssueTextBoxModules] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch text box modules', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST /api/campaigns/[id]/text-box-modules - Initialize or regenerate text box modules
  * Body: { action: 'initialize' | 'regenerate', blockId?: string, timing?: GenerationTiming }
  */
-export async function POST(request: NextRequest, context: RouteContext) {
-  try {
-    const { id: issueId } = await context.params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/text-box-modules' },
+  async ({ params, request, logger }) => {
+    const issueId = params.id
     const body = await request.json()
     const { action, blockId, timing } = body
 
@@ -159,23 +151,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
       { error: 'Invalid action. Must be "initialize" or "regenerate"' },
       { status: 400 }
     )
-
-  } catch (error: any) {
-    console.error('[IssueTextBoxModules] Failed to process:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to process request', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/campaigns/[id]/text-box-modules - Update issue block content
  * Body: { blockId: string, overrideContent?: string, overrideImageUrl?: string }
  */
-export async function PATCH(request: NextRequest, context: RouteContext) {
-  try {
-    const { id: issueId } = await context.params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/text-box-modules' },
+  async ({ params, request, logger }) => {
+    const issueId = params.id
     const body = await request.json()
     const { blockId, overrideContent, overrideImageUrl } = body
 
@@ -218,12 +204,5 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       success: true,
       message: 'Override content updated'
     })
-
-  } catch (error: any) {
-    console.error('[IssueTextBoxModules] Failed to update:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update override content', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

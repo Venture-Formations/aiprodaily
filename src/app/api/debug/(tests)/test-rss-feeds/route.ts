@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import Parser from 'rss-parser'
 
@@ -8,7 +9,9 @@ const parser = new Parser({
   }
 })
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-rss-feeds' },
+  async ({ logger }) => {
   try {
     console.log('Testing all RSS feeds...')
 
@@ -99,4 +102,5 @@ export async function GET(request: NextRequest) {
       details: error.message
     }, { status: 500 })
   }
-}
+  }
+)

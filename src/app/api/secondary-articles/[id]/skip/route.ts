@@ -1,19 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: articleId } = await params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'secondary-articles/[id]/skip' },
+  async ({ params, session }) => {
+    const articleId = params.id
 
     // Get the article to verify it exists
     const { data: article, error: articleError } = await supabaseAdmin
@@ -97,12 +89,5 @@ export async function POST(
         skipped: true
       }
     })
-
-  } catch (error) {
-    console.error('Secondary article skip failed:', error)
-    return NextResponse.json({
-      error: 'Failed to skip secondary article',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

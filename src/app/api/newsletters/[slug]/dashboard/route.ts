@@ -1,18 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-
-type RouteParams = Promise<{ slug: string }>
 
 /**
  * GET /api/newsletters/[slug]/dashboard
  * Fetch dashboard statistics for a specific newsletter
  */
-export async function GET(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'newsletters/dashboard' },
+  async ({ params }) => {
     const { slug } = params
 
     // Get newsletter
@@ -93,12 +89,5 @@ export async function GET(
         recent_issues: recentCampaigns
       }
     })
-
-  } catch (error: any) {
-    console.error('Failed to fetch dashboard data:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch dashboard data', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

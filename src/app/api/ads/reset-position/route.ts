@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'ads/reset-position' },
+  async ({ logger }) => {
     // Get the first active newsletter for publication_id
     const { data: newsletter, error: newsletterError } = await supabaseAdmin
       .from('publications')
@@ -28,11 +30,5 @@ export async function POST(request: NextRequest) {
     if (error) throw error
 
     return NextResponse.json({ success: true, next_ad_position: 1 })
-  } catch (error) {
-    console.error('Reset position error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to reset position' },
-      { status: 500 }
-    )
   }
-}
+)

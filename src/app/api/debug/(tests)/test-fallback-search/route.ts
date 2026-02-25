@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 
 interface SearchResult {
   source_url: string
@@ -10,7 +11,9 @@ interface SearchResult {
   method: string
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-fallback-search' },
+  async ({ request, logger }) => {
   try {
     const { imageUrl } = await request.json()
 
@@ -60,7 +63,8 @@ export async function POST(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error'
     })
   }
-}
+  }
+)
 
 async function testUrlPatternMethod(imageUrl: string): Promise<SearchResult[]> {
   const results: SearchResult[] = []

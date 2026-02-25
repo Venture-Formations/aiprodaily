@@ -1,25 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { generateFullNewsletterHtml } from '@/lib/newsletter-templates'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function GET(
-  request: NextRequest,
-  props: { params: Promise<{ id: string }> }
-) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/preview' },
+  async ({ params }) => {
+    const id = params.id
+
     console.log('Preview API called')
-    const { id } = await props.params
     console.log('issue ID:', id)
-
-    const session = await getServerSession(authOptions)
-    console.log('Session check:', !!session?.user?.email)
-
-    if (!session?.user?.email) {
-      console.log('Authorization failed - no session')
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     console.log('Fetching issue with ID:', id)
     // Fetch issue with active articles and events
@@ -107,13 +97,5 @@ export async function GET(
       issue,
       html: newsletterHtml
     })
-
-  } catch (error) {
-    console.error('Preview generation error:', error)
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
-    return NextResponse.json(
-      { error: `Failed to generate newsletter preview: ${error instanceof Error ? error.message : 'Unknown error'}` },
-      { status: 500 }
-    )
   }
-}
+)

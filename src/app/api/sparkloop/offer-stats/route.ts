@@ -1,10 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { PUBLICATION_ID } from '@/lib/config'
 const PAGE_SIZE = 1000
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'public', logContext: 'sparkloop-offer-stats' },
+  async ({ request, logger }) => {
     const days = parseInt(request.nextUrl.searchParams.get('days') || '30', 10)
 
     const since = new Date()
@@ -94,8 +96,5 @@ export async function GET(request: NextRequest) {
       dailyStats,
       recentEvents,
     })
-  } catch (err) {
-    console.error('[OfferStats] Error:', err)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
-}
+)

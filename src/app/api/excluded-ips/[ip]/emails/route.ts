@@ -1,8 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { isIPExcluded, IPExclusion, ipMatchesCIDR, parseCIDR } from '@/lib/ip-utils'
+import { ipMatchesCIDR, parseCIDR } from '@/lib/ip-utils'
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET - Get all email addresses that used a specific IP address
@@ -13,18 +12,10 @@ import { isIPExcluded, IPExclusion, ipMatchesCIDR, parseCIDR } from '@/lib/ip-ut
  *
  * Returns emails from poll_responses and/or link_clicks
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ ip: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { ip } = await params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'excluded-ips/[ip]/emails' },
+  async ({ request, params }) => {
+    const ip = params.ip
     const decodedIp = decodeURIComponent(ip)
 
     const { searchParams } = new URL(request.url)
@@ -219,12 +210,5 @@ export async function GET(
         total_unique: allEmails.size
       }
     })
-
-  } catch (error) {
-    console.error('[IP Exclusion] Emails by IP error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

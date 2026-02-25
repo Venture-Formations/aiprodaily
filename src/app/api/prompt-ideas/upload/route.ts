@@ -1,15 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'prompt-ideas/upload' },
+  async ({ request, logger }) => {
     const formData = await request.formData()
     const file = formData.get('file') as File
 
@@ -194,7 +189,7 @@ export async function POST(request: NextRequest) {
       .select()
 
     if (error) {
-      console.error('Database insert error:', error)
+      logger.error({ err: error }, 'Database insert error')
       return NextResponse.json({
         error: 'Failed to insert prompts',
         details: error.message
@@ -206,12 +201,5 @@ export async function POST(request: NextRequest) {
       imported: data?.length || 0,
       message: `Successfully imported ${data?.length || 0} prompt ideas`
     })
-
-  } catch (error) {
-    console.error('CSV upload error:', error)
-    return NextResponse.json({
-      error: 'Failed to process CSV file',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

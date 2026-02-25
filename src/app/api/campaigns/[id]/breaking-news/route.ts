@@ -1,17 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-type RouteParams = {
-  params: Promise<{ id: string }>
-}
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET /api/campaigns/[id]/breaking-news
  * Fetch Breaking News articles for an issue
  */
-export async function GET(request: NextRequest, props: RouteParams) {
-  try {
-    const params = await props.params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/breaking-news' },
+  async ({ params }) => {
     const issueId = params.id
 
     // Fetch RSS posts with Breaking News scores for this issue
@@ -45,23 +42,16 @@ export async function GET(request: NextRequest, props: RouteParams) {
       selectedBreaking,
       selectedBeyondFeed
     })
-
-  } catch (error) {
-    console.error('Error in GET /api/campaigns/[id]/breaking-news:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
 /**
  * POST /api/campaigns/[id]/breaking-news
  * Update Breaking News article selections for an issue
  */
-export async function POST(request: NextRequest, props: RouteParams) {
-  try {
-    const params = await props.params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/breaking-news' },
+  async ({ params, request }) => {
     const issueId = params.id
     const body = await request.json()
     const { breaking, beyond_feed } = body
@@ -106,12 +96,5 @@ export async function POST(request: NextRequest, props: RouteParams) {
       success: true,
       message: 'Breaking News selections updated'
     })
-
-  } catch (error) {
-    console.error('Error in POST /api/campaigns/[id]/breaking-news:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

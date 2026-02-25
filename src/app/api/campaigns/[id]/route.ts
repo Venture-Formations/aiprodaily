@@ -1,30 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
-import { declareRoute } from '@/lib/auth-tiers'
-import { getIssueById } from '@/lib/dal'
+import { withApiHandler } from '@/lib/api-handler'
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const routeConfig = declareRoute({
-  authTier: 'authenticated',
-  description: 'Get/update a single issue by ID'
-})
-
-interface RouteParams {
-  params: Promise<{
-    id: string
-  }>
-}
-
-export async function GET(request: NextRequest, { params }: RouteParams) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id } = await params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]' },
+  async ({ params }) => {
+    const id = params.id
 
     const { data: issue, error } = await supabaseAdmin
       .from('publication_issues')
@@ -90,24 +71,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     return NextResponse.json({ issue: transformedIssue })
-
-  } catch (error) {
-    console.error('Failed to fetch issue:', error)
-    return NextResponse.json({
-      error: 'Failed to fetch issue',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
-export async function PATCH(request: NextRequest, { params }: RouteParams) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id } = await params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]' },
+  async ({ params, session, request }) => {
+    const id = params.id
 
     const body = await request.json()
     const { status, subject_line } = body
@@ -148,12 +118,5 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     return NextResponse.json({ issue })
-
-  } catch (error) {
-    console.error('Failed to update issue:', error)
-    return NextResponse.json({
-      error: 'Failed to update issue',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

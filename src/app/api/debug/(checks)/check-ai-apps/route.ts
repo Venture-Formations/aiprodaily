@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-ai-apps' },
+  async ({ logger }) => {
     // Check newsletters table
     const { data: newsletters, error: newslettersError } = await supabaseAdmin
       .from('publications')
@@ -68,12 +70,5 @@ export async function GET() {
         accounting_has_active_apps: appsByNewsletter?.find(n => n.newsletter_slug === 'accounting')?.active_apps || 0
       }
     })
-
-  } catch (error) {
-    console.error('Debug check-ai-apps error:', error)
-    return NextResponse.json({
-      error: 'Failed to check AI apps setup',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

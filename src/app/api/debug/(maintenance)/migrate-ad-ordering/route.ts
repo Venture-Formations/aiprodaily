@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { validateDebugAuth } from '@/lib/debug-auth'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  // Validate authentication
-  const authResult = validateDebugAuth(request)
-  if (!authResult.authorized) {
-    return authResult.response
-  }
-
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/migrate-ad-ordering' },
+  async ({ request, logger }) => {
   try {
     console.log('[Ad Ordering Migration] Starting database migration...')
 
@@ -114,4 +110,5 @@ CREATE INDEX IF NOT EXISTS idx_advertisements_display_order ON advertisements(di
       details: 'If error is about missing column "display_order", run the SQL provided in the response above'
     }, { status: 500 })
   }
-}
+  }
+)

@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-dates' },
+  async ({ request, logger }) => {
     // Calculate dates EXACTLY as RSS Processing does
     const nowCentral1 = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
     const centralDate1 = new Date(nowCentral1)
@@ -69,8 +71,8 @@ export async function GET(request: NextRequest) {
       analysis: {
         datesMismatch,
         diagnosis: datesMismatch
-          ? "❌ DATES DON'T MATCH - RSS Processing creates for " + rssProcessingDate + " but Create issue looks for " + createissueDate
-          : "✅ Dates match - both endpoints use CT + 12 hours: " + rssProcessingDate,
+          ? "DATES DON'T MATCH - RSS Processing creates for " + rssProcessingDate + " but Create issue looks for " + createissueDate
+          : "Dates match - both endpoints use CT + 12 hours: " + rssProcessingDate,
         explanation: "Both endpoints now add 12 hours to Central Time before extracting the date. This ensures morning runs use today's date, evening runs (8pm+) use tomorrow's date.",
         possibleCause: datesMismatch
           ? "If Create issue doesn't find a issue, it would return 404. No duplicate should be created."
@@ -79,10 +81,5 @@ export async function GET(request: NextRequest) {
       allCampaigns: allCampaigns || [],
       timestamp: new Date().toISOString()
     })
-
-  } catch (error) {
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

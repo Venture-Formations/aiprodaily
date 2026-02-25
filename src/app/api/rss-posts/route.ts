@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
@@ -8,8 +9,9 @@ import { supabaseAdmin } from '@/lib/supabase'
  *   - article_module_id (optional): Filter by article module
  *   - limit (optional): Number of posts to return (default 20)
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'rss-posts' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const publicationIdOrSlug = searchParams.get('publication_id')
     const articleModuleId = searchParams.get('article_module_id')
@@ -52,7 +54,7 @@ export async function GET(request: NextRequest) {
         .eq('active', true)
 
       if (feedsError) {
-        console.error('[RssPosts] Error fetching module feeds:', feedsError)
+        logger.error({ err: feedsError }, '[RssPosts] Error fetching module feeds')
         return NextResponse.json(
           { error: 'Failed to fetch feeds', details: feedsError.message },
           { status: 500 }
@@ -79,7 +81,7 @@ export async function GET(request: NextRequest) {
         .eq('active', true)
 
       if (feedsError) {
-        console.error('[RssPosts] Error fetching publication feeds:', feedsError)
+        logger.error({ err: feedsError }, '[RssPosts] Error fetching publication feeds')
         return NextResponse.json(
           { error: 'Failed to fetch feeds', details: feedsError.message },
           { status: 500 }
@@ -107,26 +109,19 @@ export async function GET(request: NextRequest) {
       .limit(limit)
 
     if (postsError) {
-      console.error('[RssPosts] Error fetching posts:', postsError)
+      logger.error({ err: postsError }, '[RssPosts] Error fetching posts')
       return NextResponse.json(
         { error: 'Failed to fetch posts', details: postsError.message },
         { status: 500 }
       )
     }
 
-    console.log(`[RssPosts] Found ${posts?.length || 0} posts for module ${articleModuleId || 'all'}`)
+    logger.info(`[RssPosts] Found ${posts?.length || 0} posts for module ${articleModuleId || 'all'}`)
 
     return NextResponse.json({
       success: true,
       posts: posts || [],
       count: posts?.length || 0
     })
-
-  } catch (error: any) {
-    console.error('[RssPosts] Unexpected error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

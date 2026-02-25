@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 
-export async function GET() {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-multi-criteria' },
+  async ({ logger }) => {
   try {
     console.log('Testing multi-criteria evaluation system...')
 
@@ -178,4 +181,5 @@ export async function GET() {
       stack: error instanceof Error ? error.stack : undefined
     }, { status: 500 })
   }
-}
+  }
+)

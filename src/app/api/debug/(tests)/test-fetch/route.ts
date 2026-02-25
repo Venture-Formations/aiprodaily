@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-fetch' },
+  async ({ request, logger }) => {
   try {
     const { searchParams } = new URL(request.url)
     const imageUrl = searchParams.get('url')
@@ -76,4 +79,5 @@ export async function GET(request: NextRequest) {
       debug: 'Failed to run fetch test'
     }, { status: 500 })
   }
-}
+  }
+)

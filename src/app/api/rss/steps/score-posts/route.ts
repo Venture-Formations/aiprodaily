@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { RSSProcessor } from '@/lib/rss-processor'
 import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/workflow-state'
 
@@ -6,71 +7,73 @@ import { startWorkflowStep, completeWorkflowStep, failWorkflow } from '@/lib/wor
  * Step 4: Score/evaluate posts with AI criteria
  * Processes both primary and secondary sections sequentially
  */
-export async function POST(request: NextRequest) {
-  let issue_id: string | undefined
+export const POST = withApiHandler(
+  { authTier: 'system', logContext: 'rss/steps/score-posts' },
+  async ({ request }) => {
+    let issue_id: string | undefined
 
-  try {
-    const body = await request.json()
-    issue_id = body.issue_id
+    try {
+      const body = await request.json()
+      issue_id = body.issue_id
 
-    if (!issue_id) {
-      return NextResponse.json({ error: 'issue_id is required' }, { status: 400 })
-    }
+      if (!issue_id) {
+        return NextResponse.json({ error: 'issue_id is required' }, { status: 400 })
+      }
 
+      const startResult = await startWorkflowStep(issue_id, 'pending_score')
+      if (!startResult.success) {
+        return NextResponse.json({
+          success: false,
+          message: startResult.message,
+          step: '4/7'
+        }, { status: 409 })
+      }
 
-    const startResult = await startWorkflowStep(issue_id, 'pending_score')
-    if (!startResult.success) {
+      const processor = new RSSProcessor()
+      const overallStartTime = Date.now()
+
+      // Score primary posts first
+      const primaryStartTime = Date.now()
+      const primaryResults = await processor.scorePostsForSection(issue_id, 'primary')
+      const primaryDuration = ((Date.now() - primaryStartTime) / 1000).toFixed(1)
+
+      // Score secondary posts
+      const secondaryStartTime = Date.now()
+      const secondaryResults = await processor.scorePostsForSection(issue_id, 'secondary')
+      const secondaryDuration = ((Date.now() - secondaryStartTime) / 1000).toFixed(1)
+
+      const totalDuration = ((Date.now() - overallStartTime) / 1000).toFixed(1)
+
+      await completeWorkflowStep(issue_id, 'scoring')
+
       return NextResponse.json({
-        success: false,
-        message: startResult.message,
-        step: '4/7'
-      }, { status: 409 })
-    }
-
-    const processor = new RSSProcessor()
-    const overallStartTime = Date.now()
-
-    // Score primary posts first
-    const primaryStartTime = Date.now()
-    const primaryResults = await processor.scorePostsForSection(issue_id, 'primary')
-    const primaryDuration = ((Date.now() - primaryStartTime) / 1000).toFixed(1)
-
-    // Score secondary posts
-    const secondaryStartTime = Date.now()
-    const secondaryResults = await processor.scorePostsForSection(issue_id, 'secondary')
-    const secondaryDuration = ((Date.now() - secondaryStartTime) / 1000).toFixed(1)
-
-    const totalDuration = ((Date.now() - overallStartTime) / 1000).toFixed(1)
-
-    await completeWorkflowStep(issue_id, 'scoring')
-
-    return NextResponse.json({
-      success: true,
-      message: 'Score posts step completed',
-      issue_id,
-      primary: primaryResults,
-      secondary: secondaryResults,
-      total_scored: primaryResults.scored + secondaryResults.scored,
-      total_errors: primaryResults.errors + secondaryResults.errors,
-      duration_seconds: totalDuration,
-      next_state: 'pending_generate',
-      step: '4/7'
-    })
-
-  } catch (error) {
-    console.error('[Step 4] Score posts failed:', error)
-
-    if (issue_id) {
-      await failWorkflow(
+        success: true,
+        message: 'Score posts step completed',
         issue_id,
-        `Score posts step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      )
-    }
+        primary: primaryResults,
+        secondary: secondaryResults,
+        total_scored: primaryResults.scored + secondaryResults.scored,
+        total_errors: primaryResults.errors + secondaryResults.errors,
+        duration_seconds: totalDuration,
+        next_state: 'pending_generate',
+        step: '4/7'
+      })
 
-    return NextResponse.json({
-      error: 'Score posts step failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      step: '4/7'
-    }, { status: 500 })
+    } catch (error) {
+      console.error('[Step 4] Score posts failed:', error)
+
+      if (issue_id) {
+        await failWorkflow(
+          issue_id,
+          `Score posts step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        )
+      }
+
+      return NextResponse.json({
+        error: 'Score posts step failed',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        step: '4/7'
+      }, { status: 500 })
+    }
   }
-}
+)

@@ -1,20 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * Simple trigger endpoint for criteria 4 backfill
  * Can be called via browser or curl
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'system', logContext: 'backfill/trigger-criteria-4' },
+  async ({ request }) => {
     const { searchParams } = new URL(request.url)
-    const secret = searchParams.get('secret')
     const newsletterId = searchParams.get('publication_id')
     const dryRun = searchParams.get('dry_run') === 'true'
-
-    // Auth check
-    if (secret !== process.env.CRON_SECRET) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     if (!newsletterId) {
       return NextResponse.json({
@@ -48,14 +44,7 @@ export async function GET(request: NextRequest) {
       message: 'Backfill triggered',
       result
     })
-
-  } catch (error) {
-    console.error('[Trigger] Failed:', error)
-    return NextResponse.json({
-      error: 'Failed to trigger backfill',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
 export const maxDuration = 600 // 10 minutes

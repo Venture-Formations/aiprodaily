@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { SparkLoopService } from '@/lib/sparkloop-client'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicationSettings } from '@/lib/publication-settings'
@@ -13,12 +14,13 @@ const FALLBACK_DEFAULT_RCR = 0.25
  *
  * Returns top recommendations from our database (not SparkLoop API)
  * - Filters to active recommendations only
- * - Scores by CR × CPA × RCR (expected revenue per impression)
+ * - Scores by CR x CPA x RCR (expected revenue per impression)
  * - Uses our CR/RCR if we have 20+ data points
  * - Falls back to 22% CR, SparkLoop RCR or 25% if null
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'public', logContext: 'sparkloop-recommendations' },
+  async ({ request, logger }) => {
     // Fetch active, non-excluded recommendations from our database
     const { data: recommendations, error } = await supabaseAdmin
       .from('sparkloop_recommendations')
@@ -73,7 +75,7 @@ export async function GET(request: NextRequest) {
     const defaultCr = defaults.sparkloop_default_cr ? parseFloat(defaults.sparkloop_default_cr) / 100 : FALLBACK_DEFAULT_CR
     const defaultRcr = defaults.sparkloop_default_rcr ? parseFloat(defaults.sparkloop_default_rcr) / 100 : FALLBACK_DEFAULT_RCR
 
-    // Score and sort recommendations by CR × CPA × RCR
+    // Score and sort recommendations by CR x CPA x RCR
     // Priority: real data > override (replaces default) > default
     // CR:  our_cr (if 50+ impressions) > override_cr > configurable default
     // RCR: sparkloop_rcr > override_rcr > configurable default
@@ -145,17 +147,8 @@ export async function GET(request: NextRequest) {
       preSelectedRefCodes,
       total: formattedRecommendations.length,
     })
-  } catch (error) {
-    console.error('[SparkLoop API] Failed to fetch recommendations:', error)
-
-    return NextResponse.json({
-      recommendations: [],
-      preSelectedRefCodes: [],
-      total: 0,
-      error: error instanceof Error ? error.message : 'Failed to fetch recommendations',
-    })
   }
-}
+)
 
 /**
  * POST /api/sparkloop/recommendations
@@ -164,7 +157,10 @@ export async function GET(request: NextRequest) {
  * POST is kept for API compatibility but ignores location params
  * (We use our own scoring instead of SparkLoop's geo-targeting)
  */
-export async function POST(request: NextRequest) {
-  // Redirect to GET logic - we use our database scoring now
-  return GET(request)
-}
+export const POST = withApiHandler(
+  { authTier: 'public', logContext: 'sparkloop-recommendations' },
+  async ({ request, logger }) => {
+    // Redirect to GET logic - we use our database scoring now
+    return GET(request, { params: Promise.resolve({}) })
+  }
+)

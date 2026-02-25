@@ -1,16 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      console.error('BACKEND GET: Unauthorized - no session')
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/email' },
+  async ({ session }) => {
     // Get user's publication_id (use first active newsletter for now)
     const { data: newsletter } = await supabaseAdmin
       .from('publications')
@@ -180,24 +174,12 @@ export async function GET(request: NextRequest) {
       ...finalSettings,
       settings: settingsArray
     })
-
-  } catch (error) {
-    console.error('Failed to load email settings:', error)
-    return NextResponse.json({
-      error: 'Failed to load email settings',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      console.error('BACKEND: Unauthorized - no session')
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/email' },
+  async ({ session, request }) => {
     // Get user's publication_id (use first active newsletter for now)
     const { data: newsletter } = await supabaseAdmin
       .from('publications')
@@ -542,12 +524,5 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Email settings saved successfully'
     })
-
-  } catch (error) {
-    console.error('Failed to save email settings:', error)
-    return NextResponse.json({
-      error: 'Failed to save email settings',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

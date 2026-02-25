@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(campaign)/articles-analysis' },
+  async ({ logger }) => {
     // Get all active articles with their headlines and content
     const { data: articles, error } = await supabaseAdmin
       .from('articles')
@@ -20,14 +22,5 @@ export async function GET() {
       count: articles?.length || 0,
       articles: articles || []
     })
-  } catch (error) {
-    console.error('Error fetching articles:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)

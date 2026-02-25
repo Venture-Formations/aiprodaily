@@ -1,23 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
+import { withApiHandler } from '@/lib/api-handler'
 import { ArticleModuleSelector } from '@/lib/article-modules'
 
 /**
  * GET /api/campaigns/[id]/article-modules - Get article mod selections for an issue
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: issueId } = await params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/article-modules' },
+  async ({ params }) => {
+    const issueId = params.id
 
     // Get the issue to get publication_id and status
     const { data: issue, error: issueError } = await supabaseAdmin
@@ -76,31 +68,17 @@ export async function GET(
         bodyFont: pubSettings?.body_font || 'Arial, sans-serif'
       }
     })
-
-  } catch (error: any) {
-    console.error('[ArticleModules] Error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch article modules', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST /api/campaigns/[id]/article-modules - Manually swap articles for a mod
  * Body: { moduleId, articleIds } - array of article IDs to activate (in order)
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: issueId } = await params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/article-modules' },
+  async ({ params, request }) => {
+    const issueId = params.id
     const body = await request.json()
     const { moduleId, articleIds } = body
 
@@ -140,31 +118,17 @@ export async function POST(
       success: true,
       selections
     })
-
-  } catch (error: any) {
-    console.error('[ArticleModules] Error swapping articles:', error)
-    return NextResponse.json(
-      { error: 'Failed to swap articles', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PUT /api/campaigns/[id]/article-modules - Toggle article selection, skip article, or reorder
  * Body: { action: 'toggle' | 'skip' | 'reorder', moduleId, articleId?, articleIds?, currentState? }
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: issueId } = await params
+export const PUT = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/article-modules' },
+  async ({ params, request }) => {
+    const issueId = params.id
     const body = await request.json()
     const { action, moduleId, articleId, articleIds, currentState } = body
 
@@ -325,31 +289,17 @@ export async function PUT(
       selections,
       allArticles
     })
-
-  } catch (error: any) {
-    console.error('[ArticleModules] Error in article operation:', error)
-    return NextResponse.json(
-      { error: 'Failed to perform article operation', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/campaigns/[id]/article-modules - Get all articles for swapping (active and inactive)
  * Query: moduleId
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: issueId } = await params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/article-modules' },
+  async ({ params, request }) => {
+    const issueId = params.id
     const moduleId = request.nextUrl.searchParams.get('moduleId')
 
     if (!moduleId) {
@@ -363,12 +313,5 @@ export async function PATCH(
       success: true,
       articles
     })
-
-  } catch (error: any) {
-    console.error('[ArticleModules] Error fetching swap articles:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch articles for swapping', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

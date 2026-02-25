@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(ai)/split-article-prompts' },
+  async () => {
     const results = {
       primary_title_created: false,
       primary_body_created: false,
@@ -244,12 +246,5 @@ Respond with valid JSON in this exact format:
       results,
       note: 'You can now customize these prompts in Settings > AI Prompts'
     })
-
-  } catch (error: any) {
-    console.error('Error splitting article prompts:', error)
-    return NextResponse.json({
-      error: 'Failed to split article prompts',
-      details: error.message
-    }, { status: 500 })
   }
-}
+)

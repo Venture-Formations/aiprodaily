@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { SupabaseImageStorage } from '@/lib/supabase-image-storage'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(media)/image-upload' },
+  async ({ logger }) => {
   try {
     console.log('=== SUPABASE IMAGE UPLOAD DEBUG ===')
 
@@ -29,4 +32,5 @@ export async function GET(request: NextRequest) {
       debug: 'Failed to run debug test'
     }, { status: 500 })
   }
-}
+  }
+)

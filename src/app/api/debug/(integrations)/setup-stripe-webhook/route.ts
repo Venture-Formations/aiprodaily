@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * One-time setup endpoint to create Stripe webhook
  * This should only be run once to set up the webhook endpoint in Stripe
  */
-export async function POST(request: NextRequest) {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(integrations)/setup-stripe-webhook' },
+  async ({ logger }) => {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY
 
   if (!stripeSecretKey) {
@@ -84,10 +87,13 @@ export async function POST(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)
 
 // GET method to check if webhook already exists
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(integrations)/setup-stripe-webhook' },
+  async ({ logger }) => {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY
 
   if (!stripeSecretKey) {
@@ -139,4 +145,5 @@ export async function GET(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

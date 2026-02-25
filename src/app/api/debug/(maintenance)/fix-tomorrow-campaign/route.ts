@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { validateDebugAuth } from '@/lib/debug-auth'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 
-export async function POST(request: NextRequest) {
-  // Validate authentication
-  const authResult = validateDebugAuth(request)
-  if (!authResult.authorized) {
-    return authResult.response
-  }
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/fix-tomorrow-campaign' },
+  async ({ request, logger }) => {
 
   try {
     console.log('=== FIXING TOMORROW\'S issue ===')
@@ -130,4 +127,5 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     }, { status: 500 })
   }
-}
+  }
+)

@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/ad-pricing' },
+  async () => {
     const { data: tiers, error } = await supabaseAdmin
       .from('ad_pricing_tiers')
       .select('*')
@@ -14,16 +16,12 @@ export async function GET() {
     }
 
     return NextResponse.json({ tiers })
-  } catch (error) {
-    return NextResponse.json({
-      error: 'Failed to fetch pricing tiers',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
-export async function POST(request: Request) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/ad-pricing' },
+  async ({ request }) => {
     const body = await request.json()
     const { frequency, min_quantity, max_quantity, price_per_unit } = body
 
@@ -48,16 +46,12 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ tier: data })
-  } catch (error) {
-    return NextResponse.json({
-      error: 'Failed to create pricing tier',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
-export async function PATCH(request: Request) {
-  try {
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/ad-pricing' },
+  async ({ request }) => {
     const body = await request.json()
     const { id, price_per_unit } = body
 
@@ -77,16 +71,12 @@ export async function PATCH(request: Request) {
     }
 
     return NextResponse.json({ tier: data })
-  } catch (error) {
-    return NextResponse.json({
-      error: 'Failed to update pricing tier',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
-export async function DELETE(request: Request) {
-  try {
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/ad-pricing' },
+  async ({ request }) => {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
@@ -104,10 +94,5 @@ export async function DELETE(request: Request) {
     }
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    return NextResponse.json({
-      error: 'Failed to delete pricing tier',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

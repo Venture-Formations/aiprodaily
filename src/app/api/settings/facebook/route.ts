@@ -1,20 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
 import { FacebookService } from '@/lib/facebook'
 
 /**
  * GET /api/settings/facebook
  * Returns current Facebook posting settings for the active publication
  */
-export async function GET() {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/facebook' },
+  async () => {
     // Get user's publication_id (use first active newsletter)
     const { data: newsletter } = await supabaseAdmin
       .from('publications')
@@ -98,23 +93,16 @@ export async function GET() {
       adModuleName,
       adModules: adModules || [],
     })
-  } catch (error) {
-    console.error('[Facebook Settings] GET error:', error)
-    return NextResponse.json({ error: 'Failed to load Facebook settings' }, { status: 500 })
   }
-}
+)
 
 /**
  * POST /api/settings/facebook
  * Save Facebook posting settings
  */
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/facebook' },
+  async ({ request }) => {
     // Get user's publication_id
     const { data: newsletter } = await supabaseAdmin
       .from('publications')
@@ -168,26 +156,16 @@ export async function POST(request: NextRequest) {
 
     console.log('[Facebook Settings] Settings saved successfully')
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('[Facebook Settings] POST error:', error)
-    return NextResponse.json(
-      { error: 'Failed to save Facebook settings', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/settings/facebook
  * Verify Facebook token or send test post
  */
-export async function PATCH(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/facebook' },
+  async ({ request }) => {
     const body = await request.json()
     const action = body.action
 
@@ -355,11 +333,5 @@ export async function PATCH(request: NextRequest) {
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
-  } catch (error) {
-    console.error('[Facebook Settings] PATCH error:', error)
-    return NextResponse.json(
-      { error: 'Action failed', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

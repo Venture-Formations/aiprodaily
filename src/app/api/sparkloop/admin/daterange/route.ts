@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { PUBLICATION_ID } from '@/lib/config'
 const PAGE_SIZE = 1000
@@ -7,14 +8,10 @@ const PAGE_SIZE = 1000
  * GET /api/sparkloop/admin/daterange
  *
  * Returns per-ref_code metrics filtered by date range.
- * - Impressions: from popup_opened events (event_timestamp in range)
- * - Submissions/Confirms/Rejections/Pending: from sparkloop_referrals
- *   where source='custom_popup' and subscribed_at in range
- *
- * Query params: start (YYYY-MM-DD), end (YYYY-MM-DD)
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'sparkloop/admin/daterange' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const start = searchParams.get('start')
     const end = searchParams.get('end')
@@ -204,7 +201,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log(`[SparkLoop Admin] Date range ${start} to ${end}: ${popupEvents.length} popup events, ${referrals.length} referrals, ${uniqueIps} unique IPs`)
+    logger.info({ start, end, popupEvents: popupEvents.length, referrals: referrals.length, uniqueIps }, 'Date range query completed')
 
     return NextResponse.json({
       success: true,
@@ -215,11 +212,5 @@ export async function GET(request: NextRequest) {
         avgOffersSelected,
       },
     })
-  } catch (error) {
-    console.error('[SparkLoop Admin] Date range query failed:', error)
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

@@ -1,15 +1,10 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
 
-export async function GET() {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/footer' },
+  async () => {
     // Get user's publication_id (use first active newsletter for now)
     const { data: newsletter } = await supabaseAdmin
       .from('publications')
@@ -38,13 +33,5 @@ export async function GET() {
       businessName,
       currentYear: new Date().getFullYear()
     })
-  } catch (error) {
-    console.error('Failed to fetch footer settings:', error)
-    return NextResponse.json({
-      logoUrl: '/logo.png',
-      newsletterName: 'AI Accounting Daily',
-      businessName: 'AI Accounting Daily',
-      currentYear: new Date().getFullYear()
-    })
   }
-}
+)

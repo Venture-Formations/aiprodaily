@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import axios from 'axios'
 
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(integrations)/mailerlite-test' },
+  async ({ logger }) => {
   try {
     console.log('=== MAILERLITE DIAGNOSTIC TEST ===')
 
@@ -179,4 +182,5 @@ export async function GET(request: NextRequest) {
       message: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import {
   checkUserAgent,
@@ -158,8 +159,9 @@ async function queueFieldUpdate(
  * - subscriber_id: Subscriber ID (optional)
  * - type: Link type for field updates ('ad' | 'ai_app') (optional)
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'public', logContext: 'link-tracking' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
 
     // Extract parameters
@@ -303,17 +305,5 @@ export async function GET(request: NextRequest) {
 
     // Redirect to destination URL
     return NextResponse.redirect(normalizeUrl(url))
-
-  } catch (error) {
-    console.error('Link tracking error:', error)
-    // Try to redirect to URL if available
-    const url = new URL(request.url).searchParams.get('url')
-    if (url) {
-      return NextResponse.redirect(normalizeUrl(url))
-    }
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

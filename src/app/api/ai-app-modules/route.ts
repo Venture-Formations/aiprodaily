@@ -1,12 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * GET /api/ai-app-modules - List AI app modules for a publication
  * Query params: publication_id (optional, defaults to 'accounting' publication)
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai-app-modules' },
+  async ({ request }) => {
     let publicationId = request.nextUrl.searchParams.get('publication_id')
 
     // If no publication_id provided, get the accounting newsletter
@@ -38,21 +40,15 @@ export async function GET(request: NextRequest) {
       success: true,
       modules: modules || []
     })
-
-  } catch (error: any) {
-    console.error('[AIAppModules] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch AI app modules', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST /api/ai-app-modules - Create new AI app module
  */
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai-app-modules' },
+  async ({ request, logger }) => {
     const body = await request.json()
 
     // Validate required fields
@@ -92,28 +88,22 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
-    console.log(`[AIAppModules] Created module: ${module.name} (${module.id})`)
+    logger.info(`Created module: ${module.name} (${module.id})`)
 
     return NextResponse.json({
       success: true,
       module
     }, { status: 201 })
-
-  } catch (error: any) {
-    console.error('[AIAppModules] Failed to create:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create AI app module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/ai-app-modules - Reorder modules (bulk update display_order)
  * Body: { modules: [{ id, display_order }] }
  */
-export async function PATCH(request: NextRequest) {
-  try {
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai-app-modules' },
+  async ({ request }) => {
     const body = await request.json()
 
     if (!body.modules || !Array.isArray(body.modules)) {
@@ -144,12 +134,5 @@ export async function PATCH(request: NextRequest) {
       success: true,
       message: 'Module order updated'
     })
-
-  } catch (error: any) {
-    console.error('[AIAppModules] Failed to reorder:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to reorder modules', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

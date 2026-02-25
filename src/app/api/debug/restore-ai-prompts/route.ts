@@ -1,15 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/restore-ai-prompts' },
+  async ({ logger }) => {
     // Get the active publication
     const { data: newsletter } = await supabaseAdmin
       .from('publications')
@@ -32,7 +27,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: appError.message }, { status: 500 })
     }
 
-    console.log(`Found ${appPrompts?.length || 0} prompts in app_settings`)
+    logger.info({ count: appPrompts?.length || 0 }, 'Found prompts in app_settings')
 
     // Compare with publication_settings
     const { data: pubPrompts } = await supabaseAdmin
@@ -127,12 +122,5 @@ export async function GET(request: NextRequest) {
       })),
       diagnostics
     })
-
-  } catch (error) {
-    console.error('Error restoring AI prompts:', error)
-    return NextResponse.json({
-      error: 'Failed to restore AI prompts',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

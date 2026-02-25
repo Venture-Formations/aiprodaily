@@ -1,20 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import type { RssFeed } from '@/types/database'
 
 /**
  * GET - Fetch all RSS feeds for the current newsletter
  */
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'rss-feeds' },
+  async () => {
     // Get newsletter context (for now, using first newsletter)
     const { data: newsletters } = await supabaseAdmin
       .from('publications')
@@ -43,27 +36,15 @@ export async function GET(request: NextRequest) {
       success: true,
       feeds: feeds || []
     })
-
-  } catch (error) {
-    console.error('RSS feeds error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST - Create a new RSS feed
  */
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'rss-feeds' },
+  async ({ request }) => {
     const body = await request.json()
     const { url, name, description, active = true } = body
 
@@ -110,12 +91,5 @@ export async function POST(request: NextRequest) {
       message: 'RSS feed created successfully',
       feed
     })
-
-  } catch (error) {
-    console.error('Create RSS feed error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

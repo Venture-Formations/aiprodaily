@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * Debug endpoint to verify multi-tenant database schema
  * GET /api/debug/verify-multitenant
  */
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/verify-multitenant' },
+  async ({ logger }) => {
     const results: any = {
       timestamp: new Date().toISOString(),
       checks: {}
@@ -86,12 +88,5 @@ export async function GET() {
     return NextResponse.json(results, {
       status: allPassed ? 200 : 500
     })
-
-  } catch (error: any) {
-    return NextResponse.json({
-      status: 'ERROR',
-      error: error.message,
-      timestamp: new Date().toISOString()
-    }, { status: 500 })
   }
-}
+)

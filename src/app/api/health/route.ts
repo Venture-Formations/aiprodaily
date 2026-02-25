@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { HealthMonitor } from '@/lib/slack'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'public', logContext: 'health' },
+  async ({ request, logger }) => {
     const healthMonitor = new HealthMonitor()
     const results = await healthMonitor.runFullHealthCheck()
 
@@ -21,14 +23,5 @@ export async function GET(request: NextRequest) {
     }, {
       status: overallHealth ? 200 : 503
     })
-
-  } catch (error) {
-    console.error('Health check failed:', error)
-
-    return NextResponse.json({
-      status: 'error',
-      message: 'Health check failed',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

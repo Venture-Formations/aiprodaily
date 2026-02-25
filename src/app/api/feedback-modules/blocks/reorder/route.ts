@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { FeedbackModuleSelector } from '@/lib/feedback-modules'
+import { withApiHandler } from '@/lib/api-handler'
 
 export const maxDuration = 30
 
 // POST /api/feedback-modules/blocks/reorder - Reorder feedback blocks
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'feedback-modules/blocks/reorder' },
+  async ({ request }) => {
     const body = await request.json()
     const { module_id, block_ids } = body
 
@@ -28,11 +30,5 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('[FeedbackBlocks] Error reordering blocks:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to reorder blocks' },
-      { status: 500 }
-    )
   }
-}
+)

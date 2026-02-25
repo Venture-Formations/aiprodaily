@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { Deduplicator } from '@/lib/deduplicator'
 
@@ -8,7 +9,9 @@ export const maxDuration = 60
  * Test the new deduplication fix with real issues
  * Tests Nov 17 and Nov 18 issues to verify historical checking works
  */
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-dedup-fix' },
+  async ({ logger }) => {
   const issueId1 = 'f546382b-54e6-4d3f-8edf-79bc20541b85' // Nov 17
   const issueId2 = 'd8679cfd-c2a2-42c0-aa1a-ca6a612ba0af' // Nov 18
 
@@ -171,4 +174,5 @@ export async function GET(request: NextRequest) {
     },
     detailed_results: results
   }, { status: 200 })
-}
+  }
+)

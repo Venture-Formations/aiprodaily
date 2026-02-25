@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
@@ -6,8 +7,9 @@ import { supabaseAdmin } from '@/lib/supabase'
  *
  * Usage: GET /api/debug/check-issue-ad?issueId=xxx
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-campaign-ad' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const issueId = searchParams.get('issue_id')
 
@@ -77,15 +79,7 @@ export async function GET(request: NextRequest) {
       full_dashboard_query_error: fullError?.message,
       full_dashboard_query: fullissue?.issue_advertisements
     })
-
-  } catch (error) {
-    console.error('[Check Ad] Error:', error)
-    return NextResponse.json({
-      success: false,
-      error: 'Check failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
 export const maxDuration = 60

@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 
 export const maxDuration = 600
 
-export async function GET(request: Request) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-deduper' },
+  async ({ request, logger }) => {
   const { searchParams } = new URL(request.url)
   const issueId = searchParams.get('issue_id')
 
@@ -81,4 +84,5 @@ export async function GET(request: Request) {
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export const maxDuration = 600
@@ -7,7 +8,9 @@ export const maxDuration = 600
  * Migrates existing criteria settings to be newsletter-specific.
  * Adds publication_id to existing criteria settings that don't have one.
  */
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/migrate-criteria-settings' },
+  async ({ request, logger }) => {
   try {
     const { searchParams } = new URL(request.url)
     const newsletterSlug = searchParams.get('newsletter_slug') || 'accounting'
@@ -121,4 +124,5 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+  }
+)

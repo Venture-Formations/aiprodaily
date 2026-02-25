@@ -1,16 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-interface RouteContext {
-  params: Promise<{ id: string }>
-}
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET /api/article-modules/[id]/criteria - List criteria for a module
  */
-export async function GET(request: NextRequest, context: RouteContext) {
-  try {
-    const { id: moduleId } = await context.params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'article-modules/[id]/criteria' },
+  async ({ params }) => {
+    const moduleId = params.id
 
     const { data: criteria, error } = await supabaseAdmin
       .from('article_module_criteria')
@@ -24,23 +22,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
       success: true,
       criteria: criteria || []
     })
-
-  } catch (error: any) {
-    console.error('[ArticleModuleCriteria] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch criteria', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST /api/article-modules/[id]/criteria - Add new criterion
  * Max 5 criteria per module
  */
-export async function POST(request: NextRequest, context: RouteContext) {
-  try {
-    const { id: moduleId } = await context.params
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'article-modules/[id]/criteria' },
+  async ({ params, request }) => {
+    const moduleId = params.id
     const body = await request.json()
 
     // Validate required fields
@@ -93,23 +85,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
       success: true,
       criterion
     }, { status: 201 })
-
-  } catch (error: any) {
-    console.error('[ArticleModuleCriteria] Failed to create:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create criterion', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/article-modules/[id]/criteria - Update criteria (single or bulk)
  * Body: { criteria_id, ...updates } OR { criteria: [{ id, ...updates }] }
  */
-export async function PATCH(request: NextRequest, context: RouteContext) {
-  try {
-    const { id: moduleId } = await context.params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'article-modules/[id]/criteria' },
+  async ({ params, request }) => {
+    const moduleId = params.id
     const body = await request.json()
 
     // Bulk update mode
@@ -210,23 +196,17 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       success: true,
       criterion
     })
-
-  } catch (error: any) {
-    console.error('[ArticleModuleCriteria] Failed to update:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update criteria', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * DELETE /api/article-modules/[id]/criteria - Delete a criterion
  * Query param: criteria_id
  */
-export async function DELETE(request: NextRequest, context: RouteContext) {
-  try {
-    const { id: moduleId } = await context.params
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'article-modules/[id]/criteria' },
+  async ({ params, request }) => {
+    const moduleId = params.id
     const criteriaId = request.nextUrl.searchParams.get('criteria_id')
 
     if (!criteriaId) {
@@ -264,12 +244,5 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       success: true,
       message: 'Criterion deleted'
     })
-
-  } catch (error: any) {
-    console.error('[ArticleModuleCriteria] Failed to delete:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete criterion', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

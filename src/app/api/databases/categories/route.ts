@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // Helper to get active publication
@@ -13,8 +14,9 @@ async function getActivePublication() {
 }
 
 // GET - List all categories
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'databases/categories' },
+  async ({ logger }) => {
     const activeNewsletter = await getActivePublication()
     if (!activeNewsletter) {
       return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
@@ -27,20 +29,18 @@ export async function GET(request: NextRequest) {
       .order('name', { ascending: true })
 
     if (error) {
-      console.error('[API] Error fetching categories:', error.message)
+      logger.error({ err: error }, 'Error fetching categories')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ categories })
-  } catch (error: any) {
-    console.error('[API] Categories GET error:', error.message)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)
 
 // POST - Create a new category
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'databases/categories' },
+  async ({ request, logger }) => {
     const activeNewsletter = await getActivePublication()
     if (!activeNewsletter) {
       return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
@@ -83,13 +83,10 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('[API] Error creating category:', error.message)
+      logger.error({ err: error }, 'Error creating category')
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ category }, { status: 201 })
-  } catch (error: any) {
-    console.error('[API] Categories POST error:', error.message)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+)

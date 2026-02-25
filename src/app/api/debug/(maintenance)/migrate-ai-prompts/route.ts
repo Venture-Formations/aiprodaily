@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export const maxDuration = 600
@@ -293,7 +294,9 @@ Respond with valid JSON:
   }
 ]
 
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/migrate-ai-prompts' },
+  async ({ request, logger }) => {
   const { searchParams } = new URL(request.url)
   const dryRun = searchParams.get('dry_run') !== 'false' // Default true
 
@@ -378,4 +381,5 @@ export async function GET(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { headers } from 'next/headers'
 import axios from 'axios'
 import { getPublicationByDomain, getEmailProviderSettings } from '@/lib/publication-settings'
@@ -112,8 +113,9 @@ async function updateMailerLiteField(email: string, fieldKey: string, value: str
  * POST /api/preferences
  * Body: { email: string, preference: 'daily' | 'weekly' | 'unsubscribe' }
  */
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'public', logContext: 'preferences' },
+  async ({ request, logger }) => {
     const body = await request.json()
     const { email, preference } = body as { email: string; preference: Preference }
 
@@ -258,13 +260,5 @@ export async function POST(request: NextRequest) {
       success: true,
       message: messages[preference]
     })
-
-  } catch (error: any) {
-    console.error('[Preferences] Error updating preferences:', error)
-
-    return NextResponse.json({
-      error: 'Failed to update preferences',
-      message: error.message || 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

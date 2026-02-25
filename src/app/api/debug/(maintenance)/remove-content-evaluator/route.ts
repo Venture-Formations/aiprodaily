@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export const maxDuration = 600
@@ -8,7 +9,9 @@ export const maxDuration = 600
  * These prompts are legacy from the old scoring system and are no longer used.
  * The system now uses criteria-based scoring (ai_prompt_criteria_1 through ai_prompt_criteria_5).
  */
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/remove-content-evaluator' },
+  async ({ logger }) => {
   try {
     console.log('[REMOVE-CONTENT-EVALUATOR] Starting cleanup...')
 
@@ -66,4 +69,5 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+  }
+)

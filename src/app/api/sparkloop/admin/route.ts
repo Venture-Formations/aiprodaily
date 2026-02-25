@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicationSettings, updatePublicationSetting } from '@/lib/publication-settings'
 import { SparkLoopService } from '@/lib/sparkloop-client'
@@ -13,8 +14,9 @@ const FALLBACK_DEFAULT_RCR = 25
  *
  * Get all recommendations for admin management
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'sparkloop/admin' },
+  async ({ request, logger }) => {
     const { searchParams } = new URL(request.url)
     const filter = searchParams.get('filter') || 'all' // all, active, excluded
 
@@ -46,9 +48,6 @@ export async function GET(request: NextRequest) {
     const defaultRcr = defaults.sparkloop_default_rcr ? parseFloat(defaults.sparkloop_default_rcr) : FALLBACK_DEFAULT_RCR
 
     // Calculate scores for each recommendation
-    // Priority: real data > override (replaces default) > default
-    // CR:  our_cr (if 50+ impressions) > override_cr > configurable default
-    // RCR: sparkloop_rcr > override_rcr > configurable default
     const withScores = (data || []).map(rec => {
       const hasOverrideCr = rec.override_cr !== null && rec.override_cr !== undefined
       const hasOverrideRcr = rec.override_rcr !== null && rec.override_rcr !== undefined
@@ -57,7 +56,6 @@ export async function GET(request: NextRequest) {
       const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
       const hasSLRcr = slRcr !== null && slRcr > 0
 
-      // Effective CR: override > ours > configurable default
       let effectiveCr: number
       let crSource: string
       if (hasOverrideCr) {
@@ -71,7 +69,6 @@ export async function GET(request: NextRequest) {
         crSource = 'default'
       }
 
-      // Effective RCR: override > sparkloop > configurable default
       let effectiveRcr: number
       let rcrSource: string
       if (hasOverrideRcr) {
@@ -113,7 +110,6 @@ export async function GET(request: NextRequest) {
     let avgOffersSelected = 0
 
     try {
-      // Get all subscribe-confirmed events with ip_hash
       const { data: subscribeEvents } = await supabaseAdmin
         .from('sparkloop_events')
         .select('raw_payload')
@@ -147,7 +143,6 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Get avg offers selected from subscriptions_success events
       const { data: successEvents } = await supabaseAdmin
         .from('sparkloop_events')
         .select('raw_payload')
@@ -170,7 +165,7 @@ export async function GET(request: NextRequest) {
         }
       }
     } catch (statsError) {
-      console.error('[SparkLoop Admin] Failed to compute IP/offer stats:', statsError)
+      logger.error({ err: statsError }, 'Failed to compute IP/offer stats')
     }
 
     // Add unique_ips to each recommendation
@@ -202,14 +197,9 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Sort by score descending (highest expected revenue per impression first)
+    // Sort by score descending
     withRollingMetrics.sort((a, b) => (b.calculated_score || 0) - (a.calculated_score || 0))
 
-    // Categories are mutually exclusive:
-    // - Active: status=active AND not excluded
-    // - Excluded: any status but excluded=true
-    // - Paused: status=paused AND not excluded
-    // - Archived: status in (archived, awaiting_approval) AND not excluded
     return NextResponse.json({
       success: true,
       recommendations: withRollingMetrics,
@@ -229,26 +219,21 @@ export async function GET(request: NextRequest) {
         rcr: defaultRcr,
       },
     })
-  } catch (error) {
-    console.error('[SparkLoop Admin] Failed to fetch recommendations:', error)
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/sparkloop/admin
  *
  * Update recommendation (exclude/reactivate/pause/unpause)
  */
-export async function PATCH(request: NextRequest) {
-  try {
+export const PATCH = withApiHandler(
+  { authTier: 'admin', logContext: 'sparkloop/admin' },
+  async ({ request, logger }) => {
     const body = await request.json()
     const { id, excluded, excluded_reason, action } = body
 
-    // set_defaults doesn't need an id — handle it before the id check
+    // set_defaults doesn't need an id -- handle it before the id check
     if (action === 'set_defaults') {
       const results: string[] = []
       if ('default_cr' in body && body.default_cr !== undefined) {
@@ -273,7 +258,7 @@ export async function PATCH(request: NextRequest) {
         await updatePublicationSetting(PUBLICATION_ID, 'sparkloop_default_rcr', String(val))
         results.push(`RCR=${val}%`)
       }
-      console.log(`[SparkLoop Admin] Updated defaults: ${results.join(', ')}`)
+      logger.info({ updated: results }, 'Updated defaults')
       return NextResponse.json({ success: true, updated: results })
     }
 
@@ -289,8 +274,6 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (action === 'set_overrides') {
-      // Set or clear CR/RCR overrides
-      // Number = set override, null = clear override, field absent = don't touch
       if ('override_cr' in body) {
         updateData.override_cr = body.override_cr
       }
@@ -298,18 +281,14 @@ export async function PATCH(request: NextRequest) {
         updateData.override_rcr = body.override_rcr
       }
     } else if (action === 'pause') {
-      // Manual pause: set status to paused, mark reason as manual
       updateData.status = 'paused'
       updateData.paused_reason = 'manual'
     } else if (action === 'unpause') {
-      // Unpause: restore to active, clear paused_reason
       updateData.status = 'active'
       updateData.paused_reason = null
     } else if (action === 'toggle_module_eligible') {
-      // Toggle whether this rec appears in newsletter email modules
       updateData.eligible_for_module = body.eligible_for_module ?? false
     } else {
-      // Legacy exclude/reactivate toggle
       updateData.excluded = excluded ?? false
       updateData.excluded_reason = excluded ? (excluded_reason || 'manual_exclusion') : null
     }
@@ -326,28 +305,23 @@ export async function PATCH(request: NextRequest) {
     }
 
     const actionLabel = action === 'set_overrides' ? 'Updated overrides for' : action === 'pause' ? 'Paused' : action === 'unpause' ? 'Unpaused' : excluded ? 'Excluded' : 'Reactivated'
-    console.log(`[SparkLoop Admin] ${actionLabel} recommendation: ${data.publication_name}`)
+    logger.info({ action: actionLabel, name: data.publication_name }, 'Recommendation updated')
 
     return NextResponse.json({
       success: true,
       recommendation: data,
     })
-  } catch (error) {
-    console.error('[SparkLoop Admin] Failed to update recommendation:', error)
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST /api/sparkloop/admin
  *
  * Bulk update recommendations
  */
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'sparkloop/admin' },
+  async ({ request, logger }) => {
     const body = await request.json()
     const { action, ids, excluded_reason } = body
 
@@ -397,17 +371,11 @@ export async function POST(request: NextRequest) {
       throw new Error(`Database error: ${error.message}`)
     }
 
-    console.log(`[SparkLoop Admin] Bulk ${action}: ${data?.length || 0} recommendations`)
+    logger.info({ action, count: data?.length || 0 }, 'Bulk update completed')
 
     return NextResponse.json({
       success: true,
       updated: data?.length || 0,
     })
-  } catch (error) {
-    console.error('[SparkLoop Admin] Bulk update failed:', error)
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

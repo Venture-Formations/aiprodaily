@@ -1,8 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { isValidIP, isValidCIDR, parseCIDR, parseIPInput } from '@/lib/ip-utils'
+import { parseIPInput } from '@/lib/ip-utils'
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * Unified IP Exclusion API
@@ -14,14 +13,9 @@ import { isValidIP, isValidCIDR, parseCIDR, parseIPInput } from '@/lib/ip-utils'
  * GET - Fetch all excluded IPs for a publication
  * Query params: publication_id (required)
  */
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'excluded-ips' },
+  async ({ request }) => {
     const { searchParams } = new URL(request.url)
     const publicationId = searchParams.get('publication_id')
 
@@ -64,29 +58,17 @@ export async function GET(request: NextRequest) {
       success: true,
       ips: allExcludedIps
     })
-
-  } catch (error) {
-    console.error('[IP Exclusion] GET error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * POST - Add an IP or CIDR range to the exclusion list
  * Body: { publication_id, ip_address, reason? }
  * ip_address can be a single IP (192.168.1.1) or CIDR range (192.168.1.0/24)
  */
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'excluded-ips' },
+  async ({ request, session }) => {
     const body = await request.json()
     const { publication_id, ip_address, reason } = body
 
@@ -183,15 +165,8 @@ export async function POST(request: NextRequest) {
       added: inserted,
       ips: allExcludedIps
     })
-
-  } catch (error) {
-    console.error('[IP Exclusion] POST error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * DELETE - Remove IP(s) from the exclusion list
@@ -199,14 +174,9 @@ export async function POST(request: NextRequest) {
  *   - { publication_id, ip_address } - Remove single IP
  *   - { publication_id, exclusion_source } - Remove all IPs with given source (velocity, honeypot, manual)
  */
-export async function DELETE(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'excluded-ips' },
+  async ({ request }) => {
     const body = await request.json()
     const { publication_id, ip_address, exclusion_source } = body
 
@@ -332,12 +302,5 @@ export async function DELETE(request: NextRequest) {
       message: `IP "${normalizedIP}" removed from exclusion list`,
       ips: allExcludedIps
     })
-
-  } catch (error) {
-    console.error('[IP Exclusion] DELETE error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

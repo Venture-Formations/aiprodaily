@@ -1,16 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
 
 // GET - Fetch criteria configuration (enabled count and names)
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/criteria' },
+  async ({ request }) => {
     const { searchParams } = new URL(request.url)
     const newsletterSlug = searchParams.get('publication_id')
 
@@ -98,27 +93,13 @@ export async function GET(request: NextRequest) {
       primaryCriteria,
       secondaryCriteria
     })
-
-  } catch (error) {
-    console.error('Failed to fetch criteria configuration:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)
 
 // PATCH - Update criteria configuration
-export async function PATCH(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/criteria' },
+  async ({ request }) => {
     const body = await request.json()
     const { action, criteriaNumber, name, enabledCount, isSecondary, newsletterSlug } = body
 
@@ -226,15 +207,5 @@ export async function PATCH(request: NextRequest) {
       { error: 'Invalid action' },
       { status: 400 }
     )
-
-  } catch (error) {
-    console.error('Failed to update criteria configuration:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)

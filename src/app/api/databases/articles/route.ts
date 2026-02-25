@@ -1,9 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { withApiHandler } from '@/lib/api-handler';
 import { supabaseAdmin } from '@/lib/supabase';
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils';
 
-export async function GET(request: NextRequest) {
-  try {
+export const maxDuration = 600;
+
+export const GET = withApiHandler(
+  { authTier: 'public', logContext: 'databases-articles' },
+  async ({ request, logger }) => {
     // Use the shared supabaseAdmin client for consistent behavior
     const supabase = supabaseAdmin;
 
@@ -35,7 +39,7 @@ export async function GET(request: NextRequest) {
     }
 
     const newsletterId = newsletter.id;
-    console.log('[API] Newsletter:', newsletterSlug, '→ UUID:', newsletterId);
+    console.log('[API] Newsletter:', newsletterSlug, '-> UUID:', newsletterId);
 
     // Fetch excluded IPs for this publication (for filtering click analytics)
     let exclusions: IPExclusion[] = [];
@@ -659,14 +663,5 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ data: allArticles });
-
-  } catch (error: any) {
-    console.error('[API] Articles fetch error:', error.message);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
-      { status: 500 }
-    );
   }
-}
-
-export const maxDuration = 600;
+);

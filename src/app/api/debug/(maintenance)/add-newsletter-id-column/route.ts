@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export const maxDuration = 600
@@ -7,7 +8,9 @@ export const maxDuration = 600
  * Adds publication_id column to app_settings table.
  * This enables newsletter-specific settings for multi-tenant support.
  */
-export async function GET(request: NextRequest) {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/add-newsletter-id-column' },
+  async ({ logger }) => {
   try {
     console.log('[ADD-COLUMN] Adding publication_id column to app_settings table...')
 
@@ -90,4 +93,5 @@ ON app_settings(key, publication_id);
       `.trim()
     }, { status: 500 })
   }
-}
+  }
+)

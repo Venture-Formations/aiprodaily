@@ -1,13 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
-
-interface RouteParams {
-  params: Promise<{
-    id: string
-  }>
-}
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * PATCH /api/campaigns/[id]/ai-app-modules/pinning
@@ -19,14 +12,10 @@ interface RouteParams {
  *   pinned_overrides: Record<string, number | null> - {app_id: position or null to unpin}
  * }
  */
-export async function PATCH(request: NextRequest, { params }: RouteParams) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: issueId } = await params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/ai-app-modules/pinning' },
+  async ({ params, request }) => {
+    const issueId = params.id
     const body = await request.json()
     const { module_id, pinned_overrides } = body
 
@@ -109,28 +98,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       success: true,
       selection: updatedSelection
     })
-
-  } catch (error) {
-    console.error('Failed to update pinning overrides:', error)
-    return NextResponse.json({
-      error: 'Failed to update pinning overrides',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
 /**
  * GET /api/campaigns/[id]/ai-app-modules/pinning
  * Gets per-issue pinning overrides for all modules
  */
-export async function GET(request: NextRequest, { params }: RouteParams) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: issueId } = await params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'campaigns/[id]/ai-app-modules/pinning' },
+  async ({ params }) => {
+    const issueId = params.id
 
     // Fetch all selections with pinned_overrides for this issue
     const { data: selections, error } = await supabaseAdmin
@@ -152,12 +130,5 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       success: true,
       pinning: pinningByModule
     })
-
-  } catch (error) {
-    console.error('Failed to fetch pinning overrides:', error)
-    return NextResponse.json({
-      error: 'Failed to fetch pinning overrides',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

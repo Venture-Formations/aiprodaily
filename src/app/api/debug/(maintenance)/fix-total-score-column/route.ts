@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * Fix total_score column type from INTEGER to NUMERIC
  * This allows weighted scores like 22.5, 25.5, etc.
  */
-export async function GET() {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(maintenance)/fix-total-score-column' },
+  async ({ logger }) => {
   try {
     console.log('Fixing total_score column type...')
 
@@ -47,4 +50,5 @@ export async function GET() {
       manual_sql: 'ALTER TABLE post_ratings ALTER COLUMN total_score TYPE NUMERIC USING total_score::NUMERIC;'
     }, { status: 500 })
   }
-}
+  }
+)

@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { authOptions } from '@/lib/auth'
 
 // Valid setting keys for AI apps
 const VALID_SETTING_KEYS = [
@@ -13,13 +12,9 @@ const VALID_SETTING_KEYS = [
 /**
  * GET /api/settings/ai-apps - Get AI app settings
  */
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/ai-apps' },
+  async ({ logger }) => {
     // Get user's publication_id (use first active newsletter for now)
     const { data: newsletter } = await supabaseAdmin
       .from('publications')
@@ -49,26 +44,15 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json({ settings: settingsMap })
-
-  } catch (error: any) {
-    console.error('Failed to fetch AI app settings:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch settings', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/settings/ai-apps - Update AI app settings
  */
-export async function PATCH(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'settings/ai-apps' },
+  async ({ request, logger }) => {
     // Get user's publication_id (use first active newsletter for now)
     const { data: newsletter } = await supabaseAdmin
       .from('publications')
@@ -110,18 +94,11 @@ export async function PATCH(request: NextRequest) {
         })
 
       if (error) {
-        console.error(`Failed to update setting ${key}:`, error)
+        logger.error({ key, err: error }, `Failed to update setting ${key}`)
         throw error
       }
     }
 
     return NextResponse.json({ success: true })
-
-  } catch (error: any) {
-    console.error('Failed to update AI app settings:', error)
-    return NextResponse.json(
-      { error: 'Failed to update settings', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

@@ -1,17 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-
-type RouteParams = Promise<{ id: string }>
 
 /**
  * GET /api/ai-app-modules/[id] - Get specific AI app module
  */
-export async function GET(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai-app-modules/[id]' },
+  async ({ params }) => {
     const { id } = params
 
     const { data: module, error } = await supabaseAdmin
@@ -34,25 +30,15 @@ export async function GET(
       success: true,
       module
     })
-
-  } catch (error: any) {
-    console.error('[AIAppModules] Failed to fetch:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch AI app module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * PATCH /api/ai-app-modules/[id] - Update AI app module
  */
-export async function PATCH(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
+export const PATCH = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai-app-modules/[id]' },
+  async ({ request, params, logger }) => {
     const { id } = params
     const body = await request.json()
 
@@ -138,32 +124,22 @@ export async function PATCH(
 
     if (error) throw error
 
-    console.log(`[AIAppModules] Updated module: ${module.name} (${module.id})`)
+    logger.info(`Updated module: ${module.name} (${module.id})`)
 
     return NextResponse.json({
       success: true,
       module
     })
-
-  } catch (error: any) {
-    console.error('[AIAppModules] Failed to update:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update AI app module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)
 
 /**
  * DELETE /api/ai-app-modules/[id] - Delete AI app module
  * Note: Apps will be orphaned (ai_app_module_id set to NULL), not deleted
  */
-export async function DELETE(
-  request: NextRequest,
-  segmentData: { params: RouteParams }
-) {
-  try {
-    const params = await segmentData.params
+export const DELETE = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ai-app-modules/[id]' },
+  async ({ params, logger }) => {
     const { id } = params
 
     // First, get module info for logging
@@ -188,19 +164,12 @@ export async function DELETE(
 
     if (error) throw error
 
-    console.log(`[AIAppModules] Deleted module: ${module?.name} (${id}), orphaned ${count || 0} apps`)
+    logger.info(`Deleted module: ${module?.name} (${id}), orphaned ${count || 0} apps`)
 
     return NextResponse.json({
       success: true,
       message: 'AI app module deleted successfully',
       orphaned_apps: count || 0
     })
-
-  } catch (error: any) {
-    console.error('[AIAppModules] Failed to delete:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete AI app module', details: error.message },
-      { status: 500 }
-    )
   }
-}
+)

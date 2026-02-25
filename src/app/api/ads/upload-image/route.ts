@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { STORAGE_PUBLIC_URL } from '@/lib/config'
 import { optimizeBuffer } from '@/lib/tinify-service'
@@ -9,16 +8,9 @@ import { optimizeBuffer } from '@/lib/tinify-service'
  * Upload advertisement image to Supabase Storage (optimized via Tinify)
  * POST /api/ads/upload-image
  */
-export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) {
-    return NextResponse.json(
-      { error: 'Unauthorized. Please log in to upload images.' },
-      { status: 401 }
-    )
-  }
-
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'ads/upload-image' },
+  async ({ request, logger }) => {
     const formData = await request.formData()
     const imageFile = formData.get('image') as File
 
@@ -61,19 +53,12 @@ export async function POST(request: NextRequest) {
       })
 
     if (uploadError) {
-      console.error('[Ads] Supabase Storage upload failed:', uploadError)
+      logger.error({ err: uploadError }, 'Supabase Storage upload failed')
       throw new Error(`Upload failed: ${uploadError.message}`)
     }
 
     const publicUrl = `${STORAGE_PUBLIC_URL}/ad-images/${filename}`
 
     return NextResponse.json({ url: publicUrl })
-
-  } catch (error) {
-    console.error('[Ads] Image upload error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to upload image' },
-      { status: 500 }
-    )
   }
-}
+)

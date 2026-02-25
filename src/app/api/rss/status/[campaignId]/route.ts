@@ -1,22 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-interface RouteParams {
-  params: Promise<{
-    issueId: string
-  }>
-}
-
-export async function GET(request: NextRequest, { params }: RouteParams) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { issueId } = await params
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'rss/status' },
+  async ({ params }) => {
+    const issueId = params.issueId
 
     // Get issue info
     const { data: issue } = await supabaseAdmin
@@ -62,12 +51,5 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
       recentLogs: logs || []
     })
-
-  } catch (error) {
-    console.error('Failed to get RSS status:', error)
-    return NextResponse.json({
-      error: 'Failed to get RSS status',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

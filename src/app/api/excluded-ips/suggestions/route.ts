@@ -1,9 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
-import { getKnownIPRange, getKnownRangesByOrganization, KnownIPRange } from '@/lib/known-ip-ranges'
+import { getKnownIPRange, getKnownRangesByOrganization } from '@/lib/known-ip-ranges'
+import { withApiHandler } from '@/lib/api-handler'
 
 /**
  * GET - Get suggested IPs to exclude based on suspicious patterns
@@ -15,14 +14,9 @@ import { getKnownIPRange, getKnownRangesByOrganization, KnownIPRange } from '@/l
  *
  * Query params: publication_id (required)
  */
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+export const GET = withApiHandler(
+  { authTier: 'authenticated', logContext: 'excluded-ips/suggestions' },
+  async ({ request }) => {
     const { searchParams } = new URL(request.url)
     const publicationId = searchParams.get('publication_id')
 
@@ -282,12 +276,5 @@ export async function GET(request: NextRequest) {
       suggestions,
       detected_scanners: Object.values(detectedScanners).sort((a, b) => b.total_activity - a.total_activity)
     })
-
-  } catch (error) {
-    console.error('[IP Exclusion] Suggestions error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
   }
-}
+)

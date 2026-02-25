@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // Initialize AI prompts in database with default values from code
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(ai)/initialize-ai-prompts' },
+  async () => {
     const defaultPrompts = [
       {
         key: 'ai_prompt_content_evaluator',
@@ -329,15 +331,5 @@ IMPORTANT: Only include OCR fields if readable text is actually present. Only in
       message: 'AI prompts initialized',
       results
     })
-
-  } catch (error) {
-    console.error('Error initializing AI prompts:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)

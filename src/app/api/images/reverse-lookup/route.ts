@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { GoogleVisionService } from '@/lib/google-vision'
+import { withApiHandler } from '@/lib/api-handler'
 
 interface ReverseSearchResult {
   source_url: string
@@ -12,8 +13,9 @@ interface ReverseSearchResult {
   thumbnail_url?: string
 }
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'authenticated', logContext: 'images/reverse-lookup' },
+  async ({ request }) => {
     const { image_id } = await request.json()
 
     if (!image_id) {
@@ -100,18 +102,8 @@ export async function POST(request: NextRequest) {
       total_found: results.length,
       lookup_timestamp: new Date().toISOString()
     })
-
-  } catch (error) {
-    console.error('Reverse lookup API error:', error)
-    return NextResponse.json(
-      {
-        error: 'Reverse lookup failed',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)
 
 async function performTinEyeSearch(imageUrl: string, results: ReverseSearchResult[]) {
   // TinEye API implementation (requires API key)

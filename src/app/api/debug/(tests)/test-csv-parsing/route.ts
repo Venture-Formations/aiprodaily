@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 
 // Copy of the CSV parsing function to test
 function parseCSVContent(content: string): string[][] {
@@ -64,7 +65,9 @@ function parseCSVContent(content: string): string[][] {
   return result
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-csv-parsing' },
+  async ({ request, logger }) => {
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File
@@ -172,4 +175,5 @@ export async function POST(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
-}
+  }
+)

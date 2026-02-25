@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-last-run' },
+  async ({ request, logger }) => {
     // Get all "last run" tracking settings
     const { data: lastRunSettings } = await supabaseAdmin
       .from('app_settings')
@@ -28,16 +30,12 @@ export async function GET(request: NextRequest) {
         updatedAt: s.updated_at
       }))
     })
-  } catch (error) {
-    console.error('Error:', error)
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-last-run' },
+  async ({ request, logger }) => {
     const body = await request.json()
     const { resetKey } = body
 
@@ -75,10 +73,5 @@ export async function POST(request: NextRequest) {
       resetKey,
       newValue: yesterdayDate
     })
-  } catch (error) {
-    console.error('Error:', error)
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

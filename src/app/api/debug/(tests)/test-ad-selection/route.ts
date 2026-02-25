@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AdScheduler } from '@/lib/ad-scheduler'
 
@@ -12,7 +13,9 @@ import { AdScheduler } from '@/lib/ad-scheduler'
  * Or create a test issue:
  * POST /api/debug/test-ad-selection?create_test=true
  */
-export async function POST(request: NextRequest) {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-ad-selection' },
+  async ({ request, logger }) => {
   try {
     const { searchParams } = new URL(request.url)
     const createTest = searchParams.get('create_test') === 'true'
@@ -163,6 +166,7 @@ export async function POST(request: NextRequest) {
       details: error
     }, { status: 500 })
   }
-}
+  }
+)
 
 export const maxDuration = 60

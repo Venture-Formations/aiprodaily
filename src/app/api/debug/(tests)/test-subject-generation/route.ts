@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
 
-export async function POST(request: NextRequest) {
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(tests)/test-subject-generation' },
+  async ({ request, logger }) => {
   try {
     console.log('=== TESTING SUBJECT LINE GENERATION ===')
 
@@ -189,4 +192,5 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     }, { status: 500 })
   }
-}
+  }
+)

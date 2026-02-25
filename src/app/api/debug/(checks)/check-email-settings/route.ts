@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  { authTier: 'admin', logContext: 'debug/(checks)/check-email-settings' },
+  async () => {
     console.log('=== EMAIL SETTINGS DEBUG ===')
 
     // Get ALL email settings from database
@@ -30,11 +32,5 @@ export async function GET(request: NextRequest) {
         updated: s.updated_at
       }))
     }, { status: 200 })
-
-  } catch (error) {
-    console.error('Debug endpoint error:', error)
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
-}
+)

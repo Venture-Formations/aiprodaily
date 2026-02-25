@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST(request: NextRequest) {
-  try {
-    console.log('=== SETTING UP SUPABASE STORAGE ===')
+export const POST = withApiHandler(
+  { authTier: 'admin', logContext: 'setup/storage' },
+  async ({ logger }) => {
+    logger.info('Setting up Supabase storage')
 
     const bucketsToCreate = [
       {
@@ -41,12 +43,5 @@ export async function POST(request: NextRequest) {
       message: 'Storage buckets configured',
       buckets: results,
     })
-
-  } catch (error) {
-    console.error('Storage setup error:', error)
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : 'Unknown error',
-      message: 'Failed to setup Supabase Storage'
-    }, { status: 500 })
   }
-}
+)
