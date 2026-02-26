@@ -9,7 +9,7 @@ import type { BusinessSettings } from './types'
 
 // ==================== HEADER ====================
 
-export async function generateNewsletterHeader(formattedDate: string, issueDate?: string, issueId?: string, publication_id?: string, businessSettings?: BusinessSettings): Promise<string> {
+export async function generateNewsletterHeader(formattedDate: string, issueDate?: string, issueId?: string, publication_id?: string, businessSettings?: BusinessSettings, preheaderText?: string): Promise<string> {
   let headerImageUrl = ''
   let primaryColor = '#1877F2'
   let newsletterName = 'Newsletter'
@@ -51,9 +51,25 @@ export async function generateNewsletterHeader(formattedDate: string, issueDate?
     ? wrapTrackingUrl(websiteUrl, 'Header', issueDate, issueId)
     : websiteUrl
 
-  return `<html style="margin:0;padding:0;background-color:#f7f7f7;">
+  // Build preheader hidden div (shown in email client preview text)
+  const preheaderDiv = preheaderText
+    ? `<!--[if !mso]><!--><div style="display:none;font-size:1px;color:#f7f7f7;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">${preheaderText}&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;&#847;&zwnj;&nbsp;&#8199;&shy;</div><!--<![endif]-->`
+    : ''
+
+  return `<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" style="margin:0;padding:0;background-color:#f7f7f7;">
 <head>
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
 
   <style>
     * {
@@ -71,7 +87,7 @@ export async function generateNewsletterHeader(formattedDate: string, issueDate?
 </head>
 
 <body style="margin:0!important;padding:0!important;background-color:#f7f7f7;">
-
+${preheaderDiv}
   <div class="email-wrapper" style="width:100%;margin:0 auto;padding:10px;background-color:#f7f7f7;box-sizing:border-box;">
 
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">

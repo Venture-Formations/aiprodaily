@@ -52,6 +52,7 @@ export interface IssueSnapshot {
   businessSettings: BusinessSettings
   sortedSections: SectionItem[]
   isReview: boolean
+  preheaderText?: string
 
   // Pre-fetched content (Phase 2.3 — near-zero DB calls during render)
   pollSelections: any[]

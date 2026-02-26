@@ -160,12 +160,17 @@ export async function buildIssueSnapshot(
     articlesByModule[moduleId].push(article)
   }
 
+  // Derive preheader text: welcome_summary → subject_line → empty
+  const rawPreheader = issue.welcome_summary || issue.subject_line || ''
+  const preheaderText = rawPreheader ? String(rawPreheader).slice(0, 120) : ''
+
   return {
     issue,
     formattedDate,
     businessSettings,
     sortedSections,
     isReview,
+    preheaderText,
     pollSelections,
     promptSelections,
     aiAppSelections,
@@ -185,9 +190,9 @@ async function fetchPromptSelections(issueId: string) {
   const { data, error } = await supabaseAdmin
     .from('issue_prompt_modules')
     .select(`
-      id, issue_id, prompt_module_id, prompt_id, selection_mode, selected_at, used_at, created_at,
+      id, issue_id, prompt_module_id, prompt_id, selection_mode, selected_at, used_at,
       prompt_module:prompt_modules(${PROMPT_MODULE_COLS}),
-      prompt:prompt_ideas(id, publication_id, prompt_module_id, title, body, priority, times_used, is_active, created_at, updated_at)
+      prompt:prompt_ideas(id, publication_id, prompt_module_id, title, prompt_text, priority, times_used, is_active, created_at, updated_at)
     `)
     .eq('issue_id', issueId)
   if (error) console.error('[Snapshot] fetchPromptSelections error:', error.message)
