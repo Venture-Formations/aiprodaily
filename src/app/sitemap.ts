@@ -1,12 +1,12 @@
 import { MetadataRoute } from 'next'
 import { supabaseAdmin } from '@/lib/supabase'
+import { headers } from 'next/headers'
+import { getPublicationByDomain } from '@/lib/publication-settings'
 import { PUBLICATION_ID, SITE_BASE_URL } from '@/lib/config'
 
 // Regenerate sitemap every hour (3600 seconds)
 // This ensures new tools, articles, and newsletters appear without redeploying
 export const revalidate = 3600
-
-const BASE_URL = SITE_BASE_URL
 
 // Tool categories from directory.ts
 const TOOL_CATEGORIES = [
@@ -24,52 +24,70 @@ const TOOL_CATEGORIES = [
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date()
 
+  // Resolve publication from request host; fall back to config defaults for cron/build
+  let baseUrl = SITE_BASE_URL
+  let publicationId = PUBLICATION_ID
+
+  try {
+    const headersList = await headers()
+    const host = headersList.get('x-forwarded-host') || headersList.get('host')
+    if (host && !host.includes('localhost')) {
+      baseUrl = `https://${host}`
+      const resolved = await getPublicationByDomain(host)
+      if (resolved) {
+        publicationId = resolved
+      }
+    }
+  } catch {
+    // headers() may throw during build — fall back to config defaults
+  }
+
   // Static pages
   const staticPages: MetadataRoute.Sitemap = [
     {
-      url: BASE_URL,
+      url: baseUrl,
       lastModified: now,
       changeFrequency: 'daily',
       priority: 1.0,
     },
     {
-      url: `${BASE_URL}/subscribe`,
+      url: `${baseUrl}/subscribe`,
       lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.9,
     },
     {
-      url: `${BASE_URL}/tools`,
+      url: `${baseUrl}/tools`,
       lastModified: now,
       changeFrequency: 'daily',
       priority: 0.9,
     },
     {
-      url: `${BASE_URL}/tools/categories`,
+      url: `${baseUrl}/tools/categories`,
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 0.7,
     },
     {
-      url: `${BASE_URL}/tools/submit`,
+      url: `${baseUrl}/tools/submit`,
       lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.5,
     },
     {
-      url: `${BASE_URL}/news`,
+      url: `${baseUrl}/news`,
       lastModified: now,
       changeFrequency: 'daily',
       priority: 0.8,
     },
     {
-      url: `${BASE_URL}/contactus`,
+      url: `${baseUrl}/contactus`,
       lastModified: now,
       changeFrequency: 'yearly',
       priority: 0.3,
     },
     {
-      url: `${BASE_URL}/privacypolicy`,
+      url: `${baseUrl}/privacypolicy`,
       lastModified: now,
       changeFrequency: 'yearly',
       priority: 0.2,
@@ -78,7 +96,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Tool category pages
   const categoryPages: MetadataRoute.Sitemap = TOOL_CATEGORIES.map((slug) => ({
-    url: `${BASE_URL}/tools/category/${slug}`,
+    url: `${baseUrl}/tools/category/${slug}`,
     lastModified: now,
     changeFrequency: 'weekly' as const,
     priority: 0.7,
@@ -90,12 +108,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const { data: tools } = await supabaseAdmin
       .from('ai_applications')
       .select('id, updated_at')
-      .eq('publication_id', PUBLICATION_ID)
+      .eq('publication_id', publicationId)
       .eq('is_active', true)
 
     if (tools) {
       toolPages = tools.map((tool) => ({
-        url: `${BASE_URL}/tools/${tool.id}`,
+        url: `${baseUrl}/tools/${tool.id}`,
         lastModified: tool.updated_at ? new Date(tool.updated_at) : now,
         changeFrequency: 'weekly' as const,
         priority: 0.6,
@@ -111,12 +129,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const { data: newsletters } = await supabaseAdmin
       .from('archived_newsletters')
       .select('issue_date')
-      .eq('publication_id', PUBLICATION_ID)
+      .eq('publication_id', publicationId)
       .order('issue_date', { ascending: false })
 
     if (newsletters) {
       newsletterPages = newsletters.map((nl) => ({
-        url: `${BASE_URL}/newsletter/${nl.issue_date}`,
+        url: `${baseUrl}/newsletter/${nl.issue_date}`,
         lastModified: new Date(nl.issue_date),
         changeFrequency: 'never' as const,
         priority: 0.5,
@@ -132,12 +150,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const { data: articles } = await supabaseAdmin
       .from('manual_articles')
       .select('slug, updated_at')
-      .eq('publication_id', PUBLICATION_ID)
+      .eq('publication_id', publicationId)
       .in('status', ['published', 'used'])
 
     if (articles) {
       articlePages = articles.map((article) => ({
-        url: `${BASE_URL}/news/${article.slug}`,
+        url: `${baseUrl}/news/${article.slug}`,
         lastModified: article.updated_at ? new Date(article.updated_at) : now,
         changeFrequency: 'monthly' as const,
         priority: 0.6,

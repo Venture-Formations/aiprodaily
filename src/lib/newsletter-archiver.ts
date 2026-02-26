@@ -587,15 +587,20 @@ export class NewsletterArchiver {
   }
 
   /**
-   * Get archived newsletter by date
+   * Get archived newsletter by date, optionally scoped to a publication
    */
-  async getArchivedNewsletter(date: string): Promise<ArchivedNewsletter | null> {
+  async getArchivedNewsletter(date: string, publicationId?: string): Promise<ArchivedNewsletter | null> {
     try {
-      const { data, error } = await supabaseAdmin
+      let query = supabaseAdmin
         .from('archived_newsletters')
-        .select('*')
+        .select('id, issue_id, publication_id, issue_date, subject_line, send_date, recipient_count, html_backup, metadata, articles, secondary_articles, events, sections, created_at, updated_at')
         .eq('issue_date', date)
-        .single()
+
+      if (publicationId) {
+        query = query.eq('publication_id', publicationId)
+      }
+
+      const { data, error } = await query.single()
 
       if (error) {
         console.error('Error fetching archived newsletter:', error)
@@ -610,15 +615,21 @@ export class NewsletterArchiver {
   }
 
   /**
-   * Get list of all archived newsletters
+   * Get list of all archived newsletters, optionally scoped to a publication
    */
-  async getArchiveList(limit = 50): Promise<Array<Pick<ArchivedNewsletter, 'id' | 'issue_date' | 'subject_line' | 'send_date' | 'metadata'>>> {
+  async getArchiveList(limit = 50, publicationId?: string): Promise<Array<Pick<ArchivedNewsletter, 'id' | 'issue_date' | 'subject_line' | 'send_date' | 'metadata'>>> {
     try {
-      const { data, error } = await supabaseAdmin
+      let query = supabaseAdmin
         .from('archived_newsletters')
         .select('id, issue_date, subject_line, send_date, metadata')
         .order('issue_date', { ascending: false })
         .limit(limit)
+
+      if (publicationId) {
+        query = query.eq('publication_id', publicationId)
+      }
+
+      const { data, error } = await query
 
       if (error) {
         console.error('Error fetching archive list:', error)

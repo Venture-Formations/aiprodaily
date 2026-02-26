@@ -8,16 +8,6 @@ const isToolsRoute = createRouteMatcher(['/tools(.*)'])
 // Check if this is an /account route (for Clerk middleware)
 const isAccountRoute = createRouteMatcher(['/account(.*)'])
 
-// Newsletter website domain mappings (for easy addition of new newsletters)
-// Format: domain -> newsletter slug
-const NEWSLETTER_DOMAINS: Record<string, string> = {
-  'aiaccountingdaily.com': 'accounting',
-  'www.aiaccountingdaily.com': 'accounting',
-  // Future newsletters - just add new domains here:
-  // 'ainursingdaily.com': 'nursing',
-  // 'www.ainursingdaily.com': 'nursing',
-}
-
 // Admin domains (dashboard access)
 const ADMIN_DOMAINS = ['aiprodaily.com', 'www.aiprodaily.com', 'aiprodaily.vercel.app']
 
@@ -26,44 +16,61 @@ async function customMiddleware(request: NextRequest): Promise<NextResponse> {
   const hostname = request.headers.get('host') || ''
   const url = request.nextUrl
 
-  // Check if this is a newsletter website domain (takes priority over subdomain logic)
-  const newsletterSlug = NEWSLETTER_DOMAINS[hostname]
-
-  if (newsletterSlug) {
-    console.log('[Middleware] Newsletter domain detected:', newsletterSlug)
-    // Skip for API routes, Next.js internals, static files, dashboard, and auth
-    if (
-      url.pathname.startsWith('/_next') ||
-      url.pathname.startsWith('/api') ||
-      url.pathname.startsWith('/auth') ||
-      url.pathname.startsWith('/dashboard') ||
-      url.pathname.includes('.')
-    ) {
-      return NextResponse.next()
-    }
-
-    // Rewrite to /website routes for newsletter domains
-    const rewriteUrl = url.clone()
-
-    if (url.pathname === '/') {
-      rewriteUrl.pathname = '/website'
-    } else {
-      rewriteUrl.pathname = `/website${url.pathname}`
-    }
-
-    // Add newsletter context to headers
-    const requestHeaders = new Headers(request.headers)
-    requestHeaders.set('x-newsletter-slug', newsletterSlug)
-
-    return NextResponse.rewrite(rewriteUrl, {
-      request: {
-        headers: requestHeaders,
-      },
-    })
-  }
-
-  // Check if this is an admin domain (exact match)
+  // Dynamic domain lookup: check if this hostname belongs to a publication
+  // Skip the lookup for admin domains, Vercel previews, and localhost without subdomains
   const isAdminDomain = ADMIN_DOMAINS.includes(hostname)
+  const isVercelPreview = hostname.includes('.vercel.app') && !ADMIN_DOMAINS.includes(hostname)
+  const isDev = hostname.includes('localhost') || hostname.includes('127.0.0.1')
+
+  if (!isAdminDomain && !isVercelPreview) {
+    try {
+      const apiBase = isDev
+        ? 'http://localhost:3000'
+        : `${url.protocol}//${hostname}`
+
+      const res = await fetch(`${apiBase}/api/publications/by-domain?domain=${hostname}`)
+      const contentType = res.headers.get('content-type')
+
+      if (contentType?.includes('application/json')) {
+        const { publication } = await res.json()
+
+        if (publication) {
+          console.log('[Middleware] Newsletter domain detected:', publication.slug)
+
+          // Skip for API routes, Next.js internals, static files, dashboard, and auth
+          if (
+            url.pathname.startsWith('/_next') ||
+            url.pathname.startsWith('/api') ||
+            url.pathname.startsWith('/auth') ||
+            url.pathname.startsWith('/dashboard') ||
+            url.pathname.includes('.')
+          ) {
+            return NextResponse.next()
+          }
+
+          // Rewrite to /website routes for newsletter domains
+          const rewriteUrl = url.clone()
+          rewriteUrl.pathname = url.pathname === '/'
+            ? '/website'
+            : `/website${url.pathname}`
+
+          // Add newsletter context to headers
+          const requestHeaders = new Headers(request.headers)
+          requestHeaders.set('x-newsletter-slug', publication.slug)
+          requestHeaders.set('x-newsletter-id', publication.id)
+
+          return NextResponse.rewrite(rewriteUrl, {
+            request: {
+              headers: requestHeaders,
+            },
+          })
+        }
+      }
+    } catch (error) {
+      console.error('[Middleware] Domain lookup error:', error)
+      // Fall through to existing logic
+    }
+  }
 
   console.log('[Middleware] Admin domain check:', {
     hostname,
@@ -86,7 +93,6 @@ async function customMiddleware(request: NextRequest): Promise<NextResponse> {
   console.log('[Middleware] Not an admin domain, checking subdomain logic...')
 
   // Skip subdomain logic for Vercel preview deployments
-  const isVercelPreview = hostname.includes('.vercel.app') && !ADMIN_DOMAINS.includes(hostname)
   if (isVercelPreview) {
     console.log('[Middleware] Vercel preview deployment detected - skipping subdomain logic')
     return NextResponse.next()
@@ -94,16 +100,15 @@ async function customMiddleware(request: NextRequest): Promise<NextResponse> {
 
   // Extract subdomain
   const parts = hostname.split('.')
-  const isDevelopment = hostname.includes('localhost') || hostname.includes('127.0.0.1')
 
   let subdomain: string | null = null
 
   // Development: accounting.localhost or admin.localhost
-  if (isDevelopment && parts.length > 1 && parts[0] !== 'localhost') {
+  if (isDev && parts.length > 1 && parts[0] !== 'localhost') {
     subdomain = parts[0]
   }
   // Production: accounting.yourdomain.com or admin.yourdomain.com
-  else if (!isDevelopment && parts.length >= 3) {
+  else if (!isDev && parts.length >= 3) {
     subdomain = parts[0]
   }
 
@@ -120,7 +125,7 @@ async function customMiddleware(request: NextRequest): Promise<NextResponse> {
   if (subdomain && subdomain !== 'www' && subdomain !== 'events') {
     // For newsletter subdomains, fetch newsletter from database and add to headers
     try {
-      const apiUrl = isDevelopment
+      const apiUrl = isDev
         ? `http://localhost:3000/api/newsletters/by-subdomain?subdomain=${subdomain}`
         : `${url.protocol}//${hostname}/api/newsletters/by-subdomain?subdomain=${subdomain}`
 

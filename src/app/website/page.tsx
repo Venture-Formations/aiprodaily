@@ -3,8 +3,7 @@ import { Hero } from "@/components/salient/Hero"
 import { Footer } from "@/components/salient/Footer"
 import { LatestNewsList } from "@/components/website/latest-news-list"
 import { supabaseAdmin } from "@/lib/supabase"
-import { headers } from 'next/headers'
-import { getPublicationByDomain, getPublicationSettings } from '@/lib/publication-settings'
+import { resolvePublicationFromRequest } from '@/lib/publication-settings'
 import { STORAGE_PUBLIC_URL } from '@/lib/config'
 
 // Force dynamic rendering to fetch fresh data
@@ -27,38 +26,14 @@ interface NewsItem {
 }
 
 export default async function WebsiteHome() {
-  // Get domain from headers (Next.js 15 requires await)
-  const headersList = await headers()
-  const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'aiaccountingdaily.com'
-
-  // Get publication ID from domain
-  let publicationId: string = await getPublicationByDomain(host) || ''
-
-  // Fallback: if domain lookup fails, try to get by slug or use first active publication
-  if (!publicationId) {
-    console.warn(`[Website] No publication found for domain: ${host}, falling back to first active`)
-    const { data: firstPub } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-    publicationId = firstPub?.id || ''
-  }
-
-  // Fetch settings from publication_settings (publicationId is guaranteed to be string now)
-  const settings = await getPublicationSettings(publicationId || '', [
-    'website_header_url',
-    'logo_url',
-    'newsletter_name',
-    'business_name'
-  ])
+  const { publicationId, host, settings } = await resolvePublicationFromRequest()
 
   const headerImageUrl = settings.website_header_url || '/logo.png'
   const logoUrl = settings.logo_url || '/logo.png'
-  const newsletterName = settings.newsletter_name || 'AI Accounting Daily'
-  const businessName = settings.business_name || 'AI Accounting Daily'
+  const newsletterName = settings.newsletter_name || 'Newsletter'
+  const businessName = settings.business_name || 'Newsletter'
   const currentYear = new Date().getFullYear()
+  const siteUrl = `https://${host}`
 
   // Newsletter cover image
   const newsletterCoverImage = `${STORAGE_PUBLIC_URL}/img/c/ai_accounting_daily_cover_image.jpg`
@@ -129,12 +104,12 @@ export default async function WebsiteHome() {
   const webPageSchema = {
     "@context": "https://schema.org",
     "@type": "WebPage",
-    "name": "AI Accounting Daily - Latest News",
-    "description": "Daily insights, tools, and strategies to help accountants and finance professionals leverage AI for better outcomes.",
+    "name": `${newsletterName} - Latest News`,
+    "description": `Daily insights, tools, and strategies from ${newsletterName}.`,
     "publisher": {
       "@type": "Organization",
-      "name": "AI Accounting Daily",
-      "url": "https://aiaccountingdaily.com"
+      "name": businessName,
+      "url": siteUrl
     }
   }
 
