@@ -46,7 +46,7 @@ export async function renderNewsletterFromSnapshot(
   snapshot: IssueSnapshot
 ): Promise<string> {
   const {
-    issue, formattedDate, businessSettings, sortedSections, isReview,
+    issue, formattedDate, businessSettings, sortedSections, isReview, preheaderText,
     pollSelections, promptSelections, aiAppSelections, textBoxSelections,
     feedbackModule, sparkloopRecSelections, adSelections, articlesByModule,
   } = snapshot
@@ -70,7 +70,7 @@ export async function renderNewsletterFromSnapshot(
 
     // Generate header and footer using pre-fetched businessSettings (zero DB calls)
     const mailerliteId = issue.mailerlite_issue_id || undefined
-    const header = await generateNewsletterHeader(formattedDate, issue.date, mailerliteId, issue.publication_id, businessSettings)
+    const header = await generateNewsletterHeader(formattedDate, issue.date, mailerliteId, issue.publication_id, businessSettings, preheaderText)
     const footer = await generateNewsletterFooter(issue.date, mailerliteId, issue.publication_id, businessSettings)
 
     // Review banner for review emails
@@ -162,7 +162,13 @@ export async function renderNewsletterFromSnapshot(
     // Combine all sections (review banner first if applicable, then header, sections, footer)
     const html = reviewBanner + header + sectionsHtml + footer
 
-    console.log('Full newsletter HTML generated, length:', html.length)
+    const sizeKB = Math.round(html.length / 1024)
+    console.log(`[Newsletter] HTML generated, length: ${html.length} bytes (${sizeKB}KB)`)
+    if (sizeKB > 102) {
+      console.error(`[Newsletter] HTML size ${sizeKB}KB exceeds Gmail clipping threshold (102KB)`)
+    } else if (sizeKB > 80) {
+      console.warn(`[Newsletter] HTML size ${sizeKB}KB approaching Gmail clipping threshold (102KB)`)
+    }
     return html
 
   } catch (error) {

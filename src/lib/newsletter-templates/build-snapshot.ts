@@ -160,12 +160,18 @@ export async function buildIssueSnapshot(
     articlesByModule[moduleId].push(article)
   }
 
+  // Derive preheader from welcome_summary (first ~120 chars)
+  const preheaderText = issue.welcome_summary
+    ? String(issue.welcome_summary).slice(0, 120)
+    : ''
+
   return {
     issue,
     formattedDate,
     businessSettings,
     sortedSections,
     isReview,
+    preheaderText,
     pollSelections,
     promptSelections,
     aiAppSelections,
