@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   check:
-    name: Build & Lint
+    name: Build, Lint & Test
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -33,7 +33,10 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Lint
-        run: npm run lint || echo "::warning::Lint completed with errors (non-blocking)"
+        run: npm run lint -- --max-warnings 360
+
+      - name: Unit tests
+        run: npm run test:run
 
       - name: Build
         run: npm run build

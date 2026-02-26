@@ -2,6 +2,7 @@ import { withApiHandler } from '@/lib/api-handler'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { isIPExcluded, IPExclusion } from '@/lib/ip-utils'
+import type { Logger } from '@/lib/logger'
 
 const BATCH_SIZE = 100 // Process up to 100 updates per run
 const MAX_RETRIES = 3 // Max retry attempts before marking as failed
@@ -72,7 +73,7 @@ async function updateMailerLiteField(
  * Sync Real_Click field status for all subscribers
  * Only queues updates when state actually changes (new clickers or removed clickers)
  */
-async function syncRealClickStatus(): Promise<{
+async function syncRealClickStatus(log: Logger): Promise<{
   checked: number
   newClickers: number
   removedClickers: number
@@ -241,7 +242,7 @@ async function syncRealClickStatus(): Promise<{
           .eq('subscriber_email', email)
       }
 
-      console.log(`[Real_Click Sync] ${publication.slug}: ${emailsWithValidClicks.size} valid clickers, ${toSetTrue.length} new, ${toSetFalse.length} removed`)
+      log.info(`[Real_Click Sync] ${publication.slug}: ${emailsWithValidClicks.size} valid clickers, ${toSetTrue.length} new, ${toSetFalse.length} removed`)
 
     } catch (error) {
       errors.push(`[${publication.slug}] Error: ${error instanceof Error ? error.message : 'Unknown'}`)
@@ -259,7 +260,7 @@ async function syncRealClickStatus(): Promise<{
 /**
  * Main processing function
  */
-async function processMailerLiteUpdates() {
+async function processMailerLiteUpdates(log: Logger) {
   const startTime = Date.now()
 
   // Fetch pending updates
@@ -285,7 +286,7 @@ async function processMailerLiteUpdates() {
     }
   }
 
-  console.log(`[MailerLite Updates] Processing ${pendingUpdates.length} pending updates`)
+  log.info(`[MailerLite Updates] Processing ${pendingUpdates.length} pending updates`)
 
   let successCount = 0
   let failedCount = 0
@@ -333,7 +334,7 @@ async function processMailerLiteUpdates() {
           .eq('id', update.id)
 
         successCount++
-        console.log(`[MailerLite Updates] Updated ${email}: ${update.field_name}=true`)
+        log.info(`[MailerLite Updates] Updated ${email}: ${update.field_name}=true`)
       } else {
         const newRetryCount = update.retry_count + 1
         const shouldRetry = newRetryCount < MAX_RETRIES
@@ -353,7 +354,7 @@ async function processMailerLiteUpdates() {
           errors.push(`${email}/${update.field_name}: ${result.error}`)
         }
 
-        console.error(`[MailerLite Updates] Failed ${email}: ${result.error} (retry ${newRetryCount}/${MAX_RETRIES})`)
+        log.error(`[MailerLite Updates] Failed ${email}: ${result.error} (retry ${newRetryCount}/${MAX_RETRIES})`)
       }
     }
   }
@@ -375,7 +376,7 @@ async function processMailerLiteUpdates() {
 // GET has extra Real_Click sync logic based on time or sync_real_click param
 export const GET = withApiHandler(
   { authTier: 'system', logContext: 'process-mailerlite-updates' },
-  async ({ request }) => {
+  async ({ request, logger }) => {
     const searchParams = new URL(request.url).searchParams
     const forceSync = searchParams.get('sync_real_click') === 'true'
 
@@ -388,13 +389,13 @@ export const GET = withApiHandler(
     const isSyncTime = currentHour % 2 === 0 && currentMinute < 5
 
     if (forceSync || isSyncTime) {
-      console.log('[MailerLite Updates] Running Real_Click sync...')
-      realClickSyncResult = await syncRealClickStatus()
-      console.log(`[MailerLite Updates] Real_Click sync complete: ${realClickSyncResult.newClickers} new, ${realClickSyncResult.removedClickers} removed`)
+      logger.info('[MailerLite Updates] Running Real_Click sync...')
+      realClickSyncResult = await syncRealClickStatus(logger)
+      logger.info(`[MailerLite Updates] Real_Click sync complete: ${realClickSyncResult.newClickers} new, ${realClickSyncResult.removedClickers} removed`)
     }
 
     // Always process the queue
-    const result = await processMailerLiteUpdates()
+    const result = await processMailerLiteUpdates(logger)
 
     return NextResponse.json({
       ...result,
@@ -406,8 +407,8 @@ export const GET = withApiHandler(
 // POST just processes the queue
 export const POST = withApiHandler(
   { authTier: 'system', logContext: 'process-mailerlite-updates' },
-  async () => {
-    const result = await processMailerLiteUpdates()
+  async ({ logger }) => {
+    const result = await processMailerLiteUpdates(logger)
     return NextResponse.json(result)
   }
 )

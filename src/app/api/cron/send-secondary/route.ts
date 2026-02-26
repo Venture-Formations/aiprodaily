@@ -4,6 +4,7 @@ import { SendGridService } from '@/lib/sendgrid'
 import { MailerLiteService } from '@/lib/mailerlite'
 import { getPublicationSetting, getEmailProviderSettings } from '@/lib/publication-settings'
 import { withApiHandler } from '@/lib/api-handler'
+import type { Logger } from '@/lib/logger'
 
 export const maxDuration = 600 // 10 minutes
 
@@ -11,10 +12,8 @@ export const maxDuration = 600 // 10 minutes
  * Core logic for secondary newsletter send.
  * Shared by both POST (manual trigger) and GET (Vercel cron) handlers.
  */
-async function handleSecondarySend(): Promise<NextResponse> {
-  console.log('[CRON] === SECONDARY SEND CHECK ===')
-  console.log('[CRON] Time:', new Date().toISOString())
-  console.log('[CRON] Central Time:', new Date().toLocaleString("en-US", {timeZone: "America/Chicago"}))
+async function handleSecondarySend(log: Logger): Promise<NextResponse> {
+  log.info('[CRON] === SECONDARY SEND CHECK ===')
 
   // Get first active publication for backward compatibility
   const { data: activePublication } = await supabaseAdmin
@@ -36,7 +35,7 @@ async function handleSecondarySend(): Promise<NextResponse> {
   // Check if secondary schedule is enabled
   const secondaryScheduleEnabled = await getPublicationSetting(publicationId, 'email_secondaryScheduleEnabled')
   if (secondaryScheduleEnabled !== 'true') {
-    console.log('[CRON] Secondary schedule is disabled, skipping')
+    log.info('[CRON] Secondary schedule is disabled, skipping')
     return NextResponse.json({
       success: true,
       message: 'Secondary schedule is disabled',
@@ -51,7 +50,7 @@ async function handleSecondarySend(): Promise<NextResponse> {
     try {
       secondarySendDays = JSON.parse(secondarySendDaysRaw)
     } catch {
-      console.error('[CRON] Failed to parse secondary_send_days, using default Mon-Fri')
+      log.error('[CRON] Failed to parse secondary_send_days, using default Mon-Fri')
       secondarySendDays = [1, 2, 3, 4, 5]
     }
   } else {
@@ -63,7 +62,7 @@ async function handleSecondarySend(): Promise<NextResponse> {
   const dayOfWeek = today.getDay()
 
   if (!secondarySendDays.includes(dayOfWeek)) {
-    console.log(`[CRON] Today (${dayOfWeek}) is not a configured send day [${secondarySendDays.join(',')}], skipping`)
+    log.info({ dayOfWeek, configuredDays: secondarySendDays }, '[CRON] Today is not a configured send day, skipping')
     return NextResponse.json({
       success: true,
       message: `Today is not a configured send day`,
@@ -73,19 +72,19 @@ async function handleSecondarySend(): Promise<NextResponse> {
     })
   }
 
-  console.log(`[CRON] Today (${dayOfWeek}) is a configured send day, proceeding...`)
+  log.info({ dayOfWeek }, '[CRON] Today is a configured send day, proceeding...')
 
   // Get secondary list ID (SendGrid)
   const secondaryListId = await getPublicationSetting(publicationId, 'sendgrid_secondary_list_id')
   if (!secondaryListId) {
-    console.error('[CRON] Secondary list ID not configured')
+    log.error('[CRON] Secondary list ID not configured')
     return NextResponse.json({
       success: false,
       error: 'Secondary list ID not configured in settings (sendgrid_secondary_list_id)'
     }, { status: 400 })
   }
 
-  console.log('[CRON] Using secondary list ID:', secondaryListId)
+  log.info({ secondaryListId }, '[CRON] Using secondary list ID')
 
   // Get today's issue (can be in_review, changes_made, or sent)
   const localDate = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
@@ -118,7 +117,7 @@ async function handleSecondarySend(): Promise<NextResponse> {
     .single()
 
   if (error || !issue) {
-    console.error('[CRON] No issue found for today:', error)
+    log.error({ err: error }, '[CRON] No issue found for today')
     return NextResponse.json({
       success: false,
       error: 'No issue found for today',
@@ -126,13 +125,13 @@ async function handleSecondarySend(): Promise<NextResponse> {
     }, { status: 404 })
   }
 
-  console.log(`[CRON] Found issue: ${issue.id} (date: ${issue.date}, status: ${issue.status})`)
+  log.info({ issueId: issue.id, date: issue.date, status: issue.status }, '[CRON] Found issue')
 
   // Check if secondary send was already done today
   if (issue.secondary_sent_at) {
     const secondarySentDate = new Date(issue.secondary_sent_at).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
     if (secondarySentDate === localDate) {
-      console.log('[CRON] Secondary send already completed today at:', issue.secondary_sent_at)
+      log.info({ secondary_sent_at: issue.secondary_sent_at }, '[CRON] Secondary send already completed today')
       return NextResponse.json({
         success: true,
         message: 'Secondary send already completed today',
@@ -145,7 +144,7 @@ async function handleSecondarySend(): Promise<NextResponse> {
   // Check if we have any active articles
   const activeArticles = issue.articles.filter((article: any) => article.is_active && article.final_position)
   if (activeArticles.length === 0) {
-    console.log('[CRON] Issue has no active articles with final positions, skipping send')
+    log.info('[CRON] Issue has no active articles with final positions, skipping send')
     return NextResponse.json({
       success: false,
       error: 'Issue has no active articles',
@@ -155,7 +154,7 @@ async function handleSecondarySend(): Promise<NextResponse> {
 
   // Check which email provider to use
   const providerSettings = await getEmailProviderSettings(publicationId)
-  console.log(`[CRON] Using email provider: ${providerSettings.provider}`)
+  log.info({ provider: providerSettings.provider }, '[CRON] Using email provider')
 
   let result: { success: boolean; campaignId?: string; issueId?: string; error?: string }
 
@@ -197,13 +196,13 @@ async function handleSecondarySend(): Promise<NextResponse> {
     .eq('id', issue.id)
 
   if (updateError) {
-    console.error('[CRON] Failed to update issue with secondary send info:', updateError)
+    log.error({ err: updateError }, '[CRON] Failed to update issue with secondary send info')
     // Don't fail the entire operation - the email was sent successfully
   } else {
-    console.log('[CRON] Issue updated with secondary send timestamp')
+    log.info('[CRON] Issue updated with secondary send timestamp')
   }
 
-  console.log('[CRON] === SECONDARY SEND COMPLETED ===')
+  log.info('[CRON] === SECONDARY SEND COMPLETED ===')
 
   return NextResponse.json({
     success: true,
@@ -221,7 +220,7 @@ async function handleSecondarySend(): Promise<NextResponse> {
  */
 export const POST = withApiHandler(
   { authTier: 'system', logContext: 'send-secondary' },
-  async () => handleSecondarySend()
+  async ({ logger }) => handleSecondarySend(logger)
 )
 
 /**
@@ -230,5 +229,5 @@ export const POST = withApiHandler(
  */
 export const GET = withApiHandler(
   { authTier: 'system', logContext: 'send-secondary' },
-  async () => handleSecondarySend()
+  async ({ logger }) => handleSecondarySend(logger)
 )

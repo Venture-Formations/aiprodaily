@@ -3,8 +3,9 @@ import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { ScheduleChecker } from '@/lib/schedule-checker'
 import { PromptSelector } from '@/lib/prompt-selector'
+import type { Logger } from '@/lib/logger'
 
-async function processRSSWorkflow(force: boolean = false) {
+async function processRSSWorkflow(log: Logger, force: boolean = false) {
   let issueId: string | undefined
 
   // TODO: This legacy route should be deprecated in favor of trigger-workflow
@@ -44,7 +45,7 @@ async function processRSSWorkflow(force: boolean = false) {
       }
     }
   } else {
-    console.log('[Cron] Force mode enabled - bypassing schedule check')
+    log.info('[Cron] Force mode enabled - bypassing schedule check')
   }
 
   // Get tomorrow's date for issue creation (RSS processing is for next day)
@@ -102,7 +103,7 @@ async function processRSSWorkflow(force: boolean = false) {
     const { AppModuleSelector } = await import('@/lib/ai-app-modules')
     await AppModuleSelector.selectAppsForIssue(issueId, newsletter.id, new Date())
   } catch (appSelectionError) {
-    console.error('AI app selection failed:', appSelectionError instanceof Error ? appSelectionError.message : 'Unknown error')
+    log.error({ err: appSelectionError }, 'AI app selection failed')
   }
 
   // Construct base URL - always use production URL for internal requests
@@ -117,16 +118,13 @@ async function processRSSWorkflow(force: boolean = false) {
   }
 
   // Phase 1: Archive, Fetch+Extract, Score (steps 1-3)
-  console.log(`[Cron] Phase 1 starting for issue: ${issueId}`)
-  console.log(`[Cron] Using baseUrl: ${baseUrl}`)
+  log.info({ issueId, baseUrl }, '[Cron] Phase 1 starting')
 
   const phase1Url = `${baseUrl}/api/rss/process-phase1`
-  console.log(`[Cron] Calling: ${phase1Url}`)
 
   let phase1Response: Response
   try {
-    console.log(`[Cron] Making Phase 1 fetch request at ${new Date().toISOString()}`)
-    // Use AbortController with a 10-minute timeout (600 seconds) to match Vercel function timeout
+    log.info('[Cron] Making Phase 1 fetch request')
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 600000) // 10 minutes
 
@@ -135,26 +133,24 @@ async function processRSSWorkflow(force: boolean = false) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.CRON_SECRET}`
+          'Authorization': `Bearer ${process.env.CRON_SECRET}`,
+          'X-Correlation-ID': log.correlationId,
         },
         body: JSON.stringify({ issue_id: issueId }),
         signal: controller.signal
       })
       clearTimeout(timeoutId)
-      console.log(`[Cron] Phase 1 fetch completed at ${new Date().toISOString()}, status=${phase1Response.status}`)
+      log.info({ status: phase1Response.status }, '[Cron] Phase 1 fetch completed')
     } catch (fetchError: any) {
       clearTimeout(timeoutId)
       if (fetchError.name === 'AbortError') {
-        console.error(`[Cron] Phase 1 fetch timed out after 10 minutes`)
+        log.error('[Cron] Phase 1 fetch timed out after 10 minutes')
         throw new Error('Phase 1 fetch timed out after 10 minutes')
       }
       throw fetchError
     }
   } catch (fetchError) {
-    console.error(`[Cron] Phase 1 fetch failed:`, fetchError instanceof Error ? fetchError.message : 'Unknown error')
-    if (fetchError instanceof Error && fetchError.stack) {
-      console.error(`[Cron] Phase 1 fetch error stack:`, fetchError.stack)
-    }
+    log.error({ err: fetchError }, '[Cron] Phase 1 fetch failed')
     throw new Error(`Phase 1 fetch failed: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`)
   }
 
@@ -165,38 +161,31 @@ async function processRSSWorkflow(force: boolean = false) {
   try {
     if (contentType.includes('application/json')) {
       phase1Result = await phase1Response.json()
-      console.log(`[Cron] Phase 1 JSON parsed successfully`)
     } else {
       const text = await phase1Response.text()
-      console.error(`[Cron] Phase 1 returned HTML instead of JSON (status: ${phase1Response.status}):`, text.substring(0, 500))
+      log.error({ status: phase1Response.status, body: text.substring(0, 500) }, '[Cron] Phase 1 returned HTML instead of JSON')
       throw new Error(`Phase 1 returned non-JSON response (${phase1Response.status}): ${text.substring(0, 200)}`)
     }
   } catch (parseError) {
-    console.error(`[Cron] Failed to parse Phase 1 response:`, parseError instanceof Error ? parseError.message : 'Unknown error')
+    log.error({ err: parseError }, '[Cron] Failed to parse Phase 1 response')
     throw new Error(`Phase 1 response parsing failed: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`)
   }
 
   if (!phase1Response.ok) {
-    console.error(`[Cron] Phase 1 returned error status:`, phase1Result)
+    log.error({ result: phase1Result }, '[Cron] Phase 1 returned error status')
     throw new Error(`Phase 1 failed: ${phase1Result.message || JSON.stringify(phase1Result)}`)
   }
 
-  console.log(`[Cron] Phase 1 completed for issue: ${issueId}`)
-  console.log(`[Cron] Phase 1 result:`, JSON.stringify(phase1Result).substring(0, 200))
+  log.info({ issueId }, '[Cron] Phase 1 completed')
 
   // Phase 2: Deduplicate, Generate, Select+Subject, Welcome, Finalize (steps 4-8)
-  // Trigger Phase 2 immediately after Phase 1 completes
-  console.log(`[Cron] Phase 2 starting for issue: ${issueId}`)
-  console.log(`[Cron] Preparing Phase 2 request...`)
+  log.info({ issueId }, '[Cron] Phase 2 starting')
 
   const phase2Url = `${baseUrl}/api/rss/process-phase2`
-  console.log(`[Cron] Phase 2 URL: ${phase2Url}`)
-  console.log(`[Cron] Making Phase 2 fetch request at ${new Date().toISOString()}...`)
 
   let phase2Response: Response
   try {
-    console.log(`[Cron] Making Phase 2 fetch request at ${new Date().toISOString()}`)
-    // Use AbortController with a 10-minute timeout (600 seconds) to match Vercel function timeout
+    log.info('[Cron] Making Phase 2 fetch request')
     const controller2 = new AbortController()
     const timeoutId2 = setTimeout(() => controller2.abort(), 600000) // 10 minutes
 
@@ -205,26 +194,24 @@ async function processRSSWorkflow(force: boolean = false) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.CRON_SECRET}`
+          'Authorization': `Bearer ${process.env.CRON_SECRET}`,
+          'X-Correlation-ID': log.correlationId,
         },
         body: JSON.stringify({ issue_id: issueId }),
         signal: controller2.signal
       })
       clearTimeout(timeoutId2)
-      console.log(`[Cron] Phase 2 response received at ${new Date().toISOString()}: status=${phase2Response.status}`)
+      log.info({ status: phase2Response.status }, '[Cron] Phase 2 response received')
     } catch (fetchError: any) {
       clearTimeout(timeoutId2)
       if (fetchError.name === 'AbortError') {
-        console.error(`[Cron] Phase 2 fetch timed out after 10 minutes`)
+        log.error('[Cron] Phase 2 fetch timed out after 10 minutes')
         throw new Error('Phase 2 fetch timed out after 10 minutes')
       }
       throw fetchError
     }
   } catch (fetchError) {
-    console.error(`[Cron] Phase 2 fetch failed:`, fetchError instanceof Error ? fetchError.message : 'Unknown error')
-    if (fetchError instanceof Error && fetchError.stack) {
-      console.error(`[Cron] Phase 2 fetch error stack:`, fetchError.stack)
-    }
+    log.error({ err: fetchError }, '[Cron] Phase 2 fetch failed')
     throw new Error(`Phase 2 fetch failed: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`)
   }
 
@@ -236,7 +223,7 @@ async function processRSSWorkflow(force: boolean = false) {
     phase2Result = await phase2Response.json()
   } else {
     const text = await phase2Response.text()
-    console.error(`[Cron] Phase 2 returned HTML instead of JSON (status: ${phase2Response.status}):`, text.substring(0, 500))
+    log.error({ status: phase2Response.status, body: text.substring(0, 500) }, '[Cron] Phase 2 returned HTML instead of JSON')
     throw new Error(`Phase 2 returned non-JSON response (${phase2Response.status}): ${text.substring(0, 200)}`)
   }
 
@@ -244,7 +231,7 @@ async function processRSSWorkflow(force: boolean = false) {
     throw new Error(`Phase 2 failed: ${phase2Result.message || JSON.stringify(phase2Result)}`)
   }
 
-  console.log(`[Cron] Phase 2 completed for issue: ${issueId}`)
+  log.info({ issueId }, '[Cron] Phase 2 completed')
 
   return {
     skipped: false,
@@ -263,7 +250,7 @@ async function processRSSWorkflow(force: boolean = false) {
 
 const handler = withApiHandler(
   { authTier: 'system', logContext: 'rss-processing' },
-  async ({ request }) => {
+  async ({ request, logger }) => {
     let issueId: string | undefined
 
     try {
@@ -271,7 +258,7 @@ const handler = withApiHandler(
       const forceParam = searchParams.get('force')
       const force = forceParam === 'true'
 
-      const result = await processRSSWorkflow(force)
+      const result = await processRSSWorkflow(logger, force)
       if (result.skipped) {
         return result.response
       }
@@ -279,7 +266,7 @@ const handler = withApiHandler(
       issueId = result.issueId
       return result.response
     } catch (error) {
-      console.error('RSS processing failed:', error instanceof Error ? error.message : 'Unknown error')
+      logger.error({ err: error }, 'RSS processing failed')
 
       // Try to mark issue as failed if issueId is available
       if (issueId) {
@@ -289,7 +276,7 @@ const handler = withApiHandler(
             .update({ status: 'failed' })
             .eq('id', issueId)
         } catch (updateError) {
-          console.error('Failed to update issue status:', updateError)
+          logger.error({ err: updateError }, 'Failed to update issue status')
         }
       }
 

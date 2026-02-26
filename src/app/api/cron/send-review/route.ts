@@ -5,8 +5,9 @@ import { MailerLiteService } from '@/lib/mailerlite'
 import { ScheduleChecker } from '@/lib/schedule-checker'
 import { getEmailProviderSettings } from '@/lib/publication-settings'
 import { withApiHandler } from '@/lib/api-handler'
+import type { Logger } from '@/lib/logger'
 
-async function handleReviewSend(): Promise<NextResponse> {
+async function handleReviewSend(log: Logger): Promise<NextResponse> {
   // TODO: This legacy route should be deprecated in favor of trigger-workflow
   // Get first active newsletter for backward compatibility
   const { data: activeNewsletter } = await supabaseAdmin
@@ -23,8 +24,7 @@ async function handleReviewSend(): Promise<NextResponse> {
     }, { status: 404 })
   }
 
-  console.log('=== AUTOMATED REVIEW SEND CHECK ===')
-  console.log('Time:', new Date().toISOString())
+  log.info('=== AUTOMATED REVIEW SEND CHECK ===')
 
   // Check if it's time to run review sending based on database settings
   const shouldRun = await ScheduleChecker.shouldRunReviewSend(activeNewsletter.id)
@@ -38,8 +38,7 @@ async function handleReviewSend(): Promise<NextResponse> {
     })
   }
 
-  console.log('=== REVIEW SEND STARTED (Time Matched) ===')
-  console.log('Central Time:', new Date().toLocaleString("en-US", {timeZone: "America/Chicago"}))
+  log.info('=== REVIEW SEND STARTED (Time Matched) ===')
 
   // Get tomorrow's issue that's in draft status and ready for review
   // Use Central Time for consistent date calculations
@@ -49,7 +48,7 @@ async function handleReviewSend(): Promise<NextResponse> {
   tomorrow.setDate(tomorrow.getDate() + 1)
   const issueDate = tomorrow.toISOString().split('T')[0]
 
-  console.log('Sending review for tomorrow\'s issue date:', issueDate)
+  log.info({ issueDate }, 'Sending review for tomorrow\'s issue date')
 
   // Get accounting newsletter ID
   const { data: newsletter } = await supabaseAdmin
@@ -93,7 +92,7 @@ async function handleReviewSend(): Promise<NextResponse> {
     }, { status: 404 })
   }
 
-  console.log('Found issue:', issue.id, 'Status:', issue.status)
+  log.info({ issueId: issue.id, status: issue.status }, 'Found issue')
 
   // Check if issue has active module articles
   const activeArticles = (issue.module_articles || []).filter((article: any) => article.is_active)
@@ -105,7 +104,7 @@ async function handleReviewSend(): Promise<NextResponse> {
     }, { status: 400 })
   }
 
-  console.log(`issue has ${activeArticles.length} active articles`)
+  log.info({ count: activeArticles.length }, 'issue has active articles')
 
   // Check if subject line exists
   if (!issue.subject_line || issue.subject_line.trim() === '') {
@@ -116,11 +115,11 @@ async function handleReviewSend(): Promise<NextResponse> {
     }, { status: 400 })
   }
 
-  console.log('Using subject line:', issue.subject_line)
+  log.info({ subjectLine: issue.subject_line }, 'Using subject line')
 
   // Check which email provider to use
   const providerSettings = await getEmailProviderSettings(newsletter.id)
-  console.log(`[Review Send] Using email provider: ${providerSettings.provider}`)
+  log.info({ provider: providerSettings.provider }, '[Review Send] Using email provider')
 
   let result: { success: boolean; campaignId?: string; issueId?: string; error?: string }
 
@@ -132,7 +131,7 @@ async function handleReviewSend(): Promise<NextResponse> {
     if (!result.success) {
       throw new Error(result.error || 'Failed to create SendGrid campaign')
     }
-    console.log('SendGrid campaign created:', result.campaignId)
+    log.info({ campaignId: result.campaignId }, 'SendGrid campaign created')
   } else {
     // Create MailerLite review campaign
     const mailerliteService = new MailerLiteService()
@@ -147,11 +146,11 @@ async function handleReviewSend(): Promise<NextResponse> {
     if (!result.success) {
       throw new Error(result.error || 'Failed to create MailerLite campaign')
     }
-    console.log('MailerLite campaign created:', result.campaignId)
+    log.info({ campaignId: result.campaignId }, 'MailerLite campaign created')
   }
 
   // Note: Both services update issue status to in_review
-  console.log('=== REVIEW SEND COMPLETED ===')
+  log.info('=== REVIEW SEND COMPLETED ===')
 
   return NextResponse.json({
     success: true,
@@ -167,10 +166,10 @@ async function handleReviewSend(): Promise<NextResponse> {
 
 export const POST = withApiHandler(
   { authTier: 'system', logContext: 'send-review' },
-  async () => handleReviewSend()
+  async ({ logger }) => handleReviewSend(logger)
 )
 
 export const GET = withApiHandler(
   { authTier: 'system', logContext: 'send-review' },
-  async () => handleReviewSend()
+  async ({ logger }) => handleReviewSend(logger)
 )
