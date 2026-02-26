@@ -1,3 +1,12 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "no-restricted-syntax": [
+      "warn",
+      {
+        "selector": "CallExpression[callee.property.name='select'][arguments.0.value='*']",
+        "message": "Avoid .select('*') — use explicit column lists. See docs/patterns/backend.md#column-selection-policy."
+      }
+    ]
+  }
 }

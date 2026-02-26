@@ -2,6 +2,11 @@ import { supabaseAdmin } from '../supabase'
 import { AI_CALL } from '../openai'
 import { getNewsletterIdFromIssue, logInfo, logError } from './shared-context'
 
+// Explicit column lists (no select('*'))
+const ISSUE_COLS_FOR_EVENTS = `id, publication_id, date`
+const EVENT_COLS = `id, title, description, event_summary, start_date, end_date, venue, address, url, website, image_url, original_image_url, cropped_image_url, featured, paid_placement, active, created_at`
+const ISSUE_EVENT_COLS = `id, issue_id, event_id, event_date, is_selected, is_featured, display_order, created_at`
+
 /**
  * Utility methods module.
  * Handles welcome section generation, event population, and other utilities.
@@ -99,7 +104,7 @@ export class Utils {
     try {
       const { data: issue, error: issueError } = await supabaseAdmin
         .from('publication_issues')
-        .select('*')
+        .select(ISSUE_COLS_FOR_EVENTS)
         .eq('id', issueId)
         .single()
 
@@ -125,7 +130,7 @@ export class Utils {
 
       const { data: existingEvents, error: existingError } = await supabaseAdmin
         .from('issue_events')
-        .select('*, event:events(*)')
+        .select(`${ISSUE_EVENT_COLS}, event:events(${EVENT_COLS})`)
         .eq('issue_id', issueId)
 
       if (existingError) {
@@ -153,7 +158,7 @@ export class Utils {
 
       const { data: availableEvents, error: eventsError } = await supabaseAdmin
         .from('events')
-        .select('*')
+        .select(EVENT_COLS)
         .gte('start_date', startDate)
         .lte('start_date', endDate + 'T23:59:59')
         .eq('active', true)
@@ -310,7 +315,7 @@ export class Utils {
     try {
       const { data: issue, error: issueError } = await supabaseAdmin
         .from('publication_issues')
-        .select('*')
+        .select(ISSUE_COLS_FOR_EVENTS)
         .eq('id', issueId)
         .single()
 
@@ -338,7 +343,7 @@ export class Utils {
 
       const { data: availableEvents, error: eventsError } = await supabaseAdmin
         .from('events')
-        .select('*')
+        .select(EVENT_COLS)
         .gte('start_date', startDate)
         .lte('start_date', endDate + 'T23:59:59')
         .eq('active', true)
