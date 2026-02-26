@@ -160,10 +160,9 @@ export async function buildIssueSnapshot(
     articlesByModule[moduleId].push(article)
   }
 
-  // Derive preheader from welcome_summary (first ~120 chars)
-  const preheaderText = issue.welcome_summary
-    ? String(issue.welcome_summary).slice(0, 120)
-    : ''
+  // Derive preheader text: welcome_summary → subject_line → empty
+  const rawPreheader = issue.welcome_summary || issue.subject_line || ''
+  const preheaderText = rawPreheader ? String(rawPreheader).slice(0, 120) : ''
 
   return {
     issue,
