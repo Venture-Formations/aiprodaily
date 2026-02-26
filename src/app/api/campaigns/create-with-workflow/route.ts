@@ -64,16 +64,32 @@ export const POST = withApiHandler(
     const issueId = newissue.id
     console.log(`[Create issue] Created issue: ${issueId}`)
 
-    // Step 3: Select AI apps and prompts (like setupissue does)
+    // Step 3: Select AI apps, prompts, and SparkLoop recs
     try {
       const { AppModuleSelector } = await import('@/lib/ai-app-modules')
       const { PromptSelector } = await import('@/lib/prompt-selector')
 
       await AppModuleSelector.selectAppsForIssue(issueId, newsletterUuid, new Date())
-      await PromptSelector.selectPromptForissue(issueId)
-      console.log('[Create issue] Selected AI apps and prompts')
+      console.log('[Create issue] AI apps selected')
+
+      const selectedPrompt = await PromptSelector.selectPromptForissue(issueId)
+      if (selectedPrompt) {
+        console.log(`[Create issue] Prompt selected: ${selectedPrompt.id}`)
+      } else {
+        console.error('[Create issue] Prompt selection returned null — check prompt_ideas table has active prompts for this publication')
+      }
     } catch (error) {
-      console.log('[Create issue] AI selection failed (non-critical):', error)
+      console.error('[Create issue] AI app/prompt selection failed (non-critical):', error)
+    }
+
+    // Step 3b: Select SparkLoop recommendations
+    try {
+      const { SparkLoopRecModuleSelector } = await import('@/lib/sparkloop-rec-modules')
+      const slRecResults = await SparkLoopRecModuleSelector.selectRecsForIssue(issueId, newsletterUuid)
+      const modulesWithRecs = slRecResults.filter((s: any) => s.refCodes.length > 0).length
+      console.log(`[Create issue] SparkLoop rec modules: ${modulesWithRecs} module(s) with selections`)
+    } catch (slError) {
+      console.error('[Create issue] SparkLoop rec selection failed (non-critical):', slError)
     }
 
     // Step 4: Select advertisement

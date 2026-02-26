@@ -4,6 +4,16 @@ import { supabaseAdmin } from '../supabase'
 import { fetchBusinessSettings } from './helpers'
 import type { IssueSnapshot, SectionItem } from './types'
 
+// Explicit column lists for module config tables (no select('*'))
+const NEWSLETTER_SECTION_COLS = `id, newsletter_id, name, display_order, is_active, section_type, description, created_at`
+const AD_MODULE_COLS = `id, publication_id, name, display_order, is_active, selection_mode, block_order, config, next_position, created_at, updated_at`
+const POLL_MODULE_COLS = `id, publication_id, name, display_order, is_active, block_order, config, created_at, updated_at`
+const PROMPT_MODULE_COLS = `id, publication_id, name, display_order, is_active, selection_mode, block_order, config, next_position, created_at, updated_at`
+const ARTICLE_MODULE_COLS = `id, publication_id, name, display_order, is_active, selection_mode, block_order, config, articles_count, lookback_hours, ai_image_prompt, created_at, updated_at`
+const TEXT_BOX_MODULE_COLS = `id, publication_id, name, display_order, is_active, show_name, config, created_at, updated_at`
+const TEXT_BOX_BLOCK_COLS = `id, text_box_module_id, block_type, display_order, static_content, text_size, ai_prompt_json, generation_timing, image_type, static_image_url, ai_image_prompt, is_active, is_bold, is_italic, created_at, updated_at`
+const FEEDBACK_MODULE_COLS = `id, publication_id, name, display_order, is_active, block_order, title_text, body_text, body_is_italic, sign_off_text, sign_off_is_italic, vote_options, team_photos, config, show_name, created_at, updated_at`
+
 /**
  * Build an IssueSnapshot by fetching all module configs and business settings in parallel.
  * This replaces the sequential DB queries previously scattered across full-newsletter.ts.
@@ -29,38 +39,38 @@ export async function buildIssueSnapshot(
     fetchBusinessSettings(issue.publication_id),
     supabaseAdmin
       .from('newsletter_sections')
-      .select('*')
+      .select(NEWSLETTER_SECTION_COLS)
       .eq('is_active', true)
       .order('display_order', { ascending: true }),
     supabaseAdmin
       .from('ad_modules')
-      .select('*')
+      .select(AD_MODULE_COLS)
       .eq('publication_id', issue.publication_id)
       .eq('is_active', true)
       .order('display_order', { ascending: true }),
     supabaseAdmin
       .from('poll_modules')
-      .select('*')
+      .select(POLL_MODULE_COLS)
       .eq('publication_id', issue.publication_id)
       .eq('is_active', true)
       .order('display_order', { ascending: true }),
     supabaseAdmin
       .from('prompt_modules')
-      .select('*')
+      .select(PROMPT_MODULE_COLS)
       .eq('publication_id', issue.publication_id)
       .eq('is_active', true)
       .order('display_order', { ascending: true }),
     supabaseAdmin
       .from('article_modules')
-      .select('*')
+      .select(ARTICLE_MODULE_COLS)
       .eq('publication_id', issue.publication_id)
       .eq('is_active', true)
       .order('display_order', { ascending: true }),
     supabaseAdmin
       .from('text_box_modules')
       .select(`
-        *,
-        blocks:text_box_blocks(*)
+        ${TEXT_BOX_MODULE_COLS},
+        blocks:text_box_blocks(${TEXT_BOX_BLOCK_COLS})
       `)
       .eq('publication_id', issue.publication_id)
       .eq('is_active', true)
@@ -73,7 +83,7 @@ export async function buildIssueSnapshot(
       .order('display_order', { ascending: true }),
     supabaseAdmin
       .from('feedback_modules')
-      .select('*')
+      .select(FEEDBACK_MODULE_COLS)
       .eq('publication_id', issue.publication_id)
       .eq('is_active', true),
   ])
@@ -175,9 +185,9 @@ async function fetchPromptSelections(issueId: string) {
   const { data, error } = await supabaseAdmin
     .from('issue_prompt_modules')
     .select(`
-      *,
-      prompt_module:prompt_modules(*),
-      prompt:prompt_ideas(*)
+      id, issue_id, prompt_module_id, prompt_id, selection_mode, selected_at, used_at, created_at,
+      prompt_module:prompt_modules(${PROMPT_MODULE_COLS}),
+      prompt:prompt_ideas(id, publication_id, prompt_module_id, title, body, priority, times_used, is_active, created_at, updated_at)
     `)
     .eq('issue_id', issueId)
   if (error) console.error('[Snapshot] fetchPromptSelections error:', error.message)

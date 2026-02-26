@@ -3,6 +3,7 @@ import Image from 'next/image'
 
 import { Container } from '@/components/salient/Container'
 import { NavLink } from '@/components/salient/NavLink'
+import { DoNotSellLink } from '@/components/salient/DoNotSellLink'
 
 interface FooterProps {
   logoUrl?: string
@@ -39,10 +40,11 @@ export function Footer({
             </div>
           </nav>
         </div>
-        <div className="flex flex-col items-center border-t border-slate-400/10 py-10">
+        <div className="flex flex-col items-center gap-2 border-t border-slate-400/10 py-10">
           <p className="text-sm text-slate-500">
             Copyright &copy; {currentYear} {businessName}. All rights reserved.
           </p>
+          <DoNotSellLink />
         </div>
       </Container>
     </footer>

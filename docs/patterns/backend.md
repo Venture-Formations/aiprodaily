@@ -145,6 +145,73 @@ log.error({ err }, 'Step failed')
 
 **Existing routes** using `console.log` with `[Tag]` prefixes continue to work — migrate incrementally.
 
+## Column Selection Policy
+
+**Rule:** Never use `.select('*')` in production code. Always specify the columns you need.
+
+### Why
+- Prevents fetching unused data (bandwidth, memory, latency)
+- Makes code self-documenting — readers know exactly which fields are used
+- Protects against schema changes silently adding sensitive columns
+- ESLint warns on `.select('*')` (see `.eslintrc.json`)
+
+### DAL Column Constant Pattern
+
+For tables queried in multiple places, define column constants at the top of the module:
+
+```typescript
+// src/lib/dal/issues.ts — reference implementation
+const ISSUE_COLUMNS = `
+  id, publication_id, date, status,
+  subject_line, welcome_intro, welcome_tagline, welcome_summary,
+  review_sent_at, final_sent_at,
+  last_action, last_action_at, last_action_by,
+  created_at, updated_at
+` as const
+
+const ISSUE_COLUMNS_BRIEF = `
+  id, publication_id, date, status,
+  subject_line, workflow_state, workflow_error,
+  created_at, updated_at
+` as const
+
+// Usage
+const { data } = await supabaseAdmin
+  .from('publication_issues')
+  .select(ISSUE_COLUMNS)
+  .eq('id', issueId)
+```
+
+### Inline Column Lists
+
+For one-off queries, inline the columns directly:
+
+```typescript
+const { data } = await supabaseAdmin
+  .from('events')
+  .select('id, title, start_date, end_date, featured, paid_placement, active')
+  .gte('start_date', startDate)
+```
+
+### Joined / Nested Selects
+
+Specify columns on both the parent and joined tables:
+
+```typescript
+const { data } = await supabaseAdmin
+  .from('issue_events')
+  .select(`
+    id, issue_id, event_id, event_date, is_selected, is_featured, display_order,
+    event:events(id, title, start_date, end_date, featured, paid_placement, active)
+  `)
+  .eq('issue_id', issueId)
+```
+
+### When `select('*')` Is Tolerated
+
+- **Debug endpoints** (`/api/debug/`) — tolerated until migrated, since they're developer-only
+- **Never** in production paths (cron jobs, workflows, newsletter sends, public APIs)
+
 ## Database Query Pattern
 ```typescript
 const { data, error } = await supabaseAdmin

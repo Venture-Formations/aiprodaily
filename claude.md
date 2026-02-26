@@ -30,6 +30,7 @@ curl -H "Authorization: Bearer $CRON_SECRET" https://yourdomain.com/api/cron/hea
 
 ## 3. Critical Rules
 - **Multi-tenant isolation:** Every query must filter by `publication_id`.
+- **No `select('*')`:** Always use explicit column lists in Supabase queries. Define column constants for tables queried in multiple places (see DAL pattern in `src/lib/dal/issues.ts`). ESLint warns on `.select('*')` — see `docs/patterns/backend.md#column-selection-policy`.
 - **Date comparisons:** Use local date strings (`date.split('T')[0]`). Never rely on `toISOString()` or `toUTCString()` for logic.
 - **Logging:** One-line summaries with prefixes (`[Workflow]`, `[RSS]`, `[AI]`, `[DB]`, `[CRON]`). Stay under 10MB per invocation.
 - **Timeouts:** Vercel workflow step 800s, API route 600s, cron durations as defined in `vercel.json`.
