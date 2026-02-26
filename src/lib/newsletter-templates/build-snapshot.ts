@@ -192,7 +192,7 @@ async function fetchPromptSelections(issueId: string) {
     .select(`
       id, issue_id, prompt_module_id, prompt_id, selection_mode, selected_at, used_at, created_at,
       prompt_module:prompt_modules(${PROMPT_MODULE_COLS}),
-      prompt:prompt_ideas(id, publication_id, prompt_module_id, title, body, priority, times_used, is_active, created_at, updated_at)
+      prompt:prompt_ideas(id, publication_id, prompt_module_id, title, prompt_text, priority, times_used, is_active, created_at, updated_at)
     `)
     .eq('issue_id', issueId)
   if (error) console.error('[Snapshot] fetchPromptSelections error:', error.message)
