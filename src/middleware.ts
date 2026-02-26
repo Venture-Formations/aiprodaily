@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { createClient } from '@supabase/supabase-js'
 
 // Check if this is a /tools route (for Clerk middleware)
 const isToolsRoute = createRouteMatcher(['/tools(.*)'])
@@ -11,64 +12,117 @@ const isAccountRoute = createRouteMatcher(['/account(.*)'])
 // Admin domains (dashboard access)
 const ADMIN_DOMAINS = ['aiprodaily.com', 'www.aiprodaily.com', 'aiprodaily.vercel.app']
 
+// ---------------------------------------------------------------------------
+// Domain → Publication cache (module-level, survives across requests in the
+// same Edge worker instance). TTL keeps it fresh without hitting DB every time.
+// ---------------------------------------------------------------------------
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+interface CachedPub {
+  id: string
+  slug: string
+}
+
+const domainCache = new Map<string, { pub: CachedPub | null; ts: number }>()
+
+function getSupabaseEdgeClient() {
+  return createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
+
+async function lookupPublicationByDomain(hostname: string): Promise<CachedPub | null> {
+  const cleanDomain = hostname.split(':')[0] // strip port
+
+  // Check cache
+  const cached = domainCache.get(cleanDomain)
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+    return cached.pub
+  }
+
+  try {
+    const db = getSupabaseEdgeClient()
+
+    // Try exact match
+    const { data } = await db
+      .from('publications')
+      .select('id, slug')
+      .eq('website_domain', cleanDomain)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (data) {
+      domainCache.set(cleanDomain, { pub: data, ts: Date.now() })
+      return data
+    }
+
+    // Try www variant
+    const altDomain = cleanDomain.startsWith('www.')
+      ? cleanDomain.replace('www.', '')
+      : `www.${cleanDomain}`
+
+    const { data: altData } = await db
+      .from('publications')
+      .select('id, slug')
+      .eq('website_domain', altDomain)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    const result = altData || null
+    // Cache both the clean domain and alt domain to avoid repeat misses
+    domainCache.set(cleanDomain, { pub: result, ts: Date.now() })
+    return result
+  } catch (error) {
+    console.error('[Middleware] Domain lookup error:', error)
+    return null
+  }
+}
+
 // Custom middleware logic for non-tools routes
 async function customMiddleware(request: NextRequest): Promise<NextResponse> {
   const hostname = request.headers.get('host') || ''
   const url = request.nextUrl
 
-  // Dynamic domain lookup: check if this hostname belongs to a publication
-  // Skip the lookup for admin domains, Vercel previews, and localhost without subdomains
   const isAdminDomain = ADMIN_DOMAINS.includes(hostname)
   const isVercelPreview = hostname.includes('.vercel.app') && !ADMIN_DOMAINS.includes(hostname)
   const isDev = hostname.includes('localhost') || hostname.includes('127.0.0.1')
 
+  // Dynamic domain lookup — direct DB query with TTL cache (no self-fetch)
   if (!isAdminDomain && !isVercelPreview) {
-    try {
-      const apiBase = isDev
-        ? 'http://localhost:3000'
-        : `${url.protocol}//${hostname}`
+    const publication = await lookupPublicationByDomain(hostname)
 
-      const res = await fetch(`${apiBase}/api/publications/by-domain?domain=${hostname}`)
-      const contentType = res.headers.get('content-type')
+    if (publication) {
+      console.log('[Middleware] Newsletter domain detected:', publication.slug)
 
-      if (contentType?.includes('application/json')) {
-        const { publication } = await res.json()
-
-        if (publication) {
-          console.log('[Middleware] Newsletter domain detected:', publication.slug)
-
-          // Skip for API routes, Next.js internals, static files, dashboard, and auth
-          if (
-            url.pathname.startsWith('/_next') ||
-            url.pathname.startsWith('/api') ||
-            url.pathname.startsWith('/auth') ||
-            url.pathname.startsWith('/dashboard') ||
-            url.pathname.includes('.')
-          ) {
-            return NextResponse.next()
-          }
-
-          // Rewrite to /website routes for newsletter domains
-          const rewriteUrl = url.clone()
-          rewriteUrl.pathname = url.pathname === '/'
-            ? '/website'
-            : `/website${url.pathname}`
-
-          // Add newsletter context to headers
-          const requestHeaders = new Headers(request.headers)
-          requestHeaders.set('x-newsletter-slug', publication.slug)
-          requestHeaders.set('x-newsletter-id', publication.id)
-
-          return NextResponse.rewrite(rewriteUrl, {
-            request: {
-              headers: requestHeaders,
-            },
-          })
-        }
+      // Skip for API routes, Next.js internals, static files, dashboard, and auth
+      if (
+        url.pathname.startsWith('/_next') ||
+        url.pathname.startsWith('/api') ||
+        url.pathname.startsWith('/auth') ||
+        url.pathname.startsWith('/dashboard') ||
+        url.pathname.includes('.')
+      ) {
+        return NextResponse.next()
       }
-    } catch (error) {
-      console.error('[Middleware] Domain lookup error:', error)
-      // Fall through to existing logic
+
+      // Rewrite to /website routes for newsletter domains
+      const rewriteUrl = url.clone()
+      rewriteUrl.pathname = url.pathname === '/'
+        ? '/website'
+        : `/website${url.pathname}`
+
+      // Add newsletter context to headers
+      const requestHeaders = new Headers(request.headers)
+      requestHeaders.set('x-newsletter-slug', publication.slug)
+      requestHeaders.set('x-newsletter-id', publication.id)
+
+      return NextResponse.rewrite(rewriteUrl, {
+        request: {
+          headers: requestHeaders,
+        },
+      })
     }
   }
 
