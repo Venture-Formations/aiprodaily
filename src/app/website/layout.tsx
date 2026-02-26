@@ -66,6 +66,19 @@ export default function WebsiteLayout({
         }}
       />
 
+      {/* Hide default CCPA bar; we show a footer link that opens the opt-out dialog (Privacy & Messaging API) */}
+      <Script
+        id="google-fc-override-dns-link"
+        strategy="beforeInteractive"
+        dangerouslySetInnerHTML={{
+          __html: `
+            window.googlefc = window.googlefc || {};
+            window.googlefc.usstatesoptout = window.googlefc.usstatesoptout || {};
+            window.googlefc.usstatesoptout.overrideDnsLink = true;
+          `,
+        }}
+      />
+
       {/* Google Funding Choices — loads the CMP consent banner configured in AdSense Privacy & Messaging */}
       <Script
         id="google-fc"
