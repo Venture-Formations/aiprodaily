@@ -8,11 +8,12 @@ import { newsletterArchiver } from '@/lib/newsletter-archiver'
 import { getEmailProviderSettings } from '@/lib/publication-settings'
 import { ModuleAdSelector } from '@/lib/ad-modules'
 import { withApiHandler } from '@/lib/api-handler'
+import type { Logger } from '@/lib/logger'
 
 // Helper function to log article positions at final send
 // Re-queries fresh data to capture any changes made after initial issue fetch
-async function logFinalArticlePositions(issueId: string) {
-  console.log('=== LOGGING ARTICLE POSITIONS FOR FINAL SEND ===')
+async function logFinalArticlePositions(issueId: string, log: Logger) {
+  log.info('=== LOGGING ARTICLE POSITIONS FOR FINAL SEND ===')
 
   // MODULE ARTICLES - Query fresh data grouped by module
   const { data: moduleArticles, error: moduleError } = await supabaseAdmin
@@ -23,12 +24,12 @@ async function logFinalArticlePositions(issueId: string) {
     .order('rank', { ascending: true, nullsFirst: false })
 
   if (moduleError) {
-    console.error('Failed to fetch module articles:', moduleError)
+    log.error({ err: moduleError }, 'Failed to fetch module articles')
   }
 
   const finalActiveArticles = moduleArticles || []
-  console.log('Final active module articles:', finalActiveArticles.map((a: any) =>
-    `ID: ${a.id}, Module: ${a.article_module?.name}, Rank: ${a.rank}, Headline: ${a.headline}`))
+  log.info({ articles: finalActiveArticles.map((a: any) =>
+    `${a.article_module?.name}:${a.rank}:${a.headline}`) }, 'Final active module articles')
 
   // Update final positions for module articles
   for (let i = 0; i < finalActiveArticles.length; i++) {
@@ -39,9 +40,9 @@ async function logFinalArticlePositions(issueId: string) {
       .eq('id', finalActiveArticles[i].id)
 
     if (updateError) {
-      console.error(`Failed to update final position for article ${finalActiveArticles[i].id}:`, updateError)
+      log.error({ articleId: finalActiveArticles[i].id, err: updateError }, 'Failed to update final position for article')
     } else {
-      console.log(`✓ Article position ${position}: ${finalActiveArticles[i].headline}`)
+      log.info({ position, headline: finalActiveArticles[i].headline }, 'Article position set')
     }
   }
 
@@ -55,11 +56,11 @@ async function logFinalArticlePositions(issueId: string) {
     .limit(5)
 
   if (manualError) {
-    console.error('Failed to fetch manual articles:', manualError)
+    log.error({ err: manualError }, 'Failed to fetch manual articles')
   }
 
   const finalActiveManualArticles = manualArticles || []
-  console.log('Final active manual articles:', finalActiveManualArticles.map((a: any) => `ID: ${a.id}, Rank: ${a.rank}, Title: ${a.title}`))
+  log.info({ articles: finalActiveManualArticles.map((a: any) => `${a.rank}:${a.title}`) }, 'Final active manual articles')
 
   // Update final positions for manual articles
   for (let i = 0; i < finalActiveManualArticles.length; i++) {
@@ -70,21 +71,21 @@ async function logFinalArticlePositions(issueId: string) {
       .eq('id', finalActiveManualArticles[i].id)
 
     if (updateError) {
-      console.error(`Failed to update final position for manual article ${finalActiveManualArticles[i].id}:`, updateError)
+      log.error({ articleId: finalActiveManualArticles[i].id, err: updateError }, 'Failed to update final position for manual article')
     } else {
-      console.log(`✓ Manual article position ${position}: ${finalActiveManualArticles[i].title}`)
+      log.info({ position, title: finalActiveManualArticles[i].title }, 'Manual article position set')
     }
   }
 
-  console.log('=== FINAL ARTICLE POSITION LOGGING COMPLETE ===')
+  log.info('=== FINAL ARTICLE POSITION LOGGING COMPLETE ===')
 }
 
 /**
  * Capture the active poll for this issue at send time
  * Stores both the poll_id and a snapshot of the poll data
  */
-async function capturePollForIssue(issueId: string, publicationId: string) {
-  console.log('[Polls] Capturing active poll for issue:', issueId)
+async function capturePollForIssue(issueId: string, publicationId: string, log: Logger) {
+  log.info({ issueId }, '[Polls] Capturing active poll for issue')
 
   // Get active poll for this publication
   const { data: activePoll, error } = await supabaseAdmin
@@ -96,12 +97,12 @@ async function capturePollForIssue(issueId: string, publicationId: string) {
     .single()
 
   if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-    console.error('[Polls] Error fetching active poll:', error)
+    log.error({ err: error }, '[Polls] Error fetching active poll')
     return { poll_id: null, poll_snapshot: null }
   }
 
   if (!activePoll) {
-    console.log('[Polls] No active poll found for this publication')
+    log.info('[Polls] No active poll found for this publication')
     return { poll_id: null, poll_snapshot: null }
   }
 
@@ -112,7 +113,7 @@ async function capturePollForIssue(issueId: string, publicationId: string) {
     options: activePoll.options
   }
 
-  console.log(`[Polls] Captured poll: ${activePoll.title} (${activePoll.id})`)
+  log.info({ pollId: activePoll.id, title: activePoll.title }, '[Polls] Captured poll')
   return { poll_id: activePoll.id, poll_snapshot: pollSnapshot }
 }
 
@@ -120,8 +121,8 @@ async function capturePollForIssue(issueId: string, publicationId: string) {
  * Stage 2 Unassignment: Recycle posts that had articles generated but weren't selected
  * Runs AFTER final_position is set and issue is sent
  */
-async function unassignUnusedArticlePosts(issueId: string) {
-  console.log('=== STAGE 2: UNASSIGNING UNUSED ARTICLE POSTS ===')
+async function unassignUnusedArticlePosts(issueId: string, log: Logger) {
+  log.info('=== STAGE 2: UNASSIGNING UNUSED ARTICLE POSTS ===')
 
   // Find posts with module_articles that don't have final_position set (not selected for send)
   const { data: unusedModuleArticles } = await supabaseAdmin
@@ -133,7 +134,7 @@ async function unassignUnusedArticlePosts(issueId: string) {
   const unusedPostIds = (unusedModuleArticles?.map(a => a.post_id) || []).filter(Boolean)
 
   if (unusedPostIds.length === 0) {
-    console.log('[Stage 2] All generated articles were used in final send')
+    log.info('[Stage 2] All generated articles were used in final send')
     return { unassigned: 0 }
   }
 
@@ -144,12 +145,12 @@ async function unassignUnusedArticlePosts(issueId: string) {
     .in('id', unusedPostIds)
 
   if (error) {
-    console.error('[Stage 2] Error unassigning posts:', error.message)
+    log.error({ err: error }, '[Stage 2] Error unassigning posts')
     throw error
   }
 
-  console.log(`[Stage 2] ✓ Unassigned ${unusedPostIds.length} posts back to pool`)
-  console.log('=== STAGE 2 UNASSIGNMENT COMPLETE ===')
+  log.info({ count: unusedPostIds.length }, '[Stage 2] Unassigned posts back to pool')
+  log.info('=== STAGE 2 UNASSIGNMENT COMPLETE ===')
 
   return { unassigned: unusedPostIds.length }
 }
@@ -158,7 +159,7 @@ async function unassignUnusedArticlePosts(issueId: string) {
  * Shared final send logic used by both POST and GET handlers.
  * Keeps its own try/catch for Slack failure alerting.
  */
-async function handleFinalSend(): Promise<NextResponse> {
+async function handleFinalSend(log: Logger): Promise<NextResponse> {
   let issue: any = null
 
   try {
@@ -178,8 +179,7 @@ async function handleFinalSend(): Promise<NextResponse> {
       }, { status: 404 })
     }
 
-    console.log('=== AUTOMATED FINAL SEND CHECK ===')
-    console.log('Time:', new Date().toISOString())
+    log.info('=== AUTOMATED FINAL SEND CHECK ===')
 
     // Check if it's time to run final send based on database settings
     const shouldRun = await ScheduleChecker.shouldRunFinalSend(activeNewsletter.id)
@@ -193,8 +193,7 @@ async function handleFinalSend(): Promise<NextResponse> {
       })
     }
 
-    console.log('=== FINAL SEND STARTED (Time Matched) ===')
-    console.log('Central Time:', new Date().toLocaleString("en-US", {timeZone: "America/Chicago"}))
+    log.info('=== FINAL SEND STARTED (Time Matched) ===')
 
     // Get accounting newsletter ID
     const { data: newsletter } = await supabaseAdmin
@@ -235,19 +234,19 @@ async function handleFinalSend(): Promise<NextResponse> {
     issue = data
 
     if (error || !issue) {
-      console.log('No issue with in_review or changes_made status found')
+      log.info('No issue with in_review or changes_made status found')
       return NextResponse.json({
         message: 'No issue with in_review or changes_made status found',
         timestamp: new Date().toISOString()
       })
     }
 
-    console.log(`Found issue: ${issue.id} (date: ${issue.date}, status: ${issue.status})`)
+    log.info({ issueId: issue.id, date: issue.date, status: issue.status }, 'Found issue')
 
     // Check if we have any active module articles
     const activeArticles = (issue.module_articles || []).filter((article: any) => article.is_active)
     if (activeArticles.length === 0) {
-      console.log('issue has no active articles, skipping send')
+      log.info('issue has no active articles, skipping send')
       return NextResponse.json({
         message: 'issue has no active articles, skipping send',
         timestamp: new Date().toISOString()
@@ -255,11 +254,11 @@ async function handleFinalSend(): Promise<NextResponse> {
     }
 
     // Log article positions at final send
-    await logFinalArticlePositions(issue.id)
+    await logFinalArticlePositions(issue.id, log)
 
     // Check which email provider to use
     const providerSettings = await getEmailProviderSettings(newsletter.id)
-    console.log(`[Send Final] Using email provider: ${providerSettings.provider}`)
+    log.info({ provider: providerSettings.provider }, '[Send Final] Using email provider')
 
     let result: { success: boolean; campaignId?: string; issueId?: string; error?: string }
 
@@ -271,7 +270,7 @@ async function handleFinalSend(): Promise<NextResponse> {
       if (!result.success) {
         throw new Error(result.error || 'Failed to create SendGrid campaign')
       }
-      console.log('SendGrid campaign created:', result.campaignId)
+      log.info({ campaignId: result.campaignId }, 'SendGrid campaign created')
     } else {
       // Send via MailerLite
       const mailerliteService = new MailerLiteService()
@@ -286,7 +285,7 @@ async function handleFinalSend(): Promise<NextResponse> {
       if (!result.success) {
         throw new Error(result.error || 'Failed to create MailerLite campaign')
       }
-      console.log('MailerLite campaign created:', result.campaignId)
+      log.info({ campaignId: result.campaignId }, 'MailerLite campaign created')
     }
 
     // Record ad module usage (ads are now handled via ad_modules system)
@@ -294,10 +293,10 @@ async function handleFinalSend(): Promise<NextResponse> {
       const issueDate = new Date(issue.date)
       const moduleUsageResult = await ModuleAdSelector.recordUsageSimple(issue.id, issueDate)
       if (moduleUsageResult.recorded > 0) {
-        console.log(`[Send Final] ✓ Ad module usage recorded (${moduleUsageResult.recorded} ads)`)
+        log.info({ recorded: moduleUsageResult.recorded }, '[Send Final] Ad module usage recorded')
       }
     } catch (moduleAdError) {
-      console.error('[Send Final] Failed to record ad module usage (non-critical):', moduleAdError)
+      log.error({ err: moduleAdError }, '[Send Final] Failed to record ad module usage (non-critical)')
       // Don't fail the send if ad module tracking fails
     }
 
@@ -305,9 +304,9 @@ async function handleFinalSend(): Promise<NextResponse> {
     try {
       const { AppModuleSelector } = await import('@/lib/ai-app-modules')
       const moduleResult = await AppModuleSelector.recordUsage(issue.id)
-      console.log(`[Send Final] ✓ AI app module usage recorded (${moduleResult.recorded} modules, cooldown started)`)
+      log.info({ recorded: moduleResult.recorded }, '[Send Final] AI app module usage recorded')
     } catch (appError) {
-      console.error('[Send Final] Failed to record AI app usage (non-critical):', appError)
+      log.error({ err: appError }, '[Send Final] Failed to record AI app usage (non-critical)')
       // Don't fail the send if app tracking fails
     }
 
@@ -316,10 +315,10 @@ async function handleFinalSend(): Promise<NextResponse> {
       const { PollModuleSelector } = await import('@/lib/poll-modules')
       const pollResult = await PollModuleSelector.recordUsage(issue.id)
       if (pollResult.recorded > 0) {
-        console.log(`[Send Final] ✓ Poll module usage recorded (${pollResult.recorded} polls)`)
+        log.info({ recorded: pollResult.recorded }, '[Send Final] Poll module usage recorded')
       }
     } catch (pollError) {
-      console.error('[Send Final] Failed to record poll module usage (non-critical):', pollError)
+      log.error({ err: pollError }, '[Send Final] Failed to record poll module usage (non-critical)')
       // Don't fail the send if poll tracking fails
     }
 
@@ -328,14 +327,14 @@ async function handleFinalSend(): Promise<NextResponse> {
       const { SparkLoopRecModuleSelector } = await import('@/lib/sparkloop-rec-modules')
       const slRecResult = await SparkLoopRecModuleSelector.recordUsage(issue.id)
       if (slRecResult.recorded > 0) {
-        console.log(`[Send Final] ✓ SparkLoop rec module usage recorded (${slRecResult.recorded} modules)`)
+        log.info({ recorded: slRecResult.recorded }, '[Send Final] SparkLoop rec module usage recorded')
       }
     } catch (slRecError) {
-      console.error('[Send Final] Failed to record SparkLoop rec module usage (non-critical):', slRecError)
+      log.error({ err: slRecError }, '[Send Final] Failed to record SparkLoop rec module usage (non-critical)')
     }
 
     // Capture the active poll for this issue
-    const { poll_id, poll_snapshot } = await capturePollForIssue(issue.id, newsletter.id)
+    const { poll_id, poll_snapshot } = await capturePollForIssue(issue.id, newsletter.id, log)
 
     // Archive the newsletter for website display
     try {
@@ -347,13 +346,13 @@ async function handleFinalSend(): Promise<NextResponse> {
       })
 
       if (!archiveResult.success) {
-        console.error('Failed to archive newsletter:', archiveResult.error)
+        log.error({ error: archiveResult.error }, 'Failed to archive newsletter')
         // Don't fail the send if archiving fails
       } else {
-        console.log('✓ Newsletter archived successfully for', issue.date)
+        log.info({ date: issue.date }, 'Newsletter archived successfully')
       }
     } catch (archiveError) {
-      console.error('Error archiving newsletter:', archiveError)
+      log.error({ err: archiveError }, 'Error archiving newsletter')
       // Don't fail the send if archiving fails
     }
 
@@ -375,21 +374,21 @@ async function handleFinalSend(): Promise<NextResponse> {
       .eq('id', issue.id)
 
     if (updateError) {
-      console.error('Failed to update issue status to sent:', updateError)
+      log.error({ err: updateError }, 'Failed to update issue status to sent')
       // Don't fail the entire operation - the email was sent successfully
     } else {
-      console.log('issue status updated to sent')
+      log.info('issue status updated to sent')
       if (poll_id) {
-        console.log(`✓ Poll recorded: ${poll_snapshot?.title}`)
+        log.info({ pollTitle: poll_snapshot?.title }, 'Poll recorded')
       }
     }
 
     // Stage 2 Unassignment - Free up unused article posts
     try {
-      const unassignResult = await unassignUnusedArticlePosts(issue.id)
-      console.log(`✓ Stage 2 complete: ${unassignResult.unassigned} posts recycled back to pool`)
+      const unassignResult = await unassignUnusedArticlePosts(issue.id, log)
+      log.info({ unassigned: unassignResult.unassigned }, 'Stage 2 complete: posts recycled back to pool')
     } catch (unassignError) {
-      console.error('Stage 2 unassignment failed (non-fatal):', unassignError)
+      log.error({ err: unassignError }, 'Stage 2 unassignment failed (non-fatal)')
       // Don't fail the entire send if unassignment fails
     }
 
@@ -403,7 +402,7 @@ async function handleFinalSend(): Promise<NextResponse> {
     })
 
   } catch (error) {
-    console.error('Scheduled final newsletter send failed:', error)
+    log.error({ err: error }, 'Scheduled final newsletter send failed')
 
     // Send Slack notification for scheduled send failure
     try {
@@ -421,7 +420,7 @@ async function handleFinalSend(): Promise<NextResponse> {
         }
       )
     } catch (slackError) {
-      console.error('Failed to send Slack notification for send failure:', slackError)
+      log.error({ err: slackError }, 'Failed to send Slack notification for send failure')
     }
 
     return NextResponse.json({
@@ -434,10 +433,10 @@ async function handleFinalSend(): Promise<NextResponse> {
 
 export const POST = withApiHandler(
   { authTier: 'system', logContext: 'send-final' },
-  async () => handleFinalSend()
+  async ({ logger }) => handleFinalSend(logger)
 )
 
 export const GET = withApiHandler(
   { authTier: 'system', logContext: 'send-final' },
-  async () => handleFinalSend()
+  async ({ logger }) => handleFinalSend(logger)
 )

@@ -18,6 +18,7 @@ This is the authoritative playbook for Claude Code when building or updating AIP
 npm run build              # Verify build before committing
 npm run type-check         # TypeScript type checking
 npm run lint               # ESLint checks
+npm run test:run           # Run unit tests (Vitest)
 
 # Git (auto-deploys to Vercel on push)
 git add -A
@@ -264,6 +265,8 @@ The account system provides self-service for advertisers and users:
 ## 16. Testing & Verification
 Before completing work, confirm:
 - `npm run build` passes and affected tests are updated/added.
+- `npm run test:run` passes (Vitest unit tests).
+- CI enforces a lint warnings ceiling (`--max-warnings 360`). If adding new warnings, increase the ceiling or fix existing ones.
 - All new/updated queries filter by `publication_id` and avoid `SELECT *`.
 - No UTC conversions introduced for logical comparisons.
 - Logging remains concise (one-line summaries, no sensitive data).

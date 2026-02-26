@@ -2,6 +2,7 @@ import { withApiHandler } from '@/lib/api-handler'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SendGridService } from '@/lib/sendgrid'
+import type { Logger } from '@/lib/logger'
 
 const BATCH_SIZE = 100 // Process up to 100 updates per run
 const MAX_RETRIES = 3 // Max retry attempts before marking as failed
@@ -18,7 +19,7 @@ interface FieldUpdate {
 /**
  * Main processing function for SendGrid field updates
  */
-async function processSendGridUpdates() {
+async function processSendGridUpdates(log: Logger) {
   const startTime = Date.now()
   const sendgrid = new SendGridService()
 
@@ -45,7 +46,7 @@ async function processSendGridUpdates() {
     }
   }
 
-  console.log(`[SendGrid Updates] Processing ${pendingUpdates.length} pending updates`)
+  log.info(`[SendGrid Updates] Processing ${pendingUpdates.length} pending updates`)
 
   let successCount = 0
   let failedCount = 0
@@ -88,7 +89,7 @@ async function processSendGridUpdates() {
         .in('id', updateIds)
 
       successCount += updates.length
-      console.log(`[SendGrid Updates] Updated ${email}: ${Object.keys(fields).join(', ')}`)
+      log.info(`[SendGrid Updates] Updated ${email}: ${Object.keys(fields).join(', ')}`)
     } else {
       // Handle failure for each update
       for (const update of updates) {
@@ -111,7 +112,7 @@ async function processSendGridUpdates() {
         }
       }
 
-      console.error(`[SendGrid Updates] Failed ${email}: ${result.error}`)
+      log.error(`[SendGrid Updates] Failed ${email}: ${result.error}`)
     }
   }
 
@@ -131,8 +132,8 @@ async function processSendGridUpdates() {
 
 const handler = withApiHandler(
   { authTier: 'system', logContext: 'process-sendgrid-updates' },
-  async () => {
-    const result = await processSendGridUpdates()
+  async ({ logger }) => {
+    const result = await processSendGridUpdates(logger)
     return NextResponse.json(result)
   }
 )

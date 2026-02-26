@@ -43,10 +43,10 @@ function isTimeToPost(currentTime: string, scheduledTime: string): boolean {
 }
 
 async function handlePostToFacebook(logger: Logger) {
-  console.log('[Facebook] Starting daily post check')
+  logger.info('[Facebook] Starting daily post check')
 
   const currentTime = getCurrentTimeInCT()
-  console.log(`[Facebook] Current CT time: ${currentTime.timeString}, Date: ${currentTime.dateString}`)
+  logger.info({ time: currentTime.timeString, date: currentTime.dateString }, '[Facebook] Current CT time')
 
   // Get all active publications
   const { data: publications, error: pubError } = await supabaseAdmin
@@ -55,7 +55,7 @@ async function handlePostToFacebook(logger: Logger) {
     .eq('is_active', true)
 
   if (pubError || !publications) {
-    console.error('[Facebook] Failed to fetch publications:', pubError)
+    logger.error({ err: pubError }, '[Facebook] Failed to fetch publications')
     return NextResponse.json({ error: 'Failed to fetch publications' }, { status: 500 })
   }
 
@@ -68,7 +68,7 @@ async function handlePostToFacebook(logger: Logger) {
 
   // Process each publication
   for (const publication of publications) {
-    console.log(`[Facebook] Checking publication: ${publication.name}`)
+    logger.info({ publication: publication.name }, '[Facebook] Checking publication')
 
     try {
       // Get Facebook settings for this publication
@@ -76,33 +76,33 @@ async function handlePostToFacebook(logger: Logger) {
 
       // Skip if Facebook posting is disabled
       if (!fbSettings.enabled) {
-        console.log(`[Facebook] Posting disabled for ${publication.name}`)
+        logger.info({ publication: publication.name }, '[Facebook] Posting disabled')
         results.push({ publication: publication.name, status: 'disabled' })
         continue
       }
 
       // Skip if missing required settings
       if (!fbSettings.pageId || !fbSettings.pageAccessToken || !fbSettings.adModuleId) {
-        console.log(`[Facebook] Missing required settings for ${publication.name}`)
+        logger.info({ publication: publication.name }, '[Facebook] Missing required settings')
         results.push({ publication: publication.name, status: 'missing_config' })
         continue
       }
 
       // Check if it's time to post
       if (!isTimeToPost(currentTime.timeString, fbSettings.postTime)) {
-        console.log(`[Facebook] Not time to post for ${publication.name} (scheduled: ${fbSettings.postTime})`)
+        logger.info({ publication: publication.name, scheduled: fbSettings.postTime }, '[Facebook] Not time to post')
         results.push({ publication: publication.name, status: 'not_scheduled' })
         continue
       }
 
       // Check if already posted today
       if (fbSettings.lastPostDate === currentTime.dateString) {
-        console.log(`[Facebook] Already posted today for ${publication.name}`)
+        logger.info({ publication: publication.name }, '[Facebook] Already posted today')
         results.push({ publication: publication.name, status: 'already_posted' })
         continue
       }
 
-      console.log(`[Facebook] Time to post for ${publication.name}!`)
+      logger.info({ publication: publication.name }, '[Facebook] Time to post!')
 
       // Get today's issue for this publication
       const { data: todayIssue } = await supabaseAdmin
@@ -144,7 +144,7 @@ async function handlePostToFacebook(logger: Logger) {
             imageUrl: ad.image_url,
             buttonUrl: ad.button_url,
           }
-          console.log(`[Facebook] Found ad from today's issue: ${ad.title}`)
+          logger.info({ title: ad.title }, '[Facebook] Found ad from today\'s issue')
         }
       }
 
@@ -180,7 +180,7 @@ async function handlePostToFacebook(logger: Logger) {
               imageUrl: ad.image_url,
               buttonUrl: ad.button_url,
             }
-            console.log(`[Facebook] Using ad from recent issue ${recentSentIssue.date}: ${ad.title}`)
+            logger.info({ date: recentSentIssue.date, title: ad.title }, '[Facebook] Using ad from recent issue')
           }
         }
       }
@@ -203,12 +203,12 @@ async function handlePostToFacebook(logger: Logger) {
             imageUrl: latestAd.image_url,
             buttonUrl: latestAd.button_url,
           }
-          console.log(`[Facebook] Using latest active ad: ${latestAd.title}`)
+          logger.info({ title: latestAd.title }, '[Facebook] Using latest active ad')
         }
       }
 
       if (!adContent) {
-        console.log(`[Facebook] No ad content found for ${publication.name}`)
+        logger.info({ publication: publication.name }, '[Facebook] No ad content found')
         results.push({ publication: publication.name, status: 'no_ad_content' })
         continue
       }
@@ -228,7 +228,7 @@ async function handlePostToFacebook(logger: Logger) {
       })
 
       if (postResult.success) {
-        console.log(`[Facebook] Post created for ${publication.name}: ${postResult.postId}`)
+        logger.info({ publication: publication.name, postId: postResult.postId }, '[Facebook] Post created')
 
         // Update last post date and ID
         await updatePublicationSetting(publication.id, 'facebook_last_post_date', currentTime.dateString)
@@ -240,7 +240,7 @@ async function handlePostToFacebook(logger: Logger) {
           postId: postResult.postId,
         })
       } else {
-        console.error(`[Facebook] Failed to post for ${publication.name}:`, postResult.error)
+        logger.error({ publication: publication.name, error: postResult.error }, '[Facebook] Failed to post')
         results.push({
           publication: publication.name,
           status: 'failed',
@@ -248,7 +248,7 @@ async function handlePostToFacebook(logger: Logger) {
         })
       }
     } catch (error) {
-      console.error(`[Facebook] Error processing ${publication.name}:`, error)
+      logger.error({ publication: publication.name, err: error }, '[Facebook] Error processing')
       results.push({
         publication: publication.name,
         status: 'error',
@@ -261,7 +261,7 @@ async function handlePostToFacebook(logger: Logger) {
   const posted = results.filter((r) => r.status === 'posted').length
   const failed = results.filter((r) => r.status === 'failed' || r.status === 'error').length
 
-  console.log(`[Facebook] Completed: ${posted} posted, ${failed} failed, ${results.length} total`)
+  logger.info({ posted, failed, total: results.length }, '[Facebook] Completed')
 
   return NextResponse.json({
     success: true,

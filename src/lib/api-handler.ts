@@ -59,8 +59,13 @@ export function withApiHandler<TInput = unknown>(
 ) {
   return async (request: NextRequest, routeCtx: { params: Promise<Record<string, string>> }): Promise<NextResponse> => {
     const resolvedParams = routeCtx?.params ? await routeCtx.params : {}
+    const startMs = Date.now()
+
+    // Propagate inbound correlation ID if present
+    const inboundCorrelationId = request.headers.get('x-correlation-id') || undefined
     const logger = createLogger({
       cronName: config.logContext,
+      correlationId: inboundCorrelationId,
     })
 
     try {
@@ -149,7 +154,7 @@ export function withApiHandler<TInput = unknown>(
       }
 
       // --- Execute handler ---
-      return await handler({
+      const response = await handler({
         session,
         input,
         publicationId,
@@ -157,15 +162,23 @@ export function withApiHandler<TInput = unknown>(
         request,
         params: resolvedParams,
       })
+
+      response.headers.set('x-correlation-id', logger.correlationId)
+      const durationMs = Date.now() - startMs
+      logger.info({ durationMs, status: response.status }, 'Request completed')
+      return response
     } catch (error) {
-      logger.error({ err: error }, 'Unhandled API error')
-      return NextResponse.json(
+      const durationMs = Date.now() - startMs
+      logger.error({ err: error, durationMs }, 'Unhandled API error')
+      const errorResponse = NextResponse.json(
         {
           error: 'Internal server error',
           message: error instanceof Error ? error.message : 'Unknown error',
         },
         { status: 500 }
       )
+      errorResponse.headers.set('x-correlation-id', logger.correlationId)
+      return errorResponse
     }
   }
 }

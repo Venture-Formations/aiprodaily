@@ -21,8 +21,8 @@ async function handleCreateCampaign(logger: Logger) {
     }, { status: 404 })
   }
 
-  console.log('=== AUTOMATED issue CREATION CHECK ===')
-  console.log('Time:', new Date().toISOString())
+  logger.info('=== AUTOMATED issue CREATION CHECK ===')
+  logger.info({ time: new Date().toISOString() }, 'Time check')
 
   // Check if it's time to run issue creation based on database settings
   const shouldRun = await ScheduleChecker.shouldRunissueCreation(activeNewsletter.id)
@@ -36,8 +36,8 @@ async function handleCreateCampaign(logger: Logger) {
     })
   }
 
-  console.log('=== issue CREATION STARTED (Time Matched) ===')
-  console.log('Central Time:', new Date().toLocaleString("en-US", {timeZone: "America/Chicago"}))
+  logger.info('=== issue CREATION STARTED (Time Matched) ===')
+  logger.info({ centralTime: new Date().toLocaleString("en-US", {timeZone: "America/Chicago"}) }, 'Central Time')
 
   // Get issue (already processed with RSS and subject line)
   // Use Central Time + 12 hours for consistent date calculations
@@ -48,8 +48,8 @@ async function handleCreateCampaign(logger: Logger) {
   centralDate.setHours(centralDate.getHours() + 12)
   const issueDate = centralDate.toISOString().split('T')[0]
 
-  console.log('issue date calculation: Current CT time + 12 hours =', issueDate)
-  console.log('Creating review issue for date:', issueDate)
+  logger.info({ issueDate }, 'issue date calculation: Current CT time + 12 hours')
+  logger.info({ issueDate }, 'Creating review issue for date')
 
   // Get accounting newsletter ID
   const { data: newsletter } = await supabaseAdmin
@@ -64,10 +64,6 @@ async function handleCreateCampaign(logger: Logger) {
       error: 'Accounting newsletter not found'
     }, { status: 404 })
   }
-
-  // #region agent log
-  fetch('http://127.0.0.1:7480/ingest/f406adfc-ffdb-40d4-977a-b384a849804a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'00d517'},body:JSON.stringify({sessionId:'00d517',location:'create-campaign/route.ts:pre-issue-query',message:'Before publication_issues query',data:{issueDate,newsletterId:newsletter?.id},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-  // #endregion
 
   // Find tomorrow's issue with module articles
   // Use maybeSingle() so 0 rows returns null instead of Supabase 406 (PGRST116)
@@ -89,16 +85,9 @@ async function handleCreateCampaign(logger: Logger) {
     .eq('date', issueDate)
     .maybeSingle()
 
-  // #region agent log
-  fetch('http://127.0.0.1:7480/ingest/f406adfc-ffdb-40d4-977a-b384a849804a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'00d517'},body:JSON.stringify({sessionId:'00d517',location:'create-campaign/route.ts:after-issue-query',message:'After publication_issues query',data:{issueErrorCode:issueError?.code,issueErrorMessage:issueError?.message,issueId:issue?.id,issueDate,newsletterId:newsletter?.id,hasIssue:!!issue},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-
   if (issueError || !issue) {
-    // #region agent log
-    fetch('http://127.0.0.1:7480/ingest/f406adfc-ffdb-40d4-977a-b384a849804a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'00d517'},body:JSON.stringify({sessionId:'00d517',location:'create-campaign/route.ts:return-no-issue',message:'No issue yet - returning 200 skipped',data:{issueErrorCode:issueError?.code},timestamp:Date.now(),hypothesisId:'B',runId:'post-fix'})}).catch(()=>{});
-    // #endregion
     // Issue not created yet (workflow runs at rssProcessingTime; ensure issueCreationTime is after that)
-    console.log('[create-campaign] No issue for date yet:', issueDate, issueError?.code ? `Supabase error: ${issueError.code}` : 'no row')
+    logger.info({ issueDate, errorCode: issueError?.code }, '[create-campaign] No issue for date yet')
     return NextResponse.json({
       success: true,
       skipped: true,
@@ -107,7 +96,7 @@ async function handleCreateCampaign(logger: Logger) {
     })
   }
 
-  console.log('Found issue:', issue.id, 'Status:', issue.status)
+  logger.info({ issueId: issue.id, status: issue.status }, 'Found issue')
 
   // Only create if issue is in draft status
   if (issue.status !== 'draft') {
@@ -129,7 +118,7 @@ async function handleCreateCampaign(logger: Logger) {
     }, { status: 400 })
   }
 
-  console.log(`issue has ${activeArticles.length} active articles`)
+  logger.info({ count: activeArticles.length }, 'issue has active articles')
 
   // Check if subject line exists
   if (!issue.subject_line || issue.subject_line.trim() === '') {
@@ -140,9 +129,8 @@ async function handleCreateCampaign(logger: Logger) {
     }, { status: 400 })
   }
 
-  console.log('Using subject line:', issue.subject_line)
-  console.log('=== issue CREATION COMPLETED ===')
-  console.log('issue remains in draft status until sent to MailerLite for review')
+  logger.info({ subjectLine: issue.subject_line }, 'Using subject line')
+  logger.info('=== issue CREATION COMPLETED ===')
 
   return NextResponse.json({
     success: true,
