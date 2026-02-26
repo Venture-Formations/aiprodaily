@@ -1,7 +1,12 @@
 /**
  * Provision a new publication with all required database rows.
  *
- * Run with: npx tsx scripts/provision-publication.ts
+ * Interactive:  npx tsx scripts/provision-publication.ts
+ * Non-interactive:
+ *   npx tsx scripts/provision-publication.ts \
+ *     --name "Test Pub" --slug test-pub --subdomain test-pub \
+ *     --domain testpub.com --email test@example.com \
+ *     --sender "Test Pub" --from test@example.com --color "#1C293D"
  *
  * Creates:
  *   1. publications row
@@ -34,15 +39,34 @@ if (!supabaseUrl || !supabaseServiceKey) {
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 // ---------------------------------------------------------------------------
+// CLI arg parser (for non-interactive mode)
+// ---------------------------------------------------------------------------
+
+function parseArgs(): Record<string, string> {
+  const args: Record<string, string> = {}
+  const argv = process.argv.slice(2)
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i].startsWith('--') && i + 1 < argv.length) {
+      args[argv[i].slice(2)] = argv[i + 1]
+      i++
+    }
+  }
+  return args
+}
+
+// ---------------------------------------------------------------------------
 // Interactive prompt helper
 // ---------------------------------------------------------------------------
 
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+let rl: readline.Interface | null = null
 
 function ask(question: string, defaultValue?: string): Promise<string> {
+  if (!rl) {
+    rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+  }
   const suffix = defaultValue ? ` [${defaultValue}]` : ''
   return new Promise((resolve) => {
-    rl.question(`${question}${suffix}: `, (answer) => {
+    rl!.question(`${question}${suffix}: `, (answer) => {
       resolve(answer.trim() || defaultValue || '')
     })
   })
@@ -53,22 +77,39 @@ function ask(question: string, defaultValue?: string): Promise<string> {
 // ---------------------------------------------------------------------------
 
 async function provision() {
+  const cliArgs = parseArgs()
+  const isNonInteractive = !!cliArgs.name
+
   console.log('='.repeat(60))
   console.log('  Publication Provisioning Script')
   console.log('='.repeat(60))
   console.log()
 
-  // Gather required inputs
-  const name = await ask('Publication name (e.g. "AI Pros Daily")')
-  if (!name) { console.error('Name is required.'); process.exit(1) }
+  // Gather required inputs (from CLI args or interactive prompts)
+  let name: string, slug: string, subdomain: string, websiteDomain: string
+  let contactEmail: string, senderName: string, fromEmail: string, primaryColor: string
 
-  const slug = await ask('Slug (lowercase, hyphens)', name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''))
-  const subdomain = await ask('Subdomain', slug)
-  const websiteDomain = await ask('Website domain (e.g. aiprodaily.com)', '')
-  const contactEmail = await ask('Contact email')
-  const senderName = await ask('Sender name (for emails)', name)
-  const fromEmail = await ask('From email', contactEmail)
-  const primaryColor = await ask('Primary color', '#1C293D')
+  if (isNonInteractive) {
+    name = cliArgs.name
+    slug = cliArgs.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+    subdomain = cliArgs.subdomain || slug
+    websiteDomain = cliArgs.domain || ''
+    contactEmail = cliArgs.email || ''
+    senderName = cliArgs.sender || name
+    fromEmail = cliArgs.from || contactEmail
+    primaryColor = cliArgs.color || '#1C293D'
+  } else {
+    name = await ask('Publication name (e.g. "AI Pros Daily")')
+    if (!name) { console.error('Name is required.'); process.exit(1) }
+
+    slug = await ask('Slug (lowercase, hyphens)', name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''))
+    subdomain = await ask('Subdomain', slug)
+    websiteDomain = await ask('Website domain (e.g. aiprodaily.com)', '')
+    contactEmail = await ask('Contact email')
+    senderName = await ask('Sender name (for emails)', name)
+    fromEmail = await ask('From email', contactEmail)
+    primaryColor = await ask('Primary color', '#1C293D')
+  }
 
   console.log()
   console.log('Will create publication:')
@@ -80,10 +121,12 @@ async function provision() {
   console.log(`  Color:     ${primaryColor}`)
   console.log()
 
-  const confirm = await ask('Proceed? (y/N)', 'N')
-  if (confirm.toLowerCase() !== 'y') {
-    console.log('Aborted.')
-    process.exit(0)
+  if (!isNonInteractive) {
+    const confirm = await ask('Proceed? (y/N)', 'N')
+    if (confirm.toLowerCase() !== 'y') {
+      console.log('Aborted.')
+      process.exit(0)
+    }
   }
 
   console.log()
@@ -450,7 +493,7 @@ async function provision() {
   console.log('  See: docs/recipes/provision-publication.md for full checklist')
   console.log('='.repeat(60))
 
-  rl.close()
+  if (rl) rl.close()
 }
 
 // Run
