@@ -110,3 +110,27 @@ export async function logError(message: string, context: Record<string, any> = {
       source: 'rss_processor'
     }])
 }
+
+/**
+ * Format an unknown error value into a loggable string.
+ */
+export function formatError(err: unknown): string {
+  if (err instanceof Error) return err.message
+  if (typeof err === 'object' && err !== null) {
+    try { return JSON.stringify(err, null, 2) } catch { return String(err) }
+  }
+  return String(err)
+}
+
+/**
+ * Check if a URL is hosted on fbcdn.net by parsing the hostname.
+ * Avoids substring matching which could be tricked by path/query containing 'fbcdn.net'.
+ */
+export function isFbcdnUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase()
+    return hostname === 'fbcdn.net' || hostname.endsWith('.fbcdn.net')
+  } catch {
+    return false
+  }
+}

@@ -341,7 +341,7 @@ export class ArticleGenerator {
     }
 
     if (typeof result.score !== 'number' || typeof result.details !== 'string') {
-      throw new Error(`Invalid fact-check response: ${JSON.stringify({ score: result.score, details: result.details, resultKeys: Object.keys(result || {}), resultType: typeof result })}`)
+      throw new Error(`Invalid fact-check response: ${JSON.stringify({ score: result.score, details: result.details, resultKeys: Object.keys(result), resultType: typeof result })}`)
     }
 
     return result as FactCheckResult

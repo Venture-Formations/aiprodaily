@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../supabase'
 import { AI_CALL } from '../openai'
-import { getNewsletterIdFromIssue, logInfo, logError } from './shared-context'
+import { getNewsletterIdFromIssue, logInfo, logError, formatError } from './shared-context'
 
 // Explicit column lists (no select('*'))
 const ISSUE_COLS_FOR_EVENTS = `id, publication_id, date`
@@ -109,12 +109,7 @@ export class Utils {
         .single()
 
       if (issueError || !issue) {
-        const errorMsg = issueError instanceof Error
-          ? issueError.message
-          : typeof issueError === 'object' && issueError !== null
-            ? JSON.stringify(issueError, null, 2)
-            : String(issueError)
-        console.error('Failed to fetch issue for event population:', errorMsg)
+        console.error('Failed to fetch issue for event population:', formatError(issueError))
         return
       }
 
@@ -134,12 +129,7 @@ export class Utils {
         .eq('issue_id', issueId)
 
       if (existingError) {
-        const errorMsg = existingError instanceof Error
-          ? existingError.message
-          : typeof existingError === 'object' && existingError !== null
-            ? JSON.stringify(existingError, null, 2)
-            : String(existingError)
-        console.error('Error checking existing events:', errorMsg)
+        console.error('Error checking existing events:', formatError(existingError))
       }
 
       const existingEventsByDate: Record<string, any[]> = {}
@@ -165,12 +155,7 @@ export class Utils {
         .order('start_date', { ascending: true })
 
       if (eventsError) {
-        const errorMsg = eventsError instanceof Error
-          ? eventsError.message
-          : typeof eventsError === 'object' && eventsError !== null
-            ? JSON.stringify(eventsError, null, 2)
-            : String(eventsError)
-        console.error('Failed to fetch available events:', errorMsg)
+        console.error('Failed to fetch available events:', formatError(eventsError))
         return
       }
 
@@ -320,12 +305,7 @@ export class Utils {
         .single()
 
       if (issueError || !issue) {
-        const errorMsg = issueError instanceof Error
-          ? issueError.message
-          : typeof issueError === 'object' && issueError !== null
-            ? JSON.stringify(issueError, null, 2)
-            : String(issueError)
-        console.error('Failed to fetch issue for event population:', errorMsg)
+        console.error('Failed to fetch issue for event population:', formatError(issueError))
         return
       }
 
@@ -350,12 +330,7 @@ export class Utils {
         .order('start_date', { ascending: true })
 
       if (eventsError) {
-        const errorMsg = eventsError instanceof Error
-          ? eventsError.message
-          : typeof eventsError === 'object' && eventsError !== null
-            ? JSON.stringify(eventsError, null, 2)
-            : String(eventsError)
-        console.error('Failed to fetch available events:', errorMsg)
+        console.error('Failed to fetch available events:', formatError(eventsError))
         return
       }
 

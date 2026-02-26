@@ -2,6 +2,7 @@ import Parser from 'rss-parser'
 import { supabaseAdmin } from '../supabase'
 import { getExcludedRssSources, getBlockedDomains } from '../publication-settings'
 import type { RSSProcessorContext } from './shared-context'
+import { isFbcdnUrl } from './shared-context'
 import { Scoring } from './scoring'
 
 const parser = new Parser({
@@ -122,7 +123,7 @@ export class FeedIngestion {
 
         let imageUrl = this.extractImageUrl(item)
 
-        if (!blockImages && imageUrl && imageUrl.includes('fbcdn.net')) {
+        if (!blockImages && imageUrl && isFbcdnUrl(imageUrl)) {
           try {
             const hostedUrl = await this.ctx.imageStorage.uploadImage(imageUrl, item.title || 'Untitled')
             if (hostedUrl) imageUrl = hostedUrl

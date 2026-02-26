@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '../supabase'
 import { getArticleSettings } from '../publication-settings'
 import type { RSSProcessorContext } from './shared-context'
-import { getNewsletterIdFromIssue } from './shared-context'
+import { getNewsletterIdFromIssue, formatError } from './shared-context'
 import type { Deduplication } from './deduplication'
 import type { ArticleGenerator } from './article-generator'
 import type { ArticleSelector } from './article-selector'
@@ -207,12 +207,7 @@ export class IssueLifecycle {
       .maybeSingle()
 
     if (existingError) {
-      const errorMsg = existingError instanceof Error
-        ? existingError.message
-        : typeof existingError === 'object' && existingError !== null
-          ? JSON.stringify(existingError, null, 2)
-          : String(existingError)
-      console.error('Error checking for existing issue:', errorMsg)
+      console.error('Error checking for existing issue:', formatError(existingError))
     }
 
     let issueId: string

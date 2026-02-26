@@ -2,6 +2,17 @@ import { supabaseAdmin } from '../supabase'
 import { AI_CALL } from '../openai'
 import { getNewsletterIdFromIssue } from './shared-context'
 
+/** Recursively strip HTML tags to handle malformed/nested markup */
+function stripHtmlTags(html: string): string {
+  let result = html
+  let prev = ''
+  while (result !== prev) {
+    prev = result
+    result = result.replace(/<[^>]+>/g, '')
+  }
+  return result
+}
+
 /**
  * Article selection and subject line generation module.
  * Handles selecting top articles for issues and generating subject lines.
@@ -64,7 +75,7 @@ export class ArticleSelector {
               is_active: true,
               skipped: false,
               fact_check_score: 100,
-              word_count: manual.body.replace(/<[^>]+>/g, '').split(/\s+/).filter((w: string) => w.length > 0).length
+              word_count: stripHtmlTags(manual.body).split(/\s+/).filter((w: string) => w.length > 0).length
             })
 
           if (insertError) {
@@ -232,7 +243,7 @@ export class ArticleSelector {
               is_active: true,
               skipped: false,
               fact_check_score: 100,
-              word_count: manual.body.replace(/<[^>]+>/g, '').split(/\s+/).filter((w: string) => w.length > 0).length
+              word_count: stripHtmlTags(manual.body).split(/\s+/).filter((w: string) => w.length > 0).length
             })
 
           if (insertError) {

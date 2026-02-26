@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../supabase'
 import { getExcludedRssSources } from '../publication-settings'
 import type { RssFeed } from '@/types/database'
 import type { RSSProcessorContext } from './shared-context'
+import { isFbcdnUrl } from './shared-context'
 import { getNewsletterIdFromIssue, logInfo, logError } from './shared-context'
 import type { Scoring } from './scoring'
 import type { Deduplication } from './deduplication'
@@ -161,7 +162,7 @@ export class Legacy {
         .eq('id', issueId)
 
       // Get final article count
-      const { data: finalArticles, error: countError } = await supabaseAdmin
+      const { data: finalArticles } = await supabaseAdmin
         .from('articles')
         .select('id')
         .eq('issue_id', issueId)
@@ -337,7 +338,7 @@ export class Legacy {
           }
 
           let finalImageUrl = imageUrl
-          if (!blockImages && imageUrl && imageUrl.includes('fbcdn.net')) {
+          if (!blockImages && imageUrl && isFbcdnUrl(imageUrl)) {
             try {
               const hostedUrl = await this.ctx.imageStorage.uploadImage(imageUrl, item.title || 'Untitled')
               if (hostedUrl) {
@@ -352,7 +353,7 @@ export class Legacy {
             finalImageUrl = null
           }
 
-          const { data: newPost, error: postError } = await supabaseAdmin
+          const { error: postError } = await supabaseAdmin
             .from('rss_posts')
             .insert([{
               feed_id: feed.id,
