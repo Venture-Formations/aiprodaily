@@ -9,13 +9,13 @@ export interface ProvisionInput {
   // Required
   name: string
   slug: string
-  subdomain: string
+  // Optional — defaults to slug if omitted
+  subdomain?: string
   contactEmail: string
   senderName: string
   fromEmail: string
   primaryColor: string
-  // Optional
-  websiteDomain?: string
+  websiteDomain: string
   logoUrl?: string
   headerImageUrl?: string
   facebookEnabled?: boolean
@@ -79,8 +79,8 @@ export async function provisionPublication(
     .insert({
       name: input.name,
       slug: input.slug,
-      subdomain: input.subdomain,
-      website_domain: input.websiteDomain || null,
+      subdomain: input.subdomain || input.slug,
+      website_domain: input.websiteDomain,
       primary_color: input.primaryColor,
       is_active: true,
     })

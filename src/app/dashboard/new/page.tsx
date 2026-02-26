@@ -15,8 +15,6 @@ export default function NewPublicationPage() {
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
-  const [subdomain, setSubdomain] = useState('')
-  const [subdomainManuallyEdited, setSubdomainManuallyEdited] = useState(false)
   const [websiteDomain, setWebsiteDomain] = useState('')
   const [contactEmail, setContactEmail] = useState('')
   const [senderName, setSenderName] = useState('')
@@ -67,7 +65,6 @@ export default function NewPublicationPage() {
     if (!slugManuallyEdited) {
       const newSlug = slugify(value)
       setSlug(newSlug)
-      if (!subdomainManuallyEdited) setSubdomain(newSlug)
       debouncedSlugCheck(newSlug)
     }
     if (!senderNameManuallyEdited) setSenderName(value)
@@ -107,7 +104,6 @@ export default function NewPublicationPage() {
     const sanitized = value.toLowerCase().replace(/[^a-z0-9-]/g, '')
     setSlug(sanitized)
     setSlugManuallyEdited(true)
-    if (!subdomainManuallyEdited) setSubdomain(sanitized)
     debouncedSlugCheck(sanitized)
   }
 
@@ -127,7 +123,7 @@ export default function NewPublicationPage() {
   const canSubmit =
     name.trim() &&
     slug.trim() &&
-    subdomain.trim() &&
+    websiteDomain.trim() &&
     contactEmail.trim() &&
     fromEmail.trim() &&
     slugAvailable !== false &&
@@ -147,7 +143,6 @@ export default function NewPublicationPage() {
         body: JSON.stringify({
           name: name.trim(),
           slug: slug.trim(),
-          subdomain: subdomain.trim(),
           contactEmail: contactEmail.trim(),
           senderName: (senderName || name).trim(),
           fromEmail: fromEmail.trim(),
@@ -297,31 +292,18 @@ export default function NewPublicationPage() {
                 <p className="mt-1 text-xs text-gray-500">Lowercase letters, numbers, and hyphens only</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Subdomain <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={subdomain}
-                    onChange={(e) => { setSubdomain(e.target.value); setSubdomainManuallyEdited(true) }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="ai-pros-daily"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Website Domain
-                  </label>
-                  <input
-                    type="text"
-                    value={websiteDomain}
-                    onChange={(e) => setWebsiteDomain(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="aiprodaily.com"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Website Domain <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={websiteDomain}
+                  onChange={(e) => setWebsiteDomain(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="aiprodaily.com"
+                />
+                <p className="mt-1 text-xs text-gray-500">The custom domain for this publication&apos;s website (without https://)</p>
               </div>
             </div>
           </div>

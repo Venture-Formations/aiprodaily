@@ -140,7 +140,7 @@ async function provision() {
     senderName,
     fromEmail,
     primaryColor,
-    websiteDomain: websiteDomain || undefined,
+    websiteDomain: websiteDomain || '',
   }
 
   const result = await provisionPublication(input, supabase)
