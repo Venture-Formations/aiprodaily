@@ -73,6 +73,7 @@ This project uses a **branch-based workflow** with pull requests:
 | Quick task recipes | docs/recipes/quick-actions.md | Follow step-by-step provisioning or debug checklists. |
 | Troubleshooting production issues | docs/troubleshooting/common-issues.md, docs/status/CLEANUP_RECOMMENDATIONS.md | Use symptom-driven guides before modifying code; review outstanding cleanup items. |
 | External SDK integrations | docs/vercel-ai-sdk.md, docs/examples/OPENAI_RESPONSES_API_GUIDE.md | Align SDK usage, streaming patterns, and auth configuration. |
+| Publication provisioning | docs/recipes/provision-publication.md, `scripts/provision-publication.ts` | Run `npm run provision-publication`; follow post-provisioning checklist. |
 
 ## 6. Feature Ownership Map
 | Domain | Primary Docs | Key Code Entry Points | Status |

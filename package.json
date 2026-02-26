@@ -13,7 +13,8 @@
     "test:coverage": "vitest run --coverage",
     "type-check": "tsc --noEmit",
     "migrate:normalize-ads": "npx tsx scripts/migrate-normalize-ads.ts",
-    "migrate:advertorial-to-module": "npx tsx scripts/migrate-advertorial-to-module.ts"
+    "migrate:advertorial-to-module": "npx tsx scripts/migrate-advertorial-to-module.ts",
+    "provision-publication": "npx tsx scripts/provision-publication.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.67.0",

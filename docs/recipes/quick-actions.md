@@ -58,4 +58,9 @@ Related references:
 3. Check `issue_ai_app_selections` for recent selections.
 4. Review `ai_applications.last_used_date` for rotation tracking.
 
+## Provision a New Publication
+See dedicated runbook: [docs/recipes/provision-publication.md](provision-publication.md)
+
+**Quick version:** `npm run provision-publication` — interactive script that creates the publication row, ~50 settings, and all required modules.
+
 Keep this doc concise; expand only when a new recurring task emerges so Claude (and teammates) have a ready-made checklist.
