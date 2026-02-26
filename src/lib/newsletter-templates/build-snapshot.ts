@@ -190,7 +190,7 @@ async function fetchPromptSelections(issueId: string) {
   const { data, error } = await supabaseAdmin
     .from('issue_prompt_modules')
     .select(`
-      id, issue_id, prompt_module_id, prompt_id, selection_mode, selected_at, used_at, created_at,
+      id, issue_id, prompt_module_id, prompt_id, selection_mode, selected_at, used_at,
       prompt_module:prompt_modules(${PROMPT_MODULE_COLS}),
       prompt:prompt_ideas(id, publication_id, prompt_module_id, title, prompt_text, priority, times_used, is_active, created_at, updated_at)
     `)
