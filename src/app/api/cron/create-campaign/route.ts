@@ -20,13 +20,16 @@ async function handleCreateCampaign(logger: Logger) {
 
   logger.info({ count: newsletters.length }, '=== AUTOMATED issue CREATION CHECK ===')
 
-  // Use Central Time + 12 hours for consistent date calculations (shared across pubs)
-  const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
-  const centralDate = new Date(nowCentral)
-  centralDate.setHours(centralDate.getHours() + 12)
-  const issueDate = centralDate.toISOString().split('T')[0]
+  // Always target tomorrow in Central Time (matches send-review logic)
+  const ctParts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Chicago',
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date())
+  const [ctYear, ctMonth, ctDay] = ctParts.split('-').map(Number)
+  const tomorrowDate = new Date(ctYear, ctMonth - 1, ctDay + 1)
+  const issueDate = `${tomorrowDate.getFullYear()}-${String(tomorrowDate.getMonth() + 1).padStart(2, '0')}-${String(tomorrowDate.getDate()).padStart(2, '0')}`
 
-  logger.info({ issueDate, centralTime: nowCentral }, 'issue date calculation: Current CT time + 12 hours')
+  logger.info({ issueDate, centralTime: ctParts }, 'issue date calculation: tomorrow in Central Time')
 
   const results: Array<{ pubId: string; slug: string; success: boolean; skipped?: boolean; message?: string; error?: string }> = []
 

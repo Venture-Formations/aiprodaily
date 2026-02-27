@@ -53,10 +53,13 @@ export class IssueLifecycle {
       // STEP 1: Create NEW issue
       console.log('[Step 1/10] Creating new issue...')
 
-      const nowCentral = new Date().toLocaleString("en-US", { timeZone: "America/Chicago" })
-      const centralDate = new Date(nowCentral)
-      centralDate.setHours(centralDate.getHours() + 12)
-      const issueDate = centralDate.toISOString().split('T')[0]
+      const ctParts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Chicago',
+        year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(new Date())
+      const [ctYear, ctMonth, ctDay] = ctParts.split('-').map(Number)
+      const tomorrowDate = new Date(ctYear, ctMonth - 1, ctDay + 1)
+      const issueDate = `${tomorrowDate.getFullYear()}-${String(tomorrowDate.getMonth() + 1).padStart(2, '0')}-${String(tomorrowDate.getDate()).padStart(2, '0')}`
 
       const { data: newissue, error: createError } = await supabaseAdmin
         .from('publication_issues')
@@ -192,10 +195,13 @@ export class IssueLifecycle {
    * Get or create today's issue
    */
   async getOrCreateTodaysIssue(): Promise<string> {
-    const nowCentral = new Date().toLocaleString("en-US", { timeZone: "America/Chicago" })
-    const centralDate = new Date(nowCentral)
-    centralDate.setHours(centralDate.getHours() + 12)
-    const issueDate = centralDate.toISOString().split('T')[0]
+    const ctParts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Chicago',
+      year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date())
+    const [ctYear, ctMonth, ctDay] = ctParts.split('-').map(Number)
+    const tomorrowDate = new Date(ctYear, ctMonth - 1, ctDay + 1)
+    const issueDate = `${tomorrowDate.getFullYear()}-${String(tomorrowDate.getMonth() + 1).padStart(2, '0')}-${String(tomorrowDate.getDate()).padStart(2, '0')}`
 
     const { data: existing, error: existingError } = await supabaseAdmin
       .from('publication_issues')
