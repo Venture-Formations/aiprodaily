@@ -36,7 +36,6 @@ export const GET = withApiHandler(
 
     // Check schedule settings
     const shouldRunReviewSend = await ScheduleChecker.shouldRunReviewSend(activeNewsletter.id)
-    const shouldRunissueCreation = await ScheduleChecker.shouldRunissueCreation(activeNewsletter.id)
 
     // Get email settings from database
     const { data: settings } = await supabaseAdmin
@@ -75,8 +74,7 @@ export const GET = withApiHandler(
       },
       tomorrowDate,
       scheduleChecks: {
-        shouldRunReviewSend,
-        shouldRunissueCreation
+        shouldRunReviewSend
       },
       emailSettings,
       issue: issue ? {

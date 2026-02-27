@@ -5,10 +5,6 @@
       "schedule": "*/5 * * * *"
     },
     {
-      "path": "/api/cron/create-campaign",
-      "schedule": "*/5 * * * *"
-    },
-    {
       "path": "/api/cron/send-review",
       "schedule": "*/5 * * * *"
     },
@@ -55,9 +51,6 @@
   ],
   "functions": {
     "app/api/cron/rss-processing/route.ts": {
-      "maxDuration": 600
-    },
-    "app/api/cron/create-campaign/route.ts": {
       "maxDuration": 600
     },
     "app/api/cron/send-review/route.ts": {

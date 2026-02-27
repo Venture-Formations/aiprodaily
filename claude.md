@@ -253,8 +253,7 @@ The account system provides self-service for advertisers and users:
 |------|----------|---------|--------|
 | `trigger-workflow` | Every 5 min | Launches RSS workflow if schedule permits | ✅ Active |
 | `ingest-rss` | Every 15 min | Fetches new posts | ✅ Active |
-| `create-campaign` | Every 5 min | Creates issue if schedule permits | ✅ Active |
-| `send-review` | Every 5 min | Sends review email when ready | ✅ Active |
+| `send-review` | Every 5 min | Creates MailerLite campaign and sends review email | ✅ Active |
 | `send-final` | Every 5 min | Sends final newsletter | ✅ Active |
 | `send-secondary` | Every 5 min | Sends secondary newsletter | ✅ Active |
 | `import-metrics` | Daily 6:00 AM | Syncs MailerLite metrics | ✅ Active |
