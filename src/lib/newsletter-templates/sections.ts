@@ -66,8 +66,8 @@ export async function generatePollSection(issue: { id: string; publication_id: s
   try {
     // Fetch colors and website URL from business settings (use passed-in settings if available)
     const { primaryColor, tertiaryColor } = businessSettings || await fetchBusinessSettings(issue.publication_id)
-    // Use the main app domain for poll responses (where the poll pages are hosted)
-    const baseUrl = process.env.NEXTAUTH_URL || 'https://www.aiprodaily.com'
+    // Use per-publication domain for poll responses, with env var fallback
+    const baseUrl = businessSettings?.websiteUrl || process.env.NEXTAUTH_URL || 'https://www.aiprodaily.com'
 
     let pollData = null
 
@@ -194,7 +194,7 @@ export async function generatePollModulesSection(
       selection.poll_module,
       selection.poll,
       issue.publication_id,
-      { issueId: issue.id },
+      { issueId: issue.id, baseUrl: businessSettings?.websiteUrl },
       businessSettings
     )
 
@@ -571,7 +571,7 @@ export async function generateFeedbackModuleSection(
     const result = await FeedbackModuleRenderer.renderFeedbackModule(
       mod,
       issue.publication_id,
-      { issueId: issue.id },
+      { issueId: issue.id, baseUrl: businessSettings?.websiteUrl },
       businessSettings
     )
 

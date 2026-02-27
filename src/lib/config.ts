@@ -19,7 +19,8 @@ export const PUBLICATION_ID: string = (() => {
   return FALLBACK_PUBLICATION_ID
 })()
 
-// SITE_BASE_URL is for background jobs, cron, and build-time contexts only.
+// SITE_BASE_URL is the default-publication fallback for background jobs, cron, and build-time contexts.
+// Newsletter rendering uses businessSettings.websiteUrl per publication.
 // Website pages should use the request host via resolvePublicationFromRequest().
 export const SITE_BASE_URL: string =
   process.env.NEXT_PUBLIC_SITE_URL || 'https://aiaccountingdaily.com'
