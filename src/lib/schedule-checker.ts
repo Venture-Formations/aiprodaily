@@ -159,6 +159,58 @@ export class ScheduleChecker {
     }
   }
 
+  /**
+   * Catch-up check: If we're past the scheduled send time (up to 30 min after)
+   * and there's a draft issue for tomorrow that hasn't been sent for review,
+   * return true so the review send can still happen.
+   */
+  static async shouldCatchUpReviewSend(newsletterId: string): Promise<boolean> {
+    try {
+      const settings = await this.getScheduleSettings(newsletterId)
+      if (!settings.reviewScheduleEnabled) return false
+
+      const currentTime = this.getCurrentTimeInCT()
+      const current = this.parseTime(currentTime.timeString)
+      const scheduled = this.parseTime(settings.scheduledSendTime)
+
+      const currentMinutes = current.hours * 60 + current.minutes
+      const scheduledMinutes = scheduled.hours * 60 + scheduled.minutes
+      const minutesAfter = currentMinutes - scheduledMinutes
+
+      // Only catch up within 5-30 minutes after scheduled time
+      if (minutesAfter < 5 || minutesAfter > 30) return false
+
+      // Check if there's a draft issue for tomorrow with no review_sent_at
+      // Use Intl.DateTimeFormat to avoid timezone conversion bugs with toISOString()
+      const ctParts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Chicago',
+        year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(new Date())
+      const [ctYear, ctMonth, ctDay] = ctParts.split('-').map(Number)
+      const tomorrowDate = new Date(ctYear, ctMonth - 1, ctDay + 1)
+      const issueDate = `${tomorrowDate.getFullYear()}-${String(tomorrowDate.getMonth() + 1).padStart(2, '0')}-${String(tomorrowDate.getDate()).padStart(2, '0')}`
+
+      const { data: draftIssue } = await supabaseAdmin
+        .from('publication_issues')
+        .select('id, status, review_sent_at')
+        .eq('publication_id', newsletterId)
+        .eq('date', issueDate)
+        .eq('status', 'draft')
+        .is('review_sent_at', null)
+        .maybeSingle()
+
+      if (draftIssue) {
+        console.log(`[ScheduleChecker] Catch-up: Found unsent draft issue ${draftIssue.id} for ${issueDate}, ${minutesAfter} min after scheduled time`)
+        return true
+      }
+
+      return false
+    } catch (error) {
+      console.error('Error in catch-up review send check:', error)
+      return false
+    }
+  }
+
   static async shouldRunEventPopulation(newsletterId: string): Promise<boolean> {
     try {
       const settings = await this.getScheduleSettings(newsletterId)
