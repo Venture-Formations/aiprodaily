@@ -2,16 +2,16 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { getApprovedCategories } from '@/lib/directory'
 import { Container } from '@/components/salient/Container'
+import { SITE_BASE_URL } from '@/lib/config'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'AI Tools Categories - AI Accounting Daily',
+  title: 'AI Tools Categories',
   description: 'Browse AI tools by category. Find the best AI solutions for accounting, tax, payroll, finance, expense management, HR, and more.',
   openGraph: {
-    title: 'AI Tools Categories - AI Accounting Daily',
+    title: 'AI Tools Categories',
     description: 'Browse AI tools by category. Find the best AI solutions for accounting, tax, payroll, finance, expense management, HR, and more.',
-    url: 'https://aiaccountingdaily.com/tools/categories',
   },
 }
 
@@ -35,11 +35,11 @@ export default async function CategoriesPage() {
     "@type": "CollectionPage",
     "name": "AI Tools Categories",
     "description": "Browse AI tools by category. Find the best AI solutions for accounting, tax, payroll, finance, expense management, HR, and more.",
-    "url": "https://aiaccountingdaily.com/tools/categories",
+    "url": `${SITE_BASE_URL}/tools/categories`,
     "publisher": {
       "@type": "Organization",
-      "name": "AI Accounting Daily",
-      "url": "https://aiaccountingdaily.com"
+      "name": "AI Tools Directory",
+      "url": SITE_BASE_URL
     },
     "mainEntity": {
       "@type": "ItemList",
@@ -51,7 +51,7 @@ export default async function CategoriesPage() {
           "@type": "Thing",
           "name": category.name,
           "description": category.description,
-          "url": `https://aiaccountingdaily.com/tools/category/${category.slug}`
+          "url": `${SITE_BASE_URL}/tools/category/${category.slug}`
         }
       }))
     }

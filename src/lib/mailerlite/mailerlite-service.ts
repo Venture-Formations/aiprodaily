@@ -37,8 +37,8 @@ export class MailerLiteService {
     ])
 
     const newsletterName = settings.newsletter_name || senderName
-    const businessName = settings.business_name || 'Venture Formations LLC'
-    const businessAddress = settings.business_address || '8250 Delta Circle, Saint Joseph, MN 56374'
+    const businessName = settings.business_name || senderName
+    const businessAddress = settings.business_address || ''
     const currentYear = new Date().getFullYear()
 
     // Parse address parts (format: "Street, City, ST ZIP")
@@ -918,7 +918,7 @@ United States
     </div>
     <div class="content">
       <p>Hi ${event.submitter_name},</p>
-      <p>Great news! Your event submission has been approved and is now live on St. Cloud Scoop.</p>
+      <p>Great news! Your event submission has been approved and is now live.</p>
 
       <div class="event-details">
         <h2 style="margin-top: 0; color: #1f2937;">${event.title}</h2>
@@ -957,25 +957,24 @@ United States
         ` : ''}
       </div>
 
-      <p>Your event will be featured in our newsletter and on our website. Thank you for helping keep the St. Cloud community informed!</p>
+      <p>Your event will be featured in our newsletter and on our website. Thank you for sharing with the community!</p>
 
-      <p>Best regards,<br>The St. Cloud Scoop Team</p>
-
-      <div class="footer">
-        <p>AI Accounting Daily | <a href="https://www.aiaccountingdaily.com">www.aiaccountingdaily.com</a></p>
-      </div>
+      <p>Best regards,<br>The Events Team</p>
     </div>
   </div>
 </body>
 </html>
 `
 
+      const fromEmail = process.env.EVENT_NOTIFICATION_EMAIL || process.env.CONTACT_EMAIL || 'noreply@aiprodaily.com'
+      const fromName = process.env.EVENT_NOTIFICATION_NAME || 'Events'
+
       const response = await mailerliteClient.post('/emails', {
         to: event.submitter_email,
         subject: `✅ Your Event "${event.title}" Has Been Approved`,
         from: {
-          email: 'scoop@stcscoop.com',
-          name: 'St. Cloud Scoop'
+          email: fromEmail,
+          name: fromName
         },
         html: emailHtml
       })
@@ -1019,7 +1018,7 @@ United States
     </div>
     <div class="content">
       <p>Hi ${event.submitter_name},</p>
-      <p>Thank you for submitting your event to St. Cloud Scoop. After reviewing your submission, we're unable to approve it at this time.</p>
+      <p>Thank you for submitting your event. After reviewing your submission, we're unable to approve it at this time.</p>
 
       <div class="event-details">
         <h2 style="margin-top: 0; color: #1f2937;">${event.title}</h2>
@@ -1035,23 +1034,22 @@ United States
 
       <p>If you have questions or would like to resubmit with changes, please feel free to reach out to us.</p>
 
-      <p>Best regards,<br>The St. Cloud Scoop Team</p>
-
-      <div class="footer">
-        <p>AI Accounting Daily | <a href="https://www.aiaccountingdaily.com">www.aiaccountingdaily.com</a></p>
-      </div>
+      <p>Best regards,<br>The Events Team</p>
     </div>
   </div>
 </body>
 </html>
 `
 
+      const fromEmail = process.env.EVENT_NOTIFICATION_EMAIL || process.env.CONTACT_EMAIL || 'noreply@aiprodaily.com'
+      const fromName = process.env.EVENT_NOTIFICATION_NAME || 'Events'
+
       const response = await mailerliteClient.post('/emails', {
         to: event.submitter_email,
         subject: `Event Submission Update: "${event.title}"`,
         from: {
-          email: 'scoop@stcscoop.com',
-          name: 'St. Cloud Scoop'
+          email: fromEmail,
+          name: fromName
         },
         html: emailHtml
       })

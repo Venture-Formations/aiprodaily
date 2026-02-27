@@ -921,6 +921,10 @@ Response format:
 }
 
 // Dynamic AI Prompts - Uses database with fallbacks (Oct 7 2025 - Force cache bust)
+// WARNING: These legacy functions query app_settings WITHOUT publication_id filter.
+// For multi-tenant per-publication prompts, use callAIWithPrompt(key, newsletterId, vars)
+// which reads from publication_settings first. These functions should be migrated
+// to accept a publicationId parameter when their callers are updated.
 export const AI_PROMPTS = {
   contentEvaluator: async (post: { title: string; description: string; content?: string; hasImage?: boolean }) => {
     try {

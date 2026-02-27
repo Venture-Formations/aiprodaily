@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import Link from 'next/link'
 import { CheckCircle, Star, Crown, ArrowRight } from 'lucide-react'
-import { PUBLICATION_ID } from '@/lib/config'
+import { resolvePublicationFromRequest } from '@/lib/publication-settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,13 +31,15 @@ export default async function UpgradeSuccessPage({ searchParams }: SuccessPagePr
     redirect('/account')
   }
 
+  const { publicationId } = await resolvePublicationFromRequest()
+
   // Fetch the tool to verify ownership and get updated status
   const { data: tool } = await supabaseAdmin
     .from('ai_applications')
     .select('id, app_name, is_featured, is_paid_placement, listing_type, billing_period')
     .eq('id', toolId)
     .eq('clerk_user_id', user.id)
-    .eq('publication_id', PUBLICATION_ID)
+    .eq('publication_id', publicationId)
     .single()
 
   if (!tool) {

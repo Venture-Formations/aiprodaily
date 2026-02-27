@@ -239,9 +239,13 @@ export class Deduplicator {
       cutoffDate.setDate(cutoffDate.getDate() - this.config.historicalLookbackDays)
       const cutoffDateStr = cutoffDate.toISOString().split('T')[0]
 
+      // Get publication_id from the current issue to scope historical queries
+      const publicationId = await this.getNewsletterIdFromissue(issueId)
+
       const { data: recentCampaigns, error: issuesError } = await supabaseAdmin
         .from('publication_issues')
         .select('id')
+        .eq('publication_id', publicationId)
         .eq('status', 'sent')
         .gte('date', cutoffDateStr)
         .neq('id', issueId)

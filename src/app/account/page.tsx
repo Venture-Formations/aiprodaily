@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { ProfileCard } from './components/ProfileCard'
 import { NoProfileCard } from './components/NoProfileCard'
-import { PUBLICATION_ID } from '@/lib/config'
+import { resolvePublicationFromRequest } from '@/lib/publication-settings'
 
 // Categories mapping for ai_applications - matches directory.ts
 const CATEGORIES = [
@@ -27,17 +27,19 @@ export default async function AccountPage() {
     redirect('/sign-in')
   }
 
+  const { publicationId } = await resolvePublicationFromRequest()
+
   // Fetch user's tool listing from ai_applications table
   const { data: app, error } = await supabaseAdmin
     .from('ai_applications')
     .select('*')
     .eq('clerk_user_id', user.id)
-    .eq('publication_id', PUBLICATION_ID)
+    .eq('publication_id', publicationId)
     .single()
 
   // Debug logging
   console.log('[Account] Clerk user ID:', user.id)
-  console.log('[Account] Publication ID:', PUBLICATION_ID)
+  console.log('[Account] Publication ID:', publicationId)
   console.log('[Account] App found:', app ? { id: app.id, app_name: app.app_name } : null)
   console.log('[Account] Error:', error)
 

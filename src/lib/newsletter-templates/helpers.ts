@@ -275,7 +275,7 @@ export async function fetchBusinessSettings(publication_id?: string): Promise<Bu
     quaternaryColor: settingsMap.quaternary_color || '#8B5CF6',
     headingFont: settingsMap.heading_font || 'Arial, sans-serif',
     bodyFont: settingsMap.body_font || 'Arial, sans-serif',
-    websiteUrl: settingsMap.website_url || 'https://www.aiaccountingdaily.com',
+    websiteUrl: settingsMap.website_url || process.env.NEXT_PUBLIC_SITE_URL || 'https://aiprodaily.com',
     headerImageUrl: settingsMap.header_image_url || '',
     newsletterName: settingsMap.newsletter_name || 'Newsletter',
     businessName: settingsMap.business_name || 'Business',

@@ -5,6 +5,7 @@ import { CategoryToolsGrid } from '@/components/directory/CategoryToolsGrid'
 import { getToolsByCategory, getApprovedCategories } from '@/lib/directory'
 import { Container } from '@/components/salient/Container'
 import { Button } from '@/components/salient/Button'
+import { SITE_BASE_URL } from '@/lib/config'
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>
@@ -28,7 +29,7 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
     openGraph: {
       title: pageTitle,
       description: category.description || `Discover the best AI ${category.name.toLowerCase()} tools for accounting professionals.`,
-      url: `https://aiaccountingdaily.com/tools/category/${slug}`,
+      url: `${SITE_BASE_URL}/tools/category/${slug}`,
     },
   }
 }
@@ -53,11 +54,11 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     "@type": "CollectionPage",
     "name": pageTitle,
     "description": category.description || `Discover the best AI ${category.name.toLowerCase()} tools for accounting professionals. Browse our curated directory.`,
-    "url": `https://aiaccountingdaily.com/tools/category/${slug}`,
+    "url": `${SITE_BASE_URL}/tools/category/${slug}`,
     "publisher": {
       "@type": "Organization",
       "name": "AI Accounting Daily",
-      "url": "https://aiaccountingdaily.com"
+      "url": SITE_BASE_URL
     },
     "mainEntity": {
       "@type": "ItemList",
@@ -69,7 +70,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           "@type": "SoftwareApplication",
           "name": tool.tool_name,
           "description": tool.description || tool.tagline,
-          "url": `https://aiaccountingdaily.com/tools/${tool.id}`,
+          "url": `${SITE_BASE_URL}/tools/${tool.id}`,
           "applicationCategory": "BusinessApplication"
         }
       }))
@@ -85,19 +86,19 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
         "@type": "ListItem",
         "position": 1,
         "name": "AI Tools",
-        "item": "https://aiaccountingdaily.com/tools"
+        "item": `${SITE_BASE_URL}/tools`
       },
       {
         "@type": "ListItem",
         "position": 2,
         "name": "Categories",
-        "item": "https://aiaccountingdaily.com/tools/categories"
+        "item": `${SITE_BASE_URL}/tools/categories`
       },
       {
         "@type": "ListItem",
         "position": 3,
         "name": category.name,
-        "item": `https://aiaccountingdaily.com/tools/category/${slug}`
+        "item": `${SITE_BASE_URL}/tools/category/${slug}`
       }
     ]
   }

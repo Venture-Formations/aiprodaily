@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { currentUser } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import Stripe from 'stripe'
+import { getPublicationByDomain } from '@/lib/publication-settings'
 import { PUBLICATION_ID } from '@/lib/config'
 
 // Initialize Stripe
@@ -33,6 +34,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Payment system not configured' }, { status: 500 })
     }
 
+    // Resolve publication from request host
+    const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || ''
+    const publicationId = await getPublicationByDomain(host) || PUBLICATION_ID
+
     const body = await request.json()
     const { toolId, listingType, billingPeriod } = body as {
       toolId: string
@@ -58,7 +63,7 @@ export async function POST(request: NextRequest) {
       .from('ai_applications')
       .select('id, app_name, clerk_user_id, category, is_featured, submission_status')
       .eq('id', toolId)
-      .eq('publication_id', PUBLICATION_ID)
+      .eq('publication_id', publicationId)
       .single()
 
     if (fetchError || !tool) {
@@ -79,7 +84,7 @@ export async function POST(request: NextRequest) {
       const { data: existingFeatured } = await supabaseAdmin
         .from('ai_applications')
         .select('id')
-        .eq('publication_id', PUBLICATION_ID)
+        .eq('publication_id', publicationId)
         .eq('category', tool.category)
         .eq('is_featured', true)
         .neq('id', toolId)
@@ -122,7 +127,8 @@ export async function POST(request: NextRequest) {
           listing_type: listingType,
           billing_period: billingPeriod,
           clerk_user_id: user.id,
-          source: 'ai_applications'
+          source: 'ai_applications',
+          publication_id: publicationId
         },
         success_url: `${baseUrl}/account/ads/upgrade/success?tool_id=${toolId}&listing_type=${listingType}&billing_period=${billingPeriod}`,
         cancel_url: `${baseUrl}/account/ads/upgrade?tool=${toolId}&listing_type=${listingType}&billing_period=${billingPeriod}`
@@ -154,7 +160,8 @@ export async function POST(request: NextRequest) {
           listing_type: listingType,
           billing_period: billingPeriod,
           clerk_user_id: user.id,
-          source: 'ai_applications'
+          source: 'ai_applications',
+          publication_id: publicationId
         },
         success_url: `${baseUrl}/account/ads/upgrade/success?tool_id=${toolId}&listing_type=${listingType}&billing_period=${billingPeriod}`,
         cancel_url: `${baseUrl}/account/ads/upgrade?tool=${toolId}&listing_type=${listingType}&billing_period=${billingPeriod}`

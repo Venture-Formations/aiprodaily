@@ -56,12 +56,13 @@ export function transformApp(app: AIApplication): DirectoryApp {
  * Get all active AI applications that are visible in the directory
  * Only shows apps from modules where show_in_directory = true, or apps with no module assignment
  */
-export async function getApprovedTools(): Promise<DirectoryApp[]> {
+export async function getApprovedTools(publicationId?: string): Promise<DirectoryApp[]> {
+  const pubId = publicationId || PUBLICATION_ID
   // First, get all modules with show_in_directory = true
   const { data: visibleModules } = await supabaseAdmin
     .from('ai_app_modules')
     .select('id')
-    .eq('publication_id', PUBLICATION_ID)
+    .eq('publication_id', pubId)
     .eq('show_in_directory', true)
 
   const visibleModuleIds = visibleModules?.map(m => m.id) || []
@@ -70,7 +71,7 @@ export async function getApprovedTools(): Promise<DirectoryApp[]> {
   const { data: apps, error } = await supabaseAdmin
     .from('ai_applications')
     .select('*')
-    .eq('publication_id', PUBLICATION_ID)
+    .eq('publication_id', pubId)
     .eq('is_active', true)
     .or(`ai_app_module_id.is.null,ai_app_module_id.in.(${visibleModuleIds.join(',')})`)
     .order('is_paid_placement', { ascending: false })  // Sponsored first
@@ -89,12 +90,13 @@ export async function getApprovedTools(): Promise<DirectoryApp[]> {
 /**
  * Get all categories with tool counts (only counting directory-visible apps)
  */
-export async function getApprovedCategories(): Promise<DirectoryCategory[]> {
+export async function getApprovedCategories(publicationId?: string): Promise<DirectoryCategory[]> {
+  const pubId = publicationId || PUBLICATION_ID
   // First, get all modules with show_in_directory = true
   const { data: visibleModules } = await supabaseAdmin
     .from('ai_app_modules')
     .select('id')
-    .eq('publication_id', PUBLICATION_ID)
+    .eq('publication_id', pubId)
     .eq('show_in_directory', true)
 
   const visibleModuleIds = visibleModules?.map(m => m.id) || []
@@ -103,7 +105,7 @@ export async function getApprovedCategories(): Promise<DirectoryCategory[]> {
   const { data: apps, error } = await supabaseAdmin
     .from('ai_applications')
     .select('category, ai_app_module_id')
-    .eq('publication_id', PUBLICATION_ID)
+    .eq('publication_id', pubId)
     .eq('is_active', true)
 
   if (error) {
@@ -131,12 +133,13 @@ export async function getApprovedCategories(): Promise<DirectoryCategory[]> {
 /**
  * Get a single tool by ID
  */
-export async function getToolById(toolId: string): Promise<DirectoryApp | null> {
+export async function getToolById(toolId: string, publicationId?: string): Promise<DirectoryApp | null> {
+  const pubId = publicationId || PUBLICATION_ID
   const { data: app, error } = await supabaseAdmin
     .from('ai_applications')
     .select('*')
     .eq('id', toolId)
-    .eq('publication_id', PUBLICATION_ID)
+    .eq('publication_id', pubId)
     .single()
 
   if (error || !app) {
@@ -150,10 +153,11 @@ export async function getToolById(toolId: string): Promise<DirectoryApp | null> 
 /**
  * Get tools by category slug (only directory-visible apps)
  */
-export async function getToolsByCategory(categorySlug: string): Promise<{
+export async function getToolsByCategory(categorySlug: string, publicationId?: string): Promise<{
   category: DirectoryCategory | null
   tools: DirectoryApp[]
 }> {
+  const pubId = publicationId || PUBLICATION_ID
   // Find the category
   const category = CATEGORIES.find(c => c.slug === categorySlug)
 
@@ -165,7 +169,7 @@ export async function getToolsByCategory(categorySlug: string): Promise<{
   const { data: visibleModules } = await supabaseAdmin
     .from('ai_app_modules')
     .select('id')
-    .eq('publication_id', PUBLICATION_ID)
+    .eq('publication_id', pubId)
     .eq('show_in_directory', true)
 
   const visibleModuleIds = visibleModules?.map(m => m.id) || []
@@ -174,7 +178,7 @@ export async function getToolsByCategory(categorySlug: string): Promise<{
   const { data: apps, error } = await supabaseAdmin
     .from('ai_applications')
     .select('*')
-    .eq('publication_id', PUBLICATION_ID)
+    .eq('publication_id', pubId)
     .eq('is_active', true)
     .eq('category', category.name)
     .or(`ai_app_module_id.is.null,ai_app_module_id.in.(${visibleModuleIds.join(',')})`)
@@ -197,12 +201,13 @@ export async function getToolsByCategory(categorySlug: string): Promise<{
 /**
  * Search tools by name or description (only directory-visible apps)
  */
-export async function searchTools(query: string): Promise<DirectoryApp[]> {
+export async function searchTools(query: string, publicationId?: string): Promise<DirectoryApp[]> {
+  const pubId = publicationId || PUBLICATION_ID
   // First, get all modules with show_in_directory = true
   const { data: visibleModules } = await supabaseAdmin
     .from('ai_app_modules')
     .select('id')
-    .eq('publication_id', PUBLICATION_ID)
+    .eq('publication_id', pubId)
     .eq('show_in_directory', true)
 
   const visibleModuleIds = new Set(visibleModules?.map(m => m.id) || [])
@@ -211,7 +216,7 @@ export async function searchTools(query: string): Promise<DirectoryApp[]> {
   const { data: apps, error } = await supabaseAdmin
     .from('ai_applications')
     .select('*')
-    .eq('publication_id', PUBLICATION_ID)
+    .eq('publication_id', pubId)
     .eq('is_active', true)
     .or(`app_name.ilike.%${query}%,description.ilike.%${query}%`)
     .order('is_paid_placement', { ascending: false })  // Sponsored first
@@ -236,11 +241,12 @@ export async function searchTools(query: string): Promise<DirectoryApp[]> {
 /**
  * Get pending tools for admin review (tools with is_active = false)
  */
-export async function getPendingTools(): Promise<DirectoryApp[]> {
+export async function getPendingTools(publicationId?: string): Promise<DirectoryApp[]> {
+  const pubId = publicationId || PUBLICATION_ID
   const { data: apps, error } = await supabaseAdmin
     .from('ai_applications')
     .select('*')
-    .eq('publication_id', PUBLICATION_ID)
+    .eq('publication_id', pubId)
     .eq('is_active', false)
     .order('created_at', { ascending: false })
 
@@ -316,12 +322,13 @@ export interface DirectoryPricing {
  * Get directory pricing from publication_settings
  * Falls back to defaults if settings are not configured
  */
-export async function getDirectoryPricing(): Promise<DirectoryPricing> {
+export async function getDirectoryPricing(publicationId?: string): Promise<DirectoryPricing> {
+  const pubId = publicationId || PUBLICATION_ID
   try {
     const { data: settings, error } = await supabaseAdmin
       .from('publication_settings')
       .select('key, value')
-      .eq('publication_id', PUBLICATION_ID)
+      .eq('publication_id', pubId)
       .in('key', ['directory_paid_placement_price', 'directory_featured_price', 'directory_yearly_discount_months'])
 
     if (error) {
@@ -371,11 +378,12 @@ function computePricing(base: { paidPlacementPrice: number; featuredPrice: numbe
  * Get categories that already have a featured tool
  * Returns a Set of category names that have featured tools
  */
-export async function getCategoriesWithFeaturedTools(): Promise<Set<string>> {
+export async function getCategoriesWithFeaturedTools(publicationId?: string): Promise<Set<string>> {
+  const pubId = publicationId || PUBLICATION_ID
   const { data: featuredTools, error } = await supabaseAdmin
     .from('ai_applications')
     .select('category')
-    .eq('publication_id', PUBLICATION_ID)
+    .eq('publication_id', pubId)
     .eq('is_active', true)
     .eq('is_featured', true)
 

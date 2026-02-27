@@ -39,13 +39,18 @@ export const POST = withApiHandler(
 
     // Get domain from headers (Next.js 15 requires await)
     const headersList = await headers()
-    const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'aiaccountingdaily.com'
+    const host = headersList.get('x-forwarded-host') || headersList.get('host') || ''
 
     // Get publication ID from domain
-    const publicationId = await getPublicationByDomain(host) || 'accounting'
+    const publicationId = await getPublicationByDomain(host) || ''
 
-    // Get contact email from publication_settings
-    const contactEmail = await getPublicationSetting(publicationId, 'contact_email') || 'noreply@aiaccountingdaily.com'
+    // Get contact email and newsletter name from publication_settings
+    const contactEmail = publicationId
+      ? await getPublicationSetting(publicationId, 'contact_email') || process.env.CONTACT_EMAIL || 'noreply@aiprodaily.com'
+      : process.env.CONTACT_EMAIL || 'noreply@aiprodaily.com'
+    const newsletterName = publicationId
+      ? await getPublicationSetting(publicationId, 'newsletter_name') || 'Newsletter'
+      : 'Newsletter'
 
     // Store submission in database
     const { error: dbError } = await supabaseAdmin
@@ -80,7 +85,7 @@ export const POST = withApiHandler(
           </div>
 
           <p style="color: #666; font-size: 12px; margin-top: 20px;">
-            This email was sent from the AI Accounting Daily contact form.
+            This email was sent from the ${newsletterName} contact form.
           </p>
         </div>
       `
@@ -88,9 +93,9 @@ export const POST = withApiHandler(
       // Send via Gmail SMTP
       console.log('[CONTACT] Sending notification via Gmail SMTP to:', contactEmail)
       await gmailTransporter.sendMail({
-        from: `"AI Accounting Daily" <${process.env.GMAIL_USER}>`,
+        from: `"${newsletterName}" <${process.env.GMAIL_USER}>`,
         to: contactEmail,
-        subject: 'Contact Form - AI Accounting Daily',
+        subject: `Contact Form - ${newsletterName}`,
         html: emailHtml,
         replyTo: email // Allow replying directly to the submitter
       })

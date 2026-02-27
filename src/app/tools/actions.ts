@@ -357,6 +357,7 @@ export async function handlePaymentSuccess(
       sponsor_end_date: sponsorEndDate.toISOString()
     })
     .eq('id', toolId)
+    .eq('publication_id', PUBLICATION_ID)
 
   if (error) {
     console.error('[Directory] Failed to update tool after payment:', error)
@@ -380,6 +381,7 @@ export async function approveTool(toolId: string, approvedBy?: string) {
       approved_at: new Date().toISOString()
     })
     .eq('id', toolId)
+    .eq('publication_id', PUBLICATION_ID)
 
   if (error) {
     console.error('[Directory] Failed to approve tool:', error)
@@ -403,6 +405,7 @@ export async function rejectTool(toolId: string, reason: string) {
       rejection_reason: reason
     })
     .eq('id', toolId)
+    .eq('publication_id', PUBLICATION_ID)
 
   if (error) {
     console.error('[Directory] Failed to reject tool:', error)
@@ -421,6 +424,7 @@ export async function deleteTool(toolId: string) {
     .from('ai_applications')
     .delete()
     .eq('id', toolId)
+    .eq('publication_id', PUBLICATION_ID)
 
   if (error) {
     console.error('[Directory] Failed to delete tool:', error)
@@ -454,6 +458,7 @@ export async function updateTool(
     .from('ai_applications')
     .update(updateData)
     .eq('id', toolId)
+    .eq('publication_id', PUBLICATION_ID)
 
   if (updateError) {
     console.error('[Directory] Failed to update tool:', updateError)
@@ -473,6 +478,7 @@ export async function toggleFeatured(toolId: string, isFeatured: boolean) {
     .from('ai_applications')
     .update({ is_featured: isFeatured })
     .eq('id', toolId)
+    .eq('publication_id', PUBLICATION_ID)
 
   if (error) {
     console.error('[Directory] Failed to toggle featured:', error)
