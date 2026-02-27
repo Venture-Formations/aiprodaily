@@ -18,6 +18,7 @@ export type LinkType = 'ad' | 'ai_app'
  * @param mailerliteIssueId - Optional MailerLite campaign ID
  * @param dbIssueId - Optional database issue ID (for MailerLite field updates)
  * @param linkType - Optional link type for field updates ('ad' | 'ai_app')
+ * @param pubBaseUrl - Optional per-publication base URL (from businessSettings.websiteUrl)
  * @returns Tracking URL that redirects to destination
  */
 export function wrapTrackingUrl(
@@ -26,9 +27,10 @@ export function wrapTrackingUrl(
   issueDate: string,
   mailerliteIssueId?: string,
   dbIssueId?: string,
-  linkType?: LinkType
+  linkType?: LinkType,
+  pubBaseUrl?: string
 ): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.aiaccountingdaily.com'
+  const baseUrl = pubBaseUrl || process.env.NEXT_PUBLIC_APP_URL || 'https://www.aiaccountingdaily.com'
 
   const params = new URLSearchParams({
     url: url,

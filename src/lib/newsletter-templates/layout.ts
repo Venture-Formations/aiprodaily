@@ -48,7 +48,7 @@ export async function generateNewsletterHeader(formattedDate: string, issueDate?
 
   // Add tracking to Sign Up link if issue info available
   const signUpUrl = issueDate
-    ? wrapTrackingUrl(websiteUrl, 'Header', issueDate, issueId)
+    ? wrapTrackingUrl(websiteUrl, 'Header', issueDate, issueId, undefined, undefined, websiteUrl)
     : websiteUrl
 
   // Build preheader hidden div (shown in email client preview text)
@@ -226,7 +226,7 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
 
   // Facebook
   if (fbEnabled && fbUrl) {
-    const trackedUrl = issueDate ? wrapTrackingUrl(fbUrl, 'Footer', issueDate, issueId) : fbUrl
+    const trackedUrl = issueDate ? wrapTrackingUrl(fbUrl, 'Footer', issueDate, issueId, undefined, undefined, websiteUrl) : fbUrl
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
@@ -237,7 +237,7 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
 
   // Twitter/X
   if (twEnabled && twUrl) {
-    const trackedUrl = issueDate ? wrapTrackingUrl(twUrl, 'Footer', issueDate, issueId) : twUrl
+    const trackedUrl = issueDate ? wrapTrackingUrl(twUrl, 'Footer', issueDate, issueId, undefined, undefined, websiteUrl) : twUrl
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
@@ -248,7 +248,7 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
 
   // LinkedIn
   if (liEnabled && liUrl) {
-    const trackedUrl = issueDate ? wrapTrackingUrl(liUrl, 'Footer', issueDate, issueId) : liUrl
+    const trackedUrl = issueDate ? wrapTrackingUrl(liUrl, 'Footer', issueDate, issueId, undefined, undefined, websiteUrl) : liUrl
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
@@ -259,7 +259,7 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
 
   // Instagram
   if (igEnabled && igUrl) {
-    const trackedUrl = issueDate ? wrapTrackingUrl(igUrl, 'Footer', issueDate, issueId) : igUrl
+    const trackedUrl = issueDate ? wrapTrackingUrl(igUrl, 'Footer', issueDate, issueId, undefined, undefined, websiteUrl) : igUrl
     socialIcons.push(`
       <td style="padding: 0 8px;">
         <a href="${trackedUrl}" target="_blank">
@@ -284,7 +284,7 @@ export async function generateNewsletterFooter(issueDate?: string, issueId?: str
 
   // Generate honeypot link for bot detection (disguised as comma in address)
   const honeypotUrl = issueDate
-    ? wrapTrackingUrl(websiteUrl, HONEYPOT_CONFIG.SECTION_NAME, issueDate, issueId)
+    ? wrapTrackingUrl(websiteUrl, HONEYPOT_CONFIG.SECTION_NAME, issueDate, issueId, undefined, undefined, websiteUrl)
     : null
 
   // Split address at "Saint Joseph," to embed honeypot as the comma
