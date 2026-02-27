@@ -34,7 +34,7 @@ export default async function WebsiteLayout({
     "url": siteUrl,
     "logo": {
       "@type": "ImageObject",
-      "url": `${siteUrl}${logoUrl.startsWith('/') ? logoUrl : `/${logoUrl}`}`
+      "url": logoUrl.startsWith('http') ? logoUrl : `${siteUrl}${logoUrl.startsWith('/') ? logoUrl : `/${logoUrl}`}`
     },
     "description": `Daily insights, tools, and strategies from ${newsletterName}.`
   }

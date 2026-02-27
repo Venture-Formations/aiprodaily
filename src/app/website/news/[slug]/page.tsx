@@ -139,7 +139,7 @@ export default async function ArticlePage({ params }: PageProps) {
       name: businessName,
       logo: {
         '@type': 'ImageObject',
-        url: `${siteUrl}${logoUrl.startsWith('/') ? logoUrl : `/${logoUrl}`}`
+        url: logoUrl.startsWith('http') ? logoUrl : `${siteUrl}${logoUrl.startsWith('/') ? logoUrl : `/${logoUrl}`}`
       }
     },
     mainEntityOfPage: {
