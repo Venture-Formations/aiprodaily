@@ -365,8 +365,7 @@ await supabaseAdmin
 |------|----------|---------|
 | `/api/cron/trigger-workflow` | Every 5 min | Trigger RSS workflow if scheduled |
 | `/api/cron/ingest-rss` | Every 15 min | Fetch & score new RSS posts |
-| `/api/cron/create-campaign` | Every 5 min | Create issue if schedule permits |
-| `/api/cron/send-review` | Every 5 min | Send review emails (status: ready) |
+| `/api/cron/send-review` | Every 5 min | Create MailerLite campaign and send review email |
 | `/api/cron/send-final` | Every 5 min | Send final issues (status: approved) |
 | `/api/cron/send-secondary` | Every 5 min | Send secondary newsletter |
 | `/api/cron/monitor-workflows` | Every 5 min | Check for failed/stuck workflows |

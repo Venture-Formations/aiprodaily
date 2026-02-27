@@ -19,8 +19,7 @@ Related references:
 |------|----------|---------|-------|
 | `/api/cron/trigger-workflow` | `*/5 * * * *` | Launches RSS workflow if schedule permits | Verifies `publication_settings` toggles, avoids duplicate runs. 60s timeout. |
 | `/api/cron/ingest-rss` | `*/15 * * * *` | Fetches new posts, scores, keeps pool warm | 300s timeout; must stay within limit. |
-| `/api/cron/create-campaign` | `*/5 * * * *` | Creates issue if schedule permits | 600s timeout. **Schedule:** Set `issueCreationTime` *after* `rssProcessingTime` so the issue exists (workflow creates it at rss time). |
-| `/api/cron/send-review` | `*/5 * * * *` | Sends review issue email via MailerLite | Requires issue status `ready_to_send`. 600s timeout. |
+| `/api/cron/send-review` | `*/5 * * * *` | Creates MailerLite campaign and sends review email | Fires at `issueCreationTime`, schedules send for `scheduledSendTime`. 600s timeout. |
 | `/api/cron/send-final` | `*/5 * * * *` | Sends final issue when window matches | Performs Stage 2 unassignment post-send. 600s timeout. |
 | `/api/cron/send-secondary` | `*/5 * * * *` | Sends secondary newsletter | For publications with secondary content. 600s timeout. |
 | `/api/cron/monitor-workflows` | `*/5 * * * *` | Detects failed/stuck workflows | Slack alerts when steps exceed thresholds. |

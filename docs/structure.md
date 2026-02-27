@@ -200,8 +200,7 @@ Cron jobs triggered by Vercel (schedules in `vercel.json`):
 |----------|----------|---------|--------|
 | `trigger-workflow` | Every 5 min | Launches RSS workflow | ✅ |
 | `ingest-rss` | Every 15 min | Fetches new posts | ✅ |
-| `create-campaign` | Every 5 min | Creates issue if schedule permits | ✅ |
-| `send-review` | Every 5 min | Sends review emails | ✅ |
+| `send-review` | Every 5 min | Creates MailerLite campaign and sends review email | ✅ |
 | `send-final` | Every 5 min | Sends final newsletter | ✅ |
 | `send-secondary` | Every 5 min | Sends secondary newsletter | ✅ |
 | `import-metrics` | Daily 6 AM | Syncs MailerLite stats | ✅ |

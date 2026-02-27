@@ -113,29 +113,6 @@ export class ScheduleChecker {
     }
   }
 
-  static async shouldRunissueCreation(newsletterId: string): Promise<boolean> {
-    try {
-      const settings = await this.getScheduleSettings(newsletterId)
-
-      if (!settings.reviewScheduleEnabled) {
-        return false
-      }
-
-      const currentTime = this.getCurrentTimeInCT()
-      console.log(`issue Creation check: Current CT time ${currentTime.timeString}, Scheduled: ${settings.issueCreationTime}`)
-
-      return await this.isTimeToRun(
-        currentTime.timeString,
-        settings.issueCreationTime,
-        'last_issue_creation_run',
-        newsletterId
-      )
-    } catch (error) {
-      console.error('Error checking issue creation schedule:', error)
-      return false
-    }
-  }
-
   static async shouldRunReviewSend(newsletterId: string): Promise<boolean> {
     try {
       const settings = await this.getScheduleSettings(newsletterId)
@@ -145,11 +122,11 @@ export class ScheduleChecker {
       }
 
       const currentTime = this.getCurrentTimeInCT()
-      console.log(`Review Send check: Current CT time ${currentTime.timeString}, Scheduled Send Time: ${settings.scheduledSendTime}`)
+      console.log(`Review Send check: Current CT time ${currentTime.timeString}, Issue Creation Time: ${settings.issueCreationTime}`)
 
       return await this.isTimeToRun(
         currentTime.timeString,
-        settings.scheduledSendTime,
+        settings.issueCreationTime,
         'last_review_send_run',
         newsletterId
       )
@@ -171,13 +148,13 @@ export class ScheduleChecker {
 
       const currentTime = this.getCurrentTimeInCT()
       const current = this.parseTime(currentTime.timeString)
-      const scheduled = this.parseTime(settings.scheduledSendTime)
+      const scheduled = this.parseTime(settings.issueCreationTime)
 
       const currentMinutes = current.hours * 60 + current.minutes
       const scheduledMinutes = scheduled.hours * 60 + scheduled.minutes
       const minutesAfter = currentMinutes - scheduledMinutes
 
-      // Only catch up within 5-30 minutes after scheduled time
+      // Only catch up within 5-30 minutes after issue creation time
       if (minutesAfter < 5 || minutesAfter > 30) return false
 
       // Check if there's a draft issue for tomorrow with no review_sent_at
@@ -289,7 +266,7 @@ export class ScheduleChecker {
         rssProcessing: settings.rssProcessingTime,
         subjectGeneration: subjectGeneration,
         issueCreation: settings.issueCreationTime,
-        reviewSend: settings.scheduledSendTime,
+        reviewSend: settings.issueCreationTime,
         finalSend: settings.dailyScheduledSendTime,
         reviewEnabled: settings.reviewScheduleEnabled,
         dailyEnabled: settings.dailyScheduleEnabled

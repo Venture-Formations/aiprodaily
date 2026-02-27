@@ -144,7 +144,7 @@ _Last updated: 2025-12-17_
 ### Cron and Automation Suite
 - **What it does:** Automates recurring tasks such as issue creation, RSS processing, health checks, and performance metric imports.
 - **How it works:** Vercel cron jobs call secured API routes, each executing a focused task with retry logic and logging. Some cron endpoints orchestrate Vercel Workflows for long-running processes.
-- **Key Files / Functions:** `src/app/api/cron/create-campaign/route.ts`; `cron/ingest-rss/route.ts`; `cron/process-rss/route.ts`; `cron/send-review/route.ts`; `cron/send-final/route.ts`; `cron/health-check/route.ts`; `cron/import-metrics/route.ts`; `src/lib/workflows/process-rss-workflow.ts`; `src/lib/workflows/reprocess-articles-workflow.ts`.
+- **Key Files / Functions:** `cron/ingest-rss/route.ts`; `cron/process-rss/route.ts`; `cron/send-review/route.ts`; `cron/send-final/route.ts`; `cron/health-check/route.ts`; `cron/import-metrics/route.ts`; `src/lib/workflows/process-rss-workflow.ts`; `src/lib/workflows/reprocess-articles-workflow.ts`.
 - **Database Tables:** `cron_jobs`, `issues`, `workflow_runs`, `system_logs`, `email_metrics`.
 - **Connections:** Keeps issue lifecycle on schedule, triggers AI pipelines, populates analytics, and monitors system health. Relies on settings, prompt configurations, and issue states.
 
