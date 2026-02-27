@@ -107,10 +107,11 @@ export default function NewPublicationPage() {
     debouncedSlugCheck(sanitized)
   }
 
-  // Image preview helpers
+  // Image preview helpers — only allow blob: URLs to prevent XSS via src attribute
   const handleFileSelect = (file: File | null, type: 'logo' | 'header') => {
     if (!file) return
     const url = URL.createObjectURL(file)
+    if (!url.startsWith('blob:')) return
     if (type === 'logo') {
       setLogoFile(file)
       setLogoPreview(url)
