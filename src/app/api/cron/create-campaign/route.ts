@@ -5,141 +5,111 @@ import { ScheduleChecker } from '@/lib/schedule-checker'
 import type { Logger } from '@/lib/logger'
 
 async function handleCreateCampaign(logger: Logger) {
-  // TODO: This legacy route should be deprecated in favor of trigger-workflow
-  // Get first active newsletter for backward compatibility
-  const { data: activeNewsletter } = await supabaseAdmin
+  // Get all active publications
+  const { data: newsletters } = await supabaseAdmin
     .from('publications')
-    .select('id')
+    .select('id, name, slug')
     .eq('is_active', true)
-    .limit(1)
-    .single()
 
-  if (!activeNewsletter) {
+  if (!newsletters || newsletters.length === 0) {
     return NextResponse.json({
       success: false,
-      error: 'No active newsletter found'
+      error: 'No active publications found'
     }, { status: 404 })
   }
 
-  logger.info('=== AUTOMATED issue CREATION CHECK ===')
-  logger.info({ time: new Date().toISOString() }, 'Time check')
+  logger.info({ count: newsletters.length }, '=== AUTOMATED issue CREATION CHECK ===')
 
-  // Check if it's time to run issue creation based on database settings
-  const shouldRun = await ScheduleChecker.shouldRunissueCreation(activeNewsletter.id)
-
-  if (!shouldRun) {
-    return NextResponse.json({
-      success: true,
-      message: 'Not time to run issue creation or already ran today',
-      skipped: true,
-      timestamp: new Date().toISOString()
-    })
-  }
-
-  logger.info('=== issue CREATION STARTED (Time Matched) ===')
-  logger.info({ centralTime: new Date().toLocaleString("en-US", {timeZone: "America/Chicago"}) }, 'Central Time')
-
-  // Get issue (already processed with RSS and subject line)
-  // Use Central Time + 12 hours for consistent date calculations
-  // This ensures evening runs (8pm+) create issues for tomorrow
+  // Use Central Time + 12 hours for consistent date calculations (shared across pubs)
   const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
   const centralDate = new Date(nowCentral)
-  // Add 12 hours to determine issue date (same logic as RSS Processing)
   centralDate.setHours(centralDate.getHours() + 12)
   const issueDate = centralDate.toISOString().split('T')[0]
 
-  logger.info({ issueDate }, 'issue date calculation: Current CT time + 12 hours')
-  logger.info({ issueDate }, 'Creating review issue for date')
+  logger.info({ issueDate, centralTime: nowCentral }, 'issue date calculation: Current CT time + 12 hours')
 
-  // Get accounting newsletter ID
-  const { data: newsletter } = await supabaseAdmin
-    .from('publications')
-    .select('id')
-    .eq('slug', 'accounting')
-    .single()
+  const results: Array<{ pubId: string; slug: string; success: boolean; skipped?: boolean; message?: string; error?: string }> = []
 
-  if (!newsletter) {
-    return NextResponse.json({
-      success: false,
-      error: 'Accounting newsletter not found'
-    }, { status: 404 })
-  }
+  for (const pub of newsletters) {
+    try {
+      // Check if it's time to run issue creation based on database settings
+      const shouldRun = await ScheduleChecker.shouldRunissueCreation(pub.id)
 
-  // Find tomorrow's issue with module articles
-  // Use maybeSingle() so 0 rows returns null instead of Supabase 406 (PGRST116)
-  const { data: issue, error: issueError } = await supabaseAdmin
-    .from('publication_issues')
-    .select(`
-      *,
-      module_articles:module_articles(
-        *,
-        rss_post:rss_posts(
+      if (!shouldRun) {
+        results.push({ pubId: pub.id, slug: pub.slug, success: true, skipped: true, message: 'Not time to run or already ran today' })
+        continue
+      }
+
+      logger.info({ slug: pub.slug }, '=== issue CREATION STARTED (Time Matched) ===')
+
+      // Find issue for the calculated date with module articles
+      // Use maybeSingle() so 0 rows returns null instead of Supabase 406 (PGRST116)
+      const { data: issue, error: issueError } = await supabaseAdmin
+        .from('publication_issues')
+        .select(`
           *,
-          rss_feed:rss_feeds(*)
-        ),
-        article_module:article_modules(name, display_order)
-      ),
-      manual_articles:manual_articles(*)
-    `)
-    .eq('publication_id', newsletter.id)
-    .eq('date', issueDate)
-    .maybeSingle()
+          module_articles:module_articles(
+            *,
+            rss_post:rss_posts(
+              *,
+              rss_feed:rss_feeds(*)
+            ),
+            article_module:article_modules(name, display_order)
+          ),
+          manual_articles:manual_articles(*)
+        `)
+        .eq('publication_id', pub.id)
+        .eq('date', issueDate)
+        .maybeSingle()
 
-  if (issueError || !issue) {
-    // Issue not created yet (workflow runs at rssProcessingTime; ensure issueCreationTime is after that)
-    logger.info({ issueDate, errorCode: issueError?.code }, '[create-campaign] No issue for date yet')
-    return NextResponse.json({
-      success: true,
-      skipped: true,
-      message: 'No issue found for date yet; workflow may run later or still processing.',
-      issueDate
-    })
+      if (issueError || !issue) {
+        logger.info({ issueDate, slug: pub.slug, errorCode: issueError?.code }, '[create-campaign] No issue for date yet')
+        results.push({ pubId: pub.id, slug: pub.slug, success: true, skipped: true, message: 'No issue found for date yet' })
+        continue
+      }
+
+      logger.info({ issueId: issue.id, status: issue.status, slug: pub.slug }, 'Found issue')
+
+      // Only create if issue is in draft status
+      if (issue.status !== 'draft') {
+        results.push({ pubId: pub.id, slug: pub.slug, success: true, skipped: true, message: `Issue status is ${issue.status}` })
+        continue
+      }
+
+      // Check if issue has active module articles
+      const activeArticles = (issue.module_articles || []).filter((article: any) => article.is_active)
+      if (activeArticles.length === 0) {
+        results.push({ pubId: pub.id, slug: pub.slug, success: false, error: 'No active articles found' })
+        continue
+      }
+
+      logger.info({ count: activeArticles.length, slug: pub.slug }, 'issue has active articles')
+
+      // Check if subject line exists
+      if (!issue.subject_line || issue.subject_line.trim() === '') {
+        results.push({ pubId: pub.id, slug: pub.slug, success: false, error: 'No subject line found' })
+        continue
+      }
+
+      logger.info({ subjectLine: issue.subject_line, slug: pub.slug }, 'Using subject line')
+      logger.info({ slug: pub.slug }, '=== issue CREATION COMPLETED ===')
+
+      results.push({
+        pubId: pub.id,
+        slug: pub.slug,
+        success: true,
+        message: `Issue ${issue.id} ready for review`
+      })
+    } catch (error) {
+      logger.error({ err: error, slug: pub.slug }, '[create-campaign] Error processing publication')
+      results.push({ pubId: pub.id, slug: pub.slug, success: false, error: String(error) })
+    }
   }
-
-  logger.info({ issueId: issue.id, status: issue.status }, 'Found issue')
-
-  // Only create if issue is in draft status
-  if (issue.status !== 'draft') {
-    return NextResponse.json({
-      success: true,
-      message: `issue status is ${issue.status}, skipping issue creation`,
-      issueId: issue.id,
-      skipped: true
-    })
-  }
-
-  // Check if issue has active module articles
-  const activeArticles = (issue.module_articles || []).filter((article: any) => article.is_active)
-  if (activeArticles.length === 0) {
-    return NextResponse.json({
-      success: false,
-      error: 'No active articles found for issue creation',
-      issueId: issue.id
-    }, { status: 400 })
-  }
-
-  logger.info({ count: activeArticles.length }, 'issue has active articles')
-
-  // Check if subject line exists
-  if (!issue.subject_line || issue.subject_line.trim() === '') {
-    return NextResponse.json({
-      success: false,
-      error: 'No subject line found for issue. Run subject line generation first.',
-      issueId: issue.id
-    }, { status: 400 })
-  }
-
-  logger.info({ subjectLine: issue.subject_line }, 'Using subject line')
-  logger.info('=== issue CREATION COMPLETED ===')
 
   return NextResponse.json({
-    success: true,
-    message: 'issue created successfully - ready for MailerLite review sending',
-    issueId: issue.id,
-    issueDate: issueDate,
-    subjectLine: issue.subject_line,
-    activeArticlesCount: activeArticles.length,
-    status: 'draft',
+    success: results.every(r => r.success),
+    results,
+    issueDate,
     timestamp: new Date().toISOString()
   })
 }
