@@ -204,9 +204,15 @@ export async function resolvePublicationFromRequest(): Promise<{
   const headersList = await headers()
   const host = headersList.get('x-forwarded-host') || headersList.get('host') || ''
 
-  let publicationId = await getPublicationByDomain(host) || ''
+  // Prefer the publication ID already resolved by middleware (avoids redundant DB query)
+  let publicationId = headersList.get('x-newsletter-id') || ''
 
-  // Fallback: first active publication
+  // If middleware didn't set it, fall back to domain lookup
+  if (!publicationId) {
+    publicationId = await getPublicationByDomain(host) || ''
+  }
+
+  // Last resort: first active publication
   if (!publicationId) {
     console.warn(`[Website] No publication found for domain: ${host}, falling back to first active`)
     const { data: firstPub } = await supabaseAdmin
