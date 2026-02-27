@@ -235,7 +235,19 @@ VALUES ('<pub_id>', 'https://example.com/feed', 'Example Feed', true, true);
 - Add rows to `prompt_ideas` for Prompt of the Day
 - Add rows to `ai_applications` for AI app features
 
-### 5e. Enable Schedules
+### 5e. Admin Domain Configuration
+If the new publication has its own admin domain, add it to the `ADMIN_DOMAINS` environment variable (comma-separated list):
+```
+ADMIN_DOMAINS=aiprodaily.com,www.aiprodaily.com,newpub.com,www.newpub.com
+```
+Also add environment variables for event email branding if the publication uses the events feature:
+```
+EVENT_NOTIFICATION_EMAIL=events@newpub.com
+EVENT_NOTIFICATION_NAME=NewPub Events
+CONTACT_EMAIL=hello@newpub.com
+```
+
+### 5f. Enable Schedules
 When ready to go live, update:
 ```sql
 UPDATE publication_settings SET value = 'true'
@@ -243,7 +255,7 @@ WHERE publication_id = '<pub_id>'
   AND key IN ('email_reviewScheduleEnabled', 'email_dailyScheduleEnabled');
 ```
 
-### 5f. Customize Prompts
+### 5g. Customize Prompts
 - Update `article_module_criteria` AI prompts for your audience
 - Optionally add per-tenant AI prompts to `publication_settings` (keys prefixed `ai_prompt_`)
 

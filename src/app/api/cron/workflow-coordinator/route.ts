@@ -21,7 +21,7 @@ export const GET = withApiHandler(
   async ({ logger }) => {
     logger.info('Starting workflow state check')
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.PRODUCTION_URL || 'https://aiprodaily.vercel.app'
 
     // Find all issues ready for next step (in "pending_*" states)
     const pendingStates = [

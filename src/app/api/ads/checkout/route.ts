@@ -68,8 +68,8 @@ export const POST = withApiHandler(
       },
       body: new URLSearchParams({
         'mode': 'payment',
-        'success_url': `${process.env.NEXT_PUBLIC_URL || 'https://st-cloud-scoop.vercel.app'}/ads/success?session_id={CHECKOUT_SESSION_ID}`,
-        'cancel_url': `${process.env.NEXT_PUBLIC_URL || 'https://st-cloud-scoop.vercel.app'}/ads/submit`,
+        'success_url': `${process.env.NEXT_PUBLIC_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'}/ads/success?session_id={CHECKOUT_SESSION_ID}`,
+        'cancel_url': `${process.env.NEXT_PUBLIC_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'}/ads/submit`,
         'customer_email': submitter_email,
         'line_items[0][price_data][currency]': lineItem.price_data.currency,
         'line_items[0][price_data][product_data][name]': lineItem.price_data.product_data.name,

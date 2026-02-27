@@ -9,8 +9,10 @@ const isToolsRoute = createRouteMatcher(['/tools(.*)'])
 // Check if this is an /account route (for Clerk middleware)
 const isAccountRoute = createRouteMatcher(['/account(.*)'])
 
-// Admin domains (dashboard access)
-const ADMIN_DOMAINS = ['aiprodaily.com', 'www.aiprodaily.com', 'aiprodaily.vercel.app']
+// Admin domains (dashboard access) — configurable via ADMIN_DOMAINS env var (comma-separated)
+const ADMIN_DOMAINS = process.env.ADMIN_DOMAINS
+  ? process.env.ADMIN_DOMAINS.split(',').map(d => d.trim())
+  : ['aiprodaily.com', 'www.aiprodaily.com', 'aiprodaily.vercel.app']
 
 // ---------------------------------------------------------------------------
 // Domain → Publication cache (module-level, survives across requests in the

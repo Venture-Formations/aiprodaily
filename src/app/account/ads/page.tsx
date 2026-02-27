@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Star, Newspaper, ArrowRight, Crown, Clock } from 'lucide-react'
-import { PUBLICATION_ID } from '@/lib/config'
+import { resolvePublicationFromRequest } from '@/lib/publication-settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,19 +15,21 @@ export default async function AdsOverviewPage() {
     redirect('/sign-in')
   }
 
+  const { publicationId } = await resolvePublicationFromRequest()
+
   // Fetch user's tool listing
   const toolResult = await supabaseAdmin
     .from('ai_applications')
     .select('id, app_name, logo_url, is_paid_placement, is_featured, plan, submission_status, publication_id')
     .eq('clerk_user_id', user.id)
-    .eq('publication_id', PUBLICATION_ID)
+    .eq('publication_id', publicationId)
     .single()
 
   const { data: tool, error } = toolResult
 
   // Debug logging
   console.log('[Account/Ads] Clerk user ID:', user.id)
-  console.log('[Account/Ads] Publication ID:', PUBLICATION_ID)
+  console.log('[Account/Ads] Publication ID:', publicationId)
   console.log('[Account/Ads] Tool found:', tool)
   console.log('[Account/Ads] Error:', error)
 

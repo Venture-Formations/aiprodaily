@@ -53,7 +53,7 @@ async function handleTriggerPhase2(logger: Logger) {
     }
 
     // Trigger Phase 2
-    const baseUrl = process.env.NEXTAUTH_URL ||
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ||
                    process.env.PRODUCTION_URL ||
                    'https://aiprodaily.vercel.app'
 

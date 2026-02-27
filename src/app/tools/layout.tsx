@@ -6,8 +6,8 @@ import { Header } from '@/components/salient/Header'
 import { Footer } from '@/components/salient/Footer'
 
 export const metadata: Metadata = {
-  title: 'AI Tools Directory | AI Accounting Daily',
-  description: 'Discover the best AI tools for accounting professionals. Browse 200+ tools for finance, payroll, HR, productivity, and more.',
+  title: 'AI Tools Directory',
+  description: 'Discover the best AI tools for professionals. Browse tools for finance, payroll, HR, productivity, and more.',
 }
 
 export default async function ToolsLayout({
@@ -17,7 +17,7 @@ export default async function ToolsLayout({
 }) {
   // Get publication settings from domain
   const headersList = await headers()
-  const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'aiaccountingdaily.com'
+  const host = headersList.get('x-forwarded-host') || headersList.get('host') || ''
   const settings = await getPublicationSettingsByDomain(host, [
     'newsletter_name',
     'logo_url',
@@ -28,20 +28,21 @@ export default async function ToolsLayout({
   // Use website_header_url for header (same as /website pages), logo_url for footer
   const headerLogoUrl = settings.website_header_url || settings.logo_url || '/logo.png'
   const logoUrl = settings.logo_url || '/logo.png'
-  const newsletterName = settings.newsletter_name || 'AI Accounting Daily'
-  const businessName = settings.business_name || 'AI Accounting Daily'
+  const newsletterName = settings.newsletter_name || 'Newsletter'
+  const businessName = settings.business_name || 'Newsletter'
+  const siteUrl = host ? `https://${host}` : process.env.NEXT_PUBLIC_SITE_URL || 'https://aiprodaily.com'
 
   // JSON-LD structured data for Organization
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": newsletterName,
-    "url": "https://aiaccountingdaily.com",
+    "url": siteUrl,
     "logo": {
       "@type": "ImageObject",
-      "url": "https://aiaccountingdaily.com/logo.png"
+      "url": `${siteUrl}/logo.png`
     },
-    "description": "Daily insights, tools, and strategies to help accountants and finance professionals leverage AI for better outcomes."
+    "description": `AI Tools Directory by ${newsletterName}`
   }
 
   // JSON-LD structured data for WebSite
@@ -49,10 +50,10 @@ export default async function ToolsLayout({
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": `AI Tools Directory | ${newsletterName}`,
-    "url": "https://aiaccountingdaily.com/tools",
+    "url": `${siteUrl}/tools`,
     "potentialAction": {
       "@type": "SearchAction",
-      "target": "https://aiaccountingdaily.com/tools?search={search_term_string}",
+      "target": `${siteUrl}/tools?search={search_term_string}`,
       "query-input": "required name=search_term_string"
     }
   }

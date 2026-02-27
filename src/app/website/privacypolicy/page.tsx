@@ -10,24 +10,34 @@ export const dynamic = 'force-dynamic'
 export default async function PrivacyPolicyPage() {
   // Get domain from headers (Next.js 15 requires await)
   const headersList = await headers()
-  const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'aiaccountingdaily.com'
+  const host = headersList.get('x-forwarded-host') || headersList.get('host') || ''
 
   // Get publication ID from domain
-  const publicationId = await getPublicationByDomain(host) || 'accounting'
+  const publicationId = await getPublicationByDomain(host) || process.env.PUBLICATION_ID || ''
 
   // Fetch settings from publication_settings
   const settings = await getPublicationSettings(publicationId, [
     'website_header_url',
     'logo_url',
     'newsletter_name',
-    'business_name'
+    'business_name',
+    'business_address',
+    'contact_email'
   ])
 
   const headerImageUrl = settings.website_header_url || '/logo.png'
   const logoUrl = settings.logo_url || '/logo.png'
-  const newsletterName = settings.newsletter_name || 'AI Accounting Daily'
-  const businessName = settings.business_name || 'AI Accounting Daily'
+  const newsletterName = settings.newsletter_name || 'Newsletter'
+  const businessName = settings.business_name || 'Newsletter'
+  const businessAddress = settings.business_address || ''
+  const contactEmail = settings.contact_email || process.env.CONTACT_EMAIL || ''
   const currentYear = new Date().getFullYear()
+
+  // Parse address parts for contact section
+  const addressParts = businessAddress.split(',').map((p: string) => p.trim())
+  const street = addressParts[0] || ''
+  const city = addressParts[1] || ''
+  const stateZip = addressParts[2] || ''
 
   return (
     <main className="min-h-screen bg-white">
@@ -50,8 +60,8 @@ export default async function PrivacyPolicyPage() {
 
             {/* Intro paragraph */}
             <p className="text-gray-700 leading-relaxed mb-12">
-              AI Accounting Daily (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) is a division of Venture Formations
-              LLC. We operate daily email newsletters for professionals. This Privacy Policy explains
+              {newsletterName} (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;){businessName !== newsletterName ? ` is a division of ${businessName}` : ''}.
+              We operate daily email newsletters for professionals. This Privacy Policy explains
               how we collect, use, and protect your information when you subscribe to our newsletter
               or interact with our services.
             </p>
@@ -91,7 +101,7 @@ export default async function PrivacyPolicyPage() {
               <ul className="space-y-3 text-gray-700 leading-relaxed ml-6">
                 <li className="flex">
                   <span className="mr-3 text-gray-400">●</span>
-                  <span>Send you the AI Accounting Daily newsletter.</span>
+                  <span>Send you the {newsletterName} newsletter.</span>
                 </li>
                 <li className="flex">
                   <span className="mr-3 text-gray-400">●</span>
@@ -130,7 +140,7 @@ export default async function PrivacyPolicyPage() {
                 </li>
                 <li className="flex">
                   <span className="mr-3 text-gray-400">●</span>
-                  <span><strong>Business Transfers:</strong> In the event of a merger, acquisition, or sale of assets involving Venture Formations LLC.</span>
+                  <span><strong>Business Transfers:</strong> In the event of a merger, acquisition, or sale of assets involving {businessName}.</span>
                 </li>
               </ul>
             </section>
@@ -261,7 +271,7 @@ export default async function PrivacyPolicyPage() {
                 5. Data Retention
               </h2>
               <p className="text-gray-700 leading-relaxed">
-                We keep your information for as long as you are subscribed to AI Accounting Daily
+                We keep your information for as long as you are subscribed to {newsletterName}
                 or as needed for legal purposes. You can unsubscribe at any time by clicking the
                 link in any email.
               </p>
@@ -291,9 +301,13 @@ export default async function PrivacyPolicyPage() {
               </ul>
               <p className="text-gray-700 leading-relaxed mt-4">
                 To make a request, contact us at{' '}
-                <a href="mailto:aiaccountingdaily@aiprodaily.com" className="text-blue-600 hover:underline">
-                  aiaccountingdaily@aiprodaily.com
-                </a>.
+                {contactEmail ? (
+                  <a href={`mailto:${contactEmail}`} className="text-blue-600 hover:underline">
+                    {contactEmail}
+                  </a>
+                ) : (
+                  <span>our support team</span>
+                )}.
               </p>
             </section>
 
@@ -339,16 +353,18 @@ export default async function PrivacyPolicyPage() {
                 For questions about this Privacy Policy or your data, contact:
               </p>
               <div className="text-gray-700 leading-relaxed">
-                <p className="font-medium">Venture Formations LLC</p>
-                <p>Attn: Privacy – AI Accounting Daily</p>
-                <p>8250 Delta Cir.</p>
-                <p>Saint Joseph, MN 56374</p>
-                <p className="mt-4">
-                  Email:{' '}
-                  <a href="mailto:aiaccountingdaily@aiprodaily.com" className="text-blue-600 hover:underline">
-                    aiaccountingdaily@aiprodaily.com
-                  </a>
-                </p>
+                <p className="font-medium">{businessName}</p>
+                <p>Attn: Privacy – {newsletterName}</p>
+                {street && <p>{street}</p>}
+                {(city || stateZip) && <p>{[city, stateZip].filter(Boolean).join(', ')}</p>}
+                {contactEmail && (
+                  <p className="mt-4">
+                    Email:{' '}
+                    <a href={`mailto:${contactEmail}`} className="text-blue-600 hover:underline">
+                      {contactEmail}
+                    </a>
+                  </p>
+                )}
               </div>
             </section>
           </div>

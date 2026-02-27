@@ -17,7 +17,7 @@ const lexend = Lexend({
 })
 
 export const metadata: Metadata = {
-  title: 'AI Accounting Daily - Newsletter Admin',
+  title: 'Newsletter Admin',
   description: 'Automated newsletter generation and management system',
 }
 

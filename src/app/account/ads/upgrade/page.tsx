@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getCategoriesWithFeaturedTools, getDirectoryPricing } from '@/lib/directory'
 import { UpgradeForm } from './UpgradeForm'
-import { PUBLICATION_ID } from '@/lib/config'
+import { resolvePublicationFromRequest } from '@/lib/publication-settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,13 +27,15 @@ export default async function UpgradePage({ searchParams }: UpgradePageProps) {
   const listingType = params.listing_type as 'paid_placement' | 'featured' | undefined
   const billingPeriod = params.billing_period as 'monthly' | 'yearly' | undefined
 
+  const { publicationId } = await resolvePublicationFromRequest()
+
   // Fetch user's tool and pricing in parallel
   const [toolResult, categoriesWithFeatured, pricing] = await Promise.all([
     supabaseAdmin
       .from('ai_applications')
       .select('id, app_name, category, is_featured, is_paid_placement, listing_type, billing_period, submission_status')
       .eq('clerk_user_id', user.id)
-      .eq('publication_id', PUBLICATION_ID)
+      .eq('publication_id', publicationId)
       .single(),
     getCategoriesWithFeaturedTools(),
     getDirectoryPricing()

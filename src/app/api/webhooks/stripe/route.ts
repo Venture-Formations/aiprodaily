@@ -3,6 +3,11 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { SlackNotificationService } from '@/lib/slack'
 import { PUBLICATION_ID } from '@/lib/config'
 
+/** Resolve publication_id from Stripe session metadata, falling back to config default */
+function resolvePublicationId(metadata: Record<string, string> | null): string {
+  return metadata?.publication_id || PUBLICATION_ID
+}
+
 // Stripe webhook event types we handle
 const CHECKOUT_SESSION_COMPLETED = 'checkout.session.completed'
 const CUSTOMER_SUBSCRIPTION_DELETED = 'customer.subscription.deleted'
@@ -179,8 +184,9 @@ async function handleAIApplicationsCheckout(session: any) {
   const billingPeriod = session.metadata?.billing_period || 'monthly'
   const subscriptionId = session.subscription
   const customerId = session.customer
+  const publicationId = resolvePublicationId(session.metadata)
 
-  console.log(`[Webhook] Processing AI applications checkout for tool: ${toolId}, type: ${listingType}`)
+  console.log(`[Webhook] Processing AI applications checkout for tool: ${toolId}, type: ${listingType}, pub: ${publicationId}`)
 
   if (!toolId) {
     console.error('[Webhook] Missing tool_id in session metadata')
@@ -211,7 +217,7 @@ async function handleAIApplicationsCheckout(session: any) {
       sponsor_end_date: sponsorEndDate.toISOString()
     })
     .eq('id', toolId)
-    .eq('publication_id', PUBLICATION_ID)
+    .eq('publication_id', publicationId)
 
   if (updateError) {
     console.error('[Webhook] Failed to update ai_applications after payment:', updateError)
@@ -403,7 +409,7 @@ async function handleEventSubmissionCheckout(session: any, sessionId: string) {
     `Event${events.length > 1 ? 's' : ''} (${events.length}):`,
     `  • ${eventTitles}`,
     ``,
-    `Review: ${process.env.NEXT_PUBLIC_URL || 'https://st-cloud-scoop.vercel.app'}/dashboard/events/review`
+    `Review: ${process.env.NEXT_PUBLIC_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://aiprodaily.vercel.app'}/dashboard/events/review`
   ].join('\n')
 
   await slack.sendSimpleMessage(message)

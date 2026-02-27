@@ -24,8 +24,8 @@ export const GET = withApiHandler(
       .in('key', ['logo_url', 'newsletter_name', 'business_name'])
 
     const logoUrl = settings?.find(s => s.key === 'logo_url')?.value || '/logo.png'
-    const newsletterName = settings?.find(s => s.key === 'newsletter_name')?.value || 'AI Accounting Daily'
-    const businessName = settings?.find(s => s.key === 'business_name')?.value || 'AI Accounting Daily'
+    const newsletterName = settings?.find(s => s.key === 'newsletter_name')?.value || 'Newsletter'
+    const businessName = settings?.find(s => s.key === 'business_name')?.value || 'Newsletter'
 
     return NextResponse.json({
       logoUrl,

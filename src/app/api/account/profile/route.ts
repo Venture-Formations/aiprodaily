@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { currentUser } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getPublicationByDomain } from '@/lib/publication-settings'
 import { PUBLICATION_ID } from '@/lib/config'
 
 export async function PUT(request: NextRequest) {
@@ -10,6 +11,10 @@ export async function PUT(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Resolve publication from request host
+    const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || ''
+    const publicationId = await getPublicationByDomain(host) || PUBLICATION_ID
 
     const body = await request.json()
     console.log('[Profile API] Request body:', JSON.stringify(body, null, 2))
@@ -29,7 +34,7 @@ export async function PUT(request: NextRequest) {
       .from('ai_applications')
       .select('id, clerk_user_id, submission_status, is_featured, category')
       .eq('id', toolId)
-      .eq('publication_id', PUBLICATION_ID)
+      .eq('publication_id', publicationId)
       .single()
 
     if (fetchError || !existingTool) {
@@ -49,7 +54,7 @@ export async function PUT(request: NextRequest) {
       const { data: featuredInCategory } = await supabaseAdmin
         .from('ai_applications')
         .select('id')
-        .eq('publication_id', PUBLICATION_ID)
+        .eq('publication_id', publicationId)
         .eq('category', category)
         .eq('is_featured', true)
         .neq('id', toolId)
@@ -100,7 +105,7 @@ export async function PUT(request: NextRequest) {
       .from('ai_applications')
       .update(updateData)
       .eq('id', toolId)
-      .eq('publication_id', PUBLICATION_ID)
+      .eq('publication_id', publicationId)
 
     if (updateError) {
       console.error('Failed to update tool:', updateError)

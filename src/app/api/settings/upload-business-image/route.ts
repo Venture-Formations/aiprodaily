@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { SupabaseImageStorage } from '@/lib/supabase-image-storage'
-import { PUBLICATION_ID } from '@/lib/config'
 
 export const POST = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/upload-business-image' },
@@ -9,7 +8,11 @@ export const POST = withApiHandler(
     const formData = await request.formData()
     const file = formData.get('file') as File
     const type = formData.get('type') as string
-    const publicationId = (formData.get('publication_id') as string) || PUBLICATION_ID
+    const publicationId = formData.get('publication_id') as string
+
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
+    }
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })

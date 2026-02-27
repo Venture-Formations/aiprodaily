@@ -5,7 +5,7 @@ import { getCategoriesWithFeaturedTools, getDirectoryPricing } from '@/lib/direc
 import Link from 'next/link'
 import Image from 'next/image'
 import { Star, Check, TrendingUp, Eye, ArrowRight, Crown, Clock } from 'lucide-react'
-import { PUBLICATION_ID } from '@/lib/config'
+import { resolvePublicationFromRequest } from '@/lib/publication-settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,13 +16,15 @@ export default async function ToolProfileAdsPage() {
     redirect('/sign-in')
   }
 
+  const { publicationId } = await resolvePublicationFromRequest()
+
   // Fetch user's tool listing, pricing, and featured categories in parallel
   const [toolResult, pricing, categoriesWithFeatured] = await Promise.all([
     supabaseAdmin
       .from('ai_applications')
       .select('id, app_name, logo_url, category, is_paid_placement, is_featured, plan, submission_status, view_count, click_count, publication_id')
       .eq('clerk_user_id', user.id)
-      .eq('publication_id', PUBLICATION_ID)
+      .eq('publication_id', publicationId)
       .single(),
     getDirectoryPricing(),
     getCategoriesWithFeaturedTools()
@@ -32,7 +34,7 @@ export default async function ToolProfileAdsPage() {
 
   // Debug logging
   console.log('[Account/Ads/Profile] Clerk user ID:', user.id)
-  console.log('[Account/Ads/Profile] Publication ID:', PUBLICATION_ID)
+  console.log('[Account/Ads/Profile] Publication ID:', publicationId)
   console.log('[Account/Ads/Profile] Tool found:', tool)
   console.log('[Account/Ads/Profile] Error:', error)
 

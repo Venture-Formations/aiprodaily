@@ -3,8 +3,24 @@ import { openai, anthropic } from './clients'
 import type { StructuredPromptConfig } from './types'
 
 // Helper function to fetch prompt from database with code fallback
-export async function getPrompt(key: string, fallback: string): Promise<string> {
+// When publicationId is provided, tries publication_settings first (per-tenant), then falls back to app_settings
+export async function getPrompt(key: string, fallback: string, publicationId?: string): Promise<string> {
   try {
+    // Try publication_settings first if publicationId is provided
+    if (publicationId) {
+      const { data: pubData, error: pubError } = await supabaseAdmin
+        .from('publication_settings')
+        .select('value')
+        .eq('publication_id', publicationId)
+        .eq('key', key)
+        .single()
+
+      if (!pubError && pubData) {
+        return typeof pubData.value === 'string' ? pubData.value : JSON.stringify(pubData.value)
+      }
+    }
+
+    // Fall back to app_settings (global)
     const { data, error } = await supabaseAdmin
       .from('app_settings')
       .select('value')
@@ -13,7 +29,9 @@ export async function getPrompt(key: string, fallback: string): Promise<string> 
 
     if (error || !data) {
       console.warn(`⚠️  [AI-PROMPT] FALLBACK USED: ${key} (not found in database)`)
-      console.warn(`⚠️  [AI-PROMPT] Run migration: GET /api/debug/migrate-ai-prompts?dry_run=false`)
+      if (!publicationId) {
+        console.warn(`⚠️  [AI-PROMPT] No publicationId provided — prompt lookup is not per-tenant`)
+      }
       return fallback
     }
 

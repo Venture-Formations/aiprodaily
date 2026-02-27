@@ -157,7 +157,8 @@ _Last updated: 2025-12-17_
 
 ### AI Tools Directory
 - **What it does:** Public-facing catalog of AI tools with browsing, search, categorization, and submission capabilities.
-- **How it works:** Tools are stored in the database with categories, descriptions, and metadata. Users can browse by category, search, view individual tools, and submit new listings. Tool owners can claim listings for verified status.
+- **How it works:** Tools are stored in the database with categories, descriptions, and metadata. Users can browse by category, search, view individual tools, and submit new listings. Tool owners can claim listings for verified status. All directory functions accept an optional `publicationId` parameter for multi-tenant isolation; admin actions filter by `publication_id`.
+- **Multi-tenant:** Directory functions in `directory.ts` accept optional `publicationId` (defaults to `PUBLICATION_ID` from config). Public pages use `SITE_BASE_URL` for SEO metadata. Admin actions in `actions.ts` scope all mutations to `PUBLICATION_ID`.
 - **Key Files / Functions:** `src/app/tools/page.tsx` (listing); `src/app/tools/[id]/page.tsx` (detail); `src/app/tools/submit/page.tsx` (submission form); `src/app/tools/category/[slug]/page.tsx` (category view); `src/lib/directory.ts` (business logic); `src/app/api/tools/route.ts` (API).
 - **Database Tables:** `tools`, `tool_categories`, `tool_claims`, `tool_entitlements`, `sponsorship_packages`.
 - **Connections:** Integrated with account system for tool claims. Admin panel at `/dashboard/[slug]/tools-admin/` manages entitlements, packages, and settings.
@@ -165,6 +166,7 @@ _Last updated: 2025-12-17_
 ### User Account & Advertiser Portal
 - **What it does:** Self-service portal for users and advertisers to manage ads, billing, and profile settings.
 - **How it works:** Users can create ad campaigns, view their ads, manage billing through Stripe integration, and update profile settings. Advertisers can track ad performance and upgrade subscriptions.
+- **Multi-tenant:** Account pages use `resolvePublicationFromRequest()` for host-based publication resolution. Account API routes use `getPublicationByDomain(host)`. Stripe checkout metadata includes `publication_id` so webhooks can resolve the correct publication. Account layout uses host-based resolution instead of `.limit(1).single()`.
 - **Key Files / Functions:** `src/app/account/page.tsx` (dashboard); `src/app/account/ads/page.tsx` (ad management); `src/app/account/billing/page.tsx` (billing); `src/app/account/upgrade/page.tsx` (subscription upgrade); `src/app/api/account/` (API routes); `src/app/api/stripe/` (Stripe webhooks).
 - **Database Tables:** `users`, `user_profiles`, `advertisements`, `ad_orders`, `payments`, `subscriptions`.
 - **Connections:** Integrates with Stripe for payments, MailerLite for subscriber data, and the advertisement system for ad placement.

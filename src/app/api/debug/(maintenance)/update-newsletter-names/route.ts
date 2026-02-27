@@ -32,17 +32,23 @@ export const GET = withApiHandler(
 
 export const POST = withApiHandler(
   { authTier: 'admin', logContext: 'debug/(maintenance)/update-newsletter-names' },
-  async ({ logger }) => {
+  async ({ request, logger }) => {
   try {
-    // Update newsletter names
-    // Update accounting newsletter
-    const { error: accountingError } = await supabaseAdmin
-      .from('publications')
-      .update({ name: 'AI Accounting Daily' })
-      .eq('slug', 'accounting')
+    const body = await request.json()
+    const { slug, name } = body
 
-    if (accountingError) {
-      return NextResponse.json({ error: accountingError.message }, { status: 500 })
+    if (!slug || !name) {
+      return NextResponse.json({ error: 'slug and name are required' }, { status: 400 })
+    }
+
+    // Update newsletter name by slug
+    const { error: updateError } = await supabaseAdmin
+      .from('publications')
+      .update({ name })
+      .eq('slug', slug)
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 })
     }
 
     // Get updated newsletters
@@ -58,7 +64,7 @@ export const POST = withApiHandler(
     return NextResponse.json({
       success: true,
       newsletters,
-      message: 'Newsletter names updated successfully'
+      message: `Newsletter "${slug}" renamed to "${name}" successfully`
     })
   } catch (error) {
     console.error('Error:', error)

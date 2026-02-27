@@ -108,6 +108,45 @@ export async function POST(request: NextRequest) {
 }
 ```
 
+## Host-Based Publication Resolution
+
+For **public-facing pages** (tools directory, website, account portal) and **API routes** that serve user-facing requests, resolve the publication from the request domain rather than using a hardcoded `PUBLICATION_ID`:
+
+### Server Components (account pages, tools pages)
+```typescript
+import { resolvePublicationFromRequest } from '@/lib/publication-settings'
+
+export default async function MyPage() {
+  const { publicationId } = await resolvePublicationFromRequest()
+  // Use publicationId for all database queries
+}
+```
+
+### API Routes
+```typescript
+import { getPublicationByDomain } from '@/lib/publication-settings'
+import { PUBLICATION_ID } from '@/lib/config'
+
+export async function POST(request: NextRequest) {
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || ''
+  const publicationId = await getPublicationByDomain(host) || PUBLICATION_ID
+  // Use publicationId for all database queries
+}
+```
+
+### Stripe Webhooks (no request context)
+Pass `publication_id` in Stripe session metadata during checkout creation, then resolve in the webhook handler:
+```typescript
+// Checkout creation:
+metadata: { publication_id: publicationId }
+
+// Webhook handler:
+const publicationId = session.metadata?.publication_id || PUBLICATION_ID
+```
+
+### Admin Domains
+The `ADMIN_DOMAINS` env var (comma-separated) controls which domains can access the admin dashboard. Defaults to `aiprodaily.com` and its variants.
+
 ## Data Access Layer (DAL)
 
 **Prefer DAL functions** over inline Supabase queries for `publication_issues`:

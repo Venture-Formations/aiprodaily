@@ -4,6 +4,7 @@ import { CategoryCard } from '@/components/directory/CategoryCard'
 import { getApprovedTools, getApprovedCategories } from '@/lib/directory'
 import { Container } from '@/components/salient/Container'
 import { Button } from '@/components/salient/Button'
+import { SITE_BASE_URL } from '@/lib/config'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,11 +20,11 @@ export default async function ToolsDirectoryPage() {
     "@type": "CollectionPage",
     "name": "AI Tools Directory",
     "description": "Discover the best AI tools for accounting professionals. Browse 200+ tools for finance, payroll, HR, productivity, and more.",
-    "url": "https://aiaccountingdaily.com/tools",
+    "url": `${SITE_BASE_URL}/tools`,
     "publisher": {
       "@type": "Organization",
-      "name": "AI Accounting Daily",
-      "url": "https://aiaccountingdaily.com"
+      "name": "AI Tools Directory",
+      "url": SITE_BASE_URL
     },
     "mainEntity": {
       "@type": "ItemList",
@@ -35,7 +36,7 @@ export default async function ToolsDirectoryPage() {
           "@type": "SoftwareApplication",
           "name": tool.tool_name,
           "description": tool.description || tool.tagline,
-          "url": `https://aiaccountingdaily.com/tools/${tool.id}`,
+          "url": `${SITE_BASE_URL}/tools/${tool.id}`,
           "applicationCategory": "BusinessApplication"
         }
       }))
