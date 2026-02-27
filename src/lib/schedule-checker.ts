@@ -145,11 +145,11 @@ export class ScheduleChecker {
       }
 
       const currentTime = this.getCurrentTimeInCT()
-      console.log(`Review Send check: Current CT time ${currentTime.timeString}, issue Creation Time: ${settings.issueCreationTime}`)
+      console.log(`Review Send check: Current CT time ${currentTime.timeString}, Scheduled Send Time: ${settings.scheduledSendTime}`)
 
       return await this.isTimeToRun(
         currentTime.timeString,
-        settings.issueCreationTime,
+        settings.scheduledSendTime,
         'last_review_send_run',
         newsletterId
       )
