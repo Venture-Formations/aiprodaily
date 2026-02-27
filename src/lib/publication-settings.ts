@@ -185,6 +185,55 @@ export async function getPublicationSettingsByDomain(
   return getPublicationSettings(publicationId, keys)
 }
 
+// ==================== REQUEST-LEVEL HELPERS ====================
+
+/**
+ * Resolve publication context from the current request headers.
+ * Combines the repeated pattern across all /website/* pages:
+ * 1. Reads host from headers
+ * 2. Looks up publication by domain
+ * 3. Falls back to first active publication
+ * 4. Fetches common display settings
+ */
+export async function resolvePublicationFromRequest(): Promise<{
+  publicationId: string
+  host: string
+  settings: Record<string, string>
+}> {
+  const { headers } = await import('next/headers')
+  const headersList = await headers()
+  const host = headersList.get('x-forwarded-host') || headersList.get('host') || ''
+
+  // Prefer the publication ID already resolved by middleware (avoids redundant DB query)
+  let publicationId = headersList.get('x-newsletter-id') || ''
+
+  // If middleware didn't set it, fall back to domain lookup
+  if (!publicationId) {
+    publicationId = await getPublicationByDomain(host) || ''
+  }
+
+  // Last resort: first active publication
+  if (!publicationId) {
+    console.warn(`[Website] No publication found for domain: ${host}, falling back to first active`)
+    const { data: firstPub } = await supabaseAdmin
+      .from('publications')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single()
+    publicationId = firstPub?.id || ''
+  }
+
+  const settings = await getPublicationSettings(publicationId, [
+    'website_header_url',
+    'logo_url',
+    'newsletter_name',
+    'business_name',
+  ])
+
+  return { publicationId, host, settings }
+}
+
 // ==================== TYPED HELPER FUNCTIONS ====================
 
 /**

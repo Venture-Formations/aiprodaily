@@ -27,45 +27,52 @@ export class FeedIngestion {
   /**
    * Ingest and score new posts (runs every 15 minutes)
    * Does NOT generate articles or assign to issues
+   * Loops through all active publications and processes each pub's feeds independently.
    */
   async ingestNewPosts(): Promise<{ fetched: number; scored: number }> {
-    const { data: newsletter } = await supabaseAdmin
+    const { data: newsletters } = await supabaseAdmin
       .from('publications')
-      .select('id')
+      .select('id, name, slug')
       .eq('is_active', true)
-      .limit(1)
-      .single()
 
-    if (!newsletter) {
-      console.log('[Ingest] No active newsletter found')
+    if (!newsletters || newsletters.length === 0) {
+      console.log('[Ingest] No active publications found')
       return { fetched: 0, scored: 0 }
     }
 
     let totalFetched = 0
     let totalScored = 0
 
-    const { data: allFeeds } = await supabaseAdmin
-      .from('rss_feeds')
-      .select('*')
-      .eq('active', true)
-
-    if (!allFeeds || allFeeds.length === 0) {
-      return { fetched: 0, scored: 0 }
-    }
-
-    console.log(`[Ingest] Fetched ${allFeeds.length} active feeds:`, allFeeds.map(f => ({
-      name: f.name,
-      id: f.id,
-      article_module_id: f.article_module_id || 'NULL'
-    })))
-
-    for (const feed of allFeeds) {
+    for (const pub of newsletters) {
       try {
-        const result = await this.ingestFeedPosts(feed, newsletter.id)
-        totalFetched += result.fetched
-        totalScored += result.scored
+        const { data: allFeeds } = await supabaseAdmin
+          .from('rss_feeds')
+          .select('*')
+          .eq('active', true)
+          .eq('publication_id', pub.id)
+
+        if (!allFeeds || allFeeds.length === 0) {
+          console.log(`[Ingest] No active feeds for ${pub.slug}`)
+          continue
+        }
+
+        console.log(`[Ingest] ${pub.slug}: Fetched ${allFeeds.length} active feeds:`, allFeeds.map(f => ({
+          name: f.name,
+          id: f.id,
+          article_module_id: f.article_module_id || 'NULL'
+        })))
+
+        for (const feed of allFeeds) {
+          try {
+            const result = await this.ingestFeedPosts(feed, pub.id)
+            totalFetched += result.fetched
+            totalScored += result.scored
+          } catch (error) {
+            console.error(`[Ingest] Feed ${feed.name} (${pub.slug}) failed:`, error instanceof Error ? error.message : 'Unknown')
+          }
+        }
       } catch (error) {
-        console.error(`[Ingest] Feed ${feed.name} failed:`, error instanceof Error ? error.message : 'Unknown')
+        console.error(`[Ingest] Error processing publication ${pub.slug}:`, error instanceof Error ? error.message : 'Unknown')
       }
     }
 

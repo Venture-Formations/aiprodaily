@@ -16,23 +16,8 @@ const nextConfig = {
       },
     ],
   },
-  async rewrites() {
-    return {
-      beforeFiles: [
-        // Marketing site rewrites for aiaccountingdaily.com
-        {
-          source: '/',
-          has: [{ type: 'host', value: 'aiaccountingdaily.com' }],
-          destination: '/website',
-        },
-        {
-          source: '/:path*',
-          has: [{ type: 'host', value: 'aiaccountingdaily.com' }],
-          destination: '/website/:path*',
-        },
-      ],
-    }
-  },
+  // Domain-based rewrites are handled dynamically in middleware.ts
+  // No static rewrites needed — new publications auto-route via DB lookup
 }
 
 module.exports = withWorkflow(nextConfig)

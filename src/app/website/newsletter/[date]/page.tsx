@@ -7,8 +7,7 @@ import { Header } from "@/components/salient/Header"
 import { Footer } from "@/components/salient/Footer"
 import { Container } from "@/components/salient/Container"
 import { supabaseAdmin } from "@/lib/supabase"
-import { headers } from 'next/headers'
-import { getPublicationByDomain, getPublicationSettings } from '@/lib/publication-settings'
+import { resolvePublicationFromRequest } from '@/lib/publication-settings'
 
 interface PageProps {
   params: Promise<{ date: string }>
@@ -24,7 +23,9 @@ function cleanMergeTags(text: string): string {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { date } = await params
-  const newsletter = await newsletterArchiver.getArchivedNewsletter(date)
+  const { publicationId, settings } = await resolvePublicationFromRequest()
+  const newsletterName = settings.newsletter_name || 'Newsletter'
+  const newsletter = await newsletterArchiver.getArchivedNewsletter(date, publicationId)
 
   if (!newsletter) {
     return {
@@ -42,11 +43,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   })
 
   return {
-    title: `${newsletter.subject_line} - AI Accounting Daily`,
-    description: `AI Accounting Daily newsletter from ${formattedDate}`,
+    title: `${newsletter.subject_line} - ${newsletterName}`,
+    description: `${newsletterName} newsletter from ${formattedDate}`,
     openGraph: {
       title: newsletter.subject_line,
-      description: `AI Accounting Daily newsletter from ${formattedDate}`,
+      description: `${newsletterName} newsletter from ${formattedDate}`,
       type: 'article',
       publishedTime: newsletter.send_date,
     }
@@ -55,26 +56,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function NewsletterPage({ params }: PageProps) {
   const { date } = await params
-  const newsletter = await newsletterArchiver.getArchivedNewsletter(date)
+  const { publicationId, host, settings } = await resolvePublicationFromRequest()
+  const newsletter = await newsletterArchiver.getArchivedNewsletter(date, publicationId)
 
   if (!newsletter) {
     notFound()
   }
-
-  // Get domain from headers (Next.js 15 requires await)
-  const headersList = await headers()
-  const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'aiaccountingdaily.com'
-
-  // Get publication ID from domain
-  const publicationId = await getPublicationByDomain(host) || 'accounting'
-
-  // Fetch settings from publication_settings
-  const settings = await getPublicationSettings(publicationId, [
-    'website_header_url',
-    'logo_url',
-    'newsletter_name',
-    'business_name'
-  ])
 
   // Use archived newsletter_sections if available (snapshot at time of send), otherwise fetch live
   let newsletterSectionsConfig = newsletter.sections?.newsletter_sections || null
@@ -89,9 +76,10 @@ export default async function NewsletterPage({ params }: PageProps) {
 
   const headerImageUrl = settings.website_header_url || '/logo.png'
   const logoUrl = settings.logo_url || '/logo.png'
-  const newsletterName = settings.newsletter_name || 'AI Accounting Daily'
-  const businessName = settings.business_name || 'AI Accounting Daily'
+  const newsletterName = settings.newsletter_name || 'Newsletter'
+  const businessName = settings.business_name || 'Newsletter'
   const currentYear = new Date().getFullYear()
+  const siteUrl = `https://${host}`
 
   // Parse date as local date to avoid timezone offset issues
   const [year, month, day] = newsletter.issue_date.split('-').map(Number)
@@ -289,21 +277,21 @@ export default async function NewsletterPage({ params }: PageProps) {
     "dateModified": newsletter.send_date,
     "author": {
       "@type": "Organization",
-      "name": "AI Accounting Daily"
+      "name": businessName
     },
     "publisher": {
       "@type": "Organization",
-      "name": "AI Accounting Daily",
+      "name": businessName,
       "logo": {
         "@type": "ImageObject",
-        "url": "https://aiaccountingdaily.com/logo.png"
+        "url": logoUrl.startsWith('http') ? logoUrl : `${siteUrl}${logoUrl.startsWith('/') ? logoUrl : `/${logoUrl}`}`
       }
     },
     "mainEntityOfPage": {
       "@type": "WebPage",
-      "@id": `https://aiaccountingdaily.com/newsletter/${date}`
+      "@id": `${siteUrl}/newsletter/${date}`
     },
-    "description": `AI Accounting Daily newsletter from ${formattedDate}`
+    "description": `${newsletterName} newsletter from ${formattedDate}`
   }
 
   return (

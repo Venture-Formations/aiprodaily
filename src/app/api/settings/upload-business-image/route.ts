@@ -9,6 +9,7 @@ export const POST = withApiHandler(
     const formData = await request.formData()
     const file = formData.get('file') as File
     const type = formData.get('type') as string
+    const publicationId = (formData.get('publication_id') as string) || PUBLICATION_ID
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
@@ -41,7 +42,7 @@ export const POST = withApiHandler(
     const publicUrl = await storage.uploadBusinessImage(
       buffer,
       type as 'header' | 'logo' | 'website_header',
-      PUBLICATION_ID
+      publicationId
     )
 
     if (!publicUrl) {

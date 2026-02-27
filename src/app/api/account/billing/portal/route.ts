@@ -50,9 +50,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Create billing portal session
+    const returnHost = request.headers.get('host') || ''
+    const returnBase = process.env.NEXT_PUBLIC_BASE_URL || `https://${returnHost}`
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
-      return_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://aiaccountingdaily.com'}/account/billing`,
+      return_url: `${returnBase}/account/billing`,
     })
 
     return NextResponse.redirect(session.url)

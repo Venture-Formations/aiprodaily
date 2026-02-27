@@ -5,8 +5,7 @@ import { Header } from "@/components/salient/Header"
 import { Footer } from "@/components/salient/Footer"
 import { Container } from "@/components/salient/Container"
 import { supabaseAdmin } from "@/lib/supabase"
-import { headers } from 'next/headers'
-import { getPublicationByDomain, getPublicationSettings } from '@/lib/publication-settings'
+import { resolvePublicationFromRequest } from '@/lib/publication-settings'
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -14,11 +13,14 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
+  const { publicationId, settings } = await resolvePublicationFromRequest()
+  const newsletterName = settings.newsletter_name || 'Newsletter'
 
   const { data: article } = await supabaseAdmin
     .from('manual_articles')
     .select('title, body, image_url, publish_date')
     .eq('slug', slug)
+    .eq('publication_id', publicationId)
     .in('status', ['published', 'used'])
     .single()
 
@@ -32,7 +34,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const description = article.body.replace(/<[^>]+>/g, '').substring(0, 160) + '...'
 
   return {
-    title: `${article.title} - AI Accounting Daily`,
+    title: `${article.title} - ${newsletterName}`,
     description,
     openGraph: {
       title: article.title,
@@ -46,22 +48,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ArticlePage({ params }: PageProps) {
   const { slug } = await params
-
-  // Get domain from headers
-  const headersList = await headers()
-  const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'aiaccountingdaily.com'
-  let publicationId: string = await getPublicationByDomain(host) || ''
-
-  // Fallback: if domain lookup fails, get first active publication
-  if (!publicationId) {
-    const { data: firstPub } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-    publicationId = firstPub?.id || ''
-  }
+  const { publicationId, host, settings } = await resolvePublicationFromRequest()
 
   // Fetch the article
   const { data: article, error } = await supabaseAdmin
@@ -84,18 +71,11 @@ export default async function ArticlePage({ params }: PageProps) {
     notFound()
   }
 
-  // Fetch settings
-  const settings = await getPublicationSettings(publicationId, [
-    'website_header_url',
-    'logo_url',
-    'newsletter_name',
-    'business_name'
-  ])
-
   const headerImageUrl = settings.website_header_url || '/logo.png'
   const logoUrl = settings.logo_url || '/logo.png'
-  const newsletterName = settings.newsletter_name || 'AI Accounting Daily'
-  const businessName = settings.business_name || 'AI Accounting Daily'
+  const newsletterName = settings.newsletter_name || 'Newsletter'
+  const businessName = settings.business_name || 'Newsletter'
+  const siteUrl = `https://${host}`
   const currentYear = new Date().getFullYear()
 
   // Format date
@@ -159,12 +139,12 @@ export default async function ArticlePage({ params }: PageProps) {
       name: businessName,
       logo: {
         '@type': 'ImageObject',
-        url: 'https://aiaccountingdaily.com/logo.png'
+        url: logoUrl.startsWith('http') ? logoUrl : `${siteUrl}${logoUrl.startsWith('/') ? logoUrl : `/${logoUrl}`}`
       }
     },
     mainEntityOfPage: {
       '@type': 'WebPage',
-      '@id': `https://aiaccountingdaily.com/news/${article.slug}`
+      '@id': `${siteUrl}/news/${article.slug}`
     },
     image: article.image_url ? [article.image_url] : [],
     description: article.body.replace(/<[^>]+>/g, '').substring(0, 160)
@@ -179,19 +159,19 @@ export default async function ArticlePage({ params }: PageProps) {
         '@type': 'ListItem',
         position: 1,
         name: 'News',
-        item: 'https://aiaccountingdaily.com/news'
+        item: `${siteUrl}/news`
       },
       ...(category ? [{
         '@type': 'ListItem',
         position: 2,
         name: category.name,
-        item: `https://aiaccountingdaily.com/news?category=${category.slug}`
+        item: `${siteUrl}/news?category=${category.slug}`
       }] : []),
       {
         '@type': 'ListItem',
         position: category ? 3 : 2,
         name: article.title,
-        item: `https://aiaccountingdaily.com/news/${article.slug}`
+        item: `${siteUrl}/news/${article.slug}`
       }
     ]
   }

@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import "./globals.css"
 import Script from "next/script"
+import { resolvePublicationFromRequest } from '@/lib/publication-settings'
 
 export const metadata: Metadata = {
   title: "AI Accounting Daily - Stay Ahead of AI in Accounting",
@@ -12,35 +13,41 @@ export const metadata: Metadata = {
   },
 }
 
-export default function WebsiteLayout({
+export default async function WebsiteLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const { host, settings } = await resolvePublicationFromRequest()
+  const siteUrl = `https://${host}`
+  const newsletterName = settings.newsletter_name || 'Newsletter'
+  const businessName = settings.business_name || 'Newsletter'
+  const logoUrl = settings.logo_url || '/logo.png'
+
   const pixelId = process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID || ''
 
   // JSON-LD structured data for Organization
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    "name": "AI Accounting Daily",
-    "url": "https://aiaccountingdaily.com",
+    "name": businessName,
+    "url": siteUrl,
     "logo": {
       "@type": "ImageObject",
-      "url": "https://aiaccountingdaily.com/logo.png"
+      "url": logoUrl.startsWith('http') ? logoUrl : `${siteUrl}${logoUrl.startsWith('/') ? logoUrl : `/${logoUrl}`}`
     },
-    "description": "Daily insights, tools, and strategies to help accountants and finance professionals leverage AI for better outcomes."
+    "description": `Daily insights, tools, and strategies from ${newsletterName}.`
   }
 
   // JSON-LD structured data for WebSite
   const websiteSchema = {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    "name": "AI Accounting Daily",
-    "url": "https://aiaccountingdaily.com",
+    "name": newsletterName,
+    "url": siteUrl,
     "potentialAction": {
       "@type": "SearchAction",
-      "target": "https://aiaccountingdaily.com/?search={search_term_string}",
+      "target": `${siteUrl}/?search={search_term_string}`,
       "query-input": "required name=search_term_string"
     }
   }
