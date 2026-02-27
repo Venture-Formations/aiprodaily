@@ -91,11 +91,14 @@ async function setupIssue(newsletterId: string): Promise<{ issueId: string; modu
 
       console.log(`[Workflow Step 1] Using newsletter: ${newsletter.name} (${newsletter.id})`)
 
-      // Calculate issue date (Central Time + 12 hours)
-      const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
-      const centralDate = new Date(nowCentral)
-      centralDate.setHours(centralDate.getHours() + 12)
-      const issueDate = centralDate.toISOString().split('T')[0]
+      // Always target tomorrow in Central Time (matches send-review logic)
+      const ctParts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Chicago',
+        year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(new Date())
+      const [ctYear, ctMonth, ctDay] = ctParts.split('-').map(Number)
+      const tomorrowDate = new Date(ctYear, ctMonth - 1, ctDay + 1)
+      const issueDate = `${tomorrowDate.getFullYear()}-${String(tomorrowDate.getMonth() + 1).padStart(2, '0')}-${String(tomorrowDate.getDate()).padStart(2, '0')}`
 
       // Create new issue via DAL (dynamic import: pino uses Node.js modules not available in workflow context)
       const { createIssue } = await import('@/lib/dal')

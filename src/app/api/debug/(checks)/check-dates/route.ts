@@ -5,17 +5,23 @@ import { supabaseAdmin } from '@/lib/supabase'
 export const GET = withApiHandler(
   { authTier: 'admin', logContext: 'debug/(checks)/check-dates' },
   async ({ request, logger }) => {
-    // Calculate dates EXACTLY as RSS Processing does
-    const nowCentral1 = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
-    const centralDate1 = new Date(nowCentral1)
-    centralDate1.setHours(centralDate1.getHours() + 12)
-    const rssProcessingDate = centralDate1.toISOString().split('T')[0]
+    // Calculate dates EXACTLY as RSS Processing does (tomorrow in Central Time)
+    const ctParts1 = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Chicago',
+      year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date())
+    const [ctYear1, ctMonth1, ctDay1] = ctParts1.split('-').map(Number)
+    const tomorrowDate1 = new Date(ctYear1, ctMonth1 - 1, ctDay1 + 1)
+    const rssProcessingDate = `${tomorrowDate1.getFullYear()}-${String(tomorrowDate1.getMonth() + 1).padStart(2, '0')}-${String(tomorrowDate1.getDate()).padStart(2, '0')}`
 
-    // Calculate dates EXACTLY as Create issue does
-    const nowCentral2 = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
-    const centralDate2 = new Date(nowCentral2)
-    centralDate2.setHours(centralDate2.getHours() + 12)
-    const createissueDate = centralDate2.toISOString().split('T')[0]
+    // Calculate dates EXACTLY as Create issue does (tomorrow in Central Time)
+    const ctParts2 = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Chicago',
+      year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date())
+    const [ctYear2, ctMonth2, ctDay2] = ctParts2.split('-').map(Number)
+    const tomorrowDate2 = new Date(ctYear2, ctMonth2 - 1, ctDay2 + 1)
+    const createissueDate = `${tomorrowDate2.getFullYear()}-${String(tomorrowDate2.getMonth() + 1).padStart(2, '0')}-${String(tomorrowDate2.getDate()).padStart(2, '0')}`
 
     // Check for issue with RSS Processing date
     const { data: rssissue } = await supabaseAdmin
@@ -44,11 +50,11 @@ export const GET = withApiHandler(
       debug: 'Date Calculation Comparison',
       currentTime: {
         utc: new Date().toISOString(),
-        central: nowCentral1,
+        central: ctParts1,
       },
       rssProcessing: {
-        description: "RSS Processing creates issue for 'CT + 12 hours' (line 311-312 of rss-processor.ts)",
-        calculation: "centralDate.setHours(centralDate.getHours() + 12); centralDate.toISOString().split('T')[0]",
+        description: "RSS Processing creates issue for tomorrow in Central Time",
+        calculation: "Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago' }) + 1 day",
         issueDate: rssProcessingDate,
         foundissue: rssissue ? {
           id: rssissue.id,
@@ -58,8 +64,8 @@ export const GET = withApiHandler(
         } : null
       },
       createissue: {
-        description: "Create issue queries for 'CT + 12 hours' (line 37-38 of create-issue/route.ts)",
-        calculation: "centralDate.setHours(centralDate.getHours() + 12); centralDate.toISOString().split('T')[0]",
+        description: "Create issue targets tomorrow in Central Time",
+        calculation: "Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago' }) + 1 day",
         issueDate: createissueDate,
         foundissue: createissue ? {
           id: createissue.id,
@@ -72,8 +78,8 @@ export const GET = withApiHandler(
         datesMismatch,
         diagnosis: datesMismatch
           ? "DATES DON'T MATCH - RSS Processing creates for " + rssProcessingDate + " but Create issue looks for " + createissueDate
-          : "Dates match - both endpoints use CT + 12 hours: " + rssProcessingDate,
-        explanation: "Both endpoints now add 12 hours to Central Time before extracting the date. This ensures morning runs use today's date, evening runs (8pm+) use tomorrow's date.",
+          : "Dates match - both endpoints target tomorrow in CT: " + rssProcessingDate,
+        explanation: "All endpoints use tomorrow in Central Time, matching send-review logic. This ensures consistent issue dates regardless of time of day.",
         possibleCause: datesMismatch
           ? "If Create issue doesn't find a issue, it would return 404. No duplicate should be created."
           : "Both endpoints should work with the same issue."
