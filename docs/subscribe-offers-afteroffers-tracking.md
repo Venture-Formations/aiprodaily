@@ -35,7 +35,7 @@ This doc summarizes Emile’s two questions from After Offers and recommended re
 >
 > **Variables we’d like to receive:**
 > - **click_id** (required) — so we can match the postback to the visit we sent you.
-> - **revenue** (required) — amount earned for that conversion.
+> - **revenue** (optional) — amount earned for that conversion; may be absent for impression/click events.
 > - **email** (optional) — if you have it, so we can tie the conversion to our subscriber record.
 >
 > If you also send impression or click events (not just conversions), an **event** or **action** parameter would be helpful (e.g. `conversion`, `impression`, `click`) so we can track funnel steps.

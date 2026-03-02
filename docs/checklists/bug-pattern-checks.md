@@ -87,7 +87,7 @@ The `publication-id` check knows about these tenant-scoped tables (queries must 
 
 `publication_issues`, `issue_articles`, `issue_advertisements`, `publication_settings`, `rss_feeds`, `rss_posts`, `module_articles`, `ai_applications`, `advertisements`, `newsletter_sections`, `article_modules`, `issue_article_modules`, `issue_ai_app_selections`, `issue_module_ads`, `issue_prompt_modules`, `issue_ai_app_modules`, `issue_ad_modules`, `issue_poll_modules`, `ad_modules`, `poll_modules`, `prompt_modules`, `post_ratings`, `publication_events`, `issue_events`, `secondary_articles`, `tools`
 
-To add a new table, update the `TENANT_TABLES` array in `scripts/check-bug-patterns.mjs`.
+To add a new table, update the `TENANT_TABLES` array in `scripts/bug-pattern-checks.ts` (canonical source) and `scripts/check-bug-patterns.mjs` (CLI copy).
 
 ## Implementation
 

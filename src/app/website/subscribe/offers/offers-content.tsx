@@ -40,37 +40,36 @@ export function OffersContent({ logoUrl, newsletterName }: OffersContentProps) {
     }
   }, [email])
 
-  // Derive click_id from URL, sessionStorage, or generate a new one
+  // Derive click_id from URL, sessionStorage, or generate a new one.
+  // Always call setClickId even if sessionStorage fails.
   useEffect(() => {
     let id = urlClickId
 
-    try {
-      if (!id && typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
+    if (!id && typeof window !== 'undefined') {
+      try {
         const stored = window.sessionStorage.getItem('afteroffers_click_id')
-        if (stored) {
-          id = stored
-        }
+        if (stored) id = stored
+      } catch {
+        // sessionStorage unavailable — fall through to generate
       }
+    }
 
-      if (!id) {
-        id = generateAfterOffersClickId()
-        if (typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
-          window.sessionStorage.setItem('afteroffers_click_id', id)
-        }
-      }
+    if (!id) {
+      id = generateAfterOffersClickId()
+    }
 
-      if (id) {
-        // eslint-disable-next-line no-console
-        console.log('[AfterOffers] Using click_id on offers page', id)
-        setClickId(id)
+    // Persist to sessionStorage (best-effort)
+    try {
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem('afteroffers_click_id', id)
       }
     } catch {
       // Ignore storage errors
-      if (!id) {
-        const fallbackId = generateAfterOffersClickId()
-        setClickId(fallbackId)
-      }
     }
+
+    // eslint-disable-next-line no-console
+    console.log('[AfterOffers] Using click_id on offers page', id)
+    setClickId(id)
   }, [urlClickId])
 
   // Build the AfterOffers URL with email and click_id
@@ -103,17 +102,19 @@ export function OffersContent({ logoUrl, newsletterName }: OffersContentProps) {
             Thank you for visiting AI Accounting Daily
           </h1>
 
-          {/* AfterOffers iframe */}
-          <div className="rounded-xl overflow-hidden shadow-lg border border-slate-200">
-            <iframe
-              src={afterOffersUrl}
-              height="600"
-              width="100%"
-              frameBorder="0"
-              sandbox="allow-forms allow-top-navigation allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin"
-              className="w-full"
-            />
-          </div>
+          {/* AfterOffers iframe — only render once clickId is ready */}
+          {clickId && (
+            <div className="rounded-xl overflow-hidden shadow-lg border border-slate-200">
+              <iframe
+                src={afterOffersUrl}
+                height="600"
+                width="100%"
+                frameBorder="0"
+                sandbox="allow-forms allow-top-navigation allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+                className="w-full"
+              />
+            </div>
+          )}
 
         </div>
       </Container>

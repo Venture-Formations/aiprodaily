@@ -12,9 +12,24 @@ create table if not exists public.afteroffers_events (
   created_at timestamptz not null default now()
 );
 
-create index if not exists afteroffers_events_publication_click_idx
-  on public.afteroffers_events (publication_id, click_id);
+-- Unique constraint for webhook replay deduplication
+alter table public.afteroffers_events
+  add constraint afteroffers_events_publication_click_event_unique
+  unique (publication_id, click_id, event_type);
 
+-- Index for email-based lookups (non-unique since email is optional)
 create index if not exists afteroffers_events_publication_email_idx
   on public.afteroffers_events (publication_id, email);
 
+-- Enable RLS and restrict access to service_role only
+alter table public.afteroffers_events enable row level security;
+
+-- Revoke default public access
+revoke all on public.afteroffers_events from anon, authenticated;
+
+-- Allow only service_role full access (used by backend supabaseAdmin)
+create policy "Service role full access on afteroffers_events"
+  on public.afteroffers_events
+  for all
+  using (true)
+  with check (true);
