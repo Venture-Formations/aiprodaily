@@ -60,3 +60,8 @@ mcp.json
 next-env.d.ts
 .vercel
 NUL
+
+# CCPM working directories
+.claude/epics/
+.claude/prds/
+.claude-backup/

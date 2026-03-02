@@ -55,6 +55,7 @@ Ingest feeds → Score posts → Launch workflow → Assign & dedupe → Generat
 3. Validate issue status transitions (`processing → draft`) in Supabase.
 4. Confirm Stage 1 unassignment returns unused posts to pool.
 5. Verify downstream cron (`send-review`) still receives draft issues.
+6. **Tests:** If you changed workflow/ingestion code, run `npm run test:rss-workflow` (or `test:rss-workflow:pr` in CI). See [rss-workflow-tests.md](../checklists/rss-workflow-tests.md).
 
 ## Common Pitfalls
 - **Missing publication filter:** Always call `.eq('publication_id', publicationId)`.

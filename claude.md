@@ -246,6 +246,8 @@ The account system provides self-service for advertisers and users:
 - Cron schedules, secrets, recovery: docs/operations/cron-jobs.md
 - Vercel deployment & API notes: docs/vercel-api.md
 - Testing checklist: docs/checklists/TESTING_CHECKLIST.md
+- Bug-pattern checks (scoped to changed files): docs/checklists/bug-pattern-checks.md — run before commit or in PR via `npm run check:bug-patterns` / `npm run check:bug-patterns:pr`
+- RSS workflow tests (scoped to changed files): docs/checklists/rss-workflow-tests.md — run when workflow/ingestion code changes via `npm run test:rss-workflow` / `npm run test:rss-workflow:pr`
 - Monitoring expectations: `[Workflow]`, `[CRON]`, Slack alerts from monitor cron.
 
 ### Active Cron Jobs (from `vercel.json`)
@@ -342,3 +344,28 @@ If issues arise, start with docs/troubleshooting/common-issues.md. For deeper hi
 - If documentation gaps remain, add to the relevant subfolder and link here so future updates stay predictable.
 
 Stay disciplined about referencing the supporting docs. If a scenario lacks documentation, create or extend it, then cross-link in this guide to keep Claude—and the team—aligned.
+
+## 24. CCPM Rules
+
+This project uses **Claude Code PM (CCPM)** for spec-driven development, GitHub issue tracking, and parallel execution. CCPM was installed from [automazeio/ccpm](https://github.com/automazeio/ccpm) at commit `3c8e0e7`.
+
+### Key Paths
+- **Commands:** `.claude/commands/pm/`, `.claude/commands/context/`, `.claude/commands/testing/`
+- **Rules:** `.claude/rules/` (agent-coordination, branch-operations, github-operations, etc.)
+- **Scripts:** `.claude/scripts/pm/` (bash helpers invoked by commands)
+- **Agents:** `.claude/agents/` (code-analyzer, file-analyzer, parallel-worker, test-runner)
+- **Config:** `.claude/ccpm.config` (GitHub repo detection + `gh` CLI wrappers)
+- **Epics/PRDs:** `.claude/epics/`, `.claude/prds/` (gitignored working directories)
+
+### Workflow
+1. `/pm:prd-new` — Create a PRD via guided brainstorm
+2. `/pm:epic-oneshot` — Decompose PRD into GitHub issues
+3. `/pm:issue-start` — Pick up an issue, create branch, begin work
+4. `/pm:issue-sync` — Post progress to GitHub
+5. `/pm:epic-merge` — Merge parallel work
+
+### Integration Notes
+- CCPM rules in `.claude/rules/` are auto-loaded by Claude Code and coexist with this project's existing rules.
+- Existing project rules (multi-tenant isolation, date handling, logging, etc.) take priority over CCPM defaults if there is a conflict.
+- GitHub issues are created in the repo detected from `git remote get-url origin`.
+- The `.claude/epics/` directory is excluded from version control via `.gitignore`.
