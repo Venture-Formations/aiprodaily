@@ -35,6 +35,13 @@ const CHECK_PATHS = {
 
 const PUB_ID_EXCLUDE = ['/api/debug/', 'debug/']
 
+// Files that contain detection patterns as string literals (self-referential); skip them.
+const SELF_EXCLUDE = [
+  'scripts/check-bug-patterns.mjs',
+  'scripts/bug-pattern-checks.ts',
+  'scripts/__tests__/check-bug-patterns.test.ts',
+]
+
 const TENANT_TABLES = [
   'publication_issues',
   'issue_articles',
@@ -70,6 +77,7 @@ function isSuppressed(line, checkId) {
 
 function appliesToPath(checkId, filePath) {
   const normalized = filePath.replace(/\\/g, '/')
+  if (SELF_EXCLUDE.some((p) => normalized.endsWith(p))) return false
   const patterns = CHECK_PATHS[checkId]
   if (!patterns) return false
   const matches = patterns.some((p) => normalized.includes(p))

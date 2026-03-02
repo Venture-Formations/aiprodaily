@@ -17,6 +17,13 @@ export const CHECK_PATHS: Record<string, string[]> = {
 /** Paths excluded from publication-id (e.g. debug routes) */
 export const PUB_ID_EXCLUDE = ['/api/debug/', 'debug/']
 
+/** Files that contain detection patterns as string literals (self-referential); skip them. */
+export const SELF_EXCLUDE = [
+  'scripts/check-bug-patterns.mjs',
+  'scripts/bug-pattern-checks.ts',
+  'scripts/__tests__/check-bug-patterns.test.ts',
+]
+
 /** Tenant-scoped table names (queries to these should have publication_id in the file) */
 export const TENANT_TABLES = [
   'publication_issues',
@@ -70,6 +77,7 @@ function isSuppressed(line: string, checkId: string): boolean {
 
 export function appliesToPath(checkId: string, filePath: string): boolean {
   const normalized = filePath.replace(/\\/g, '/')
+  if (SELF_EXCLUDE.some((p) => normalized.endsWith(p))) return false
   const patterns = CHECK_PATHS[checkId]
   if (!patterns) return false
   const matches = patterns.some((p) => normalized.includes(p))
