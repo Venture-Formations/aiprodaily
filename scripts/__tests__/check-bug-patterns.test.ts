@@ -7,8 +7,6 @@ import {
   runPublicationId,
   runDateIso,
   TENANT_TABLES,
-  CHECK_PATHS,
-  PUB_ID_EXCLUDE,
   SELF_EXCLUDE,
 } from '../bug-pattern-checks'
 
