@@ -138,6 +138,7 @@ export default function SparkLoopAdminPage() {
   const [chartStats, setChartStats] = useState<ChartStats | null>(null)
   const [chartLoading, setChartLoading] = useState(true)
   const [timeframe, setTimeframe] = useState<'7' | '30' | '90'>('30')
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchRecommendations()
@@ -149,6 +150,7 @@ export default function SparkLoopAdminPage() {
 
   async function fetchRecommendations() {
     setLoading(true)
+    setError(null)
     try {
       const res = await fetch('/api/sparkloop/admin?filter=all')
       const data = await res.json()
@@ -161,9 +163,14 @@ export default function SparkLoopAdminPage() {
         if (data.defaults) {
           setDefaults(data.defaults)
         }
+      } else {
+        const msg = data.error || data.message || `API returned status ${res.status}`
+        setError(`Failed to load recommendations: ${msg}`)
+        console.error('SparkLoop admin API error:', data)
       }
-    } catch (error) {
-      console.error('Failed to fetch recommendations:', error)
+    } catch (err) {
+      setError(`Failed to fetch recommendations: ${err instanceof Error ? err.message : 'Network error'}`)
+      console.error('Failed to fetch recommendations:', err)
     }
     setLoading(false)
   }
@@ -328,6 +335,22 @@ export default function SparkLoopAdminPage() {
             {syncing ? 'Syncing...' : 'Sync from SparkLoop'}
           </button>
         </div>
+
+        {/* Error Banner */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <span className="text-red-600 font-medium text-sm">Error:</span>
+              <span className="text-red-700 text-sm">{error}</span>
+            </div>
+            <button
+              onClick={fetchRecommendations}
+              className="mt-2 text-sm text-red-600 underline hover:text-red-800"
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
         {/* Tab Buttons */}
         <div className="flex gap-1 mb-6 border-b">
