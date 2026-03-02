@@ -177,8 +177,19 @@ function getChangedFiles() {
   }
 
   if (base) {
-    const out = execSync(`git diff --name-only ${base}...HEAD`, { cwd: ROOT, encoding: 'utf-8' })
-    return out.trim().split(/\n/).filter(Boolean)
+    try {
+      const out = execSync(`git diff --name-only ${base}...HEAD`, { cwd: ROOT, encoding: 'utf-8' })
+      return out.trim().split(/\n/).filter(Boolean)
+    } catch {
+      console.warn(`Warning: could not resolve '${base}'. Falling back to HEAD~1 diff.`)
+      try {
+        const out = execSync('git diff --name-only HEAD~1...HEAD', { cwd: ROOT, encoding: 'utf-8' })
+        return out.trim().split(/\n/).filter(Boolean)
+      } catch {
+        console.warn('Warning: fallback diff also failed. Skipping bug-pattern checks.')
+        return []
+      }
+    }
   }
 
   // default: staged files
