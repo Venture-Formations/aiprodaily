@@ -32,11 +32,17 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Bug-pattern checks (scoped to changed files)
+        run: npm run check:bug-patterns:pr
+
       - name: Lint
         run: npm run lint -- --max-warnings 360
 
       - name: Unit tests
         run: npm run test:run
+
+      - name: RSS workflow tests (scoped to changed files)
+        run: npm run test:rss-workflow:pr
 
       - name: Build
         run: npm run build

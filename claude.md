@@ -246,6 +246,8 @@ The account system provides self-service for advertisers and users:
 - Cron schedules, secrets, recovery: docs/operations/cron-jobs.md
 - Vercel deployment & API notes: docs/vercel-api.md
 - Testing checklist: docs/checklists/TESTING_CHECKLIST.md
+- Bug-pattern checks (scoped to changed files): docs/checklists/bug-pattern-checks.md — run before commit or in PR via `npm run check:bug-patterns` / `npm run check:bug-patterns:pr`
+- RSS workflow tests (scoped to changed files): docs/checklists/rss-workflow-tests.md — run when workflow/ingestion code changes via `npm run test:rss-workflow` / `npm run test:rss-workflow:pr`
 - Monitoring expectations: `[Workflow]`, `[CRON]`, Slack alerts from monitor cron.
 
 ### Active Cron Jobs (from `vercel.json`)
