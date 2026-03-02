@@ -49,6 +49,15 @@ function getFacebookPixelData() {
   }
 }
 
+function generateAfterOffersClickId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+
+  const randomPart = Math.random().toString(36).slice(2, 10)
+  return `ao_${Date.now()}_${randomPart}`
+}
+
 export function SubscribeForm() {
   const [email, setEmail] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -64,7 +73,19 @@ export function SubscribeForm() {
 
   // Handle subscribe complete - redirect to offers page
   const handleSubscribeComplete = useCallback(() => {
-    window.location.href = `/subscribe/offers?email=${encodeURIComponent(subscribedEmail)}`
+    const clickId = generateAfterOffersClickId()
+
+    try {
+      if (typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
+        window.sessionStorage.setItem('afteroffers_click_id', clickId)
+        // eslint-disable-next-line no-console
+        console.log('[AfterOffers] Generated click_id for subscribe flow', clickId)
+      }
+    } catch {
+      // Ignore storage errors
+    }
+
+    window.location.href = `/subscribe/offers?email=${encodeURIComponent(subscribedEmail)}&click_id=${encodeURIComponent(clickId)}`
   }, [subscribedEmail])
 
   const handleSubmit = async (e: React.FormEvent) => {
