@@ -1,7 +1,7 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Container } from '@/components/salient/Container'
 import { SubscribeProgressBar } from '@/components/SubscribeProgressBar'
 
@@ -10,9 +10,20 @@ interface OffersContentProps {
   newsletterName: string
 }
 
+function generateAfterOffersClickId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+
+  const randomPart = Math.random().toString(36).slice(2, 10)
+  return `ao_${Date.now()}_${randomPart}`
+}
+
 export function OffersContent({ logoUrl, newsletterName }: OffersContentProps) {
   const searchParams = useSearchParams()
   const email = searchParams.get('email') || ''
+  const urlClickId = searchParams.get('click_id') || ''
+  const [clickId, setClickId] = useState('')
 
   // Store email in sessionStorage so info page can retrieve it as fallback
   useEffect(() => {
@@ -29,40 +40,48 @@ export function OffersContent({ logoUrl, newsletterName }: OffersContentProps) {
     }
   }, [email])
 
-  // Listen for messages from AfterOffers iframe
+  // Derive click_id from URL, sessionStorage, or generate a new one
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // Log all messages to see what AfterOffers sends
-      if (event.origin.includes('afteroffers')) {
-        console.log('[AfterOffers Event]', event.data)
+    let id = urlClickId
+
+    try {
+      if (!id && typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
+        const stored = window.sessionStorage.getItem('afteroffers_click_id')
+        if (stored) {
+          id = stored
+        }
+      }
+
+      if (!id) {
+        id = generateAfterOffersClickId()
+        if (typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
+          window.sessionStorage.setItem('afteroffers_click_id', id)
+        }
+      }
+
+      if (id) {
+        // eslint-disable-next-line no-console
+        console.log('[AfterOffers] Using click_id on offers page', id)
+        setClickId(id)
+      }
+    } catch {
+      // Ignore storage errors
+      if (!id) {
+        const fallbackId = generateAfterOffersClickId()
+        setClickId(fallbackId)
       }
     }
+  }, [urlClickId])
 
-    window.addEventListener('message', handleMessage)
-
-    // Track page visibility changes (user switching tabs, etc.)
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        console.log('[AfterOffers] User left offers page')
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    // Track when user is about to leave the page
-    const handleBeforeUnload = () => {
-      console.log('[AfterOffers] User navigating away from offers page')
-    }
-    window.addEventListener('beforeunload', handleBeforeUnload)
-
-    return () => {
-      window.removeEventListener('message', handleMessage)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-    }
-  }, [])
-
-  // Build the AfterOffers URL with the email
-  const afterOffersUrl = `https://offers.afteroffers.com/show_offers/994-2MMat6y-1?email=${encodeURIComponent(email)}`
+  // Build the AfterOffers URL with email and click_id
+  const params = new URLSearchParams()
+  if (email) {
+    params.set('email', email)
+  }
+  if (clickId) {
+    params.set('click_id', clickId)
+  }
+  const afterOffersUrl = `https://offers.afteroffers.com/show_offers/994-2MMat6y-1?${params.toString()}`
 
   return (
     <section className="pt-8 sm:pt-12 pb-6 sm:pb-16">
