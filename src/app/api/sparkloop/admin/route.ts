@@ -175,27 +175,43 @@ export const GET = withApiHandler(
     }))
 
     // Calculate rolling window metrics (14D and 30D) in parallel
-    const [metrics14d, metrics30d] = await Promise.all([
-      SparkLoopService.calculateRollingWindowMetrics(14, PUBLICATION_ID),
-      SparkLoopService.calculateRollingWindowMetrics(30, PUBLICATION_ID),
-    ])
+    // Wrapped in try/catch so a failure here doesn't block the entire response
+    let withRollingMetrics = withIpStats.map(rec => ({
+      ...rec,
+      rcr_14d: null as number | null,
+      rcr_30d: null as number | null,
+      slippage_14d: null as number | null,
+      slippage_30d: null as number | null,
+      sends_14d: 0,
+      sends_30d: 0,
+      confirms_gained_14d: 0,
+      confirms_gained_30d: 0,
+    }))
 
-    // Merge rolling metrics into each recommendation
-    const withRollingMetrics = withIpStats.map(rec => {
-      const m14 = metrics14d.get(rec.ref_code)
-      const m30 = metrics30d.get(rec.ref_code)
-      return {
-        ...rec,
-        rcr_14d: m14?.rcr ?? null,
-        rcr_30d: m30?.rcr ?? null,
-        slippage_14d: m14?.slippage_rate ?? null,
-        slippage_30d: m30?.slippage_rate ?? null,
-        sends_14d: m14?.sends ?? 0,
-        sends_30d: m30?.sends ?? 0,
-        confirms_gained_14d: m14?.confirms_gained ?? 0,
-        confirms_gained_30d: m30?.confirms_gained ?? 0,
-      }
-    })
+    try {
+      const [metrics14d, metrics30d] = await Promise.all([
+        SparkLoopService.calculateRollingWindowMetrics(14, PUBLICATION_ID),
+        SparkLoopService.calculateRollingWindowMetrics(30, PUBLICATION_ID),
+      ])
+
+      withRollingMetrics = withIpStats.map(rec => {
+        const m14 = metrics14d.get(rec.ref_code)
+        const m30 = metrics30d.get(rec.ref_code)
+        return {
+          ...rec,
+          rcr_14d: m14?.rcr ?? null,
+          rcr_30d: m30?.rcr ?? null,
+          slippage_14d: m14?.slippage_rate ?? null,
+          slippage_30d: m30?.slippage_rate ?? null,
+          sends_14d: m14?.sends ?? 0,
+          sends_30d: m30?.sends ?? 0,
+          confirms_gained_14d: m14?.confirms_gained ?? 0,
+          confirms_gained_30d: m30?.confirms_gained ?? 0,
+        }
+      })
+    } catch (metricsError) {
+      logger.error({ err: metricsError }, 'Failed to calculate rolling window metrics — returning data without rolling metrics')
+    }
 
     // Sort by score descending
     withRollingMetrics.sort((a, b) => (b.calculated_score || 0) - (a.calculated_score || 0))
