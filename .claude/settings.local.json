@@ -1,6 +1,10 @@
 {
   "permissions": {
     "allow": [
+      "Bash(bash .claude/scripts/test-and-log.sh:*)",
+      "Bash(.claude/scripts/test-and-log.sh:*)",
+      "Bash(bash .claude/scripts/pm/*)",
+      "Bash(.claude/scripts/pm/*)",
       "WebFetch(domain:api.github.com)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
