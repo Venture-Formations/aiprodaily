@@ -8,6 +8,7 @@ import { newsletterArchiver } from '@/lib/newsletter-archiver'
 import { getEmailProviderSettings } from '@/lib/publication-settings'
 import { ModuleAdSelector } from '@/lib/ad-modules'
 import { withApiHandler } from '@/lib/api-handler'
+import { getEnvironment, isProduction, shouldSkipScheduleCheck } from '@/lib/env-guard'
 import type { Logger } from '@/lib/logger'
 
 // Helper function to log article positions at final send
@@ -161,10 +162,16 @@ async function unassignUnusedArticlePosts(issueId: string, log: Logger) {
  */
 async function processFinalSendForPub(pub: { id: string; slug: string }, log: Logger): Promise<{ success: boolean; skipped?: boolean; message?: string; issueId?: string }> {
   // Check if it's time to run final send based on database settings
-  const shouldRun = await ScheduleChecker.shouldRunFinalSend(pub.id)
+  const skipSchedule = shouldSkipScheduleCheck()
+  if (skipSchedule) {
+    log.info({ slug: pub.slug }, '[ENV-GUARD] SKIP_SCHEDULE_CHECK is set — bypassing schedule check')
+  }
 
-  if (!shouldRun) {
-    return { success: true, skipped: true, message: 'Not time to run or already ran today' }
+  if (!skipSchedule) {
+    const shouldRun = await ScheduleChecker.shouldRunFinalSend(pub.id)
+    if (!shouldRun) {
+      return { success: true, skipped: true, message: 'Not time to run or already ran today' }
+    }
   }
 
   log.info({ slug: pub.slug }, '=== FINAL SEND STARTED (Time Matched) ===')
@@ -343,6 +350,8 @@ async function processFinalSendForPub(pub: { id: string; slug: string }, log: Lo
  * Shared final send logic used by both POST and GET handlers.
  */
 async function handleFinalSend(log: Logger): Promise<NextResponse> {
+  log.info({ env: getEnvironment(), isProduction: isProduction() }, '[ENV] Environment check')
+
   // Get all active publications
   const { data: newsletters } = await supabaseAdmin
     .from('publications')

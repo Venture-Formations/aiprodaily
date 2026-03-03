@@ -4,6 +4,7 @@ import { ErrorHandler, SlackNotificationService } from '../slack'
 import type { issueWithArticles, issueWithEvents, Article } from '@/types/database'
 import { generateFullNewsletterHtml } from '../newsletter-templates'
 import { getEmailSettings, getScheduleSettings, getPublicationSetting, getPublicationSettings } from '../publication-settings'
+import { getEnvironment, isProduction } from '../env-guard'
 
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
 
@@ -139,8 +140,13 @@ United States
 
       console.log('Final subject line being sent to MailerLite:', subjectLine)
 
+      const env = getEnvironment()
+      const envPrefix = isProduction() ? '' : `[${env.toUpperCase()}] `
+
+      console.log(`[ENV-GUARD] createReviewissue: env="${env}", targetGroup="${reviewGroupId}"`)
+
       const issueData = {
-        name: `${newsletterName} Review: ${issue.date}`,
+        name: `${envPrefix}${newsletterName} Review: ${issue.date}`,
         type: 'regular',
         emails: [{
           subject: `${subjectEmoji} ${subjectLine}`,
@@ -184,7 +190,7 @@ United States
           // issue is created at issue Creation Time (8:50pm) and scheduled to send same day at Scheduled Send Time
           const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
           const centralDate = new Date(nowCentral)
-          const today = centralDate.toISOString().split('T')[0] // Today's date in YYYY-MM-DD
+          const today = `${centralDate.getFullYear()}-${String(centralDate.getMonth() + 1).padStart(2, '0')}-${String(centralDate.getDate()).padStart(2, '0')}`
           scheduleData = await this.getReviewScheduleData(today, issue.publication_id)
           console.log('Scheduling review issue for today with data:', scheduleData)
 
@@ -611,7 +617,7 @@ United States
         const centralDate = new Date(nowCentral)
         centralDate.setMinutes(centralDate.getMinutes() + 2)
 
-        const date = centralDate.toISOString().split('T')[0]
+        const date = `${centralDate.getFullYear()}-${String(centralDate.getMonth() + 1).padStart(2, '0')}-${String(centralDate.getDate()).padStart(2, '0')}`
         const hours = String(centralDate.getHours()).padStart(2, '0')
         const minutes = String(centralDate.getMinutes()).padStart(2, '0')
 
@@ -671,12 +677,16 @@ United States
 
       const subjectLine = issue.subject_line || `Newsletter - ${new Date(issue.date).toLocaleDateString()}`
 
+      const env = getEnvironment()
+      const envPrefix = isProduction() ? '' : `[${env.toUpperCase()}] `
+
+      console.log(`[ENV-GUARD] createFinalissue: env="${env}", targetGroup="${mainGroupId}", isSecondary=${isSecondary}`)
       console.log(`Creating ${isSecondary ? 'secondary' : 'final'} issue with subject line:`, subjectLine)
       console.log('Using publication settings:', { senderName, fromEmail })
 
       const campaignName = isSecondary
-        ? `${newsletterName} Newsletter (Secondary): ${issue.date}`
-        : `${newsletterName} Newsletter: ${issue.date}`
+        ? `${envPrefix}${newsletterName} Newsletter (Secondary): ${issue.date}`
+        : `${envPrefix}${newsletterName} Newsletter: ${issue.date}`
 
       const issueData = {
         name: campaignName,
@@ -726,7 +736,7 @@ United States
         try {
           const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
           const centralDate = new Date(nowCentral)
-          const today = centralDate.toISOString().split('T')[0] // Today's date in YYYY-MM-DD
+          const today = `${centralDate.getFullYear()}-${String(centralDate.getMonth() + 1).padStart(2, '0')}-${String(centralDate.getDate()).padStart(2, '0')}`
           const finalScheduleData = isSecondary
             ? await this.getSecondaryScheduleData(today, issue.publication_id)
             : await this.getFinalScheduleData(today, issue.publication_id)
