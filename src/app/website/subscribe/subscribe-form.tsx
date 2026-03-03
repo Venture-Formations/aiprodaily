@@ -142,8 +142,12 @@ export function SubscribeForm() {
       <div className="space-y-4">
         <form onSubmit={handleSubmit} className="flex justify-center">
           <div className="relative w-full max-w-lg">
+            <label htmlFor="email" className="sr-only">Email address</label>
             <input
               type="email"
+              name="email"
+              id="email"
+              autoComplete="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
