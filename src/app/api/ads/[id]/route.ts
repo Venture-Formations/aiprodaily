@@ -5,14 +5,20 @@ import { supabaseAdmin } from '@/lib/supabase'
 // GET single ad
 export const GET = withApiHandler(
   { authTier: 'admin', logContext: 'ads/[id]' },
-  async ({ params }) => {
+  async ({ request, params }) => {
     const id = params.id
+    const publicationId = new URL(request.url).searchParams.get('publication_id')
 
-    const { data: ad, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('advertisements')
-      .select('*')
+      .select('id, publication_id, advertiser_id, title, body, image_url, image_alt, button_text, button_url, company_name, status, start_date, end_date, is_active, priority, times_used, last_used_date, display_order, frequency, times_paid, paid, created_at, updated_at')
       .eq('id', id)
-      .single()
+
+    if (publicationId) {
+      query = query.eq('publication_id', publicationId)
+    }
+
+    const { data: ad, error } = await query.single()
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
@@ -56,9 +62,10 @@ export const PATCH = withApiHandler(
     }
 
     // First verify the ad exists and get current values
+    const { publication_id: _pubId, ...updateBody } = body
     const { data: existingAd, error: fetchError } = await supabaseAdmin
       .from('advertisements')
-      .select('id, body')
+      .select('id, body, publication_id')
       .eq('id', id)
       .single()
 
@@ -67,14 +74,15 @@ export const PATCH = withApiHandler(
       return NextResponse.json({ error: 'Advertisement not found' }, { status: 404 })
     }
 
-    // Perform the update
+    // Perform the update (scoped to the ad's publication)
     const { data: ad, error } = await supabaseAdmin
       .from('advertisements')
       .update({
-        ...body,
+        ...updateBody,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
+      .eq('publication_id', existingAd.publication_id)
       .select()
       .single()
 
@@ -102,13 +110,20 @@ export const PATCH = withApiHandler(
 // DELETE - Delete ad
 export const DELETE = withApiHandler(
   { authTier: 'admin', logContext: 'ads/[id]' },
-  async ({ params }) => {
+  async ({ request, params }) => {
     const id = params.id
+    const publicationId = new URL(request.url).searchParams.get('publication_id')
 
-    const { error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('advertisements')
       .delete()
       .eq('id', id)
+
+    if (publicationId) {
+      query = query.eq('publication_id', publicationId)
+    }
+
+    const { error } = await query
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })

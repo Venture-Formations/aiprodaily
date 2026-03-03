@@ -4,23 +4,28 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/footer' },
-  async () => {
-    // Get user's publication_id (use first active newsletter for now)
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
+  async ({ request }) => {
+    let publicationId = request.nextUrl.searchParams.get('publication_id')
 
-    if (!newsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    // Fall back to first active publication for public website callers
+    if (!publicationId) {
+      const { data: pub } = await supabaseAdmin
+        .from('publications')
+        .select('id')
+        .eq('is_active', true)
+        .limit(1)
+        .single()
+
+      if (!pub) {
+        return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+      }
+      publicationId = pub.id
     }
 
     const { data: settings } = await supabaseAdmin
       .from('publication_settings')
       .select('key, value')
-      .eq('publication_id', newsletter.id)
+      .eq('publication_id', publicationId!)
       .in('key', ['logo_url', 'newsletter_name', 'business_name'])
 
     const logoUrl = settings?.find(s => s.key === 'logo_url')?.value || '/logo.png'

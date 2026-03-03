@@ -16,19 +16,19 @@ export const GET = withApiHandler(
       return NextResponse.json({ error: 'key parameter is required' }, { status: 400 })
     }
 
-    // If no publication_id provided, get the active publication
+    // Fall back to first active publication for legacy callers
     if (!publicationId) {
-      const { data: newsletter } = await supabaseAdmin
+      const { data: pub } = await supabaseAdmin
         .from('publications')
         .select('id')
         .eq('is_active', true)
         .limit(1)
         .single()
 
-      if (!newsletter) {
+      if (!pub) {
         return NextResponse.json({ error: 'No active publication found' }, { status: 404 })
       }
-      publicationId = newsletter.id
+      publicationId = pub.id
     }
 
     // Fetch the setting
@@ -60,7 +60,7 @@ export const PATCH = withApiHandler(
   async ({ request }) => {
     const body = await request.json()
     const { key, value } = body
-    let publicationId = body.publication_id
+    let publicationId = request.nextUrl.searchParams.get('publication_id') || body.publication_id
 
     if (!key) {
       return NextResponse.json({ error: 'key is required' }, { status: 400 })
@@ -70,19 +70,19 @@ export const PATCH = withApiHandler(
       return NextResponse.json({ error: 'value is required' }, { status: 400 })
     }
 
-    // If no publication_id provided, get the active publication
+    // Fall back to first active publication for legacy callers
     if (!publicationId) {
-      const { data: newsletter } = await supabaseAdmin
+      const { data: pub } = await supabaseAdmin
         .from('publications')
         .select('id')
         .eq('is_active', true)
         .limit(1)
         .single()
 
-      if (!newsletter) {
+      if (!pub) {
         return NextResponse.json({ error: 'No active publication found' }, { status: 404 })
       }
-      publicationId = newsletter.id
+      publicationId = pub.id
     }
 
     // Upsert the setting

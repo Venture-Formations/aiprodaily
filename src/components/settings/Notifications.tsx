@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 
-export default function Notifications() {
+export default function Notifications({ publicationId }: { publicationId: string }) {
   const [settings, setSettings] = useState({
     campaignStatusUpdates: true,
     workflowFailure: true,
@@ -20,11 +20,11 @@ export default function Notifications() {
 
   useEffect(() => {
     loadSettings()
-  }, [])
+  }, [publicationId])
 
   const loadSettings = async () => {
     try {
-      const response = await fetch('/api/settings/slack')
+      const response = await fetch(`/api/settings/slack?publication_id=${publicationId}`)
       if (response.ok) {
         const data = await response.json()
         setSettings(prev => ({ ...prev, ...data }))
@@ -39,7 +39,7 @@ export default function Notifications() {
     setMessage('')
 
     try {
-      const response = await fetch('/api/settings/slack', {
+      const response = await fetch(`/api/settings/slack?publication_id=${publicationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)

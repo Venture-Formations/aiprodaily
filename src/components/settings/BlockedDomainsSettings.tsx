@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 
-export default function BlockedDomainsSettings() {
+export default function BlockedDomainsSettings({ publicationId }: { publicationId: string }) {
   const [blockedDomains, setBlockedDomains] = useState<string[]>([])
   const [suggestions, setSuggestions] = useState<{
     domain: string
@@ -22,8 +22,8 @@ export default function BlockedDomainsSettings() {
 
       // Fetch blocked domains and suggestions in parallel
       const [domainsRes, suggestionsRes] = await Promise.all([
-        fetch('/api/settings/blocked-domains'),
-        fetch('/api/settings/blocked-domains/suggestions')
+        fetch(`/api/settings/blocked-domains?publication_id=${publicationId}`),
+        fetch(`/api/settings/blocked-domains/suggestions?publication_id=${publicationId}`)
       ])
 
       if (domainsRes.ok) {
@@ -45,7 +45,7 @@ export default function BlockedDomainsSettings() {
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [publicationId])
 
   const showMessage = (msg: string, type: 'success' | 'error') => {
     setMessage(msg)
@@ -57,7 +57,7 @@ export default function BlockedDomainsSettings() {
     if (!newDomain.trim()) return
 
     try {
-      const res = await fetch('/api/settings/blocked-domains', {
+      const res = await fetch(`/api/settings/blocked-domains?publication_id=${publicationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ domain: newDomain.trim() })
@@ -79,7 +79,7 @@ export default function BlockedDomainsSettings() {
 
   const handleRemoveDomain = async (domain: string) => {
     try {
-      const res = await fetch('/api/settings/blocked-domains', {
+      const res = await fetch(`/api/settings/blocked-domains?publication_id=${publicationId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ domain })
@@ -100,7 +100,7 @@ export default function BlockedDomainsSettings() {
 
   const handleBlockSuggestion = async (domain: string) => {
     try {
-      const res = await fetch('/api/settings/blocked-domains', {
+      const res = await fetch(`/api/settings/blocked-domains?publication_id=${publicationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ domain })
@@ -121,7 +121,7 @@ export default function BlockedDomainsSettings() {
 
   const handleIgnoreSuggestion = async (domain: string) => {
     try {
-      const res = await fetch('/api/settings/blocked-domains/suggestions', {
+      const res = await fetch(`/api/settings/blocked-domains/suggestions?publication_id=${publicationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ domain })

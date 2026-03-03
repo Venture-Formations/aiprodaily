@@ -17,14 +17,32 @@ export default function DatabasesPage() {
   const slug = params?.slug as string || ''
   const [databases, setDatabases] = useState<DatabaseInfo[]>([])
   const [loading, setLoading] = useState(true)
+  const [publicationId, setPublicationId] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchDatabaseStats()
-  }, [])
+    // Resolve slug to publication_id
+    const resolvePublication = async () => {
+      try {
+        const res = await fetch(`/api/newsletters?slug=${slug}`)
+        if (res.ok) {
+          const data = await res.json()
+          const pub = data.newsletters?.find((n: any) => n.slug === slug)
+          if (pub) setPublicationId(pub.id)
+        }
+      } catch (err) {
+        console.error('Failed to resolve publication:', err)
+      }
+    }
+    if (slug) resolvePublication()
+  }, [slug])
+
+  useEffect(() => {
+    if (publicationId) fetchDatabaseStats()
+  }, [publicationId])
 
   const fetchDatabaseStats = async () => {
     try {
-      const response = await fetch('/api/databases/stats')
+      const response = await fetch(`/api/databases/stats?publication_id=${publicationId}`)
       if (response.ok) {
         const data = await response.json()
         // Add slug to all database hrefs

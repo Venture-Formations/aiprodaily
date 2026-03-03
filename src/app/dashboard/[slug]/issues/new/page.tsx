@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Layout from '@/components/Layout'
 
@@ -10,16 +10,36 @@ export default function NewissuePage() {
   const slug = params.slug as string
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [publicationId, setPublicationId] = useState<string | null>(null)
   const [date, setDate] = useState(() => {
     // Default to today's date
     const today = new Date()
     return today.toISOString().split('T')[0]
   })
 
+  // Resolve publication_id from slug
+  useEffect(() => {
+    if (slug) {
+      fetch('/api/newsletters')
+        .then(res => res.json())
+        .then(data => {
+          const pub = data.newsletters?.find((n: { slug: string; id: string }) => n.slug === slug)
+          if (pub) setPublicationId(pub.id)
+        })
+        .catch(console.error)
+    }
+  }, [slug])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
+
+    if (!publicationId) {
+      setError('Publication not found for this slug')
+      setLoading(false)
+      return
+    }
 
     try {
       const response = await fetch('/api/campaigns', {
@@ -27,7 +47,7 @@ export default function NewissuePage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ date }),
+        body: JSON.stringify({ date, publication_id: publicationId }),
       })
 
       const data = await response.json()

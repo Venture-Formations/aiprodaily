@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 
-export default function EmailSettings() {
+export default function EmailSettings({ publicationId }: { publicationId: string }) {
   const [settings, setSettings] = useState({
     // Email Provider Toggle
     emailProvider: 'mailerlite' as 'mailerlite' | 'sendgrid',
@@ -73,12 +73,12 @@ export default function EmailSettings() {
     loadLookbackHours()
     loadDedupSettings()
     loadSubjectLinePrompt()
-  }, [])
+  }, [publicationId])
 
   const loadSettings = async () => {
     try {
       console.log('FRONTEND: Loading email settings...')
-      const response = await fetch('/api/settings/email')
+      const response = await fetch(`/api/settings/email?publication_id=${publicationId}`)
       if (response.ok) {
         const data = await response.json()
         console.log('FRONTEND: Loaded settings from API:', data)
@@ -117,7 +117,7 @@ export default function EmailSettings() {
     console.log('FRONTEND: Saving email settings:', emailSettings)
 
     try {
-      const response = await fetch('/api/settings/email', {
+      const response = await fetch(`/api/settings/email?publication_id=${publicationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(emailSettings)
@@ -150,7 +150,7 @@ export default function EmailSettings() {
 
   const loadMaxArticles = async () => {
     try {
-      const response = await fetch('/api/settings/email')
+      const response = await fetch(`/api/settings/email?publication_id=${publicationId}`)
       if (response.ok) {
         const data = await response.json()
 
@@ -181,7 +181,7 @@ export default function EmailSettings() {
     setMessage('')
 
     try {
-      const response = await fetch('/api/settings/email', {
+      const response = await fetch(`/api/settings/email?publication_id=${publicationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -206,7 +206,7 @@ export default function EmailSettings() {
 
   const loadLookbackHours = async () => {
     try {
-      const response = await fetch('/api/settings/email')
+      const response = await fetch(`/api/settings/email?publication_id=${publicationId}`)
       if (response.ok) {
         const data = await response.json()
 
@@ -236,7 +236,7 @@ export default function EmailSettings() {
     setMessage('')
 
     try {
-      const response = await fetch('/api/settings/email', {
+      const response = await fetch(`/api/settings/email?publication_id=${publicationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -261,7 +261,7 @@ export default function EmailSettings() {
 
   const loadDedupSettings = async () => {
     try {
-      const response = await fetch('/api/settings/email')
+      const response = await fetch(`/api/settings/email?publication_id=${publicationId}`)
       if (response.ok) {
         const data = await response.json()
 
@@ -291,7 +291,7 @@ export default function EmailSettings() {
     setMessage('')
 
     try {
-      const response = await fetch('/api/settings/email', {
+      const response = await fetch(`/api/settings/email?publication_id=${publicationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -357,7 +357,7 @@ export default function EmailSettings() {
   // Subject Line Prompt functions
   const loadSubjectLinePrompt = async () => {
     try {
-      const response = await fetch('/api/settings/ai-prompts')
+      const response = await fetch(`/api/settings/ai-prompts?publication_id=${publicationId}`)
       if (response.ok) {
         const data = await response.json()
         const subjectPrompt = data.prompts?.find((p: any) => p.key === 'ai_prompt_subject_line')
@@ -396,7 +396,7 @@ export default function EmailSettings() {
     setMessage('')
 
     try {
-      const response = await fetch('/api/settings/ai-prompts', {
+      const response = await fetch(`/api/settings/ai-prompts?publication_id=${publicationId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -433,7 +433,7 @@ export default function EmailSettings() {
     setMessage('')
 
     try {
-      const response = await fetch('/api/settings/ai-prompts', {
+      const response = await fetch(`/api/settings/ai-prompts?publication_id=${publicationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: 'ai_prompt_subject_line' })
@@ -467,7 +467,7 @@ export default function EmailSettings() {
     setMessage('')
 
     try {
-      const response = await fetch('/api/settings/ai-prompts', {
+      const response = await fetch(`/api/settings/ai-prompts?publication_id=${publicationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

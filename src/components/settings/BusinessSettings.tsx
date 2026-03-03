@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 
-export default function BusinessSettings() {
+export default function BusinessSettings({ publicationId }: { publicationId: string }) {
   const [settings, setSettings] = useState({
     newsletter_name: '',
     business_name: '',
@@ -46,11 +46,11 @@ export default function BusinessSettings() {
 
   useEffect(() => {
     loadSettings()
-  }, [])
+  }, [publicationId])
 
   const loadSettings = async () => {
     try {
-      const response = await fetch('/api/settings/business')
+      const response = await fetch(`/api/settings/business?publication_id=${publicationId}`)
       if (response.ok) {
         const data = await response.json()
         setSettings(prev => ({ ...prev, ...data }))
@@ -67,7 +67,7 @@ export default function BusinessSettings() {
     setMessage('')
 
     try {
-      const response = await fetch('/api/settings/business', {
+      const response = await fetch(`/api/settings/business?publication_id=${publicationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
@@ -96,6 +96,7 @@ export default function BusinessSettings() {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('type', type)
+      formData.append('publication_id', publicationId)
 
       // Upload to server
       const uploadResponse = await fetch('/api/settings/upload-business-image', {

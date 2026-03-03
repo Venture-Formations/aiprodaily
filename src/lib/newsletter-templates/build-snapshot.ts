@@ -40,6 +40,7 @@ export async function buildIssueSnapshot(
     supabaseAdmin
       .from('newsletter_sections')
       .select(NEWSLETTER_SECTION_COLS)
+      .eq('newsletter_id', issue.publication_id)
       .eq('is_active', true)
       .order('display_order', { ascending: true }),
     supabaseAdmin

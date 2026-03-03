@@ -1,22 +1,22 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
+
+/** Resolve publication_id from query param (no fallback — caller must provide it) */
+function resolvePublicationId(request: NextRequest): string | null {
+  return request.nextUrl.searchParams.get('publication_id')
+}
 
 // GET - Fetch all AI prompts with weights for criteria
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/ai-prompts' },
-  async () => {
-    // Get user's publication_id (use first active newsletter for now)
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (!newsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+  async ({ request }) => {
+    const publicationId = resolvePublicationId(request)
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
+
+    const newsletter = { id: publicationId }
 
     const { data: prompts, error } = await supabaseAdmin
       .from('publication_settings')
@@ -100,17 +100,12 @@ export const GET = withApiHandler(
 export const PATCH = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/ai-prompts' },
   async ({ request }) => {
-    // Get user's publication_id (use first active newsletter for now)
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (!newsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    const publicationId = resolvePublicationId(request)
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
+
+    const newsletter = { id: publicationId }
 
     const body = await request.json()
     const { key, value, ai_provider } = body
@@ -189,17 +184,12 @@ export const PATCH = withApiHandler(
 export const POST = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/ai-prompts' },
   async ({ request }) => {
-    // Get user's publication_id (use first active newsletter for now)
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (!newsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    const publicationId = resolvePublicationId(request)
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
+
+    const newsletter = { id: publicationId }
 
     const body = await request.json()
     const { key, action } = body

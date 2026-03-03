@@ -19,21 +19,13 @@ function extractDomain(url: string): string | null {
  */
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/blocked-domains/suggestions' },
-  async () => {
-    // Get the first active newsletter for publication_id
-    const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (newsletterError || !newsletter) {
-      return NextResponse.json(
-        { error: 'No active newsletter found' },
-        { status: 404 }
-      )
+  async ({ request }) => {
+    const publicationId = request.nextUrl.searchParams.get('publication_id')
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
+
+    const newsletter = { id: publicationId }
 
     // Get current blocked domains to exclude from suggestions
     const { data: blockedSettings } = await supabaseAdmin
@@ -158,6 +150,11 @@ export const GET = withApiHandler(
 export const POST = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/blocked-domains/suggestions' },
   async ({ request }) => {
+    const publicationId = request.nextUrl.searchParams.get('publication_id')
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
+    }
+
     const body = await request.json()
     const { domain } = body
 
@@ -170,20 +167,7 @@ export const POST = withApiHandler(
 
     const normalizedDomain = domain.toLowerCase().replace(/^www\./, '').trim()
 
-    // Get the first active newsletter for publication_id
-    const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (newsletterError || !newsletter) {
-      return NextResponse.json(
-        { error: 'No active newsletter found' },
-        { status: 404 }
-      )
-    }
+    const newsletter = { id: publicationId }
 
     // Get current ignored domains
     const { data: currentSettings } = await supabaseAdmin

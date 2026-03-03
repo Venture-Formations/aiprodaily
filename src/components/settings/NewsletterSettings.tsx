@@ -195,12 +195,14 @@ function NewsletterSettings() {
   }, [pathname])
 
   useEffect(() => {
-    fetchSections()
-  }, [])
+    if (publicationId) {
+      fetchSections()
+    }
+  }, [publicationId])
 
   const fetchSections = async () => {
     try {
-      const response = await fetch('/api/settings/newsletter-sections')
+      const response = await fetch(`/api/settings/newsletter-sections?publication_id=${publicationId}`)
       if (response.ok) {
         const data = await response.json()
         setSections(data.sections || [])
@@ -249,6 +251,7 @@ function NewsletterSettings() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          publication_id: publicationId,
           sections: updatedSections.map(s => ({
             id: s.id,
             display_order: s.display_order
@@ -300,6 +303,7 @@ function NewsletterSettings() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          publication_id: publicationId,
           section_id: sectionId,
           is_active: isActive
         })
@@ -331,6 +335,7 @@ function NewsletterSettings() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          publication_id: publicationId,
           section_id: sectionId,
           name: newName
         })

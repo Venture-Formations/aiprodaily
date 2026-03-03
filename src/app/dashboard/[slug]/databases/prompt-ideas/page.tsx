@@ -1,10 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
 import Layout from '@/components/Layout'
 import type { PromptIdea } from '@/types/database'
 
 export default function PromptIdeasPage() {
+  const params = useParams()
+  const slug = params?.slug as string || ''
+  const [publicationId, setPublicationId] = useState<string | null>(null)
   const [prompts, setPrompts] = useState<PromptIdea[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -22,13 +26,29 @@ export default function PromptIdeasPage() {
   const [uploadMessage, setUploadMessage] = useState('')
 
   useEffect(() => {
-    fetchPrompts()
-  }, [])
+    const resolvePublication = async () => {
+      try {
+        const res = await fetch(`/api/newsletters?slug=${slug}`)
+        if (res.ok) {
+          const data = await res.json()
+          const pub = data.newsletters?.find((n: any) => n.slug === slug)
+          if (pub) setPublicationId(pub.id)
+        }
+      } catch (err) {
+        console.error('Failed to resolve publication:', err)
+      }
+    }
+    if (slug) resolvePublication()
+  }, [slug])
+
+  useEffect(() => {
+    if (publicationId) fetchPrompts()
+  }, [publicationId])
 
   const fetchPrompts = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/prompt-ideas')
+      const response = await fetch(`/api/prompt-ideas?publication_id=${publicationId}`)
       if (response.ok) {
         const data = await response.json()
         setPrompts(data.prompts || [])
@@ -55,7 +75,7 @@ export default function PromptIdeasPage() {
       const response = await fetch(`/api/prompt-ideas/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm)
+        body: JSON.stringify({ ...editForm, publication_id: publicationId })
       })
 
       if (response.ok) {
@@ -72,7 +92,7 @@ export default function PromptIdeasPage() {
     if (!confirm(`Are you sure you want to delete "${title}"?`)) return
 
     try {
-      const response = await fetch(`/api/prompt-ideas/${id}`, {
+      const response = await fetch(`/api/prompt-ideas/${id}?publication_id=${publicationId}`, {
         method: 'DELETE'
       })
 
@@ -94,7 +114,7 @@ export default function PromptIdeasPage() {
       const response = await fetch('/api/prompt-ideas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(addForm)
+        body: JSON.stringify({ ...addForm, publication_id: publicationId })
       })
 
       if (response.ok) {
@@ -120,6 +140,9 @@ export default function PromptIdeasPage() {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      if (publicationId) {
+        formData.append('publication_id', publicationId)
+      }
 
       const response = await fetch('/api/prompt-ideas/upload', {
         method: 'POST',

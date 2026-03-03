@@ -1,10 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
 import Layout from '@/components/Layout'
 import type { AIApplication, AIAppModule } from '@/types/database'
 
 export default function AIApplicationsPage() {
+  const params = useParams()
+  const slug = params?.slug as string || ''
+  const [publicationId, setPublicationId] = useState<string | null>(null)
   const [apps, setApps] = useState<AIApplication[]>([])
   const [modules, setModules] = useState<AIAppModule[]>([])
   const [loading, setLoading] = useState(true)
@@ -34,14 +38,42 @@ export default function AIApplicationsPage() {
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
-    fetchApps()
-    fetchModules()
-  }, [])
+    const resolvePublication = async () => {
+      try {
+        const res = await fetch(`/api/newsletters?slug=${slug}`)
+        if (res.ok) {
+          const data = await res.json()
+          const pub = data.newsletters?.find((n: any) => n.slug === slug)
+          if (pub) {
+            console.log(`[AI Apps] Resolved slug "${slug}" to publication_id: ${pub.id} (${pub.name})`)
+            setPublicationId(pub.id)
+          } else {
+            console.error(`[AI Apps] No publication found with slug "${slug}". Available:`, data.newsletters?.map((n: any) => n.slug))
+            setLoading(false)
+          }
+        } else {
+          console.error('[AI Apps] Failed to fetch newsletters:', res.status)
+          setLoading(false)
+        }
+      } catch (err) {
+        console.error('Failed to resolve publication:', err)
+        setLoading(false)
+      }
+    }
+    if (slug) resolvePublication()
+  }, [slug])
+
+  useEffect(() => {
+    if (publicationId) {
+      fetchApps()
+      fetchModules()
+    }
+  }, [publicationId])
 
   const fetchApps = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/ai-apps')
+      const response = await fetch(`/api/ai-apps?publication_id=${publicationId}`)
       if (response.ok) {
         const data = await response.json()
         setApps(data.apps || [])
@@ -80,7 +112,7 @@ export default function AIApplicationsPage() {
       const response = await fetch(`/api/ai-apps/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm)
+        body: JSON.stringify({ ...editForm, publication_id: publicationId })
       })
 
       if (response.ok) {
@@ -97,7 +129,7 @@ export default function AIApplicationsPage() {
     if (!confirm(`Are you sure you want to delete "${appName}"?`)) return
 
     try {
-      const response = await fetch(`/api/ai-apps/${id}`, {
+      const response = await fetch(`/api/ai-apps/${id}?publication_id=${publicationId}`, {
         method: 'DELETE'
       })
 
@@ -115,11 +147,17 @@ export default function AIApplicationsPage() {
       return
     }
 
+    if (!publicationId) {
+      alert('Error: Publication not resolved. Cannot create app without publication_id.')
+      return
+    }
+
     try {
+      console.log(`[AI Apps] Creating app with publication_id: ${publicationId}`)
       const response = await fetch('/api/ai-apps', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(addForm)
+        body: JSON.stringify({ ...addForm, publication_id: publicationId })
       })
 
       if (response.ok) {
@@ -138,6 +176,10 @@ export default function AIApplicationsPage() {
           is_affiliate: false,
           ai_app_module_id: null
         })
+      } else {
+        const errData = await response.json().catch(() => ({}))
+        console.error('[AI Apps] POST failed:', response.status, errData)
+        alert(`Failed to add application: ${errData.error || response.statusText}`)
       }
     } catch (error) {
       console.error('Failed to add application:', error)
@@ -150,8 +192,15 @@ export default function AIApplicationsPage() {
     setShowUploadModal(false)
 
     try {
+      if (!publicationId) {
+        setUploadMessage('Error: publication not resolved. Please reload the page.')
+        setUploadingCSV(false)
+        return
+      }
+
       const formData = new FormData()
       formData.append('file', file)
+      formData.append('publication_id', publicationId)
       if (uploadModuleId) {
         formData.append('module_id', uploadModuleId)
       }

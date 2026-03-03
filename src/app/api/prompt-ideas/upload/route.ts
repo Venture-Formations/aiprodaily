@@ -7,9 +7,14 @@ export const POST = withApiHandler(
   async ({ request, logger }) => {
     const formData = await request.formData()
     const file = formData.get('file') as File
+    const publicationId = formData.get('publication_id') as string | null
 
     if (!file) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
+    }
+
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
 
     // Read CSV file
@@ -164,21 +169,10 @@ export const POST = withApiHandler(
       return NextResponse.json({ error: 'No valid prompts found in CSV' }, { status: 400 })
     }
 
-    // Get accounting newsletter ID
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('slug', 'accounting')
-      .single()
-
-    if (!newsletter) {
-      return NextResponse.json({ error: 'Newsletter not found' }, { status: 404 })
-    }
-
     // Add publication_id and times_used to all prompts
     const promptsWithNewsletterId = prompts.map(prompt => ({
       ...prompt,
-      publication_id: newsletter.id,
+      publication_id: publicationId,
       times_used: 0
     }))
 

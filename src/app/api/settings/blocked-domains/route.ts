@@ -14,21 +14,13 @@ function normalizeDomain(domain: string): string {
  */
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/blocked-domains' },
-  async () => {
-    // Get the first active newsletter for publication_id
-    const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (newsletterError || !newsletter) {
-      return NextResponse.json(
-        { error: 'No active newsletter found' },
-        { status: 404 }
-      )
+  async ({ request }) => {
+    const publicationId = request.nextUrl.searchParams.get('publication_id')
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
+
+    const newsletter = { id: publicationId }
 
     // Get blocked domains from settings table
     const { data: settings, error: settingsError } = await supabaseAdmin
@@ -60,6 +52,11 @@ export const GET = withApiHandler(
 export const POST = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/blocked-domains' },
   async ({ request }) => {
+    const publicationId = request.nextUrl.searchParams.get('publication_id')
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
+    }
+
     const body = await request.json()
     const { domain } = body
 
@@ -79,20 +76,7 @@ export const POST = withApiHandler(
       )
     }
 
-    // Get the first active newsletter for publication_id
-    const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (newsletterError || !newsletter) {
-      return NextResponse.json(
-        { error: 'No active newsletter found' },
-        { status: 404 }
-      )
-    }
+    const newsletter = { id: publicationId }
 
     // Get current blocked domains
     const { data: currentSettings } = await supabaseAdmin
@@ -151,6 +135,11 @@ export const POST = withApiHandler(
 export const DELETE = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/blocked-domains' },
   async ({ request }) => {
+    const publicationId = request.nextUrl.searchParams.get('publication_id')
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
+    }
+
     const body = await request.json()
     const { domain } = body
 
@@ -163,20 +152,7 @@ export const DELETE = withApiHandler(
 
     const normalizedDomain = normalizeDomain(domain)
 
-    // Get the first active newsletter for publication_id
-    const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (newsletterError || !newsletter) {
-      return NextResponse.json(
-        { error: 'No active newsletter found' },
-        { status: 404 }
-      )
-    }
+    const newsletter = { id: publicationId }
 
     // Get current blocked domains
     const { data: currentSettings } = await supabaseAdmin

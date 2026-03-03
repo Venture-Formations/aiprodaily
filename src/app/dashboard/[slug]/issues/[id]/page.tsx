@@ -108,8 +108,6 @@ export default function IssueDetailPage() {
     if (params.id) {
       fetchissue(params.id as string)
       fetchissueEvents(params.id as string)
-      fetchNewsletterSections()
-      fetchCriteriaConfig()
     }
   }, [params.id])
 
@@ -146,10 +144,12 @@ export default function IssueDetailPage() {
     return () => clearInterval(pollInterval)
   }, [issue?.status, issue?.id])
 
-  // Fetch article modules sum when publication_id is available
+  // Fetch publication-scoped data when publication_id is available
   useEffect(() => {
     if (issue?.publication_id) {
       fetchArticleModulesSum(issue.publication_id)
+      fetchNewsletterSections(issue.publication_id)
+      fetchCriteriaConfig(issue.publication_id)
     }
   }, [issue?.publication_id])
 
@@ -189,9 +189,9 @@ export default function IssueDetailPage() {
     }
   }
 
-  const fetchCriteriaConfig = async () => {
+  const fetchCriteriaConfig = async (publicationId: string) => {
     try {
-      const response = await fetch('/api/settings/email')
+      const response = await fetch(`/api/settings/email?publication_id=${publicationId}`)
       if (response.ok) {
         const data = await response.json()
 
@@ -272,10 +272,10 @@ export default function IssueDetailPage() {
     }
   }
 
-  const fetchNewsletterSections = async () => {
+  const fetchNewsletterSections = async (publicationId: string) => {
     setLoadingSections(true)
     try {
-      const response = await fetch('/api/settings/newsletter-sections')
+      const response = await fetch(`/api/settings/newsletter-sections?publication_id=${publicationId}`)
       if (response.ok) {
         const data = await response.json()
         setNewsletterSections(data.sections || [])

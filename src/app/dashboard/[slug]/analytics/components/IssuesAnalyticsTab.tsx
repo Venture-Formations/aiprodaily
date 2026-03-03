@@ -71,7 +71,7 @@ export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
   const fetchFeedbackAnalytics = async () => {
     try {
       setFeedbackLoading(true)
-      const response = await fetch(`/api/feedback/analytics?days=${selectedTimeframe}`)
+      const response = await fetch(`/api/feedback/analytics?newsletter_slug=${slug}&days=${selectedTimeframe}`)
       if (response.ok) {
         const data = await response.json()
         setFeedbackAnalytics(data.analytics)
@@ -86,7 +86,7 @@ export default function IssuesAnalyticsTab({ slug, excludeIps = true }: Props) {
   const fetchLinkClickAnalytics = async () => {
     try {
       setLinkClickLoading(true)
-      const response = await fetch(`/api/link-tracking/analytics?days=${selectedTimeframe}&exclude_ips=${excludeIps}`)
+      const response = await fetch(`/api/link-tracking/analytics?newsletter_slug=${slug}&days=${selectedTimeframe}&exclude_ips=${excludeIps}`)
       if (response.ok) {
         const data = await response.json()
         setLinkClickAnalytics(data.analytics)

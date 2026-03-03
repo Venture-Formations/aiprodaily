@@ -190,25 +190,28 @@ export default function NewPublicationPage() {
 
         if (logoFile) {
           const logoUrl = await uploadImage(logoFile, 'logo')
-          // Update the setting
+          // Save logo_url to publication_settings
           await fetch('/api/settings/publication', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               publication_id: publicationId,
-              settings: { logo_url: logoUrl },
+              key: 'logo_url',
+              value: logoUrl,
             }),
           })
         }
 
         if (headerFile) {
           const headerImageUrl = await uploadImage(headerFile, 'header')
+          // Save header_image_url to publication_settings
           await fetch('/api/settings/publication', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               publication_id: publicationId,
-              settings: { header_image_url: headerImageUrl },
+              key: 'header_image_url',
+              value: headerImageUrl,
             }),
           })
         }

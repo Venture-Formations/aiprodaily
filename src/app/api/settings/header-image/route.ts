@@ -4,18 +4,13 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/header-image' },
-  async () => {
-    // Get user's publication_id (use first active newsletter for now)
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (!newsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+  async ({ request }) => {
+    const publicationId = request.nextUrl.searchParams.get('publication_id')
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
+
+    const newsletter = { id: publicationId }
 
     const { data: settings } = await supabaseAdmin
       .from('publication_settings')
