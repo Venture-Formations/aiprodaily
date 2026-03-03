@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-
-const PROMPT_COLS = 'id, publication_id, prompt_module_id, title, prompt_text, category, use_case, suggested_model, difficulty_level, is_featured, is_active, display_order, priority, times_used, created_at, updated_at'
+import { PROMPT_COLS } from '@/lib/column-constants'
 
 // GET - List all prompt ideas
 export const GET = withApiHandler(
