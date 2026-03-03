@@ -2,28 +2,18 @@ import { NextResponse, NextRequest } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-/** Resolve publication_id from query param, falling back to first active publication */
-async function resolvePublicationId(request: NextRequest): Promise<string | null> {
-  const fromParam = request.nextUrl.searchParams.get('publication_id')
-  if (fromParam) return fromParam
-
-  const { data: pub } = await supabaseAdmin
-    .from('publications')
-    .select('id')
-    .eq('is_active', true)
-    .limit(1)
-    .single()
-
-  return pub?.id || null
+/** Resolve publication_id from query param (no fallback — caller must provide it) */
+function resolvePublicationId(request: NextRequest): string | null {
+  return request.nextUrl.searchParams.get('publication_id')
 }
 
 // GET - Fetch all AI prompts with weights for criteria
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/ai-prompts' },
   async ({ request }) => {
-    const publicationId = await resolvePublicationId(request)
+    const publicationId = resolvePublicationId(request)
     if (!publicationId) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
 
     const newsletter = { id: publicationId }
@@ -110,9 +100,9 @@ export const GET = withApiHandler(
 export const PATCH = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/ai-prompts' },
   async ({ request }) => {
-    const publicationId = await resolvePublicationId(request)
+    const publicationId = resolvePublicationId(request)
     if (!publicationId) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
 
     const newsletter = { id: publicationId }
@@ -194,9 +184,9 @@ export const PATCH = withApiHandler(
 export const POST = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/ai-prompts' },
   async ({ request }) => {
-    const publicationId = await resolvePublicationId(request)
+    const publicationId = resolvePublicationId(request)
     if (!publicationId) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
 
     const newsletter = { id: publicationId }

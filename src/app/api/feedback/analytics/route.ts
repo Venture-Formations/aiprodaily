@@ -23,6 +23,10 @@ export const GET = withApiHandler(
       if (pub) publicationId = pub.id
     }
 
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id or newsletter_slug is required' }, { status: 400 })
+    }
+
     // Calculate date range
     const endDate = new Date()
     const startDate = new Date()
@@ -51,20 +55,14 @@ export const GET = withApiHandler(
       excludedIpCount = exclusions.length
     }
 
-    // Fetch feedback responses within date range
-    let query = supabaseAdmin
+    // Fetch feedback responses within date range, scoped to publication
+    const { data: responsesRaw, error } = await supabaseAdmin
       .from('feedback_responses')
-      .select('*')
+      .select('id, publication_id, campaign_date, section_choice, ip_address, mailerlite_updated, created_at')
+      .eq('publication_id', publicationId)
       .gte('campaign_date', startDateStr)
       .lte('campaign_date', endDateStr)
       .order('created_at', { ascending: false })
-
-    // Filter by publication_id if provided
-    if (publicationId) {
-      query = query.eq('publication_id', publicationId)
-    }
-
-    const { data: responsesRaw, error } = await query
 
     if (error) {
       console.error('[Feedback Analytics] Error fetching responses:', error)

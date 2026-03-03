@@ -11,16 +11,16 @@ export const GET = withApiHandler(
     const { id } = params
     const publicationId = new URL(request.url).searchParams.get('publication_id')
 
-    let query = supabaseAdmin
+    if (!publicationId) {
+      return NextResponse.json({ success: false, error: 'publication_id is required' }, { status: 400 })
+    }
+
+    const { data: app, error } = await supabaseAdmin
       .from('ai_applications')
       .select('id, publication_id, app_name, tagline, description, category, app_url, logo_url, logo_alt, screenshot_url, screenshot_alt, tool_type, category_priority, pinned_position, is_active, is_featured, is_paid_placement, is_affiliate, ai_app_module_id, times_used, last_used_date, created_at, updated_at')
       .eq('id', id)
-
-    if (publicationId) {
-      query = query.eq('publication_id', publicationId)
-    }
-
-    const { data: app, error } = await query.single()
+      .eq('publication_id', publicationId)
+      .single()
 
     if (error) {
       if (error.code === 'PGRST116') {
@@ -49,6 +49,10 @@ export const PATCH = withApiHandler(
     const body = await request.json()
     const { publication_id, ...updateFields } = body
 
+    if (!publication_id) {
+      return NextResponse.json({ success: false, error: 'publication_id is required' }, { status: 400 })
+    }
+
     // Build update object with validation
     const updates: Record<string, unknown> = {
       ...updateFields,
@@ -71,16 +75,12 @@ export const PATCH = withApiHandler(
       }
     }
 
-    let query = supabaseAdmin
+    const { data: app, error } = await supabaseAdmin
       .from('ai_applications')
       .update(updates)
       .eq('id', id)
-
-    if (publication_id) {
-      query = query.eq('publication_id', publication_id)
-    }
-
-    const { data: app, error } = await query.select().single()
+      .eq('publication_id', publication_id)
+      .select().single()
 
     if (error) throw error
 
@@ -100,16 +100,15 @@ export const DELETE = withApiHandler(
     const { id } = params
     const publicationId = new URL(request.url).searchParams.get('publication_id')
 
-    let query = supabaseAdmin
+    if (!publicationId) {
+      return NextResponse.json({ success: false, error: 'publication_id is required' }, { status: 400 })
+    }
+
+    const { error } = await supabaseAdmin
       .from('ai_applications')
       .delete()
       .eq('id', id)
-
-    if (publicationId) {
-      query = query.eq('publication_id', publicationId)
-    }
-
-    const { error } = await query
+      .eq('publication_id', publicationId)
 
     if (error) throw error
 

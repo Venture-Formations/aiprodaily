@@ -192,11 +192,15 @@ export default function AIApplicationsPage() {
     setShowUploadModal(false)
 
     try {
+      if (!publicationId) {
+        setUploadMessage('Error: publication not resolved. Please reload the page.')
+        setUploadingCSV(false)
+        return
+      }
+
       const formData = new FormData()
       formData.append('file', file)
-      if (publicationId) {
-        formData.append('publication_id', publicationId)
-      }
+      formData.append('publication_id', publicationId)
       if (uploadModuleId) {
         formData.append('module_id', uploadModuleId)
       }

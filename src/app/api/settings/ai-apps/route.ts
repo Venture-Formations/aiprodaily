@@ -22,12 +22,17 @@ export const GET = withApiHandler(
 
     const newsletter = { id: publicationId }
 
-    const { data: settings } = await supabaseAdmin
+    const { data: settings, error } = await supabaseAdmin
       .from('publication_settings')
       .select('key, value, description')
       .eq('publication_id', newsletter.id)
       .in('key', VALID_SETTING_KEYS)
       .order('key')
+
+    if (error) {
+      logger.error({ err: error }, 'Failed to fetch AI app settings')
+      throw error
+    }
 
     // Convert to flat object for easier editing
     const settingsMap: Record<string, any> = {}
