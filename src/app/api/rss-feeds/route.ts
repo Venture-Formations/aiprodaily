@@ -18,7 +18,7 @@ export const GET = withApiHandler(
     // Fetch RSS feeds for this publication
     const { data: feeds, error } = await supabaseAdmin
       .from('rss_feeds')
-      .select('*')
+      .select('id, publication_id, url, name, description, active, last_processed, processing_errors, last_error, use_for_primary_section, use_for_secondary_section, article_module_id, created_at, updated_at')
       .eq('publication_id', publicationId)
       .order('created_at', { ascending: false })
 

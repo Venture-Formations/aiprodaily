@@ -47,7 +47,7 @@ export class FeedIngestion {
       try {
         const { data: allFeeds } = await supabaseAdmin
           .from('rss_feeds')
-          .select('*')
+          .select('id, url, name, article_module_id')
           .eq('active', true)
           .eq('publication_id', pub.id)
 
@@ -210,7 +210,7 @@ export class FeedIngestion {
       if (newPosts.length > 0) {
         const { data: fullPosts } = await supabaseAdmin
           .from('rss_posts')
-          .select('*')
+          .select('id, title, description, content, source_url, full_article_text, article_module_id')
           .in('id', newPosts.map(p => p.id))
 
         if (fullPosts && fullPosts.length > 0) {
