@@ -16,7 +16,7 @@ const log = createLogger({ module: 'dal:issues' })
 
 // Column sets for consistent select lists (only columns that exist on publication_issues)
 // Note: mailerlite_issue_id lives in email_metrics; not on publication_issues
-const ISSUE_COLUMNS = `
+export const ISSUE_COLUMNS = `
   id, publication_id, date, status,
   subject_line, welcome_intro, welcome_tagline, welcome_summary,
   review_sent_at, final_sent_at,
@@ -28,7 +28,7 @@ const ISSUE_COLUMNS = `
   created_at, updated_at
 ` as const
 
-const ISSUE_COLUMNS_BRIEF = `
+export const ISSUE_COLUMNS_BRIEF = `
   id, publication_id, date, status,
   subject_line, workflow_state, workflow_error,
   review_sent_at, final_sent_at,

@@ -4,8 +4,8 @@ import { getNewsletterIdFromIssue, logInfo, logError, formatError } from './shar
 
 // Explicit column lists (no select('*'))
 const ISSUE_COLS_FOR_EVENTS = `id, publication_id, date`
-const EVENT_COLS = `id, title, description, event_summary, start_date, end_date, venue, address, url, website, image_url, original_image_url, cropped_image_url, featured, paid_placement, active, created_at`
-const ISSUE_EVENT_COLS = `id, issue_id, event_id, event_date, is_selected, is_featured, display_order, created_at`
+export const EVENT_COLS = `id, title, description, event_summary, start_date, end_date, venue, address, url, website, image_url, original_image_url, cropped_image_url, featured, paid_placement, active, created_at`
+export const ISSUE_EVENT_COLS = `id, issue_id, event_id, event_date, is_selected, is_featured, display_order, created_at`
 
 /**
  * Utility methods module.

@@ -5,14 +5,14 @@ import { fetchBusinessSettings } from './helpers'
 import type { IssueSnapshot, SectionItem } from './types'
 
 // Explicit column lists for module config tables (no select('*'))
-const NEWSLETTER_SECTION_COLS = `id, newsletter_id, name, display_order, is_active, section_type, description, created_at`
-const AD_MODULE_COLS = `id, publication_id, name, display_order, is_active, selection_mode, block_order, config, next_position, created_at, updated_at`
-const POLL_MODULE_COLS = `id, publication_id, name, display_order, is_active, block_order, config, created_at, updated_at`
-const PROMPT_MODULE_COLS = `id, publication_id, name, display_order, is_active, selection_mode, block_order, config, next_position, created_at, updated_at`
-const ARTICLE_MODULE_COLS = `id, publication_id, name, display_order, is_active, selection_mode, block_order, config, articles_count, lookback_hours, ai_image_prompt, created_at, updated_at`
-const TEXT_BOX_MODULE_COLS = `id, publication_id, name, display_order, is_active, show_name, config, created_at, updated_at`
-const TEXT_BOX_BLOCK_COLS = `id, text_box_module_id, block_type, display_order, static_content, text_size, ai_prompt_json, generation_timing, image_type, static_image_url, ai_image_prompt, is_active, is_bold, is_italic, created_at, updated_at`
-const FEEDBACK_MODULE_COLS = `id, publication_id, name, display_order, is_active, block_order, title_text, body_text, body_is_italic, sign_off_text, sign_off_is_italic, vote_options, team_photos, config, show_name, created_at, updated_at`
+export const NEWSLETTER_SECTION_COLS = `id, newsletter_id, name, display_order, is_active, section_type, description, created_at`
+export const AD_MODULE_COLS = `id, publication_id, name, display_order, is_active, selection_mode, block_order, config, next_position, created_at, updated_at`
+export const POLL_MODULE_COLS = `id, publication_id, name, display_order, is_active, block_order, config, created_at, updated_at`
+export const PROMPT_MODULE_COLS = `id, publication_id, name, display_order, is_active, selection_mode, block_order, config, next_position, created_at, updated_at`
+export const ARTICLE_MODULE_COLS = `id, publication_id, name, display_order, is_active, selection_mode, block_order, config, articles_count, lookback_hours, ai_image_prompt, created_at, updated_at`
+export const TEXT_BOX_MODULE_COLS = `id, publication_id, name, display_order, is_active, show_name, config, created_at, updated_at`
+export const TEXT_BOX_BLOCK_COLS = `id, text_box_module_id, block_type, display_order, static_content, text_size, ai_prompt_json, generation_timing, image_type, static_image_url, ai_image_prompt, is_active, is_bold, is_italic, created_at, updated_at`
+export const FEEDBACK_MODULE_COLS = `id, publication_id, name, display_order, is_active, block_order, title_text, body_text, body_is_italic, sign_off_text, sign_off_is_italic, vote_options, team_photos, config, show_name, created_at, updated_at`
 
 /**
  * Build an IssueSnapshot by fetching all module configs and business settings in parallel.

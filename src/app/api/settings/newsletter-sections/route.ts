@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-
-const SECTION_COLS = 'id, newsletter_id, name, display_order, is_active, section_type, description, created_at'
+import { SECTION_COLS } from '@/lib/column-constants'
 
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/newsletter-sections' },
