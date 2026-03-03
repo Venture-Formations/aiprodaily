@@ -10,68 +10,108 @@ function maskEmail(email: string): string {
   return `${masked}@${domain}`
 }
 
-export const GET = withApiHandler(
-  { authTier: 'public', logContext: 'afteroffers/postback' },
-  async ({ request, logger }) => {
-    const url = new URL(request.url)
-    const searchParams = url.searchParams
+async function handlePostback(request: Request, logger: ReturnType<typeof import('@/lib/logger').createLogger>) {
+  const url = new URL(request.url)
+  const searchParams = url.searchParams
 
-    const clickId = searchParams.get('click_id') || ''
-    const revenueRaw = searchParams.get('revenue')
-    const email = searchParams.get('email') || undefined
-    const eventParam = searchParams.get('event') || searchParams.get('action') || undefined
-
-    if (!clickId) {
-      return NextResponse.json(
-        { error: 'click_id is required' },
-        { status: 400 }
-      )
+  // Capture POST body if present
+  let body: Record<string, unknown> | null = null
+  if (request.method === 'POST') {
+    try {
+      body = await request.json()
+    } catch {
+      try {
+        const text = await request.text()
+        if (text) body = { _raw_text: text }
+      } catch { /* no body */ }
     }
+  }
 
-    const eventType = eventParam && eventParam.trim() !== '' ? eventParam : 'conversion'
+  // Merge query params and body — body fields take precedence
+  const params: Record<string, string> = Object.fromEntries(searchParams.entries())
+  const merged = { ...params, ...(body || {}) }
 
-    let revenue: number | null = null
-    if (revenueRaw != null) {
-      const parsed = Number(revenueRaw)
-      if (!Number.isNaN(parsed)) {
-        revenue = parsed
-      } else {
-        logger.warn({ revenueRaw }, 'Invalid revenue value in AfterOffers postback')
-      }
+  const clickId = String(merged.click_id || '') || ''
+  const revenueRaw = merged.revenue != null ? String(merged.revenue) : null
+  const email = String(merged.email || '') || undefined
+  const eventParam = String(merged.event || merged.action || '') || undefined
+
+  if (!clickId) {
+    return NextResponse.json(
+      { error: 'click_id is required' },
+      { status: 400 }
+    )
+  }
+
+  const eventType = eventParam && eventParam.trim() !== '' ? eventParam : 'conversion'
+
+  let revenue: number | null = null
+  if (revenueRaw != null) {
+    const parsed = Number(revenueRaw)
+    if (!Number.isNaN(parsed)) {
+      revenue = parsed
+    } else {
+      logger.warn({ revenueRaw }, 'Invalid revenue value in AfterOffers postback')
     }
+  }
 
-    const rawPayload = Object.fromEntries(searchParams.entries())
-
-    // Upsert to handle webhook replays — unique on (publication_id, click_id, event_type)
-    const { error } = await supabaseAdmin
-      .from('afteroffers_events')
-      .upsert(
-        {
-          publication_id: PUBLICATION_ID,
-          click_id: clickId,
-          email,
-          revenue,
-          event_type: eventType,
-          raw_payload: rawPayload,
-        },
-        { onConflict: 'publication_id,click_id,event_type' }
-      )
-
-    if (error) {
-      logger.error({ err: error, clickId }, 'Failed to store AfterOffers event')
-      throw new Error(`Database error: ${error.message}`)
+  // Build full raw payload with headers, query params, and body
+  const headers: Record<string, string> = {}
+  request.headers.forEach((value, key) => {
+    // Skip large/noisy headers
+    if (!['cookie', 'authorization'].includes(key.toLowerCase())) {
+      headers[key] = value
     }
+  })
 
-    logger.info(
+  const rawPayload = {
+    method: request.method,
+    query_params: params,
+    body: body,
+    headers,
+    url: url.pathname + url.search,
+  }
+
+  // Upsert to handle webhook replays — unique on (publication_id, click_id, event_type)
+  const { error } = await supabaseAdmin
+    .from('afteroffers_events')
+    .upsert(
       {
-        clickId,
-        maskedEmail: email ? maskEmail(email) : undefined,
+        publication_id: PUBLICATION_ID,
+        click_id: clickId,
+        email,
         revenue,
-        eventType,
+        event_type: eventType,
+        raw_payload: rawPayload,
       },
-      'Recorded AfterOffers postback event'
+      { onConflict: 'publication_id,click_id,event_type' }
     )
 
-    return NextResponse.json({ success: true })
+  if (error) {
+    logger.error({ err: error, clickId }, 'Failed to store AfterOffers event')
+    throw new Error(`Database error: ${error.message}`)
   }
+
+  logger.info(
+    {
+      clickId,
+      maskedEmail: email ? maskEmail(email) : undefined,
+      revenue,
+      eventType,
+      method: request.method,
+    },
+    'Recorded AfterOffers postback event'
+  )
+
+  return NextResponse.json({ success: true })
+}
+
+export const GET = withApiHandler(
+  { authTier: 'public', logContext: 'afteroffers/postback' },
+  async ({ request, logger }) => handlePostback(request, logger)
+)
+
+export const POST = withApiHandler(
+  { authTier: 'public', logContext: 'afteroffers/postback' },
+  async ({ request, logger }) => handlePostback(request, logger)
 )
