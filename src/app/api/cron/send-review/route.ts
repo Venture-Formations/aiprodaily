@@ -5,9 +5,12 @@ import { MailerLiteService } from '@/lib/mailerlite'
 import { ScheduleChecker } from '@/lib/schedule-checker'
 import { getEmailProviderSettings } from '@/lib/publication-settings'
 import { withApiHandler } from '@/lib/api-handler'
+import { getEnvironment, isProduction } from '@/lib/env-guard'
 import type { Logger } from '@/lib/logger'
 
 async function handleReviewSend(log: Logger): Promise<NextResponse> {
+  log.info({ env: getEnvironment(), isProduction: isProduction() }, '[ENV] Environment check')
+
   // Get all active publications
   const { data: newsletters } = await supabaseAdmin
     .from('publications')

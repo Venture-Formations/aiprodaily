@@ -8,6 +8,7 @@ import { newsletterArchiver } from '@/lib/newsletter-archiver'
 import { getEmailProviderSettings } from '@/lib/publication-settings'
 import { ModuleAdSelector } from '@/lib/ad-modules'
 import { withApiHandler } from '@/lib/api-handler'
+import { getEnvironment, isProduction } from '@/lib/env-guard'
 import type { Logger } from '@/lib/logger'
 
 // Helper function to log article positions at final send
@@ -343,6 +344,8 @@ async function processFinalSendForPub(pub: { id: string; slug: string }, log: Lo
  * Shared final send logic used by both POST and GET handlers.
  */
 async function handleFinalSend(log: Logger): Promise<NextResponse> {
+  log.info({ env: getEnvironment(), isProduction: isProduction() }, '[ENV] Environment check')
+
   // Get all active publications
   const { data: newsletters } = await supabaseAdmin
     .from('publications')

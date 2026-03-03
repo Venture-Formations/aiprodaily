@@ -4,6 +4,7 @@ import { SendGridService } from '@/lib/sendgrid'
 import { MailerLiteService } from '@/lib/mailerlite'
 import { getPublicationSetting, getEmailProviderSettings } from '@/lib/publication-settings'
 import { withApiHandler } from '@/lib/api-handler'
+import { getEnvironment, isProduction } from '@/lib/env-guard'
 import type { Logger } from '@/lib/logger'
 
 export const maxDuration = 600 // 10 minutes
@@ -13,6 +14,7 @@ export const maxDuration = 600 // 10 minutes
  * Shared by both POST (manual trigger) and GET (Vercel cron) handlers.
  */
 async function handleSecondarySend(log: Logger): Promise<NextResponse> {
+  log.info({ env: getEnvironment(), isProduction: isProduction() }, '[ENV] Environment check')
   log.info('[CRON] === SECONDARY SEND CHECK ===')
 
   // Get all active publications

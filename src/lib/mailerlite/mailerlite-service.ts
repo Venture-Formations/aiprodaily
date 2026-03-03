@@ -4,6 +4,7 @@ import { ErrorHandler, SlackNotificationService } from '../slack'
 import type { issueWithArticles, issueWithEvents, Article } from '@/types/database'
 import { generateFullNewsletterHtml } from '../newsletter-templates'
 import { getEmailSettings, getScheduleSettings, getPublicationSetting, getPublicationSettings } from '../publication-settings'
+import { getEnvironment, isProduction } from '../env-guard'
 
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
 
@@ -139,8 +140,13 @@ United States
 
       console.log('Final subject line being sent to MailerLite:', subjectLine)
 
+      const env = getEnvironment()
+      const envPrefix = isProduction() ? '' : `[${env.toUpperCase()}] `
+
+      console.log(`[ENV-GUARD] createReviewissue: env="${env}", targetGroup="${reviewGroupId}"`)
+
       const issueData = {
-        name: `${newsletterName} Review: ${issue.date}`,
+        name: `${envPrefix}${newsletterName} Review: ${issue.date}`,
         type: 'regular',
         emails: [{
           subject: `${subjectEmoji} ${subjectLine}`,
@@ -671,12 +677,16 @@ United States
 
       const subjectLine = issue.subject_line || `Newsletter - ${new Date(issue.date).toLocaleDateString()}`
 
+      const env = getEnvironment()
+      const envPrefix = isProduction() ? '' : `[${env.toUpperCase()}] `
+
+      console.log(`[ENV-GUARD] createFinalissue: env="${env}", targetGroup="${mainGroupId}", isSecondary=${isSecondary}`)
       console.log(`Creating ${isSecondary ? 'secondary' : 'final'} issue with subject line:`, subjectLine)
       console.log('Using publication settings:', { senderName, fromEmail })
 
       const campaignName = isSecondary
-        ? `${newsletterName} Newsletter (Secondary): ${issue.date}`
-        : `${newsletterName} Newsletter: ${issue.date}`
+        ? `${envPrefix}${newsletterName} Newsletter (Secondary): ${issue.date}`
+        : `${envPrefix}${newsletterName} Newsletter: ${issue.date}`
 
       const issueData = {
         name: campaignName,
