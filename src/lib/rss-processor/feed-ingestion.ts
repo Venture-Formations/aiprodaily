@@ -47,7 +47,7 @@ export class FeedIngestion {
       try {
         const { data: allFeeds } = await supabaseAdmin
           .from('rss_feeds')
-          .select('*')
+          .select('id, url, name, article_module_id')
           .eq('active', true)
           .eq('publication_id', pub.id)
 
@@ -64,7 +64,7 @@ export class FeedIngestion {
 
         for (const feed of allFeeds) {
           try {
-            const result = await this.ingestFeedPosts(feed, pub.id)
+            const result = await this.ingestFeedPosts(feed, pub.id, allFeeds.map(f => f.id))
             totalFetched += result.fetched
             totalScored += result.scored
           } catch (error) {
@@ -82,7 +82,7 @@ export class FeedIngestion {
   /**
    * Ingest posts from a single feed
    */
-  private async ingestFeedPosts(feed: any, newsletterId: string): Promise<{ fetched: number; scored: number }> {
+  private async ingestFeedPosts(feed: any, newsletterId: string, publicationFeedIds: string[]): Promise<{ fetched: number; scored: number }> {
     try {
       const rssFeed = await parser.parseURL(feed.url)
 
@@ -120,6 +120,8 @@ export class FeedIngestion {
           .from('rss_posts')
           .select('id')
           .eq('external_id', externalId)
+          .in('feed_id', publicationFeedIds)
+          .limit(1)
           .maybeSingle()
 
         if (existing) continue
@@ -209,7 +211,7 @@ export class FeedIngestion {
       if (newPosts.length > 0) {
         const { data: fullPosts } = await supabaseAdmin
           .from('rss_posts')
-          .select('*')
+          .select('id, title, description, content, source_url, full_article_text, article_module_id')
           .in('id', newPosts.map(p => p.id))
 
         if (fullPosts && fullPosts.length > 0) {

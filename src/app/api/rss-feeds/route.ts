@@ -6,25 +6,20 @@ import { supabaseAdmin } from '@/lib/supabase'
  * GET - Fetch all RSS feeds for the current newsletter
  */
 export const GET = withApiHandler(
-  { authTier: 'authenticated', logContext: 'rss-feeds' },
-  async () => {
-    // Get newsletter context (for now, using first newsletter)
-    const { data: newsletters } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
+  { authTier: 'admin', logContext: 'rss-feeds' },
+  async ({ request }) => {
+    const { searchParams } = new URL(request.url)
+    const publicationId = searchParams.get('publication_id')
 
-    if (!newsletters) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id query parameter is required' }, { status: 400 })
     }
 
-    // Fetch RSS feeds for this newsletter
+    // Fetch RSS feeds for this publication
     const { data: feeds, error } = await supabaseAdmin
       .from('rss_feeds')
-      .select('*')
-      .eq('publication_id', newsletters.id)
+      .select('id, publication_id, url, name, description, active, last_processed, processing_errors, last_error, use_for_primary_section, use_for_secondary_section, article_module_id, created_at, updated_at')
+      .eq('publication_id', publicationId)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -43,10 +38,10 @@ export const GET = withApiHandler(
  * POST - Create a new RSS feed
  */
 export const POST = withApiHandler(
-  { authTier: 'authenticated', logContext: 'rss-feeds' },
+  { authTier: 'admin', logContext: 'rss-feeds' },
   async ({ request }) => {
     const body = await request.json()
-    const { url, name, description, active = true } = body
+    const { url, name, description, active = true, publication_id } = body
 
     if (!url || !name) {
       return NextResponse.json(
@@ -55,23 +50,18 @@ export const POST = withApiHandler(
       )
     }
 
-    // Get newsletter context
-    const { data: newsletters } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (!newsletters) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    if (!publication_id) {
+      return NextResponse.json(
+        { error: 'publication_id is required' },
+        { status: 400 }
+      )
     }
 
     // Create the RSS feed
     const { data: feed, error } = await supabaseAdmin
       .from('rss_feeds')
       .insert({
-        publication_id: newsletters.id,
+        publication_id,
         url,
         name,
         description: description || null,

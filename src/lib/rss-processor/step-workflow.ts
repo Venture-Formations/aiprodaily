@@ -46,6 +46,7 @@ export class StepWorkflow {
       .from('rss_feeds')
       .select('id')
       .eq('active', true)
+      .eq('publication_id', newsletterId)
       .eq(section === 'primary' ? 'use_for_primary_section' : 'use_for_secondary_section', true)
 
     if (!feeds || feeds.length === 0) {

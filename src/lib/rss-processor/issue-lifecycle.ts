@@ -50,6 +50,19 @@ export class IssueLifecycle {
     let issueId = ''
 
     try {
+      // Resolve publication for multi-tenant isolation
+      const { data: newsletter } = await supabaseAdmin
+        .from('publications')
+        .select('id, name, slug')
+        .eq('is_active', true)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single()
+
+      if (!newsletter) {
+        throw new Error('No active publication found')
+      }
+
       // STEP 1: Create NEW issue
       console.log('[Step 1/10] Creating new issue...')
 
@@ -63,7 +76,7 @@ export class IssueLifecycle {
 
       const { data: newissue, error: createError } = await supabaseAdmin
         .from('publication_issues')
-        .insert([{ date: issueDate, status: 'processing' }])
+        .insert([{ date: issueDate, status: 'processing', publication_id: newsletter.id }])
         .select('id')
         .single()
 
@@ -72,7 +85,7 @@ export class IssueLifecycle {
       }
 
       issueId = newissue.id
-      console.log(`[Step 1/10] ✓ issue created: ${issueId} for ${issueDate}`)
+      console.log(`[Step 1/10] ✓ issue created: ${issueId} for ${issueDate} (pub: ${newsletter.slug})`)
 
       // STEP 2: Select AI applications and prompts
       console.log('[Step 2/10] Selecting AI apps and prompts...')
@@ -80,17 +93,9 @@ export class IssueLifecycle {
       try {
         const { AppModuleSelector } = await import('../ai-app-modules')
         const { PromptSelector } = await import('../prompt-selector')
-        const { data: newsletter } = await supabaseAdmin
-          .from('publications')
-          .select('id, name, slug')
-          .eq('is_active', true)
-          .limit(1)
-          .single()
 
-        if (newsletter) {
-          await AppModuleSelector.selectAppsForIssue(issueId, newsletter.id, new Date())
-          await PromptSelector.selectPromptForissue(issueId)
-        }
+        await AppModuleSelector.selectAppsForIssue(issueId, newsletter.id, new Date())
+        await PromptSelector.selectPromptForissue(issueId)
       } catch (error) {
         console.log('[Step 2/10] ⚠️ AI selection failed (non-critical):', error)
       }
@@ -195,6 +200,19 @@ export class IssueLifecycle {
    * Get or create today's issue
    */
   async getOrCreateTodaysIssue(): Promise<string> {
+    // Resolve publication for multi-tenant isolation
+    const { data: newsletter } = await supabaseAdmin
+      .from('publications')
+      .select('id, name, slug')
+      .eq('is_active', true)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .single()
+
+    if (!newsletter) {
+      throw new Error('No active publication found')
+    }
+
     const ctParts = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'America/Chicago',
       year: 'numeric', month: '2-digit', day: '2-digit'
@@ -207,6 +225,7 @@ export class IssueLifecycle {
       .from('publication_issues')
       .select('id, status')
       .eq('date', issueDate)
+      .eq('publication_id', newsletter.id)
       .in('status', ['draft', 'processing'])
       .order('created_at', { ascending: true })
       .limit(1)
@@ -224,7 +243,7 @@ export class IssueLifecycle {
     } else {
       const { data: newissue, error } = await supabaseAdmin
         .from('publication_issues')
-        .insert([{ date: issueDate, status: 'processing' }])
+        .insert([{ date: issueDate, status: 'processing', publication_id: newsletter.id }])
         .select('id')
         .single()
 
@@ -257,20 +276,11 @@ export class IssueLifecycle {
       const needsPrompt = !existingPrompt || existingPrompt.length === 0
 
       if (needsApps || needsPrompt) {
-        const { data: newsletter } = await supabaseAdmin
-          .from('publications')
-          .select('id, name, slug')
-          .eq('is_active', true)
-          .limit(1)
-          .single()
-
-        if (newsletter) {
-          if (needsApps) {
-            await AppModuleSelector.selectAppsForIssue(issueId, newsletter.id, new Date())
-          }
-          if (needsPrompt) {
-            await PromptSelector.selectPromptForissue(issueId)
-          }
+        if (needsApps) {
+          await AppModuleSelector.selectAppsForIssue(issueId, newsletter.id, new Date())
+        }
+        if (needsPrompt) {
+          await PromptSelector.selectPromptForissue(issueId)
         }
       }
     } catch (initError) {
@@ -301,6 +311,7 @@ export class IssueLifecycle {
       .from('rss_feeds')
       .select('id')
       .eq('active', true)
+      .eq('publication_id', newsletterId)
       .eq('use_for_primary_section', true)
 
     const primaryFeedIds = primaryFeeds?.map(f => f.id) || []
@@ -309,6 +320,7 @@ export class IssueLifecycle {
       .from('rss_feeds')
       .select('id')
       .eq('active', true)
+      .eq('publication_id', newsletterId)
       .eq('use_for_secondary_section', true)
 
     const secondaryFeedIds = secondaryFeeds?.map(f => f.id) || []
