@@ -85,6 +85,13 @@ export function SubscribeForm() {
       // Ignore storage errors
     }
 
+    // Fire-and-forget: map click_id to email for postback attribution
+    fetch('/api/afteroffers/map-click', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: subscribedEmail, click_id: clickId }),
+    }).catch(() => { /* non-critical */ })
+
     window.location.href = `/subscribe/offers?email=${encodeURIComponent(subscribedEmail)}&click_id=${encodeURIComponent(clickId)}`
   }, [subscribedEmail])
 
