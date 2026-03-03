@@ -31,18 +31,13 @@ const BUSINESS_SETTINGS_KEYS = [
 
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/business' },
-  async () => {
-    // Get user's publication_id (use first active newsletter for now)
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (!newsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+  async ({ request }) => {
+    const publicationId = request.nextUrl.searchParams.get('publication_id')
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
+
+    const newsletter = { id: publicationId }
 
     // Fetch all business settings
     const { data: settings, error } = await supabaseAdmin
@@ -78,17 +73,12 @@ export const GET = withApiHandler(
 export const POST = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/business' },
   async ({ request }) => {
-    // Get user's publication_id (use first active newsletter for now)
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (!newsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    const publicationId = request.nextUrl.searchParams.get('publication_id')
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
+
+    const newsletter = { id: publicationId }
 
     const body = await request.json()
 
@@ -116,7 +106,7 @@ export const POST = withApiHandler(
       await supabaseAdmin
         .from('publications')
         .update({ logo_url: body.logo_url })
-        .eq('slug', 'accounting') // Update the accounting newsletter
+        .eq('id', publicationId)
     }
 
     return NextResponse.json({

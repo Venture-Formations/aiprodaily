@@ -14,18 +14,13 @@ const VALID_SETTING_KEYS = [
  */
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/ai-apps' },
-  async ({ logger }) => {
-    // Get user's publication_id (use first active newsletter for now)
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (!newsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+  async ({ request, logger }) => {
+    const publicationId = request.nextUrl.searchParams.get('publication_id')
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
+
+    const newsletter = { id: publicationId }
 
     const { data: settings } = await supabaseAdmin
       .from('publication_settings')
@@ -53,17 +48,12 @@ export const GET = withApiHandler(
 export const PATCH = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/ai-apps' },
   async ({ request, logger }) => {
-    // Get user's publication_id (use first active newsletter for now)
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (!newsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    const publicationId = request.nextUrl.searchParams.get('publication_id')
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
+
+    const newsletter = { id: publicationId }
 
     const body = await request.json()
     const { settings } = body

@@ -4,20 +4,13 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/slack' },
-  async () => {
-    // Get user's publication_id (use first active newsletter)
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (!newsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+  async ({ request }) => {
+    const publicationId = request.nextUrl.searchParams.get('publication_id')
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
 
-    const newsletterId = newsletter.id
+    const newsletterId = publicationId
 
     // Get current Slack settings from database
     const { data: settings } = await supabaseAdmin
@@ -61,19 +54,12 @@ export const GET = withApiHandler(
 export const POST = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/slack' },
   async ({ request, logger }) => {
-    // Get user's publication_id (use first active newsletter)
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (!newsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    const publicationId = request.nextUrl.searchParams.get('publication_id')
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
 
-    const newsletterId = newsletter.id
+    const newsletterId = publicationId
     logger.info({ newsletterId }, 'Saving Slack settings')
 
     const body = await request.json()

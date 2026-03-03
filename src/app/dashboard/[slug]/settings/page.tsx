@@ -75,13 +75,13 @@ export default function SettingsPage() {
         {/* Tab Content */}
         <div className="mt-6">
           {activeTab === 'system' && <SystemStatus />}
-          {activeTab === 'business' && <BusinessSettings />}
+          {activeTab === 'business' && publicationId && <BusinessSettings publicationId={publicationId} />}
           {activeTab === 'newsletter' && <NewsletterSettings />}
-          {activeTab === 'email' && <EmailSettings />}
-          {activeTab === 'blocked-domains' && <BlockedDomainsSettings />}
+          {activeTab === 'email' && publicationId && <EmailSettings publicationId={publicationId} />}
+          {activeTab === 'blocked-domains' && publicationId && <BlockedDomainsSettings publicationId={publicationId} />}
           {activeTab === 'ip-exclusion' && <IPExclusionSettings />}
-          {activeTab === 'notifications' && <Notifications />}
-          {activeTab === 'facebook' && <FacebookSettings />}
+          {activeTab === 'notifications' && publicationId && <Notifications publicationId={publicationId} />}
+          {activeTab === 'facebook' && publicationId && <FacebookSettings publicationId={publicationId} />}
           {activeTab === 'users' && <Users />}
           {activeTab === 'danger' && publicationId && slug && (
             <DangerZone publicationId={publicationId} slug={slug} />

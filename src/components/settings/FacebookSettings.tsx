@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 
-export default function FacebookSettings() {
+export default function FacebookSettings({ publicationId }: { publicationId: string }) {
   const [settings, setSettings] = useState({
     enabled: false,
     pageId: '',
@@ -24,11 +24,11 @@ export default function FacebookSettings() {
 
   useEffect(() => {
     loadSettings()
-  }, [])
+  }, [publicationId])
 
   const loadSettings = async () => {
     try {
-      const response = await fetch('/api/settings/facebook')
+      const response = await fetch(`/api/settings/facebook?publication_id=${publicationId}`)
       if (response.ok) {
         const data = await response.json()
         setSettings({
@@ -62,7 +62,7 @@ export default function FacebookSettings() {
     setMessage('')
 
     try {
-      const response = await fetch('/api/settings/facebook', {
+      const response = await fetch(`/api/settings/facebook?publication_id=${publicationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings),
@@ -89,7 +89,7 @@ export default function FacebookSettings() {
     setTokenStatus(null)
 
     try {
-      const response = await fetch('/api/settings/facebook', {
+      const response = await fetch(`/api/settings/facebook?publication_id=${publicationId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'verify' }),
@@ -117,7 +117,7 @@ export default function FacebookSettings() {
     setTesting(true)
 
     try {
-      const response = await fetch('/api/settings/facebook', {
+      const response = await fetch(`/api/settings/facebook?publication_id=${publicationId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'test' }),
@@ -141,7 +141,7 @@ export default function FacebookSettings() {
     setTesting(true)
 
     try {
-      const response = await fetch('/api/settings/facebook', {
+      const response = await fetch(`/api/settings/facebook?publication_id=${publicationId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'test-ad' }),

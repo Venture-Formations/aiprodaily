@@ -5,18 +5,25 @@ import { supabaseAdmin } from '@/lib/supabase'
 // GET is public - allows the public events submission page to fetch current pricing
 export const GET = withApiHandler(
   { authTier: 'public', logContext: 'settings/public-events' },
-  async () => {
-    // Get first active newsletter for settings
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
+  async ({ request }) => {
+    let publicationId = request.nextUrl.searchParams.get('publication_id')
 
-    if (!newsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    // Fall back to first active publication for public page callers
+    if (!publicationId) {
+      const { data: pub } = await supabaseAdmin
+        .from('publications')
+        .select('id')
+        .eq('is_active', true)
+        .limit(1)
+        .single()
+
+      if (!pub) {
+        return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+      }
+      publicationId = pub.id
     }
+
+    const newsletter = { id: publicationId }
 
     // Get current pricing settings from database
     const { data: settingsRows, error } = await supabaseAdmin
@@ -55,17 +62,12 @@ export const GET = withApiHandler(
 export const POST = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/public-events' },
   async ({ session, request }) => {
-    // Get user's publication_id (use first active newsletter for now)
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (!newsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    const publicationId = request.nextUrl.searchParams.get('publication_id')
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
+
+    const newsletter = { id: publicationId }
 
     const settings = await request.json()
 

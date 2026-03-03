@@ -9,20 +9,11 @@ import { FacebookService } from '@/lib/facebook'
  */
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/facebook' },
-  async () => {
-    // Get user's publication_id (use first active newsletter)
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (!newsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+  async ({ request }) => {
+    const publicationId = request.nextUrl.searchParams.get('publication_id')
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
-
-    const publicationId = newsletter.id
 
     // Get current Facebook settings from database
     const { data: settings } = await supabaseAdmin
@@ -103,19 +94,11 @@ export const GET = withApiHandler(
 export const POST = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/facebook' },
   async ({ request }) => {
-    // Get user's publication_id
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (!newsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    const publicationId = request.nextUrl.searchParams.get('publication_id')
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
 
-    const publicationId = newsletter.id
     const body = await request.json()
 
     console.log('[Facebook Settings] Saving settings for publication:', publicationId)
@@ -166,22 +149,13 @@ export const POST = withApiHandler(
 export const PATCH = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/facebook' },
   async ({ request }) => {
-    const body = await request.json()
-    const action = body.action
-
-    // Get user's publication_id
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (!newsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    const publicationId = request.nextUrl.searchParams.get('publication_id')
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
 
-    const publicationId = newsletter.id
+    const body = await request.json()
+    const action = body.action
 
     // Get current Facebook settings
     const { data: settings } = await supabaseAdmin

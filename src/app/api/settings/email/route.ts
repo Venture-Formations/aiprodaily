@@ -5,18 +5,25 @@ import { updateScheduleConfig, type ScheduleConfig } from '@/lib/settings/schedu
 
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/email' },
-  async ({ session }) => {
-    // Get user's publication_id (use first active newsletter for now)
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
+  async ({ request, session }) => {
+    let resolvedPublicationId = request.nextUrl.searchParams.get('publication_id')
 
-    if (!newsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    // Fall back to first active publication for legacy callers
+    if (!resolvedPublicationId) {
+      const { data: pub } = await supabaseAdmin
+        .from('publications')
+        .select('id')
+        .eq('is_active', true)
+        .limit(1)
+        .single()
+
+      if (!pub) {
+        return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+      }
+      resolvedPublicationId = pub.id
     }
+
+    const newsletter = { id: resolvedPublicationId! }
 
     console.log('BACKEND GET: Loading email settings from database for newsletter:', newsletter.id)
     // Get current settings from database (key-value structure)
@@ -181,19 +188,24 @@ export const GET = withApiHandler(
 export const POST = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/email' },
   async ({ session, request }) => {
-    // Get user's publication_id (use first active newsletter for now)
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
+    let resolvedPublicationId = request.nextUrl.searchParams.get('publication_id')
 
-    if (!newsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+    // Fall back to first active publication for legacy callers
+    if (!resolvedPublicationId) {
+      const { data: pub } = await supabaseAdmin
+        .from('publications')
+        .select('id')
+        .eq('is_active', true)
+        .limit(1)
+        .single()
+
+      if (!pub) {
+        return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
+      }
+      resolvedPublicationId = pub.id
     }
 
-    const newsletterId = newsletter.id
+    const newsletterId = resolvedPublicationId!
     console.log('BACKEND: Saving settings for newsletter:', newsletterId)
 
     const settings = await request.json()
