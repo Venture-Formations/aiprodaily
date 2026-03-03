@@ -8,9 +8,20 @@ export const GET = withApiHandler(
   async ({ request }) => {
     const { searchParams } = new URL(request.url)
     const days = parseInt(searchParams.get('days') || '30')
-    const publicationId = searchParams.get('publication_id')
+    let publicationId = searchParams.get('publication_id')
+    const newsletterSlug = searchParams.get('newsletter_slug')
     const excludeIpsParam = searchParams.get('exclude_ips')
     const shouldExcludeIps = excludeIpsParam !== 'false' // Default to true
+
+    // Resolve publication_id from slug if not provided directly
+    if (!publicationId && newsletterSlug) {
+      const { data: pub } = await supabaseAdmin
+        .from('publications')
+        .select('id')
+        .eq('slug', newsletterSlug)
+        .single()
+      if (pub) publicationId = pub.id
+    }
 
     // Calculate date range
     const endDate = new Date()
