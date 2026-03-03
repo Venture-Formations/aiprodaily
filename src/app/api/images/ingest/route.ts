@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { openai, AI_PROMPTS } from '@/lib/openai'
+import { openai } from '@/lib/openai'
+import { AI_PROMPTS } from '@/lib/openai/prompt-loaders'
 import { ImageAnalysisResult, ImageTag } from '@/types/database'
 import { SupabaseImageStorage } from '@/lib/supabase-image-storage'
 import sharp from 'sharp'

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
-import { AI_PROMPTS } from '@/lib/openai'
+import { AI_PROMPTS } from '@/lib/openai/prompt-loaders'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export const POST = withApiHandler(

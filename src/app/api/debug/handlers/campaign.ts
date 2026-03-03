@@ -3,7 +3,8 @@ import type { ApiHandlerContext } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { newsletterArchiver } from '@/lib/newsletter-archiver'
 import { ArticleArchiveService } from '@/lib/article-archive'
-import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
+import { callOpenAI } from '@/lib/openai'
+import { AI_PROMPTS } from '@/lib/openai/prompt-loaders'
 import { MailerLiteService } from '@/lib/mailerlite'
 
 type DebugHandler = (context: ApiHandlerContext) => Promise<NextResponse>

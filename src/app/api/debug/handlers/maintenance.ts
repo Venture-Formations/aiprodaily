@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import type { ApiHandlerContext } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { checkUserAgent } from '@/lib/bot-detection'
-import { AI_PROMPTS, callOpenAI } from '@/lib/openai'
+import { callOpenAI } from '@/lib/openai'
+import { AI_PROMPTS } from '@/lib/openai/prompt-loaders'
 
 type DebugHandler = (context: ApiHandlerContext) => Promise<NextResponse>
 
