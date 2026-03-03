@@ -38,7 +38,7 @@ export function extractResponseContent(response: any): any {
   }
 
   // If rawContent is already a parsed object (from JSON schema), unwrap or return it
-  if (typeof rawContent === 'object' && rawContent !== null && !Array.isArray(rawContent)) {
+  if (typeof rawContent === 'object' && !Array.isArray(rawContent)) {
     if ('output' in rawContent || 'output_text' in rawContent || 'id' in rawContent) {
       // Response wrapper — try to extract actual content
       const extracted = rawContent.output_text ?? rawContent.text
