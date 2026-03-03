@@ -29,7 +29,9 @@ export function isProduction(): boolean {
  * Returns true when schedule-time checks should be skipped.
  * Set SKIP_SCHEDULE_CHECK=true on Vercel Preview (or locally) to allow
  * cron endpoints to fire regardless of the configured send window.
+ * Hard-blocked in production so the var can never accidentally bypass gates.
  */
 export function shouldSkipScheduleCheck(): boolean {
+  if (getEnvironment() === 'production') return false
   return process.env.SKIP_SCHEDULE_CHECK === 'true'
 }

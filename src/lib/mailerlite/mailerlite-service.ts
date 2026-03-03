@@ -190,7 +190,7 @@ United States
           // issue is created at issue Creation Time (8:50pm) and scheduled to send same day at Scheduled Send Time
           const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
           const centralDate = new Date(nowCentral)
-          const today = centralDate.toISOString().split('T')[0] // Today's date in YYYY-MM-DD
+          const today = `${centralDate.getFullYear()}-${String(centralDate.getMonth() + 1).padStart(2, '0')}-${String(centralDate.getDate()).padStart(2, '0')}`
           scheduleData = await this.getReviewScheduleData(today, issue.publication_id)
           console.log('Scheduling review issue for today with data:', scheduleData)
 
@@ -617,7 +617,7 @@ United States
         const centralDate = new Date(nowCentral)
         centralDate.setMinutes(centralDate.getMinutes() + 2)
 
-        const date = centralDate.toISOString().split('T')[0]
+        const date = `${centralDate.getFullYear()}-${String(centralDate.getMonth() + 1).padStart(2, '0')}-${String(centralDate.getDate()).padStart(2, '0')}`
         const hours = String(centralDate.getHours()).padStart(2, '0')
         const minutes = String(centralDate.getMinutes()).padStart(2, '0')
 
@@ -736,7 +736,7 @@ United States
         try {
           const nowCentral = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"})
           const centralDate = new Date(nowCentral)
-          const today = centralDate.toISOString().split('T')[0] // Today's date in YYYY-MM-DD
+          const today = `${centralDate.getFullYear()}-${String(centralDate.getMonth() + 1).padStart(2, '0')}-${String(centralDate.getDate()).padStart(2, '0')}`
           const finalScheduleData = isSecondary
             ? await this.getSecondaryScheduleData(today, issue.publication_id)
             : await this.getFinalScheduleData(today, issue.publication_id)

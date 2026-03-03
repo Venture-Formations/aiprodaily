@@ -314,18 +314,21 @@ export async function getEmailSettings(publicationId: string): Promise<{
     mailerlite_group_id: settings.mailerlite_group_id || '',
   }
 
-  // Apply env-var overrides on non-production environments
-  if (getEnvironment() !== 'production') {
+  // Fail-closed on non-production: require override env vars so Preview never targets production audiences
+  const env = getEnvironment()
+  if (env !== 'production') {
     const reviewOverride = process.env.MAILERLITE_REVIEW_GROUP_ID_OVERRIDE
     const mainOverride = process.env.MAILERLITE_MAIN_GROUP_ID_OVERRIDE
-    if (reviewOverride) {
-      console.log(`[ENV-GUARD] Overriding review_group_id: ${result.review_group_id} → ${reviewOverride}`)
-      result.review_group_id = reviewOverride
+    if (!reviewOverride || !mainOverride) {
+      throw new Error(
+        `[ENV-GUARD] Non-production env "${env}" requires MAILERLITE_REVIEW_GROUP_ID_OVERRIDE and MAILERLITE_MAIN_GROUP_ID_OVERRIDE to be set. ` +
+        'Refusing to send with production group IDs.'
+      )
     }
-    if (mainOverride) {
-      console.log(`[ENV-GUARD] Overriding mailerlite_group_id: ${result.mailerlite_group_id} → ${mainOverride}`)
-      result.mailerlite_group_id = mainOverride
-    }
+    console.log(`[ENV-GUARD] Overriding review_group_id: ${result.review_group_id} → ${reviewOverride}`)
+    result.review_group_id = reviewOverride
+    console.log(`[ENV-GUARD] Overriding mailerlite_group_id: ${result.mailerlite_group_id} → ${mainOverride}`)
+    result.mailerlite_group_id = mainOverride
   }
 
   return result
@@ -381,19 +384,22 @@ export async function getEmailProviderSettings(publicationId: string): Promise<{
     secondaryGroupId: settings.mailerlite_secondary_group_id || '',
   }
 
-  // Apply env-var overrides on non-production environments
-  if (getEnvironment() !== 'production') {
+  // Fail-closed on non-production: require override env vars so Preview never targets production audiences
+  const env = getEnvironment()
+  if (env !== 'production') {
     const reviewOverride = process.env.MAILERLITE_REVIEW_GROUP_ID_OVERRIDE
     const mainOverride = process.env.MAILERLITE_MAIN_GROUP_ID_OVERRIDE
     const secondaryOverride = process.env.MAILERLITE_SECONDARY_GROUP_ID_OVERRIDE
-    if (reviewOverride) {
-      console.log(`[ENV-GUARD] Overriding reviewGroupId: ${mlResult.reviewGroupId} → ${reviewOverride}`)
-      mlResult.reviewGroupId = reviewOverride
+    if (!reviewOverride || !mainOverride) {
+      throw new Error(
+        `[ENV-GUARD] Non-production env "${env}" requires MAILERLITE_REVIEW_GROUP_ID_OVERRIDE and MAILERLITE_MAIN_GROUP_ID_OVERRIDE to be set. ` +
+        'Refusing to send with production group IDs.'
+      )
     }
-    if (mainOverride) {
-      console.log(`[ENV-GUARD] Overriding mainGroupId: ${mlResult.mainGroupId} → ${mainOverride}`)
-      mlResult.mainGroupId = mainOverride
-    }
+    console.log(`[ENV-GUARD] Overriding reviewGroupId: ${mlResult.reviewGroupId} → ${reviewOverride}`)
+    mlResult.reviewGroupId = reviewOverride
+    console.log(`[ENV-GUARD] Overriding mainGroupId: ${mlResult.mainGroupId} → ${mainOverride}`)
+    mlResult.mainGroupId = mainOverride
     if (secondaryOverride) {
       console.log(`[ENV-GUARD] Overriding secondaryGroupId: ${mlResult.secondaryGroupId} → ${secondaryOverride}`)
       mlResult.secondaryGroupId = secondaryOverride
