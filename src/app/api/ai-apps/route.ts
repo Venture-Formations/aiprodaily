@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-const APP_COLS = 'id, publication_id, app_name, description, category, app_url, tool_type, affiliate_url, category_priority, pinned_position, is_active, is_featured, is_paid_placement, is_affiliate, ai_app_module_id, times_shown, last_shown_at, cooldown_until, created_at, updated_at'
+const APP_COLS = 'id, publication_id, app_name, tagline, description, category, app_url, logo_url, logo_alt, screenshot_url, screenshot_alt, tool_type, category_priority, pinned_position, is_active, is_featured, is_paid_placement, is_affiliate, ai_app_module_id, times_used, last_used_date, created_at, updated_at'
 
 /**
  * GET /api/ai-apps - List AI applications
