@@ -117,7 +117,7 @@ export default function CampaignsPage() {
         },
         body: JSON.stringify({
           date: selectedDate,
-          publication_id: 'accounting' // TODO: Get from context/params
+          publication_id: slug
         })
       })
 

@@ -68,7 +68,8 @@ export default async function NewsletterPage({ params }: PageProps) {
   if (!newsletterSectionsConfig) {
     const { data: liveSections } = await supabaseAdmin
       .from('newsletter_sections')
-      .select('*')
+      .select('id, newsletter_id, name, display_order, is_active, section_type, description, created_at')
+      .eq('newsletter_id', publicationId)
       .eq('is_active', true)
       .order('display_order', { ascending: true })
     newsletterSectionsConfig = liveSections

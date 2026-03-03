@@ -2,13 +2,21 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
+const SECTION_COLS = 'id, newsletter_id, name, display_order, is_active, section_type, description, created_at'
+
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/newsletter-sections' },
-  async () => {
-    // Fetch all newsletter sections ordered by display_order
+  async ({ request }) => {
+    const publicationId = new URL(request.url).searchParams.get('publication_id')
+
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
+    }
+
     const { data: sections, error } = await supabaseAdmin
       .from('newsletter_sections')
-      .select('*')
+      .select(SECTION_COLS)
+      .eq('newsletter_id', publicationId)
       .order('display_order', { ascending: true })
 
     if (error) {
@@ -25,10 +33,14 @@ export const PATCH = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/newsletter-sections' },
   async ({ request }) => {
     const body = await request.json()
+    const { publication_id } = body
+
+    if (!publication_id) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
+    }
 
     // Handle section order updates
     if (body.sections && Array.isArray(body.sections)) {
-      // Update display order for multiple sections
       const { sections } = body
 
       for (const section of sections) {
@@ -42,6 +54,7 @@ export const PATCH = withApiHandler(
           .from('newsletter_sections')
           .update({ display_order: section.display_order })
           .eq('id', section.id)
+          .eq('newsletter_id', publication_id)
 
         if (error) {
           throw error
@@ -68,6 +81,7 @@ export const PATCH = withApiHandler(
         .from('newsletter_sections')
         .update({ name: name.trim() })
         .eq('id', section_id)
+        .eq('newsletter_id', publication_id)
 
       if (error) {
         throw error
@@ -87,6 +101,7 @@ export const PATCH = withApiHandler(
         .from('newsletter_sections')
         .update({ is_active })
         .eq('id', section_id)
+        .eq('newsletter_id', publication_id)
 
       if (error) {
         throw error
@@ -109,11 +124,14 @@ export const DELETE = withApiHandler(
   async ({ request }) => {
     const { searchParams } = new URL(request.url)
     const sectionId = searchParams.get('id')
+    const publicationId = searchParams.get('publication_id')
 
     if (!sectionId) {
-      return NextResponse.json({
-        error: 'Section ID is required'
-      }, { status: 400 })
+      return NextResponse.json({ error: 'Section ID is required' }, { status: 400 })
+    }
+
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
 
     // Get section info before deleting
@@ -121,6 +139,7 @@ export const DELETE = withApiHandler(
       .from('newsletter_sections')
       .select('name')
       .eq('id', sectionId)
+      .eq('newsletter_id', publicationId)
       .single()
 
     // Delete the section
@@ -128,6 +147,7 @@ export const DELETE = withApiHandler(
       .from('newsletter_sections')
       .delete()
       .eq('id', sectionId)
+      .eq('newsletter_id', publicationId)
 
     if (error) {
       throw error
@@ -144,18 +164,21 @@ export const POST = withApiHandler(
   { authTier: 'authenticated', logContext: 'settings/newsletter-sections' },
   async ({ request }) => {
     const body = await request.json()
-    const { name, display_order = 999, is_active = true } = body
+    const { name, publication_id, display_order = 999, is_active = true } = body
 
     if (!name || typeof name !== 'string') {
-      return NextResponse.json({
-        error: 'Section name is required'
-      }, { status: 400 })
+      return NextResponse.json({ error: 'Section name is required' }, { status: 400 })
     }
 
-    // Check if section with this name already exists
+    if (!publication_id) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
+    }
+
+    // Check if section with this name already exists for this publication
     const { data: existingSection } = await supabaseAdmin
       .from('newsletter_sections')
       .select('id')
+      .eq('newsletter_id', publication_id)
       .eq('name', name)
       .single()
 
@@ -169,11 +192,12 @@ export const POST = withApiHandler(
     const { data: newSection, error } = await supabaseAdmin
       .from('newsletter_sections')
       .insert([{
+        newsletter_id: publication_id,
         name,
         display_order,
         is_active
       }])
-      .select('*')
+      .select(SECTION_COLS)
       .single()
 
     if (error) {

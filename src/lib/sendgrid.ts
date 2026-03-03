@@ -792,10 +792,11 @@ export class SendGridService {
 
     console.log('[SendGrid] Active articles to render:', activeArticles.length)
 
-    // Fetch newsletter sections order
+    // Fetch newsletter sections order (filtered by publication)
     const { data: sections } = await supabaseAdmin
       .from('newsletter_sections')
-      .select('*')
+      .select('id, newsletter_id, name, display_order, is_active, section_type, description, created_at')
+      .eq('newsletter_id', issue.publication_id)
       .eq('is_active', true)
       .order('display_order', { ascending: true })
 

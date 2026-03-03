@@ -167,22 +167,26 @@ export const POST = withApiHandler(
   { authTier: 'authenticated', logContext: 'campaigns' },
   async ({ request }) => {
     const body = await request.json()
-    const { date } = body
+    const { date, publication_id } = body
 
     if (!date) {
       return NextResponse.json({ error: 'Date is required' }, { status: 400 })
     }
 
-    // Get accounting newsletter ID
+    if (!publication_id) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
+    }
+
+    // Verify publication exists
     const { data: newsletter } = await supabaseAdmin
       .from('publications')
       .select('id')
-      .eq('slug', 'accounting')
+      .eq('id', publication_id)
       .single()
 
     if (!newsletter) {
       return NextResponse.json({
-        error: 'Accounting newsletter not found'
+        error: 'Publication not found'
       }, { status: 404 })
     }
 

@@ -324,7 +324,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
     setLoading(true)
     try {
       // Fetch newsletter sections
-      const sectionsRes = await fetch('/api/settings/newsletter-sections')
+      const sectionsRes = await fetch(`/api/settings/newsletter-sections?publication_id=${publicationId}`)
       if (sectionsRes.ok) {
         const sectionsData = await sectionsRes.json()
         setSections(sectionsData.sections || [])
@@ -519,6 +519,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            publication_id: publicationId,
             sections: newSections.map(s => ({ id: s.id, display_order: s.display_order }))
           })
         })
@@ -630,6 +631,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            publication_id: publicationId,
             section_id: item.data.id,
             is_active: newActive
           })
@@ -871,6 +873,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            publication_id: publicationId,
             name: newModuleName.trim(),
             display_order: allItems.length + 1,
             is_active: true
@@ -1391,6 +1394,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          publication_id: publicationId,
           section_id: sectionId,
           ...updates
         })
