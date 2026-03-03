@@ -5,7 +5,7 @@ import { MailerLiteService } from '@/lib/mailerlite'
 import { ScheduleChecker } from '@/lib/schedule-checker'
 import { getEmailProviderSettings } from '@/lib/publication-settings'
 import { withApiHandler } from '@/lib/api-handler'
-import { getEnvironment, isProduction } from '@/lib/env-guard'
+import { getEnvironment, isProduction, shouldSkipScheduleCheck } from '@/lib/env-guard'
 import type { Logger } from '@/lib/logger'
 
 async function handleReviewSend(log: Logger): Promise<NextResponse> {
@@ -31,17 +31,24 @@ async function handleReviewSend(log: Logger): Promise<NextResponse> {
   for (const pub of newsletters) {
     try {
       // Check if it's time to run review sending based on database settings
-      const shouldRun = await ScheduleChecker.shouldRunReviewSend(pub.id)
+      const skipSchedule = shouldSkipScheduleCheck()
+      if (skipSchedule) {
+        log.info({ slug: pub.slug }, '[ENV-GUARD] SKIP_SCHEDULE_CHECK is set — bypassing schedule check')
+      }
 
-      if (!shouldRun) {
-        // Catch-up: If a draft issue exists for tomorrow with no review_sent_at,
-        // and we're within 30 minutes after scheduled send time, still send it.
-        const catchUp = await ScheduleChecker.shouldCatchUpReviewSend(pub.id)
-        if (!catchUp) {
-          results.push({ pubId: pub.id, slug: pub.slug, success: true, skipped: true, message: 'Not time to run or already ran today' })
-          continue
+      if (!skipSchedule) {
+        const shouldRun = await ScheduleChecker.shouldRunReviewSend(pub.id)
+
+        if (!shouldRun) {
+          // Catch-up: If a draft issue exists for tomorrow with no review_sent_at,
+          // and we're within 30 minutes after scheduled send time, still send it.
+          const catchUp = await ScheduleChecker.shouldCatchUpReviewSend(pub.id)
+          if (!catchUp) {
+            results.push({ pubId: pub.id, slug: pub.slug, success: true, skipped: true, message: 'Not time to run or already ran today' })
+            continue
+          }
+          log.info({ slug: pub.slug }, 'Catch-up review send triggered — draft issue found after scheduled window')
         }
-        log.info({ slug: pub.slug }, 'Catch-up review send triggered — draft issue found after scheduled window')
       }
 
       log.info({ slug: pub.slug }, '=== REVIEW SEND STARTED (Time Matched) ===')

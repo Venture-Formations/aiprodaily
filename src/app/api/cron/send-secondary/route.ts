@@ -4,7 +4,7 @@ import { SendGridService } from '@/lib/sendgrid'
 import { MailerLiteService } from '@/lib/mailerlite'
 import { getPublicationSetting, getEmailProviderSettings } from '@/lib/publication-settings'
 import { withApiHandler } from '@/lib/api-handler'
-import { getEnvironment, isProduction } from '@/lib/env-guard'
+import { getEnvironment, isProduction, shouldSkipScheduleCheck } from '@/lib/env-guard'
 import type { Logger } from '@/lib/logger'
 
 export const maxDuration = 600 // 10 minutes
@@ -62,8 +62,13 @@ async function handleSecondarySend(log: Logger): Promise<NextResponse> {
       // Check if today is a send day (0 = Sunday, 6 = Saturday)
       const today = new Date()
       const dayOfWeek = today.getDay()
+      const skipSchedule = shouldSkipScheduleCheck()
 
-      if (!secondarySendDays.includes(dayOfWeek)) {
+      if (skipSchedule) {
+        log.info({ slug: pub.slug }, '[ENV-GUARD] SKIP_SCHEDULE_CHECK is set — bypassing day-of-week and already-sent checks')
+      }
+
+      if (!skipSchedule && !secondarySendDays.includes(dayOfWeek)) {
         results.push({ pubId: pub.id, slug: pub.slug, success: true, skipped: true, message: `Not a configured send day (${dayOfWeek})` })
         continue
       }
@@ -117,7 +122,7 @@ async function handleSecondarySend(log: Logger): Promise<NextResponse> {
       log.info({ issueId: issue.id, date: issue.date, status: issue.status, slug: pub.slug }, '[CRON] Found issue')
 
       // Check if secondary send was already done today
-      if (issue.secondary_sent_at) {
+      if (!skipSchedule && issue.secondary_sent_at) {
         const secondarySentDate = new Date(issue.secondary_sent_at).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
         if (secondarySentDate === localDate) {
           results.push({ pubId: pub.id, slug: pub.slug, success: true, skipped: true, message: 'Secondary send already completed today' })

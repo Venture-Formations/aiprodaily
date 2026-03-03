@@ -1,9 +1,13 @@
 /**
- * Environment detection helpers.
- * Used for observability (campaign name prefixes, cron logging).
+ * Environment detection and send-isolation helpers.
  *
- * Actual send isolation is handled by separate Supabase projects per environment —
- * each environment's DB has its own MailerLite group IDs configured in publication_settings.
+ * All Vercel environments share the same Supabase database and MailerLite API key.
+ * Send isolation on Preview deployments is achieved via env-var overrides:
+ *   - MAILERLITE_*_GROUP_ID_OVERRIDE  → redirect sends to test groups
+ *   - SKIP_SCHEDULE_CHECK=true        → bypass time-of-day gates
+ *   - CRON_SECRET                     → already different per environment
+ *
+ * Production is unaffected — these override vars are never set there.
  *
  * Uses VERCEL_ENV (set automatically by Vercel) to detect environment.
  * Falls back to 'development' for local dev.
@@ -19,4 +23,13 @@ export function getEnvironment(): VercelEnv {
 
 export function isProduction(): boolean {
   return getEnvironment() === 'production'
+}
+
+/**
+ * Returns true when schedule-time checks should be skipped.
+ * Set SKIP_SCHEDULE_CHECK=true on Vercel Preview (or locally) to allow
+ * cron endpoints to fire regardless of the configured send window.
+ */
+export function shouldSkipScheduleCheck(): boolean {
+  return process.env.SKIP_SCHEDULE_CHECK === 'true'
 }
