@@ -44,10 +44,20 @@ export default function AIApplicationsPage() {
         if (res.ok) {
           const data = await res.json()
           const pub = data.newsletters?.find((n: any) => n.slug === slug)
-          if (pub) setPublicationId(pub.id)
+          if (pub) {
+            console.log(`[AI Apps] Resolved slug "${slug}" to publication_id: ${pub.id} (${pub.name})`)
+            setPublicationId(pub.id)
+          } else {
+            console.error(`[AI Apps] No publication found with slug "${slug}". Available:`, data.newsletters?.map((n: any) => n.slug))
+            setLoading(false)
+          }
+        } else {
+          console.error('[AI Apps] Failed to fetch newsletters:', res.status)
+          setLoading(false)
         }
       } catch (err) {
         console.error('Failed to resolve publication:', err)
+        setLoading(false)
       }
     }
     if (slug) resolvePublication()
@@ -137,7 +147,13 @@ export default function AIApplicationsPage() {
       return
     }
 
+    if (!publicationId) {
+      alert('Error: Publication not resolved. Cannot create app without publication_id.')
+      return
+    }
+
     try {
+      console.log(`[AI Apps] Creating app with publication_id: ${publicationId}`)
       const response = await fetch('/api/ai-apps', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -160,6 +176,10 @@ export default function AIApplicationsPage() {
           is_affiliate: false,
           ai_app_module_id: null
         })
+      } else {
+        const errData = await response.json().catch(() => ({}))
+        console.error('[AI Apps] POST failed:', response.status, errData)
+        alert(`Failed to add application: ${errData.error || response.statusText}`)
       }
     } catch (error) {
       console.error('Failed to add application:', error)
