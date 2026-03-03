@@ -11,21 +11,8 @@ function maskEmail(email: string): string {
 }
 
 export const GET = withApiHandler(
-  { authTier: 'system', logContext: 'afteroffers/postback' },
+  { authTier: 'public', logContext: 'afteroffers/postback' },
   async ({ request, logger }) => {
-    // Require AFTEROFFERS_WEBHOOK_SECRET — endpoint is closed if not configured
-    const expectedSecret = process.env.AFTEROFFERS_WEBHOOK_SECRET
-    if (!expectedSecret) {
-      logger.error('AFTEROFFERS_WEBHOOK_SECRET is not configured — rejecting postback')
-      return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
-    }
-
-    const authHeader = request.headers.get('authorization') || ''
-    if (authHeader !== `Bearer ${expectedSecret}`) {
-      logger.warn('Unauthorized AfterOffers postback attempt')
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const url = new URL(request.url)
     const searchParams = url.searchParams
 
