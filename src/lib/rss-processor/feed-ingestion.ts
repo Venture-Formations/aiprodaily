@@ -121,6 +121,7 @@ export class FeedIngestion {
           .select('id')
           .eq('external_id', externalId)
           .in('feed_id', publicationFeedIds)
+          .limit(1)
           .maybeSingle()
 
         if (existing) continue

@@ -6,7 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase'
  * GET - Fetch all RSS feeds for the current newsletter
  */
 export const GET = withApiHandler(
-  { authTier: 'authenticated', logContext: 'rss-feeds' },
+  { authTier: 'admin', logContext: 'rss-feeds' },
   async ({ request }) => {
     const { searchParams } = new URL(request.url)
     const publicationId = searchParams.get('publication_id')
@@ -38,7 +38,7 @@ export const GET = withApiHandler(
  * POST - Create a new RSS feed
  */
 export const POST = withApiHandler(
-  { authTier: 'authenticated', logContext: 'rss-feeds' },
+  { authTier: 'admin', logContext: 'rss-feeds' },
   async ({ request }) => {
     const body = await request.json()
     const { url, name, description, active = true, publication_id } = body

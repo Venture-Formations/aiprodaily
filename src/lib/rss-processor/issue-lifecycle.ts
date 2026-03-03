@@ -55,6 +55,7 @@ export class IssueLifecycle {
         .from('publications')
         .select('id, name, slug')
         .eq('is_active', true)
+        .order('created_at', { ascending: true })
         .limit(1)
         .single()
 
@@ -204,6 +205,7 @@ export class IssueLifecycle {
       .from('publications')
       .select('id, name, slug')
       .eq('is_active', true)
+      .order('created_at', { ascending: true })
       .limit(1)
       .single()
 
