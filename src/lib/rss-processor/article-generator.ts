@@ -23,11 +23,14 @@ export class ArticleGenerator {
   }
 
   async generateNewsletterArticles(issueId: string, section: 'primary' | 'secondary' = 'primary', limit: number = 12) {
+    const newsletterId = await getNewsletterIdFromIssue(issueId)
+
     // Get feeds for this section
     const { data: feeds, error: feedsError } = await supabaseAdmin
       .from('rss_feeds')
       .select('id')
       .eq('active', true)
+      .eq('publication_id', newsletterId)
       .eq(section === 'primary' ? 'use_for_primary_section' : 'use_for_secondary_section', true)
 
     if (feedsError || !feeds || feeds.length === 0) {

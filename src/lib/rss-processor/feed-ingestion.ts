@@ -64,7 +64,7 @@ export class FeedIngestion {
 
         for (const feed of allFeeds) {
           try {
-            const result = await this.ingestFeedPosts(feed, pub.id)
+            const result = await this.ingestFeedPosts(feed, pub.id, allFeeds.map(f => f.id))
             totalFetched += result.fetched
             totalScored += result.scored
           } catch (error) {
@@ -82,7 +82,7 @@ export class FeedIngestion {
   /**
    * Ingest posts from a single feed
    */
-  private async ingestFeedPosts(feed: any, newsletterId: string): Promise<{ fetched: number; scored: number }> {
+  private async ingestFeedPosts(feed: any, newsletterId: string, publicationFeedIds: string[]): Promise<{ fetched: number; scored: number }> {
     try {
       const rssFeed = await parser.parseURL(feed.url)
 
@@ -120,6 +120,7 @@ export class FeedIngestion {
           .from('rss_posts')
           .select('id')
           .eq('external_id', externalId)
+          .in('feed_id', publicationFeedIds)
           .maybeSingle()
 
         if (existing) continue
