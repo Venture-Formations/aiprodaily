@@ -2,13 +2,22 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
+const PROMPT_COLS = 'id, publication_id, prompt_module_id, title, prompt_text, category, use_case, suggested_model, difficulty_level, is_featured, is_active, display_order, priority, times_used, created_at, updated_at'
+
 // GET - List all prompt ideas
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'prompt-ideas' },
-  async ({ logger }) => {
+  async ({ request, logger }) => {
+    const publicationId = new URL(request.url).searchParams.get('publication_id')
+
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
+    }
+
     const { data: prompts, error } = await supabaseAdmin
       .from('prompt_ideas')
-      .select('*')
+      .select(PROMPT_COLS)
+      .eq('publication_id', publicationId)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -25,22 +34,16 @@ export const POST = withApiHandler(
   { authTier: 'authenticated', logContext: 'prompt-ideas' },
   async ({ request, logger }) => {
     const body = await request.json()
+    const { publication_id } = body
 
-    // Get accounting newsletter ID
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('slug', 'accounting')
-      .single()
-
-    if (!newsletter) {
-      return NextResponse.json({ error: 'Newsletter not found' }, { status: 404 })
+    if (!publication_id) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
 
     const { data: prompt, error } = await supabaseAdmin
       .from('prompt_ideas')
       .insert({
-        publication_id: newsletter.id,
+        publication_id,
         title: body.title,
         prompt_text: body.prompt_text,
         category: body.category || null,

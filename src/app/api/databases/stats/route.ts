@@ -1,89 +1,66 @@
 import { NextResponse } from 'next/server';
 import { withApiHandler } from '@/lib/api-handler';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export const GET = withApiHandler(
-  { authTier: 'public', logContext: 'databases-stats' },
-  async ({ request, logger }) => {
-    const supabase = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+  { authTier: 'authenticated', logContext: 'databases-stats' },
+  async ({ request }) => {
+    const publicationId = new URL(request.url).searchParams.get('publication_id')
 
-    // AI Applications count
-    const { data: aiAppsCount, error: aiAppsError } = await supabase
-      .from('ai_applications')
-      .select('id', { count: 'exact' });
-
-    if (aiAppsError) {
-      console.error('[API] Error fetching AI applications count:', aiAppsError.message);
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
 
-    // Prompt Ideas count
-    const { data: promptsCount, error: promptsError } = await supabase
-      .from('prompt_ideas')
-      .select('id', { count: 'exact' });
+    // All counts filtered by publication_id
+    const [
+      { count: aiAppsCount, error: aiAppsError },
+      { count: promptsCount, error: promptsError },
+      { count: adsCount, error: adsError },
+      { count: pollsCount, error: pollsError },
+      { count: manualArticlesCount, error: manualArticlesError },
+    ] = await Promise.all([
+      supabaseAdmin.from('ai_applications').select('id', { count: 'exact', head: true }).eq('publication_id', publicationId),
+      supabaseAdmin.from('prompt_ideas').select('id', { count: 'exact', head: true }).eq('publication_id', publicationId),
+      supabaseAdmin.from('advertisements').select('id', { count: 'exact', head: true }).eq('publication_id', publicationId),
+      supabaseAdmin.from('polls').select('id', { count: 'exact', head: true }).eq('publication_id', publicationId),
+      supabaseAdmin.from('manual_articles').select('id', { count: 'exact', head: true }).eq('publication_id', publicationId),
+    ])
 
-    if (promptsError) {
-      console.error('[API] Error fetching prompt ideas count:', promptsError.message);
-    }
-
-    // Advertisements count
-    const { data: adsCount, error: adsError } = await supabase
-      .from('advertisements')
-      .select('id', { count: 'exact' });
-
-    if (adsError) {
-      console.error('[API] Error fetching Ads count:', adsError.message);
-    }
-
-    // Polls count
-    const { data: pollsCount, error: pollsError } = await supabase
-      .from('polls')
-      .select('id', { count: 'exact' });
-
-    if (pollsError) {
-      console.error('[API] Error fetching polls count:', pollsError.message);
-    }
-
-    // Manual Articles count
-    const { data: manualArticlesCount, error: manualArticlesError } = await supabase
-      .from('manual_articles')
-      .select('id', { count: 'exact' });
-
-    if (manualArticlesError) {
-      console.error('[API] Error fetching manual articles count:', manualArticlesError.message);
-    }
+    if (aiAppsError) console.error('[DB] Error fetching AI applications count:', aiAppsError.message)
+    if (promptsError) console.error('[DB] Error fetching prompt ideas count:', promptsError.message)
+    if (adsError) console.error('[DB] Error fetching Ads count:', adsError.message)
+    if (pollsError) console.error('[DB] Error fetching polls count:', pollsError.message)
+    if (manualArticlesError) console.error('[DB] Error fetching manual articles count:', manualArticlesError.message)
 
     const databases = [
       {
         name: 'AI Applications',
-        description: 'AI tools and applications for accountants',
-        count: aiAppsCount?.length || 0,
+        description: 'AI tools and applications featured in the newsletter',
+        count: aiAppsCount || 0,
         href: '/dashboard/databases/ai-apps'
       },
       {
         name: 'Prompt Ideas',
-        description: 'AI prompts and templates for accounting tasks',
-        count: promptsCount?.length || 0,
+        description: 'AI prompts and templates for the newsletter',
+        count: promptsCount || 0,
         href: '/dashboard/databases/prompt-ideas'
       },
       {
         name: 'Advertisements',
         description: 'Newsletter advertisement submissions',
-        count: adsCount?.length || 0,
+        count: adsCount || 0,
         href: '/dashboard/databases/ads'
       },
       {
         name: 'Polls',
         description: 'Newsletter polls for subscriber engagement',
-        count: pollsCount?.length || 0,
+        count: pollsCount || 0,
         href: '/dashboard/polls'
       },
       {
         name: 'Manual Articles',
         description: 'Custom articles for newsletters and /news pages',
-        count: manualArticlesCount?.length || 0,
+        count: manualArticlesCount || 0,
         href: '/dashboard/databases/manual-articles'
       }
     ];

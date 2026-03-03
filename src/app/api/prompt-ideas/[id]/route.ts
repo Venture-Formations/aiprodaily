@@ -7,14 +7,20 @@ import { supabaseAdmin } from '@/lib/supabase'
  */
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'prompt-ideas/[id]' },
-  async ({ params, logger }) => {
+  async ({ request, params }) => {
     const id = params.id
+    const publicationId = new URL(request.url).searchParams.get('publication_id')
 
-    const { data: prompt, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('prompt_ideas')
-      .select('*')
+      .select('id, publication_id, prompt_module_id, title, prompt_text, category, use_case, suggested_model, difficulty_level, is_featured, is_active, display_order, priority, times_used, created_at, updated_at')
       .eq('id', id)
-      .single()
+
+    if (publicationId) {
+      query = query.eq('publication_id', publicationId)
+    }
+
+    const { data: prompt, error } = await query.single()
 
     if (error) {
       if (error.code === 'PGRST116') {
@@ -38,19 +44,24 @@ export const GET = withApiHandler(
  */
 export const PATCH = withApiHandler(
   { authTier: 'authenticated', logContext: 'prompt-ideas/[id]' },
-  async ({ params, request, logger }) => {
+  async ({ params, request }) => {
     const id = params.id
     const body = await request.json()
+    const { publication_id, ...updateFields } = body
 
-    const { data: prompt, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('prompt_ideas')
       .update({
-        ...body,
+        ...updateFields,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
-      .select()
-      .single()
+
+    if (publication_id) {
+      query = query.eq('publication_id', publication_id)
+    }
+
+    const { data: prompt, error } = await query.select().single()
 
     if (error) throw error
 
@@ -66,13 +77,20 @@ export const PATCH = withApiHandler(
  */
 export const DELETE = withApiHandler(
   { authTier: 'authenticated', logContext: 'prompt-ideas/[id]' },
-  async ({ params, logger }) => {
+  async ({ request, params }) => {
     const id = params.id
+    const publicationId = new URL(request.url).searchParams.get('publication_id')
 
-    const { error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('prompt_ideas')
       .delete()
       .eq('id', id)
+
+    if (publicationId) {
+      query = query.eq('publication_id', publicationId)
+    }
+
+    const { error } = await query
 
     if (error) throw error
 

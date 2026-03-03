@@ -2,20 +2,29 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
+const APP_COLS = 'id, publication_id, app_name, description, category, app_url, tool_type, affiliate_url, category_priority, pinned_position, is_active, is_featured, is_paid_placement, is_affiliate, ai_app_module_id, times_shown, last_shown_at, cooldown_until, created_at, updated_at'
+
 /**
  * GET /api/ai-apps - List AI applications
  * Query params:
+ *   - publication_id: Required - filter by publication (multi-tenant isolation)
  *   - ids: comma-separated list of app IDs to fetch
  */
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'ai-apps' },
   async ({ request }) => {
     const { searchParams } = new URL(request.url)
+    const publicationId = searchParams.get('publication_id')
     const idsParam = searchParams.get('ids')
+
+    if (!publicationId) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
+    }
 
     let query = supabaseAdmin
       .from('ai_applications')
-      .select('*')
+      .select(APP_COLS)
+      .eq('publication_id', publicationId)
 
     // Filter by specific IDs if provided
     if (idsParam) {
@@ -42,19 +51,10 @@ export const POST = withApiHandler(
   { authTier: 'authenticated', logContext: 'ai-apps' },
   async ({ request }) => {
     const body = await request.json()
+    const { publication_id } = body
 
-    // Get the accounting newsletter ID
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('slug', 'accounting')
-      .single()
-
-    if (!newsletter) {
-      return NextResponse.json(
-        { error: 'Newsletter not found' },
-        { status: 404 }
-      )
+    if (!publication_id) {
+      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
     }
 
     // Validate required fields
@@ -68,8 +68,8 @@ export const POST = withApiHandler(
     const { data: app, error } = await supabaseAdmin
       .from('ai_applications')
       .insert({
-        publication_id: newsletter.id,
-        ...body
+        ...body,
+        publication_id
       })
       .select()
       .single()

@@ -7,14 +7,20 @@ import { supabaseAdmin } from '@/lib/supabase'
  */
 export const GET = withApiHandler(
   { authTier: 'authenticated', logContext: 'ai-apps/[id]' },
-  async ({ params }) => {
+  async ({ request, params }) => {
     const { id } = params
+    const publicationId = new URL(request.url).searchParams.get('publication_id')
 
-    const { data: app, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('ai_applications')
-      .select('*')
+      .select('id, publication_id, app_name, description, category, app_url, tool_type, affiliate_url, category_priority, pinned_position, is_active, is_featured, is_paid_placement, is_affiliate, ai_app_module_id, times_shown, last_shown_at, cooldown_until, created_at, updated_at')
       .eq('id', id)
-      .single()
+
+    if (publicationId) {
+      query = query.eq('publication_id', publicationId)
+    }
+
+    const { data: app, error } = await query.single()
 
     if (error) {
       if (error.code === 'PGRST116') {
@@ -41,19 +47,20 @@ export const PATCH = withApiHandler(
   async ({ request, params }) => {
     const { id } = params
     const body = await request.json()
+    const { publication_id, ...updateFields } = body
 
     // Build update object with validation
     const updates: Record<string, unknown> = {
-      ...body,
+      ...updateFields,
       updated_at: new Date().toISOString()
     }
 
     // Validate pinned_position (must be 1-20 or null)
-    if ('pinned_position' in body) {
-      if (body.pinned_position === null || body.pinned_position === '') {
+    if ('pinned_position' in updateFields) {
+      if (updateFields.pinned_position === null || updateFields.pinned_position === '') {
         updates.pinned_position = null
       } else {
-        const position = parseInt(body.pinned_position)
+        const position = parseInt(updateFields.pinned_position)
         if (isNaN(position) || position < 1 || position > 20) {
           return NextResponse.json(
             { success: false, error: 'Pinned position must be between 1 and 20' },
@@ -64,12 +71,16 @@ export const PATCH = withApiHandler(
       }
     }
 
-    const { data: app, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('ai_applications')
       .update(updates)
       .eq('id', id)
-      .select()
-      .single()
+
+    if (publication_id) {
+      query = query.eq('publication_id', publication_id)
+    }
+
+    const { data: app, error } = await query.select().single()
 
     if (error) throw error
 
@@ -85,13 +96,20 @@ export const PATCH = withApiHandler(
  */
 export const DELETE = withApiHandler(
   { authTier: 'authenticated', logContext: 'ai-apps/[id]' },
-  async ({ params }) => {
+  async ({ request, params }) => {
     const { id } = params
+    const publicationId = new URL(request.url).searchParams.get('publication_id')
 
-    const { error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('ai_applications')
       .delete()
       .eq('id', id)
+
+    if (publicationId) {
+      query = query.eq('publication_id', publicationId)
+    }
+
+    const { error } = await query
 
     if (error) throw error
 

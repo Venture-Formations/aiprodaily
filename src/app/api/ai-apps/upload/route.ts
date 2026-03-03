@@ -29,10 +29,18 @@ export const POST = withApiHandler(
     const formData = await request.formData()
     const file = formData.get('file') as File
     const moduleId = formData.get('module_id') as string | null
+    const publicationId = formData.get('publication_id') as string | null
 
     if (!file) {
       return NextResponse.json(
         { error: 'No file provided' },
+        { status: 400 }
+      )
+    }
+
+    if (!publicationId) {
+      return NextResponse.json(
+        { error: 'publication_id is required' },
         { status: 400 }
       )
     }
@@ -45,20 +53,6 @@ export const POST = withApiHandler(
       return NextResponse.json(
         { error: 'CSV file is empty or has no data rows' },
         { status: 400 }
-      )
-    }
-
-    // Get the accounting newsletter ID
-    const { data: newsletter } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('slug', 'accounting')
-      .single()
-
-    if (!newsletter) {
-      return NextResponse.json(
-        { error: 'Newsletter not found' },
-        { status: 404 }
       )
     }
 
@@ -92,7 +86,7 @@ export const POST = withApiHandler(
         const isAffiliate = ['yes', 'true', '1', 'y'].includes(affiliateValue)
 
         const app: any = {
-          publication_id: newsletter.id,
+          publication_id: publicationId,
           app_name: row['Tool Name']?.trim() || row['tool name']?.trim() || row['App Name']?.trim() || null,
           category: row['Category']?.trim() || null,
           tool_type: row['Tool Type']?.trim() || row['tool type']?.trim() || 'Client',
@@ -152,7 +146,7 @@ export const POST = withApiHandler(
       const { data: existingApps } = await supabaseAdmin
         .from('ai_applications')
         .select('id, app_name, app_url, ai_app_module_id')
-        .eq('publication_id', newsletter.id)
+        .eq('publication_id', publicationId)
 
       const existingAppMap = new Map(
         existingApps?.map(app => [app.app_name.toLowerCase(), app]) || []
