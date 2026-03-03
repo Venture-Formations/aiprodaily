@@ -33,7 +33,7 @@ async function handlePostback(request: Request, logger: ReturnType<typeof import
 
   const clickId = String(merged.click_id || '') || ''
   const revenueRaw = merged.revenue != null ? String(merged.revenue) : null
-  const email = String(merged.email || '') || undefined
+  let email: string | undefined = String(merged.email || '') || undefined
   const eventParam = String(merged.event || merged.action || '') || undefined
 
   if (!clickId) {
@@ -41,6 +41,21 @@ async function handlePostback(request: Request, logger: ReturnType<typeof import
       { error: 'click_id is required' },
       { status: 400 }
     )
+  }
+
+  // If email missing, look up from click mapping table
+  if (!email && clickId) {
+    const { data: mapping } = await supabaseAdmin
+      .from('afteroffers_click_mappings')
+      .select('email')
+      .eq('publication_id', PUBLICATION_ID)
+      .eq('click_id', clickId)
+      .maybeSingle()
+
+    if (mapping?.email) {
+      email = mapping.email
+      logger.info({ clickId }, 'Resolved email from click mapping')
+    }
   }
 
   const eventType = eventParam && eventParam.trim() !== '' ? eventParam : 'conversion'
