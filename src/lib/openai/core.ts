@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { openai, anthropic } from './clients'
 import type { StructuredPromptConfig } from './types'
+import { extractResponseContent, parseAIResponseJSON } from './response-parser'
 
 // Helper function to fetch prompt from database with code fallback
 // When publicationId is provided, tries publication_settings first (per-tenant), then falls back to app_settings
@@ -188,29 +189,6 @@ export async function getPromptWithProvider(key: string, fallback: string): Prom
   }
 }
 
-function parseJSONResponse(content: string) {
-  try {
-    // Clean the content - remove any text before/after JSON (support both objects {} and arrays [])
-    const objectMatch = content.match(/\{[\s\S]*\}/)
-    const arrayMatch = content.match(/\[[\s\S]*\]/)
-
-    if (objectMatch) {
-      // Prefer object match to preserve full response structure (e.g., {"bullet_hooks":[],"summary":""})
-      return JSON.parse(objectMatch[0])
-    } else if (arrayMatch) {
-      // Use array match only if no object wraps it
-      return JSON.parse(arrayMatch[0])
-    } else {
-      // Try parsing the entire content
-      return JSON.parse(content.trim())
-    }
-  } catch (parseError) {
-    // Not an error - many prompts return plain text, not JSON
-    // Wrap in { raw: content } for calling code to extract
-    return { raw: content }
-  }
-}
-
 // Helper function to call OpenAI or Claude with structured prompt from database
 // Sends the JSON prompt EXACTLY as-is (with placeholder replacement only)
 export async function callWithStructuredPrompt(
@@ -331,139 +309,18 @@ export async function callWithStructuredPrompt(
 
       clearTimeout(timeoutId)
 
-      // Extract content from Responses API format
-      // For GPT-5 (reasoning model), search for json_schema content item explicitly
-      // since reasoning block may be first item (empty, redacted)
-      const outputArray = response.output?.[0]?.content
-      const jsonSchemaItem = outputArray?.find((c: any) => c.type === "json_schema")
-      const textItem = outputArray?.find((c: any) => c.type === "text")
+      const rawContent = extractResponseContent(response)
 
-      let rawContent = jsonSchemaItem?.json ??                    // JSON schema response (GPT-5 compatible)
-        jsonSchemaItem?.input_json ??                             // Alternative JSON location
-        response.output?.[0]?.content?.[0]?.json ??              // Fallback: first content item (GPT-4o)
-        response.output?.[0]?.content?.[0]?.input_json ??        // Fallback: first input_json
-        textItem?.text ??                                         // Text from text content item
-        response.output?.[0]?.content?.[0]?.text ??              // Fallback: first text
-        response.output_text ??                                   // Legacy location
-        response.text ??
-        ""
-
-      if (!rawContent || (typeof rawContent === 'string' && rawContent === '')) {
-        console.error('[AI] No content found in OpenAI response:', JSON.stringify({
-          hasOutput: !!response.output,
-          outputLength: response.output?.length,
-          outputText: response.output_text,
-          responseKeys: Object.keys(response || {})
-        }, null, 2))
-        throw new Error('No response from OpenAI')
-      }
-
-      // If rawContent is already a parsed object/array (from JSON schema), use it directly
-      // This matches the test endpoint behavior - if it's an object, use it as-is
-      if (typeof rawContent === 'object' && rawContent !== null && !Array.isArray(rawContent)) {
-        // Check if it's the response wrapper (has 'output', 'output_text', 'id')
-        if ('output' in rawContent || 'output_text' in rawContent || 'id' in rawContent) {
-          // This is the response wrapper - try to extract actual content
-          const extracted = rawContent.output_text ?? rawContent.text
-          if (extracted && typeof extracted !== 'object') {
-            // Extracted content is a string, continue to parsing
-            rawContent = extracted
-          } else if (extracted && typeof extracted === 'object') {
-            // Extracted content is already parsed, use it
-            return extracted
-          } else {
-            // Can't extract, might be valid response structure
-            return rawContent
-          }
-        } else {
-          // Already the parsed AI response content (from JSON schema)
-          return rawContent
-        }
-      } else if (Array.isArray(rawContent)) {
-        // Already a parsed array (from JSON schema)
+      // If already parsed (object/array from JSON schema), return directly
+      if (typeof rawContent !== 'string') {
         return rawContent
       }
 
-      // Otherwise, it's a string that needs parsing
-      content = typeof rawContent === 'string' ? rawContent : String(rawContent)
+      content = rawContent
     }
 
-    // Try to parse as JSON, fallback to raw content (same for both providers)
-    try {
-      // Ensure content is defined and is a string (should be set in if/else above)
-      if (typeof content === 'undefined') {
-        console.error('[AI] Content variable is undefined - this should not happen')
-        return { raw: 'Content was undefined' }
-      }
-
-      // Validate content is a string
-      if (!content || typeof content !== 'string') {
-        console.error('[AI] Invalid content type for parsing:', typeof content, content)
-        return { raw: content }
-      }
-
-      let cleanedContent: string = String(content) // Ensure it's definitely a string
-      try {
-        const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
-        if (codeFenceMatch && codeFenceMatch[1] !== undefined) {
-          cleanedContent = codeFenceMatch[1]
-        }
-      } catch (matchError) {
-        // If regex matching fails, use original content
-        console.warn('[AI] Regex match failed, using original content:', matchError)
-        cleanedContent = String(content)
-      }
-
-      // Validate cleanedContent is still a string
-      if (!cleanedContent || typeof cleanedContent !== 'string') {
-        console.error('[AI] Invalid cleanedContent after code fence removal:', typeof cleanedContent, cleanedContent)
-        return { raw: content }
-      }
-
-      // Ensure cleanedContent is still a valid string before calling .match()
-      if (!cleanedContent || typeof cleanedContent !== 'string') {
-        console.error('[AI] cleanedContent is not a string before regex matching:', typeof cleanedContent, cleanedContent)
-        return { raw: content }
-      }
-
-      let objectMatch: RegExpMatchArray | null = null
-      let arrayMatch: RegExpMatchArray | null = null
-
-      try {
-        objectMatch = cleanedContent.match(/\{[\s\S]*\}/)
-      } catch (matchError) {
-        console.warn('[AI] Object match failed:', matchError)
-      }
-
-      try {
-        arrayMatch = cleanedContent.match(/\[[\s\S]*\]/)
-      } catch (matchError) {
-        console.warn('[AI] Array match failed:', matchError)
-      }
-
-      // Prefer object match to preserve full response structure (e.g., {"bullet_hooks":[],"summary":""})
-      let parsed: any
-      if (objectMatch && Array.isArray(objectMatch) && objectMatch[0]) {
-        parsed = JSON.parse(objectMatch[0])
-      } else if (arrayMatch && Array.isArray(arrayMatch) && arrayMatch[0]) {
-        parsed = JSON.parse(arrayMatch[0])
-      } else {
-        parsed = JSON.parse(cleanedContent.trim())
-      }
-
-      // Debug: Log parsed content to check newlines preservation
-      if (parsed && parsed.content) {
-        console.log(`[AI][Parsed] Content length: ${parsed.content.length}`)
-        console.log(`[AI][Parsed] Contains \\n: ${parsed.content.includes('\n')}`)
-        console.log(`[AI][Parsed] Contains \\n\\n: ${parsed.content.includes('\n\n')}`)
-        console.log(`[AI][Parsed] First 300 chars: ${parsed.content.substring(0, 300)}`)
-      }
-
-      return parsed
-    } catch (parseError) {
-      // Return raw content wrapped in object
-      return { raw: content }
-    }
+    // Parse string content as JSON (same for both providers)
+    return parseAIResponseJSON(content)
   } catch (error) {
     clearTimeout(timeoutId)
     throw error

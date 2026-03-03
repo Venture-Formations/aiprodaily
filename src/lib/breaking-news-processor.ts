@@ -1,6 +1,7 @@
 import Parser from 'rss-parser'
 import { supabaseAdmin } from './supabase'
-import { AI_PROMPTS, callOpenAI } from './openai'
+import { callOpenAI } from './openai'
+import { AI_PROMPTS } from './openai/prompt-loaders'
 import { ErrorHandler, SlackNotificationService } from './slack'
 import type { RssFeed, RssPost } from '@/types/database'
 
