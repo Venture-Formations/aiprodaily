@@ -1,5 +1,3 @@
-const { withWorkflow } = require('workflow/next')
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
@@ -20,4 +18,9 @@ const nextConfig = {
   // No static rewrites needed — new publications auto-route via DB lookup
 }
 
-module.exports = withWorkflow(nextConfig)
+if (process.env.VERCEL) {
+  const { withWorkflow } = require('workflow/next')
+  module.exports = withWorkflow(nextConfig)
+} else {
+  module.exports = nextConfig
+}
