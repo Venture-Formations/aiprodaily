@@ -118,6 +118,30 @@ async function handlePostback(request: Request, logger: ReturnType<typeof import
     'Recorded AfterOffers postback event'
   )
 
+  // Update MailerLite subscriber field for conversion events
+  if (email && eventType === 'conversion') {
+    try {
+      const { MailerLiteService } = await import('@/lib/mailerlite/mailerlite-service')
+      const mailerlite = new MailerLiteService()
+      let result = await mailerlite.updateSubscriberField(email, 'afteroffers_conversion', 'true')
+
+      // Retry if subscriber not found yet (timing issue)
+      if (!result.success && result.error === 'Subscriber not found') {
+        logger.info({ email: maskEmail(email) }, 'Subscriber not found, retrying in 2s')
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        result = await mailerlite.updateSubscriberField(email, 'afteroffers_conversion', 'true')
+      }
+
+      if (result.success) {
+        logger.info({ email: maskEmail(email) }, 'Updated MailerLite afteroffers_conversion field')
+      } else {
+        logger.warn({ error: result.error }, 'Failed to update MailerLite afteroffers_conversion field')
+      }
+    } catch (mlError) {
+      logger.error({ err: mlError }, 'MailerLite afteroffers_conversion update error (non-fatal)')
+    }
+  }
+
   return NextResponse.json({ success: true })
 }
 
