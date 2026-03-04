@@ -19,7 +19,10 @@
     "test:rss-workflow:pr": "node scripts/run-rss-workflow-tests.mjs --base origin/master",
     "migrate:normalize-ads": "npx tsx scripts/migrate-normalize-ads.ts",
     "migrate:advertorial-to-module": "npx tsx scripts/migrate-advertorial-to-module.ts",
-    "provision-publication": "npx tsx scripts/provision-publication.ts"
+    "provision-publication": "npx tsx scripts/provision-publication.ts",
+    "migrate:staging": "node scripts/run-migrations.mjs staging",
+    "migrate:prod": "node scripts/run-migrations.mjs prod",
+    "refresh-staging": "bash scripts/refresh-staging.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.67.0",

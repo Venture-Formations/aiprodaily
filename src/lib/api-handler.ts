@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
 import { createLogger, type Logger } from '@/lib/logger'
 import type { AuthTier } from '@/lib/auth-tiers'
+import { isCronEnabled } from '@/lib/env-guard'
 
 /**
  * Standard API route wrapper.
@@ -86,6 +87,13 @@ export function withApiHandler<TInput = unknown>(
         if (!bearerValid && !paramValid && !isVercelCron) {
           logger.warn('Unauthorized system route access attempt')
           return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        // Cron kill switch: skip Vercel-scheduled crons when CRON_ENABLED=false
+        // Manual triggers (Bearer token / secret param) bypass this check
+        if (!isCronEnabled() && isVercelCron) {
+          logger.info('Cron skipped: CRON_ENABLED=false')
+          return NextResponse.json({ skipped: true, reason: 'CRON_ENABLED=false' }, { status: 200 })
         }
       } else if (config.authTier === 'authenticated' || config.authTier === 'admin') {
         session = await getServerSession(authOptions)

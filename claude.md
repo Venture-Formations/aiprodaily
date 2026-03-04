@@ -70,6 +70,7 @@ This project uses a **branch-based workflow** with pull requests:
 | Advertorials / ads | docs/feature-summary.md (Ads section), `src/lib/newsletter-templates.ts` | Confirm Stage 1/2 unassignment behaviors and ad rotation settings. |
 | Campaign dashboard or admin UI | docs/feature-summary.md | Keep React server components aligned with workflow data. |
 | Cron / automation | docs/operations/cron-jobs.md, docs/vercel-api.md | Check schedule, secrets, and failure recovery steps. |
+| Environments / staging / data isolation | docs/operations/staging-supabase-implementation-plan.md | Staging Supabase project, Vercel env scoping, migration automation. |
 | Quick task recipes | docs/recipes/quick-actions.md | Follow step-by-step provisioning or debug checklists. |
 | Troubleshooting production issues | docs/troubleshooting/common-issues.md, docs/status/CLEANUP_RECOMMENDATIONS.md | Use symptom-driven guides before modifying code; review outstanding cleanup items. |
 | External SDK integrations | docs/vercel-ai-sdk.md, docs/examples/OPENAI_RESPONSES_API_GUIDE.md | Align SDK usage, streaming patterns, and auth configuration. |
@@ -244,6 +245,7 @@ The account system provides self-service for advertisers and users:
 
 ## 15. Automation & Ops
 - Cron schedules, secrets, recovery: docs/operations/cron-jobs.md
+- Staging Supabase and data isolation: docs/operations/staging-supabase-implementation-plan.md
 - Vercel deployment & API notes: docs/vercel-api.md
 - Testing checklist: docs/checklists/TESTING_CHECKLIST.md
 - Bug-pattern checks (scoped to changed files): docs/checklists/bug-pattern-checks.md — run before commit or in PR via `npm run check:bug-patterns` / `npm run check:bug-patterns:pr`
