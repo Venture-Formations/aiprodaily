@@ -2,7 +2,7 @@
 // Provides typed access to publication_settings with fallback to app_settings
 
 import { supabaseAdmin } from './supabase'
-import { getEnvironment } from './env-guard'
+import { shouldApplySendGuards } from './env-guard'
 
 // ==================== CORE FUNCTIONS ====================
 
@@ -314,14 +314,13 @@ export async function getEmailSettings(publicationId: string): Promise<{
     mailerlite_group_id: settings.mailerlite_group_id || '',
   }
 
-  // Fail-closed on non-production: require override env vars so Preview never targets production audiences
-  const env = getEnvironment()
-  if (env !== 'production') {
+  // Fail-closed on non-production/staging: require override env vars so Preview/Staging never targets production audiences
+  if (shouldApplySendGuards()) {
     const reviewOverride = process.env.MAILERLITE_REVIEW_GROUP_ID_OVERRIDE
     const mainOverride = process.env.MAILERLITE_MAIN_GROUP_ID_OVERRIDE
     if (!reviewOverride || !mainOverride) {
       throw new Error(
-        `[ENV-GUARD] Non-production env "${env}" requires MAILERLITE_REVIEW_GROUP_ID_OVERRIDE and MAILERLITE_MAIN_GROUP_ID_OVERRIDE to be set. ` +
+        '[ENV-GUARD] Non-production/staging env requires MAILERLITE_REVIEW_GROUP_ID_OVERRIDE and MAILERLITE_MAIN_GROUP_ID_OVERRIDE to be set. ' +
         'Refusing to send with production group IDs.'
       )
     }
@@ -384,15 +383,14 @@ export async function getEmailProviderSettings(publicationId: string): Promise<{
     secondaryGroupId: settings.mailerlite_secondary_group_id || '',
   }
 
-  // Fail-closed on non-production: require override env vars so Preview never targets production audiences
-  const env = getEnvironment()
-  if (env !== 'production') {
+  // Fail-closed on non-production/staging: require override env vars so Preview/Staging never targets production audiences
+  if (shouldApplySendGuards()) {
     const reviewOverride = process.env.MAILERLITE_REVIEW_GROUP_ID_OVERRIDE
     const mainOverride = process.env.MAILERLITE_MAIN_GROUP_ID_OVERRIDE
     const secondaryOverride = process.env.MAILERLITE_SECONDARY_GROUP_ID_OVERRIDE
     if (!reviewOverride || !mainOverride) {
       throw new Error(
-        `[ENV-GUARD] Non-production env "${env}" requires MAILERLITE_REVIEW_GROUP_ID_OVERRIDE and MAILERLITE_MAIN_GROUP_ID_OVERRIDE to be set. ` +
+        '[ENV-GUARD] Non-production/staging env requires MAILERLITE_REVIEW_GROUP_ID_OVERRIDE and MAILERLITE_MAIN_GROUP_ID_OVERRIDE to be set. ' +
         'Refusing to send with production group IDs.'
       )
     }
