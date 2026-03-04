@@ -54,7 +54,6 @@ export const GET = withApiHandler(
       throw new Error(`Database error: ${error.message}`)
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase can't infer types from long column strings
     const data = rawData as unknown as any[] | null
 
     // Load configurable defaults from publication_settings
