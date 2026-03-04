@@ -43,9 +43,11 @@ export const GET = withApiHandler(
     const defaults = await getPublicationSettings(PUBLICATION_ID, [
       'sparkloop_default_cr',
       'sparkloop_default_rcr',
+      'sparkloop_min_conversions_budget',
     ])
     const defaultCr = defaults.sparkloop_default_cr ? parseFloat(defaults.sparkloop_default_cr) : FALLBACK_DEFAULT_CR
     const defaultRcr = defaults.sparkloop_default_rcr ? parseFloat(defaults.sparkloop_default_rcr) : FALLBACK_DEFAULT_RCR
+    const minConversionsBudget = defaults.sparkloop_min_conversions_budget ? parseInt(defaults.sparkloop_min_conversions_budget) : 10
 
     // Calculate scores for each recommendation
     const withScores = (data || []).map(rec => {
@@ -233,6 +235,7 @@ export const GET = withApiHandler(
       defaults: {
         cr: defaultCr,
         rcr: defaultRcr,
+        minConversionsBudget,
       },
     })
   }
@@ -273,6 +276,17 @@ export const PATCH = withApiHandler(
         }
         await updatePublicationSetting(PUBLICATION_ID, 'sparkloop_default_rcr', String(val))
         results.push(`RCR=${val}%`)
+      }
+      if ('min_conversions_budget' in body && body.min_conversions_budget !== undefined) {
+        const val = parseInt(body.min_conversions_budget)
+        if (isNaN(val) || val < 1 || val > 100) {
+          return NextResponse.json(
+            { success: false, error: 'min_conversions_budget must be between 1 and 100' },
+            { status: 400 }
+          )
+        }
+        await updatePublicationSetting(PUBLICATION_ID, 'sparkloop_min_conversions_budget', String(val))
+        results.push(`MCB=${val}`)
       }
       logger.info({ updated: results }, 'Updated defaults')
       return NextResponse.json({ success: true, updated: results })

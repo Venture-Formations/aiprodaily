@@ -15,6 +15,7 @@ import type {
   StoredSparkLoopRecommendation,
 } from '@/types/sparkloop'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getPublicationSettings } from '@/lib/publication-settings'
 
 const SPARKLOOP_API_BASE = 'https://api.sparkloop.app/v2'
 
@@ -347,7 +348,7 @@ export class SparkLoopService {
     updated: number
     active: number
     paused: number
-    outOfBudget: number
+    lowBudget: number
     confirmDeltas: number
     rejectionDeltas: number
   }> {
@@ -356,9 +357,15 @@ export class SparkLoopService {
       this.getAllRecommendations(),
       this.getPartnerCampaigns(),
     ])
+    // Read min conversions budget from publication settings (default: 10)
+    const pubSettings = await getPublicationSettings(publicationId, ['sparkloop_min_conversions_budget'])
+    const minConversionsBudget = pubSettings.sparkloop_min_conversions_budget
+      ? parseInt(pubSettings.sparkloop_min_conversions_budget)
+      : 10
+
     let created = 0
     let updated = 0
-    let outOfBudget = 0
+    let lowBudget = 0
     let confirmDeltas = 0
     let rejectionDeltas = 0
 
@@ -414,32 +421,40 @@ export class SparkLoopService {
       // The partner_campaigns endpoint can disagree — recommendations API is authoritative.
       // Only override: manual pauses set by admin in our dashboard.
       const isManuallyPaused = existing?.paused_reason === 'manual'
-      const effectiveStatus = isManuallyPaused ? 'paused' : rec.status
+      let effectiveStatus = isManuallyPaused ? 'paused' : rec.status
 
-      const pausedReason = isManuallyPaused
+      let pausedReason: string | null = isManuallyPaused
         ? 'manual'
         : (rec.status === 'paused' ? 'api_paused' : null)
 
       const remainingBudget = budgetInfo?.remaining_budget_dollars ?? 0
       const screeningPeriod = budgetInfo?.referral_pending_period ?? null
       const cpaInDollars = (rec.cpa || 0) / 100
-      const minBudgetRequired = cpaInDollars * 5 // Need at least 5 referrals worth of budget
+      const minBudgetRequired = cpaInDollars * minConversionsBudget
 
-      // Budget-based auto-exclusion only for active recs with known budget
-      const isOutOfBudget = effectiveStatus === 'active' && budgetInfo && remainingBudget < minBudgetRequired
+      // Budget-based auto-pause only for active recs with known budget
+      const isLowBudget = budgetInfo && remainingBudget < minBudgetRequired
 
+      if (isLowBudget && effectiveStatus === 'active' && !isManuallyPaused) {
+        effectiveStatus = 'paused'
+        pausedReason = 'low_budget'
+        lowBudget++
+        console.log(`[SparkLoop] Auto-pausing ${rec.publication_name} (budget $${remainingBudget} < ${minConversionsBudget}x CPA $${minBudgetRequired})`)
+      } else if (!isLowBudget && existing?.paused_reason === 'low_budget') {
+        // Budget restored — un-pause (effectiveStatus already set from rec.status above)
+        pausedReason = rec.status === 'paused' ? 'api_paused' : null
+        console.log(`[SparkLoop] Auto-reactivating ${rec.publication_name} (budget restored: $${remainingBudget})`)
+      }
+
+      // Preserve manual exclusion state (not related to budget)
       let excluded = existing?.excluded ?? false
       let excludedReason = existing?.excluded_reason ?? null
 
-      if (isOutOfBudget && !excluded) {
-        excluded = true
-        excludedReason = 'budget_used_up'
-        outOfBudget++
-        console.log(`[SparkLoop] Auto-excluding ${rec.publication_name} (budget $${remainingBudget} < 5x CPA $${minBudgetRequired})`)
-      } else if (!isOutOfBudget && excluded && excludedReason === 'budget_used_up') {
+      // Clear legacy budget_used_up exclusions — budget now uses paused_reason instead
+      if (excluded && excludedReason === 'budget_used_up') {
         excluded = false
         excludedReason = null
-        console.log(`[SparkLoop] Auto-reactivating ${rec.publication_name} (budget restored: $${remainingBudget})`)
+        console.log(`[SparkLoop] Clearing legacy budget_used_up exclusion for ${rec.publication_name}`)
       }
 
       // Clear legacy partner_paused exclusions — status now comes from API directly
@@ -586,11 +601,11 @@ export class SparkLoopService {
     const active = recommendations.filter(r => r.status === 'active').length
     const paused = recommendations.filter(r => r.status === 'paused').length
 
-    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (API: ${active} active, ${paused} paused | ${pausedByPartner} disappeared, ${outOfBudget} budget-excluded, ${reactivated} reactivated | budget match: ${budgetMatched} [${matchedByUuid} uuid, ${matchedByName} name], unmatched: ${budgetUnmatched})`)
+    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (API: ${active} active, ${paused} paused | ${pausedByPartner} disappeared, ${lowBudget} low-budget-paused, ${reactivated} reactivated | budget match: ${budgetMatched} [${matchedByUuid} uuid, ${matchedByName} name], unmatched: ${budgetUnmatched})`)
     if (confirmDeltas > 0 || rejectionDeltas > 0) {
       console.log(`[SparkLoop] Deltas tracked: +${confirmDeltas} confirms, +${rejectionDeltas} rejections`)
     }
-    return { synced: recommendations.length, created, updated, active, paused, outOfBudget, confirmDeltas, rejectionDeltas }
+    return { synced: recommendations.length, created, updated, active, paused, lowBudget, confirmDeltas, rejectionDeltas }
   }
 
   /**

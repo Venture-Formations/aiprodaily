@@ -21,13 +21,13 @@ export const GET = withApiHandler(
     // Take daily snapshot after sync (idempotent — last sync of the day wins)
     const snapshotCount = await service.takeDailySnapshot(PUBLICATION_ID)
 
-    logger.info(`Completed: ${result.synced} synced, ${result.outOfBudget} auto-excluded, +${result.confirmDeltas} confirms, +${result.rejectionDeltas} rejections, ${snapshotCount} snapshot rows`)
+    logger.info(`Completed: ${result.synced} synced, ${result.lowBudget} low-budget-paused, +${result.confirmDeltas} confirms, +${result.rejectionDeltas} rejections, ${snapshotCount} snapshot rows`)
 
     return NextResponse.json({
       success: true,
       ...result,
       snapshotCount,
-      message: `Synced ${result.synced} recommendations (${result.created} new, ${result.updated} updated, ${result.outOfBudget} auto-excluded, +${result.confirmDeltas} confirms, +${result.rejectionDeltas} rejections, ${snapshotCount} snapshot rows)`,
+      message: `Synced ${result.synced} recommendations (${result.created} new, ${result.updated} updated, ${result.lowBudget} low-budget-paused, +${result.confirmDeltas} confirms, +${result.rejectionDeltas} rejections, ${snapshotCount} snapshot rows)`,
     })
   }
 )

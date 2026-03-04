@@ -74,6 +74,7 @@ interface Column {
 interface Defaults {
   cr: number
   rcr: number
+  minConversionsBudget: number
 }
 
 interface DetailedTabProps {
@@ -186,6 +187,8 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
   const [editingDefaultRcr, setEditingDefaultRcr] = useState(false)
   const [defaultCrInput, setDefaultCrInput] = useState('')
   const [defaultRcrInput, setDefaultRcrInput] = useState('')
+  const [editingDefaultMcb, setEditingDefaultMcb] = useState(false)
+  const [defaultMcbInput, setDefaultMcbInput] = useState('')
   const [defaultSaving, setDefaultSaving] = useState(false)
 
   const dateRangeActive = dateRangeMetrics !== null
@@ -522,18 +525,26 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
     setOverrideSaving(false)
   }
 
-  async function saveDefault(field: 'cr' | 'rcr') {
-    const value = field === 'cr' ? defaultCrInput : defaultRcrInput
-    const parsed = parseFloat(value)
-    if (isNaN(parsed) || parsed < 0 || parsed > 100) {
-      alert('Value must be between 0 and 100')
-      return
+  async function saveDefault(field: 'cr' | 'rcr' | 'mcb') {
+    const value = field === 'cr' ? defaultCrInput : field === 'rcr' ? defaultRcrInput : defaultMcbInput
+    const parsed = field === 'mcb' ? parseInt(value) : parseFloat(value)
+    if (field === 'mcb') {
+      if (isNaN(parsed) || parsed < 1 || parsed > 100) {
+        alert('Value must be between 1 and 100')
+        return
+      }
+    } else {
+      if (isNaN(parsed) || parsed < 0 || parsed > 100) {
+        alert('Value must be between 0 and 100')
+        return
+      }
     }
     setDefaultSaving(true)
     try {
       const body: Record<string, unknown> = { action: 'set_defaults' }
       if (field === 'cr') body.default_cr = parsed
       if (field === 'rcr') body.default_rcr = parsed
+      if (field === 'mcb') body.min_conversions_budget = parsed
 
       const res = await fetch('/api/sparkloop/admin', {
         method: 'PATCH',
@@ -544,6 +555,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
       if (data.success) {
         if (field === 'cr') setEditingDefaultCr(false)
         if (field === 'rcr') setEditingDefaultRcr(false)
+        if (field === 'mcb') setEditingDefaultMcb(false)
         onRefresh()
       } else {
         alert('Save failed: ' + data.error)
@@ -1101,6 +1113,56 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
                 }}
                 className="p-0.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"
                 title="Edit default RCR"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 text-xs">
+          <span className="text-gray-500">Min. Conv. Budget:</span>
+          {editingDefaultMcb ? (
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                step="1"
+                min="1"
+                max="100"
+                value={defaultMcbInput}
+                onChange={e => setDefaultMcbInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') saveDefault('mcb')
+                  if (e.key === 'Escape') setEditingDefaultMcb(false)
+                }}
+                autoFocus
+                className="w-16 px-1.5 py-0.5 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+              />
+              <button
+                onClick={() => saveDefault('mcb')}
+                disabled={defaultSaving}
+                className="p-0.5 rounded text-green-600 hover:bg-green-100 disabled:opacity-50"
+                title="Save"
+              >
+                <Check className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setEditingDefaultMcb(false)}
+                className="p-0.5 rounded text-gray-400 hover:bg-gray-100"
+                title="Cancel"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <span className="font-medium">{defaults.minConversionsBudget}</span>
+              <button
+                onClick={() => {
+                  setDefaultMcbInput(String(defaults.minConversionsBudget))
+                  setEditingDefaultMcb(true)
+                }}
+                className="p-0.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                title="Edit min conversions budget"
               >
                 <Pencil className="w-3 h-3" />
               </button>
