@@ -100,7 +100,7 @@ export const authOptions: NextAuthOptions = {
               // Check if user exists in our users table
               const { data: existingUser } = await supabaseAdmin
                 .from('users')
-                .select('*')
+                .select('id')
                 .eq('email', user.email)
                 .single()
 

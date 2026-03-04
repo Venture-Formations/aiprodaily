@@ -20,9 +20,24 @@ export const GET = withApiHandler(
     const { searchParams } = new URL(request.url)
     const filter = searchParams.get('filter') || 'all' // all, active, excluded
 
+    const REC_COLUMNS = [
+      'id', 'publication_id', 'ref_code', 'sparkloop_uuid',
+      'publication_name', 'publication_logo', 'description',
+      'type', 'status', 'cpa', 'screening_period', 'sparkloop_rcr',
+      'pinned', 'position', 'max_payout', 'partner_program_uuid',
+      'sparkloop_pending', 'sparkloop_rejected', 'sparkloop_confirmed',
+      'sparkloop_earnings', 'sparkloop_net_earnings',
+      'impressions', 'selections', 'submissions', 'confirms', 'rejections', 'pending',
+      'our_total_subscribes', 'our_confirms', 'our_rejections', 'our_pending',
+      'our_cr', 'our_rcr', 'override_cr', 'override_rcr',
+      'excluded', 'excluded_reason', 'paused_reason',
+      'remaining_budget_dollars', 'eligible_for_module',
+      'last_synced_at', 'created_at', 'updated_at',
+    ].join(', ')
+
     let query = supabaseAdmin
       .from('sparkloop_recommendations')
-      .select('*')
+      .select(REC_COLUMNS)
       .eq('publication_id', PUBLICATION_ID)
 
     if (filter === 'active') {
@@ -33,11 +48,14 @@ export const GET = withApiHandler(
       query = query.eq('status', 'paused').or('excluded.is.null,excluded.eq.false')
     }
 
-    const { data, error } = await query
+    const { data: rawData, error } = await query
 
     if (error) {
       throw new Error(`Database error: ${error.message}`)
     }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase can't infer types from long column strings
+    const data = rawData as unknown as any[] | null
 
     // Load configurable defaults from publication_settings
     const defaults = await getPublicationSettings(PUBLICATION_ID, [

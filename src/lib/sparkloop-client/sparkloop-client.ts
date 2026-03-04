@@ -19,6 +19,14 @@ import { getPublicationSettings } from '@/lib/publication-settings'
 
 const SPARKLOOP_API_BASE = 'https://api.sparkloop.app/v2'
 
+/** Format a Date as YYYY-MM-DD using local date parts (avoids UTC shift from toISOString) */
+function toDateString(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 /**
  * Normalize Gmail addresses by stripping periods from the local part.
  * Gmail ignores periods, so david.pennertz@gmail.com === davidpennertz@gmail.com.
@@ -613,9 +621,24 @@ export class SparkLoopService {
    * Falls back to API if no stored data
    */
   async getStoredRecommendations(publicationId: string = PUBLICATION_ID): Promise<StoredSparkLoopRecommendation[]> {
+    const columns = [
+      'id', 'publication_id', 'ref_code', 'sparkloop_uuid',
+      'publication_name', 'publication_logo', 'description',
+      'type', 'status', 'cpa', 'screening_period', 'sparkloop_rcr',
+      'pinned', 'position', 'max_payout', 'partner_program_uuid',
+      'sparkloop_pending', 'sparkloop_rejected', 'sparkloop_confirmed',
+      'sparkloop_earnings', 'sparkloop_net_earnings',
+      'impressions', 'selections', 'submissions', 'confirms', 'rejections', 'pending',
+      'our_total_subscribes', 'our_confirms', 'our_rejections', 'our_pending',
+      'our_cr', 'our_rcr', 'override_cr', 'override_rcr',
+      'excluded', 'excluded_reason', 'paused_reason',
+      'remaining_budget_dollars', 'eligible_for_module',
+      'last_synced_at', 'created_at', 'updated_at',
+    ].join(', ')
+
     const { data, error } = await supabaseAdmin
       .from('sparkloop_recommendations')
-      .select('*')
+      .select(columns)
       .eq('publication_id', publicationId)
       .eq('status', 'active')
       .order('cpa', { ascending: false })
@@ -627,15 +650,15 @@ export class SparkLoopService {
       // Retry fetch after sync
       const { data: refreshedData } = await supabaseAdmin
         .from('sparkloop_recommendations')
-        .select('*')
+        .select(columns)
         .eq('publication_id', publicationId)
         .eq('status', 'active')
         .order('cpa', { ascending: false })
 
-      return (refreshedData || []) as StoredSparkLoopRecommendation[]
+      return (refreshedData || []) as unknown as StoredSparkLoopRecommendation[]
     }
 
-    return data as StoredSparkLoopRecommendation[]
+    return data as unknown as StoredSparkLoopRecommendation[]
   }
 
   /**
@@ -893,7 +916,7 @@ export class SparkLoopService {
    * Idempotent — last sync of the day wins
    */
   async takeDailySnapshot(publicationId: string = PUBLICATION_ID): Promise<number> {
-    const today = new Date().toISOString().split('T')[0]
+    const today = toDateString(new Date())
 
     const { data: recs, error } = await supabaseAdmin
       .from('sparkloop_recommendations')
@@ -969,7 +992,7 @@ export class SparkLoopService {
     if (!recs || recs.length === 0) return results
 
     const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
+    const todayStr = toDateString(today)
 
     // Get today's snapshots for all recs
     const { data: todaySnaps } = await supabaseAdmin
@@ -989,7 +1012,7 @@ export class SparkLoopService {
     // Get window-start snapshots (W days ago)
     const windowStart = new Date(today)
     windowStart.setDate(windowStart.getDate() - windowDays)
-    const windowStartStr = windowStart.toISOString().split('T')[0]
+    const windowStartStr = toDateString(windowStart)
 
     // For window-start, get the closest snapshot on or before the target date
     const { data: windowStartSnaps } = await supabaseAdmin
@@ -1025,7 +1048,7 @@ export class SparkLoopService {
       .from('sparkloop_referrals')
       .select('ref_code, subscribed_at')
       .eq('publication_id', publicationId)
-      .gte('subscribed_at', sendsRangeStart.toISOString().split('T')[0])
+      .gte('subscribed_at', toDateString(sendsRangeStart))
 
     // Group referrals by ref_code with their dates
     const referralsByRefCode = new Map<string, Date[]>()
