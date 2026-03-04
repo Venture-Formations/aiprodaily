@@ -19,7 +19,7 @@ export const POST = withApiHandler(
     return NextResponse.json({
       success: true,
       ...result,
-      message: `Synced ${result.synced} recommendations (${result.created} new, ${result.updated} updated, ${result.outOfBudget} auto-excluded for budget)`,
+      message: `Synced ${result.synced} recommendations (${result.created} new, ${result.updated} updated, ${result.lowBudget} low-budget-paused)`,
     })
   }
 )

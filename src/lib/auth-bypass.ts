@@ -1,14 +1,17 @@
 /**
- * Authentication Bypass — Local Development Only
+ * Authentication Bypass — Non-Production Environments
  *
- * Controlled via ALLOW_AUTH_BYPASS=true in .env.local.
- * Never set this on Vercel (staging or production).
+ * Controlled via ALLOW_AUTH_BYPASS=true.
+ * Allowed on: local dev, staging (STAGING=true), preview deployments.
+ * Blocked on: production (VERCEL_ENV=production without STAGING=true).
  */
 
 export function shouldBypassAuth(): boolean {
   if (process.env.ALLOW_AUTH_BYPASS === 'true') {
-    if (process.env.VERCEL) {
-      console.error('[SECURITY] ALLOW_AUTH_BYPASS is set on Vercel! Remove it immediately.')
+    // Block on real production (not staging)
+    if (process.env.VERCEL_ENV === 'production' && process.env.STAGING !== 'true') {
+      console.error('[SECURITY] ALLOW_AUTH_BYPASS is set on production! Remove it immediately.')
+      return false
     }
     return true
   }

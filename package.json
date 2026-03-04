@@ -22,7 +22,7 @@
     "provision-publication": "npx tsx scripts/provision-publication.ts",
     "migrate:staging": "node scripts/run-migrations.mjs staging",
     "migrate:prod": "node scripts/run-migrations.mjs prod",
-    "refresh-staging": "bash scripts/refresh-staging.sh"
+    "refresh-staging": "node scripts/refresh-staging.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.67.0",

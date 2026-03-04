@@ -15,8 +15,17 @@ import type {
   StoredSparkLoopRecommendation,
 } from '@/types/sparkloop'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getPublicationSettings } from '@/lib/publication-settings'
 
 const SPARKLOOP_API_BASE = 'https://api.sparkloop.app/v2'
+
+/** Format a Date as YYYY-MM-DD using local date parts (avoids UTC shift from toISOString) */
+function toDateString(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
 
 /**
  * Normalize Gmail addresses by stripping periods from the local part.
@@ -347,7 +356,7 @@ export class SparkLoopService {
     updated: number
     active: number
     paused: number
-    outOfBudget: number
+    lowBudget: number
     confirmDeltas: number
     rejectionDeltas: number
   }> {
@@ -356,9 +365,15 @@ export class SparkLoopService {
       this.getAllRecommendations(),
       this.getPartnerCampaigns(),
     ])
+    // Read min conversions budget from publication settings (default: 10)
+    const pubSettings = await getPublicationSettings(publicationId, ['sparkloop_min_conversions_budget'])
+    const minConversionsBudget = pubSettings.sparkloop_min_conversions_budget
+      ? parseInt(pubSettings.sparkloop_min_conversions_budget)
+      : 10
+
     let created = 0
     let updated = 0
-    let outOfBudget = 0
+    let lowBudget = 0
     let confirmDeltas = 0
     let rejectionDeltas = 0
 
@@ -414,32 +429,40 @@ export class SparkLoopService {
       // The partner_campaigns endpoint can disagree — recommendations API is authoritative.
       // Only override: manual pauses set by admin in our dashboard.
       const isManuallyPaused = existing?.paused_reason === 'manual'
-      const effectiveStatus = isManuallyPaused ? 'paused' : rec.status
+      let effectiveStatus = isManuallyPaused ? 'paused' : rec.status
 
-      const pausedReason = isManuallyPaused
+      let pausedReason: string | null = isManuallyPaused
         ? 'manual'
         : (rec.status === 'paused' ? 'api_paused' : null)
 
       const remainingBudget = budgetInfo?.remaining_budget_dollars ?? 0
       const screeningPeriod = budgetInfo?.referral_pending_period ?? null
       const cpaInDollars = (rec.cpa || 0) / 100
-      const minBudgetRequired = cpaInDollars * 5 // Need at least 5 referrals worth of budget
+      const minBudgetRequired = cpaInDollars * minConversionsBudget
 
-      // Budget-based auto-exclusion only for active recs with known budget
-      const isOutOfBudget = effectiveStatus === 'active' && budgetInfo && remainingBudget < minBudgetRequired
+      // Budget-based auto-pause only for active recs with known budget
+      const isLowBudget = budgetInfo && remainingBudget < minBudgetRequired
 
+      if (isLowBudget && effectiveStatus === 'active' && !isManuallyPaused) {
+        effectiveStatus = 'paused'
+        pausedReason = 'low_budget'
+        lowBudget++
+        console.log(`[SparkLoop] Auto-pausing ${rec.publication_name} (budget $${remainingBudget} < ${minConversionsBudget}x CPA $${minBudgetRequired})`)
+      } else if (!isLowBudget && existing?.paused_reason === 'low_budget') {
+        // Budget restored — un-pause (effectiveStatus already set from rec.status above)
+        pausedReason = rec.status === 'paused' ? 'api_paused' : null
+        console.log(`[SparkLoop] Auto-reactivating ${rec.publication_name} (budget restored: $${remainingBudget})`)
+      }
+
+      // Preserve manual exclusion state (not related to budget)
       let excluded = existing?.excluded ?? false
       let excludedReason = existing?.excluded_reason ?? null
 
-      if (isOutOfBudget && !excluded) {
-        excluded = true
-        excludedReason = 'budget_used_up'
-        outOfBudget++
-        console.log(`[SparkLoop] Auto-excluding ${rec.publication_name} (budget $${remainingBudget} < 5x CPA $${minBudgetRequired})`)
-      } else if (!isOutOfBudget && excluded && excludedReason === 'budget_used_up') {
+      // Clear legacy budget_used_up exclusions — budget now uses paused_reason instead
+      if (excluded && excludedReason === 'budget_used_up') {
         excluded = false
         excludedReason = null
-        console.log(`[SparkLoop] Auto-reactivating ${rec.publication_name} (budget restored: $${remainingBudget})`)
+        console.log(`[SparkLoop] Clearing legacy budget_used_up exclusion for ${rec.publication_name}`)
       }
 
       // Clear legacy partner_paused exclusions — status now comes from API directly
@@ -586,11 +609,11 @@ export class SparkLoopService {
     const active = recommendations.filter(r => r.status === 'active').length
     const paused = recommendations.filter(r => r.status === 'paused').length
 
-    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (API: ${active} active, ${paused} paused | ${pausedByPartner} disappeared, ${outOfBudget} budget-excluded, ${reactivated} reactivated | budget match: ${budgetMatched} [${matchedByUuid} uuid, ${matchedByName} name], unmatched: ${budgetUnmatched})`)
+    console.log(`[SparkLoop] Synced ${recommendations.length} recommendations: ${created} created, ${updated} updated (API: ${active} active, ${paused} paused | ${pausedByPartner} disappeared, ${lowBudget} low-budget-paused, ${reactivated} reactivated | budget match: ${budgetMatched} [${matchedByUuid} uuid, ${matchedByName} name], unmatched: ${budgetUnmatched})`)
     if (confirmDeltas > 0 || rejectionDeltas > 0) {
       console.log(`[SparkLoop] Deltas tracked: +${confirmDeltas} confirms, +${rejectionDeltas} rejections`)
     }
-    return { synced: recommendations.length, created, updated, active, paused, outOfBudget, confirmDeltas, rejectionDeltas }
+    return { synced: recommendations.length, created, updated, active, paused, lowBudget, confirmDeltas, rejectionDeltas }
   }
 
   /**
@@ -598,9 +621,24 @@ export class SparkLoopService {
    * Falls back to API if no stored data
    */
   async getStoredRecommendations(publicationId: string = PUBLICATION_ID): Promise<StoredSparkLoopRecommendation[]> {
+    const columns = [
+      'id', 'publication_id', 'ref_code', 'sparkloop_uuid',
+      'publication_name', 'publication_logo', 'description',
+      'type', 'status', 'cpa', 'screening_period', 'sparkloop_rcr',
+      'pinned', 'position', 'max_payout', 'partner_program_uuid',
+      'sparkloop_pending', 'sparkloop_rejected', 'sparkloop_confirmed',
+      'sparkloop_earnings', 'sparkloop_net_earnings',
+      'impressions', 'selections', 'submissions', 'confirms', 'rejections', 'pending',
+      'our_total_subscribes', 'our_confirms', 'our_rejections', 'our_pending',
+      'our_cr', 'our_rcr', 'override_cr', 'override_rcr',
+      'excluded', 'excluded_reason', 'paused_reason',
+      'remaining_budget_dollars', 'eligible_for_module',
+      'last_synced_at', 'created_at', 'updated_at',
+    ].join(', ')
+
     const { data, error } = await supabaseAdmin
       .from('sparkloop_recommendations')
-      .select('*')
+      .select(columns)
       .eq('publication_id', publicationId)
       .eq('status', 'active')
       .order('cpa', { ascending: false })
@@ -612,15 +650,15 @@ export class SparkLoopService {
       // Retry fetch after sync
       const { data: refreshedData } = await supabaseAdmin
         .from('sparkloop_recommendations')
-        .select('*')
+        .select(columns)
         .eq('publication_id', publicationId)
         .eq('status', 'active')
         .order('cpa', { ascending: false })
 
-      return (refreshedData || []) as StoredSparkLoopRecommendation[]
+      return (refreshedData || []) as unknown as StoredSparkLoopRecommendation[]
     }
 
-    return data as StoredSparkLoopRecommendation[]
+    return data as unknown as StoredSparkLoopRecommendation[]
   }
 
   /**
@@ -878,7 +916,7 @@ export class SparkLoopService {
    * Idempotent — last sync of the day wins
    */
   async takeDailySnapshot(publicationId: string = PUBLICATION_ID): Promise<number> {
-    const today = new Date().toISOString().split('T')[0]
+    const today = toDateString(new Date())
 
     const { data: recs, error } = await supabaseAdmin
       .from('sparkloop_recommendations')
@@ -954,7 +992,7 @@ export class SparkLoopService {
     if (!recs || recs.length === 0) return results
 
     const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
+    const todayStr = toDateString(today)
 
     // Get today's snapshots for all recs
     const { data: todaySnaps } = await supabaseAdmin
@@ -974,7 +1012,7 @@ export class SparkLoopService {
     // Get window-start snapshots (W days ago)
     const windowStart = new Date(today)
     windowStart.setDate(windowStart.getDate() - windowDays)
-    const windowStartStr = windowStart.toISOString().split('T')[0]
+    const windowStartStr = toDateString(windowStart)
 
     // For window-start, get the closest snapshot on or before the target date
     const { data: windowStartSnaps } = await supabaseAdmin
@@ -1010,7 +1048,7 @@ export class SparkLoopService {
       .from('sparkloop_referrals')
       .select('ref_code, subscribed_at')
       .eq('publication_id', publicationId)
-      .gte('subscribed_at', sendsRangeStart.toISOString().split('T')[0])
+      .gte('subscribed_at', toDateString(sendsRangeStart))
 
     // Group referrals by ref_code with their dates
     const referralsByRefCode = new Map<string, Date[]>()

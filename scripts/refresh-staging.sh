@@ -8,6 +8,14 @@ set -euo pipefail
 #
 # Requires: pg_dump, psql
 
+# Add PostgreSQL to PATH (Windows)
+export PATH="/c/Program Files/PostgreSQL/18/bin:/c/Program Files/PostgreSQL/17/bin:/c/Program Files/PostgreSQL/16/bin:$PATH"
+
+if ! command -v pg_dump &>/dev/null; then
+  echo "Error: pg_dump not found. Install PostgreSQL or add its bin directory to PATH." >&2
+  exit 1
+fi
+
 if [ -z "${PROD_DATABASE_URL:-}" ]; then
   echo "Error: PROD_DATABASE_URL is not set." >&2
   exit 1

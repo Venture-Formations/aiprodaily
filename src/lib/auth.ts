@@ -1,5 +1,6 @@
 import NextAuth, { type NextAuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
+import CredentialsProvider from 'next-auth/providers/credentials'
 import { supabaseAdmin } from '@/lib/supabase'
 import type { User } from '@/types/database'
 import { shouldBypassAuth, getMockSession } from '@/lib/auth-bypass'
@@ -11,6 +12,24 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    })
+  )
+}
+
+// Add a staging auto-login provider when auth bypass is enabled
+if (process.env.ALLOW_AUTH_BYPASS === 'true') {
+  providers.push(
+    CredentialsProvider({
+      id: 'staging-bypass',
+      name: 'Staging Auto-Login',
+      credentials: {},
+      async authorize() {
+        return {
+          id: 'staging-admin',
+          email: process.env.ALLOWED_ADMIN_EMAILS?.split(',')[0]?.trim() || 'dev@staging',
+          name: 'Staging Admin',
+        }
+      },
     })
   )
 }
@@ -81,7 +100,7 @@ export const authOptions: NextAuthOptions = {
               // Check if user exists in our users table
               const { data: existingUser } = await supabaseAdmin
                 .from('users')
-                .select('*')
+                .select('id')
                 .eq('email', user.email)
                 .single()
 

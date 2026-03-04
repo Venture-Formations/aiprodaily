@@ -89,6 +89,7 @@ interface GlobalStats {
 interface Defaults {
   cr: number
   rcr: number
+  minConversionsBudget: number
 }
 
 interface DailyStats {
@@ -129,7 +130,7 @@ export default function SparkLoopAdminPage() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [counts, setCounts] = useState<Counts>({ total: 0, active: 0, excluded: 0, paused: 0, archived: 0 })
   const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null)
-  const [defaults, setDefaults] = useState<Defaults>({ cr: 22, rcr: 25 })
+  const [defaults, setDefaults] = useState<Defaults>({ cr: 22, rcr: 25, minConversionsBudget: 10 })
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [activeTab, setActiveTab] = useState<'overview' | 'detailed' | 'publications' | 'offers'>('overview')
