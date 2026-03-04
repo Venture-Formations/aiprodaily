@@ -58,7 +58,7 @@ async function handlePostback(request: Request, logger: ReturnType<typeof import
     }
   }
 
-  const eventType = eventParam && eventParam.trim() !== '' ? eventParam : 'conversion'
+  const eventType = eventParam && eventParam.trim() !== '' ? eventParam.trim().toLowerCase() : 'conversion'
 
   let revenue: number | null = null
   if (revenueRaw != null) {
@@ -137,8 +137,9 @@ async function handlePostback(request: Request, logger: ReturnType<typeof import
       } else {
         logger.warn({ error: result.error }, 'Failed to update MailerLite afteroffers_conversion field')
       }
-    } catch (mlError) {
-      logger.error({ err: mlError }, 'MailerLite afteroffers_conversion update error (non-fatal)')
+    } catch (mlError: unknown) {
+      const errMsg = mlError instanceof Error ? mlError.message : 'Unknown error'
+      logger.error({ error: errMsg, clickId, maskedEmail: maskEmail(email) }, 'MailerLite afteroffers_conversion update error (non-fatal)')
     }
   }
 
