@@ -23,7 +23,7 @@ Related references:
 | `/api/cron/send-final` | `*/5 * * * *` | Sends final issue when window matches | Performs Stage 2 unassignment post-send. 600s timeout. |
 | `/api/cron/send-secondary` | `*/5 * * * *` | Sends secondary newsletter | For publications with secondary content. 600s timeout. |
 | `/api/cron/monitor-workflows` | `*/5 * * * *` | Detects failed/stuck workflows | Slack alerts when steps exceed thresholds. |
-| `/api/cron/process-mailerlite-updates` | `*/5 * * * *` | Processes MailerLite webhook updates | 120s timeout. |
+| `/api/cron/process-mailerlite-updates` | `*/5 * * * *` | Processes MailerLite webhook updates | 120s timeout. Throttled (700ms between calls) and 429 retry; limit ~120 req/min shared with Make.com (e.g. link-click → CreateUpdateSubscriber). |
 | `/api/cron/cleanup-pending-submissions` | `0 7 * * *` | Clears stale ad submissions | Daily at 7 AM. Keeps Stripe sessions tidy. 600s timeout. |
 | `/api/cron/import-metrics` | `0 6 * * *` | Syncs MailerLite metrics | Daily at 6 AM; ensure API limits considered. 600s timeout. |
 | `/api/cron/health-check` | `*/5 8-22 * * *` | Pings core services during business hours | Alerts on downtime. 600s timeout. |
