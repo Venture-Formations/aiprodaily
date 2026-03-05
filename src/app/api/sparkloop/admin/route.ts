@@ -32,6 +32,7 @@ export const GET = withApiHandler(
       'our_cr', 'our_rcr', 'override_cr', 'override_rcr',
       'excluded', 'excluded_reason', 'paused_reason',
       'remaining_budget_dollars', 'eligible_for_module',
+      'last_seen_in_generate', 'page_impressions', 'page_submissions', 'page_cr',
       'last_synced_at', 'created_at', 'updated_at',
     ].join(', ')
 
