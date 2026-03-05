@@ -71,6 +71,15 @@ const BULK_TABLES = [
 // Stale objects to drop after restore (remnants from old schema)
 const STALE_TABLES = ['newsletters']
 
+// Known-safe pg_restore warnings that can be ignored
+const BENIGN_RESTORE_PATTERNS = [
+  /already exists/i,
+  /schema "public" already exists/i,
+  /extension .* already exists/i,
+  /WARNING:/i,
+  /NOTICE:/i,
+]
+
 // ── Parse CLI args ───────────────────────────────────────────────────────────
 const fullMode = process.argv.includes('--full')
 const mode = fullMode ? 'full' : 'quick'
@@ -116,6 +125,8 @@ const dumpFile = join(tmpdir(), `staging-refresh-${timestamp}.dump`)
 //  MAIN
 // ══════════════════════════════════════════════════════════════════════════════
 
+let failed = false
+
 try {
   // ── Phase 1: Pre-flight Validation ───────────────────────────────────────
   phase(1, 'Pre-flight Validation')
@@ -123,24 +134,21 @@ try {
   const prodUrl = process.env.PROD_DATABASE_URL
   const stagingUrl = process.env.STAGING_DATABASE_URL
 
-  if (!prodUrl) { console.error('❌ PROD_DATABASE_URL is not set.'); process.exit(1) }
-  if (!stagingUrl) { console.error('❌ STAGING_DATABASE_URL is not set.'); process.exit(1) }
+  if (!prodUrl) throw new Error('PROD_DATABASE_URL is not set.')
+  if (!stagingUrl) throw new Error('STAGING_DATABASE_URL is not set.')
 
   // Direction safety: verify project IDs in connection strings
   // Supabase pooler uses a shared hostname — the project ID is in the username
   if (!prodUrl.includes(PROD_PROJECT_ID)) {
-    console.error(`❌ PROD_DATABASE_URL does not contain production project ID (${PROD_PROJECT_ID}).`)
-    process.exit(1)
+    throw new Error(`PROD_DATABASE_URL does not contain production project ID (${PROD_PROJECT_ID}).`)
   }
 
   if (!stagingUrl.includes(STAGING_PROJECT_ID)) {
-    console.error(`❌ STAGING_DATABASE_URL does not contain staging project ID (${STAGING_PROJECT_ID}).`)
-    process.exit(1)
+    throw new Error(`STAGING_DATABASE_URL does not contain staging project ID (${STAGING_PROJECT_ID}).`)
   }
 
   if (prodUrl === stagingUrl) {
-    console.error('❌ PROD and STAGING URLs are identical — aborting to prevent data loss.')
-    process.exit(1)
+    throw new Error('PROD and STAGING URLs are identical — aborting to prevent data loss.')
   }
 
   const prodHost = parseHost(prodUrl)
@@ -151,10 +159,16 @@ try {
   console.log(`  Staging:     ${STAGING_PROJECT_ID} @ ${stagingHost}`)
 
   try { sql(prodUrl, 'SELECT 1'); console.log('  Production DB:    ✅ connected') }
-  catch (err) { console.error('❌ Cannot connect to production database.'); console.error('  ', (err.stderr || err.message || '').trim().slice(0, 300)); process.exit(1) }
+  catch (err) {
+    const detail = sanitizeError((err.stderr || err.message || '').trim())
+    throw new Error(`Cannot connect to production database. ${detail}`)
+  }
 
   try { sql(stagingUrl, 'SELECT 1'); console.log('  Staging DB:       ✅ connected') }
-  catch (err) { console.error('❌ Cannot connect to staging database.'); console.error('  ', (err.stderr || err.message || '').trim().slice(0, 300)); process.exit(1) }
+  catch (err) {
+    const detail = sanitizeError((err.stderr || err.message || '').trim())
+    throw new Error(`Cannot connect to staging database. ${detail}`)
+  }
 
   // Interactive confirmation
   console.log('')
@@ -210,8 +224,8 @@ try {
       env
     )
   } catch (err) {
-    console.error('❌ pg_dump failed:', sanitizeError(err.stderr || err.message || ''))
-    process.exit(1)
+    const stderr = sanitizeError(err.stderr || '<no stderr output>')
+    throw new Error(`pg_dump failed: ${stderr}`)
   }
 
   const dumpSize = statSync(dumpFile).size
@@ -222,9 +236,16 @@ try {
   console.log('  Restoring to staging (pg_restore)...')
   try {
     runPassthrough(`pg_restore -d "${stagingUrl}" --no-owner --no-acl "${dumpFile}"`, env)
-  } catch {
+  } catch (err) {
     // pg_restore returns non-zero if ANY warning occurs (e.g. extension already exists)
-    console.log('  ⚠️  pg_restore returned warnings (often expected for extensions/schemas)')
+    // Only suppress known-safe warnings; rethrow unexpected fatal errors
+    const output = (err.stderr || err.message || '').toString()
+    const isBenign = BENIGN_RESTORE_PATTERNS.some(pattern => pattern.test(output))
+    if (isBenign || output.trim() === '') {
+      console.log('  ⚠️  pg_restore returned warnings (often expected for extensions/schemas)')
+    } else {
+      throw new Error(`pg_restore failed with unexpected errors: ${sanitizeError(output)}`)
+    }
   }
   console.log('  ✅ Restore complete')
 
@@ -237,12 +258,15 @@ try {
     .filter(f => f.endsWith('.sql'))
     .sort()
 
+  // Use ON_ERROR_STOP=1 so psql fails fast on genuine SQL errors
+  const migEnv = { ...env, ON_ERROR_STOP: '1' }
+
   let migOk = 0
   let migWarn = 0
   for (const file of migrationFiles) {
     const filePath = join(migrationsDir, file)
     try {
-      run(`psql "${stagingUrl}" -f "${filePath}" 2>&1`, env)
+      run(`psql "${stagingUrl}" -v ON_ERROR_STOP=1 -f "${filePath}" 2>&1`, migEnv)
       migOk++
     } catch (err) {
       const output = (err.stdout || '') + (err.stderr || '')
@@ -250,7 +274,7 @@ try {
         migWarn++
       } else {
         // Non-critical post-restore — log and continue
-        console.log(`  ⚠️  ${file}: ${output.slice(0, 200)}`)
+        console.log(`  ⚠️  ${file}: ${sanitizeError(output).slice(0, 200)}`)
         migWarn++
       }
     }
@@ -277,7 +301,7 @@ try {
     sql(stagingUrl, "NOTIFY pgrst, 'reload schema'")
     console.log('  ✅ PostgREST schema cache reloaded')
   } catch (err) {
-    console.log('  ⚠️  NOTIFY failed (non-critical):', (err.stderr || err.message || '').slice(0, 100))
+    console.log('  ⚠️  NOTIFY failed (non-critical):', sanitizeError((err.stderr || err.message || '')).slice(0, 100))
   }
 
   // ── Phase 5: Integrity Validation ────────────────────────────────────────
@@ -295,6 +319,9 @@ try {
   // ── Phase 7: Cleanup & Summary ──────────────────────────────────────────
   phase(7, 'Cleanup & Summary')
 
+} catch (err) {
+  failed = true
+  console.error(`\n❌ ${err.message}`)
 } finally {
   // Always delete dump file, even on error
   if (existsSync(dumpFile)) {
@@ -311,15 +338,18 @@ try {
   if (existsSync(dumpFile)) {
     console.error(`\n❌ SECURITY: Dump file still exists at ${dumpFile}`)
     console.error('   This file contains production data. Delete it immediately.')
-    process.exit(1)
+    process.exitCode = 1
   } else {
     console.log('  ✅ Dump file verified deleted')
   }
 }
 
-// ── Final Summary ──────────────────────────────────────────────────────────
-const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-console.log(`
+if (failed) {
+  process.exitCode = 1
+} else if (!process.exitCode) {
+  // ── Final Summary ──────────────────────────────────────────────────────────
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
+  console.log(`
 ${'═'.repeat(60)}
   STAGING REFRESH COMPLETE (${mode.toUpperCase()} mode)
 ${'═'.repeat(60)}
@@ -332,3 +362,4 @@ ${'═'.repeat(60)}
   - Run a test workflow if needed
 ${'═'.repeat(60)}
 `)
+}

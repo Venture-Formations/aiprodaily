@@ -34,22 +34,22 @@ const SCRUB_OPERATIONS = [
   {
     table: 'contact_submissions',
     description: 'Anonymize emails and names',
-    sql: `UPDATE contact_submissions SET email = md5(email) || '@example.com', name = 'User ' || left(md5(name), 6) WHERE email IS NOT NULL AND email NOT LIKE '%@example.com'`,
+    sql: `UPDATE contact_submissions SET email = CASE WHEN email IS NOT NULL THEN md5(email) || '@example.com' ELSE email END, name = CASE WHEN name IS NOT NULL THEN 'User ' || left(md5(name), 6) ELSE name END WHERE (email IS NOT NULL AND email NOT LIKE '%@example.com') OR (name IS NOT NULL AND name NOT LIKE 'User %')`,
   },
   {
     table: 'feedback_comments',
     description: 'Anonymize author emails and names',
-    sql: `UPDATE feedback_comments SET author_email = md5(author_email) || '@example.com', author_name = 'User ' || left(md5(COALESCE(author_name, '')), 6) WHERE author_email IS NOT NULL AND author_email NOT LIKE '%@example.com'`,
+    sql: `UPDATE feedback_comments SET author_email = CASE WHEN author_email IS NOT NULL THEN md5(author_email) || '@example.com' ELSE author_email END, author_name = CASE WHEN author_name IS NOT NULL THEN 'User ' || left(md5(author_name), 6) ELSE author_name END WHERE (author_email IS NOT NULL AND author_email NOT LIKE '%@example.com') OR (author_name IS NOT NULL AND author_name NOT LIKE 'User %')`,
   },
   {
     table: 'ai_applications',
     description: 'Anonymize submitter info',
-    sql: `UPDATE ai_applications SET submitted_by_email = md5(submitted_by_email) || '@example.com', submitted_by_name = 'User ' || left(md5(COALESCE(submitted_by_name, '')), 6) WHERE submitted_by_email IS NOT NULL AND submitted_by_email NOT LIKE '%@example.com'`,
+    sql: `UPDATE ai_applications SET submitted_by_email = CASE WHEN submitted_by_email IS NOT NULL THEN md5(submitted_by_email) || '@example.com' ELSE submitted_by_email END, submitted_by_name = CASE WHEN submitted_by_name IS NOT NULL THEN 'User ' || left(md5(COALESCE(submitted_by_name, '')), 6) ELSE submitted_by_name END WHERE (submitted_by_email IS NOT NULL AND submitted_by_email NOT LIKE '%@example.com') OR (submitted_by_name IS NOT NULL AND submitted_by_name NOT LIKE 'User %')`,
   },
   {
     table: 'advertisers',
     description: 'Anonymize contact info',
-    sql: `UPDATE advertisers SET contact_email = md5(contact_email) || '@example.com', contact_name = 'User ' || left(md5(COALESCE(contact_name, '')), 6) WHERE contact_email IS NOT NULL AND contact_email NOT LIKE '%@example.com'`,
+    sql: `UPDATE advertisers SET contact_email = CASE WHEN contact_email IS NOT NULL THEN md5(contact_email) || '@example.com' ELSE contact_email END, contact_name = CASE WHEN contact_name IS NOT NULL THEN 'User ' || left(md5(COALESCE(contact_name, '')), 6) ELSE contact_name END WHERE (contact_email IS NOT NULL AND contact_email NOT LIKE '%@example.com') OR (contact_name IS NOT NULL AND contact_name NOT LIKE 'User %')`,
   },
 ]
 
@@ -72,7 +72,7 @@ export function runPiiScrub(dbUrl, runSqlFn) {
     } catch (err) {
       // Table may not exist in staging — that's fine, skip it
       const msg = err.message || err.stderr || ''
-      if (msg.includes('does not exist') || msg.includes('relation')) {
+      if (msg.includes('does not exist') || /relation\s+"?\w+"?\s+does\s+not\s+exist/i.test(msg)) {
         details.push({ table: op.table, description: op.description, rows: 0, ok: true, note: 'table not found' })
         skipped++
       } else {

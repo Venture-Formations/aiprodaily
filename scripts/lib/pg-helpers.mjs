@@ -4,26 +4,29 @@
  * Shared PostgreSQL binary helpers for staging scripts.
  */
 
-import { execSync } from 'child_process'
+import { execSync, execFileSync } from 'child_process'
 import { existsSync } from 'fs'
 
 /**
  * Locate pg_dump/psql binaries. Returns prefix path or '' if on PATH.
+ * Verifies both pg_dump and psql are available since scripts need both.
  */
 export function findPgBin() {
+  // Check if both are on PATH
   try {
     execSync('pg_dump --version', { stdio: 'pipe' })
+    execSync('psql --version', { stdio: 'pipe' })
     return ''
   } catch {}
 
   if (process.platform === 'win32') {
     for (const ver of [18, 17, 16, 15, 14]) {
       const bin = `C:\\Program Files\\PostgreSQL\\${ver}\\bin`
-      if (existsSync(`${bin}\\pg_dump.exe`)) return bin
+      if (existsSync(`${bin}\\pg_dump.exe`) && existsSync(`${bin}\\psql.exe`)) return bin
     }
   }
 
-  console.error('❌ pg_dump not found. Install PostgreSQL or add its bin directory to PATH.')
+  console.error('❌ pg_dump and/or psql not found. Install PostgreSQL or add its bin directory to PATH.')
   process.exit(1)
 }
 
@@ -45,5 +48,10 @@ export function runPassthrough(cmd, env) {
 
 /** Run a SQL query against a database URL and return trimmed stdout. */
 export function runSql(dbUrl, sql, env) {
-  return run(`psql "${dbUrl}" -t -A -c "${sql.replace(/"/g, '\\"')}"`, env).trim()
+  const result = execFileSync('psql', [dbUrl, '-t', '-A', '-c', sql], {
+    encoding: 'utf-8',
+    env,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  })
+  return result.trim()
 }
