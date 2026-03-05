@@ -57,6 +57,13 @@ Related references:
 4. Run endpoint manually with secret to confirm functionality.
 5. Temporarily increase logging and redeploy if still undetected.
 
+## MailerLite Rate Limit (429)
+**Symptoms:** `[MailerLite]` errors, 429 "Too Many Attempts", send-review/send-final or process-mailerlite-updates failing.
+
+1. **Shared limit:** MailerLite allows ~120 requests per minute per account. This app shares the account with **Make.com** (e.g. "Accounting Conversions (Link Click)" scenario that calls CreateUpdateSubscriber on each link click). Morning bursts (review + final send + process-mailerlite-updates every 5 min) can hit the limit.
+2. **Mitigations in code:** The MailerLite axios client retries once on 429 after Retry-After (or 60s). The process-mailerlite-updates cron uses a 700ms delay between subscriber updates and on 429 leaves rows pending (no retry count consumed).
+3. **If 429s persist:** Reduce Make.com scenario frequency or batch size; or lower process-mailerlite-updates `BATCH_SIZE` / increase `DELAY_BETWEEN_CALLS_MS` in `src/app/api/cron/process-mailerlite-updates/route.ts`. Check Vercel logs for `[MailerLite] Rate limited (429)`.
+
 ## Advertorial Missing in Final Send
 **Symptoms:** Email lacks advertorial section or shows fallback copy.
 

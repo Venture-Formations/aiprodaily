@@ -7,6 +7,9 @@ import type { Logger } from '@/lib/logger'
 const BATCH_SIZE = 100 // Process up to 100 updates per run
 const MAX_RETRIES = 3 // Max retry attempts before marking as failed
 const REAL_CLICK_FIELD = 'real_click' // MailerLite custom field key (lowercase)
+/** Throttle to stay under MailerLite's ~120 req/min (shared with Make.com link-click scenario). */
+const DELAY_BETWEEN_CALLS_MS = 700
+const RATE_LIMIT_RETRY_WAIT_MS = 60_000
 
 interface FieldUpdate {
   id: string
@@ -18,20 +21,20 @@ interface FieldUpdate {
 }
 
 /**
- * Updates a subscriber's custom field in MailerLite
+ * Updates a subscriber's custom field in MailerLite.
+ * On 429, retries once after Retry-After; if still 429, returns rateLimited so caller keeps status pending.
  */
 async function updateMailerLiteField(
   email: string,
   fieldName: string,
   fieldValue: boolean
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; rateLimited?: boolean }> {
   const apiKey = process.env.MAILERLITE_API_KEY
   if (!apiKey) {
     return { success: false, error: 'MAILERLITE_API_KEY not configured' }
   }
 
-  try {
-    // Use the MailerLite API to update subscriber field
+  const doRequest = async (): Promise<{ success: boolean; error?: string; rateLimited?: boolean }> => {
     const response = await fetch(
       `https://connect.mailerlite.com/api/subscribers/${encodeURIComponent(email)}`,
       {
@@ -48,25 +51,41 @@ async function updateMailerLiteField(
       }
     )
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      const errorMessage = errorData.message || `HTTP ${response.status}`
-
-      // 404 means subscriber not found - treat as permanent failure
-      if (response.status === 404) {
-        return { success: false, error: `Subscriber not found: ${email}` }
-      }
-
-      return { success: false, error: errorMessage }
+    if (response.ok) {
+      return { success: true }
     }
 
-    return { success: true }
+    const errorData = await response.json().catch(() => ({}))
+    const errorMessage = errorData.message || `HTTP ${response.status}`
+
+    if (response.status === 404) {
+      return { success: false, error: `Subscriber not found: ${email}` }
+    }
+
+    if (response.status === 429) {
+      return { success: false, error: errorMessage, rateLimited: true }
+    }
+
+    return { success: false, error: errorMessage }
+  }
+
+  try {
+    let result = await doRequest()
+    if (result.rateLimited) {
+      await new Promise((r) => setTimeout(r, RATE_LIMIT_RETRY_WAIT_MS))
+      result = await doRequest()
+    }
+    return result
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms))
 }
 
 /**
@@ -324,7 +343,6 @@ async function processMailerLiteUpdates(log: Logger) {
       )
 
       if (result.success) {
-        // Mark as completed
         await supabaseAdmin
           .from('mailerlite_field_updates')
           .update({
@@ -334,7 +352,15 @@ async function processMailerLiteUpdates(log: Logger) {
           .eq('id', update.id)
 
         successCount++
-        log.info(`[MailerLite Updates] Updated ${email}: ${update.field_name}=true`)
+        log.info(`[MailerLite Updates] Updated ${email}: ${update.field_name}=${update.field_value}`)
+      } else if (result.rateLimited) {
+        // Leave as pending so next run retries; do not consume retry_count
+        await supabaseAdmin
+          .from('mailerlite_field_updates')
+          .update({ status: 'pending' })
+          .in('id', updateIds)
+        log.warn(`[MailerLite Updates] Rate limited (429), left ${updates.length} update(s) pending for ${email}`)
+        break // stop this run to avoid further 429s
       } else {
         const newRetryCount = update.retry_count + 1
         const shouldRetry = newRetryCount < MAX_RETRIES
@@ -356,6 +382,8 @@ async function processMailerLiteUpdates(log: Logger) {
 
         log.error(`[MailerLite Updates] Failed ${email}: ${result.error} (retry ${newRetryCount}/${MAX_RETRIES})`)
       }
+
+      await delay(DELAY_BETWEEN_CALLS_MS)
     }
   }
 

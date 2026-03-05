@@ -8,6 +8,10 @@ import { getEnvironment, isProduction } from '../env-guard'
 
 const MAILERLITE_API_BASE = 'https://connect.mailerlite.com/api'
 
+/** MailerLite global limit ~120 requests/min. This app shares the account with Make.com (e.g. link-click → CreateUpdateSubscriber). */
+const MAILERLITE_RATE_LIMIT_RETRY_ATTEMPTS = 2
+const MAILERLITE_RATE_LIMIT_DEFAULT_WAIT_MS = 60_000
+
 const mailerliteClient = axios.create({
   baseURL: MAILERLITE_API_BASE,
   headers: {
@@ -16,6 +20,31 @@ const mailerliteClient = axios.create({
     'Accept': 'application/json',
   },
 })
+
+// On 429, retry once after Retry-After (or default 60s)
+mailerliteClient.interceptors.response.use(
+  (res) => res,
+  async (err) => {
+    const status = err?.response?.status
+    if (status !== 429) return Promise.reject(err)
+
+    const attempt = (err.config._rateLimitAttempt ?? 0) + 1
+    if (attempt > MAILERLITE_RATE_LIMIT_RETRY_ATTEMPTS) {
+      console.error('[MailerLite] Rate limited (429), max retries reached')
+      return Promise.reject(err)
+    }
+
+    const retryAfterSec = err?.response?.headers?.['x-ratelimit-retry-after']
+    const waitMs = retryAfterSec
+      ? Math.min(Number(retryAfterSec) * 1000, 120_000)
+      : MAILERLITE_RATE_LIMIT_DEFAULT_WAIT_MS
+
+    console.warn(`[MailerLite] Rate limited (429), retrying after ${waitMs / 1000}s (attempt ${attempt})`)
+    err.config._rateLimitAttempt = attempt
+    await new Promise((r) => setTimeout(r, waitMs))
+    return mailerliteClient.request(err.config)
+  }
+)
 
 export class MailerLiteService {
   private errorHandler: ErrorHandler
