@@ -12,4 +12,4 @@ export const APP_COLS = 'id, publication_id, app_name, tagline, description, cat
 export const PROMPT_COLS = 'id, publication_id, prompt_module_id, title, prompt_text, category, use_case, suggested_model, difficulty_level, is_featured, is_active, display_order, priority, times_used, created_at, updated_at'
 
 // newsletter_sections columns used by /api/settings/newsletter-sections
-export const SECTION_COLS = 'id, newsletter_id, name, display_order, is_active, section_type, description, created_at'
+export const SECTION_COLS = 'id, publication_id, name, display_order, is_active, section_type, created_at'

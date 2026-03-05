@@ -243,9 +243,25 @@ The account system provides self-service for advertisers and users:
 - **Access:** `callAIWithPrompt(promptKey, newsletterId, variables)`
 - **Provider:** Auto-detected from model name (claude → Anthropic, else → OpenAI)
 
-## 15. Automation & Ops
+## 15. Staging Environment
+The project has a full staging environment with data isolation. See docs/operations/staging-supabase-implementation-plan.md for details.
+
+| Component | Production | Staging |
+|-----------|-----------|---------|
+| Vercel project | `aiprodaily` | `aiprodaily-staging` |
+| Git branch | `master` | `staging` |
+| Supabase project | `vsbdfrqfokoltgjyiivq` | `cbnecpswmjonbdatxzwv` |
+| Crons | Always on | `CRON_ENABLED=false` (manual trigger with Bearer token) |
+| Auth | Google OAuth | Auto-login (`ALLOW_AUTH_BYPASS=true`) |
+| MailerLite | Real groups | Override groups (fail-closed) |
+
+**Key env vars:** `STAGING=true`, `CRON_ENABLED=false`, `ALLOW_AUTH_BYPASS=true`
+**Key helpers:** `isStaging()`, `shouldApplySendGuards()`, `isCronEnabled()` in `src/lib/env-guard.ts`
+**Scripts:** `npm run migrate:staging`, `npm run refresh-staging`
+
+## 16. Automation & Ops
 - Cron schedules, secrets, recovery: docs/operations/cron-jobs.md
-- Staging Supabase and data isolation: docs/operations/staging-supabase-implementation-plan.md
+- Staging environment: docs/operations/staging-supabase-implementation-plan.md
 - Vercel deployment & API notes: docs/vercel-api.md
 - Testing checklist: docs/checklists/TESTING_CHECKLIST.md
 - Bug-pattern checks (scoped to changed files): docs/checklists/bug-pattern-checks.md — run before commit or in PR via `npm run check:bug-patterns` / `npm run check:bug-patterns:pr`
@@ -266,7 +282,7 @@ The account system provides self-service for advertisers and users:
 | `process-mailerlite-updates` | Every 5 min | Processes MailerLite webhooks | ✅ Active |
 | `cleanup-pending-submissions` | Daily 7:00 AM | Clears stale ad submissions | ✅ Active |
 
-## 16. Testing & Verification
+## 17. Testing & Verification
 Before completing work, confirm:
 - `npm run build` passes and affected tests are updated/added.
 - `npm run test:run` passes (Vitest unit tests).
@@ -289,7 +305,7 @@ Before completing work, confirm:
 | Migrations | Apply on staging via Supabase; verify roll-forward/back | Update `docs/migrations/` status file. |
 | Marketing site | `npm run build` on marketing app; Lighthouse smoke check | Confirm assets relocated to `public/`. |
 
-## 17. Environment Overview
+## 18. Environment Overview
 | Area | Key Env Vars | Notes |
 |------|--------------|-------|
 | Supabase | `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL` | Keep server-only; never expose client side. |
@@ -303,7 +319,7 @@ Before completing work, confirm:
 | Google | `GOOGLE_VISION_API_KEY` (optional) | For image analysis. |
 | Slack | `SLACK_WEBHOOK_URL` (optional) | Enables alerts from monitor cron. |
 
-## 18. Cross-Feature Checklist
+## 19. Cross-Feature Checklist
 When changes span multiple domains (e.g., workflow + UI):
 - Update backend logic and corresponding UI components.
 - Adjust prompts or `publication_settings` if new content paths introduced.
@@ -311,12 +327,12 @@ When changes span multiple domains (e.g., workflow + UI):
 - Update docs: core guide here plus impacted feature doc(s).
 - Mention cross-feature impact in pull request notes.
 
-## 19. Documentation Hygiene
+## 20. Documentation Hygiene
 - After modifying workflows, prompts, migrations, or notable features, update the specific doc in `docs/` and ensure this guide references it.
 - If a new area lacks documentation, create it in the appropriate subfolder (`docs/workflows/`, `docs/guides/`, etc.) and add a reference here.
 - Keep links accurate; update them when files move/rename.
 
-## 20. Troubleshooting Primer
+## 21. Troubleshooting Primer
 If issues arise, start with docs/troubleshooting/common-issues.md. For deeper historical context or session notes, consult docs in `docs/status/` as needed.
 
 ### Common Debug Endpoints
@@ -327,19 +343,19 @@ If issues arise, start with docs/troubleshooting/common-issues.md. For deeper hi
 | `/api/debug/(campaign)/recent-campaigns` | List recent campaigns |
 | `/api/cron/health-check` | System health status |
 
-## 21. External Integrations
+## 22. External Integrations
 - Vercel AI SDK usage patterns: docs/vercel-ai-sdk.md
 - OpenAI Responses API specifics: docs/examples/OPENAI_RESPONSES_API_GUIDE.md
 - Vercel API workflows and cron deployment: docs/vercel-api.md
 - If Supabase edge cases occur, review platform notes in `docs/migrations/` and Supabase dashboard configuration.
 
-## 22. Security Guidelines
+## 23. Security Guidelines
 - Never log API keys, secrets, or Personally Identifiable Information.
 - Do not bypass authentication/authorization checks in API routes.
 - Keep service-role interactions on server only; sanitize user input.
 - Audit third-party calls (Slack, MailerLite, Stripe) for retries and error handling.
 
-## 23. Hand-off Notes
+## 24. Hand-off Notes
 - Document any new prompts, migrations, or cron jobs in the appropriate doc before finishing.
 - Update `package.json` scripts or environment instructions only after aligning with deployment strategy.
 - Leave concise pull request notes summarizing impacted workflows, tests run, and linked docs.
@@ -347,7 +363,7 @@ If issues arise, start with docs/troubleshooting/common-issues.md. For deeper hi
 
 Stay disciplined about referencing the supporting docs. If a scenario lacks documentation, create or extend it, then cross-link in this guide to keep Claude—and the team—aligned.
 
-## 24. CCPM Rules
+## 25. CCPM Rules
 
 This project uses **Claude Code PM (CCPM)** for spec-driven development, GitHub issue tracking, and parallel execution. CCPM was installed from [automazeio/ccpm](https://github.com/automazeio/ccpm) at commit `3c8e0e7`.
 

@@ -16,9 +16,15 @@ export default function SignIn() {
       router.push('/dashboard')
       return
     }
-    if (process.env.NEXT_PUBLIC_STAGING === 'true') {
-      signIn('staging-bypass', { callbackUrl: '/dashboard' })
-    }
+    // Check if staging-bypass provider is available (runtime check, no build-time env var needed)
+    fetch('/api/auth/providers')
+      .then(r => r.json())
+      .then(providers => {
+        if (providers['staging-bypass']) {
+          signIn('staging-bypass', { callbackUrl: '/dashboard' })
+        }
+      })
+      .catch(() => {}) // Ignore errors, fall through to manual Google sign-in
   }, [status, session, router])
 
   const handleSignIn = async () => {
