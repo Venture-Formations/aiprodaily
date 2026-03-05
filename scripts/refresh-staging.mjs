@@ -4,13 +4,24 @@
  * Refresh staging database from production — 7-phase secure process.
  *
  * Usage:
- *   PROD_DATABASE_URL="..." STAGING_DATABASE_URL="..." node scripts/refresh-staging.mjs
+ *   PROD_DATABASE_URL="..." STAGING_DATABASE_URL="..." node scripts/refresh-staging.mjs [--full]
+ *
+ * Modes:
+ *   (default)  Quick refresh — skips bulk analytics tables (~90% smaller dump)
+ *   --full     Full refresh  — copies every table
+ *
+ * Approach:
+ *   Dumps schema+data from production (production schema is canonical truth,
+ *   not migrations — many FKs and columns were added via Supabase dashboard).
+ *   Uses --clean --if-exists to drop+recreate objects on staging.
+ *   Then runs migrations to apply any newer schema changes, drops stale objects,
+ *   reloads PostgREST cache, validates integrity, and scrubs PII.
  *
  * Phases:
  *   1. Pre-flight validation (env vars, connectivity, direction check)
- *   2. Schema preparation (drop tables, run migrations for canonical schema)
- *   3. Data transfer (pg_dump --data-only from prod, psql restore to staging)
- *   4. Post-restore migration re-run (catch seed data / defaults)
+ *   2. Data transfer (pg_dump schema+data from prod, psql restore to staging)
+ *   3. Post-restore migrations (apply newer schema changes)
+ *   4. Post-restore cleanup (drop stale objects, reload PostgREST)
  *   5. Integrity validation (FK counts, PKs, orphans, row counts)
  *   6. PII scrubbing (anonymize emails, names, IPs)
  *   7. Cleanup (delete dump file, print summary)
@@ -30,24 +41,52 @@ import { runPiiScrub, printScrubReport } from './lib/staging-scrubber.mjs'
 const STAGING_PROJECT_ID = 'cbnecpswmjonbdatxzwv'
 const PROD_PROJECT_ID = 'vsbdfrqfokoltgjyiivq'
 
+// Bulk analytics/tracking tables excluded in quick mode.
+// These are high-volume event tables that aren't needed for staging functionality.
+// New tables are included by default — only add tables here that are confirmed bulk data.
+const BULK_TABLES = [
+  'link_clicks',
+  'feedback_responses',
+  'feedback_votes',
+  'feedback_comments',
+  'feedback_comment_read_status',
+  'poll_responses',
+  'excluded_ips',
+  'subscriber_real_click_status',
+  'sparkloop_events',
+  'sparkloop_daily_snapshots',
+  'sparkloop_referrals',
+  'sparkloop_module_clicks',
+  'sparkloop_offer_events',
+  'afteroffers_events',
+  'afteroffers_click_mappings',
+  'tool_directory_clicks',
+  'mailerlite_field_updates',
+  'sendgrid_field_updates',
+  'article_performance',
+  'contact_submissions',
+  'ai_prompt_tests',
+]
+
+// Stale objects to drop after restore (remnants from old schema)
+const STALE_TABLES = ['newsletters']
+
+// ── Parse CLI args ───────────────────────────────────────────────────────────
+const fullMode = process.argv.includes('--full')
+const mode = fullMode ? 'full' : 'quick'
+
 // ── Init ─────────────────────────────────────────────────────────────────────
 const pgBin = findPgBin()
 const env = pgEnv(pgBin)
 const startTime = Date.now()
 
-// Bind runSql to our env
 function sql(dbUrl, query) {
   return runSql(dbUrl, query, env)
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function parseHost(url) {
-  try {
-    const u = new URL(url)
-    return u.hostname
-  } catch {
-    return 'unknown'
-  }
+  try { return new URL(url).hostname } catch { return 'unknown' }
 }
 
 function ask(question) {
@@ -64,9 +103,14 @@ function phase(n, title) {
   console.log('═'.repeat(60))
 }
 
+/** Strip credentials from error messages to prevent leaking passwords in output. */
+function sanitizeError(msg) {
+  return msg.replace(/postgresql:\/\/[^@]*@/g, 'postgresql://***@').slice(0, 500)
+}
+
 // ── Dump file path (set early so finally block can always clean up) ──────────
 const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-const dumpFile = join(tmpdir(), `staging-refresh-${timestamp}.sql`)
+const dumpFile = join(tmpdir(), `staging-refresh-${timestamp}.dump`)
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  MAIN
@@ -82,52 +126,55 @@ try {
   if (!prodUrl) { console.error('❌ PROD_DATABASE_URL is not set.'); process.exit(1) }
   if (!stagingUrl) { console.error('❌ STAGING_DATABASE_URL is not set.'); process.exit(1) }
 
-  const prodHost = parseHost(prodUrl)
-  const stagingHost = parseHost(stagingUrl)
-
-  // Direction safety: hostnames must differ
-  if (prodHost === stagingHost) {
-    console.error('❌ PROD and STAGING hostnames are identical — aborting to prevent data loss.')
-    process.exit(1)
-  }
-
-  // Verify URLs contain correct project IDs
-  if (!stagingUrl.includes(STAGING_PROJECT_ID)) {
-    console.error(`❌ STAGING_DATABASE_URL does not contain staging project ID (${STAGING_PROJECT_ID}).`)
-    process.exit(1)
-  }
-
+  // Direction safety: verify project IDs in connection strings
+  // Supabase pooler uses a shared hostname — the project ID is in the username
   if (!prodUrl.includes(PROD_PROJECT_ID)) {
     console.error(`❌ PROD_DATABASE_URL does not contain production project ID (${PROD_PROJECT_ID}).`)
     process.exit(1)
   }
 
-  // Test connectivity
-  console.log(`  Production host:  ${prodHost}`)
-  console.log(`  Staging host:     ${stagingHost}`)
+  if (!stagingUrl.includes(STAGING_PROJECT_ID)) {
+    console.error(`❌ STAGING_DATABASE_URL does not contain staging project ID (${STAGING_PROJECT_ID}).`)
+    process.exit(1)
+  }
+
+  if (prodUrl === stagingUrl) {
+    console.error('❌ PROD and STAGING URLs are identical — aborting to prevent data loss.')
+    process.exit(1)
+  }
+
+  const prodHost = parseHost(prodUrl)
+  const stagingHost = parseHost(stagingUrl)
+
+  console.log(`  Mode:        ${mode.toUpperCase()}${fullMode ? '' : ` (skipping ${BULK_TABLES.length} bulk tables)`}`)
+  console.log(`  Production:  ${PROD_PROJECT_ID} @ ${prodHost}`)
+  console.log(`  Staging:     ${STAGING_PROJECT_ID} @ ${stagingHost}`)
 
   try { sql(prodUrl, 'SELECT 1'); console.log('  Production DB:    ✅ connected') }
-  catch { console.error('❌ Cannot connect to production database.'); process.exit(1) }
+  catch (err) { console.error('❌ Cannot connect to production database.'); console.error('  ', (err.stderr || err.message || '').trim().slice(0, 300)); process.exit(1) }
 
   try { sql(stagingUrl, 'SELECT 1'); console.log('  Staging DB:       ✅ connected') }
-  catch { console.error('❌ Cannot connect to staging database.'); process.exit(1) }
+  catch (err) { console.error('❌ Cannot connect to staging database.'); console.error('  ', (err.stderr || err.message || '').trim().slice(0, 300)); process.exit(1) }
 
   // Interactive confirmation
   console.log('')
   console.log('This will:')
-  console.log('  1. DROP all tables on staging')
-  console.log('  2. Re-create schema from migrations')
-  console.log('  3. Copy production data (data-only)')
-  console.log('  4. Validate integrity')
-  console.log('  5. Scrub PII (emails, names, IPs)')
+  console.log('  1. Drop all tables on staging')
+  console.log(`  2. Dump+restore production schema+data (${mode === 'full' ? 'all tables' : 'excluding bulk analytics'})`)
+  console.log('  3. Run migrations for any newer schema changes')
+  console.log('  4. Drop stale objects, reload PostgREST cache')
+  console.log('  5. Validate integrity')
+  console.log('  6. Scrub PII (emails, names, IPs)')
 
   const answer = await ask('\nContinue? (yes/no): ')
   if (answer !== 'yes') { console.log('Aborted.'); process.exit(0) }
 
-  // ── Phase 2: Schema Preparation ──────────────────────────────────────────
-  phase(2, 'Schema Preparation (staging)')
+  // ── Phase 2: Clean Staging + Restore ─────────────────────────────────────
+  phase(2, 'Clean Staging + Restore from Production')
 
-  // Drop all tables in public schema
+  // Step 1: Drop all tables on staging first (clean slate)
+  // We do this ourselves rather than relying on pg_restore --clean,
+  // because --clean fails silently on Supabase tables with triggers/RLS/extensions.
   console.log('  Dropping all public tables on staging...')
   const dropTablesSql = `
     DO $$ DECLARE r RECORD;
@@ -138,10 +185,8 @@ try {
     END $$;
   `
   sql(stagingUrl, dropTablesSql.replace(/\n/g, ' '))
-  console.log('  ✅ All public tables dropped')
 
-  // Drop custom enum types
-  console.log('  Dropping custom enum types...')
+  // Also drop custom enum types
   const dropEnumsSql = `
     DO $$ DECLARE r RECORD;
     BEGIN
@@ -151,10 +196,42 @@ try {
     END $$;
   `
   sql(stagingUrl, dropEnumsSql.replace(/\n/g, ' '))
-  console.log('  ✅ Custom enum types dropped')
+  console.log('  ✅ Staging cleaned (all tables + enums dropped)')
 
-  // Run all migrations to establish canonical schema
-  console.log('  Running migrations to establish canonical schema...')
+  // Step 2: Dump production (custom format, NO --clean since we already cleaned)
+  const excludeFlags = fullMode
+    ? ''
+    : BULK_TABLES.map(t => `--exclude-table-data=${t}`).join(' ')
+
+  console.log(`  Dumping production (schema+data${fullMode ? '' : `, excluding data for ${BULK_TABLES.length} bulk tables`})...`)
+  try {
+    run(
+      `pg_dump "${prodUrl}" -Fc --no-owner --no-acl ${excludeFlags} -f "${dumpFile}"`,
+      env
+    )
+  } catch (err) {
+    console.error('❌ pg_dump failed:', sanitizeError(err.stderr || err.message || ''))
+    process.exit(1)
+  }
+
+  const dumpSize = statSync(dumpFile).size
+  const dumpMB = (dumpSize / (1024 * 1024)).toFixed(1)
+  console.log(`  ✅ Dump complete: ${dumpMB} MB`)
+
+  // Step 3: Restore into clean staging (no --clean needed)
+  console.log('  Restoring to staging (pg_restore)...')
+  try {
+    runPassthrough(`pg_restore -d "${stagingUrl}" --no-owner --no-acl "${dumpFile}"`, env)
+  } catch {
+    // pg_restore returns non-zero if ANY warning occurs (e.g. extension already exists)
+    console.log('  ⚠️  pg_restore returned warnings (often expected for extensions/schemas)')
+  }
+  console.log('  ✅ Restore complete')
+
+  // ── Phase 3: Post-restore Migrations ─────────────────────────────────────
+  phase(3, 'Post-restore Migrations')
+
+  console.log('  Running migrations to apply any newer schema changes...')
   const migrationsDir = resolve(process.cwd(), 'db', 'migrations')
   const migrationFiles = readdirSync(migrationsDir)
     .filter(f => f.endsWith('.sql'))
@@ -172,77 +249,42 @@ try {
       if (output.includes('already exists') || output.includes('duplicate')) {
         migWarn++
       } else {
-        console.error(`  ❌ Migration failed: ${file}`)
-        console.error(output.slice(0, 500))
-        process.exit(1)
-      }
-    }
-  }
-  console.log(`  ✅ Migrations complete: ${migOk} applied, ${migWarn} skipped`)
-
-  // ── Phase 3: Data Transfer ───────────────────────────────────────────────
-  phase(3, 'Data Transfer')
-
-  console.log('  Dumping production data (--data-only)...')
-  try {
-    run(
-      `pg_dump "${prodUrl}" --data-only --no-owner --no-acl --disable-triggers -f "${dumpFile}"`,
-      env
-    )
-  } catch (err) {
-    console.error('❌ pg_dump failed:', err.stderr || err.message)
-    process.exit(1)
-  }
-
-  const dumpSize = statSync(dumpFile).size
-  console.log(`  ✅ Dump complete: ${Math.round(dumpSize / 1024)} KB`)
-
-  console.log('  Restoring data to staging...')
-  try {
-    runPassthrough(`psql "${stagingUrl}" -f "${dumpFile}"`, env)
-  } catch {
-    // psql may return non-zero on warnings (e.g. duplicate keys for seed data) — that's OK
-    console.log('  ⚠️  psql returned warnings (often expected for data-only restores)')
-  }
-  console.log('  ✅ Data restore complete')
-
-  // ── Phase 4: Post-restore Migration Re-run ───────────────────────────────
-  phase(4, 'Post-restore Migration Re-run')
-
-  console.log('  Re-running migrations for seed data and defaults...')
-  let postMigOk = 0
-  let postMigWarn = 0
-  for (const file of migrationFiles) {
-    const filePath = join(migrationsDir, file)
-    try {
-      run(`psql "${stagingUrl}" -f "${filePath}" 2>&1`, env)
-      postMigOk++
-    } catch (err) {
-      const output = (err.stdout || '') + (err.stderr || '')
-      if (output.includes('already exists') || output.includes('duplicate')) {
-        postMigWarn++
-      } else {
-        // Non-critical in post-restore — log and continue
+        // Non-critical post-restore — log and continue
         console.log(`  ⚠️  ${file}: ${output.slice(0, 200)}`)
-        postMigWarn++
+        migWarn++
       }
     }
   }
-  console.log(`  ✅ Post-restore migrations: ${postMigOk} applied, ${postMigWarn} skipped`)
+  console.log(`  ✅ Migrations: ${migOk} applied, ${migWarn} skipped (already applied)`)
+
+  // ── Phase 4: Post-restore Cleanup ────────────────────────────────────────
+  phase(4, 'Post-restore Cleanup')
+
+  // Drop stale tables that shouldn't exist
+  for (const table of STALE_TABLES) {
+    try {
+      const exists = sql(stagingUrl, `SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename = '${table}'`)
+      if (parseInt(exists, 10) > 0) {
+        sql(stagingUrl, `DROP TABLE IF EXISTS ${table} CASCADE`)
+        console.log(`  ✅ Dropped stale table: ${table}`)
+      }
+    } catch {}
+  }
+
+  // Reload PostgREST schema cache
+  console.log('  Reloading PostgREST schema cache...')
+  try {
+    sql(stagingUrl, "NOTIFY pgrst, 'reload schema'")
+    console.log('  ✅ PostgREST schema cache reloaded')
+  } catch (err) {
+    console.log('  ⚠️  NOTIFY failed (non-critical):', (err.stderr || err.message || '').slice(0, 100))
+  }
 
   // ── Phase 5: Integrity Validation ────────────────────────────────────────
   phase(5, 'Integrity Validation')
 
   const validation = await runValidations(stagingUrl, sql)
   printValidationReport(validation)
-
-  // Blocking check: stale newsletters table
-  const staleCheck = validation.results.find(r => r.name === 'No stale newsletters table')
-  if (staleCheck && !staleCheck.ok) {
-    console.error('\n❌ BLOCKING: Stale "newsletters" table detected. Dropping it...')
-    sql(stagingUrl, 'DROP TABLE IF EXISTS newsletters CASCADE')
-    console.log('  ✅ Dropped stale newsletters table')
-  }
 
   // ── Phase 6: PII Scrubbing ──────────────────────────────────────────────
   phase(6, 'PII Scrubbing')
@@ -268,7 +310,7 @@ try {
   // Verify deletion
   if (existsSync(dumpFile)) {
     console.error(`\n❌ SECURITY: Dump file still exists at ${dumpFile}`)
-    console.error('   This file contains a full production database copy. Delete it immediately.')
+    console.error('   This file contains production data. Delete it immediately.')
     process.exit(1)
   } else {
     console.log('  ✅ Dump file verified deleted')
@@ -279,7 +321,7 @@ try {
 const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
 console.log(`
 ${'═'.repeat(60)}
-  STAGING REFRESH COMPLETE
+  STAGING REFRESH COMPLETE (${mode.toUpperCase()} mode)
 ${'═'.repeat(60)}
   Duration:     ${elapsed}s
   Dump file:    deleted ✅

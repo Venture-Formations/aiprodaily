@@ -16,7 +16,9 @@ export async function runValidations(dbUrl, runSqlFn) {
     try {
       actual = runSqlFn(dbUrl, sql)
     } catch (err) {
-      results.push({ name, expected: expectedLabel, actual: `ERROR: ${err.message}`, ok: false })
+      // Sanitize credentials from error messages
+      const msg = (err.message || '').replace(/postgresql:\/\/[^@]*@/g, 'postgresql://***@').slice(0, 200)
+      results.push({ name, expected: expectedLabel, actual: `ERROR: ${msg}`, ok: false })
       return
     }
     const ok = expectFn(actual)
