@@ -15,7 +15,7 @@ export const GET = withApiHandler(
     const { data: sections, error } = await supabaseAdmin
       .from('newsletter_sections')
       .select(SECTION_COLS)
-      .eq('newsletter_id', publicationId)
+      .eq('publication_id', publicationId)
       .order('display_order', { ascending: true })
 
     if (error) {
@@ -53,7 +53,7 @@ export const PATCH = withApiHandler(
           .from('newsletter_sections')
           .update({ display_order: section.display_order })
           .eq('id', section.id)
-          .eq('newsletter_id', publication_id)
+          .eq('publication_id', publication_id)
 
         if (error) {
           throw error
@@ -80,7 +80,7 @@ export const PATCH = withApiHandler(
         .from('newsletter_sections')
         .update({ name: name.trim() })
         .eq('id', section_id)
-        .eq('newsletter_id', publication_id)
+        .eq('publication_id', publication_id)
 
       if (error) {
         throw error
@@ -100,7 +100,7 @@ export const PATCH = withApiHandler(
         .from('newsletter_sections')
         .update({ is_active })
         .eq('id', section_id)
-        .eq('newsletter_id', publication_id)
+        .eq('publication_id', publication_id)
 
       if (error) {
         throw error
@@ -138,7 +138,7 @@ export const DELETE = withApiHandler(
       .from('newsletter_sections')
       .select('name')
       .eq('id', sectionId)
-      .eq('newsletter_id', publicationId)
+      .eq('publication_id', publicationId)
       .single()
 
     // Delete the section
@@ -146,7 +146,7 @@ export const DELETE = withApiHandler(
       .from('newsletter_sections')
       .delete()
       .eq('id', sectionId)
-      .eq('newsletter_id', publicationId)
+      .eq('publication_id', publicationId)
 
     if (error) {
       throw error
@@ -177,7 +177,7 @@ export const POST = withApiHandler(
     const { data: existingSection } = await supabaseAdmin
       .from('newsletter_sections')
       .select('id')
-      .eq('newsletter_id', publication_id)
+      .eq('publication_id', publication_id)
       .eq('name', name)
       .single()
 
@@ -191,7 +191,7 @@ export const POST = withApiHandler(
     const { data: newSection, error } = await supabaseAdmin
       .from('newsletter_sections')
       .insert([{
-        newsletter_id: publication_id,
+        publication_id: publication_id,
         name,
         display_order,
         is_active

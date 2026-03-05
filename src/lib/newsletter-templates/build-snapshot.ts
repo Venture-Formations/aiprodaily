@@ -5,7 +5,7 @@ import { fetchBusinessSettings } from './helpers'
 import type { IssueSnapshot, SectionItem } from './types'
 
 // Explicit column lists for module config tables (no select('*'))
-export const NEWSLETTER_SECTION_COLS = `id, newsletter_id, name, display_order, is_active, section_type, description, created_at`
+export const NEWSLETTER_SECTION_COLS = `id, publication_id, name, display_order, is_active, section_type, created_at`
 export const AD_MODULE_COLS = `id, publication_id, name, display_order, is_active, selection_mode, block_order, config, next_position, created_at, updated_at`
 export const POLL_MODULE_COLS = `id, publication_id, name, display_order, is_active, block_order, config, created_at, updated_at`
 export const PROMPT_MODULE_COLS = `id, publication_id, name, display_order, is_active, selection_mode, block_order, config, next_position, created_at, updated_at`
@@ -40,7 +40,7 @@ export async function buildIssueSnapshot(
     supabaseAdmin
       .from('newsletter_sections')
       .select(NEWSLETTER_SECTION_COLS)
-      .eq('newsletter_id', issue.publication_id)
+      .eq('publication_id', issue.publication_id)
       .eq('is_active', true)
       .order('display_order', { ascending: true }),
     supabaseAdmin
