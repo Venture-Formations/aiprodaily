@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Refresh staging database from production — 7-phase secure process.
+ * Refresh staging database from production — non-destructive data-only process.
  *
  * Usage:
  *   PROD_DATABASE_URL="..." STAGING_DATABASE_URL="..." node scripts/refresh-staging.mjs [--full]
@@ -11,17 +11,16 @@
  *   --full     Full refresh  — copies every table
  *
  * Approach:
- *   Dumps schema+data from production (production schema is canonical truth,
- *   not migrations — many FKs and columns were added via Supabase dashboard).
- *   Uses --clean --if-exists to drop+recreate objects on staging.
- *   Then runs migrations to apply any newer schema changes, drops stale objects,
- *   reloads PostgREST cache, validates integrity, and scrubs PII.
+ *   TRUNCATES data in staging tables, then restores DATA ONLY from production.
+ *   Schema is NEVER touched — RLS policies, grants, triggers, enum types,
+ *   PostgREST/Realtime connections all stay intact.
+ *   Schema changes should be applied separately via `npm run migrate:staging`.
  *
  * Phases:
  *   1. Pre-flight validation (env vars, connectivity, direction check)
- *   2. Data transfer (pg_dump schema+data from prod, psql restore to staging)
+ *   2. Data transfer (TRUNCATE staging, pg_dump --data-only from prod, restore)
  *   3. Post-restore migrations (apply newer schema changes)
- *   4. Post-restore cleanup (drop stale objects, reload PostgREST)
+ *   4. Post-restore cleanup (reload PostgREST cache)
  *   5. Integrity validation (FK counts, PKs, orphans, row counts)
  *   6. PII scrubbing (anonymize emails, names, IPs)
  *   7. Cleanup (delete dump file, print summary)
@@ -68,12 +67,10 @@ const BULK_TABLES = [
   'ai_prompt_tests',
 ]
 
-// Stale objects to drop after restore (remnants from old schema)
-const STALE_TABLES = ['newsletters']
-
 // Known-safe pg_restore warnings that can be ignored
 const BENIGN_RESTORE_PATTERNS = [
   /already exists/i,
+  /does not exist/i,
   /schema "public" already exists/i,
   /extension .* already exists/i,
   /WARNING:/i,
@@ -173,54 +170,45 @@ try {
   // Interactive confirmation
   console.log('')
   console.log('This will:')
-  console.log('  1. Drop all tables on staging')
-  console.log(`  2. Dump+restore production schema+data (${mode === 'full' ? 'all tables' : 'excluding bulk analytics'})`)
+  console.log(`  1. TRUNCATE all public tables on staging (schema/RLS/grants preserved)`)
+  console.log(`  2. Restore DATA ONLY from production (${mode === 'full' ? 'all tables' : 'excluding bulk analytics'})`)
   console.log('  3. Run migrations for any newer schema changes')
-  console.log('  4. Drop stale objects, reload PostgREST cache')
+  console.log('  4. Reload PostgREST cache')
   console.log('  5. Validate integrity')
   console.log('  6. Scrub PII (emails, names, IPs)')
 
   const answer = await ask('\nContinue? (yes/no): ')
   if (answer !== 'yes') { console.log('Aborted.'); process.exit(0) }
 
-  // ── Phase 2: Clean Staging + Restore ─────────────────────────────────────
-  phase(2, 'Clean Staging + Restore from Production')
+  // ── Phase 2: Truncate Staging + Restore Data Only ─────────────────────────
+  phase(2, 'Truncate Staging + Restore Data from Production')
 
-  // Step 1: Drop all tables on staging first (clean slate)
-  // We do this ourselves rather than relying on pg_restore --clean,
-  // because --clean fails silently on Supabase tables with triggers/RLS/extensions.
-  console.log('  Dropping all public tables on staging...')
-  const dropTablesSql = `
+  // Step 1: Truncate all public tables on staging.
+  // TRUNCATE preserves schema, RLS policies, grants, triggers, and connections.
+  // CASCADE handles FK dependencies between tables.
+  console.log('  Truncating all public tables on staging...')
+  const truncateTablesSql = `
     DO $$ DECLARE r RECORD;
     BEGIN
       FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
-        EXECUTE 'DROP TABLE IF EXISTS public.' || quote_ident(r.tablename) || ' CASCADE';
+        EXECUTE 'TRUNCATE TABLE public.' || quote_ident(r.tablename) || ' CASCADE';
       END LOOP;
     END $$;
   `
-  sql(stagingUrl, dropTablesSql.replace(/\n/g, ' '))
+  sql(stagingUrl, truncateTablesSql.replace(/\n/g, ' '))
+  console.log('  Staging data cleared (schema + RLS + grants preserved)')
 
-  // Also drop custom enum types
-  const dropEnumsSql = `
-    DO $$ DECLARE r RECORD;
-    BEGIN
-      FOR r IN (SELECT t.typname FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE n.nspname = 'public' AND t.typtype = 'e') LOOP
-        EXECUTE 'DROP TYPE IF EXISTS public.' || quote_ident(r.typname) || ' CASCADE';
-      END LOOP;
-    END $$;
-  `
-  sql(stagingUrl, dropEnumsSql.replace(/\n/g, ' '))
-  console.log('  ✅ Staging cleaned (all tables + enums dropped)')
-
-  // Step 2: Dump production (custom format, NO --clean since we already cleaned)
+  // Step 2: Dump production DATA ONLY (custom format)
+  // --data-only: no schema, no RLS, no grants — just row data
+  // --disable-triggers: prevents FK violations during restore (re-enabled after)
   const excludeFlags = fullMode
     ? ''
     : BULK_TABLES.map(t => `--exclude-table-data=${t}`).join(' ')
 
-  console.log(`  Dumping production (schema+data${fullMode ? '' : `, excluding data for ${BULK_TABLES.length} bulk tables`})...`)
+  console.log(`  Dumping production (data only${fullMode ? '' : `, excluding ${BULK_TABLES.length} bulk tables`})...`)
   try {
     run(
-      `pg_dump "${prodUrl}" -Fc --no-owner --no-acl ${excludeFlags} -f "${dumpFile}"`,
+      `pg_dump "${prodUrl}" -Fc --data-only --disable-triggers ${excludeFlags} -f "${dumpFile}"`,
       env
     )
   } catch (err) {
@@ -230,24 +218,29 @@ try {
 
   const dumpSize = statSync(dumpFile).size
   const dumpMB = (dumpSize / (1024 * 1024)).toFixed(1)
-  console.log(`  ✅ Dump complete: ${dumpMB} MB`)
+  console.log(`  Dump complete: ${dumpMB} MB`)
 
-  // Step 3: Restore into clean staging (no --clean needed)
-  console.log('  Restoring to staging (pg_restore)...')
+  // Step 3: Restore data into staging
+  // --data-only + --disable-triggers: loads data, temporarily disables triggers
+  // to avoid FK constraint violations from insert ordering, then re-enables them.
+  console.log('  Restoring data to staging (pg_restore --data-only)...')
   try {
-    runPassthrough(`pg_restore -d "${stagingUrl}" --no-owner --no-acl "${dumpFile}"`, env)
+    runPassthrough(
+      `pg_restore -d "${stagingUrl}" --data-only --disable-triggers --no-owner --no-acl "${dumpFile}"`,
+      env
+    )
   } catch (err) {
-    // pg_restore returns non-zero if ANY warning occurs (e.g. extension already exists)
+    // pg_restore returns non-zero if ANY warning occurs (e.g. table not found in staging)
     // Only suppress known-safe warnings; rethrow unexpected fatal errors
     const output = (err.stderr || err.message || '').toString()
     const isBenign = BENIGN_RESTORE_PATTERNS.some(pattern => pattern.test(output))
     if (isBenign || output.trim() === '') {
-      console.log('  ⚠️  pg_restore returned warnings (often expected for extensions/schemas)')
+      console.log('  pg_restore returned warnings (often expected for missing tables)')
     } else {
       throw new Error(`pg_restore failed with unexpected errors: ${sanitizeError(output)}`)
     }
   }
-  console.log('  ✅ Restore complete')
+  console.log('  Restore complete')
 
   // ── Phase 3: Post-restore Migrations ─────────────────────────────────────
   phase(3, 'Post-restore Migrations')
@@ -284,24 +277,13 @@ try {
   // ── Phase 4: Post-restore Cleanup ────────────────────────────────────────
   phase(4, 'Post-restore Cleanup')
 
-  // Drop stale tables that shouldn't exist
-  for (const table of STALE_TABLES) {
-    try {
-      const exists = sql(stagingUrl, `SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename = '${table}'`)
-      if (parseInt(exists, 10) > 0) {
-        sql(stagingUrl, `DROP TABLE IF EXISTS ${table} CASCADE`)
-        console.log(`  ✅ Dropped stale table: ${table}`)
-      }
-    } catch {}
-  }
-
-  // Reload PostgREST schema cache
+  // Reload PostgREST schema cache so API reflects any migration changes
   console.log('  Reloading PostgREST schema cache...')
   try {
     sql(stagingUrl, "NOTIFY pgrst, 'reload schema'")
-    console.log('  ✅ PostgREST schema cache reloaded')
+    console.log('  PostgREST schema cache reloaded')
   } catch (err) {
-    console.log('  ⚠️  NOTIFY failed (non-critical):', sanitizeError((err.stderr || err.message || '')).slice(0, 100))
+    console.log('  NOTIFY failed (non-critical):', sanitizeError((err.stderr || err.message || '')).slice(0, 100))
   }
 
   // ── Phase 5: Integrity Validation ────────────────────────────────────────
