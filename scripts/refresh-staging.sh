@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# DEPRECATED: Use `npm run refresh-staging` (refresh-staging.mjs) instead.
+# This script uses destructive DROP+restore which breaks Supabase connections.
+# The .mjs version uses non-destructive TRUNCATE+data-only restore.
+echo "DEPRECATED: Use 'npm run refresh-staging' instead (non-destructive data-only approach)."
+echo "This script drops tables which breaks RLS policies, grants, and connections."
+exit 1
+
 # Refresh staging database from production.
 #
 # Usage:
