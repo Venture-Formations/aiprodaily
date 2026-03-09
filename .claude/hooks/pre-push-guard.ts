@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { join } from 'path';
 
@@ -26,7 +26,11 @@ function main() {
   const projectDir = process.env.CLAUDE_PROJECT_DIR || input.cwd;
   const markerPath = join(projectDir, '.claude', '.pre-push-approved');
 
-  if (!existsSync(markerPath)) {
+  // Read marker in one step (avoids TOCTOU between existsSync and readFileSync)
+  let approvedSha: string;
+  try {
+    approvedSha = readFileSync(markerPath, 'utf-8').trim();
+  } catch {
     process.stderr.write(
       '❌ BLOCKED: Pre-push checklist not completed.\n\n' +
       'Before pushing or creating a PR, you MUST run:\n' +
@@ -38,8 +42,6 @@ function main() {
     process.exit(2);
   }
 
-  // Marker exists — check if it matches current HEAD
-  const approvedSha = readFileSync(markerPath, 'utf-8').trim();
   let currentSha = 'unknown';
   try {
     currentSha = execSync('git rev-parse HEAD', { encoding: 'utf-8' }).trim();

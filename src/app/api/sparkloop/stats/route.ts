@@ -169,7 +169,8 @@ export const GET = withApiHandler(
 
     // Helper to subtract N days from a YYYY-MM-DD string
     const subtractDays = (dateStr: string, days: number): string => {
-      const d = new Date(dateStr)
+      const [year, month, day] = dateStr.split('-').map(Number)
+      const d = new Date(year, month - 1, day) // Local constructor avoids UTC parse
       d.setDate(d.getDate() - days)
       return toDateStr(d)
     }
