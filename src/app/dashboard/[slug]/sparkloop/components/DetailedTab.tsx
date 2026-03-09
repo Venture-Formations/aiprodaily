@@ -100,6 +100,9 @@ interface RangeStats {
   avgOffersSelected: number
 }
 
+const STATUS_FILTERS = ['all', 'active', 'excluded', 'paused', 'archived'] as const
+type StatusFilter = typeof STATUS_FILTERS[number]
+
 const DEFAULT_COLUMNS: Column[] = [
   { key: 'publication_name', label: 'Newsletter', enabled: true, exportable: true, width: 'lg' },
   { key: 'ref_code', label: 'Ref Code', enabled: false, exportable: true, width: 'md' },
@@ -163,7 +166,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [showColumnSelector, setShowColumnSelector] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'excluded' | 'paused' | 'archived'>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
 
   // Date range state
   const [dateStart, setDateStart] = useState('')
@@ -881,7 +884,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
 
         {/* Status filter */}
         <div className="flex gap-1">
-          {(['all', 'active', 'excluded', 'paused', 'archived'] as const).map(s => (
+          {STATUS_FILTERS.map(s => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
