@@ -35,8 +35,10 @@ mailerliteClient.interceptors.response.use(
     }
 
     const retryAfterSec = err?.response?.headers?.['x-ratelimit-retry-after']
-    const waitMs = retryAfterSec
-      ? Math.min(Number(retryAfterSec) * 1000, 120_000)
+      ?? err?.response?.headers?.['retry-after']
+    const parsedSec = Number(retryAfterSec)
+    const waitMs = retryAfterSec && !Number.isNaN(parsedSec) && parsedSec > 0
+      ? Math.min(parsedSec * 1000, 120_000)
       : MAILERLITE_RATE_LIMIT_DEFAULT_WAIT_MS
 
     console.warn(`[MailerLite] Rate limited (429), retrying after ${waitMs / 1000}s (attempt ${attempt})`)

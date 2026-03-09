@@ -17,14 +17,18 @@ export default function SignIn() {
       return
     }
     // Check if staging-bypass provider is available (runtime check, no build-time env var needed)
-    fetch('/api/auth/providers')
-      .then(r => r.json())
-      .then(providers => {
+    const checkStagingBypass = async () => {
+      try {
+        const response = await fetch('/api/auth/providers')
+        const providers = await response.json()
         if (providers['staging-bypass']) {
           signIn('staging-bypass', { callbackUrl: '/dashboard' })
         }
-      })
-      .catch(() => {}) // Ignore errors, fall through to manual Google sign-in
+      } catch {
+        // Ignore errors, fall through to manual Google sign-in
+      }
+    }
+    checkStagingBypass()
   }, [status, session, router])
 
   const handleSignIn = async () => {

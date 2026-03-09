@@ -136,10 +136,13 @@ export function printValidationReport(validationResult) {
 
   for (const r of results) {
     const status = r.ok ? '✅' : '❌'
+    const actualStr = String(r.actual).length > actualWidth - 1
+      ? String(r.actual).slice(0, actualWidth - 2) + '…'
+      : String(r.actual)
     console.log(
       r.name.padEnd(nameWidth) +
       String(r.expected).padEnd(expectedWidth) +
-      String(r.actual).padEnd(actualWidth) +
+      actualStr.padEnd(actualWidth) +
       status
     )
   }

@@ -67,13 +67,17 @@ const BULK_TABLES = [
   'ai_prompt_tests',
 ]
 
-// Known-safe pg_restore warnings that can be ignored
+// Known-safe pg_restore warnings that can be ignored.
+// pg_restore emits WARNINGs for privilege/ownership issues and NOTICEs for
+// existing objects — all expected when restoring --no-owner --no-acl dumps.
 const BENIGN_RESTORE_PATTERNS = [
   /already exists/i,
   /does not exist/i,
   /schema "public" already exists/i,
   /extension .* already exists/i,
-  /WARNING:/i,
+  /WARNING:.*no privileges/i,
+  /WARNING:.*skipping/i,
+  /WARNING:.*owner/i,
   /NOTICE:/i,
 ]
 

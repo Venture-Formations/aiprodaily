@@ -2,7 +2,7 @@
 
 **Purpose:** Full staging environment with dedicated Supabase project and Vercel project, providing complete data isolation from production with controllable cron jobs for end-to-end testing.
 
-**Status:** Implemented
+**Status:** Implemented (2 minor items pending — see verification checklist)
 **Completed:** 2026-03-05
 **Last updated:** 2026-03-05
 **Related:** [env-guard.ts](../../src/lib/env-guard.ts), [publication-settings.ts](../../src/lib/publication-settings.ts), [api-handler.ts](../../src/lib/api-handler.ts), [cron-jobs.md](./cron-jobs.md)

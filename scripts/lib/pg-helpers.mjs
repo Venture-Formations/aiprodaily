@@ -6,6 +6,7 @@
 
 import { execSync, execFileSync } from 'child_process'
 import { existsSync } from 'fs'
+import { delimiter } from 'path'
 
 /**
  * Locate pg_dump/psql binaries. Returns prefix path or '' if on PATH.
@@ -32,7 +33,7 @@ export function findPgBin() {
 
 /** Build PATH env with pg binaries included. */
 export function pgEnv(pgBin) {
-  const pathEnv = pgBin ? `${pgBin};${process.env.PATH}` : process.env.PATH
+  const pathEnv = pgBin ? `${pgBin}${delimiter}${process.env.PATH}` : process.env.PATH
   return { ...process.env, PATH: pathEnv }
 }
 

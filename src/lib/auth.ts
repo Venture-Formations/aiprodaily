@@ -16,22 +16,27 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   )
 }
 
-// Add a staging auto-login provider when auth bypass is enabled
-if (process.env.ALLOW_AUTH_BYPASS === 'true') {
-  providers.push(
-    CredentialsProvider({
-      id: 'staging-bypass',
-      name: 'Staging Auto-Login',
-      credentials: {},
-      async authorize() {
-        return {
-          id: 'staging-admin',
-          email: process.env.ALLOWED_ADMIN_EMAILS?.split(',')[0]?.trim() || 'dev@staging',
-          name: 'Staging Admin',
-        }
-      },
-    })
-  )
+// Add a staging auto-login provider when auth bypass is enabled (only on staging, never production)
+if (process.env.ALLOW_AUTH_BYPASS === 'true' && process.env.STAGING === 'true') {
+  const bypassEmail = process.env.ALLOWED_ADMIN_EMAILS?.split(',')[0]?.trim()
+  if (bypassEmail) {
+    providers.push(
+      CredentialsProvider({
+        id: 'staging-bypass',
+        name: 'Staging Auto-Login',
+        credentials: {},
+        async authorize() {
+          return {
+            id: 'staging-admin',
+            email: bypassEmail,
+            name: 'Staging Admin',
+          }
+        },
+      })
+    )
+  } else {
+    console.error('[Auth] staging-bypass requires ALLOWED_ADMIN_EMAILS to be configured')
+  }
 }
 
 export const authOptions: NextAuthOptions = {

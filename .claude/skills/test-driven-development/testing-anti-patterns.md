@@ -92,9 +92,47 @@ test('detects duplicate server', () => {
 
 **The Iron Rule:** Mock the COMPLETE data structure as it exists in reality, not just fields your immediate test uses.
 
+```typescript
+// BAD: Mock only includes fields used in this test
+vi.mock('UserService', () => ({
+  getUser: vi.fn().mockResolvedValue({ id: 123 })
+}));
+
+// GOOD: Mock complete User structure
+vi.mock('UserService', () => ({
+  getUser: vi.fn().mockResolvedValue({
+    id: 123,
+    name: 'Test User',
+    email: 'test@example.com',
+    roles: ['user'],
+    createdAt: new Date('2024-01-01')
+  })
+}));
+```
+
+Incomplete mocks hide shape/type mismatches that only surface at runtime.
+
 ## Anti-Pattern 5: Integration Tests as Afterthought
 
-Testing is part of implementation, not optional follow-up. TDD would have caught this.
+Testing is part of implementation, not optional follow-up.
+
+```typescript
+// BAD: Code written first, integration test bolted on later — misses edge case
+test('creates order', async () => {
+  const order = await createOrder({ items: [{ id: 1 }] });
+  expect(order.id).toBeDefined();
+  // Never tested: what happens when inventory is zero?
+});
+
+// GOOD: TDD — test drives the design, edge cases caught early
+test('rejects order when inventory is zero', async () => {
+  await setInventory(itemId, 0);
+  await expect(createOrder({ items: [{ id: itemId }] }))
+    .rejects.toThrow('Out of stock');
+});
+```
+
+Write integration tests alongside the code, not after. TDD catches design flaws before they ship.
 
 ## Quick Reference
 
@@ -105,7 +143,7 @@ Testing is part of implementation, not optional follow-up. TDD would have caught
 | Mock without understanding | Understand dependencies first, mock minimally |
 | Incomplete mocks | Mirror real API completely |
 | Tests as afterthought | TDD - tests first |
-| Over-complex mocks | Consider integration tests |
+| Over-complex mocks | Simplify or use integration tests |
 
 ## Red Flags
 
