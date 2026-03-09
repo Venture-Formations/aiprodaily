@@ -156,6 +156,94 @@
                 ]
             }
         },
+        "systematic-debugging": {
+            "type": "domain",
+            "enforcement": "suggest",
+            "priority": "high",
+            "description": "Structured root-cause debugging methodology - investigate before fixing",
+            "promptTriggers": {
+                "keywords": [
+                    "bug",
+                    "debug",
+                    "root cause",
+                    "test failure",
+                    "unexpected behavior",
+                    "investigate",
+                    "broken",
+                    "not working"
+                ],
+                "intentPatterns": [
+                    "(fix|debug|investigate).*?(bug|failure|error)",
+                    "(find|trace).*?(root cause|issue)",
+                    "(why|what).*?(failing|broken|wrong)"
+                ]
+            }
+        },
+        "test-driven-development": {
+            "type": "domain",
+            "enforcement": "suggest",
+            "priority": "high",
+            "description": "TDD methodology - write failing test first, then minimal implementation",
+            "promptTriggers": {
+                "keywords": [
+                    "TDD",
+                    "test first",
+                    "red green refactor",
+                    "failing test",
+                    "unit test",
+                    "write test"
+                ],
+                "intentPatterns": [
+                    "(write|add).*?test.*?first",
+                    "(implement|add).*?with.*?test"
+                ]
+            },
+            "pathTriggers": {
+                "patterns": [
+                    "**/*.test.ts",
+                    "**/__tests__/**"
+                ]
+            }
+        },
+        "verification-before-completion": {
+            "type": "domain",
+            "enforcement": "suggest",
+            "priority": "medium",
+            "description": "Quality gate - run verification commands before claiming work is done",
+            "promptTriggers": {
+                "keywords": [
+                    "verify",
+                    "confirm fix",
+                    "before complete",
+                    "done",
+                    "finished",
+                    "ready to push"
+                ],
+                "intentPatterns": [
+                    "(verify|confirm|check).*?(fix|done|complete)",
+                    "(am I|is it).*?done"
+                ]
+            }
+        },
+        "requesting-code-review": {
+            "type": "domain",
+            "enforcement": "suggest",
+            "priority": "medium",
+            "description": "Code review request and feedback handling workflow",
+            "promptTriggers": {
+                "keywords": [
+                    "code review",
+                    "review my code",
+                    "pre-push review",
+                    "before merge",
+                    "review feedback"
+                ],
+                "intentPatterns": [
+                    "(request|run|do).*?review",
+                    "(respond|address).*?review"
+                ]
+            }
+        },
         "ai-content-generation": {
             "type": "domain",
             "enforcement": "suggest",

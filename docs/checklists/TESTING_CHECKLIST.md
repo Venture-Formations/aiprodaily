@@ -9,6 +9,8 @@ _Last updated: 2025-11-28_
 
 ---
 
+For test-first (TDD) methodology, see `.claude/skills/test-driven-development/SKILL.md`.
+
 ## 🎯 Core Functionality Tests
 
 ### 1. Main Dashboard Page

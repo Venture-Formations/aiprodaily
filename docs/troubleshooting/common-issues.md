@@ -11,6 +11,7 @@ Related references:
 - @docs/workflows/rss-processing.md — Workflow step details and triggers
 - @docs/operations/cron-jobs.md — Scheduling, expectations, and recovery steps
 - @docs/patterns/backend.md — Safe coding patterns to prevent regressions
+- For a structured root-cause-first debugging process, see `.claude/skills/systematic-debugging/SKILL.md`
 
 ---
 
