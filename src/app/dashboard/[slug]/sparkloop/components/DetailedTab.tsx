@@ -100,6 +100,7 @@ interface RangeStats {
   avgOffersSelected: number
 }
 
+const MS_PER_DAY = 86400000
 const STATUS_FILTERS = ['all', 'active', 'excluded', 'paused', 'archived'] as const
 type StatusFilter = typeof STATUS_FILTERS[number]
 
@@ -169,7 +170,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
 
   // Date range state — default to last 30 days so snapshot-derived metrics show immediately
-  const [dateStart, setDateStart] = useState(() => new Date(Date.now() - 29 * 86400000).toISOString().split('T')[0])
+  const [dateStart, setDateStart] = useState(() => new Date(Date.now() - 29 * MS_PER_DAY).toISOString().split('T')[0])
   const [dateEnd, setDateEnd] = useState(() => new Date().toISOString().split('T')[0])
   const [dateRangeMetrics, setDateRangeMetrics] = useState<Record<string, DateRangeMetrics> | null>(null)
   const [dateRangeLoading, setDateRangeLoading] = useState(false)
@@ -961,7 +962,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
         <button
           onClick={() => setQuickRange(7)}
           className={`px-2 py-1 text-xs rounded-lg ${
-            dateRangeActive && dateStart === new Date(Date.now() - 6 * 86400000).toISOString().split('T')[0]
+            dateRangeActive && dateStart === new Date(Date.now() - 6 * MS_PER_DAY).toISOString().split('T')[0]
               ? 'bg-purple-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
           }`}
         >
@@ -970,7 +971,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
         <button
           onClick={() => setQuickRange(30)}
           className={`px-2 py-1 text-xs rounded-lg ${
-            dateRangeActive && dateStart === new Date(Date.now() - 29 * 86400000).toISOString().split('T')[0]
+            dateRangeActive && dateStart === new Date(Date.now() - 29 * MS_PER_DAY).toISOString().split('T')[0]
               ? 'bg-purple-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
           }`}
         >

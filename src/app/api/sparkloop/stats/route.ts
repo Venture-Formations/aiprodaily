@@ -61,8 +61,8 @@ export const GET = withApiHandler(
       .select('ref_code, publication_name, publication_logo, cpa, sparkloop_rcr, override_rcr, sparkloop_confirmed, sparkloop_rejected, sparkloop_pending, sparkloop_earnings, screening_period')
       .eq('publication_id', PUBLICATION_ID)
 
-    // Build a lookup: ref_code -> { cpaDollars, rcr, screeningPeriod }
-    const recLookup = new Map<string, { cpaDollars: number; rcr: number; screeningPeriod: number }>()
+    // Build a lookup: ref_code -> { cpaDollars, rcr, screeningPeriod, name, logo }
+    const recLookup = new Map<string, { cpaDollars: number; rcr: number; screeningPeriod: number; name: string; logo: string | null }>()
     for (const rec of recommendations || []) {
       const cpaDollars = (rec.cpa || 0) / 100
       const slRcr = rec.sparkloop_rcr !== null ? Number(rec.sparkloop_rcr) : null
@@ -71,7 +71,11 @@ export const GET = withApiHandler(
       const rcr = hasOverrideRcr ? Number(rec.override_rcr) / 100
         : hasSLRcr ? slRcr! / 100
         : defaultRcr
-      recLookup.set(rec.ref_code, { cpaDollars, rcr, screeningPeriod: rec.screening_period || 14 })
+      recLookup.set(rec.ref_code, {
+        cpaDollars, rcr, screeningPeriod: rec.screening_period || 14,
+        name: rec.publication_name || rec.ref_code,
+        logo: rec.publication_logo || null,
+      })
     }
 
     const pageSize = 1000
@@ -277,23 +281,19 @@ export const GET = withApiHandler(
     }))
 
     // Build top earners from in-range snapshot deltas
-    const recNameLookup = new Map<string, { name: string; logo: string | null }>()
-    for (const rec of recommendations || []) {
-      recNameLookup.set(rec.ref_code, {
-        name: rec.publication_name || rec.ref_code,
-        logo: rec.publication_logo || null,
-      })
-    }
     const topEarners = Array.from(earningsByRef.entries())
       .filter(([, earnings]) => earnings > 0)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 9)
-      .map(([refCode, earnings]) => ({
-        name: recNameLookup.get(refCode)?.name || refCode,
-        logo: recNameLookup.get(refCode)?.logo || null,
-        referrals: confirmedByRef.get(refCode) || 0,
-        earnings: Math.round(earnings * 100) / 100,
-      }))
+      .map(([refCode, earnings]) => {
+        const info = recLookup.get(refCode)
+        return {
+          name: info?.name || refCode,
+          logo: info?.logo || null,
+          referrals: confirmedByRef.get(refCode) || 0,
+          earnings: Math.round(earnings * 100) / 100,
+        }
+      })
 
     return NextResponse.json({
       success: true,
