@@ -16,16 +16,9 @@ import type {
 } from '@/types/sparkloop'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicationSettings } from '@/lib/publication-settings'
+import { toLocalDateStr as toDateString } from '@/lib/date-utils'
 
 const SPARKLOOP_API_BASE = 'https://api.sparkloop.app/v2'
-
-/** Format a Date as YYYY-MM-DD using local date parts (avoids UTC shift from toISOString) */
-function toDateString(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
 
 /**
  * Normalize Gmail addresses by stripping periods from the local part.
