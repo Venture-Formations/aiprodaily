@@ -13,7 +13,7 @@ export interface SparkLoopRecommendation {
   uuid: string
   ref_code: string
   type: 'free' | 'paid'
-  status: 'active' | 'paused'
+  status: 'active' | 'paused' | 'archived' | 'awaiting_approval'
   publication_name: string
   publication_logo: string | null
   description: string | null
@@ -46,7 +46,7 @@ export interface StoredSparkLoopRecommendation {
 
   // SparkLoop metadata
   type: 'free' | 'paid'
-  status: 'active' | 'paused'
+  status: 'active' | 'paused' | 'archived' | 'awaiting_approval'
   cpa: number | null
   screening_period: number | null
   sparkloop_rcr: number | null // SparkLoop's 30-day confirmation rate

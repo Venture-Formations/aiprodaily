@@ -10,7 +10,7 @@ interface Recommendation {
   publication_logo: string | null
   description: string | null
   type: 'free' | 'paid'
-  status: 'active' | 'paused'
+  status: 'active' | 'paused' | 'archived' | 'awaiting_approval'
   cpa: number | null
   sparkloop_rcr: number | null
   max_payout: number | null
@@ -100,6 +100,9 @@ interface RangeStats {
   avgOffersSelected: number
 }
 
+const STATUS_FILTERS = ['all', 'active', 'excluded', 'paused', 'archived'] as const
+type StatusFilter = typeof STATUS_FILTERS[number]
+
 const DEFAULT_COLUMNS: Column[] = [
   { key: 'publication_name', label: 'Newsletter', enabled: true, exportable: true, width: 'lg' },
   { key: 'ref_code', label: 'Ref Code', enabled: false, exportable: true, width: 'md' },
@@ -163,7 +166,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [showColumnSelector, setShowColumnSelector] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'excluded' | 'paused'>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
 
   // Date range state
   const [dateStart, setDateStart] = useState('')
@@ -295,6 +298,8 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
     // Status filter
     if (statusFilter === 'active') {
       result = result.filter(r => r.status === 'active' && !r.excluded)
+    } else if (statusFilter === 'archived') {
+      result = result.filter(r => r.status === 'archived' || r.status === 'awaiting_approval')
     } else if (statusFilter === 'excluded') {
       result = result.filter(r => r.excluded)
     } else if (statusFilter === 'paused') {
@@ -309,6 +314,8 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
           const getStatusLabel = (r: Recommendation) => {
             if (r.excluded) return r.excluded_reason || 'excluded'
             if (r.status === 'paused') return r.paused_reason || 'paused'
+            if (r.status === 'archived') return 'archived'
+            if (r.status === 'awaiting_approval') return 'awaiting approval'
             return 'active'
           }
           const strA = getStatusLabel(a).toLowerCase()
@@ -659,6 +666,12 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
         if (rec.status === 'paused') {
           return <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-yellow-100 text-yellow-700">{rec.paused_reason || 'paused'}</span>
         }
+        if (rec.status === 'archived') {
+          return <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-gray-100 text-gray-600">Archived</span>
+        }
+        if (rec.status === 'awaiting_approval') {
+          return <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-blue-100 text-blue-700">Awaiting Approval</span>
+        }
         const popupReason = getPopupExclusionReason(rec)
         return (
           <div>
@@ -871,7 +884,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
 
         {/* Status filter */}
         <div className="flex gap-1">
-          {(['all', 'active', 'excluded', 'paused'] as const).map(s => (
+          {STATUS_FILTERS.map(s => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
