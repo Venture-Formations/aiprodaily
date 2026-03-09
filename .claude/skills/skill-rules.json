@@ -163,14 +163,12 @@
             "description": "Structured root-cause debugging methodology - investigate before fixing",
             "promptTriggers": {
                 "keywords": [
-                    "bug",
+                    "fix bug",
                     "debug",
                     "root cause",
                     "test failure",
                     "unexpected behavior",
-                    "investigate",
-                    "broken",
-                    "not working"
+                    "investigate issue"
                 ],
                 "intentPatterns": [
                     "(fix|debug|investigate).*?(bug|failure|error)",
@@ -212,12 +210,11 @@
             "description": "Quality gate - run verification commands before claiming work is done",
             "promptTriggers": {
                 "keywords": [
-                    "verify",
+                    "verify fix",
                     "confirm fix",
                     "before complete",
-                    "done",
-                    "finished",
-                    "ready to push"
+                    "ready to push",
+                    "ready to merge"
                 ],
                 "intentPatterns": [
                     "(verify|confirm|check).*?(fix|done|complete)",
