@@ -58,7 +58,7 @@ export const GET = withApiHandler(
     // Get all recommendations with CPA, RCR, and screening_period data
     const { data: recommendations } = await supabaseAdmin
       .from('sparkloop_recommendations')
-      .select('ref_code, cpa, sparkloop_rcr, override_rcr, sparkloop_confirmed, sparkloop_rejected, sparkloop_pending, sparkloop_earnings, screening_period')
+      .select('ref_code, publication_name, publication_logo, cpa, sparkloop_rcr, override_rcr, sparkloop_confirmed, sparkloop_rejected, sparkloop_pending, sparkloop_earnings, screening_period')
       .eq('publication_id', PUBLICATION_ID)
 
     // Build a lookup: ref_code -> { cpaDollars, rcr, screeningPeriod }
@@ -158,6 +158,9 @@ export const GET = withApiHandler(
     const confirmedByDate = new Map<string, number>()
     const rejectedByDate = new Map<string, number>()
     const confirmedEarningsByDate = new Map<string, number>()
+    // Per-recommendation totals within the date range (for top earners)
+    const confirmedByRef = new Map<string, number>()
+    const earningsByRef = new Map<string, number>()
 
     // Helper to subtract N days from a YYYY-MM-DD string
     const subtractDays = (dateStr: string, days: number): string => {
@@ -188,6 +191,11 @@ export const GET = withApiHandler(
         if (confirmDelta > 0) {
           confirmedByDate.set(attributionDate, (confirmedByDate.get(attributionDate) || 0) + confirmDelta)
           confirmedEarningsByDate.set(attributionDate, (confirmedEarningsByDate.get(attributionDate) || 0) + (confirmDelta * info.cpaDollars))
+          // Accumulate per-recommendation totals for top earners (only if attribution date is in range)
+          if (dailyMap.has(attributionDate)) {
+            confirmedByRef.set(refCode, (confirmedByRef.get(refCode) || 0) + confirmDelta)
+            earningsByRef.set(refCode, (earningsByRef.get(refCode) || 0) + (confirmDelta * info.cpaDollars))
+          }
         }
         if (rejectDelta > 0) {
           rejectedByDate.set(attributionDate, (rejectedByDate.get(attributionDate) || 0) + rejectDelta)
@@ -268,14 +276,24 @@ export const GET = withApiHandler(
       newPending: stats.newPending,
     }))
 
-    // Get top earning recommendations — use sparkloop_confirmed (from API sync)
-    const { data: topRecs } = await supabaseAdmin
-      .from('sparkloop_recommendations')
-      .select('publication_name, publication_logo, sparkloop_confirmed, sparkloop_earnings')
-      .eq('publication_id', PUBLICATION_ID)
-      .gt('sparkloop_earnings', 0)
-      .order('sparkloop_earnings', { ascending: false })
-      .limit(9)
+    // Build top earners from in-range snapshot deltas
+    const recNameLookup = new Map<string, { name: string; logo: string | null }>()
+    for (const rec of recommendations || []) {
+      recNameLookup.set(rec.ref_code, {
+        name: rec.publication_name || rec.ref_code,
+        logo: rec.publication_logo || null,
+      })
+    }
+    const topEarners = Array.from(earningsByRef.entries())
+      .filter(([, earnings]) => earnings > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 9)
+      .map(([refCode, earnings]) => ({
+        name: recNameLookup.get(refCode)?.name || refCode,
+        logo: recNameLookup.get(refCode)?.logo || null,
+        referrals: confirmedByRef.get(refCode) || 0,
+        earnings: Math.round(earnings * 100) / 100,
+      }))
 
     return NextResponse.json({
       success: true,
@@ -288,12 +306,7 @@ export const GET = withApiHandler(
         projectedFromPending: Math.round(totalProjectedEarnings * 100) / 100,
       },
       dailyStats,
-      topEarners: topRecs?.map(r => ({
-        name: r.publication_name,
-        logo: r.publication_logo,
-        referrals: r.sparkloop_confirmed || 0,
-        earnings: (r.sparkloop_earnings || 0) / 100,
-      })) || [],
+      topEarners,
       dateRange: {
         from: fromDate.toISOString().split('T')[0],
         to: toDate.toISOString().split('T')[0],

@@ -168,9 +168,9 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
 
-  // Date range state
-  const [dateStart, setDateStart] = useState('')
-  const [dateEnd, setDateEnd] = useState('')
+  // Date range state — default to last 30 days so snapshot-derived metrics show immediately
+  const [dateStart, setDateStart] = useState(() => new Date(Date.now() - 29 * 86400000).toISOString().split('T')[0])
+  const [dateEnd, setDateEnd] = useState(() => new Date().toISOString().split('T')[0])
   const [dateRangeMetrics, setDateRangeMetrics] = useState<Record<string, DateRangeMetrics> | null>(null)
   const [dateRangeLoading, setDateRangeLoading] = useState(false)
   const [rangeStats, setRangeStats] = useState<RangeStats | null>(null)
