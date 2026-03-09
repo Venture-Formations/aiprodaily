@@ -100,15 +100,9 @@ interface RangeStats {
   avgOffersSelected: number
 }
 
-const MS_PER_DAY = 86400000
+import { toLocalDateStr } from '@/lib/date-utils'
 
-/** Local YYYY-MM-DD string (avoids UTC off-by-one from toISOString) */
-const toLocalDateStr = (d: Date): string => {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
+const MS_PER_DAY = 86400000
 const STATUS_FILTERS = ['all', 'active', 'excluded', 'paused', 'archived'] as const
 type StatusFilter = typeof STATUS_FILTERS[number]
 

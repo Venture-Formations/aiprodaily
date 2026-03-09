@@ -320,7 +320,9 @@ async function processMailerLiteUpdates(log: Logger) {
   }
 
   // Process each subscriber's updates
+  let rateLimitHit = false
   for (const [email, updates] of Array.from(updatesBySubscriber.entries())) {
+    if (rateLimitHit) break
     // Combine all field updates for this subscriber
     const fields: Record<string, boolean> = {}
     for (const update of updates) {
@@ -360,6 +362,7 @@ async function processMailerLiteUpdates(log: Logger) {
           .update({ status: 'pending' })
           .in('id', updateIds)
         log.warn(`[MailerLite Updates] Rate limited (429), left ${updates.length} update(s) pending for ${email}`)
+        rateLimitHit = true
         break // stop this run to avoid further 429s
       } else {
         const newRetryCount = update.retry_count + 1

@@ -37,16 +37,14 @@ These high-volume tables are excluded (empty tables with correct schema are stil
   - `PROD_DATABASE_URL` — production Supabase **direct** connection string (not pooler)
   - `STAGING_DATABASE_URL` — staging Supabase **direct** connection string
 - Connection strings must use the **direct** format: `postgresql://postgres:PASSWORD@db.PROJECT_ID.supabase.co:5432/postgres`
-- Connection strings must contain the correct project IDs:
-  - Production: `vsbdfrqfokoltgjyiivq`
-  - Staging: `cbnecpswmjonbdatxzwv`
+- Connection strings must contain the correct project IDs (see `.env` files or Supabase dashboard)
 
 ## Running
 
 ```powershell
-# Set env vars (PowerShell)
-$env:PROD_DATABASE_URL="postgresql://postgres:PASSWORD@db.vsbdfrqfokoltgjyiivq.supabase.co:5432/postgres"
-$env:STAGING_DATABASE_URL="postgresql://postgres:PASSWORD@db.cbnecpswmjonbdatxzwv.supabase.co:5432/postgres"
+# Set env vars (PowerShell) — replace YOUR_*_PROJECT_ID with actual Supabase project IDs
+$env:PROD_DATABASE_URL="postgresql://postgres:PASSWORD@db.YOUR_PROD_PROJECT_ID.supabase.co:5432/postgres"
+$env:STAGING_DATABASE_URL="postgresql://postgres:PASSWORD@db.YOUR_STAGING_PROJECT_ID.supabase.co:5432/postgres"
 
 # Quick refresh (default — skips bulk analytics)
 npm run refresh-staging
@@ -64,7 +62,7 @@ The script will prompt for confirmation before making any changes.
 | `afteroffers_click_mappings` | email | md5 hash + @example.com |
 | `afteroffers_events` | email | md5 hash + @example.com |
 | `subscriber_real_click_status` | subscriber_email | md5 hash + @example.com |
-| `link_clicks` | ip_address | Last octet zeroed |
+| `link_clicks` | ip_address | Last two octets zeroed |
 | `contact_submissions` | email, name | md5 hash |
 | `feedback_comments` | author_email, author_name | md5 hash |
 | `ai_applications` | submitted_by_email, submitted_by_name | md5 hash |

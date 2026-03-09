@@ -3,6 +3,7 @@ import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicationSettings } from '@/lib/publication-settings'
 import { PUBLICATION_ID } from '@/lib/config'
+import { toLocalDateStr as toDateStr } from '@/lib/date-utils'
 const FALLBACK_DEFAULT_RCR = 25
 
 interface DailyStats {
@@ -113,7 +114,7 @@ export const GET = withApiHandler(
     // Initialize all days in range
     const currentDate = new Date(fromDate)
     while (currentDate <= toDate) {
-      const dateKey = currentDate.toISOString().split('T')[0]
+      const dateKey = toDateStr(currentDate)
       dailyMap.set(dateKey, { subscribes: 0, confirmed: 0, rejected: 0, projectedEarnings: 0, confirmedEarnings: 0, newPending: null })
       currentDate.setDate(currentDate.getDate() + 1)
     }
@@ -128,8 +129,8 @@ export const GET = withApiHandler(
         .from('sparkloop_daily_snapshots')
         .select('ref_code, snapshot_date, sparkloop_pending, sparkloop_confirmed, sparkloop_rejected')
         .eq('publication_id', PUBLICATION_ID)
-        .gte('snapshot_date', snapshotFromDate.toISOString().split('T')[0])
-        .lte('snapshot_date', toDate.toISOString().split('T')[0])
+        .gte('snapshot_date', toDateStr(snapshotFromDate))
+        .lte('snapshot_date', toDateStr(toDate))
         .order('snapshot_date', { ascending: true })
         .order('ref_code', { ascending: true })
         .range(snapPageFrom, snapPageFrom + pageSize - 1)
@@ -168,9 +169,10 @@ export const GET = withApiHandler(
 
     // Helper to subtract N days from a YYYY-MM-DD string
     const subtractDays = (dateStr: string, days: number): string => {
-      const d = new Date(dateStr + 'T00:00:00Z')
-      d.setUTCDate(d.getUTCDate() - days)
-      return d.toISOString().split('T')[0]
+      const [year, month, day] = dateStr.split('-').map(Number)
+      const d = new Date(year, month - 1, day) // Local constructor avoids UTC parse
+      d.setDate(d.getDate() - days)
+      return toDateStr(d)
     }
 
     Array.from(snapshotsByRefCode.entries()).forEach(([refCode, refMap]) => {
@@ -308,8 +310,8 @@ export const GET = withApiHandler(
       dailyStats,
       topEarners,
       dateRange: {
-        from: fromDate.toISOString().split('T')[0],
-        to: toDate.toISOString().split('T')[0],
+        from: toDateStr(fromDate),
+        to: toDateStr(toDate),
       },
     })
   }

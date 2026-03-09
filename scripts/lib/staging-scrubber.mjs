@@ -28,8 +28,8 @@ const SCRUB_OPERATIONS = [
   },
   {
     table: 'link_clicks',
-    description: 'Anonymize IP last octet',
-    sql: `UPDATE link_clicks SET ip_address = regexp_replace(ip_address, '\\.[0-9]+$', '.0') WHERE ip_address IS NOT NULL AND ip_address !~ '\\.0$'`,
+    description: 'Anonymize IP last two octets',
+    sql: `UPDATE link_clicks SET ip_address = regexp_replace(ip_address, '\\.[0-9]+\\.[0-9]+$', '.0.0') WHERE ip_address IS NOT NULL AND ip_address !~ '\\.0\\.0$'`,
   },
   {
     table: 'contact_submissions',
@@ -55,6 +55,8 @@ const SCRUB_OPERATIONS = [
 
 /**
  * Run all PII scrubbing operations. Returns { scrubbed, skipped, details }.
+ * @param {string} dbUrl
+ * @param {(dbUrl: string, sql: string) => string} runSqlFn — must be synchronous (e.g. execFileSync wrapper)
  */
 export function runPiiScrub(dbUrl, runSqlFn) {
   const details = []

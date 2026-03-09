@@ -37,8 +37,13 @@ try {
   console.log('Restoring to staging...')
   try {
     runPassthrough(`pg_restore -d "${stagingUrl}" --no-owner --no-acl --data-only "${dumpFile}"`, env)
-  } catch {
-    console.log('⚠️  pg_restore returned warnings (often expected)')
+  } catch (err) {
+    // pg_restore exits non-zero for warnings too; only ignore exit code 1 (warnings)
+    if (err.status === 1) {
+      console.log('⚠️  pg_restore returned warnings (often expected)')
+    } else {
+      throw err
+    }
   }
   console.log('✅ Restore complete')
 

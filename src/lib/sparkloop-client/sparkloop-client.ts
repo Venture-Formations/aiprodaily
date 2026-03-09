@@ -16,16 +16,9 @@ import type {
 } from '@/types/sparkloop'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicationSettings } from '@/lib/publication-settings'
+import { toLocalDateStr as toDateString } from '@/lib/date-utils'
 
 const SPARKLOOP_API_BASE = 'https://api.sparkloop.app/v2'
-
-/** Format a Date as YYYY-MM-DD using local date parts (avoids UTC shift from toISOString) */
-function toDateString(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
 
 /**
  * Normalize Gmail addresses by stripping periods from the local part.
@@ -367,9 +360,10 @@ export class SparkLoopService {
     ])
     // Read min conversions budget from publication settings (default: 10)
     const pubSettings = await getPublicationSettings(publicationId, ['sparkloop_min_conversions_budget'])
-    const minConversionsBudget = pubSettings.sparkloop_min_conversions_budget
-      ? parseInt(pubSettings.sparkloop_min_conversions_budget)
-      : 10
+    const parsedBudget = pubSettings.sparkloop_min_conversions_budget
+      ? parseInt(pubSettings.sparkloop_min_conversions_budget, 10)
+      : NaN
+    const minConversionsBudget = Number.isNaN(parsedBudget) ? 10 : parsedBudget
 
     let created = 0
     let updated = 0
@@ -448,7 +442,7 @@ export class SparkLoopService {
         pausedReason = 'low_budget'
         lowBudget++
         console.log(`[SparkLoop] Auto-pausing ${rec.publication_name} (budget $${remainingBudget} < ${minConversionsBudget}x CPA $${minBudgetRequired})`)
-      } else if (!isLowBudget && existing?.paused_reason === 'low_budget') {
+      } else if (budgetInfo && !isLowBudget && existing?.paused_reason === 'low_budget') {
         // Budget restored — un-pause (effectiveStatus already set from rec.status above)
         pausedReason = rec.status === 'paused' ? 'api_paused' : null
         console.log(`[SparkLoop] Auto-reactivating ${rec.publication_name} (budget restored: $${remainingBudget})`)

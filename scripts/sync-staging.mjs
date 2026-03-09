@@ -206,7 +206,7 @@ try {
   for (const t of tables) {
     const tsCol = t.hasUpdated ? 'updated_at' : 'created_at'
     const countResult = sql(prodUrl,
-      `SELECT count(*) FROM ${t.name} WHERE ${tsCol} >= now() - interval '${DAYS} days'`
+      `SELECT count(*) FROM "${t.name}" WHERE "${tsCol}" >= now() - interval '${DAYS} days'`
     )
     const count = parseInt(countResult, 10)
     if (count > 0) {
@@ -252,7 +252,7 @@ try {
       const colsRaw = sql(prodUrl, `
         SELECT string_agg(column_name, ',' ORDER BY ordinal_position)
         FROM information_schema.columns
-        WHERE table_schema = 'public' AND table_name = '${t.name}'
+        WHERE table_schema = 'public' AND table_name = '${t.name.replace(/'/g, "''")}'
       `)
       const allCols = colsRaw.trim()
 
@@ -266,7 +266,7 @@ try {
       const stagingColsRaw = sql(stagingUrl, `
         SELECT string_agg(column_name, ',' ORDER BY ordinal_position)
         FROM information_schema.columns
-        WHERE table_schema = 'public' AND table_name = '${t.name}'
+        WHERE table_schema = 'public' AND table_name = '${t.name.replace(/'/g, "''")}'
       `)
 
       if (!stagingColsRaw.trim()) {
@@ -288,6 +288,15 @@ try {
       }
 
       const colList = commonCols.join(', ')
+
+      // Verify all PK columns exist in common columns
+      const missingPkCols = t.pkCols.filter(pk => !commonCols.includes(pk))
+      if (missingPkCols.length > 0) {
+        console.log(`  ${t.name}: skipped (PK columns missing on staging: ${missingPkCols.join(', ')})`)
+        skippedTables++
+        results.push({ table: t.name, rows: 0, status: 'skipped (PK mismatch)' })
+        continue
+      }
 
       // Step 3: Export recent rows from production to CSV
       const whereClause = t.mode === 'full'

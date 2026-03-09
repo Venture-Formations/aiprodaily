@@ -59,10 +59,9 @@ const VALID_COLUMNS: Record<string, Set<string>> = {
     'created_at', 'updated_at',
   ]),
 
-  // NewsletterSection TS interface is minimal; newsletter_id and description are DB-only columns
   newsletter_sections: new Set([
-    'id', 'newsletter_id', 'name', 'display_order', 'is_active', 'section_type',
-    'description', 'created_at',
+    'id', 'publication_id', 'name', 'display_order', 'is_active', 'section_type',
+    'created_at',
   ]),
 
   publication_issues: new Set([
