@@ -65,3 +65,4 @@ NUL
 .claude/epics/
 .claude/prds/
 .claude-backup/
+.claude/.pre-push-approved
