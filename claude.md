@@ -57,6 +57,7 @@ This project uses a **branch-based workflow** with pull requests:
    - Code quality (no unused variables, clear naming)
 3. Only push after review passes or issues are addressed
 4. For a detailed review checklist and responding to feedback, see the `requesting-code-review` skill.
+5. Run `/simplify` to review changed code for reuse, quality, and efficiency before creating a PR.
 
 ## 5. Task Router
 | You are working on… | Open these references | Checklist |
