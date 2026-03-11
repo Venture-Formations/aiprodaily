@@ -138,6 +138,10 @@ export default function AdsManagementPage() {
       // Add section filter
       params.set('ad_module_id', selectedSection)
 
+      if (publicationId) {
+        params.set('publication_id', publicationId)
+      }
+
       const response = await fetch(`/api/ads?${params.toString()}`)
       if (response.ok) {
         const data = await response.json()
@@ -720,6 +724,15 @@ export default function AdsManagementPage() {
                                     >
                                       Preview
                                     </button>
+                                    <a
+                                      href={`/ads/${ad.id}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 text-xs"
+                                    >
+                                      Analytics
+                                    </a>
                                     <button
                                       onClick={(e) => { e.stopPropagation(); setEditingAd(ad as AdWithRelations) }}
                                       className="bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 text-xs"
@@ -774,6 +787,14 @@ export default function AdsManagementPage() {
                       >
                         Preview
                       </button>
+                      <a
+                        href={`/ads/${ad.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 text-sm"
+                      >
+                        Analytics
+                      </a>
                       <button
                         onClick={() => handleApprove(ad.id)}
                         className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"
@@ -892,6 +913,14 @@ export default function AdsManagementPage() {
                       >
                         Preview
                       </button>
+                      <a
+                        href={`/ads/${ad.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 text-sm"
+                      >
+                        Analytics
+                      </a>
                       <button
                         onClick={() => handleActivate(ad.id)}
                         className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"

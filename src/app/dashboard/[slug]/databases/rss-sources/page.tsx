@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Layout from '@/components/Layout'
+import { usePublicationId } from '@/hooks/usePublicationId'
 
 interface RssSource {
   author: string
@@ -10,18 +11,19 @@ interface RssSource {
 }
 
 export default function RssSourcesPage() {
+  const { publicationId } = usePublicationId()
   const [sources, setSources] = useState<RssSource[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchSources()
-  }, [])
+    if (publicationId) fetchSources()
+  }, [publicationId])
 
   const fetchSources = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/rss-sources')
+      const response = await fetch(`/api/rss-sources?publication_id=${publicationId}`)
       if (!response.ok) {
         throw new Error('Failed to fetch RSS sources')
       }
@@ -36,7 +38,7 @@ export default function RssSourcesPage() {
 
   const toggleExclusion = async (author: string, currentlyExcluded: boolean) => {
     try {
-      const response = await fetch('/api/rss-sources', {
+      const response = await fetch(`/api/rss-sources?publication_id=${publicationId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

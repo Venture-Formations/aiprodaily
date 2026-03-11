@@ -4,26 +4,9 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 // GET is public - allows the public events submission page to fetch current pricing
 export const GET = withApiHandler(
-  { authTier: 'public', logContext: 'settings/public-events' },
-  async ({ request }) => {
-    let publicationId = request.nextUrl.searchParams.get('publication_id')
-
-    // Fall back to first active publication for public page callers
-    if (!publicationId) {
-      const { data: pub } = await supabaseAdmin
-        .from('publications')
-        .select('id')
-        .eq('is_active', true)
-        .limit(1)
-        .single()
-
-      if (!pub) {
-        return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
-      }
-      publicationId = pub.id
-    }
-
-    const newsletter = { id: publicationId }
+  { authTier: 'public', logContext: 'settings/public-events', requirePublicationId: true },
+  async ({ publicationId }) => {
+    const newsletter = { id: publicationId! }
 
     // Get current pricing settings from database
     const { data: settingsRows, error } = await supabaseAdmin
@@ -60,14 +43,9 @@ export const GET = withApiHandler(
 )
 
 export const POST = withApiHandler(
-  { authTier: 'authenticated', logContext: 'settings/public-events' },
-  async ({ session, request }) => {
-    const publicationId = request.nextUrl.searchParams.get('publication_id')
-    if (!publicationId) {
-      return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
-    }
-
-    const newsletter = { id: publicationId }
+  { authTier: 'authenticated', logContext: 'settings/public-events', requirePublicationId: true },
+  async ({ session, request, publicationId }) => {
+    const newsletter = { id: publicationId! }
 
     const settings = await request.json()
 

@@ -2,30 +2,14 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// Helper to get active publication
-async function getActivePublication() {
-  const { data: publication } = await supabaseAdmin
-    .from('publications')
-    .select('id')
-    .eq('is_active', true)
-    .limit(1)
-    .single()
-  return publication
-}
-
 // GET - List all categories
 export const GET = withApiHandler(
-  { authTier: 'authenticated', logContext: 'databases/categories' },
-  async ({ logger }) => {
-    const activeNewsletter = await getActivePublication()
-    if (!activeNewsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
-    }
-
+  { authTier: 'authenticated', logContext: 'databases/categories', requirePublicationId: true },
+  async ({ publicationId, logger }) => {
     const { data: categories, error } = await supabaseAdmin
       .from('article_categories')
       .select('*')
-      .eq('publication_id', activeNewsletter.id)
+      .eq('publication_id', publicationId!)
       .order('name', { ascending: true })
 
     if (error) {
@@ -39,13 +23,8 @@ export const GET = withApiHandler(
 
 // POST - Create a new category
 export const POST = withApiHandler(
-  { authTier: 'authenticated', logContext: 'databases/categories' },
-  async ({ request, logger }) => {
-    const activeNewsletter = await getActivePublication()
-    if (!activeNewsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
-    }
-
+  { authTier: 'authenticated', logContext: 'databases/categories', requirePublicationId: true },
+  async ({ request, publicationId, logger }) => {
     const body = await request.json()
     const { name } = body
 
@@ -64,7 +43,7 @@ export const POST = withApiHandler(
     const { data: existing } = await supabaseAdmin
       .from('article_categories')
       .select('id')
-      .eq('publication_id', activeNewsletter.id)
+      .eq('publication_id', publicationId!)
       .eq('slug', slug)
       .single()
 
@@ -75,7 +54,7 @@ export const POST = withApiHandler(
     const { data: category, error } = await supabaseAdmin
       .from('article_categories')
       .insert({
-        publication_id: activeNewsletter.id,
+        publication_id: publicationId!,
         name: name.trim(),
         slug
       })
