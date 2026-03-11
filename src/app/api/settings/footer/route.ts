@@ -3,25 +3,8 @@ import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export const GET = withApiHandler(
-  { authTier: 'authenticated', logContext: 'settings/footer' },
-  async ({ request }) => {
-    let publicationId = request.nextUrl.searchParams.get('publication_id')
-
-    // Fall back to first active publication for public website callers
-    if (!publicationId) {
-      const { data: pub } = await supabaseAdmin
-        .from('publications')
-        .select('id')
-        .eq('is_active', true)
-        .limit(1)
-        .single()
-
-      if (!pub) {
-        return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
-      }
-      publicationId = pub.id
-    }
-
+  { authTier: 'authenticated', logContext: 'settings/footer', requirePublicationId: true },
+  async ({ publicationId }) => {
     const { data: settings } = await supabaseAdmin
       .from('publication_settings')
       .select('key, value')

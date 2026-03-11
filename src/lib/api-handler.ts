@@ -148,17 +148,26 @@ export function withApiHandler<TInput = unknown>(
       }
 
       // --- Publication ID extraction ---
+      // Checks query params, validated input, and JSON body (in that order).
+      // When requirePublicationId is true, returns 400 if none found.
       let publicationId: string | null = null
-      if (config.requirePublicationId) {
-        publicationId = (input as any)?.publicationId || (input as any)?.publication_id || null
-        if (!publicationId) {
+      {
+        const searchParams = new URL(request.url).searchParams
+        publicationId =
+          searchParams.get('publication_id') ||
+          (input as any)?.publicationId ||
+          (input as any)?.publication_id ||
+          null
+        if (config.requirePublicationId && !publicationId) {
           return NextResponse.json(
             { error: 'publication_id is required' },
             { status: 400 }
           )
         }
-        // Bind to logger for downstream queries
-        ;(logger as any).publicationId = publicationId
+        if (publicationId) {
+          // Bind to logger for downstream queries
+          ;(logger as any).publicationId = publicationId
+        }
       }
 
       // --- Execute handler ---

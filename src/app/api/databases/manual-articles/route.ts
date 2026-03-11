@@ -2,17 +2,6 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// Helper to get active publication
-async function getActivePublication() {
-  const { data: publication } = await supabaseAdmin
-    .from('publications')
-    .select('id, website_domain')
-    .eq('is_active', true)
-    .limit(1)
-    .single()
-  return publication
-}
-
 // Helper to generate slug from title
 function generateSlug(title: string): string {
   return title
@@ -24,12 +13,14 @@ function generateSlug(title: string): string {
 
 // GET - List all manual articles
 export const GET = withApiHandler(
-  { authTier: 'authenticated', logContext: 'databases/manual-articles' },
-  async ({ request, logger }) => {
-    const activeNewsletter = await getActivePublication()
-    if (!activeNewsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
-    }
+  { authTier: 'authenticated', logContext: 'databases/manual-articles', requirePublicationId: true },
+  async ({ request, publicationId, logger }) => {
+    // Also fetch website_domain for this publication
+    const { data: pub } = await supabaseAdmin
+      .from('publications')
+      .select('website_domain')
+      .eq('id', publicationId!)
+      .single()
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') // Optional filter: draft, published, used
@@ -40,7 +31,7 @@ export const GET = withApiHandler(
         *,
         category:article_categories(id, name, slug)
       `)
-      .eq('publication_id', activeNewsletter.id)
+      .eq('publication_id', publicationId!)
       .order('publish_date', { ascending: false })
 
     if (status) {
@@ -56,20 +47,15 @@ export const GET = withApiHandler(
 
     return NextResponse.json({
       articles,
-      website_domain: activeNewsletter.website_domain
+      website_domain: pub?.website_domain || ''
     })
   }
 )
 
 // POST - Create a new manual article
 export const POST = withApiHandler(
-  { authTier: 'authenticated', logContext: 'databases/manual-articles' },
-  async ({ request, logger }) => {
-    const activeNewsletter = await getActivePublication()
-    if (!activeNewsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
-    }
-
+  { authTier: 'authenticated', logContext: 'databases/manual-articles', requirePublicationId: true },
+  async ({ request, publicationId, logger }) => {
     const body = await request.json()
     const {
       title,
@@ -104,7 +90,7 @@ export const POST = withApiHandler(
       const { data: existing } = await supabaseAdmin
         .from('manual_articles')
         .select('id')
-        .eq('publication_id', activeNewsletter.id)
+        .eq('publication_id', publicationId!)
         .eq('slug', slugToUse)
         .single()
 
@@ -116,7 +102,7 @@ export const POST = withApiHandler(
     const { data: article, error } = await supabaseAdmin
       .from('manual_articles')
       .insert({
-        publication_id: activeNewsletter.id,
+        publication_id: publicationId!,
         title: title.trim(),
         slug: slugToUse,
         body: articleBody,

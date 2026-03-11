@@ -392,7 +392,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
       }
 
       // Fetch cooldown setting
-      const settingsRes = await fetch(`/api/settings/publication?key=ad_company_cooldown_days`)
+      const settingsRes = await fetch(`/api/settings/publication?key=ad_company_cooldown_days&publication_id=${publicationId}`)
       if (settingsRes.ok) {
         const settingsData = await settingsRes.json()
         setCooldownDays(parseInt(settingsData.value) || 7)
@@ -1370,7 +1370,7 @@ export default function SectionsPanel({ publicationId: propPublicationId }: Sect
 
   const handleCooldownChange = async (days: number) => {
     try {
-      await fetch('/api/settings/publication', {
+      await fetch(`/api/settings/publication?publication_id=${publicationId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

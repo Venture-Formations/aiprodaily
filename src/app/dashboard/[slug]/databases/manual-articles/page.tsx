@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import Layout from '@/components/Layout'
+import { usePublicationId } from '@/hooks/usePublicationId'
 import RichTextEditor from '@/components/RichTextEditor'
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop'
 import 'react-image-crop/dist/ReactCrop.css'
@@ -37,6 +38,7 @@ const SECTION_OPTIONS = [
 export default function ManualArticlesPage() {
   const params = useParams()
   const slug = params?.slug as string || ''
+  const { publicationId } = usePublicationId()
 
   const [activeTab, setActiveTab] = useState<'draft' | 'published' | 'used'>('draft')
   const [articles, setArticles] = useState<NewsArticle[]>([])
@@ -70,14 +72,16 @@ export default function ManualArticlesPage() {
   const [uploadingImage, setUploadingImage] = useState(false)
 
   useEffect(() => {
-    fetchArticles()
-    fetchCategories()
-  }, [activeTab])
+    if (publicationId) {
+      fetchArticles()
+      fetchCategories()
+    }
+  }, [activeTab, publicationId])
 
   const fetchArticles = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/databases/manual-articles?status=${activeTab}`)
+      const response = await fetch(`/api/databases/manual-articles?status=${activeTab}&publication_id=${publicationId}`)
       if (response.ok) {
         const data = await response.json()
         setArticles(data.articles || [])
@@ -94,7 +98,7 @@ export default function ManualArticlesPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('/api/databases/categories')
+      const response = await fetch(`/api/databases/categories?publication_id=${publicationId}`)
       if (response.ok) {
         const data = await response.json()
         setCategories(data.categories || [])
@@ -287,8 +291,8 @@ export default function ManualArticlesPage() {
       }
 
       const url = editingArticle
-        ? `/api/databases/manual-articles/${editingArticle.id}`
-        : '/api/databases/manual-articles'
+        ? `/api/databases/manual-articles/${editingArticle.id}?publication_id=${publicationId}`
+        : `/api/databases/manual-articles?publication_id=${publicationId}`
 
       const response = await fetch(url, {
         method: editingArticle ? 'PATCH' : 'POST',
@@ -314,7 +318,7 @@ export default function ManualArticlesPage() {
 
   const handleStatusChange = async (articleId: string, newStatus: 'draft' | 'published') => {
     try {
-      const response = await fetch(`/api/databases/manual-articles/${articleId}`, {
+      const response = await fetch(`/api/databases/manual-articles/${articleId}?publication_id=${publicationId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -333,7 +337,7 @@ export default function ManualArticlesPage() {
     if (!confirm('Delete this article? This cannot be undone.')) return
 
     try {
-      const response = await fetch(`/api/databases/manual-articles/${articleId}`, {
+      const response = await fetch(`/api/databases/manual-articles/${articleId}?publication_id=${publicationId}`, {
         method: 'DELETE'
       })
 
@@ -356,7 +360,7 @@ export default function ManualArticlesPage() {
     }
 
     try {
-      const response = await fetch('/api/databases/categories', {
+      const response = await fetch(`/api/databases/categories?publication_id=${publicationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newCategoryName })
