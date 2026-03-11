@@ -2,17 +2,6 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// Helper to get active publication
-async function getActivePublication() {
-  const { data: publication } = await supabaseAdmin
-    .from('publications')
-    .select('id')
-    .eq('is_active', true)
-    .limit(1)
-    .single()
-  return publication
-}
-
 // Helper to generate slug from title
 function generateSlug(title: string): string {
   return title
@@ -52,15 +41,10 @@ export const GET = withApiHandler(
 
 // PATCH - Update an article
 export const PATCH = withApiHandler(
-  { authTier: 'authenticated', logContext: 'databases/manual-articles/[id]' },
-  async ({ params, request, logger }) => {
+  { authTier: 'authenticated', logContext: 'databases/manual-articles/[id]', requirePublicationId: true },
+  async ({ params, request, publicationId, logger }) => {
     const id = params.id
     const body = await request.json()
-
-    const activeNewsletter = await getActivePublication()
-    if (!activeNewsletter) {
-      return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
-    }
 
     // Get existing article
     const { data: existing, error: fetchError } = await supabaseAdmin
@@ -95,7 +79,7 @@ export const PATCH = withApiHandler(
       const { data: slugExists } = await supabaseAdmin
         .from('manual_articles')
         .select('id')
-        .eq('publication_id', activeNewsletter.id)
+        .eq('publication_id', publicationId!)
         .eq('slug', newSlug)
         .neq('id', id)
         .single()

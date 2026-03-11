@@ -6,8 +6,8 @@ import { supabaseAdmin } from '@/lib/supabase'
  * GET - Fetch all RSS sources (authors) with post counts and image blocking status
  */
 export const GET = withApiHandler(
-  { authTier: 'authenticated', logContext: 'rss-sources' },
-  async () => {
+  { authTier: 'authenticated', logContext: 'rss-sources', requirePublicationId: true },
+  async ({ publicationId }) => {
     // Get all unique authors from rss_posts with their post counts
     const { data: posts, error: postsError } = await supabaseAdmin
       .from('rss_posts')
@@ -18,26 +18,11 @@ export const GET = withApiHandler(
       return NextResponse.json({ error: postsError.message }, { status: 500 })
     }
 
-    // Get the first active newsletter for publication_id
-    const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (newsletterError || !newsletter) {
-      return NextResponse.json(
-        { error: 'No active newsletter found' },
-        { status: 404 }
-      )
-    }
-
     // Get excluded sources from settings table
     const { data: excludedSettings } = await supabaseAdmin
       .from('publication_settings')
       .select('value')
-      .eq('publication_id', newsletter.id)
+      .eq('publication_id', publicationId!)
       .eq('key', 'excluded_rss_sources')
       .maybeSingle()
 
@@ -73,8 +58,8 @@ export const GET = withApiHandler(
  * PATCH - Update exclusion status for a source
  */
 export const PATCH = withApiHandler(
-  { authTier: 'authenticated', logContext: 'rss-sources' },
-  async ({ request }) => {
+  { authTier: 'authenticated', logContext: 'rss-sources', requirePublicationId: true },
+  async ({ request, publicationId }) => {
     const body = await request.json()
     const { author, excluded } = body
 
@@ -85,26 +70,11 @@ export const PATCH = withApiHandler(
       )
     }
 
-    // Get the first active newsletter for publication_id
-    const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (newsletterError || !newsletter) {
-      return NextResponse.json(
-        { error: 'No active newsletter found' },
-        { status: 404 }
-      )
-    }
-
     // Get current excluded sources
     const { data: currentSettings } = await supabaseAdmin
       .from('publication_settings')
       .select('value')
-      .eq('publication_id', newsletter.id)
+      .eq('publication_id', publicationId!)
       .eq('key', 'excluded_rss_sources')
       .maybeSingle()
 
@@ -127,7 +97,7 @@ export const PATCH = withApiHandler(
     const { error: updateError } = await supabaseAdmin
       .from('publication_settings')
       .upsert({
-        publication_id: newsletter.id,
+        publication_id: publicationId!,
         key: 'excluded_rss_sources',
         value: JSON.stringify(excludedSources),
         description: 'List of RSS post authors/sources whose images should be blocked (posts still processed, but without images)',

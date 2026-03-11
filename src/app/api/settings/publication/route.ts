@@ -4,38 +4,22 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * GET /api/settings/publication - Get individual publication setting
- * Query params: key (required), publication_id (optional - defaults to active publication)
+ * Query params: key (required), publication_id (required)
  */
 export const GET = withApiHandler(
-  { authTier: 'authenticated', logContext: 'settings/publication' },
-  async ({ request }) => {
+  { authTier: 'authenticated', logContext: 'settings/publication', requirePublicationId: true },
+  async ({ request, publicationId }) => {
     const key = request.nextUrl.searchParams.get('key')
-    let publicationId = request.nextUrl.searchParams.get('publication_id')
 
     if (!key) {
       return NextResponse.json({ error: 'key parameter is required' }, { status: 400 })
-    }
-
-    // Fall back to first active publication for legacy callers
-    if (!publicationId) {
-      const { data: pub } = await supabaseAdmin
-        .from('publications')
-        .select('id')
-        .eq('is_active', true)
-        .limit(1)
-        .single()
-
-      if (!pub) {
-        return NextResponse.json({ error: 'No active publication found' }, { status: 404 })
-      }
-      publicationId = pub.id
     }
 
     // Fetch the setting
     const { data: setting, error } = await supabaseAdmin
       .from('publication_settings')
       .select('value')
-      .eq('publication_id', publicationId)
+      .eq('publication_id', publicationId!)
       .eq('key', key)
       .maybeSingle()
 
@@ -53,14 +37,13 @@ export const GET = withApiHandler(
 
 /**
  * PATCH /api/settings/publication - Update publication setting
- * Body: { key, value, publication_id? }
+ * Body: { key, value, publication_id }
  */
 export const PATCH = withApiHandler(
-  { authTier: 'authenticated', logContext: 'settings/publication' },
-  async ({ request }) => {
+  { authTier: 'authenticated', logContext: 'settings/publication', requirePublicationId: true },
+  async ({ request, publicationId }) => {
     const body = await request.json()
     const { key, value } = body
-    let publicationId = request.nextUrl.searchParams.get('publication_id') || body.publication_id
 
     if (!key) {
       return NextResponse.json({ error: 'key is required' }, { status: 400 })
@@ -70,26 +53,11 @@ export const PATCH = withApiHandler(
       return NextResponse.json({ error: 'value is required' }, { status: 400 })
     }
 
-    // Fall back to first active publication for legacy callers
-    if (!publicationId) {
-      const { data: pub } = await supabaseAdmin
-        .from('publications')
-        .select('id')
-        .eq('is_active', true)
-        .limit(1)
-        .single()
-
-      if (!pub) {
-        return NextResponse.json({ error: 'No active publication found' }, { status: 404 })
-      }
-      publicationId = pub.id
-    }
-
     // Upsert the setting
     const { error } = await supabaseAdmin
       .from('publication_settings')
       .upsert({
-        publication_id: publicationId,
+        publication_id: publicationId!,
         key,
         value: String(value),
         updated_at: new Date().toISOString()

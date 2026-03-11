@@ -4,26 +4,11 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 // GET all ads with optional status and ad_module_id filters
 export const GET = withApiHandler(
-  { authTier: 'admin', logContext: 'ads' },
-  async ({ request }) => {
+  { authTier: 'admin', logContext: 'ads', requirePublicationId: true },
+  async ({ request, publicationId }) => {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const adModuleId = searchParams.get('ad_module_id')
-
-    // Get the first active newsletter for publication_id
-    const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (newsletterError || !newsletter) {
-      return NextResponse.json(
-        { error: 'No active newsletter found' },
-        { status: 404 }
-      )
-    }
 
     let query = supabaseAdmin
       .from('advertisements')
@@ -32,7 +17,7 @@ export const GET = withApiHandler(
         ad_module:ad_modules(id, name),
         advertiser:advertisers(id, company_name, logo_url)
       `)
-      .eq('publication_id', newsletter.id)
+      .eq('publication_id', publicationId!)
       .order('created_at', { ascending: false })
 
     // Filter by ad_module_id
@@ -65,8 +50,8 @@ export const GET = withApiHandler(
 
 // POST - Create new ad (admin only)
 export const POST = withApiHandler(
-  { authTier: 'admin', logContext: 'ads' },
-  async ({ request, logger }) => {
+  { authTier: 'admin', logContext: 'ads', requirePublicationId: true },
+  async ({ request, publicationId, logger }) => {
     const body = await request.json()
     const {
       title,
@@ -89,23 +74,6 @@ export const POST = withApiHandler(
       normalizedUrl = 'https://' + normalizedUrl
     }
 
-    // Get the first active newsletter for publication_id
-    const { data: newsletter, error: newsletterError } = await supabaseAdmin
-      .from('publications')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
-      .single()
-
-    if (newsletterError || !newsletter) {
-      return NextResponse.json(
-        { error: 'No active newsletter found' },
-        { status: 404 }
-      )
-    }
-
-    const newsletterId = newsletter.id
-
     // Determine display_order if status is active
     let display_order = null
     const requestedStatus = body.status || 'approved'
@@ -117,7 +85,7 @@ export const POST = withApiHandler(
         const { data: settingsData, error: settingsError } = await supabaseAdmin
           .from('publication_settings')
           .select('value')
-          .eq('publication_id', newsletterId)
+          .eq('publication_id', publicationId)
           .eq('key', 'next_ad_position')
           .maybeSingle()
 
@@ -132,7 +100,7 @@ export const POST = withApiHandler(
         const { data: adsToShift, error: fetchAdsError } = await supabaseAdmin
           .from('advertisements')
           .select('id, display_order')
-          .eq('publication_id', newsletterId)
+          .eq('publication_id', publicationId)
           .eq('status', 'active')
           .gte('display_order', nextAdPosition)
           .not('display_order', 'is', null)
@@ -156,7 +124,7 @@ export const POST = withApiHandler(
         const { data: activeAds, error: fetchError } = await supabaseAdmin
           .from('advertisements')
           .select('display_order')
-          .eq('publication_id', newsletterId)
+          .eq('publication_id', publicationId)
           .eq('status', 'active')
           .not('display_order', 'is', null)
           .order('display_order', { ascending: false })
@@ -191,7 +159,7 @@ export const POST = withApiHandler(
         image_url: body.image_url || null,
         image_alt: body.image_alt || null,
         submission_date: new Date().toISOString(),
-        publication_id: newsletterId, // Associate ad with newsletter
+        publication_id: publicationId,
         ad_module_id: body.ad_module_id || null, // Optional ad module assignment
         advertiser_id: body.advertiser_id || null, // Optional advertiser assignment
         priority: body.priority || 0, // Priority for selection mode

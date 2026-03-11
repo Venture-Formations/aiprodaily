@@ -4,26 +4,9 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { updateScheduleConfig, type ScheduleConfig } from '@/lib/settings/schedule-settings'
 
 export const GET = withApiHandler(
-  { authTier: 'authenticated', logContext: 'settings/email' },
-  async ({ request, session }) => {
-    let resolvedPublicationId = request.nextUrl.searchParams.get('publication_id')
-
-    // Fall back to first active publication for legacy callers
-    if (!resolvedPublicationId) {
-      const { data: pub } = await supabaseAdmin
-        .from('publications')
-        .select('id')
-        .eq('is_active', true)
-        .limit(1)
-        .single()
-
-      if (!pub) {
-        return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
-      }
-      resolvedPublicationId = pub.id
-    }
-
-    const newsletter = { id: resolvedPublicationId! }
+  { authTier: 'authenticated', logContext: 'settings/email', requirePublicationId: true },
+  async ({ request, session, publicationId }) => {
+    const newsletter = { id: publicationId! }
 
     console.log('BACKEND GET: Loading email settings from database for newsletter:', newsletter.id)
     // Get current settings from database (key-value structure)
@@ -186,26 +169,9 @@ export const GET = withApiHandler(
 )
 
 export const POST = withApiHandler(
-  { authTier: 'authenticated', logContext: 'settings/email' },
-  async ({ session, request }) => {
-    let resolvedPublicationId = request.nextUrl.searchParams.get('publication_id')
-
-    // Fall back to first active publication for legacy callers
-    if (!resolvedPublicationId) {
-      const { data: pub } = await supabaseAdmin
-        .from('publications')
-        .select('id')
-        .eq('is_active', true)
-        .limit(1)
-        .single()
-
-      if (!pub) {
-        return NextResponse.json({ error: 'No active newsletter found' }, { status: 404 })
-      }
-      resolvedPublicationId = pub.id
-    }
-
-    const newsletterId = resolvedPublicationId!
+  { authTier: 'authenticated', logContext: 'settings/email', requirePublicationId: true },
+  async ({ session, request, publicationId }) => {
+    const newsletterId = publicationId!
     console.log('BACKEND: Saving settings for newsletter:', newsletterId)
 
     const settings = await request.json()

@@ -201,16 +201,14 @@ export default function AdsAnalyticsTab({ slug, excludeIps = true }: Props) {
                       )}
                     </div>
                   </div>
-                  {ad.button_url && (
-                    <a
-                      href={ad.button_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-brand-primary hover:text-blue-700"
-                    >
-                      View URL →
-                    </a>
-                  )}
+                  <a
+                    href={`/ads/${ad.ad_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-brand-primary hover:text-blue-700"
+                  >
+                    View Analytics →
+                  </a>
                 </div>
               </div>
 
