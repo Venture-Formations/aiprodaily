@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { PUBLICATION_ID } from '@/lib/config'
+import { toProjectDateStr } from '@/lib/date-utils'
 
 /**
  * Tools Directory Analytics Endpoint
@@ -87,12 +88,12 @@ export const GET = withApiHandler(
       clicksByType[click.click_type] = (clicksByType[click.click_type] || 0) + 1
     })
 
-    // Calculate daily clicks
+    // Calculate daily clicks (convert UTC to project timezone)
     const dailyClicks: { [key: string]: number } = {}
     const dailyByType: { [key: string]: { category_click: number; tool_view: number; external_link: number } } = {}
 
     allClicks.forEach(click => {
-      const date = click.clicked_at.split('T')[0]
+      const date = toProjectDateStr(click.clicked_at)
       dailyClicks[date] = (dailyClicks[date] || 0) + 1
 
       if (!dailyByType[date]) {

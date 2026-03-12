@@ -2,6 +2,7 @@ import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { supabaseAdmin } from '@/lib/supabase'
+import { toProjectDateStr } from '@/lib/date-utils'
 import { isIPExcluded, type IPExclusion } from '@/lib/ip-utils'
 import { ExternalLink, MousePointer, Users, TrendingUp, Calendar, BarChart3 } from 'lucide-react'
 
@@ -197,10 +198,13 @@ export default async function AdAnalyticsPage({ params }: PageProps) {
     ? Math.round((uniqueClickers / totalRecipients) * 10000) / 100
     : null
 
-  // Calculate daily breakdown
+  // Calculate daily breakdown (convert UTC timestamps to project timezone)
+  // Clamp click dates: clicks before the issue date are bucketed to the issue date
+  // (e.g., review email clicks the evening before delivery)
   const clicksByDate = new Map<string, { total: number; unique: Set<string> }>()
   adClicks.forEach(click => {
-    const date = click.clicked_at.split('T')[0]
+    const clickDate = toProjectDateStr(click.clicked_at)
+    const date = click.issue_date && clickDate < click.issue_date ? click.issue_date : clickDate
     if (!clicksByDate.has(date)) {
       clicksByDate.set(date, { total: 0, unique: new Set() })
     }
