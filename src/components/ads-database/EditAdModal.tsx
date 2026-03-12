@@ -26,6 +26,7 @@ export default function EditAdModal({ ad, onClose, onSuccess, publicationId }: E
     body: ad.body,
     button_url: ad.button_url,
     image_alt: ad.image_alt || '',
+    cta_text: ad.cta_text || '',
     status: ad.status,
     paid: ad.paid || false,
     frequency: ad.frequency || 'weekly',
@@ -310,6 +311,23 @@ export default function EditAdModal({ ad, onClose, onSuccess, publicationId }: E
             />
           </div>
 
+          {/* Call to Action */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Call to Action (Optional)
+            </label>
+            <input
+              type="text"
+              value={formData.cta_text}
+              onChange={(e) => setFormData(prev => ({ ...prev, cta_text: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="e.g. Try it free for 14 days"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Text that will be linked to the URL below. Leave blank to omit.
+            </p>
+          </div>
+
           {/* Current Image Display */}
           {ad.image_url && !selectedImage && (
             <div>
@@ -532,7 +550,7 @@ export default function EditAdModal({ ad, onClose, onSuccess, publicationId }: E
               placeholder="https://example.com"
             />
             <p className="text-xs text-gray-500 mt-1">
-              The image and last line of the ad will link to this URL
+              The image and Call to Action will link to this URL
             </p>
           </div>
 

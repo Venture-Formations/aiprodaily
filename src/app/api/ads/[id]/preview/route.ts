@@ -62,7 +62,8 @@ export const GET = withApiHandler(
         title: ad.title,
         body: ad.body || '',
         button_url: ad.button_url || '#',
-        image_url: ad.image_url
+        image_url: ad.image_url,
+        cta_text: ad.cta_text
       },
       {
         primaryColor,
