@@ -12,8 +12,9 @@ export type BlockType =
   // Ad blocks (matches database schema)
   | 'title'
   | 'image'
-  | 'body'      // Ad body with last-sentence-link logic
+  | 'body'      // Ad body content
   | 'button'
+  | 'cta'       // Call to action link text
   // Article blocks
   | 'headline'
   | 'content'   // Article content (different from ad body)
@@ -28,7 +29,7 @@ export type BlockType =
  * Block types specifically for ad modules
  * Matches database ad_modules.block_order schema
  */
-export type AdBlockType = 'title' | 'image' | 'body' | 'button'
+export type AdBlockType = 'title' | 'image' | 'body' | 'button' | 'cta'
 
 /**
  * Block types specifically for primary articles
@@ -93,6 +94,9 @@ export interface BlockData {
   // Attribution
   source_name?: string
   author?: string
+
+  // CTA
+  cta_text?: string
 
   // Tracking
   trackingUrl?: string

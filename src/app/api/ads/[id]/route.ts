@@ -11,7 +11,7 @@ export const GET = withApiHandler(
 
     let query = supabaseAdmin
       .from('advertisements')
-      .select('id, publication_id, advertiser_id, title, body, image_url, image_alt, button_text, button_url, company_name, status, start_date, end_date, is_active, priority, times_used, last_used_date, display_order, frequency, times_paid, paid, created_at, updated_at')
+      .select('id, publication_id, advertiser_id, title, body, image_url, image_alt, button_text, button_url, company_name, status, start_date, end_date, is_active, priority, times_used, last_used_date, display_order, frequency, times_paid, paid, cta_text, created_at, updated_at')
       .eq('id', id)
 
     if (publicationId) {

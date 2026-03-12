@@ -44,9 +44,10 @@ export class AdModuleRenderer {
       title: ad.title,
       body: ad.body,
       image_url: ad.image_url,
-      image_alt: (ad as any).image_alt || undefined,
+      image_alt: ad.image_alt || undefined,
       button_text: ad.button_text,
       button_url: ad.button_url,
+      cta_text: ad.cta_text || undefined,
       trackingUrl
     }
   }
@@ -130,7 +131,7 @@ export class AdModuleRenderer {
       : baseUrl
 
     // Render each block in the configured order using global block library
-    const blockOrder = mod.block_order as AdBlockType[]
+    const blockOrder = this.ensureCtaBlock(mod.block_order as AdBlockType[], ad)
     let blocksHtml = ''
 
     for (const blockType of blockOrder) {
@@ -208,7 +209,7 @@ export class AdModuleRenderer {
     const linkUrl = ad.button_url || '#'
 
     // Render blocks using global block library
-    const blockOrder = mod.block_order as AdBlockType[]
+    const blockOrder = this.ensureCtaBlock(mod.block_order as AdBlockType[], ad)
     let blocksHtml = ''
 
     for (const blockType of blockOrder) {
@@ -231,6 +232,7 @@ export class AdModuleRenderer {
       image_alt?: string | null
       button_text?: string
       button_url?: string
+      cta_text?: string | null
     },
     blockOrder: AdBlockType[],
     styles: { primaryColor: string; headingFont: string; bodyFont: string }
@@ -245,15 +247,38 @@ export class AdModuleRenderer {
       image_alt: ad.image_alt || undefined,
       button_text: ad.button_text,
       button_url: ad.button_url,
+      cta_text: ad.cta_text || undefined,
       trackingUrl: linkUrl
     }
 
+    // Auto-inject cta block if ad has cta_text and it's not already in block_order
+    const effectiveBlockOrder = this.ensureCtaBlock(blockOrder, ad as any)
+
     // Render each block using the global registry
     let blocksHtml = ''
-    for (const blockType of blockOrder) {
+    for (const blockType of effectiveBlockOrder) {
       blocksHtml += renderBlock(blockType as BlockType, blockData, styles)
     }
 
     return this.wrapInSection(moduleName, blocksHtml, styles)
+  }
+
+  /**
+   * Auto-inject 'cta' into block_order if the ad has cta_text and 'cta' isn't already present.
+   * Inserts after 'body' if found, otherwise appends at the end.
+   */
+  private static ensureCtaBlock(
+    blockOrder: AdBlockType[],
+    ad: { cta_text?: string | null }
+  ): AdBlockType[] {
+    if (!ad.cta_text || blockOrder.includes('cta')) return blockOrder
+    const order = [...blockOrder]
+    const bodyIdx = order.indexOf('body')
+    if (bodyIdx >= 0) {
+      order.splice(bodyIdx + 1, 0, 'cta')
+    } else {
+      order.push('cta')
+    }
+    return order
   }
 }

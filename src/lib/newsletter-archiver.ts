@@ -280,7 +280,9 @@ export class NewsletterArchiver {
             body,
             button_text,
             button_url,
-            image_url
+            image_url,
+            image_alt,
+            cta_text
           )
         `)
         .eq('issue_id', issueId)
@@ -311,6 +313,7 @@ export class NewsletterArchiver {
             image_url,
             button_text,
             button_url,
+            cta_text,
             company_name,
             advertiser:advertisers(
               id,
@@ -338,6 +341,7 @@ export class NewsletterArchiver {
             image_url: selection.advertisement.image_url,
             button_text: selection.advertisement.button_text,
             button_url: selection.advertisement.button_url,
+            cta_text: selection.advertisement.cta_text,
             company_name: selection.advertisement.company_name || selection.advertisement.advertiser?.company_name,
             company_logo: selection.advertisement.advertiser?.logo_url,
             company_url: selection.advertisement.advertiser?.website_url
