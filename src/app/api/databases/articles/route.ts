@@ -15,8 +15,11 @@ export const GET = withApiHandler(
     const newsletterSlug = searchParams.get('publication_id'); // Actually a slug, not UUID
     const excludeIpsParam = searchParams.get('exclude_ips');
     const shouldExcludeIps = excludeIpsParam !== 'false'; // Default to true
-    const dateFrom = searchParams.get('date_from'); // YYYY-MM-DD
-    const dateTo = searchParams.get('date_to'); // YYYY-MM-DD
+    const dateFromRaw = searchParams.get('start_date');
+    const dateToRaw = searchParams.get('end_date');
+    const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+    const dateFrom = dateFromRaw && DATE_REGEX.test(dateFromRaw) ? dateFromRaw : null;
+    const dateTo = dateToRaw && DATE_REGEX.test(dateToRaw) ? dateToRaw : null;
 
     if (!newsletterSlug) {
       return NextResponse.json(

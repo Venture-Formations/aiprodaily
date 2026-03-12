@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface Article {
   id: string
@@ -68,25 +68,24 @@ interface Props {
 
 type DatePreset = '7d' | '30d' | '90d' | 'custom'
 
-function getDateRange(preset: DatePreset): { from: string; to: string } {
-  const today = new Date()
-  const to = today.toISOString().split('T')[0]
-  const from = new Date(today)
-  switch (preset) {
-    case '7d':
-      from.setDate(from.getDate() - 7)
-      break
-    case '30d':
-      from.setDate(from.getDate() - 30)
-      break
-    case '90d':
-      from.setDate(from.getDate() - 90)
-      break
-    case 'custom':
-      return { from: '', to: '' }
-  }
-  return { from: from.toISOString().split('T')[0], to }
+function toLocalDateString(d: Date): string {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
+
+function getDateRange(preset: DatePreset): { from: string; to: string } {
+  if (preset === 'custom') return { from: '', to: '' }
+  const today = new Date()
+  const to = toLocalDateString(today)
+  const from = new Date(today)
+  const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90 }
+  from.setDate(from.getDate() - daysMap[preset])
+  return { from: toLocalDateString(from), to }
+}
+
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
 
 export default function ArticlesTab({ slug, excludeIps = true }: Props) {
   const [articles, setArticles] = useState<Article[]>([])
@@ -97,9 +96,14 @@ export default function ArticlesTab({ slug, excludeIps = true }: Props) {
   const [showColumnSelector, setShowColumnSelector] = useState(false)
 
   // Date range filter
+  const initialRange = getDateRange('7d')
   const [datePreset, setDatePreset] = useState<DatePreset>('7d')
-  const [dateFrom, setDateFrom] = useState(() => getDateRange('7d').from)
-  const [dateTo, setDateTo] = useState(() => getDateRange('7d').to)
+  const [dateFrom, setDateFrom] = useState(initialRange.from)
+  const [dateTo, setDateTo] = useState(initialRange.to)
+  // Staging values for custom date mode (only applied on "Apply" click)
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const abortRef = useRef<AbortController | null>(null)
 
   // Filter states
   const [feedTypeFilter, setFeedTypeFilter] = useState<string>('all')
@@ -159,7 +163,11 @@ export default function ArticlesTab({ slug, excludeIps = true }: Props) {
   ])
 
   useEffect(() => {
-    fetchArticles()
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    fetchArticles(controller.signal)
+    return () => controller.abort()
   }, [slug, excludeIps, dateFrom, dateTo])
 
   useEffect(() => {
@@ -172,25 +180,36 @@ export default function ArticlesTab({ slug, excludeIps = true }: Props) {
       const range = getDateRange(preset)
       setDateFrom(range.from)
       setDateTo(range.to)
+    } else {
+      setCustomFrom(dateFrom)
+      setCustomTo(dateTo)
     }
   }
 
-  const fetchArticles = async () => {
+  const applyCustomDateRange = () => {
+    if (DATE_REGEX.test(customFrom) && DATE_REGEX.test(customTo)) {
+      setDateFrom(customFrom)
+      setDateTo(customTo)
+    }
+  }
+
+  const fetchArticles = async (signal?: AbortSignal) => {
     try {
       setLoading(true)
       const params = new URLSearchParams({
         publication_id: slug,
         exclude_ips: String(excludeIps),
       })
-      if (dateFrom) params.set('date_from', dateFrom)
-      if (dateTo) params.set('date_to', dateTo)
-      const response = await fetch(`/api/databases/articles?${params}`)
+      if (dateFrom) params.set('start_date', dateFrom)
+      if (dateTo) params.set('end_date', dateTo)
+      const response = await fetch(`/api/databases/articles?${params}`, { signal })
       if (!response.ok) {
         throw new Error('Failed to fetch articles')
       }
       const result = await response.json()
       setArticles(result.data || [])
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
       setLoading(false)
@@ -463,7 +482,7 @@ export default function ArticlesTab({ slug, excludeIps = true }: Props) {
       <div className="text-center py-12">
         <div className="text-red-600 mb-4">Error: {error}</div>
         <button
-          onClick={fetchArticles}
+          onClick={() => fetchArticles()}
           className="text-brand-primary hover:text-blue-700"
         >
           Try Again
@@ -510,17 +529,24 @@ export default function ArticlesTab({ slug, excludeIps = true }: Props) {
               <div className="flex items-center gap-2">
                 <input
                   type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
                   className="border border-gray-300 rounded-md px-3 py-1.5 text-sm"
                 />
                 <span className="text-gray-500 text-sm">to</span>
                 <input
                   type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
                   className="border border-gray-300 rounded-md px-3 py-1.5 text-sm"
                 />
+                <button
+                  onClick={applyCustomDateRange}
+                  disabled={!DATE_REGEX.test(customFrom) || !DATE_REGEX.test(customTo)}
+                  className="px-3 py-1.5 text-sm rounded-md bg-brand-primary text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Apply
+                </button>
               </div>
             )}
           </div>
