@@ -66,6 +66,28 @@ interface Props {
   excludeIps?: boolean
 }
 
+type DatePreset = '7d' | '30d' | '90d' | 'custom'
+
+function getDateRange(preset: DatePreset): { from: string; to: string } {
+  const today = new Date()
+  const to = today.toISOString().split('T')[0]
+  const from = new Date(today)
+  switch (preset) {
+    case '7d':
+      from.setDate(from.getDate() - 7)
+      break
+    case '30d':
+      from.setDate(from.getDate() - 30)
+      break
+    case '90d':
+      from.setDate(from.getDate() - 90)
+      break
+    case 'custom':
+      return { from: '', to: '' }
+  }
+  return { from: from.toISOString().split('T')[0], to }
+}
+
 export default function ArticlesTab({ slug, excludeIps = true }: Props) {
   const [articles, setArticles] = useState<Article[]>([])
   const [filteredArticles, setFilteredArticles] = useState<Article[]>([])
@@ -73,6 +95,11 @@ export default function ArticlesTab({ slug, excludeIps = true }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
   const [showColumnSelector, setShowColumnSelector] = useState(false)
+
+  // Date range filter
+  const [datePreset, setDatePreset] = useState<DatePreset>('7d')
+  const [dateFrom, setDateFrom] = useState(() => getDateRange('7d').from)
+  const [dateTo, setDateTo] = useState(() => getDateRange('7d').to)
 
   // Filter states
   const [feedTypeFilter, setFeedTypeFilter] = useState<string>('all')
@@ -133,16 +160,31 @@ export default function ArticlesTab({ slug, excludeIps = true }: Props) {
 
   useEffect(() => {
     fetchArticles()
-  }, [slug, excludeIps])
+  }, [slug, excludeIps, dateFrom, dateTo])
 
   useEffect(() => {
     applyFiltersAndSort()
   }, [articles, feedTypeFilter, positionFilter, searchTerm, minScore, maxScore, sortColumn, sortDirection])
 
+  const handleDatePresetChange = (preset: DatePreset) => {
+    setDatePreset(preset)
+    if (preset !== 'custom') {
+      const range = getDateRange(preset)
+      setDateFrom(range.from)
+      setDateTo(range.to)
+    }
+  }
+
   const fetchArticles = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/databases/articles?publication_id=${slug}&exclude_ips=${excludeIps}`)
+      const params = new URLSearchParams({
+        publication_id: slug,
+        exclude_ips: String(excludeIps),
+      })
+      if (dateFrom) params.set('date_from', dateFrom)
+      if (dateTo) params.set('date_to', dateTo)
+      const response = await fetch(`/api/databases/articles?${params}`)
       if (!response.ok) {
         throw new Error('Failed to fetch articles')
       }
@@ -256,6 +298,7 @@ export default function ArticlesTab({ slug, excludeIps = true }: Props) {
     setSearchTerm('')
     setMinScore('')
     setMaxScore('')
+    handleDatePresetChange('7d')
   }
 
   const clearSort = () => {
@@ -444,6 +487,45 @@ export default function ArticlesTab({ slug, excludeIps = true }: Props) {
 
       {/* Filters */}
       <div className="bg-white shadow rounded-lg p-4 mb-4">
+        {/* Date Range Filter */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Date Range
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            {(['7d', '30d', '90d', 'custom'] as DatePreset[]).map((preset) => (
+              <button
+                key={preset}
+                onClick={() => handleDatePresetChange(preset)}
+                className={`px-3 py-1.5 text-sm rounded-md border ${
+                  datePreset === preset
+                    ? 'bg-brand-primary text-white border-brand-primary'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                {preset === '7d' ? 'Past 7 Days' : preset === '30d' ? 'Past 30 Days' : preset === '90d' ? 'Past 90 Days' : 'Custom'}
+              </button>
+            ))}
+            {datePreset === 'custom' && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-1.5 text-sm"
+                />
+                <span className="text-gray-500 text-sm">to</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-1.5 text-sm"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

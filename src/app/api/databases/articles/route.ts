@@ -15,6 +15,8 @@ export const GET = withApiHandler(
     const newsletterSlug = searchParams.get('publication_id'); // Actually a slug, not UUID
     const excludeIpsParam = searchParams.get('exclude_ips');
     const shouldExcludeIps = excludeIpsParam !== 'false'; // Default to true
+    const dateFrom = searchParams.get('date_from'); // YYYY-MM-DD
+    const dateTo = searchParams.get('date_to'); // YYYY-MM-DD
 
     if (!newsletterSlug) {
       return NextResponse.json(
@@ -96,7 +98,7 @@ export const GET = withApiHandler(
     let hasMoreIssues = true;
 
     while (hasMoreIssues) {
-      const { data: issuesBatch, error: issuesError } = await supabase
+      let issuesQuery = supabase
         .from('publication_issues')
         .select(`
           id,
@@ -105,8 +107,19 @@ export const GET = withApiHandler(
           status,
           email_metrics(sent_count, mailerlite_issue_id)
         `)
-        .eq('publication_id', newsletterId)
-        .range(issuesOffset, issuesOffset + issuesBatchSize - 1);
+        .eq('publication_id', newsletterId);
+
+      // Apply date range filter if provided
+      if (dateFrom) {
+        issuesQuery = issuesQuery.gte('date', dateFrom);
+      }
+      if (dateTo) {
+        issuesQuery = issuesQuery.lte('date', dateTo);
+      }
+
+      issuesQuery = issuesQuery.range(issuesOffset, issuesOffset + issuesBatchSize - 1);
+
+      const { data: issuesBatch, error: issuesError } = await issuesQuery;
 
       if (issuesError) {
         console.error('[API] Issues fetch error:', issuesError.message);
