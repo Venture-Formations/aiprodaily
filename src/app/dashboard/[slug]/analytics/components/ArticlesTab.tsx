@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface Article {
   id: string
@@ -66,6 +66,27 @@ interface Props {
   excludeIps?: boolean
 }
 
+type DatePreset = '7d' | '30d' | '90d' | 'custom'
+
+function toLocalDateString(d: Date): string {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function getDateRange(preset: DatePreset): { from: string; to: string } {
+  if (preset === 'custom') return { from: '', to: '' }
+  const today = new Date()
+  const to = toLocalDateString(today)
+  const from = new Date(today)
+  const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90 }
+  from.setDate(from.getDate() - daysMap[preset])
+  return { from: toLocalDateString(from), to }
+}
+
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
+
 export default function ArticlesTab({ slug, excludeIps = true }: Props) {
   const [articles, setArticles] = useState<Article[]>([])
   const [filteredArticles, setFilteredArticles] = useState<Article[]>([])
@@ -73,6 +94,16 @@ export default function ArticlesTab({ slug, excludeIps = true }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
   const [showColumnSelector, setShowColumnSelector] = useState(false)
+
+  // Date range filter
+  const initialRange = getDateRange('7d')
+  const [datePreset, setDatePreset] = useState<DatePreset>('7d')
+  const [dateFrom, setDateFrom] = useState(initialRange.from)
+  const [dateTo, setDateTo] = useState(initialRange.to)
+  // Staging values for custom date mode (only applied on "Apply" click)
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const abortRef = useRef<AbortController | null>(null)
 
   // Filter states
   const [feedTypeFilter, setFeedTypeFilter] = useState<string>('all')
@@ -132,23 +163,53 @@ export default function ArticlesTab({ slug, excludeIps = true }: Props) {
   ])
 
   useEffect(() => {
-    fetchArticles()
-  }, [slug, excludeIps])
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    fetchArticles(controller.signal)
+    return () => controller.abort()
+  }, [slug, excludeIps, dateFrom, dateTo])
 
   useEffect(() => {
     applyFiltersAndSort()
   }, [articles, feedTypeFilter, positionFilter, searchTerm, minScore, maxScore, sortColumn, sortDirection])
 
-  const fetchArticles = async () => {
+  const handleDatePresetChange = (preset: DatePreset) => {
+    setDatePreset(preset)
+    if (preset !== 'custom') {
+      const range = getDateRange(preset)
+      setDateFrom(range.from)
+      setDateTo(range.to)
+    } else {
+      setCustomFrom(dateFrom)
+      setCustomTo(dateTo)
+    }
+  }
+
+  const applyCustomDateRange = () => {
+    if (DATE_REGEX.test(customFrom) && DATE_REGEX.test(customTo)) {
+      setDateFrom(customFrom)
+      setDateTo(customTo)
+    }
+  }
+
+  const fetchArticles = async (signal?: AbortSignal) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/databases/articles?publication_id=${slug}&exclude_ips=${excludeIps}`)
+      const params = new URLSearchParams({
+        publication_id: slug,
+        exclude_ips: String(excludeIps),
+      })
+      if (dateFrom) params.set('start_date', dateFrom)
+      if (dateTo) params.set('end_date', dateTo)
+      const response = await fetch(`/api/databases/articles?${params}`, { signal })
       if (!response.ok) {
         throw new Error('Failed to fetch articles')
       }
       const result = await response.json()
       setArticles(result.data || [])
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
       setLoading(false)
@@ -256,6 +317,7 @@ export default function ArticlesTab({ slug, excludeIps = true }: Props) {
     setSearchTerm('')
     setMinScore('')
     setMaxScore('')
+    handleDatePresetChange('7d')
   }
 
   const clearSort = () => {
@@ -420,7 +482,7 @@ export default function ArticlesTab({ slug, excludeIps = true }: Props) {
       <div className="text-center py-12">
         <div className="text-red-600 mb-4">Error: {error}</div>
         <button
-          onClick={fetchArticles}
+          onClick={() => fetchArticles()}
           className="text-brand-primary hover:text-blue-700"
         >
           Try Again
@@ -444,6 +506,52 @@ export default function ArticlesTab({ slug, excludeIps = true }: Props) {
 
       {/* Filters */}
       <div className="bg-white shadow rounded-lg p-4 mb-4">
+        {/* Date Range Filter */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Date Range
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            {(['7d', '30d', '90d', 'custom'] as DatePreset[]).map((preset) => (
+              <button
+                key={preset}
+                onClick={() => handleDatePresetChange(preset)}
+                className={`px-3 py-1.5 text-sm rounded-md border ${
+                  datePreset === preset
+                    ? 'bg-brand-primary text-white border-brand-primary'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                {preset === '7d' ? 'Past 7 Days' : preset === '30d' ? 'Past 30 Days' : preset === '90d' ? 'Past 90 Days' : 'Custom'}
+              </button>
+            ))}
+            {datePreset === 'custom' && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-1.5 text-sm"
+                />
+                <span className="text-gray-500 text-sm">to</span>
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-1.5 text-sm"
+                />
+                <button
+                  onClick={applyCustomDateRange}
+                  disabled={!DATE_REGEX.test(customFrom) || !DATE_REGEX.test(customTo)}
+                  className="px-3 py-1.5 text-sm rounded-md bg-brand-primary text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Apply
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
