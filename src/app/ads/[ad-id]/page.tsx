@@ -2,6 +2,7 @@ import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { supabaseAdmin } from '@/lib/supabase'
+import { isIPExcluded, type IPExclusion } from '@/lib/ip-utils'
 import { ExternalLink, MousePointer, Users, TrendingUp, Calendar, BarChart3 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -43,7 +44,7 @@ export default async function AdAnalyticsPage({ params }: PageProps) {
   // Fetch the advertisement with its ad module
   const { data: ad, error: adError } = await supabaseAdmin
     .from('advertisements')
-    .select('id, title, body, image_url, button_text, button_url, status, company_name, publication_id, times_used, created_at, ad_module_id')
+    .select('id, title, body, image_url, image_alt, button_text, button_url, cta_text, status, company_name, publication_id, times_used, created_at, ad_module_id')
     .eq('id', adId)
     .single()
 
@@ -127,17 +128,32 @@ export default async function AdAnalyticsPage({ params }: PageProps) {
     }
   }
 
-  // Fetch link clicks for this ad's issues
+  // Fetch excluded IPs for this publication
+  const { data: excludedIpsData } = await supabaseAdmin
+    .from('excluded_ips')
+    .select('ip_address, is_range, cidr_prefix')
+    .eq('publication_id', ad.publication_id)
+
+  const exclusions: IPExclusion[] = (excludedIpsData || []).map(e => ({
+    ip_address: e.ip_address,
+    is_range: e.is_range || false,
+    cidr_prefix: e.cidr_prefix
+  }))
+
+  // Fetch link clicks for this ad's issues (excluding bot/excluded IPs)
   let linkClicks: any[] = []
   if (issueIds.length > 0) {
     const { data: clicksData } = await supabaseAdmin
       .from('link_clicks')
-      .select('id, subscriber_email, issue_id, issue_date, clicked_at, link_url')
+      .select('id, subscriber_email, issue_id, issue_date, clicked_at, link_url, ip_address, is_bot_ua')
       .in('issue_id', issueIds)
       .in('link_section', adSectionNames)
       .order('clicked_at', { ascending: false })
 
-    linkClicks = clicksData || []
+    // Filter out bot clicks and excluded IPs
+    linkClicks = (clicksData || []).filter(click =>
+      !click.is_bot_ua && !isIPExcluded(click.ip_address, exclusions)
+    )
   }
 
   // Filter clicks that match this ad (by issue_id or URL)
@@ -273,7 +289,7 @@ export default async function AdAnalyticsPage({ params }: PageProps) {
               <div className="mb-4">
                 <img
                   src={ad.image_url}
-                  alt={ad.title}
+                  alt={ad.image_alt || ad.title}
                   className="w-full max-w-md h-auto rounded-lg border border-gray-200"
                 />
               </div>
@@ -284,6 +300,20 @@ export default async function AdAnalyticsPage({ params }: PageProps) {
               className="prose prose-sm max-w-none text-gray-700 mb-4"
               dangerouslySetInnerHTML={{ __html: ad.body }}
             />
+
+            {/* CTA */}
+            {ad.cta_text && ad.button_url && (
+              <div className="mb-4">
+                <a
+                  href={ad.button_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-black underline font-bold"
+                >
+                  {ad.cta_text}
+                </a>
+              </div>
+            )}
 
             {/* Button */}
             {showButton && ad.button_url && (
