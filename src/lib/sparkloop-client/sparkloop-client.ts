@@ -1004,29 +1004,53 @@ export class SparkLoopService {
       })
     }
 
-    // Get window-start snapshots (W days ago)
+    // Get window-start date (W days ago) — used as the earliest possible snapshot anchor
     const windowStart = new Date(today)
     windowStart.setDate(windowStart.getDate() - windowDays)
     const windowStartStr = toDateString(windowStart)
 
-    // For window-start, get the closest snapshot on or before the target date
-    const { data: windowStartSnaps } = await supabaseAdmin
-      .from('sparkloop_daily_snapshots')
-      .select('ref_code, sparkloop_confirmed, sparkloop_rejected, snapshot_date')
-      .eq('publication_id', publicationId)
-      .lte('snapshot_date', windowStartStr)
-      .order('snapshot_date', { ascending: false })
-
-    // Group by ref_code, take the most recent snapshot for each
-    const windowStartMap = new Map<string, { confirmed: number; rejected: number }>()
-    for (const snap of windowStartSnaps || []) {
-      if (!windowStartMap.has(snap.ref_code)) {
-        windowStartMap.set(snap.ref_code, {
-          confirmed: snap.sparkloop_confirmed,
-          rejected: snap.sparkloop_rejected,
-        })
-      }
+    // Fetch all snapshots from before the window through today.
+    // We need snapshots across this full range because each rec's effective snapshot
+    // start is adjusted based on its first send date + screening period. A rec whose
+    // first send was recent will use a snapshot much closer to today than windowStart.
+    // Paginate to avoid Supabase's default 1000-row limit.
+    const allSnaps: Array<{ ref_code: string; sparkloop_confirmed: number; sparkloop_rejected: number; snapshot_date: string }> = []
+    let snapOffset = 0
+    const SNAP_PAGE = 1000
+    while (true) {
+      const { data: page } = await supabaseAdmin
+        .from('sparkloop_daily_snapshots')
+        .select('ref_code, sparkloop_confirmed, sparkloop_rejected, snapshot_date')
+        .eq('publication_id', publicationId)
+        .lte('snapshot_date', todayStr)
+        .order('snapshot_date', { ascending: false })
+        .range(snapOffset, snapOffset + SNAP_PAGE - 1)
+      if (!page || page.length === 0) break
+      allSnaps.push(...page)
+      if (page.length < SNAP_PAGE) break
+      snapOffset += SNAP_PAGE
     }
+
+    // Group snapshots by ref_code, sorted by date descending (most recent first).
+    // Exclude each rec's very first snapshot — it captured all-time cumulative totals
+    // on the day tracking started, creating a fake "0 → total" delta that contaminates
+    // any window that uses it as a baseline.
+    const rawSnapsByRefCode = new Map<string, Array<{ confirmed: number; rejected: number; date: string }>>()
+    for (const snap of allSnaps || []) {
+      if (!rawSnapsByRefCode.has(snap.ref_code)) {
+        rawSnapsByRefCode.set(snap.ref_code, [])
+      }
+      rawSnapsByRefCode.get(snap.ref_code)!.push({
+        confirmed: snap.sparkloop_confirmed,
+        rejected: snap.sparkloop_rejected,
+        date: snap.snapshot_date,
+      })
+    }
+    // Remove the earliest snapshot (last element, since sorted desc) from each rec
+    const snapsByRefCode = new Map<string, Array<{ confirmed: number; rejected: number; date: string }>>()
+    rawSnapsByRefCode.forEach((snaps, refCode) => {
+      snapsByRefCode.set(refCode, snaps.length > 1 ? snaps.slice(0, -1) : [])
+    })
 
     // Compute the broadest date range needed for send counts
     // We need referrals where subscribed_at is between (S+W) and (S+1) days ago
@@ -1038,12 +1062,23 @@ export class SparkLoopService {
     // Minimum screening+1 for any rec
     sendsRangeEnd.setDate(sendsRangeEnd.getDate() - 2) // at least S+1=2 days ago for S=1
 
-    // Fetch all referrals in the broadest date range at once
-    const { data: allReferrals } = await supabaseAdmin
-      .from('sparkloop_referrals')
-      .select('ref_code, subscribed_at')
-      .eq('publication_id', publicationId)
-      .gte('subscribed_at', toDateString(sendsRangeStart))
+    // Fetch all referrals in the broadest date range.
+    // Paginate to avoid Supabase's default 1000-row limit.
+    const allReferrals: Array<{ ref_code: string; subscribed_at: string }> = []
+    let refOffset = 0
+    const REF_PAGE = 1000
+    while (true) {
+      const { data: page } = await supabaseAdmin
+        .from('sparkloop_referrals')
+        .select('ref_code, subscribed_at')
+        .eq('publication_id', publicationId)
+        .gte('subscribed_at', toDateString(sendsRangeStart))
+        .range(refOffset, refOffset + REF_PAGE - 1)
+      if (!page || page.length === 0) break
+      allReferrals.push(...page)
+      if (page.length < REF_PAGE) break
+      refOffset += REF_PAGE
+    }
 
     // Group referrals by ref_code with their dates
     const referralsByRefCode = new Map<string, Date[]>()
@@ -1067,11 +1102,28 @@ export class SparkLoopService {
 
       // Count sends in window from pre-fetched data
       const refDates = referralsByRefCode.get(rec.ref_code) || []
-      const sends = refDates.filter(d => d >= sendsFrom && d <= sendsTo).length
+      const sendsInWindow = refDates.filter(d => d >= sendsFrom && d <= sendsTo)
+      const sends = sendsInWindow.length
 
-      // Get snapshot deltas
+      // Adjust snapshot start based on when our first send could have matured.
+      // Without this, the snapshot delta includes confirms/rejects from subscribers
+      // sent before we started tracking (pre-tracking contamination).
+      // Effective start = max(first_send + S, windowStart) — never go further back than W days.
+      let effectiveStartStr = windowStartStr
+      if (sendsInWindow.length > 0) {
+        const firstSend = new Date(Math.min(...sendsInWindow.map(d => d.getTime())))
+        const maturityDate = new Date(firstSend)
+        maturityDate.setDate(maturityDate.getDate() + S)
+        if (maturityDate > windowStart) {
+          effectiveStartStr = toDateString(maturityDate)
+        }
+      }
+
+      // Get snapshot deltas using the adjusted start
       const todaySnap = todayMap.get(rec.ref_code)
-      const startSnap = windowStartMap.get(rec.ref_code)
+      const recSnaps = snapsByRefCode.get(rec.ref_code) || []
+      // Find closest snapshot on or before the effective start date
+      const startSnap = recSnaps.find(s => s.date <= effectiveStartStr)
 
       if (!todaySnap || !startSnap) {
         // Not enough snapshot history
@@ -1089,7 +1141,10 @@ export class SparkLoopService {
       const confirmsGained = Math.max(0, todaySnap.confirmed - startSnap.confirmed)
       const rejectionsGained = Math.max(0, todaySnap.rejected - startSnap.rejected)
 
-      // RCR = confirms / sends (null if sends < 5)
+      // RCR = confirms / sends (null if sends < 5).
+      // With the adjusted snapshot start, confirms_gained is now scoped to the period
+      // after our first send could have matured, reducing pre-tracking contamination.
+      // RCR can still exceed 100% if external sources contribute confirms.
       const rcr = sends >= 5 ? (confirmsGained / sends) * 100 : null
 
       // Slippage = sends - (confirms + rejections), rate = slippage / sends

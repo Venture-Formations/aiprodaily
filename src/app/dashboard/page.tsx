@@ -133,6 +133,31 @@ export default function NewsletterSelect() {
               ))}
             </div>
           )}
+
+          {/* Admin Tools */}
+          <div className="mt-12 pt-8 border-t border-gray-200">
+            <h3 className="text-lg font-medium text-gray-700 mb-4">Admin Tools</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button
+                onClick={() => router.push('/dashboard/rss-combiner')}
+                className="text-left focus:outline-none focus:ring-2 focus:ring-brand-primary rounded-lg"
+              >
+                <Card hover padding="md">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
+                      <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 5c7.18 0 13 5.82 13 13M6 11a7 7 0 017 7m-6 0a1 1 0 110-2 1 1 0 010 2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900">RSS Feed Combiner</div>
+                      <div className="text-sm text-gray-500">Combine multiple RSS feeds into one</div>
+                    </div>
+                  </div>
+                </Card>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </Layout>
