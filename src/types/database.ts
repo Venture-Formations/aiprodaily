@@ -1219,6 +1219,7 @@ export interface Advertisement {
   ad_module_id: string | null   // Links ad to a specific ad module/section. NULL = legacy advertorial.
   advertiser_id: string | null  // Links ad to an advertiser for company-level cooldown tracking
   priority: number              // Priority for selection mode (higher = shown first)
+  cta_text: string | null       // Optional CTA text rendered as linked element below body
 }
 
 export interface IssueAdvertisement {
@@ -1421,7 +1422,7 @@ export interface CustomerEntitlementWithDetails extends CustomerEntitlement {
 // Ad Modules System Types
 // ============================================
 
-export type AdBlockType = 'title' | 'image' | 'body' | 'button'
+export type AdBlockType = 'title' | 'image' | 'body' | 'button' | 'cta'
 
 export type AdSelectionMode = 'sequential' | 'random' | 'priority' | 'manual'
 

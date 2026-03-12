@@ -47,6 +47,7 @@ export class AdModuleRenderer {
       image_alt: (ad as any).image_alt || undefined,
       button_text: ad.button_text,
       button_url: ad.button_url,
+      cta_text: (ad as any).cta_text || undefined,
       trackingUrl
     }
   }
@@ -231,6 +232,7 @@ export class AdModuleRenderer {
       image_alt?: string | null
       button_text?: string
       button_url?: string
+      cta_text?: string | null
     },
     blockOrder: AdBlockType[],
     styles: { primaryColor: string; headingFont: string; bodyFont: string }
@@ -245,6 +247,7 @@ export class AdModuleRenderer {
       image_alt: ad.image_alt || undefined,
       button_text: ad.button_text,
       button_url: ad.button_url,
+      cta_text: ad.cta_text || undefined,
       trackingUrl: linkUrl
     }
 
