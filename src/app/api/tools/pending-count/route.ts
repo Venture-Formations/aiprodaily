@@ -12,10 +12,11 @@ export const GET = withApiHandler(
   async ({ logger }) => {
     const { count, error } = await supabaseAdmin
       .from('ai_applications')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('publication_id', PUBLICATION_ID)
       .eq('is_active', false)
       .eq('submission_status', 'pending')
+      .not('submitter_email', 'is', null)
 
     if (error) {
       logger.error({ err: error }, 'Error fetching pending count')
