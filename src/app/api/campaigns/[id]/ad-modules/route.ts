@@ -137,6 +137,7 @@ export const GET = withApiHandler(
               image_url,
               button_text,
               button_url,
+              cta_text,
               company_name,
               times_used,
               advertiser:advertisers(

@@ -1474,8 +1474,10 @@ export interface ModuleAd {
   title?: string
   body?: string
   image_url?: string
+  image_alt?: string | null
   button_text: string
   button_url?: string
+  cta_text?: string | null
   status: ModuleAdStatus
   priority: number
   display_order: number  // Order for sequential rotation (set via drag-drop on ads page)

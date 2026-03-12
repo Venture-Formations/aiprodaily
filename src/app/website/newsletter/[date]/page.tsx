@@ -483,7 +483,7 @@ export default async function NewsletterPage({ params }: PageProps) {
                               />
                             ) : null
                           case 'cta':
-                            return renderCtaLink(ad.cta_text, ad.button_url)
+                            return <div key="cta">{renderCtaLink(ad.cta_text, ad.button_url)}</div>
                           case 'button':
                             return ad.button_url ? (
                               <div key="button" className="mt-4">

@@ -60,8 +60,9 @@ export function generateAdvertorialHtml(
   const processedBody = normalizeEmailHtml(ad.body || '')
 
   // CTA: if cta_text is provided, render it as a linked row after the body
-  const ctaHtml = ad.cta_text && buttonUrl !== '#'
-    ? `<tr><td style='padding: 4px 10px 10px; font-family: ${bodyFont}; font-size: 16px; line-height: 24px;'><a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${ad.cta_text}</a></td></tr>`
+  const escapedCtaText = ad.cta_text ? ad.cta_text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : ''
+  const ctaHtml = escapedCtaText && buttonUrl !== '#'
+    ? `<tr><td style='padding: 4px 10px 10px; font-family: ${bodyFont}; font-size: 16px; line-height: 24px;'><a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${escapedCtaText}</a></td></tr>`
     : ''
 
   return `
