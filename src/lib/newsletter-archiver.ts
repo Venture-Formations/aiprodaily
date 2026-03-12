@@ -281,6 +281,7 @@ export class NewsletterArchiver {
             button_text,
             button_url,
             image_url,
+            image_alt,
             cta_text
           )
         `)

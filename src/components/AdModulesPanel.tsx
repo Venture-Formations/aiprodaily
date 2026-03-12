@@ -274,10 +274,10 @@ export default function AdModulesPanel({ issueId }: AdModulesPanelProps) {
                                   />
                                 ) : null
                               case 'cta':
-                                return selectedAd.cta_text ? (
+                                return selectedAd.cta_text && selectedAd.button_url ? (
                                   <div key={idx} className="px-4 pb-4">
                                     <a
-                                      href={selectedAd.button_url || '#'}
+                                      href={selectedAd.button_url}
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="text-black underline font-bold"
