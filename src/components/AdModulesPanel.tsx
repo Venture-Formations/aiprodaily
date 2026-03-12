@@ -22,6 +22,7 @@ interface ModuleAd {
   image_url?: string
   button_text?: string
   button_url?: string
+  cta_text?: string | null
   times_used?: number
   display_order?: number
   advertiser?: {
@@ -38,61 +39,6 @@ interface AdSelection {
   used_at?: string
   ad_module?: AdModule
   advertisement?: ModuleAd  // Changed from selected_ad to match unified schema
-}
-
-// Process ad body to make last sentence a link (matches email format exactly)
-function processAdBody(body: string, buttonUrl?: string): string {
-  if (!body) return body
-  if (!buttonUrl) return body
-
-  // Check for arrow CTA pattern (→ text) first
-  const arrowPattern = /(→\s*)([^<\n→]+?)(\s*<\/p>|\s*<\/strong>|\s*$)/i
-  const arrowMatch = body.match(arrowPattern)
-
-  if (arrowMatch && arrowMatch[2].trim().length > 3) {
-    const arrow = arrowMatch[1]
-    const ctaText = arrowMatch[2].trim()
-    const afterCta = arrowMatch[3] || ''
-
-    return body.replace(
-      arrowPattern,
-      `<strong>${arrow}</strong><a href='${buttonUrl}' target='_blank' rel='noopener noreferrer' style='color: #000; text-decoration: underline; font-weight: bold;'>${ctaText}</a>${afterCta}`
-    )
-  }
-
-  // Strip HTML to get plain text for sentence detection
-  const plainText = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-
-  // Find sentence-ending punctuation
-  const sentenceEndPattern = /[.!?](?=\s+[A-Z]|$)/g
-  const matches = Array.from(plainText.matchAll(sentenceEndPattern))
-
-  if (matches.length > 0) {
-    const lastMatch = matches[matches.length - 1] as RegExpMatchArray
-    const lastPeriodIndex = lastMatch.index!
-
-    let startIndex = 0
-    if (matches.length > 1) {
-      const secondLastMatch = matches[matches.length - 2] as RegExpMatchArray
-      startIndex = secondLastMatch.index! + 1
-    }
-
-    const lastSentence = plainText.substring(startIndex, lastPeriodIndex + 1).trim()
-
-    if (lastSentence.length > 5) {
-      const escapedSentence = lastSentence.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      const parts = escapedSentence.split(/\s+/)
-      const flexiblePattern = parts.join('\\s*(?:<[^>]*>\\s*)*')
-      const sentenceRegex = new RegExp(flexiblePattern, 'i')
-
-      return body.replace(
-        sentenceRegex,
-        `<a href='${buttonUrl}' target='_blank' rel='noopener noreferrer' style='color: #000; text-decoration: underline; font-weight: bold;'>$&</a>`
-      )
-    }
-  }
-
-  return body
 }
 
 export default function AdModulesPanel({ issueId }: AdModulesPanelProps) {
@@ -324,8 +270,21 @@ export default function AdModulesPanel({ issueId }: AdModulesPanelProps) {
                                   <div
                                     key={idx}
                                     className="px-4 pb-4 pt-2 text-base leading-relaxed [&_a]:underline [&_a]:font-bold [&_b]:font-bold [&_strong]:font-bold"
-                                    dangerouslySetInnerHTML={{ __html: processAdBody(selectedAd.body, selectedAd.button_url) }}
+                                    dangerouslySetInnerHTML={{ __html: selectedAd.body }}
                                   />
+                                ) : null
+                              case 'cta':
+                                return selectedAd.cta_text ? (
+                                  <div key={idx} className="px-4 pb-4">
+                                    <a
+                                      href={selectedAd.button_url || '#'}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-black underline font-bold"
+                                    >
+                                      {selectedAd.cta_text}
+                                    </a>
+                                  </div>
                                 ) : null
                               case 'button':
                                 return selectedAd.button_url ? (

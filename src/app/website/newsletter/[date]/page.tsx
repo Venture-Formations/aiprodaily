@@ -185,88 +185,16 @@ export default async function NewsletterPage({ params }: PageProps) {
       .map((m: any) => ({ type: 'text_box_module' as const, data: m, display_order: m.display_order ?? 999 }))
   ].sort((a, b) => a.display_order - b.display_order)
 
-  // Process advertorial body to make last sentence or arrow CTA a hyperlink (like email template)
-  const processAdvertorialBody = (body: string, url: string) => {
-    if (!url || url === '#' || !body) return body
-
-    let processedBody = body
-
-    // Check for arrow CTA pattern in paragraph format (e.g., "→ Try Fiskl")
-    // Pattern handles: <p><strong>→ Try Fiskl</strong></p> or plain "→ Try Fiskl"
-    const arrowCtaPattern = /(<(?:strong|b)[^>]*>)?(→\s*)([^<\n]+?)(<\/(?:strong|b)>)?(\s*<\/p>)?(\s*)$/i
-    const arrowMatch = processedBody.match(arrowCtaPattern)
-
-    if (arrowMatch) {
-      // Found arrow CTA pattern - make arrow bold, text after arrow is the link
-      const openingTag = arrowMatch[1] || '' // "<strong>" or "<b>" if present
-      const arrow = arrowMatch[2] // "→ "
-      const ctaText = arrowMatch[3].trim() // "Try Fiskl"
-      const closingStrongTag = arrowMatch[4] || '' // "</strong>" or "</b>" if present
-      const closingPTag = arrowMatch[5] || '' // "</p>" if present
-      const trailingSpace = arrowMatch[6] || ''
-
-      return processedBody.replace(
-        arrowCtaPattern,
-        `${openingTag}${arrow}${closingStrongTag || '</strong>'}<a href="${url}" target="_blank" rel="noopener noreferrer sponsored" style="text-decoration: underline; font-weight: bold;">${ctaText}</a>${closingPTag}${trailingSpace}`
-      )
-    }
-
-    // No arrow CTA - use last-sentence logic (matching email template approach)
-    // Strip HTML to get plain text
-    const plainText = processedBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-
-    // Find all sentence-ending punctuation marks (., !, ?)
-    // But exclude periods that are part of domains (.com, .ai, .io, etc.) or abbreviations
-    const sentenceEndPattern = /[.!?](?=\s+[A-Z]|$)/g
-    const matches = Array.from(plainText.matchAll(sentenceEndPattern))
-
-    if (matches.length > 0) {
-      // Get the position of the last sentence-ending punctuation
-      const lastMatch = matches[matches.length - 1] as RegExpMatchArray
-      const lastPeriodIndex = lastMatch.index!
-
-      // Find the second-to-last sentence-ending punctuation
-      let startIndex = 0
-      if (matches.length > 1) {
-        const secondLastMatch = matches[matches.length - 2] as RegExpMatchArray
-        startIndex = secondLastMatch.index! + 1
-      }
-
-      // Extract the last complete sentence (from after previous punctuation to end, including the final punctuation)
-      const lastSentence = plainText.substring(startIndex, lastPeriodIndex + 1).trim()
-
-      if (lastSentence.length > 5) {
-        // Escape special regex characters
-        const escapedSentence = lastSentence.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
-        // Replace in the original HTML
-        // Look for the sentence text, accounting for HTML tags that might be in between
-        const parts = escapedSentence.split(/\s+/)
-        const flexiblePattern = parts.join('\\s*(?:<[^>]*>\\s*)*')
-        const sentenceRegex = new RegExp(flexiblePattern, 'i')
-
-        return processedBody.replace(
-          sentenceRegex,
-          `<a href="${url}" target="_blank" rel="noopener noreferrer sponsored" style="text-decoration: underline; font-weight: bold;">$&</a>`
-        )
-      }
-    } else {
-      // No sentence-ending punctuation found - wrap the entire text
-      const trimmedText = plainText.trim()
-      if (trimmedText.length > 5) {
-        const escapedText = trimmedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        const parts = escapedText.split(/\s+/)
-        const flexiblePattern = parts.join('\\s*(?:<[^>]*>\\s*)*')
-        const textRegex = new RegExp(flexiblePattern, 'i')
-
-        return processedBody.replace(
-          textRegex,
-          `<a href="${url}" target="_blank" rel="noopener noreferrer sponsored" style="text-decoration: underline; font-weight: bold;">$&</a>`
-        )
-      }
-    }
-
-    return body
+  // CTA rendering helper for archive page
+  const renderCtaLink = (ctaText: string | null | undefined, url: string) => {
+    if (!ctaText || !url || url === '#') return null
+    return (
+      <div className="mt-2">
+        <a href={url} target="_blank" rel="noopener noreferrer sponsored" className="underline font-bold text-slate-900">
+          {ctaText}
+        </a>
+      </div>
+    )
   }
 
   // JSON-LD structured data for NewsArticle
@@ -554,6 +482,8 @@ export default async function NewsletterPage({ params }: PageProps) {
                                 dangerouslySetInnerHTML={{ __html: ad.body }}
                               />
                             ) : null
+                          case 'cta':
+                            return renderCtaLink(ad.cta_text, ad.button_url)
                           case 'button':
                             return ad.button_url ? (
                               <div key="button" className="mt-4">
@@ -950,7 +880,6 @@ export default async function NewsletterPage({ params }: PageProps) {
 
           {/* Fallback: Render advertorial if it exists but wasn't rendered in sections loop */}
           {advertorial && !newsletterSectionsConfig?.some((s: any) => s.id === SECTION_IDS.ADVERTISEMENT) && (() => {
-            const processedBody = processAdvertorialBody(advertorial.body, advertorial.button_url)
             return (
               <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
                 <h2 className="text-2xl font-bold py-3 px-6 sm:px-8 bg-slate-800 text-white">Presented By</h2>
@@ -980,8 +909,9 @@ export default async function NewsletterPage({ params }: PageProps) {
                     ) : null}
                     <div
                       className="text-slate-900 leading-relaxed text-left prose prose-sm max-w-none [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-none [&_ol]:pl-0 [&_li]:mb-1 [&_ol_li[data-list='bullet']]:pl-6 [&_ol_li[data-list='bullet']]:relative [&_ol_li[data-list='bullet']]:before:content-['•'] [&_ol_li[data-list='bullet']]:before:absolute [&_ol_li[data-list='bullet']]:before:left-0 [&_ol]:counter-reset-[item] [&_ol_li[data-list='ordered']]:pl-6 [&_ol_li[data-list='ordered']]:relative [&_ol_li[data-list='ordered']]:before:content-[counter(item)_'.'] [&_ol_li[data-list='ordered']]:before:absolute [&_ol_li[data-list='ordered']]:before:left-0 [&_ol_li[data-list='ordered']]:counter-increment-[item]"
-                      dangerouslySetInnerHTML={{ __html: processedBody }}
+                      dangerouslySetInnerHTML={{ __html: advertorial.body }}
                     />
+                    {renderCtaLink(advertorial.cta_text, advertorial.button_url)}
                   </div>
                 </div>
               </div>

@@ -26,6 +26,7 @@ export interface AdvertorialAdData {
   button_url: string
   image_url?: string
   image_alt?: string | null
+  cta_text?: string | null
 }
 
 // Shared interface for advertorial styling options
@@ -55,134 +56,13 @@ export function generateAdvertorialHtml(
     ? `<tr><td style='padding: 0 12px; text-align: center;'><a href='${buttonUrl}'><img src='${ad.image_url}' alt='${adAltText}' style='max-width: 100%; max-height: 500px; border-radius: 4px; display: block; margin: 0 auto;'></a></td></tr>`
     : ''
 
-  // Process ad body: normalize HTML for email compatibility, then make the last sentence a hyperlink
-  let processedBody = normalizeEmailHtml(ad.body || '')
-  if (buttonUrl !== '#' && processedBody) {
-    // Check for arrow CTA in table format (created by normalizeEmailHtml)
-    // This handles both single-row tables AND multi-row tables with arrows
-    // We want to make the LAST arrow row's text into a clickable link
+  // Normalize HTML for email compatibility
+  const processedBody = normalizeEmailHtml(ad.body || '')
 
-    // Pattern for the last row with an arrow in a table (handles bold arrows too)
-    // Made more flexible: doesn't require table to be at very end, allows for trailing whitespace/content
-    const tableArrowLastRowPattern = /(<table[^>]*>(?:[\s\S]*?<tr>[\s\S]*?<\/tr>)*?)(<tr>\s*<td[^>]*>\s*(?:<strong>)?\s*→\s*(?:<\/strong>)?\s*<\/td>\s*<td>)([^<]+)(<\/td>\s*<\/tr>\s*<\/table>)/i
-    const tableArrowMatch = processedBody.match(tableArrowLastRowPattern)
-
-    if (tableArrowMatch) {
-      // Found table-based arrow CTA - keep the table structure but make the last row's text a link
-      const beforeLastRow = tableArrowMatch[1]
-      const lastRowStart = tableArrowMatch[2]
-      const ctaText = tableArrowMatch[3].trim()
-      const lastRowEnd = tableArrowMatch[4]
-
-      processedBody = processedBody.replace(
-        tableArrowLastRowPattern,
-        `${beforeLastRow}${lastRowStart}<a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${ctaText}</a>${lastRowEnd}`
-      )
-    } else {
-      // Check for arrow CTA pattern in paragraph format
-      // Handle various structures:
-      // 1. Plain: "→ Try Fiskl"
-      // 2. Mid-line: "Some text → Try Fiskl"
-      // 3. Separate tags: "<strong>→ </strong><strong>Send it to Shoeboxed.</strong>"
-
-      let arrowHandled = false
-
-      // First, try to match arrow in separate strong tag followed by CTA in another strong tag
-      // Pattern: <strong>→ </strong><strong>CTA text</strong>
-      const separateTagsPattern = /([\s\S]*?<strong[^>]*>)(→\s*)(<\/strong>\s*<strong[^>]*>)([^<]+)(<\/strong>)/i
-      const separateTagsMatch = processedBody.match(separateTagsPattern)
-
-      if (separateTagsMatch && separateTagsMatch[4].trim().length > 3) {
-        const beforeArrow = separateTagsMatch[1]
-        const arrow = separateTagsMatch[2]
-        const betweenTags = separateTagsMatch[3]
-        const ctaText = separateTagsMatch[4].trim()
-        const closingTag = separateTagsMatch[5]
-
-        processedBody = processedBody.replace(
-          separateTagsPattern,
-          `${beforeArrow}${arrow}${betweenTags}<a href='${buttonUrl}' style='color: #000; text-decoration: underline;'>${ctaText}</a>${closingTag}`
-        )
-        arrowHandled = true
-      }
-
-      // If not handled, try simpler mid-line pattern
-      if (!arrowHandled) {
-        const midLineArrowPattern = /([\s\S]*?)(→\s*)([^<\n→]+?)(\s*<\/p>|\s*<\/strong>|\s*$)/i
-        const midLineMatch = processedBody.match(midLineArrowPattern)
-
-        if (midLineMatch && midLineMatch[3].trim().length > 3) {
-          const beforeArrow = midLineMatch[1]
-          const arrow = midLineMatch[2]
-          const ctaText = midLineMatch[3].trim()
-          const afterCta = midLineMatch[4] || ''
-
-          processedBody = processedBody.replace(
-            midLineArrowPattern,
-            `${beforeArrow}<strong>${arrow}</strong><a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${ctaText}</a>${afterCta}`
-          )
-          arrowHandled = true
-        }
-      }
-
-      if (!arrowHandled) {
-      // No arrow CTA - use existing last-sentence logic
-      // Strip HTML to get plain text
-      const plainText = processedBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-
-      // Find all sentence-ending punctuation marks (., !, ?)
-      // But exclude periods that are part of domains (.com, .ai, .io, etc.) or abbreviations
-      const sentenceEndPattern = /[.!?](?=\s+[A-Z]|$)/g
-      const matches = Array.from(plainText.matchAll(sentenceEndPattern))
-
-    if (matches.length > 0) {
-      // Get the position of the last sentence-ending punctuation
-      const lastMatch = matches[matches.length - 1] as RegExpMatchArray
-      const lastPeriodIndex = lastMatch.index!
-
-      // Find the second-to-last sentence-ending punctuation
-      let startIndex = 0
-      if (matches.length > 1) {
-        const secondLastMatch = matches[matches.length - 2] as RegExpMatchArray
-        startIndex = secondLastMatch.index! + 1
-      }
-
-      // Extract the last complete sentence (from after previous punctuation to end, including the final punctuation)
-      const lastSentence = plainText.substring(startIndex, lastPeriodIndex + 1).trim()
-
-      if (lastSentence.length > 5) {
-        // Escape special regex characters
-        const escapedSentence = lastSentence.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
-        // Replace in the original HTML
-        // Look for the sentence text, accounting for HTML tags that might be in between
-        const parts = escapedSentence.split(/\s+/)
-        const flexiblePattern = parts.join('\\s*(?:<[^>]*>\\s*)*')
-        const sentenceRegex = new RegExp(flexiblePattern, 'i')
-
-        processedBody = processedBody.replace(
-          sentenceRegex,
-          `<a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>$&</a>`
-        )
-      }
-    } else {
-      // No sentence-ending punctuation found - wrap the entire text
-      const trimmedText = plainText.trim()
-      if (trimmedText.length > 5) {
-        const escapedText = trimmedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        const parts = escapedText.split(/\s+/)
-        const flexiblePattern = parts.join('\\s*(?:<[^>]*>\\s*)*')
-        const textRegex = new RegExp(flexiblePattern, 'i')
-
-        processedBody = processedBody.replace(
-          textRegex,
-          `<a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>$&</a>`
-        )
-      }
-    }
-      }
-    }
-  }
+  // CTA: if cta_text is provided, render it as a linked row after the body
+  const ctaHtml = ad.cta_text && buttonUrl !== '#'
+    ? `<tr><td style='padding: 4px 10px 10px; font-family: ${bodyFont}; font-size: 16px; line-height: 24px;'><a href='${buttonUrl}' style='color: #000; text-decoration: underline; font-weight: bold;'>${ad.cta_text}</a></td></tr>`
+    : ''
 
   return `
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:750px;margin:0 auto;">
@@ -197,6 +77,7 @@ export function generateAdvertorialHtml(
         <tr><td style='padding: 10px 10px 4px; font-size: 20px; font-weight: bold; text-align: left;'>${ad.title}</td></tr>
         ${imageHtml}
         <tr><td style='padding: 0 10px 10px; font-family: ${bodyFont}; font-size: 16px; line-height: 24px; color: #333;'>${processedBody}</td></tr>
+        ${ctaHtml}
       </table>
     </td>
   </tr>
@@ -245,7 +126,8 @@ export async function generateAdvertorialSection(issue: any, _recordUsage: boole
         body: selectedAd.body || '',
         button_url: selectedAd.button_url || '#',
         image_url: selectedAd.image_url,
-        image_alt: selectedAd.image_alt
+        image_alt: selectedAd.image_alt,
+        cta_text: selectedAd.cta_text
       },
       {
         primaryColor,
@@ -291,7 +173,7 @@ export async function generateAdModulesSection(issue: any, moduleId?: string, bu
           selected_at,
           ad_module_id,
           ad_module:ad_modules(id, name, display_order, block_order),
-          advertisement:advertisements(id, title, body, image_url, image_alt, button_text, button_url, company_name,
+          advertisement:advertisements(id, title, body, image_url, image_alt, button_text, button_url, cta_text, company_name,
             advertiser:advertisers(id, company_name, logo_url, website_url))
         `)
         .eq('issue_id', issue.id)
@@ -341,7 +223,8 @@ export async function generateAdModulesSection(issue: any, moduleId?: string, bu
           image_url: ad.image_url,
           image_alt: ad.image_alt,
           button_text: ad.button_text,
-          button_url: trackedUrl // Use tracked URL
+          button_url: trackedUrl, // Use tracked URL
+          cta_text: ad.cta_text
         },
         blockOrder,
         {

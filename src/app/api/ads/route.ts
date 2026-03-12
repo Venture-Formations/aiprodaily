@@ -164,7 +164,8 @@ export const POST = withApiHandler(
         advertiser_id: body.advertiser_id || null, // Optional advertiser assignment
         priority: body.priority || 0, // Priority for selection mode
         ad_type: body.ad_type || null, // Section type label
-        company_name: body.company_name || null // Company name
+        company_name: body.company_name || null, // Company name
+        cta_text: body.cta_text || null // Optional CTA text
       })
       .select()
       .single()
