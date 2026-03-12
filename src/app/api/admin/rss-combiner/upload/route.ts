@@ -109,42 +109,49 @@ export const POST = withApiHandler(
 
     const uploadedUrlSet = new Set(uploadedUrls.map((u) => u.url))
 
-    // Upsert uploaded URLs
+    const now = new Date().toISOString()
+
+    // Batch: collect inserts and updates
+    const toInsert: { url: string; label: string; is_active: boolean; is_excluded: boolean }[] = []
+    const toUpdateIds: string[] = []
+
     for (const { url, label } of uploadedUrls) {
       const existingSource = existingMap.get(url)
 
       if (existingSource) {
-        // Update label and ensure active
         if (existingSource.label !== label || !existingSource.is_active) {
+          toUpdateIds.push(existingSource.id)
+          // Update label individually since labels may differ per row
           await supabaseAdmin
             .from('combined_feed_sources')
-            .update({
-              label,
-              is_active: true,
-              updated_at: new Date().toISOString(),
-            })
+            .update({ label, is_active: true, updated_at: now })
             .eq('id', existingSource.id)
           updated++
         }
       } else {
-        // Insert new
-        await supabaseAdmin
-          .from('combined_feed_sources')
-          .insert({ url, label, is_active: true, is_excluded: false })
-        created++
+        toInsert.push({ url, label, is_active: true, is_excluded: false })
       }
     }
 
-    // Deactivate URLs not in upload
-    const existingEntries = Array.from(existingMap.entries())
-    for (const [url, source] of existingEntries) {
-      if (!uploadedUrlSet.has(url) && source.is_active) {
-        await supabaseAdmin
-          .from('combined_feed_sources')
-          .update({ is_active: false, updated_at: new Date().toISOString() })
-          .eq('id', source.id)
-        deactivated++
-      }
+    // Batch insert all new sources at once
+    if (toInsert.length > 0) {
+      await supabaseAdmin
+        .from('combined_feed_sources')
+        .insert(toInsert)
+      created = toInsert.length
+    }
+
+    // Batch deactivate: all active sources not in upload set
+    const toDeactivateIds = (existing || [])
+      .filter((s) => s.is_active && !uploadedUrlSet.has(s.url))
+      .map((s) => s.id)
+
+    if (toDeactivateIds.length > 0) {
+      await supabaseAdmin
+        .from('combined_feed_sources')
+        .update({ is_active: false, updated_at: now })
+        .in('id', toDeactivateIds)
+      deactivated = toDeactivateIds.length
     }
 
     invalidateCache()
