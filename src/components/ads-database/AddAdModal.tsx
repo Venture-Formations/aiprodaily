@@ -144,7 +144,7 @@ export default function AddAdModal({ onClose, onSuccess, publicationId, selected
       const words = text.split(/\s+/).filter(w => w.length > 0)
       const wordCount = words.length
 
-      const response = await fetch('/api/ads', {
+      const response = await fetch(`/api/ads?publication_id=${publicationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
