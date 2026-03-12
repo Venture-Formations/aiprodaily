@@ -29,14 +29,22 @@ interface UploadResult {
   total: number
 }
 
+interface ExcludedSource {
+  id: string
+  source_name: string
+  created_at: string
+}
+
 export default function RSSCombinerPage() {
   const [sources, setSources] = useState<FeedSource[]>([])
   const [settings, setSettings] = useState<FeedSettings | null>(null)
+  const [excludedSources, setExcludedSources] = useState<ExcludedSource[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null)
   const [savingSettings, setSavingSettings] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [newExcludedSource, setNewExcludedSource] = useState('')
 
   // Editable settings fields
   const [editMaxAge, setEditMaxAge] = useState(7)
@@ -45,9 +53,10 @@ export default function RSSCombinerPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [sourcesRes, settingsRes] = await Promise.all([
+      const [sourcesRes, settingsRes, excludedRes] = await Promise.all([
         fetch('/api/admin/rss-combiner/sources'),
         fetch('/api/admin/rss-combiner/settings'),
+        fetch('/api/admin/rss-combiner/excluded-sources'),
       ])
 
       if (sourcesRes.ok) {
@@ -64,6 +73,11 @@ export default function RSSCombinerPage() {
           setEditCacheTtl(s.cache_ttl_minutes)
           setEditFeedTitle(s.feed_title)
         }
+      }
+
+      if (excludedRes.ok) {
+        const data = await excludedRes.json()
+        setExcludedSources(data.excludedSources || [])
       }
     } catch (error) {
       console.error('Failed to load data:', error)
@@ -153,6 +167,43 @@ export default function RSSCombinerPage() {
     }
   }
 
+  const handleAddExcludedSource = async () => {
+    const name = newExcludedSource.trim()
+    if (!name) return
+
+    try {
+      const res = await fetch('/api/admin/rss-combiner/excluded-sources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source_name: name }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setExcludedSources((prev) => [...prev, data.excludedSource])
+        setNewExcludedSource('')
+      }
+    } catch (error) {
+      console.error('Add excluded source failed:', error)
+    }
+  }
+
+  const handleRemoveExcludedSource = async (id: string) => {
+    try {
+      const res = await fetch('/api/admin/rss-combiner/excluded-sources', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+
+      if (res.ok) {
+        setExcludedSources((prev) => prev.filter((s) => s.id !== id))
+      }
+    } catch (error) {
+      console.error('Remove excluded source failed:', error)
+    }
+  }
+
   const feedUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/api/feeds/combined`
     : '/api/feeds/combined'
@@ -164,7 +215,7 @@ export default function RSSCombinerPage() {
   }
 
   const activeCount = sources.filter((s) => s.is_active && !s.is_excluded).length
-  const excludedCount = sources.filter((s) => s.is_excluded).length
+  const excludedFeedCount = sources.filter((s) => s.is_excluded).length
   const inactiveCount = sources.filter((s) => !s.is_active).length
 
   if (loading) {
@@ -189,18 +240,22 @@ export default function RSSCombinerPage() {
         </div>
 
         {/* Stats Bar */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
             <div className="text-2xl font-bold text-green-600">{activeCount}</div>
-            <div className="text-xs text-gray-500 mt-1">Active Sources</div>
+            <div className="text-xs text-gray-500 mt-1">Active Feeds</div>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
-            <div className="text-2xl font-bold text-red-600">{excludedCount}</div>
-            <div className="text-xs text-gray-500 mt-1">Excluded</div>
+            <div className="text-2xl font-bold text-red-600">{excludedFeedCount}</div>
+            <div className="text-xs text-gray-500 mt-1">Excluded Feeds</div>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
             <div className="text-2xl font-bold text-gray-400">{inactiveCount}</div>
-            <div className="text-xs text-gray-500 mt-1">Inactive</div>
+            <div className="text-xs text-gray-500 mt-1">Inactive Feeds</div>
+          </div>
+          <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
+            <div className="text-2xl font-bold text-orange-600">{excludedSources.length}</div>
+            <div className="text-xs text-gray-500 mt-1">Excluded Publishers</div>
           </div>
         </div>
 
@@ -219,7 +274,7 @@ export default function RSSCombinerPage() {
             </button>
           </div>
           <p className="mt-1 text-xs text-gray-500">
-            Requires Bearer token (CRON_SECRET) for authentication. Add ?refresh=true to force cache bust.
+            Requires Bearer token (CRON_SECRET) or ?secret= param. Add ?refresh=true to force cache bust.
           </p>
         </div>
 
@@ -309,6 +364,61 @@ export default function RSSCombinerPage() {
                 {savingSettings ? 'Saving...' : 'Save Settings'}
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Excluded Publishers */}
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-8">
+          <div className="px-4 py-3 border-b border-gray-200">
+            <h2 className="text-sm font-medium text-gray-700">
+              Excluded Publishers ({excludedSources.length})
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Articles from these publishers will be filtered out of the combined feed. Source names come from the RSS &lt;source&gt; element (e.g. Google News feeds include the publisher name).
+            </p>
+          </div>
+          <div className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <input
+                type="text"
+                value={newExcludedSource}
+                onChange={(e) => setNewExcludedSource(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddExcludedSource()}
+                placeholder="Publisher name (e.g. Barchart.com)"
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md"
+              />
+              <button
+                onClick={handleAddExcludedSource}
+                disabled={!newExcludedSource.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
+              >
+                Exclude
+              </button>
+            </div>
+            {excludedSources.length === 0 ? (
+              <div className="text-sm text-gray-500 py-2">
+                No publishers excluded yet.
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {excludedSources.map((es) => (
+                  <span
+                    key={es.id}
+                    className="inline-flex items-center gap-1 px-3 py-1 text-sm bg-red-50 text-red-700 rounded-full border border-red-200"
+                  >
+                    {es.source_name}
+                    <button
+                      onClick={() => handleRemoveExcludedSource(es.id)}
+                      className="ml-1 text-red-400 hover:text-red-600"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

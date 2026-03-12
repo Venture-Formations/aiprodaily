@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 const parser = new Parser({
   customFields: {
-    item: ['media:content', 'enclosure'],
+    item: ['media:content', 'enclosure', 'source'],
   },
 })
 
@@ -21,6 +21,7 @@ interface NormalizedItem {
   pubDate: Date
   author: string
   sourceLabel: string
+  sourceName: string
   guid: string
 }
 
@@ -28,12 +29,41 @@ interface NormalizedItem {
 let cachedXml: string | null = null
 let cachedAt: number | null = null
 
+/**
+ * Extract the publisher/source name from an RSS item.
+ * Google News RSS includes <source>Publisher Name</source>.
+ * Falls back to parsing "Title - Source" pattern from the title.
+ */
+function extractSourceName(item: any): string {
+  // rss-parser captures <source> element text
+  if (item.source && typeof item.source === 'string') {
+    return item.source
+  }
+  // Some feeds use source as an object with $ attrs and _ text
+  if (item.source?._) {
+    return item.source._
+  }
+  // Fallback: Google News titles are "Article Title - Publisher Name"
+  const title = item.title || ''
+  const dashIdx = title.lastIndexOf(' - ')
+  if (dashIdx > 0) {
+    return title.substring(dashIdx + 3).trim()
+  }
+  return ''
+}
+
 export async function fetchAndCombineFeeds(
   sources: FeedSource[],
-  maxAgeDays: number
+  maxAgeDays: number,
+  excludedSources: Set<string> = new Set()
 ): Promise<NormalizedItem[]> {
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - maxAgeDays)
+
+  // Lowercase excluded sources for case-insensitive matching
+  const excludedLower = new Set(
+    Array.from(excludedSources).map((s) => s.toLowerCase())
+  )
 
   const results = await Promise.allSettled(
     sources.map(async (source) => {
@@ -45,6 +75,7 @@ export async function fetchAndCombineFeeds(
         pubDate: item.pubDate ? new Date(item.pubDate) : new Date(),
         author: item.creator || (item as any).author || '',
         sourceLabel: source.label || new URL(source.url).hostname,
+        sourceName: extractSourceName(item),
         guid: item.guid || item.link || `${source.url}#${item.title}`,
       }))
     })
@@ -61,6 +92,7 @@ export async function fetchAndCombineFeeds(
 
   return items
     .filter((item) => item.pubDate >= cutoff)
+    .filter((item) => !item.sourceName || !excludedLower.has(item.sourceName.toLowerCase()))
     .sort((a, b) => b.pubDate.getTime() - a.pubDate.getTime())
 }
 
@@ -86,7 +118,10 @@ export function generateCombinedFeedXml(
       description: item.description,
       date: item.pubDate,
       author: item.author ? [{ name: item.author }] : undefined,
-      category: item.sourceLabel ? [{ name: item.sourceLabel }] : undefined,
+      category: [
+        ...(item.sourceLabel ? [{ name: item.sourceLabel }] : []),
+        ...(item.sourceName ? [{ name: `source:${item.sourceName}` }] : []),
+      ],
     })
   }
 
@@ -113,13 +148,22 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
     return cachedXml
   }
 
-  // Fetch active, non-excluded sources
+  // Fetch active, non-excluded feed sources
   const { data: sources } = await supabaseAdmin
     .from('combined_feed_sources')
     .select('id, url, label')
     .eq('is_active', true)
     .eq('is_excluded', false)
     .order('label')
+
+  // Fetch excluded article sources (publisher names)
+  const { data: excludedRows } = await supabaseAdmin
+    .from('combined_feed_excluded_sources')
+    .select('source_name')
+
+  const excludedSources = new Set(
+    (excludedRows || []).map((r) => r.source_name)
+  )
 
   if (!sources || sources.length === 0) {
     const emptyFeed = generateCombinedFeedXml(
@@ -133,7 +177,8 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
 
   const items = await fetchAndCombineFeeds(
     sources,
-    settings?.max_age_days ?? 7
+    settings?.max_age_days ?? 7,
+    excludedSources
   )
   const xml = generateCombinedFeedXml(
     items,

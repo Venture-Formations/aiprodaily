@@ -23,3 +23,10 @@ CREATE TABLE combined_feed_settings (
 
 -- Seed default row
 INSERT INTO combined_feed_settings (feed_title) VALUES ('Combined RSS Feed');
+
+-- Excluded article sources (publisher names like "Barchart.com", "CNBC")
+CREATE TABLE combined_feed_excluded_sources (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_name TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
