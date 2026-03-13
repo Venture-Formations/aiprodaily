@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Layout from '@/components/Layout'
+import * as XLSX from 'xlsx'
 
 type Tab = 'trades' | 'ticker-db' | 'excluded-companies' | 'excluded-sources' | 'excluded-keywords' | 'settings'
 
@@ -62,6 +63,48 @@ interface FeedSettings {
   updated_at: string
 }
 
+// Column header mapping for XLSX parsing (client-side)
+const COLUMN_MAP: Record<string, string> = {
+  ticker: 'ticker',
+  'ticker type': 'ticker_type',
+  company: 'company',
+  traded: 'traded',
+  filed: 'filed',
+  transaction: 'transaction',
+  trade_size_usd: 'trade_size_usd',
+  'trade size (usd)': 'trade_size_usd',
+  name: 'name',
+  party: 'party',
+  district: 'district',
+  chamber: 'chamber',
+  state: 'state',
+  'capitol trades url': 'capitol_trades_url',
+}
+
+function normalizeHeader(h: string): string {
+  return h.toLowerCase().trim().replace(/_/g, ' ')
+}
+
+function parseExcelDate(val: any): string | null {
+  if (!val) return null
+  if (typeof val === 'number') {
+    const date = XLSX.SSF.parse_date_code(val)
+    if (date) {
+      const y = date.y
+      const m = String(date.m).padStart(2, '0')
+      const d = String(date.d).padStart(2, '0')
+      return `${y}-${m}-${d}`
+    }
+  }
+  if (typeof val === 'string') {
+    const d = new Date(val)
+    if (!isNaN(d.getTime())) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    }
+  }
+  return null
+}
+
 const TABS: { key: Tab; label: string }[] = [
   { key: 'trades', label: 'Trades' },
   { key: 'ticker-db', label: 'Ticker Database' },
@@ -79,6 +122,7 @@ export default function RSSCombinerPage() {
   const [tradeStats, setTradeStats] = useState<TradeStats | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadResult, setUploadResult] = useState<any>(null)
+  const [uploadProgress, setUploadProgress] = useState('')
 
   // Settings state
   const [settings, setSettings] = useState<FeedSettings | null>(null)
@@ -96,6 +140,8 @@ export default function RSSCombinerPage() {
   const [tickerSearch, setTickerSearch] = useState('')
   const [newTicker, setNewTicker] = useState('')
   const [newTickerName, setNewTickerName] = useState('')
+  const [editingTickerId, setEditingTickerId] = useState<string | null>(null)
+  const [editTickerName, setEditTickerName] = useState('')
   const [tickerUploading, setTickerUploading] = useState(false)
   const [tickerUploadResult, setTickerUploadResult] = useState<any>(null)
 
@@ -103,10 +149,18 @@ export default function RSSCombinerPage() {
   const [excludedCompanies, setExcludedCompanies] = useState<ExcludedCompany[]>([])
   const [newExcludedTicker, setNewExcludedTicker] = useState('')
   const [newExcludedCompanyName, setNewExcludedCompanyName] = useState('')
+  const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null)
+  const [editCompanyTicker, setEditCompanyTicker] = useState('')
+  const [editCompanyName, setEditCompanyName] = useState('')
 
   // Excluded sources state
   const [excludedSources, setExcludedSources] = useState<ExcludedSource[]>([])
   const [newExcludedSource, setNewExcludedSource] = useState('')
+  const [knownSources, setKnownSources] = useState<string[]>([])
+  const [loadingKnownSources, setLoadingKnownSources] = useState(false)
+  const [showSourceDropdown, setShowSourceDropdown] = useState(false)
+  const sourceInputRef = useRef<HTMLInputElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Excluded keywords state
   const [excludedKeywords, setExcludedKeywords] = useState<ExcludedKeyword[]>([])
@@ -174,6 +228,19 @@ export default function RSSCombinerPage() {
     }
   }, [])
 
+  const fetchKnownSources = useCallback(async () => {
+    setLoadingKnownSources(true)
+    try {
+      const res = await fetch('/api/admin/rss-combiner/known-sources')
+      if (res.ok) {
+        const data = await res.json()
+        setKnownSources(data.sources || [])
+      }
+    } finally {
+      setLoadingKnownSources(false)
+    }
+  }, [])
+
   useEffect(() => {
     Promise.all([
       fetchTrades(),
@@ -184,6 +251,29 @@ export default function RSSCombinerPage() {
       fetchExcludedKeywords(),
     ]).finally(() => setLoading(false))
   }, [fetchTrades, fetchSettings, fetchTickers, fetchExcludedCompanies, fetchExcludedSources, fetchExcludedKeywords])
+
+  // Fetch known sources when switching to excluded-sources tab
+  useEffect(() => {
+    if (activeTab === 'excluded-sources' && knownSources.length === 0) {
+      fetchKnownSources()
+    }
+  }, [activeTab, knownSources.length, fetchKnownSources])
+
+  // Close source dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node) &&
+        sourceInputRef.current &&
+        !sourceInputRef.current.contains(e.target as Node)
+      ) {
+        setShowSourceDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   // --- Upload Handlers ---
 
@@ -196,21 +286,101 @@ export default function RSSCombinerPage() {
 
     setUploading(true)
     setUploadResult(null)
+    setUploadProgress('Reading XLSX file...')
 
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await fetch('/api/admin/rss-combiner/upload', { method: 'POST', body: formData })
-      const data = await res.json()
-      setUploadResult(data)
-      if (res.ok) {
-        fetchTrades()
-        fileInput.value = ''
+      // Parse XLSX client-side
+      const buffer = await file.arrayBuffer()
+      const workbook = XLSX.read(buffer, { type: 'array' })
+      const sheetName = workbook.SheetNames[0]
+      if (!sheetName) {
+        setUploadResult({ error: 'No sheets found in workbook' })
+        return
       }
-    } catch {
-      setUploadResult({ error: 'Upload failed' })
+
+      const sheet = workbook.Sheets[sheetName]
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+
+      if (rows.length === 0) {
+        setUploadResult({ error: 'No data rows found' })
+        return
+      }
+
+      setUploadProgress(`Parsed ${rows.length.toLocaleString()} rows. Mapping columns...`)
+
+      // Map columns
+      const rawHeaders = Object.keys(rows[0])
+      const colIndex: Record<string, string> = {}
+      for (const h of rawHeaders) {
+        const normalized = normalizeHeader(h)
+        const dbCol = COLUMN_MAP[normalized]
+        if (dbCol) colIndex[h] = dbCol
+      }
+
+      if (!Object.values(colIndex).includes('ticker') || !Object.values(colIndex).includes('traded')) {
+        setUploadResult({ error: 'XLSX must have "Ticker" and "Traded" columns' })
+        return
+      }
+
+      // Convert rows to trade objects
+      const trades: any[] = []
+      for (const row of rows) {
+        const trade: Record<string, any> = {}
+        for (const [rawHeader, dbCol] of Object.entries(colIndex)) {
+          const val = row[rawHeader]
+          if (dbCol === 'traded' || dbCol === 'filed') {
+            trade[dbCol] = parseExcelDate(val)
+          } else {
+            trade[dbCol] = val != null ? String(val).trim() || null : null
+          }
+        }
+        if (trade.ticker && trade.traded) {
+          trades.push(trade)
+        }
+      }
+
+      setUploadProgress(`Uploading ${trades.length.toLocaleString()} trades in batches...`)
+
+      // Send as JSON in chunks (10K per request to stay well under limits)
+      const CHUNK_SIZE = 10000
+      let totalInserted = 0
+      const allErrors: string[] = []
+
+      for (let i = 0; i < trades.length; i += CHUNK_SIZE) {
+        const chunk = trades.slice(i, i + CHUNK_SIZE)
+        const batchNum = Math.floor(i / CHUNK_SIZE) + 1
+        const totalBatches = Math.ceil(trades.length / CHUNK_SIZE)
+        setUploadProgress(`Uploading batch ${batchNum} of ${totalBatches}...`)
+
+        // First chunk truncates existing data, subsequent chunks append
+        const res = await fetch('/api/admin/rss-combiner/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trades: chunk, append: i > 0 }),
+        })
+
+        const data = await res.json()
+        if (res.ok) {
+          totalInserted += data.inserted || 0
+          if (data.errors?.length) allErrors.push(...data.errors)
+        } else {
+          allErrors.push(data.error || `Batch ${batchNum} failed`)
+        }
+      }
+
+      setUploadResult({
+        inserted: totalInserted,
+        total: rows.length,
+        uniqueTickers: new Set(trades.map((t: any) => t.ticker?.toUpperCase())).size,
+        errors: allErrors.slice(0, 20),
+      })
+      fetchTrades()
+      fileInput.value = ''
+    } catch (err: any) {
+      setUploadResult({ error: err.message || 'Upload failed' })
     } finally {
       setUploading(false)
+      setUploadProgress('')
     }
   }
 
@@ -257,6 +427,22 @@ export default function RSSCombinerPage() {
     }
   }
 
+  const handleEditTicker = async (id: string) => {
+    if (!editTickerName.trim()) return
+    const ticker = tickers.find((t) => t.id === id)
+    if (!ticker) return
+    const res = await fetch('/api/admin/rss-combiner/ticker-db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticker: ticker.ticker, company_name: editTickerName }),
+    })
+    if (res.ok) {
+      fetchTickers()
+      setEditingTickerId(null)
+      setEditTickerName('')
+    }
+  }
+
   const handleDeleteTicker = async (id: string) => {
     const res = await fetch('/api/admin/rss-combiner/ticker-db', {
       method: 'DELETE',
@@ -281,6 +467,27 @@ export default function RSSCombinerPage() {
     }
   }
 
+  const handleEditExcludedCompany = async (id: string) => {
+    if (!editCompanyTicker.trim()) return
+    // Delete old, create new (since ticker is the unique key)
+    const delRes = await fetch('/api/admin/rss-combiner/excluded-companies', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    if (delRes.ok) {
+      const addRes = await fetch('/api/admin/rss-combiner/excluded-companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticker: editCompanyTicker, company_name: editCompanyName || undefined }),
+      })
+      if (addRes.ok) {
+        fetchExcludedCompanies()
+      }
+    }
+    setEditingCompanyId(null)
+  }
+
   const handleDeleteExcludedCompany = async (id: string) => {
     const res = await fetch('/api/admin/rss-combiner/excluded-companies', {
       method: 'DELETE',
@@ -290,8 +497,8 @@ export default function RSSCombinerPage() {
     if (res.ok) setExcludedCompanies((prev) => prev.filter((c) => c.id !== id))
   }
 
-  const handleAddExcludedSource = async () => {
-    const name = newExcludedSource.trim()
+  const handleAddExcludedSource = async (sourceName?: string) => {
+    const name = (sourceName || newExcludedSource).trim()
     if (!name) return
     const res = await fetch('/api/admin/rss-combiner/excluded-sources', {
       method: 'POST',
@@ -302,6 +509,7 @@ export default function RSSCombinerPage() {
       const data = await res.json()
       setExcludedSources((prev) => [...prev, data.excludedSource])
       setNewExcludedSource('')
+      setShowSourceDropdown(false)
     }
   }
 
@@ -374,6 +582,14 @@ export default function RSSCombinerPage() {
       )
     : tickers
 
+  // Filtered known sources for dropdown (exclude already-excluded ones)
+  const excludedSourceNames = new Set(excludedSources.map((s) => s.source_name.toLowerCase()))
+  const filteredKnownSources = knownSources
+    .filter((s) => !excludedSourceNames.has(s.toLowerCase()))
+    .filter((s) =>
+      newExcludedSource ? s.toLowerCase().includes(newExcludedSource.toLowerCase()) : true
+    )
+
   if (loading) {
     return (
       <Layout>
@@ -417,7 +633,6 @@ export default function RSSCombinerPage() {
         {/* Tab: Trades */}
         {activeTab === 'trades' && (
           <div className="space-y-6">
-            {/* Stats Bar */}
             {tradeStats && (
               <div className="grid grid-cols-3 gap-4">
                 <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
@@ -435,7 +650,6 @@ export default function RSSCombinerPage() {
               </div>
             )}
 
-            {/* Upload + Template Settings side-by-side */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white rounded-lg border border-gray-200 p-4">
                 <h2 className="text-sm font-medium text-gray-700 mb-3">Upload XLSX</h2>
@@ -454,8 +668,12 @@ export default function RSSCombinerPage() {
                   </button>
                 </form>
                 <p className="mt-2 text-xs text-gray-500">
-                  Expects congressional trading XLSX. Each upload replaces all existing trades.
+                  Expects congressional trading XLSX. File is parsed in browser then uploaded in batches.
                 </p>
+
+                {uploadProgress && (
+                  <div className="mt-2 text-xs text-blue-600">{uploadProgress}</div>
+                )}
 
                 {uploadResult && (
                   <div className="mt-3 p-3 rounded bg-gray-50 text-sm">
@@ -568,7 +786,6 @@ export default function RSSCombinerPage() {
         {/* Tab: Ticker Database */}
         {activeTab === 'ticker-db' && (
           <div className="space-y-6">
-            {/* Manual Add */}
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <h2 className="text-sm font-medium text-gray-700 mb-3">Add Ticker Mapping</h2>
               <div className="flex items-end gap-2">
@@ -603,7 +820,6 @@ export default function RSSCombinerPage() {
               </div>
             </div>
 
-            {/* CSV Upload */}
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <h2 className="text-sm font-medium text-gray-700 mb-3">Bulk Import (CSV)</h2>
               <form onSubmit={handleTickerCSVUpload}>
@@ -633,7 +849,7 @@ export default function RSSCombinerPage() {
               )}
             </div>
 
-            {/* Ticker Table */}
+            {/* Ticker Table with Edit */}
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
                 <h2 className="text-sm font-medium text-gray-700">Ticker Mappings ({tickers.length})</h2>
@@ -656,21 +872,65 @@ export default function RSSCombinerPage() {
                       <tr>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ticker</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Company Name</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase w-40">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {filteredTickers.map((t) => (
                         <tr key={t.id}>
                           <td className="px-4 py-2 font-medium text-gray-900">{t.ticker}</td>
-                          <td className="px-4 py-2 text-gray-700">{t.company_name}</td>
-                          <td className="px-4 py-2 text-right">
-                            <button
-                              onClick={() => handleDeleteTicker(t.id)}
-                              className="text-red-500 hover:text-red-700 text-xs"
-                            >
-                              Delete
-                            </button>
+                          <td className="px-4 py-2 text-gray-700">
+                            {editingTickerId === t.id ? (
+                              <input
+                                type="text"
+                                value={editTickerName}
+                                onChange={(e) => setEditTickerName(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleEditTicker(t.id)
+                                  if (e.key === 'Escape') setEditingTickerId(null)
+                                }}
+                                autoFocus
+                                className="w-full px-2 py-1 text-sm border border-blue-300 rounded"
+                              />
+                            ) : (
+                              t.company_name
+                            )}
+                          </td>
+                          <td className="px-4 py-2 text-right space-x-2">
+                            {editingTickerId === t.id ? (
+                              <>
+                                <button
+                                  onClick={() => handleEditTicker(t.id)}
+                                  className="text-green-600 hover:text-green-800 text-xs"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => setEditingTickerId(null)}
+                                  className="text-gray-500 hover:text-gray-700 text-xs"
+                                >
+                                  Cancel
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setEditingTickerId(t.id)
+                                    setEditTickerName(t.company_name)
+                                  }}
+                                  className="text-blue-500 hover:text-blue-700 text-xs"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteTicker(t.id)}
+                                  className="text-red-500 hover:text-red-700 text-xs"
+                                >
+                                  Delete
+                                </button>
+                              </>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -682,7 +942,7 @@ export default function RSSCombinerPage() {
           </div>
         )}
 
-        {/* Tab: Excluded Companies */}
+        {/* Tab: Excluded Companies with Edit */}
         {activeTab === 'excluded-companies' && (
           <div className="space-y-6">
             <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -734,21 +994,77 @@ export default function RSSCombinerPage() {
                     <tr>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ticker</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Display Name</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase w-40">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {excludedCompanies.map((c) => (
                       <tr key={c.id}>
-                        <td className="px-4 py-2 font-medium text-gray-900">{c.ticker}</td>
-                        <td className="px-4 py-2 text-gray-500">{c.company_name || '-'}</td>
-                        <td className="px-4 py-2 text-right">
-                          <button
-                            onClick={() => handleDeleteExcludedCompany(c.id)}
-                            className="text-red-500 hover:text-red-700 text-xs"
-                          >
-                            Remove
-                          </button>
+                        <td className="px-4 py-2 font-medium text-gray-900">
+                          {editingCompanyId === c.id ? (
+                            <input
+                              type="text"
+                              value={editCompanyTicker}
+                              onChange={(e) => setEditCompanyTicker(e.target.value)}
+                              className="w-full px-2 py-1 text-sm border border-blue-300 rounded uppercase"
+                            />
+                          ) : (
+                            c.ticker
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-gray-500">
+                          {editingCompanyId === c.id ? (
+                            <input
+                              type="text"
+                              value={editCompanyName}
+                              onChange={(e) => setEditCompanyName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleEditExcludedCompany(c.id)
+                                if (e.key === 'Escape') setEditingCompanyId(null)
+                              }}
+                              autoFocus
+                              className="w-full px-2 py-1 text-sm border border-blue-300 rounded"
+                            />
+                          ) : (
+                            c.company_name || '-'
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-right space-x-2">
+                          {editingCompanyId === c.id ? (
+                            <>
+                              <button
+                                onClick={() => handleEditExcludedCompany(c.id)}
+                                className="text-green-600 hover:text-green-800 text-xs"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => setEditingCompanyId(null)}
+                                className="text-gray-500 hover:text-gray-700 text-xs"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setEditingCompanyId(c.id)
+                                  setEditCompanyTicker(c.ticker)
+                                  setEditCompanyName(c.company_name || '')
+                                }}
+                                className="text-blue-500 hover:text-blue-700 text-xs"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteExcludedCompany(c.id)}
+                                className="text-red-500 hover:text-red-700 text-xs"
+                              >
+                                Remove
+                              </button>
+                            </>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -759,7 +1075,7 @@ export default function RSSCombinerPage() {
           </div>
         )}
 
-        {/* Tab: Excluded Sources */}
+        {/* Tab: Excluded Sources with Autocomplete */}
         {activeTab === 'excluded-sources' && (
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200">
@@ -770,16 +1086,45 @@ export default function RSSCombinerPage() {
             </div>
             <div className="p-4">
               <div className="flex items-center gap-2 mb-4">
-                <input
-                  type="text"
-                  value={newExcludedSource}
-                  onChange={(e) => setNewExcludedSource(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddExcludedSource()}
-                  placeholder="Publisher name (e.g. Barchart.com)"
-                  className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md"
-                />
+                <div className="flex-1 relative">
+                  <input
+                    ref={sourceInputRef}
+                    type="text"
+                    value={newExcludedSource}
+                    onChange={(e) => {
+                      setNewExcludedSource(e.target.value)
+                      setShowSourceDropdown(true)
+                    }}
+                    onFocus={() => setShowSourceDropdown(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAddExcludedSource()
+                        setShowSourceDropdown(false)
+                      }
+                      if (e.key === 'Escape') setShowSourceDropdown(false)
+                    }}
+                    placeholder={loadingKnownSources ? 'Loading sources...' : 'Type to search or add publisher...'}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                  />
+                  {showSourceDropdown && filteredKnownSources.length > 0 && (
+                    <div
+                      ref={dropdownRef}
+                      className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto"
+                    >
+                      {filteredKnownSources.map((source) => (
+                        <button
+                          key={source}
+                          onClick={() => handleAddExcludedSource(source)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 text-gray-700"
+                        >
+                          {source}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button
-                  onClick={handleAddExcludedSource}
+                  onClick={() => handleAddExcludedSource()}
                   disabled={!newExcludedSource.trim()}
                   className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
                 >
@@ -914,7 +1259,6 @@ export default function RSSCombinerPage() {
               </div>
             </div>
 
-            {/* Feed URL */}
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">Combined Feed URL</label>
               <div className="flex items-center gap-2">
