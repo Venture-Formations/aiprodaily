@@ -43,6 +43,10 @@ interface Recommendation {
   unique_ips: number
   override_cr: number | null
   override_rcr: number | null
+  override_slip: number | null
+  alltime_slip: number
+  effective_slip: number
+  slip_source: string
   submission_capped?: boolean
   page_impressions: number
   page_submissions: number
@@ -133,6 +137,7 @@ const DEFAULT_COLUMNS: Column[] = [
   { key: 'our_pending', label: 'Our Pend', enabled: true, exportable: true, width: 'xs' },
   { key: 'slippage_14d', label: '14D Slip%', enabled: true, exportable: true, width: 'sm' },
   { key: 'slippage_30d', label: '30D Slip%', enabled: true, exportable: true, width: 'sm' },
+  { key: 'alltime_slip', label: 'AT Slip%', enabled: true, exportable: true, width: 'sm' },
   { key: 'sparkloop_confirmed', label: 'SL Confirmed', enabled: false, exportable: true, width: 'xs' },
   { key: 'sparkloop_rejected', label: 'SL Rejected', enabled: false, exportable: true, width: 'xs' },
   { key: 'sparkloop_pending', label: 'SL Pending', enabled: false, exportable: true, width: 'xs' },
@@ -186,6 +191,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
   const [overrideRec, setOverrideRec] = useState<Recommendation | null>(null)
   const [overrideCrValue, setOverrideCrValue] = useState('')
   const [overrideRcrValue, setOverrideRcrValue] = useState('')
+  const [overrideSlipValue, setOverrideSlipValue] = useState('')
   const [overrideSaving, setOverrideSaving] = useState(false)
 
   // Default CR/RCR editing state
@@ -503,6 +509,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
     setOverrideRec(rec)
     setOverrideCrValue(rec.override_cr !== null && rec.override_cr !== undefined ? String(rec.override_cr) : '')
     setOverrideRcrValue(rec.override_rcr !== null && rec.override_rcr !== undefined ? String(rec.override_rcr) : '')
+    setOverrideSlipValue(rec.override_slip !== null && rec.override_slip !== undefined ? String(rec.override_slip) : '')
   }
 
   async function saveOverrides() {
@@ -516,6 +523,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
       // Parse CR: empty string = clear (null), otherwise number
       body.override_cr = overrideCrValue.trim() === '' ? null : parseFloat(overrideCrValue)
       body.override_rcr = overrideRcrValue.trim() === '' ? null : parseFloat(overrideRcrValue)
+      body.override_slip = overrideSlipValue.trim() === '' ? null : parseFloat(overrideSlipValue)
 
       const res = await fetch('/api/sparkloop/admin', {
         method: 'PATCH',
@@ -730,6 +738,21 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
         return <span className={`${color30} font-medium`} title={`${rec.sends_30d} sends - ${rec.confirms_gained_30d} confirms = unaccounted subs in 30D`}>{rec.slippage_30d.toFixed(1)}%</span>
       }
 
+      case 'alltime_slip': {
+        if (rec.our_total_subscribes === 0) return <span className="text-gray-400" title="No sends">-</span>
+        const colorAt = rec.effective_slip < 15 ? 'text-green-600' : rec.effective_slip < 30 ? 'text-yellow-600' : 'text-red-600'
+        const isOverride = rec.slip_source === 'override' || rec.slip_source === 'override_with_data'
+        const overrideColor = rec.slip_source === 'override_with_data' ? 'text-red-600' : rec.slip_source === 'override' ? 'text-orange-600' : ''
+        return (
+          <div>
+            <span className={`${isOverride ? overrideColor : colorAt} font-medium`} title={`Sends: ${rec.our_total_subscribes}, Confirmed: ${rec.sparkloop_confirmed}, Rejected: ${rec.sparkloop_rejected}, Pending: ${rec.sparkloop_pending}. Effective: ${rec.effective_slip.toFixed(1)}% (${rec.slip_source})`}>
+              {rec.effective_slip.toFixed(1)}%
+            </span>
+            {isOverride && <span className="text-[9px] ml-0.5" title={`Calculated: ${rec.alltime_slip.toFixed(1)}%`}>ovr</span>}
+          </div>
+        )
+      }
+
       case 'effective_rcr':
         return <span className={getSourceColor(rec.rcr_source)}>{rec.effective_rcr.toFixed(1)}%</span>
 
@@ -762,10 +785,12 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
       case 'calculated_score': {
         const crOvr = rec.override_cr !== null && rec.override_cr !== undefined
         const rcrOvr = rec.override_rcr !== null && rec.override_rcr !== undefined
+        const slipOvr = rec.override_slip !== null && rec.override_slip !== undefined
         const parts: string[] = []
         if (crOvr) parts.push(`CR:${rec.override_cr}%`)
         if (rcrOvr) parts.push(`RCR:${rec.override_rcr}%`)
-        const hasRedOverride = rec.rcr_source === 'override_with_sl' || rec.cr_source === 'override_with_data'
+        if (slipOvr) parts.push(`Slip:${rec.override_slip}%`)
+        const hasRedOverride = rec.rcr_source === 'override_with_sl' || rec.cr_source === 'override_with_data' || rec.slip_source === 'override_with_data'
         return (
           <div>
             <span className="font-mono font-medium">${rec.calculated_score.toFixed(4)}</span>
@@ -1334,7 +1359,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
 
       {/* Legend */}
       <div className="mt-3 text-[10px] text-gray-500">
-        <strong>Score</strong> = CR x CPA x RCR (expected revenue per impression) |
+        <strong>Score</strong> = CR x CPA x RCR x (1 - Slip%) |
         <span className="text-blue-600 ml-1">Blue</span> = popup data |
         <span className="text-teal-600 ml-1">Teal</span> = page data |
         <span className="text-orange-600 ml-1">Orange</span> = override (no real data) |
@@ -1388,6 +1413,18 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
                   {overrideRec.effective_rcr.toFixed(1)}% ({overrideRec.rcr_source.replace('_with_sl', '*')})
                 </span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">All-time Slip (calculated):</span>
+                <span className={overrideRec.alltime_slip < 15 ? 'text-green-600' : overrideRec.alltime_slip < 30 ? 'text-yellow-600' : 'text-red-600'}>
+                  {overrideRec.our_total_subscribes > 0 ? `${overrideRec.alltime_slip.toFixed(1)}%` : '-'}
+                </span>
+              </div>
+              <div className="flex justify-between font-medium">
+                <span className="text-gray-700">Current effective Slip:</span>
+                <span className={overrideRec.slip_source === 'override_with_data' ? 'text-red-600' : overrideRec.slip_source === 'override' ? 'text-orange-600' : ''}>
+                  {overrideRec.effective_slip.toFixed(1)}% ({overrideRec.slip_source.replace('_with_data', '*')})
+                </span>
+              </div>
             </div>
 
             {/* Override inputs */}
@@ -1432,6 +1469,29 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
                   />
                   <button
                     onClick={() => setOverrideRcrValue('')}
+                    className="px-3 py-2 text-xs bg-gray-100 rounded-lg hover:bg-gray-200 text-gray-600"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-1">
+                  Override Slip (%) <span className="text-gray-400 font-normal">— penalizes score for slippage</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    placeholder="Leave empty to use calculated"
+                    value={overrideSlipValue}
+                    onChange={e => setOverrideSlipValue(e.target.value)}
+                    className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <button
+                    onClick={() => setOverrideSlipValue('')}
                     className="px-3 py-2 text-xs bg-gray-100 rounded-lg hover:bg-gray-200 text-gray-600"
                   >
                     Clear
