@@ -341,8 +341,8 @@ export default function RSSCombinerPage() {
 
       setUploadProgress(`Uploading ${trades.length.toLocaleString()} trades in batches...`)
 
-      // Send as JSON in chunks (10K per request to stay well under limits)
-      const CHUNK_SIZE = 10000
+      // Send as JSON in chunks (2K rows per request to stay under Vercel 4.5MB body limit)
+      const CHUNK_SIZE = 2000
       let totalInserted = 0
       const allErrors: string[] = []
 
