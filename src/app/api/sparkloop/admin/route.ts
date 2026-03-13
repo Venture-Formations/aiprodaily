@@ -67,6 +67,50 @@ export const GET = withApiHandler(
     const defaultRcr = defaults.sparkloop_default_rcr ? parseFloat(defaults.sparkloop_default_rcr) : FALLBACK_DEFAULT_RCR
     const minConversionsBudget = defaults.sparkloop_min_conversions_budget ? parseInt(defaults.sparkloop_min_conversions_budget) : 10
 
+    // Count matured sends per ref_code for all-time slippage.
+    // A send is "matured" if it was sent more than S (screening_period) days ago,
+    // giving SparkLoop enough time to confirm or reject it.
+    // Group by screening_period to minimize queries.
+    const screeningGroups = new Map<number, string[]>()
+    for (const rec of data || []) {
+      const s = rec.screening_period || 14
+      if (!screeningGroups.has(s)) screeningGroups.set(s, [])
+      screeningGroups.get(s)!.push(rec.ref_code)
+    }
+
+    const maturedSendsByRefCode = new Map<string, number>()
+    const today = new Date()
+    await Promise.all(
+      Array.from(screeningGroups.entries()).map(async ([s, refCodes]) => {
+        const cutoff = new Date(today)
+        cutoff.setDate(cutoff.getDate() - s)
+        const cutoffStr = cutoff.toISOString().split('T')[0]
+
+        // Paginate to avoid Supabase's 1000-row limit
+        let offset = 0
+        const PAGE = 1000
+        const counts = new Map<string, number>()
+        while (true) {
+          const { data: page } = await supabaseAdmin
+            .from('sparkloop_referrals')
+            .select('ref_code')
+            .eq('publication_id', PUBLICATION_ID)
+            .in('ref_code', refCodes)
+            .lte('subscribed_at', cutoffStr)
+            .range(offset, offset + PAGE - 1)
+          if (!page || page.length === 0) break
+          for (const row of page) {
+            counts.set(row.ref_code, (counts.get(row.ref_code) || 0) + 1)
+          }
+          if (page.length < PAGE) break
+          offset += PAGE
+        }
+        counts.forEach((count, rc) => {
+          maturedSendsByRefCode.set(rc, count)
+        })
+      })
+    )
+
     // Calculate scores for each recommendation
     const withScores = (data || []).map(rec => {
       const hasOverrideCr = rec.override_cr !== null && rec.override_cr !== undefined
@@ -102,16 +146,17 @@ export const GET = withApiHandler(
         rcrSource = 'default'
       }
 
-      // All-time slippage (from cumulative columns — no extra DB query)
-      // Matches 30D methodology: only confirmed + rejected count as resolved.
-      // Pending subs are NOT subtracted — they may never resolve and are potential slippage.
-      const totalSends = rec.our_total_subscribes || 0
+      // All-time slippage using matured sends only.
+      // Only subs sent more than S (screening_period) days ago are evaluated —
+      // recent subs still in screening are excluded from the denominator.
+      // Only confirmed + rejected count as resolved (matches 30D methodology).
+      const maturedSends = maturedSendsByRefCode.get(rec.ref_code) || 0
       const totalConfirmed = rec.sparkloop_confirmed || 0
       const totalRejected = rec.sparkloop_rejected || 0
-      const allTimeSlip = totalSends > 0
-        ? Math.max(0, totalSends - (totalConfirmed + totalRejected))
+      const allTimeSlip = maturedSends > 0
+        ? Math.max(0, maturedSends - (totalConfirmed + totalRejected))
         : 0
-      const allTimeSlipRate = totalSends > 0 ? (allTimeSlip / totalSends) * 100 : 0
+      const allTimeSlipRate = maturedSends > 0 ? (allTimeSlip / maturedSends) * 100 : 0
 
       // Override slip
       const hasOverrideSlip = rec.override_slip !== null && rec.override_slip !== undefined
@@ -119,7 +164,7 @@ export const GET = withApiHandler(
       let slipSource: string
       if (hasOverrideSlip) {
         effectiveSlip = Number(rec.override_slip)
-        slipSource = totalSends > 0 ? 'override_with_data' : 'override'
+        slipSource = maturedSends > 0 ? 'override_with_data' : 'override'
       } else {
         effectiveSlip = allTimeSlipRate
         slipSource = 'calculated'
@@ -140,6 +185,7 @@ export const GET = withApiHandler(
         alltime_slip: allTimeSlipRate,
         effective_slip: effectiveSlip,
         slip_source: slipSource,
+        matured_sends: maturedSends,
         submission_capped: !hasSLRcr && !hasOverrideRcr && (rec.submissions || 0) >= 50,
       }
     })
