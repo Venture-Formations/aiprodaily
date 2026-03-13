@@ -71,7 +71,7 @@ const COLUMN_MAP: Record<string, string> = {
   traded: 'traded',
   filed: 'filed',
   transaction: 'transaction',
-  trade_size_usd: 'trade_size_usd',
+  'trade size usd': 'trade_size_usd',
   'trade size (usd)': 'trade_size_usd',
   name: 'name',
   party: 'party',
