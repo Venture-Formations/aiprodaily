@@ -283,18 +283,19 @@ export function generateCombinedFeedXml(
     if (item.sourceLabel) categories.push({ name: item.sourceLabel })
     if (item.sourceName) categories.push({ name: `source:${item.sourceName}` })
 
-    // Add trade metadata as category tags
+    // Build custom XML extensions for trade metadata
+    const extensions: { name: string; objects: Record<string, unknown> }[] = []
     if (item.tradeMeta) {
       const m = item.tradeMeta
-      categories.push({ name: `ticker:${m.ticker}` })
-      categories.push({ name: `company:${m.company_name}` })
-      if (m.traded) categories.push({ name: `traded:${m.traded}` })
-      if (m.transaction) categories.push({ name: `transaction:${m.transaction}` })
-      if (m.name) categories.push({ name: `member:${m.name}` })
-      if (m.party) categories.push({ name: `party:${m.party}` })
-      if (m.district) categories.push({ name: `district:${m.district}` })
-      if (m.chamber) categories.push({ name: `chamber:${m.chamber}` })
-      if (m.state) categories.push({ name: `state:${m.state}` })
+      extensions.push({ name: 'ticker', objects: { _text: m.ticker } })
+      extensions.push({ name: 'company', objects: { _text: m.company_name } })
+      if (m.traded) extensions.push({ name: 'traded', objects: { _text: m.traded } })
+      if (m.transaction) extensions.push({ name: 'transaction', objects: { _text: m.transaction } })
+      if (m.name) extensions.push({ name: 'member', objects: { _text: m.name } })
+      if (m.party) extensions.push({ name: 'party', objects: { _text: m.party } })
+      if (m.district) extensions.push({ name: 'district', objects: { _text: m.district } })
+      if (m.chamber) extensions.push({ name: 'chamber', objects: { _text: m.chamber } })
+      if (m.state) extensions.push({ name: 'state', objects: { _text: m.state } })
     }
 
     feed.addItem({
@@ -305,6 +306,7 @@ export function generateCombinedFeedXml(
       date: item.pubDate,
       author: item.author ? [{ name: item.author }] : undefined,
       category: categories,
+      extensions,
     })
   }
 
