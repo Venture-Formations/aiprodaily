@@ -221,6 +221,7 @@ async function fetchAdSelections(issueId: string) {
         image_alt,
         button_text,
         button_url,
+        cta_text,
         company_name,
         advertiser:advertisers(
           id,
