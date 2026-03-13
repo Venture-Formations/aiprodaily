@@ -34,10 +34,21 @@ const patchSchema = z.object({
 export const PATCH = withApiHandler(
   { authTier: 'admin', logContext: 'rss-combiner/settings', inputSchema: patchSchema },
   async ({ input }) => {
+    // Get the settings row ID first (single-row table)
+    const { data: existing } = await supabaseAdmin
+      .from('combined_feed_settings')
+      .select('id')
+      .limit(1)
+      .single()
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Settings row not found' }, { status: 404 })
+    }
+
     const { data, error } = await supabaseAdmin
       .from('combined_feed_settings')
       .update({ ...input, updated_at: new Date().toISOString() })
-      .limit(1)
+      .eq('id', existing.id)
       .select(SETTINGS_COLUMNS)
       .single()
 
