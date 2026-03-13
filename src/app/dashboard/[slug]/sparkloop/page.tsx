@@ -62,6 +62,7 @@ interface Recommendation {
   alltime_slip: number
   effective_slip: number
   slip_source: string
+  matured_sends: number
   submission_capped?: boolean
   page_impressions: number
   page_submissions: number
