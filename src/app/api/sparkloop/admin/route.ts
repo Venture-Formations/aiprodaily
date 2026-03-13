@@ -103,12 +103,13 @@ export const GET = withApiHandler(
       }
 
       // All-time slippage (from cumulative columns — no extra DB query)
+      // Matches 30D methodology: only confirmed + rejected count as resolved.
+      // Pending subs are NOT subtracted — they may never resolve and are potential slippage.
       const totalSends = rec.our_total_subscribes || 0
       const totalConfirmed = rec.sparkloop_confirmed || 0
       const totalRejected = rec.sparkloop_rejected || 0
-      const totalPending = rec.sparkloop_pending || 0
       const allTimeSlip = totalSends > 0
-        ? Math.max(0, totalSends - (totalConfirmed + totalRejected + totalPending))
+        ? Math.max(0, totalSends - (totalConfirmed + totalRejected))
         : 0
       const allTimeSlipRate = totalSends > 0 ? (allTimeSlip / totalSends) * 100 : 0
 

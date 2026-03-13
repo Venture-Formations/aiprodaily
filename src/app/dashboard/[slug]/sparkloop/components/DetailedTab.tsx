@@ -745,7 +745,7 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
         const overrideColor = rec.slip_source === 'override_with_data' ? 'text-red-600' : rec.slip_source === 'override' ? 'text-orange-600' : ''
         return (
           <div>
-            <span className={`${isOverride ? overrideColor : colorAt} font-medium`} title={`Sends: ${rec.our_total_subscribes}, Confirmed: ${rec.sparkloop_confirmed}, Rejected: ${rec.sparkloop_rejected}, Pending: ${rec.sparkloop_pending}. Effective: ${rec.effective_slip.toFixed(1)}% (${rec.slip_source})`}>
+            <span className={`${isOverride ? overrideColor : colorAt} font-medium`} title={`Sends: ${rec.our_total_subscribes}, Confirmed: ${rec.sparkloop_confirmed}, Rejected: ${rec.sparkloop_rejected}, Pending: ${rec.sparkloop_pending}. Slip = Sends - (Confirmed + Rejected). Effective: ${rec.effective_slip.toFixed(1)}% (${rec.slip_source})`}>
               {rec.effective_slip.toFixed(1)}%
             </span>
             {isOverride && <span className="text-[9px] ml-0.5" title={`Calculated: ${rec.alltime_slip.toFixed(1)}%`}>ovr</span>}
