@@ -80,6 +80,7 @@
     "typescript": "^5",
     "uuid": "^9.0.1",
     "workflow": "^4.0.1-beta.27",
+    "xlsx": "^0.18.5",
     "zod": "^4.1.13"
   },
   "devDependencies": {

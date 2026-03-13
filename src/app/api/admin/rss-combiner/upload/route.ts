@@ -1,38 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { invalidateCache } from '@/lib/rss-combiner'
+import { invalidateCache, parseTradeSize } from '@/lib/rss-combiner'
+import * as XLSX from 'xlsx'
 
-function parseCSVLine(line: string): string[] {
-  const fields: string[] = []
-  let current = ''
-  let inQuotes = false
+// Map spreadsheet column headers to our DB columns
+const COLUMN_MAP: Record<string, string> = {
+  ticker: 'ticker',
+  'ticker type': 'ticker_type',
+  company: 'company',
+  traded: 'traded',
+  filed: 'filed',
+  transaction: 'transaction',
+  trade_size_usd: 'trade_size_usd',
+  'trade size (usd)': 'trade_size_usd',
+  name: 'name',
+  party: 'party',
+  district: 'district',
+  chamber: 'chamber',
+  state: 'state',
+  'capitol trades url': 'capitol_trades_url',
+}
 
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i]
-    if (inQuotes) {
-      if (char === '"' && line[i + 1] === '"') {
-        current += '"'
-        i++
-      } else if (char === '"') {
-        inQuotes = false
-      } else {
-        current += char
-      }
-    } else {
-      if (char === '"') {
-        inQuotes = true
-      } else if (char === ',') {
-        fields.push(current.trim())
-        current = ''
-      } else {
-        current += char
-      }
+function normalizeHeader(h: string): string {
+  return h.toLowerCase().trim().replace(/_/g, ' ')
+}
+
+function parseExcelDate(val: any): string | null {
+  if (!val) return null
+  // XLSX serial date number
+  if (typeof val === 'number') {
+    const date = XLSX.SSF.parse_date_code(val)
+    if (date) {
+      const y = date.y
+      const m = String(date.m).padStart(2, '0')
+      const d = String(date.d).padStart(2, '0')
+      return `${y}-${m}-${d}`
     }
   }
-  fields.push(current.trim())
-  return fields
+  // Already a string date
+  if (typeof val === 'string') {
+    const d = new Date(val)
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().split('T')[0]
+    }
+  }
+  return null
 }
+
+const BATCH_SIZE = 1000
 
 export const POST = withApiHandler(
   { authTier: 'admin', logContext: 'rss-combiner/upload' },
@@ -44,124 +60,113 @@ export const POST = withApiHandler(
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    const text = await file.text()
-    const lines = text.split(/\r?\n/).filter((l) => l.trim())
-
-    if (lines.length < 2) {
-      return NextResponse.json({ error: 'CSV must have a header row and at least one data row' }, { status: 400 })
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const workbook = XLSX.read(buffer, { type: 'buffer' })
+    const sheetName = workbook.SheetNames[0]
+    if (!sheetName) {
+      return NextResponse.json({ error: 'No sheets found in workbook' }, { status: 400 })
     }
 
-    // Parse header
-    const header = parseCSVLine(lines[0]).map((h) => h.toLowerCase())
-    const urlIdx = header.findIndex((h) => h === 'url' || h === 'feed_url' || h === 'rss_url')
-    const labelIdx = header.findIndex((h) => h === 'label' || h === 'name' || h === 'source')
+    const sheet = workbook.Sheets[sheetName]
+    const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' })
 
-    if (urlIdx === -1) {
-      return NextResponse.json(
-        { error: 'CSV must have a "url" column' },
-        { status: 400 }
-      )
+    if (rows.length === 0) {
+      return NextResponse.json({ error: 'No data rows found' }, { status: 400 })
     }
 
-    // Parse rows
-    const uploadedUrls: { url: string; label: string }[] = []
+    // Build column index from first row keys
+    const rawHeaders = Object.keys(rows[0])
+    const colIndex: Record<string, string> = {}
+    for (const h of rawHeaders) {
+      const normalized = normalizeHeader(h)
+      const dbCol = COLUMN_MAP[normalized]
+      if (dbCol) {
+        colIndex[h] = dbCol
+      }
+    }
+
+    if (!Object.values(colIndex).includes('ticker')) {
+      return NextResponse.json({ error: 'XLSX must have a "Ticker" column' }, { status: 400 })
+    }
+    if (!Object.values(colIndex).includes('traded')) {
+      return NextResponse.json({ error: 'XLSX must have a "Traded" column' }, { status: 400 })
+    }
+
+    // Parse rows into trade objects
+    const trades: any[] = []
     const errors: string[] = []
 
-    for (let i = 1; i < lines.length; i++) {
-      const fields = parseCSVLine(lines[i])
-      const url = fields[urlIdx]?.trim()
-      const label = labelIdx !== -1 ? fields[labelIdx]?.trim() || '' : ''
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]
+      const trade: Record<string, any> = {}
 
-      if (!url) {
-        errors.push(`Row ${i + 1}: missing URL`)
+      for (const [rawHeader, dbCol] of Object.entries(colIndex)) {
+        const val = row[rawHeader]
+        if (dbCol === 'traded' || dbCol === 'filed') {
+          trade[dbCol] = parseExcelDate(val)
+        } else {
+          trade[dbCol] = val != null ? String(val).trim() : null
+        }
+      }
+
+      if (!trade.ticker) {
+        errors.push(`Row ${i + 2}: missing ticker`)
+        continue
+      }
+      if (!trade.traded) {
+        errors.push(`Row ${i + 2}: missing or invalid traded date`)
         continue
       }
 
-      try {
-        new URL(url)
-      } catch {
-        errors.push(`Row ${i + 1}: invalid URL "${url}"`)
-        continue
-      }
+      // Parse trade size
+      trade.trade_size_parsed = parseTradeSize(trade.trade_size_usd)
 
-      uploadedUrls.push({ url, label })
+      trades.push(trade)
     }
 
-    if (uploadedUrls.length === 0) {
+    if (trades.length === 0) {
       return NextResponse.json(
-        { error: 'No valid URLs found in CSV', errors },
+        { error: 'No valid trade rows found', errors },
         { status: 400 }
       )
     }
 
-    // Get existing sources
-    const { data: existing } = await supabaseAdmin
-      .from('combined_feed_sources')
-      .select('id, url, label, is_active')
+    // Truncate existing trades
+    const { error: truncError } = await supabaseAdmin
+      .from('congress_trades')
+      .delete()
+      .gte('id', '00000000-0000-0000-0000-000000000000')
 
-    const existingMap = new Map(
-      (existing || []).map((s) => [s.url, s])
-    )
+    if (truncError) {
+      console.error('[RSS-Combiner] Truncate failed:', truncError.message)
+      return NextResponse.json({ error: 'Failed to clear existing trades' }, { status: 500 })
+    }
 
-    let created = 0
-    let updated = 0
-    let deactivated = 0
+    // Batch insert
+    let inserted = 0
+    for (let i = 0; i < trades.length; i += BATCH_SIZE) {
+      const batch = trades.slice(i, i + BATCH_SIZE)
+      const { error: insertError } = await supabaseAdmin
+        .from('congress_trades')
+        .insert(batch)
 
-    const uploadedUrlSet = new Set(uploadedUrls.map((u) => u.url))
-
-    const now = new Date().toISOString()
-
-    // Batch: collect inserts and updates
-    const toInsert: { url: string; label: string; is_active: boolean; is_excluded: boolean }[] = []
-    const toUpdateIds: string[] = []
-
-    for (const { url, label } of uploadedUrls) {
-      const existingSource = existingMap.get(url)
-
-      if (existingSource) {
-        if (existingSource.label !== label || !existingSource.is_active) {
-          toUpdateIds.push(existingSource.id)
-          // Update label individually since labels may differ per row
-          await supabaseAdmin
-            .from('combined_feed_sources')
-            .update({ label, is_active: true, updated_at: now })
-            .eq('id', existingSource.id)
-          updated++
-        }
+      if (insertError) {
+        errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${insertError.message}`)
       } else {
-        toInsert.push({ url, label, is_active: true, is_excluded: false })
+        inserted += batch.length
       }
-    }
-
-    // Batch insert all new sources at once
-    if (toInsert.length > 0) {
-      await supabaseAdmin
-        .from('combined_feed_sources')
-        .insert(toInsert)
-      created = toInsert.length
-    }
-
-    // Batch deactivate: all active sources not in upload set
-    const toDeactivateIds = (existing || [])
-      .filter((s) => s.is_active && !uploadedUrlSet.has(s.url))
-      .map((s) => s.id)
-
-    if (toDeactivateIds.length > 0) {
-      await supabaseAdmin
-        .from('combined_feed_sources')
-        .update({ is_active: false, updated_at: now })
-        .in('id', toDeactivateIds)
-      deactivated = toDeactivateIds.length
     }
 
     invalidateCache()
 
+    // Get unique ticker count
+    const uniqueTickers = new Set(trades.map((t) => t.ticker.toUpperCase())).size
+
     return NextResponse.json({
-      created,
-      updated,
-      deactivated,
-      errors,
-      total: uploadedUrls.length,
+      inserted,
+      total: rows.length,
+      uniqueTickers,
+      errors: errors.slice(0, 20), // Cap error list
     })
   }
 )
