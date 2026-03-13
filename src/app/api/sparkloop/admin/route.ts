@@ -29,7 +29,7 @@ export const GET = withApiHandler(
       'sparkloop_earnings', 'sparkloop_net_earnings',
       'impressions', 'selections', 'submissions', 'confirms', 'rejections', 'pending',
       'our_total_subscribes', 'our_confirms', 'our_rejections', 'our_pending',
-      'our_cr', 'our_rcr', 'override_cr', 'override_rcr',
+      'our_cr', 'our_rcr', 'override_cr', 'override_rcr', 'override_slip',
       'excluded', 'excluded_reason', 'paused_reason',
       'remaining_budget_dollars', 'eligible_for_module',
       'last_seen_in_generate', 'page_impressions', 'page_submissions', 'page_cr',
@@ -102,10 +102,32 @@ export const GET = withApiHandler(
         rcrSource = 'default'
       }
 
+      // All-time slippage (from cumulative columns — no extra DB query)
+      const totalSends = rec.our_total_subscribes || 0
+      const totalConfirmed = rec.sparkloop_confirmed || 0
+      const totalRejected = rec.sparkloop_rejected || 0
+      const totalPending = rec.sparkloop_pending || 0
+      const allTimeSlip = totalSends > 0
+        ? Math.max(0, totalSends - (totalConfirmed + totalRejected + totalPending))
+        : 0
+      const allTimeSlipRate = totalSends > 0 ? (allTimeSlip / totalSends) * 100 : 0
+
+      // Override slip
+      const hasOverrideSlip = rec.override_slip !== null && rec.override_slip !== undefined
+      let effectiveSlip: number
+      let slipSource: string
+      if (hasOverrideSlip) {
+        effectiveSlip = Number(rec.override_slip)
+        slipSource = totalSends > 0 ? 'override_with_data' : 'override'
+      } else {
+        effectiveSlip = allTimeSlipRate
+        slipSource = 'calculated'
+      }
+
       const cr = effectiveCr / 100
       const rcr = effectiveRcr / 100
       const cpa = (rec.cpa || 0) / 100
-      const score = cr * cpa * rcr
+      const score = cr * cpa * rcr * (1 - effectiveSlip / 100)
 
       return {
         ...rec,
@@ -114,6 +136,9 @@ export const GET = withApiHandler(
         effective_rcr: effectiveRcr,
         cr_source: crSource,
         rcr_source: rcrSource,
+        alltime_slip: allTimeSlipRate,
+        effective_slip: effectiveSlip,
+        slip_source: slipSource,
         submission_capped: !hasSLRcr && !hasOverrideRcr && (rec.submissions || 0) >= 50,
       }
     })
@@ -327,6 +352,9 @@ export const PATCH = withApiHandler(
       }
       if ('override_rcr' in body) {
         updateData.override_rcr = body.override_rcr
+      }
+      if ('override_slip' in body) {
+        updateData.override_slip = body.override_slip
       }
     } else if (action === 'pause') {
       updateData.status = 'paused'

@@ -58,6 +58,10 @@ interface Recommendation {
   unique_ips: number
   override_cr: number | null
   override_rcr: number | null
+  override_slip: number | null
+  alltime_slip: number
+  effective_slip: number
+  slip_source: string
   submission_capped?: boolean
   page_impressions: number
   page_submissions: number

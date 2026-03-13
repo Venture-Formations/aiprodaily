@@ -14,6 +14,14 @@ interface Recommendation {
   rcr_source: string
   override_cr: number | null
   override_rcr: number | null
+  override_slip: number | null
+  alltime_slip: number
+  effective_slip: number
+  slip_source: string
+  our_total_subscribes: number
+  sparkloop_confirmed: number
+  sparkloop_rejected: number
+  sparkloop_pending: number
 }
 
 interface Defaults {
@@ -39,6 +47,11 @@ export default function OverrideModal({ recommendation, defaults, onClose, onRef
       ? String(recommendation.override_rcr)
       : ''
   )
+  const [overrideSlipValue, setOverrideSlipValue] = useState(
+    recommendation.override_slip !== null && recommendation.override_slip !== undefined
+      ? String(recommendation.override_slip)
+      : ''
+  )
   const [saving, setSaving] = useState(false)
 
   async function saveOverrides() {
@@ -50,6 +63,7 @@ export default function OverrideModal({ recommendation, defaults, onClose, onRef
       }
       body.override_cr = overrideCrValue.trim() === '' ? null : parseFloat(overrideCrValue)
       body.override_rcr = overrideRcrValue.trim() === '' ? null : parseFloat(overrideRcrValue)
+      body.override_slip = overrideSlipValue.trim() === '' ? null : parseFloat(overrideSlipValue)
 
       const res = await fetch('/api/sparkloop/admin', {
         method: 'PATCH',
@@ -109,6 +123,18 @@ export default function OverrideModal({ recommendation, defaults, onClose, onRef
               {recommendation.effective_rcr.toFixed(1)}% ({recommendation.rcr_source.replace('_with_sl', '*')})
             </span>
           </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">All-time Slip (calculated):</span>
+            <span className={recommendation.alltime_slip < 15 ? 'text-green-600' : recommendation.alltime_slip < 30 ? 'text-yellow-600' : 'text-red-600'}>
+              {recommendation.our_total_subscribes > 0 ? `${recommendation.alltime_slip.toFixed(1)}%` : '-'}
+            </span>
+          </div>
+          <div className="flex justify-between font-medium">
+            <span className="text-gray-700">Current effective Slip:</span>
+            <span className={recommendation.slip_source === 'override_with_data' ? 'text-red-600' : recommendation.slip_source === 'override' ? 'text-orange-600' : ''}>
+              {recommendation.effective_slip.toFixed(1)}% ({recommendation.slip_source.replace('_with_data', '*')})
+            </span>
+          </div>
         </div>
 
         {/* Override inputs */}
@@ -153,6 +179,29 @@ export default function OverrideModal({ recommendation, defaults, onClose, onRef
               />
               <button
                 onClick={() => setOverrideRcrValue('')}
+                className="px-3 py-2 text-xs bg-gray-100 rounded-lg hover:bg-gray-200 text-gray-600"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">
+              Override Slip (%) <span className="text-gray-400 font-normal">— penalizes score for slippage</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                placeholder="Leave empty to use calculated"
+                value={overrideSlipValue}
+                onChange={e => setOverrideSlipValue(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <button
+                onClick={() => setOverrideSlipValue('')}
                 className="px-3 py-2 text-xs bg-gray-100 rounded-lg hover:bg-gray-200 text-gray-600"
               >
                 Clear
