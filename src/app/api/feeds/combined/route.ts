@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCombinedFeed } from '@/lib/rss-combiner'
 
-export const maxDuration = 60
+export const maxDuration = 300
 
 export async function GET(request: NextRequest) {
   // Manual Bearer auth — not using withApiHandler({ authTier: 'system' })

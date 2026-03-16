@@ -6,6 +6,7 @@ const parser = new Parser({
   customFields: {
     item: ['media:content', 'enclosure', 'source'],
   },
+  timeout: 15_000, // 15s per feed fetch
 })
 
 interface CongressTrade {
@@ -209,7 +210,8 @@ async function fetchAndEnrichFeeds(
   feedEntries: { trade: TradeWithCompanyName; url: string }[],
   maxAgeDays: number,
   excludedSources: Set<string>,
-  excludedKeywords: string[]
+  excludedKeywords: string[],
+  maxArticlesPerTrade: number
 ): Promise<NormalizedItem[]> {
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - maxAgeDays)
@@ -222,7 +224,7 @@ async function fetchAndEnrichFeeds(
   const results = await Promise.allSettled(
     feedEntries.map(async ({ trade, url }) => {
       const feed = await parser.parseURL(url)
-      return feed.items.map((item) => ({
+      return feed.items.slice(0, maxArticlesPerTrade).map((item) => ({
         title: item.title || 'Untitled',
         link: item.link || '',
         description: item.contentSnippet || item.content || '',
@@ -336,7 +338,7 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
   // Load settings
   const { data: settings } = await supabaseAdmin
     .from('combined_feed_settings')
-    .select('max_age_days, cache_ttl_minutes, feed_title, url_template, sale_url_template, purchase_url_template, max_trades')
+    .select('max_age_days, cache_ttl_minutes, feed_title, url_template, sale_url_template, purchase_url_template, max_trades, max_articles_per_trade')
     .limit(1)
     .single()
 
@@ -387,11 +389,14 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
     return emptyFeed
   }
 
+  const maxArticlesPerTrade = settings?.max_articles_per_trade ?? 5
+
   const items = await fetchAndEnrichFeeds(
     feedEntries,
     settings?.max_age_days ?? 7,
     excludedSources,
-    excludedKeywords
+    excludedKeywords,
+    maxArticlesPerTrade
   )
 
   const xml = generateCombinedFeedXml(

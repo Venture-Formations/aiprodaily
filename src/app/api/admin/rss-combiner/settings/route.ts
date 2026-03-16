@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { z } from 'zod'
 import { invalidateCache } from '@/lib/rss-combiner'
 
-const SETTINGS_COLUMNS = 'id, max_age_days, cache_ttl_minutes, feed_title, url_template, sale_url_template, purchase_url_template, max_trades, updated_at' as const
+const SETTINGS_COLUMNS = 'id, max_age_days, cache_ttl_minutes, feed_title, url_template, sale_url_template, purchase_url_template, max_trades, max_articles_per_trade, updated_at' as const
 
 export const GET = withApiHandler(
   { authTier: 'admin', logContext: 'rss-combiner/settings' },
@@ -31,6 +31,7 @@ const patchSchema = z.object({
   sale_url_template: z.string().max(2000).optional(),
   purchase_url_template: z.string().max(2000).optional(),
   max_trades: z.number().int().min(1).max(200).optional(),
+  max_articles_per_trade: z.number().int().min(1).max(100).optional(),
 })
 
 export const PATCH = withApiHandler(

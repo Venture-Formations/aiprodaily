@@ -62,6 +62,7 @@ interface FeedSettings {
   sale_url_template: string | null
   purchase_url_template: string | null
   max_trades: number
+  max_articles_per_trade: number
   updated_at: string
 }
 
@@ -136,6 +137,7 @@ export default function RSSCombinerPage() {
     sale_url_template: '',
     purchase_url_template: '',
     max_trades: 21,
+    max_articles_per_trade: 5,
   })
   const [savingSettings, setSavingSettings] = useState(false)
 
@@ -197,6 +199,7 @@ export default function RSSCombinerPage() {
           sale_url_template: s.sale_url_template || '',
           purchase_url_template: s.purchase_url_template || '',
           max_trades: s.max_trades,
+          max_articles_per_trade: s.max_articles_per_trade ?? 5,
         })
       }
     }
@@ -737,6 +740,17 @@ export default function RSSCombinerPage() {
                       onChange={(e) => setEditSettings({ ...editSettings, max_trades: parseInt(e.target.value) || 1 })}
                       min={1}
                       max={200}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Max Articles per Trade</label>
+                    <input
+                      type="number"
+                      value={editSettings.max_articles_per_trade}
+                      onChange={(e) => setEditSettings({ ...editSettings, max_articles_per_trade: parseInt(e.target.value) || 1 })}
+                      min={1}
+                      max={100}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
                     />
                   </div>
