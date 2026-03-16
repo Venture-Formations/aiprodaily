@@ -9,16 +9,28 @@ const COLUMNS = 'id, ticker, company_name, created_at' as const
 export const GET = withApiHandler(
   { authTier: 'admin', logContext: 'rss-combiner/ticker-db' },
   async () => {
-    const { data, error } = await supabaseAdmin
-      .from('ticker_company_names')
-      .select(COLUMNS)
-      .order('ticker')
+    const PAGE_SIZE = 1000
+    const allTickers: any[] = []
+    let offset = 0
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    while (true) {
+      const { data, error } = await supabaseAdmin
+        .from('ticker_company_names')
+        .select(COLUMNS)
+        .order('ticker')
+        .range(offset, offset + PAGE_SIZE - 1)
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+
+      if (!data || data.length === 0) break
+      allTickers.push(...data)
+      if (data.length < PAGE_SIZE) break
+      offset += PAGE_SIZE
     }
 
-    return NextResponse.json({ tickers: data })
+    return NextResponse.json({ tickers: allTickers })
   }
 )
 
