@@ -708,26 +708,15 @@ export default function RSSCombinerPage() {
                 <h2 className="text-sm font-medium text-gray-700 mb-3">Feed Generation</h2>
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Default URL Template (fallback)</label>
-                    <input
-                      type="text"
-                      value={editSettings.url_template}
-                      onChange={(e) => setEditSettings({ ...editSettings, url_template: e.target.value })}
-                      placeholder="https://news.google.com/rss/search?q={company_name}+stock..."
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md font-mono"
-                    />
-                    <p className="text-xs text-gray-400 mt-1">Use {'{company_name}'} as placeholder. Used when Sale/Purchase templates are empty.</p>
-                  </div>
-                  <div>
                     <label className="block text-xs text-gray-500 mb-1">Sale URL Template</label>
                     <input
                       type="text"
                       value={editSettings.sale_url_template}
                       onChange={(e) => setEditSettings({ ...editSettings, sale_url_template: e.target.value })}
-                      placeholder="Leave empty to use default template"
+                      placeholder="https://news.google.com/rss/search?q={company_name}+stock..."
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md font-mono"
                     />
-                    <p className="text-xs text-gray-400 mt-1">For Sale, Sale (Partial), Sale (Full) transactions</p>
+                    <p className="text-xs text-gray-400 mt-1">For Sale, Sale (Partial), Sale (Full) transactions. Use {'{company_name}'} as placeholder.</p>
                   </div>
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Purchase URL Template</label>
@@ -735,10 +724,10 @@ export default function RSSCombinerPage() {
                       type="text"
                       value={editSettings.purchase_url_template}
                       onChange={(e) => setEditSettings({ ...editSettings, purchase_url_template: e.target.value })}
-                      placeholder="Leave empty to use default template"
+                      placeholder="https://news.google.com/rss/search?q={company_name}+stock..."
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md font-mono"
                     />
-                    <p className="text-xs text-gray-400 mt-1">For Purchase transactions</p>
+                    <p className="text-xs text-gray-400 mt-1">For Purchase transactions. Use {'{company_name}'} as placeholder.</p>
                   </div>
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Max Trades for Feed</label>

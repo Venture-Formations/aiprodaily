@@ -171,23 +171,35 @@ export async function resolveTickerNames(
  * Generate RSS search URLs from trades using transaction-specific URL templates.
  * Sale trades (Sale, Sale (Partial), Sale (Full)) use saleTemplate.
  * Purchase trades use purchaseTemplate.
+ * Trades that are neither sale nor purchase are skipped.
  */
 function generateFeedUrls(
   trades: TradeWithCompanyName[],
   saleTemplate: string,
   purchaseTemplate: string
 ): { trade: TradeWithCompanyName; url: string }[] {
-  return trades.map((trade) => {
-    const isSale = trade.transaction?.toLowerCase().startsWith('sale')
-    const template = isSale ? saleTemplate : purchaseTemplate
-    return {
+  const entries: { trade: TradeWithCompanyName; url: string }[] = []
+
+  for (const trade of trades) {
+    const txn = trade.transaction?.toLowerCase() ?? ''
+    let template = ''
+    if (txn.startsWith('sale') && saleTemplate) {
+      template = saleTemplate
+    } else if (txn === 'purchase' && purchaseTemplate) {
+      template = purchaseTemplate
+    } else {
+      continue // skip trades that aren't sale or purchase
+    }
+    entries.push({
       trade,
       url: template.replace(
         '{company_name}',
         encodeURIComponent(trade.company_name)
       ),
-    }
-  })
+    })
+  }
+
+  return entries
 }
 
 /**
@@ -341,11 +353,8 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
   }
 
   const maxTrades = settings?.max_trades ?? 21
-  const defaultTemplate =
-    settings?.url_template ??
-    'https://news.google.com/rss/search?q={company_name}+stock&hl=en-US&gl=US&ceid=US:en'
-  const saleTemplate = settings?.sale_url_template || defaultTemplate
-  const purchaseTemplate = settings?.purchase_url_template || defaultTemplate
+  const saleTemplate = settings?.sale_url_template || ''
+  const purchaseTemplate = settings?.purchase_url_template || ''
 
   // Get top trades and resolve company names
   const trades = await getTopTrades(maxTrades)
