@@ -212,12 +212,14 @@ export async function getTopTrades(maxTrades: number): Promise<CongressTrade[]> 
   )
 
   // Deduplicate by ticker (first occurrence = largest trade since sorted by size desc)
+  // Skip "Over $50,000,000" trades — these are outliers that often fail to fetch
   const seen = new Set<string>()
   const deduped: CongressTrade[] = []
 
   for (const trade of trades) {
     const upperTicker = trade.ticker.toUpperCase()
     if (excludedTickers.has(upperTicker)) continue
+    if (trade.trade_size_usd?.toLowerCase().startsWith('over')) continue
     if (seen.has(upperTicker)) continue
     seen.add(upperTicker)
     deduped.push(trade)
