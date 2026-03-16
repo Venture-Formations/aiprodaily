@@ -67,120 +67,6 @@ export const GET = withApiHandler(
     const defaultRcr = defaults.sparkloop_default_rcr ? parseFloat(defaults.sparkloop_default_rcr) : FALLBACK_DEFAULT_RCR
     const minConversionsBudget = defaults.sparkloop_min_conversions_budget ? parseInt(defaults.sparkloop_min_conversions_budget) : 10
 
-    // All-time slippage: count matured sends and snapshot-based confirms/rejects per ref_code.
-    // Matured send = sent more than S (screening_period) days ago.
-    // Confirms/rejects come from snapshot deltas, excluding the first snapshot (which captures
-    // pre-existing cumulative totals and would inflate the numbers). The baseline snapshot is
-    // the first one recorded after (first_send_date + S), so we only count confirms/rejects
-    // that correspond to subs we actually sent.
-    const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
-
-    // 1. Count matured sends per ref_code, grouped by screening_period
-    const screeningGroups = new Map<number, string[]>()
-    for (const rec of data || []) {
-      const s = rec.screening_period || 14
-      if (!screeningGroups.has(s)) screeningGroups.set(s, [])
-      screeningGroups.get(s)!.push(rec.ref_code)
-    }
-
-    const maturedSendsByRefCode = new Map<string, number>()
-    const firstSendByRefCode = new Map<string, string>()
-    await Promise.all(
-      Array.from(screeningGroups.entries()).map(async ([s, refCodes]) => {
-        const cutoff = new Date(today)
-        cutoff.setDate(cutoff.getDate() - s)
-        const cutoffStr = cutoff.toISOString().split('T')[0]
-
-        // Paginate to avoid Supabase's 1000-row limit
-        let offset = 0
-        const PAGE = 1000
-        const counts = new Map<string, number>()
-        while (true) {
-          const { data: page } = await supabaseAdmin
-            .from('sparkloop_referrals')
-            .select('ref_code, subscribed_at')
-            .eq('publication_id', PUBLICATION_ID)
-            .in('ref_code', refCodes)
-            .lte('subscribed_at', cutoffStr)
-            .range(offset, offset + PAGE - 1)
-          if (!page || page.length === 0) break
-          for (const row of page) {
-            counts.set(row.ref_code, (counts.get(row.ref_code) || 0) + 1)
-            const existing = firstSendByRefCode.get(row.ref_code)
-            if (!existing || row.subscribed_at < existing) {
-              firstSendByRefCode.set(row.ref_code, row.subscribed_at)
-            }
-          }
-          if (page.length < PAGE) break
-          offset += PAGE
-        }
-        counts.forEach((count, rc) => {
-          maturedSendsByRefCode.set(rc, count)
-        })
-      })
-    )
-
-    // 2. Fetch all daily snapshots and compute delta-based confirms/rejects per ref_code.
-    //    Baseline = first snapshot after (first_send + S days), excluding the very first
-    //    snapshot ever recorded for each rec (day-1 inflation).
-    type SnapRow = { ref_code: string; snapshot_date: string; sparkloop_confirmed: number; sparkloop_rejected: number }
-    const allSnapshots: SnapRow[] = []
-    let snapOffset = 0
-    const SNAP_PAGE = 1000
-    while (true) {
-      const { data: page } = await supabaseAdmin
-        .from('sparkloop_daily_snapshots')
-        .select('ref_code, snapshot_date, sparkloop_confirmed, sparkloop_rejected')
-        .eq('publication_id', PUBLICATION_ID)
-        .order('snapshot_date', { ascending: true })
-        .range(snapOffset, snapOffset + SNAP_PAGE - 1)
-      if (!page || page.length === 0) break
-      allSnapshots.push(...(page as SnapRow[]))
-      if (page.length < SNAP_PAGE) break
-      snapOffset += SNAP_PAGE
-    }
-
-    // Group snapshots by ref_code (sorted ascending by date from the query)
-    const snapsByRefCode = new Map<string, SnapRow[]>()
-    for (const snap of allSnapshots) {
-      if (!snapsByRefCode.has(snap.ref_code)) snapsByRefCode.set(snap.ref_code, [])
-      snapsByRefCode.get(snap.ref_code)!.push(snap)
-    }
-
-    // For each ref_code, compute delta confirms/rejects from baseline to latest snapshot
-    const slipDataByRefCode = new Map<string, { confirmsGained: number; rejectsGained: number }>()
-    for (const rec of data || []) {
-      const s = rec.screening_period || 14
-      const snaps = snapsByRefCode.get(rec.ref_code)
-      if (!snaps || snaps.length < 2) continue
-
-      const firstSend = firstSendByRefCode.get(rec.ref_code)
-      if (!firstSend) continue
-
-      // Baseline date = first_send + S days
-      const baselineDate = new Date(firstSend)
-      baselineDate.setDate(baselineDate.getDate() + s)
-      const baselineDateStr = baselineDate.toISOString().split('T')[0]
-
-      // Skip the very first snapshot (index 0) — it has inflated cumulative totals.
-      // Find baseline: first snapshot on or after baselineDate, excluding index 0.
-      let baselineSnap: SnapRow | null = null
-      for (let i = 1; i < snaps.length; i++) {
-        if (snaps[i].snapshot_date >= baselineDateStr) {
-          baselineSnap = snaps[i]
-          break
-        }
-      }
-      if (!baselineSnap) continue
-
-      const latestSnap = snaps[snaps.length - 1]
-      slipDataByRefCode.set(rec.ref_code, {
-        confirmsGained: Math.max(0, latestSnap.sparkloop_confirmed - baselineSnap.sparkloop_confirmed),
-        rejectsGained: Math.max(0, latestSnap.sparkloop_rejected - baselineSnap.sparkloop_rejected),
-      })
-    }
-
     // Calculate scores for each recommendation
     const withScores = (data || []).map(rec => {
       const hasOverrideCr = rec.override_cr !== null && rec.override_cr !== undefined
@@ -216,18 +102,15 @@ export const GET = withApiHandler(
         rcrSource = 'default'
       }
 
-      // All-time slippage using matured sends and snapshot-based confirms/rejects.
-      // maturedSends = subs sent more than S days ago (had time to clear screening).
-      // confirmsGained/rejectsGained = snapshot delta from (first_send + S) to today,
-      // excluding the first snapshot (inflated with pre-existing cumulative totals).
-      const maturedSends = maturedSendsByRefCode.get(rec.ref_code) || 0
-      const slipData = slipDataByRefCode.get(rec.ref_code)
-      const confirmsGained = slipData?.confirmsGained ?? 0
-      const rejectsGained = slipData?.rejectsGained ?? 0
-      const allTimeSlip = maturedSends > 0
-        ? Math.max(0, maturedSends - (confirmsGained + rejectsGained))
+      // All-time slippage (from cumulative columns — no extra DB query)
+      const totalSends = rec.our_total_subscribes || 0
+      const totalConfirmed = rec.sparkloop_confirmed || 0
+      const totalRejected = rec.sparkloop_rejected || 0
+      const totalPending = rec.sparkloop_pending || 0
+      const allTimeSlip = totalSends > 0
+        ? Math.max(0, totalSends - (totalConfirmed + totalRejected + totalPending))
         : 0
-      const allTimeSlipRate = maturedSends > 0 ? (allTimeSlip / maturedSends) * 100 : 0
+      const allTimeSlipRate = totalSends > 0 ? (allTimeSlip / totalSends) * 100 : 0
 
       // Override slip
       const hasOverrideSlip = rec.override_slip !== null && rec.override_slip !== undefined
@@ -235,7 +118,7 @@ export const GET = withApiHandler(
       let slipSource: string
       if (hasOverrideSlip) {
         effectiveSlip = Number(rec.override_slip)
-        slipSource = maturedSends > 0 ? 'override_with_data' : 'override'
+        slipSource = totalSends > 0 ? 'override_with_data' : 'override'
       } else {
         effectiveSlip = allTimeSlipRate
         slipSource = 'calculated'
@@ -256,7 +139,6 @@ export const GET = withApiHandler(
         alltime_slip: allTimeSlipRate,
         effective_slip: effectiveSlip,
         slip_source: slipSource,
-        matured_sends: maturedSends,
         submission_capped: !hasSLRcr && !hasOverrideRcr && (rec.submissions || 0) >= 50,
       }
     })

@@ -47,7 +47,6 @@ interface Recommendation {
   alltime_slip: number
   effective_slip: number
   slip_source: string
-  matured_sends: number
   submission_capped?: boolean
   page_impressions: number
   page_submissions: number
@@ -740,13 +739,13 @@ export default function DetailedTab({ recommendations, globalStats, defaults, lo
       }
 
       case 'alltime_slip': {
-        if (rec.matured_sends === 0) return <span className="text-gray-400" title="No matured sends (all within screening period)">-</span>
+        if (rec.our_total_subscribes === 0) return <span className="text-gray-400" title="No sends">-</span>
         const colorAt = rec.effective_slip < 15 ? 'text-green-600' : rec.effective_slip < 30 ? 'text-yellow-600' : 'text-red-600'
         const isOverride = rec.slip_source === 'override' || rec.slip_source === 'override_with_data'
         const overrideColor = rec.slip_source === 'override_with_data' ? 'text-red-600' : rec.slip_source === 'override' ? 'text-orange-600' : ''
         return (
           <div>
-            <span className={`${isOverride ? overrideColor : colorAt} font-medium`} title={`Matured sends: ${rec.matured_sends} (sent >${rec.screening_period || 14}d ago), Confirmed: ${rec.sparkloop_confirmed}, Rejected: ${rec.sparkloop_rejected}. Slip = Matured - (Confirmed + Rejected). Effective: ${rec.effective_slip.toFixed(1)}% (${rec.slip_source})`}>
+            <span className={`${isOverride ? overrideColor : colorAt} font-medium`} title={`Sends: ${rec.our_total_subscribes}, Confirmed: ${rec.sparkloop_confirmed}, Rejected: ${rec.sparkloop_rejected}, Pending: ${rec.sparkloop_pending}. Effective: ${rec.effective_slip.toFixed(1)}% (${rec.slip_source})`}>
               {rec.effective_slip.toFixed(1)}%
             </span>
             {isOverride && <span className="text-[9px] ml-0.5" title={`Calculated: ${rec.alltime_slip.toFixed(1)}%`}>ovr</span>}

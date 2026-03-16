@@ -17,6 +17,7 @@ import { renderTitleBlock } from './renderers/title'
 import { renderImageBlock } from './renderers/image'
 import { renderBodyBlock } from './renderers/body'
 import { renderButtonBlock } from './renderers/button'
+import { renderCtaBlock } from './renderers/cta'
 import { renderQuestion } from './renderers/question'
 import { renderOptions } from './renderers/options'
 
@@ -40,7 +41,7 @@ const blockDefinitions: Record<BlockType, BlockDefinition> = {
   body: {
     type: 'body',
     name: 'Body',
-    description: 'Ad content with last sentence linked',
+    description: 'Ad body content',
     render: renderBodyBlock
   },
   button: {
@@ -48,6 +49,12 @@ const blockDefinitions: Record<BlockType, BlockDefinition> = {
     name: 'Button',
     description: 'Call-to-action button',
     render: renderButtonBlock
+  },
+  cta: {
+    type: 'cta',
+    name: 'CTA',
+    description: 'Call-to-action linked text',
+    render: renderCtaBlock
   },
 
   // Article blocks (to be implemented)
@@ -130,7 +137,7 @@ export function getAllBlockTypes(): BlockType[] {
  */
 export function getBlockTypesByCategory(category: 'ad' | 'article' | 'poll'): BlockType[] {
   if (category === 'ad') {
-    return ['title', 'image', 'body', 'button']
+    return ['title', 'image', 'body', 'button', 'cta']
   }
   if (category === 'poll') {
     return ['title', 'question', 'image', 'options']

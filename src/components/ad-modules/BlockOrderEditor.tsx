@@ -30,10 +30,11 @@ const BLOCK_LABELS: Record<AdBlockType, string> = {
   title: 'Title',
   image: 'Image',
   body: 'Body',
-  button: 'Button'
+  button: 'Button',
+  cta: 'CTA'
 }
 
-const ALL_BLOCK_TYPES: AdBlockType[] = ['title', 'image', 'body', 'button']
+const ALL_BLOCK_TYPES: AdBlockType[] = ['title', 'image', 'body', 'button', 'cta']
 
 function SortableBlock({
   block,

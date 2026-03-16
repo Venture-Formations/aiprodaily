@@ -20,7 +20,8 @@ export default function AddAdModal({ onClose, onSuccess, publicationId, selected
     title: '',
     body: '',
     button_url: '',
-    image_alt: ''
+    image_alt: '',
+    cta_text: ''
   })
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [crop, setCrop] = useState<Crop>()
@@ -143,7 +144,7 @@ export default function AddAdModal({ onClose, onSuccess, publicationId, selected
       const words = text.split(/\s+/).filter(w => w.length > 0)
       const wordCount = words.length
 
-      const response = await fetch('/api/ads', {
+      const response = await fetch(`/api/ads?publication_id=${publicationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -282,6 +283,23 @@ export default function AddAdModal({ onClose, onSuccess, publicationId, selected
             />
           </div>
 
+          {/* Call to Action */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Call to Action (Optional)
+            </label>
+            <input
+              type="text"
+              value={formData.cta_text}
+              onChange={(e) => setFormData(prev => ({ ...prev, cta_text: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="e.g. Try it free for 14 days"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Text that will be linked to the URL below. Leave blank to omit.
+            </p>
+          </div>
+
           {/* Image Upload and Cropper */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -362,7 +380,7 @@ export default function AddAdModal({ onClose, onSuccess, publicationId, selected
               placeholder="https://example.com"
             />
             <p className="text-xs text-gray-500 mt-1">
-              The image and last line of the ad will link to this URL
+              The image and Call to Action will link to this URL
             </p>
           </div>
 
