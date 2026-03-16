@@ -221,44 +221,59 @@ async function fetchAndEnrichFeeds(
   )
   const keywordsLower = excludedKeywords.map((k) => k.toLowerCase())
 
-  const results = await Promise.allSettled(
-    feedEntries.map(async ({ trade, url }) => {
-      const feed = await parser.parseURL(url)
-      return feed.items.slice(0, maxArticlesPerTrade).map((item) => ({
-        title: item.title || 'Untitled',
-        link: item.link || '',
-        description: item.contentSnippet || item.content || '',
-        pubDate: item.pubDate ? new Date(item.pubDate) : new Date(),
-        author: item.creator || (item as any).author || '',
-        sourceLabel: trade.company_name,
-        sourceName: extractSourceName(item),
-        guid: item.guid || item.link || `${url}#${item.title}`,
-        tradeMeta: {
-          ticker: trade.ticker,
-          company_name: trade.company_name,
-          traded: trade.traded,
-          transaction: trade.transaction,
-          name: trade.name,
-          party: trade.party,
-          district: trade.district,
-          chamber: trade.chamber,
-          state: trade.state,
-        },
-      }))
-    })
-  )
-
+  // Fetch in batches of 3 with 1s delay between batches to avoid Google rate-limiting
+  const BATCH_SIZE = 3
+  const BATCH_DELAY_MS = 1000
   const allItems: NormalizedItem[] = []
-  for (const result of results) {
-    if (result.status === 'fulfilled') {
-      allItems.push(...result.value)
-    } else {
-      console.error(
-        '[RSS-Combiner] Feed fetch failed:',
-        result.reason?.message || result.reason
-      )
+  let succeeded = 0
+  let failed = 0
+
+  for (let i = 0; i < feedEntries.length; i += BATCH_SIZE) {
+    if (i > 0) await new Promise((r) => setTimeout(r, BATCH_DELAY_MS))
+
+    const batch = feedEntries.slice(i, i + BATCH_SIZE)
+    const results = await Promise.allSettled(
+      batch.map(async ({ trade, url }) => {
+        const feed = await parser.parseURL(url)
+        return feed.items.slice(0, maxArticlesPerTrade).map((item) => ({
+          title: item.title || 'Untitled',
+          link: item.link || '',
+          description: item.contentSnippet || item.content || '',
+          pubDate: item.pubDate ? new Date(item.pubDate) : new Date(),
+          author: item.creator || (item as any).author || '',
+          sourceLabel: trade.company_name,
+          sourceName: extractSourceName(item),
+          guid: item.guid || item.link || `${url}#${item.title}`,
+          tradeMeta: {
+            ticker: trade.ticker,
+            company_name: trade.company_name,
+            traded: trade.traded,
+            transaction: trade.transaction,
+            name: trade.name,
+            party: trade.party,
+            district: trade.district,
+            chamber: trade.chamber,
+            state: trade.state,
+          },
+        }))
+      })
+    )
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        allItems.push(...result.value)
+        succeeded++
+      } else {
+        failed++
+        console.error(
+          '[RSS-Combiner] Feed fetch failed:',
+          result.reason?.message || result.reason
+        )
+      }
     }
   }
+
+  console.log(`[RSS-Combiner] Fetched ${succeeded}/${succeeded + failed} feeds, ${allItems.length} articles`)
 
   // Deduplicate by article URL (keep first occurrence)
   const seenUrls = new Set<string>()
