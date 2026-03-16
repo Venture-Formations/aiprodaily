@@ -59,6 +59,8 @@ interface FeedSettings {
   cache_ttl_minutes: number
   feed_title: string
   url_template: string
+  sale_url_template: string | null
+  purchase_url_template: string | null
   max_trades: number
   updated_at: string
 }
@@ -131,6 +133,8 @@ export default function RSSCombinerPage() {
     cache_ttl_minutes: 15,
     feed_title: 'Combined RSS Feed',
     url_template: '',
+    sale_url_template: '',
+    purchase_url_template: '',
     max_trades: 21,
   })
   const [savingSettings, setSavingSettings] = useState(false)
@@ -190,6 +194,8 @@ export default function RSSCombinerPage() {
           cache_ttl_minutes: s.cache_ttl_minutes,
           feed_title: s.feed_title,
           url_template: s.url_template || '',
+          sale_url_template: s.sale_url_template || '',
+          purchase_url_template: s.purchase_url_template || '',
           max_trades: s.max_trades,
         })
       }
@@ -702,7 +708,7 @@ export default function RSSCombinerPage() {
                 <h2 className="text-sm font-medium text-gray-700 mb-3">Feed Generation</h2>
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">URL Template</label>
+                    <label className="block text-xs text-gray-500 mb-1">Default URL Template (fallback)</label>
                     <input
                       type="text"
                       value={editSettings.url_template}
@@ -710,7 +716,29 @@ export default function RSSCombinerPage() {
                       placeholder="https://news.google.com/rss/search?q={company_name}+stock..."
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md font-mono"
                     />
-                    <p className="text-xs text-gray-400 mt-1">Use {'{company_name}'} as placeholder</p>
+                    <p className="text-xs text-gray-400 mt-1">Use {'{company_name}'} as placeholder. Used when Sale/Purchase templates are empty.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Sale URL Template</label>
+                    <input
+                      type="text"
+                      value={editSettings.sale_url_template}
+                      onChange={(e) => setEditSettings({ ...editSettings, sale_url_template: e.target.value })}
+                      placeholder="Leave empty to use default template"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md font-mono"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">For Sale, Sale (Partial), Sale (Full) transactions</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Purchase URL Template</label>
+                    <input
+                      type="text"
+                      value={editSettings.purchase_url_template}
+                      onChange={(e) => setEditSettings({ ...editSettings, purchase_url_template: e.target.value })}
+                      placeholder="Leave empty to use default template"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md font-mono"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">For Purchase transactions</p>
                   </div>
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Max Trades for Feed</label>

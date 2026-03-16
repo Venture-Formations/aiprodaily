@@ -168,19 +168,26 @@ export async function resolveTickerNames(
 }
 
 /**
- * Generate RSS search URLs from trades using the URL template.
+ * Generate RSS search URLs from trades using transaction-specific URL templates.
+ * Sale trades (Sale, Sale (Partial), Sale (Full)) use saleTemplate.
+ * Purchase trades use purchaseTemplate.
  */
 function generateFeedUrls(
   trades: TradeWithCompanyName[],
-  urlTemplate: string
+  saleTemplate: string,
+  purchaseTemplate: string
 ): { trade: TradeWithCompanyName; url: string }[] {
-  return trades.map((trade) => ({
-    trade,
-    url: urlTemplate.replace(
-      '{company_name}',
-      encodeURIComponent(trade.company_name)
-    ),
-  }))
+  return trades.map((trade) => {
+    const isSale = trade.transaction?.toLowerCase().startsWith('sale')
+    const template = isSale ? saleTemplate : purchaseTemplate
+    return {
+      trade,
+      url: template.replace(
+        '{company_name}',
+        encodeURIComponent(trade.company_name)
+      ),
+    }
+  })
 }
 
 /**
@@ -317,7 +324,7 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
   // Load settings
   const { data: settings } = await supabaseAdmin
     .from('combined_feed_settings')
-    .select('max_age_days, cache_ttl_minutes, feed_title, url_template, max_trades')
+    .select('max_age_days, cache_ttl_minutes, feed_title, url_template, sale_url_template, purchase_url_template, max_trades')
     .limit(1)
     .single()
 
@@ -334,14 +341,16 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
   }
 
   const maxTrades = settings?.max_trades ?? 21
-  const urlTemplate =
+  const defaultTemplate =
     settings?.url_template ??
     'https://news.google.com/rss/search?q={company_name}+stock&hl=en-US&gl=US&ceid=US:en'
+  const saleTemplate = settings?.sale_url_template || defaultTemplate
+  const purchaseTemplate = settings?.purchase_url_template || defaultTemplate
 
   // Get top trades and resolve company names
   const trades = await getTopTrades(maxTrades)
   const tradesWithNames = await resolveTickerNames(trades)
-  const feedEntries = generateFeedUrls(tradesWithNames, urlTemplate)
+  const feedEntries = generateFeedUrls(tradesWithNames, saleTemplate, purchaseTemplate)
 
   // Load excluded sources (publisher names)
   const { data: excludedSourceRows } = await supabaseAdmin
