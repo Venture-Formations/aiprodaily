@@ -144,6 +144,8 @@ export default function RSSCombinerPage() {
   // Ticker DB state
   const [tickers, setTickers] = useState<TickerMapping[]>([])
   const [tickerSearch, setTickerSearch] = useState('')
+  const [tickerPage, setTickerPage] = useState(0)
+  const TICKERS_PER_PAGE = 200
   const [newTicker, setNewTicker] = useState('')
   const [newTickerName, setNewTickerName] = useState('')
   const [editingTickerId, setEditingTickerId] = useState<string | null>(null)
@@ -582,7 +584,7 @@ export default function RSSCombinerPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  // Filtered ticker list for search
+  // Filtered ticker list for search (reset page when search changes)
   const filteredTickers = tickerSearch
     ? tickers.filter(
         (t) =>
@@ -590,6 +592,12 @@ export default function RSSCombinerPage() {
           t.company_name.toLowerCase().includes(tickerSearch.toLowerCase())
       )
     : tickers
+
+  const tickerTotalPages = Math.ceil(filteredTickers.length / TICKERS_PER_PAGE)
+  const paginatedTickers = filteredTickers.slice(
+    tickerPage * TICKERS_PER_PAGE,
+    (tickerPage + 1) * TICKERS_PER_PAGE
+  )
 
   // Filtered known sources for dropdown (exclude already-excluded ones)
   const excludedSourceNames = new Set(excludedSources.map((s) => s.source_name.toLowerCase()))
@@ -887,7 +895,7 @@ export default function RSSCombinerPage() {
                 <input
                   type="text"
                   value={tickerSearch}
-                  onChange={(e) => setTickerSearch(e.target.value)}
+                  onChange={(e) => { setTickerSearch(e.target.value); setTickerPage(0) }}
                   placeholder="Search..."
                   className="px-3 py-1.5 text-sm border border-gray-300 rounded-md w-48"
                 />
@@ -897,7 +905,7 @@ export default function RSSCombinerPage() {
                   {tickers.length === 0 ? 'No ticker mappings yet.' : 'No results matching your search.'}
                 </div>
               ) : (
-                <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200 text-sm">
                     <thead className="bg-gray-50 sticky top-0">
                       <tr>
@@ -907,7 +915,7 @@ export default function RSSCombinerPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {filteredTickers.map((t) => (
+                      {paginatedTickers.map((t) => (
                         <tr key={t.id}>
                           <td className="px-4 py-2 font-medium text-gray-900">{t.ticker}</td>
                           <td className="px-4 py-2 text-gray-700">
@@ -967,6 +975,32 @@ export default function RSSCombinerPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+              {tickerTotalPages > 1 && (
+                <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
+                  <span className="text-xs text-gray-500">
+                    Showing {tickerPage * TICKERS_PER_PAGE + 1}-{Math.min((tickerPage + 1) * TICKERS_PER_PAGE, filteredTickers.length)} of {filteredTickers.length}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setTickerPage((p) => Math.max(0, p - 1))}
+                      disabled={tickerPage === 0}
+                      className="px-3 py-1 text-xs font-medium border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-xs text-gray-600">
+                      Page {tickerPage + 1} of {tickerTotalPages}
+                    </span>
+                    <button
+                      onClick={() => setTickerPage((p) => Math.min(tickerTotalPages - 1, p + 1))}
+                      disabled={tickerPage >= tickerTotalPages - 1}
+                      className="px-3 py-1 text-xs font-medium border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
