@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
-import { getTopTrades, resolveTickerNames } from '@/lib/rss-combiner'
+import { getTopTrades, resolveTickerNames, getTradeStats } from '@/lib/rss-combiner'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export const GET = withApiHandler(
@@ -17,25 +17,12 @@ export const GET = withApiHandler(
 
     const trades = await getTopTrades(maxTrades)
     const tradesWithNames = await resolveTickerNames(trades)
-
-    // Also get total trade count and unique ticker count for stats
-    const { count: totalTrades } = await supabaseAdmin
-      .from('congress_trades')
-      .select('id', { count: 'exact', head: true })
-
-    // Count unique tickers
-    const { data: allTickers } = await supabaseAdmin
-      .from('congress_trades')
-      .select('ticker')
-
-    const uniqueTickers = new Set(
-      (allTickers || []).map((r) => r.ticker.toUpperCase())
-    ).size
+    const { totalTrades, uniqueTickers } = await getTradeStats()
 
     return NextResponse.json({
       trades: tradesWithNames,
       stats: {
-        totalTrades: totalTrades ?? 0,
+        totalTrades,
         uniqueTickers,
         selectedForFeed: tradesWithNames.length,
       },

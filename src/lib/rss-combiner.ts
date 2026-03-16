@@ -1,12 +1,10 @@
-import Parser from 'rss-parser'
 import { Feed } from 'feed'
 import { supabaseAdmin } from '@/lib/supabase'
+import { XMLParser } from 'fast-xml-parser'
 
-const parser = new Parser({
-  customFields: {
-    item: ['media:content', 'enclosure', 'source'],
-  },
-  timeout: 15_000, // 15s per feed fetch
+const xmlParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
 })
 
 interface CongressTrade {
@@ -57,15 +55,57 @@ let cachedXml: string | null = null
 let cachedAt: number | null = null
 
 /**
- * Extract the publisher/source name from an RSS item.
+ * Fetch and parse an RSS feed using native fetch + fast-xml-parser.
+ * More reliable than rss-parser for Google News feeds on serverless.
+ */
+async function fetchRssFeed(
+  url: string,
+  timeoutMs = 15_000
+): Promise<{ title?: string; link?: string; items: any[] }> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; AIProDaily/1.0; +https://aiprodaily.com)',
+        Accept: 'application/rss+xml, application/xml, text/xml',
+      },
+    })
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} ${res.statusText}`)
+    }
+
+    const xml = await res.text()
+    const parsed = xmlParser.parse(xml)
+
+    const channel = parsed?.rss?.channel
+    if (!channel) return { items: [] }
+
+    // Normalize items to always be an array
+    const rawItems = channel.item
+    const items = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : []
+
+    return {
+      title: channel.title,
+      link: channel.link,
+      items,
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
+ * Extract the publisher/source name from a parsed RSS item.
  * Google News RSS includes <source>Publisher Name</source>.
  */
 function extractSourceName(item: any): string {
-  if (item.source && typeof item.source === 'string') {
-    return item.source
-  }
-  if (item.source?._) {
-    return item.source._
+  if (item.source) {
+    if (typeof item.source === 'string') return item.source
+    if (item.source['#text']) return item.source['#text']
   }
   const title = item.title || ''
   const dashIdx = title.lastIndexOf(' - ')
@@ -101,11 +141,61 @@ export function parseTradeSize(raw: string | null | undefined): number {
 }
 
 /**
+ * Fetch all rows from a Supabase table using pagination.
+ * Supabase defaults to 1,000 rows per request.
+ */
+async function fetchAllRows<T>(
+  table: string,
+  columns: string,
+  options?: {
+    order?: { column: string; ascending: boolean }
+    filters?: Array<{ column: string; op: 'eq' | 'neq'; value: any }>
+  }
+): Promise<T[]> {
+  const PAGE_SIZE = 1000
+  const allRows: T[] = []
+  let offset = 0
+
+  while (true) {
+    let query = supabaseAdmin
+      .from(table)
+      .select(columns)
+      .range(offset, offset + PAGE_SIZE - 1)
+
+    if (options?.order) {
+      query = query.order(options.order.column, { ascending: options.order.ascending })
+    }
+
+    if (options?.filters) {
+      for (const f of options.filters) {
+        query = query.eq(f.column, f.value)
+      }
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error(`[RSS-Combiner] Failed to fetch ${table}:`, error.message)
+      break
+    }
+
+    if (!data || data.length === 0) break
+
+    allRows.push(...(data as T[]))
+
+    if (data.length < PAGE_SIZE) break
+    offset += PAGE_SIZE
+  }
+
+  return allRows
+}
+
+/**
  * Get top trades: deduplicate by ticker (keep largest trade_size_parsed),
  * exclude tickers in combined_feed_excluded_companies, sort by size DESC, limit N.
  */
 export async function getTopTrades(maxTrades: number): Promise<CongressTrade[]> {
-  // Get excluded tickers
+  // Get excluded tickers (small table, no pagination needed)
   const { data: excludedRows } = await supabaseAdmin
     .from('combined_feed_excluded_companies')
     .select('ticker')
@@ -114,16 +204,12 @@ export async function getTopTrades(maxTrades: number): Promise<CongressTrade[]> 
     (excludedRows || []).map((r) => r.ticker.toUpperCase())
   )
 
-  // Get all trades, ordered by size desc
-  const { data: trades, error } = await supabaseAdmin
-    .from('congress_trades')
-    .select('id, ticker, ticker_type, company, traded, filed, transaction, trade_size_usd, trade_size_parsed, name, party, district, chamber, state')
-    .order('trade_size_parsed', { ascending: false })
-
-  if (error || !trades) {
-    console.error('[RSS-Combiner] Failed to fetch trades:', error?.message)
-    return []
-  }
+  // Fetch all trades with pagination, ordered by size desc
+  const trades = await fetchAllRows<CongressTrade>(
+    'congress_trades',
+    'id, ticker, ticker_type, company, traded, filed, transaction, trade_size_usd, trade_size_parsed, name, party, district, chamber, state',
+    { order: { column: 'trade_size_parsed', ascending: false } }
+  )
 
   // Deduplicate by ticker (first occurrence = largest trade since sorted by size desc)
   const seen = new Set<string>()
@@ -166,6 +252,28 @@ export async function resolveTickerNames(
       trade.company ||
       trade.ticker,
   }))
+}
+
+/**
+ * Get total trade count and unique ticker count using pagination-safe methods.
+ */
+export async function getTradeStats(): Promise<{ totalTrades: number; uniqueTickers: number }> {
+  // Use count query for total (no pagination issue)
+  const { count: totalTrades } = await supabaseAdmin
+    .from('congress_trades')
+    .select('id', { count: 'exact', head: true })
+
+  // Fetch all tickers with pagination for accurate unique count
+  const allTickers = await fetchAllRows<{ ticker: string }>(
+    'congress_trades',
+    'ticker'
+  )
+
+  const uniqueTickers = new Set(
+    allTickers.map((r) => r.ticker.toUpperCase())
+  ).size
+
+  return { totalTrades: totalTrades ?? 0, uniqueTickers }
 }
 
 /**
@@ -234,16 +342,16 @@ async function fetchAndEnrichFeeds(
     const batch = feedEntries.slice(i, i + BATCH_SIZE)
     const results = await Promise.allSettled(
       batch.map(async ({ trade, url }) => {
-        const feed = await parser.parseURL(url)
-        return feed.items.slice(0, maxArticlesPerTrade).map((item) => ({
+        const feed = await fetchRssFeed(url)
+        return feed.items.slice(0, maxArticlesPerTrade).map((item: any) => ({
           title: item.title || 'Untitled',
           link: item.link || '',
-          description: item.contentSnippet || item.content || '',
+          description: item.description || '',
           pubDate: item.pubDate ? new Date(item.pubDate) : new Date(),
-          author: item.creator || (item as any).author || '',
+          author: item['dc:creator'] || '',
           sourceLabel: trade.company_name,
           sourceName: extractSourceName(item),
-          guid: item.guid || item.link || `${url}#${item.title}`,
+          guid: item.guid?.['#text'] || item.guid || item.link || `${url}#${item.title}`,
           tradeMeta: {
             ticker: trade.ticker,
             company_name: trade.company_name,
