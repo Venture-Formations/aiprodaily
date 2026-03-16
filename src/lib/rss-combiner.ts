@@ -329,59 +329,49 @@ async function fetchAndEnrichFeeds(
   )
   const keywordsLower = excludedKeywords.map((k) => k.toLowerCase())
 
-  // Fetch in batches of 3 with 1s delay between batches to avoid Google rate-limiting
-  const BATCH_SIZE = 3
-  const BATCH_DELAY_MS = 1000
+  // Fetch sequentially with delay to avoid Google rate-limiting
+  const DELAY_MS = 500
   const allItems: NormalizedItem[] = []
   let succeeded = 0
   let failed = 0
 
-  for (let i = 0; i < feedEntries.length; i += BATCH_SIZE) {
-    if (i > 0) await new Promise((r) => setTimeout(r, BATCH_DELAY_MS))
+  for (let i = 0; i < feedEntries.length; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, DELAY_MS))
 
-    const batch = feedEntries.slice(i, i + BATCH_SIZE)
-    const results = await Promise.allSettled(
-      batch.map(async ({ trade, url }) => {
-        const feed = await fetchRssFeed(url)
-        return feed.items.slice(0, maxArticlesPerTrade).map((item: any) => ({
-          title: item.title || 'Untitled',
-          link: item.link || '',
-          description: item.description || '',
-          pubDate: item.pubDate ? new Date(item.pubDate) : new Date(),
-          author: item['dc:creator'] || '',
-          sourceLabel: trade.company_name,
-          sourceName: extractSourceName(item),
-          guid: item.guid?.['#text'] || item.guid || item.link || `${url}#${item.title}`,
-          tradeMeta: {
-            ticker: trade.ticker,
-            company_name: trade.company_name,
-            traded: trade.traded,
-            transaction: trade.transaction,
-            name: trade.name,
-            party: trade.party,
-            district: trade.district,
-            chamber: trade.chamber,
-            state: trade.state,
-          },
-        }))
-      })
-    )
-
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        allItems.push(...result.value)
-        succeeded++
-      } else {
-        failed++
-        console.error(
-          '[RSS-Combiner] Feed fetch failed:',
-          result.reason?.message || result.reason
-        )
-      }
+    const { trade, url } = feedEntries[i]
+    try {
+      const feed = await fetchRssFeed(url)
+      const items = feed.items.slice(0, maxArticlesPerTrade).map((item: any) => ({
+        title: item.title || 'Untitled',
+        link: item.link || '',
+        description: item.description || '',
+        pubDate: item.pubDate ? new Date(item.pubDate) : new Date(),
+        author: item['dc:creator'] || '',
+        sourceLabel: trade.company_name,
+        sourceName: extractSourceName(item),
+        guid: item.guid?.['#text'] || item.guid || item.link || `${url}#${item.title}`,
+        tradeMeta: {
+          ticker: trade.ticker,
+          company_name: trade.company_name,
+          traded: trade.traded,
+          transaction: trade.transaction,
+          name: trade.name,
+          party: trade.party,
+          district: trade.district,
+          chamber: trade.chamber,
+          state: trade.state,
+        },
+      }))
+      allItems.push(...items)
+      succeeded++
+      console.log(`[RSS-Combiner] ${trade.ticker} (${trade.company_name}): ${items.length} articles`)
+    } catch (err: any) {
+      failed++
+      console.error(`[RSS-Combiner] ${trade.ticker} (${trade.company_name}) failed: ${err.message}`)
     }
   }
 
-  console.log(`[RSS-Combiner] Fetched ${succeeded}/${succeeded + failed} feeds, ${allItems.length} articles`)
+  console.log(`[RSS-Combiner] Fetched ${succeeded}/${succeeded + failed} feeds, ${allItems.length} articles total`)
 
   // Deduplicate by article URL (keep first occurrence)
   const seenUrls = new Set<string>()
