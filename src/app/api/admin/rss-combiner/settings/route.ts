@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { z } from 'zod'
-import { invalidateCache } from '@/lib/rss-combiner'
+import { invalidateCache, invalidateTradesCache } from '@/lib/rss-combiner'
 
 const SETTINGS_COLUMNS = 'id, max_age_days, cache_ttl_minutes, feed_title, url_template, sale_url_template, purchase_url_template, max_trades, max_articles_per_trade, last_ingestion_at, updated_at' as const
 
@@ -60,6 +60,7 @@ export const PATCH = withApiHandler(
     }
 
     invalidateCache()
+    invalidateTradesCache()
 
     return NextResponse.json({ settings: data })
   }

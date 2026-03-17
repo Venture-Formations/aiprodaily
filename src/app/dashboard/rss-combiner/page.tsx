@@ -287,24 +287,52 @@ export default function RSSCombinerPage() {
     }
   }, [])
 
-  useEffect(() => {
-    Promise.all([
-      fetchTrades(),
-      fetchSettings(),
-      fetchTickers(),
-      fetchExcludedCompanies(),
-      fetchApprovedSources(),
-      fetchExcludedSources(),
-      fetchExcludedKeywords(),
-    ]).finally(() => setLoading(false))
-  }, [fetchTrades, fetchSettings, fetchTickers, fetchExcludedCompanies, fetchApprovedSources, fetchExcludedSources, fetchExcludedKeywords])
+  // Track which tabs have been loaded
+  const loadedTabs = useRef<Set<string>>(new Set())
 
-  // Fetch known sources when switching to excluded-sources tab
+  // Load data for the active tab on demand
   useEffect(() => {
-    if (activeTab === 'excluded-sources' && knownSources.length === 0) {
-      fetchKnownSources()
+    const loadTabData = async () => {
+      const promises: Promise<void>[] = []
+
+      // Settings are always needed (for ingestion stats, feed URL, etc.)
+      if (!loadedTabs.current.has('settings')) {
+        loadedTabs.current.add('settings')
+        promises.push(fetchSettings())
+      }
+
+      if (!loadedTabs.current.has(activeTab)) {
+        loadedTabs.current.add(activeTab)
+        switch (activeTab) {
+          case 'trades':
+            promises.push(fetchTrades())
+            break
+          case 'ticker-db':
+            promises.push(fetchTickers())
+            break
+          case 'excluded-companies':
+            promises.push(fetchExcludedCompanies())
+            break
+          case 'approved-sources':
+            promises.push(fetchApprovedSources())
+            break
+          case 'excluded-sources':
+            promises.push(fetchExcludedSources(), fetchKnownSources())
+            break
+          case 'excluded-keywords':
+            promises.push(fetchExcludedKeywords())
+            break
+        }
+      }
+
+      if (promises.length > 0) {
+        await Promise.all(promises).finally(() => setLoading(false))
+      } else {
+        setLoading(false)
+      }
     }
-  }, [activeTab, knownSources.length, fetchKnownSources])
+    loadTabData()
+  }, [activeTab, fetchTrades, fetchSettings, fetchTickers, fetchExcludedCompanies, fetchApprovedSources, fetchExcludedSources, fetchExcludedKeywords, fetchKnownSources])
 
   // Close source dropdown on outside click
   useEffect(() => {

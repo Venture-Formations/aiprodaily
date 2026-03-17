@@ -58,9 +58,12 @@ export interface IngestionResult {
   articlesSkippedDuplicate: number
 }
 
-// Module-level cache
+// Module-level cache for feed XML
 let cachedXml: string | null = null
 let cachedAt: number | null = null
+
+// Module-level cache for trades (expensive computation, only changes on upload/settings change)
+let cachedTradesResponse: { trades: any[]; stats: any } | null = null
 
 /**
  * Fetch and parse an RSS feed using native fetch + fast-xml-parser.
@@ -286,23 +289,23 @@ export async function resolveTickerNames(
 }
 
 /**
- * Get total trade count and unique ticker count using pagination-safe methods.
+ * Get total trade count and unique ticker count.
+ * Uses exact count for total and a single bounded query for unique tickers.
  */
 export async function getTradeStats(): Promise<{ totalTrades: number; uniqueTickers: number }> {
-  // Use count query for total (no pagination issue)
-  const { count: totalTrades } = await supabaseAdmin
-    .from('congress_trades')
-    .select('id', { count: 'exact', head: true })
+  const [{ count: totalTrades }, { data: tickerData }] = await Promise.all([
+    supabaseAdmin
+      .from('congress_trades')
+      .select('id', { count: 'exact', head: true }),
+    supabaseAdmin
+      .from('congress_trades')
+      .select('ticker')
+      .limit(10000),
+  ])
 
-  // Fetch all tickers with pagination for accurate unique count
-  const allTickers = await fetchAllRows<{ ticker: string }>(
-    'congress_trades',
-    'ticker'
-  )
-
-  const uniqueTickers = new Set(
-    allTickers.map((r) => r.ticker.toUpperCase())
-  ).size
+  const uniqueTickers = tickerData
+    ? new Set(tickerData.map((r) => r.ticker.toUpperCase())).size
+    : 0
 
   return { totalTrades: totalTrades ?? 0, uniqueTickers }
 }
@@ -346,10 +349,10 @@ function generateFeedUrls(
     } else {
       continue // skip trades that aren't sale or purchase
     }
-    // Replace {company_name} and inject date filter after it
-    let url = template.replace(
-      '{company_name}',
-      encodeURIComponent(trade.company_name) + dateFilter
+    // Replace %22{company_name}%22 with quoted name + date filter outside quotes
+    const url = template.replace(
+      '%22{company_name}%22',
+      '%22' + encodeURIComponent(trade.company_name) + '%22' + dateFilter
     )
     entries.push({ trade, url })
   }
@@ -751,4 +754,16 @@ export async function getCombinedFeed(forceRefresh = false): Promise<string> {
 export function invalidateCache(): void {
   cachedXml = null
   cachedAt = null
+}
+
+export function invalidateTradesCache(): void {
+  cachedTradesResponse = null
+}
+
+export function getCachedTradesResponse(): { trades: any[]; stats: any } | null {
+  return cachedTradesResponse
+}
+
+export function setCachedTradesResponse(data: { trades: any[]; stats: any }): void {
+  cachedTradesResponse = data
 }
