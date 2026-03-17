@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { z } from 'zod'
 import { invalidateCache } from '@/lib/rss-combiner'
 
-const SETTINGS_COLUMNS = 'id, max_age_days, cache_ttl_minutes, feed_title, url_template, sale_url_template, purchase_url_template, max_trades, max_articles_per_trade, updated_at' as const
+const SETTINGS_COLUMNS = 'id, max_age_days, cache_ttl_minutes, feed_title, url_template, sale_url_template, purchase_url_template, max_trades, max_articles_per_trade, last_ingestion_at, updated_at' as const
 
 export const GET = withApiHandler(
   { authTier: 'admin', logContext: 'rss-combiner/settings' },

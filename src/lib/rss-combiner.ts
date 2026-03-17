@@ -50,6 +50,14 @@ interface NormalizedItem {
   }
 }
 
+export interface IngestionResult {
+  feedsFetched: number
+  feedsFailed: number
+  articlesStored: number
+  articlesFiltered: number
+  articlesSkippedDuplicate: number
+}
+
 // Module-level cache
 let cachedXml: string | null = null
 let cachedAt: number | null = null
@@ -116,6 +124,25 @@ function extractSourceName(item: any): string {
 }
 
 /**
+ * Extract the source domain from a parsed RSS item.
+ * Google News RSS includes <source url="https://domain.com">.
+ * Falls back to extracting domain from the article link.
+ */
+function extractSourceDomain(item: any): string {
+  if (item.source?.['@_url']) {
+    try {
+      return new URL(item.source['@_url']).hostname
+    } catch {}
+  }
+  if (item.link) {
+    try {
+      return new URL(item.link).hostname
+    } catch {}
+  }
+  return ''
+}
+
+/**
  * Parse the Trade_Size_USD field into a numeric upper bound for sorting.
  * Formats: "$1,001 - $15,000", "$1,000.00", "Over $50,000,000"
  */
@@ -123,13 +150,13 @@ export function parseTradeSize(raw: string | null | undefined): number {
   if (!raw || typeof raw !== 'string') return 0
   const cleaned = raw.replace(/[$,]/g, '').trim()
 
-  // "Over X" → X + 1
+  // "Over X" -> X + 1
   const overMatch = cleaned.match(/over\s+([\d.]+)/i)
   if (overMatch) {
     return (parseFloat(overMatch[1]) || 0) + 1
   }
 
-  // Range "X - Y" → take Y (upper bound)
+  // Range "X - Y" -> take Y (upper bound)
   const rangeMatch = cleaned.match(/([\d.]+)\s*-\s*([\d.]+)/)
   if (rangeMatch) {
     return parseFloat(rangeMatch[2]) || 0
@@ -315,6 +342,7 @@ function generateFeedUrls(
 
 /**
  * Fetch feeds, filter, enrich with trade metadata, deduplicate by article URL.
+ * Retained for testing/manual use; no longer called by getCombinedFeed.
  */
 async function fetchAndEnrichFeeds(
   feedEntries: { trade: TradeWithCompanyName; url: string }[],
@@ -460,76 +488,231 @@ export function generateCombinedFeedXml(
   return feed.rss2()
 }
 
+/**
+ * Ingest articles from Google News RSS feeds into the congress_feed_articles table.
+ * Fetches feeds sequentially, filters by approved sources and excluded keywords,
+ * and upserts each article by article_url.
+ */
+export async function runIngestion(): Promise<IngestionResult> {
+  // 1. Load settings
+  const { data: settings } = await supabaseAdmin
+    .from('combined_feed_settings')
+    .select('max_trades, sale_url_template, purchase_url_template, max_articles_per_trade, max_age_days')
+    .limit(1)
+    .single()
+
+  const maxTrades = settings?.max_trades ?? 21
+  const saleTemplate = settings?.sale_url_template || ''
+  const purchaseTemplate = settings?.purchase_url_template || ''
+  const maxArticlesPerTrade = settings?.max_articles_per_trade ?? 5
+  const maxAgeDays = settings?.max_age_days ?? 7
+
+  // 2. Load approved source domains
+  const { data: approvedRows } = await supabaseAdmin
+    .from('congress_approved_sources')
+    .select('source_domain')
+    .eq('is_active', true)
+
+  const approvedDomains = new Set(
+    (approvedRows || []).map((r: { source_domain: string }) => r.source_domain.toLowerCase())
+  )
+
+  // 3. Load excluded keywords
+  const { data: excludedKeywordRows } = await supabaseAdmin
+    .from('combined_feed_excluded_keywords')
+    .select('keyword')
+
+  const excludedKeywords = (excludedKeywordRows || []).map((r: { keyword: string }) => r.keyword.toLowerCase())
+
+  // 4. Get top trades and resolve names
+  const trades = await getTopTrades(maxTrades)
+  const tradesWithNames = await resolveTickerNames(trades)
+  const feedEntries = generateFeedUrls(tradesWithNames, saleTemplate, purchaseTemplate)
+
+  // 5. Calculate age cutoff
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - maxAgeDays)
+
+  // 6. Fetch feeds sequentially and upsert articles
+  const DELAY_MS = 500
+  let feedsFetched = 0
+  let feedsFailed = 0
+  let articlesStored = 0
+  let articlesFiltered = 0
+  let articlesSkippedDuplicate = 0
+
+  for (let i = 0; i < feedEntries.length; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, DELAY_MS))
+
+    const { trade, url } = feedEntries[i]
+    let lastError = ''
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 2000))
+      try {
+        const feed = await fetchRssFeed(url)
+        const items = feed.items.slice(0, maxArticlesPerTrade)
+        let storedForTrade = 0
+
+        for (const item of items) {
+          const sourceName = extractSourceName(item)
+          const sourceDomain = extractSourceDomain(item)
+          const title = item.title || 'Untitled'
+          const link = item.link || ''
+          const pubDate = item.pubDate ? new Date(item.pubDate) : new Date()
+
+          // Filter: approved sources only
+          if (!sourceDomain || !approvedDomains.has(sourceDomain.toLowerCase())) {
+            articlesFiltered++
+            continue
+          }
+
+          // Filter: excluded keywords
+          const titleLower = title.toLowerCase()
+          if (excludedKeywords.some((kw) => titleLower.includes(kw))) {
+            articlesFiltered++
+            continue
+          }
+
+          // Filter: max age
+          if (pubDate < cutoff) {
+            articlesFiltered++
+            continue
+          }
+
+          // Skip if no link
+          if (!link) {
+            articlesFiltered++
+            continue
+          }
+
+          // Upsert into congress_feed_articles
+          const { error } = await supabaseAdmin
+            .from('congress_feed_articles')
+            .upsert(
+              {
+                ticker: trade.ticker,
+                company_name: trade.company_name,
+                transaction_type: trade.transaction,
+                article_title: title,
+                article_url: link,
+                article_description: item.description || null,
+                source_name: sourceName || null,
+                source_domain: sourceDomain || null,
+                published_at: pubDate.toISOString(),
+                trade_meta: {
+                  member: trade.name,
+                  party: trade.party,
+                  chamber: trade.chamber,
+                  state: trade.state,
+                  district: trade.district,
+                  traded: trade.traded,
+                },
+                ingested_at: new Date().toISOString(),
+              },
+              { onConflict: 'article_url' }
+            )
+
+          if (error) {
+            if (error.code === '23505') {
+              articlesSkippedDuplicate++
+            } else {
+              console.error(`[RSS-Combiner] Upsert failed for ${link}:`, error.message)
+            }
+          } else {
+            storedForTrade++
+            articlesStored++
+          }
+        }
+
+        feedsFetched++
+        console.log(`[RSS-Combiner] Ingested ${trade.ticker} (${trade.company_name}): ${storedForTrade} stored, ${items.length - storedForTrade} filtered/skipped${attempt > 0 ? ' (retry)' : ''}`)
+        lastError = ''
+        break
+      } catch (err: any) {
+        lastError = err.message
+      }
+    }
+
+    if (lastError) {
+      feedsFailed++
+      console.error(`[RSS-Combiner] ${trade.ticker} (${trade.company_name}) failed after 2 attempts: ${lastError}`)
+    }
+  }
+
+  // 7. Update last_ingestion_at
+  await supabaseAdmin
+    .from('combined_feed_settings')
+    .update({ last_ingestion_at: new Date().toISOString() })
+    .not('id', 'is', null)
+
+  console.log(`[RSS-Combiner] Ingestion complete: ${feedsFetched}/${feedsFetched + feedsFailed} feeds, ${articlesStored} stored, ${articlesFiltered} filtered, ${articlesSkippedDuplicate} duplicates`)
+
+  return { feedsFetched, feedsFailed, articlesStored, articlesFiltered, articlesSkippedDuplicate }
+}
+
+/**
+ * Serve the combined RSS feed from stored articles in congress_feed_articles.
+ * Uses module-level cache with configurable TTL from combined_feed_settings.
+ */
 export async function getCombinedFeed(forceRefresh = false): Promise<string> {
   // Load settings
   const { data: settings } = await supabaseAdmin
     .from('combined_feed_settings')
-    .select('max_age_days, cache_ttl_minutes, feed_title, url_template, sale_url_template, purchase_url_template, max_trades, max_articles_per_trade')
+    .select('max_age_days, cache_ttl_minutes, feed_title')
     .limit(1)
     .single()
 
   const cacheTtlMs = (settings?.cache_ttl_minutes ?? 15) * 60 * 1000
 
   // Return cached if fresh
-  if (
-    !forceRefresh &&
-    cachedXml &&
-    cachedAt &&
-    Date.now() - cachedAt < cacheTtlMs
-  ) {
+  if (!forceRefresh && cachedXml && cachedAt && Date.now() - cachedAt < cacheTtlMs) {
     return cachedXml
   }
 
-  const maxTrades = settings?.max_trades ?? 21
-  const saleTemplate = settings?.sale_url_template || ''
-  const purchaseTemplate = settings?.purchase_url_template || ''
+  const maxAgeDays = settings?.max_age_days ?? 7
+  const feedTitle = settings?.feed_title ?? 'Combined RSS Feed'
 
-  // Get top trades and resolve company names
-  const trades = await getTopTrades(maxTrades)
-  const tradesWithNames = await resolveTickerNames(trades)
-  const feedEntries = generateFeedUrls(tradesWithNames, saleTemplate, purchaseTemplate)
+  // Query stored articles from DB
+  const cutoffDate = new Date()
+  cutoffDate.setDate(cutoffDate.getDate() - maxAgeDays)
 
-  // Load excluded sources (publisher names)
-  const { data: excludedSourceRows } = await supabaseAdmin
-    .from('combined_feed_excluded_sources')
-    .select('source_name')
+  const { data: articles, error } = await supabaseAdmin
+    .from('congress_feed_articles')
+    .select('article_title, article_url, article_description, source_name, source_domain, published_at, ticker, company_name, transaction_type, trade_meta')
+    .gte('published_at', cutoffDate.toISOString())
+    .order('published_at', { ascending: false })
+    .limit(500)
 
-  const excludedSources = new Set(
-    (excludedSourceRows || []).map((r) => r.source_name)
-  )
-
-  // Load excluded keywords
-  const { data: excludedKeywordRows } = await supabaseAdmin
-    .from('combined_feed_excluded_keywords')
-    .select('keyword')
-
-  const excludedKeywords = (excludedKeywordRows || []).map((r) => r.keyword)
-
-  if (feedEntries.length === 0) {
-    const emptyFeed = generateCombinedFeedXml(
-      [],
-      settings?.feed_title ?? 'Combined RSS Feed'
-    )
-    cachedXml = emptyFeed
-    cachedAt = Date.now()
-    return emptyFeed
+  if (error) {
+    console.error('[RSS-Combiner] Failed to query articles:', error.message)
+    throw new Error('Failed to query stored articles')
   }
 
-  const maxArticlesPerTrade = settings?.max_articles_per_trade ?? 5
+  // Convert DB rows to NormalizedItem format
+  const items: NormalizedItem[] = (articles || []).map((row) => ({
+    title: row.article_title,
+    link: row.article_url,
+    description: row.article_description || '',
+    pubDate: new Date(row.published_at),
+    author: '',
+    sourceLabel: row.company_name,
+    sourceName: row.source_name || '',
+    guid: row.article_url,
+    tradeMeta: {
+      ticker: row.ticker,
+      company_name: row.company_name,
+      traded: row.trade_meta?.traded || '',
+      transaction: row.transaction_type,
+      name: row.trade_meta?.member || null,
+      party: row.trade_meta?.party || null,
+      district: row.trade_meta?.district || null,
+      chamber: row.trade_meta?.chamber || null,
+      state: row.trade_meta?.state || null,
+    },
+  }))
 
-  const items = await fetchAndEnrichFeeds(
-    feedEntries,
-    settings?.max_age_days ?? 7,
-    excludedSources,
-    excludedKeywords,
-    maxArticlesPerTrade
-  )
-
-  const xml = generateCombinedFeedXml(
-    items,
-    settings?.feed_title ?? 'Combined RSS Feed'
-  )
-
+  const xml = generateCombinedFeedXml(items, feedTitle)
   cachedXml = xml
   cachedAt = Date.now()
 

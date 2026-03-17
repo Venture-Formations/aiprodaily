@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import Layout from '@/components/Layout'
 import * as XLSX from 'xlsx'
 
-type Tab = 'trades' | 'ticker-db' | 'excluded-companies' | 'excluded-sources' | 'excluded-keywords' | 'settings'
+type Tab = 'trades' | 'ticker-db' | 'excluded-companies' | 'approved-sources' | 'excluded-sources' | 'excluded-keywords' | 'settings'
 
 interface TradeRow {
   id: string
@@ -53,6 +53,22 @@ interface ExcludedKeyword {
   created_at: string
 }
 
+interface ApprovedSource {
+  id: string
+  source_name: string
+  source_domain: string
+  is_active: boolean
+  created_at: string
+}
+
+interface IngestionStats {
+  feedsFetched: number
+  feedsFailed: number
+  articlesStored: number
+  articlesFiltered: number
+  articlesSkippedDuplicate: number
+}
+
 interface FeedSettings {
   id: string
   max_age_days: number
@@ -63,6 +79,7 @@ interface FeedSettings {
   purchase_url_template: string | null
   max_trades: number
   max_articles_per_trade: number
+  last_ingestion_at: string | null
   updated_at: string
 }
 
@@ -112,6 +129,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'trades', label: 'Trades' },
   { key: 'ticker-db', label: 'Ticker Database' },
   { key: 'excluded-companies', label: 'Excluded Companies' },
+  { key: 'approved-sources', label: 'Approved Sources' },
   { key: 'excluded-sources', label: 'Excluded Sources' },
   { key: 'excluded-keywords', label: 'Excluded Keywords' },
   { key: 'settings', label: 'Settings' },
@@ -169,6 +187,15 @@ export default function RSSCombinerPage() {
   const [showSourceDropdown, setShowSourceDropdown] = useState(false)
   const sourceInputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Approved sources state
+  const [approvedSources, setApprovedSources] = useState<ApprovedSource[]>([])
+  const [newApprovedName, setNewApprovedName] = useState('')
+  const [newApprovedDomain, setNewApprovedDomain] = useState('')
+
+  // Ingestion state
+  const [ingesting, setIngesting] = useState(false)
+  const [ingestionResult, setIngestionResult] = useState<IngestionStats | null>(null)
 
   // Excluded keywords state
   const [excludedKeywords, setExcludedKeywords] = useState<ExcludedKeyword[]>([])
@@ -231,6 +258,14 @@ export default function RSSCombinerPage() {
     }
   }, [])
 
+  const fetchApprovedSources = useCallback(async () => {
+    const res = await fetch('/api/admin/rss-combiner/approved-sources')
+    if (res.ok) {
+      const data = await res.json()
+      setApprovedSources(data.approvedSources || [])
+    }
+  }, [])
+
   const fetchExcludedKeywords = useCallback(async () => {
     const res = await fetch('/api/admin/rss-combiner/excluded-keywords')
     if (res.ok) {
@@ -258,10 +293,11 @@ export default function RSSCombinerPage() {
       fetchSettings(),
       fetchTickers(),
       fetchExcludedCompanies(),
+      fetchApprovedSources(),
       fetchExcludedSources(),
       fetchExcludedKeywords(),
     ]).finally(() => setLoading(false))
-  }, [fetchTrades, fetchSettings, fetchTickers, fetchExcludedCompanies, fetchExcludedSources, fetchExcludedKeywords])
+  }, [fetchTrades, fetchSettings, fetchTickers, fetchExcludedCompanies, fetchApprovedSources, fetchExcludedSources, fetchExcludedKeywords])
 
   // Fetch known sources when switching to excluded-sources tab
   useEffect(() => {
@@ -557,6 +593,63 @@ export default function RSSCombinerPage() {
     if (res.ok) setExcludedKeywords((prev) => prev.filter((k) => k.id !== id))
   }
 
+  const handleAddApprovedSource = async () => {
+    if (!newApprovedName.trim() || !newApprovedDomain.trim()) return
+    const res = await fetch('/api/admin/rss-combiner/approved-sources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source_name: newApprovedName.trim(), source_domain: newApprovedDomain.trim() }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      setApprovedSources((prev) => [...prev, data.approvedSource])
+      setNewApprovedName('')
+      setNewApprovedDomain('')
+    }
+  }
+
+  const handleDeleteApprovedSource = async (id: string) => {
+    const res = await fetch('/api/admin/rss-combiner/approved-sources', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    if (res.ok) setApprovedSources((prev) => prev.filter((s) => s.id !== id))
+  }
+
+  const handleToggleApprovedSource = async (id: string, is_active: boolean) => {
+    const res = await fetch('/api/admin/rss-combiner/approved-sources', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, is_active }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      setApprovedSources((prev) => prev.map((s) => (s.id === id ? data.approvedSource : s)))
+    }
+  }
+
+  const handleRunIngestion = async () => {
+    setIngesting(true)
+    setIngestionResult(null)
+    try {
+      const res = await fetch('/api/admin/rss-combiner/ingest', { method: 'POST' })
+      if (res.ok) {
+        const data = await res.json()
+        setIngestionResult(data)
+        fetchSettings() // refresh last_ingestion_at
+      } else {
+        const data = await res.json()
+        setIngestionResult({ feedsFetched: 0, feedsFailed: 0, articlesStored: 0, articlesFiltered: 0, articlesSkippedDuplicate: 0 })
+        console.error('Ingestion failed:', data.error)
+      }
+    } catch {
+      setIngestionResult({ feedsFetched: 0, feedsFailed: 0, articlesStored: 0, articlesFiltered: 0, articlesSkippedDuplicate: 0 })
+    } finally {
+      setIngesting(false)
+    }
+  }
+
   const handleSaveSettings = async () => {
     setSavingSettings(true)
     try {
@@ -650,6 +743,52 @@ export default function RSSCombinerPage() {
         {/* Tab: Trades */}
         {activeTab === 'trades' && (
           <div className="space-y-6">
+            {/* Ingestion Controls */}
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-medium text-gray-700">Feed Ingestion</h2>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Fetch Google News feeds for top trades and store approved articles in the database.
+                    {settings?.last_ingestion_at && (
+                      <> Last run: <span className="font-medium">{new Date(settings.last_ingestion_at).toLocaleString()}</span></>
+                    )}
+                  </p>
+                </div>
+                <button
+                  onClick={handleRunIngestion}
+                  disabled={ingesting}
+                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {ingesting ? 'Ingesting...' : 'Ingest Now'}
+                </button>
+              </div>
+              {ingestionResult && (
+                <div className="mt-3 p-3 rounded bg-gray-50 text-sm grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  <div>
+                    <div className="text-xs text-gray-500">Feeds Fetched</div>
+                    <div className="font-medium text-gray-900">{ingestionResult.feedsFetched}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Feeds Failed</div>
+                    <div className="font-medium text-red-600">{ingestionResult.feedsFailed}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Articles Stored</div>
+                    <div className="font-medium text-green-600">{ingestionResult.articlesStored}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Filtered Out</div>
+                    <div className="font-medium text-orange-600">{ingestionResult.articlesFiltered}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Duplicates</div>
+                    <div className="font-medium text-gray-500">{ingestionResult.articlesSkippedDuplicate}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {tradeStats && (
               <div className="grid grid-cols-3 gap-4">
                 <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
@@ -1130,6 +1269,98 @@ export default function RSSCombinerPage() {
                               </button>
                             </>
                           )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab: Approved Sources */}
+        {activeTab === 'approved-sources' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <h2 className="text-sm font-medium text-gray-700 mb-2">Add Approved Source</h2>
+              <p className="text-xs text-gray-500 mb-3">
+                Only articles from approved source domains will be stored during ingestion.
+              </p>
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-500 mb-1">Source Name</label>
+                  <input
+                    type="text"
+                    value={newApprovedName}
+                    onChange={(e) => setNewApprovedName(e.target.value)}
+                    placeholder="Yahoo Finance"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-500 mb-1">Domain</label>
+                  <input
+                    type="text"
+                    value={newApprovedDomain}
+                    onChange={(e) => setNewApprovedDomain(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddApprovedSource()}
+                    placeholder="finance.yahoo.com"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md font-mono"
+                  />
+                </div>
+                <button
+                  onClick={handleAddApprovedSource}
+                  disabled={!newApprovedName.trim() || !newApprovedDomain.trim()}
+                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-200">
+                <h2 className="text-sm font-medium text-gray-700">
+                  Approved Sources ({approvedSources.length})
+                </h2>
+              </div>
+              {approvedSources.length === 0 ? (
+                <div className="p-6 text-center text-sm text-gray-500">No approved sources yet.</div>
+              ) : (
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Source Name</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Domain</th>
+                      <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Active</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase w-24">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {approvedSources.map((s) => (
+                      <tr key={s.id} className={!s.is_active ? 'bg-gray-50 opacity-60' : ''}>
+                        <td className="px-4 py-2 text-gray-900">{s.source_name}</td>
+                        <td className="px-4 py-2 text-gray-500 font-mono text-xs">{s.source_domain}</td>
+                        <td className="px-4 py-2 text-center">
+                          <button
+                            onClick={() => handleToggleApprovedSource(s.id, !s.is_active)}
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                              s.is_active
+                                ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            {s.is_active ? 'Active' : 'Inactive'}
+                          </button>
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <button
+                            onClick={() => handleDeleteApprovedSource(s.id)}
+                            className="text-red-500 hover:text-red-700 text-xs"
+                          >
+                            Delete
+                          </button>
                         </td>
                       </tr>
                     ))}
