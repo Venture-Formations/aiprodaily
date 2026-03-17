@@ -129,17 +129,19 @@ function extractSourceName(item: any): string {
  * Falls back to extracting domain from the article link.
  */
 function extractSourceDomain(item: any): string {
+  let hostname = ''
   if (item.source?.['@_url']) {
     try {
-      return new URL(item.source['@_url']).hostname
+      hostname = new URL(item.source['@_url']).hostname
     } catch {}
   }
-  if (item.link) {
+  if (!hostname && item.link) {
     try {
-      return new URL(item.link).hostname
+      hostname = new URL(item.link).hostname
     } catch {}
   }
-  return ''
+  // Normalize: strip www. prefix for consistent matching
+  return hostname.replace(/^www\./, '')
 }
 
 /**
@@ -513,7 +515,7 @@ export async function runIngestion(): Promise<IngestionResult> {
     .eq('is_active', true)
 
   const approvedDomains = new Set(
-    (approvedRows || []).map((r: { source_domain: string }) => r.source_domain.toLowerCase())
+    (approvedRows || []).map((r: { source_domain: string }) => r.source_domain.toLowerCase().replace(/^www\./, ''))
   )
 
   // 3. Load excluded keywords
