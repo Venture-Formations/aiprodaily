@@ -312,12 +312,28 @@ export async function getTradeStats(): Promise<{ totalTrades: number; uniqueTick
  * Sale trades (Sale, Sale (Partial), Sale (Full)) use saleTemplate.
  * Purchase trades use purchaseTemplate.
  * Trades that are neither sale nor purchase are skipped.
+ * Injects after:/before: date params into the Google News q= parameter
+ * to limit results to the max_age_days window.
  */
 function generateFeedUrls(
   trades: TradeWithCompanyName[],
   saleTemplate: string,
-  purchaseTemplate: string
+  purchaseTemplate: string,
+  maxAgeDays?: number
 ): { trade: TradeWithCompanyName; url: string }[] {
+  // Build date filter string for Google News q= param
+  let dateFilter = ''
+  if (maxAgeDays && maxAgeDays > 0) {
+    const now = new Date()
+    const after = new Date(now)
+    after.setDate(after.getDate() - maxAgeDays)
+    const tomorrow = new Date(now)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const afterStr = after.toISOString().split('T')[0]
+    const beforeStr = tomorrow.toISOString().split('T')[0]
+    dateFilter = `+after:${afterStr}+before:${beforeStr}`
+  }
+
   const entries: { trade: TradeWithCompanyName; url: string }[] = []
 
   for (const trade of trades) {
@@ -330,13 +346,12 @@ function generateFeedUrls(
     } else {
       continue // skip trades that aren't sale or purchase
     }
-    entries.push({
-      trade,
-      url: template.replace(
-        '{company_name}',
-        encodeURIComponent(trade.company_name)
-      ),
-    })
+    // Replace {company_name} and inject date filter after it
+    let url = template.replace(
+      '{company_name}',
+      encodeURIComponent(trade.company_name) + dateFilter
+    )
+    entries.push({ trade, url })
   }
 
   return entries
@@ -528,7 +543,7 @@ export async function runIngestion(): Promise<IngestionResult> {
   // 4. Get top trades and resolve names
   const trades = await getTopTrades(maxTrades)
   const tradesWithNames = await resolveTickerNames(trades)
-  const feedEntries = generateFeedUrls(tradesWithNames, saleTemplate, purchaseTemplate)
+  const feedEntries = generateFeedUrls(tradesWithNames, saleTemplate, purchaseTemplate, maxAgeDays)
 
   // 5. Calculate age cutoff
   const cutoff = new Date()
