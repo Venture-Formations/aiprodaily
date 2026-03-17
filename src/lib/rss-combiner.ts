@@ -553,6 +553,16 @@ export async function runIngestion(): Promise<IngestionResult> {
         const items = feed.items
         let storedForTrade = 0
 
+        // Log first item structure for debugging (once per ingestion run)
+        if (i === 0 && items.length > 0) {
+          const sample = items[0]
+          console.log(`[RSS-Combiner] Sample item structure:`, JSON.stringify({
+            source: sample.source,
+            link: typeof sample.link === 'string' ? sample.link.substring(0, 80) : sample.link,
+            title: typeof sample.title === 'string' ? sample.title.substring(0, 60) : sample.title,
+          }))
+        }
+
         for (const item of items) {
           const sourceName = extractSourceName(item)
           const sourceDomain = extractSourceDomain(item)
@@ -563,6 +573,9 @@ export async function runIngestion(): Promise<IngestionResult> {
           // Filter: approved sources only
           if (!sourceDomain || !approvedDomains.has(sourceDomain.toLowerCase())) {
             articlesFiltered++
+            if (feedsFetched === 0 && articlesFiltered <= 3) {
+              console.log(`[RSS-Combiner] Filtered: domain="${sourceDomain}" name="${sourceName}" title="${title.substring(0, 50)}"`)
+            }
             continue
           }
 
