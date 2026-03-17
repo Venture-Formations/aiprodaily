@@ -497,14 +497,13 @@ export async function runIngestion(): Promise<IngestionResult> {
   // 1. Load settings
   const { data: settings } = await supabaseAdmin
     .from('combined_feed_settings')
-    .select('max_trades, sale_url_template, purchase_url_template, max_articles_per_trade, max_age_days')
+    .select('max_trades, sale_url_template, purchase_url_template, max_age_days')
     .limit(1)
     .single()
 
   const maxTrades = settings?.max_trades ?? 21
   const saleTemplate = settings?.sale_url_template || ''
   const purchaseTemplate = settings?.purchase_url_template || ''
-  const maxArticlesPerTrade = settings?.max_articles_per_trade ?? 5
   const maxAgeDays = settings?.max_age_days ?? 7
 
   // 2. Load approved source domains
@@ -551,7 +550,7 @@ export async function runIngestion(): Promise<IngestionResult> {
       if (attempt > 0) await new Promise((r) => setTimeout(r, 2000))
       try {
         const feed = await fetchRssFeed(url)
-        const items = feed.items.slice(0, maxArticlesPerTrade)
+        const items = feed.items
         let storedForTrade = 0
 
         for (const item of items) {
