@@ -341,35 +341,46 @@ async function fetchAndEnrichFeeds(
     if (i > 0) await new Promise((r) => setTimeout(r, DELAY_MS))
 
     const { trade, url } = feedEntries[i]
-    try {
-      const feed = await fetchRssFeed(url)
-      const items = feed.items.slice(0, maxArticlesPerTrade).map((item: any) => ({
-        title: item.title || 'Untitled',
-        link: item.link || '',
-        description: item.description || '',
-        pubDate: item.pubDate ? new Date(item.pubDate) : new Date(),
-        author: item['dc:creator'] || '',
-        sourceLabel: trade.company_name,
-        sourceName: extractSourceName(item),
-        guid: item.guid?.['#text'] || item.guid || item.link || `${url}#${item.title}`,
-        tradeMeta: {
-          ticker: trade.ticker,
-          company_name: trade.company_name,
-          traded: trade.traded,
-          transaction: trade.transaction,
-          name: trade.name,
-          party: trade.party,
-          district: trade.district,
-          chamber: trade.chamber,
-          state: trade.state,
-        },
-      }))
-      allItems.push(...items)
-      succeeded++
-      console.log(`[RSS-Combiner] ${trade.ticker} (${trade.company_name}): ${items.length} articles`)
-    } catch (err: any) {
+    let lastError = ''
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 2000))
+      try {
+        const feed = await fetchRssFeed(url)
+        const items = feed.items.slice(0, maxArticlesPerTrade).map((item: any) => ({
+          title: item.title || 'Untitled',
+          link: item.link || '',
+          description: item.description || '',
+          pubDate: item.pubDate ? new Date(item.pubDate) : new Date(),
+          author: item['dc:creator'] || '',
+          sourceLabel: trade.company_name,
+          sourceName: extractSourceName(item),
+          guid: item.guid?.['#text'] || item.guid || item.link || `${url}#${item.title}`,
+          tradeMeta: {
+            ticker: trade.ticker,
+            company_name: trade.company_name,
+            traded: trade.traded,
+            transaction: trade.transaction,
+            name: trade.name,
+            party: trade.party,
+            district: trade.district,
+            chamber: trade.chamber,
+            state: trade.state,
+          },
+        }))
+        allItems.push(...items)
+        succeeded++
+        console.log(`[RSS-Combiner] ${trade.ticker} (${trade.company_name}): ${items.length} articles${attempt > 0 ? ' (retry)' : ''}`)
+        lastError = ''
+        break
+      } catch (err: any) {
+        lastError = err.message
+      }
+    }
+
+    if (lastError) {
       failed++
-      console.error(`[RSS-Combiner] ${trade.ticker} (${trade.company_name}) failed: ${err.message}`)
+      console.error(`[RSS-Combiner] ${trade.ticker} (${trade.company_name}) failed after 2 attempts: ${lastError}`)
     }
   }
 
