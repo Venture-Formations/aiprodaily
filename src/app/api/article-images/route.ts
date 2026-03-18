@@ -7,7 +7,7 @@ const COLUMNS = 'id, publication_id, category, lookup_key, display_name, image_u
 
 const createSchema = z.object({
   publication_id: z.string().uuid(),
-  category: z.enum(['member', 'transaction', 'custom']),
+  category: z.enum(['trade', 'member', 'transaction', 'custom']),
   lookup_key: z.string().min(1),
   display_name: z.string().min(1),
   image_url: z.string().url(),
