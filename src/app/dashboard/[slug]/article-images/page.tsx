@@ -23,7 +23,7 @@ interface MemberSuggestion {
   chamber: string
 }
 
-const TRANSACTION_TYPES = ['Purchase', 'Sale', 'Sale (Partial)', 'Sale (Full)', 'Exchange']
+const TRANSACTION_TYPES = ['Purchase', 'Sale']
 
 function normalizeLookupKey(name: string): string {
   return name
