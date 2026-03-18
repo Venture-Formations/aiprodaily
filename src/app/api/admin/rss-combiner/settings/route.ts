@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { z } from 'zod'
-import { invalidateCache } from '@/lib/rss-combiner'
+import { invalidateCache, invalidateTradesCache } from '@/lib/rss-combiner'
 
-const SETTINGS_COLUMNS = 'id, max_age_days, cache_ttl_minutes, feed_title, url_template, max_trades, updated_at' as const
+const SETTINGS_COLUMNS = 'id, max_age_days, cache_ttl_minutes, feed_title, url_template, sale_url_template, purchase_url_template, max_trades, max_articles_per_trade, last_ingestion_at, updated_at' as const
 
 export const GET = withApiHandler(
   { authTier: 'admin', logContext: 'rss-combiner/settings' },
@@ -28,7 +28,10 @@ const patchSchema = z.object({
   cache_ttl_minutes: z.number().int().min(1).max(1440).optional(),
   feed_title: z.string().min(1).max(200).optional(),
   url_template: z.string().min(1).max(2000).optional(),
+  sale_url_template: z.string().max(2000).optional(),
+  purchase_url_template: z.string().max(2000).optional(),
   max_trades: z.number().int().min(1).max(200).optional(),
+  max_articles_per_trade: z.number().int().min(1).max(100).optional(),
 })
 
 export const PATCH = withApiHandler(
@@ -57,6 +60,7 @@ export const PATCH = withApiHandler(
     }
 
     invalidateCache()
+    invalidateTradesCache()
 
     return NextResponse.json({ settings: data })
   }

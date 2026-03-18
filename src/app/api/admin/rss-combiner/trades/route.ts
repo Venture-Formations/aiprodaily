@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
-import { getTopTrades, resolveTickerNames } from '@/lib/rss-combiner'
+import { getTopTrades, resolveTickerNames, getTradeStats, getCachedTradesResponse, setCachedTradesResponse } from '@/lib/rss-combiner'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export const GET = withApiHandler(
   { authTier: 'admin', logContext: 'rss-combiner/trades' },
   async ({ request }: { request: NextRequest }) => {
+    // Return cached result if available
+    const cached = getCachedTradesResponse()
+    if (cached) {
+      return NextResponse.json(cached)
+    }
+
     // Load settings for max_trades
     const { data: settings } = await supabaseAdmin
       .from('combined_feed_settings')
@@ -17,28 +23,19 @@ export const GET = withApiHandler(
 
     const trades = await getTopTrades(maxTrades)
     const tradesWithNames = await resolveTickerNames(trades)
+    const { totalTrades, uniqueTickers } = await getTradeStats()
 
-    // Also get total trade count and unique ticker count for stats
-    const { count: totalTrades } = await supabaseAdmin
-      .from('congress_trades')
-      .select('id', { count: 'exact', head: true })
-
-    // Count unique tickers
-    const { data: allTickers } = await supabaseAdmin
-      .from('congress_trades')
-      .select('ticker')
-
-    const uniqueTickers = new Set(
-      (allTickers || []).map((r) => r.ticker.toUpperCase())
-    ).size
-
-    return NextResponse.json({
+    const response = {
       trades: tradesWithNames,
       stats: {
-        totalTrades: totalTrades ?? 0,
+        totalTrades,
         uniqueTickers,
         selectedForFeed: tradesWithNames.length,
       },
-    })
+    }
+
+    setCachedTradesResponse(response)
+
+    return NextResponse.json(response)
   }
 )

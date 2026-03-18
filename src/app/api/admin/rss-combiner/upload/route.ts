@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
-import { invalidateCache, parseTradeSize } from '@/lib/rss-combiner'
+import { invalidateCache, invalidateTradesCache, parseTradeSize } from '@/lib/rss-combiner'
 import { z } from 'zod'
 
 const BATCH_SIZE = 1000
@@ -84,6 +84,7 @@ export const POST = withApiHandler(
     }
 
     invalidateCache()
+    invalidateTradesCache()
 
     const uniqueTickers = new Set(trades.map((t) => t.ticker.toUpperCase())).size
 

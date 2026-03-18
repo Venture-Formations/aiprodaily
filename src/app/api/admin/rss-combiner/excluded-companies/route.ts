@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { withApiHandler } from '@/lib/api-handler'
 import { supabaseAdmin } from '@/lib/supabase'
 import { z } from 'zod'
-import { invalidateCache } from '@/lib/rss-combiner'
+import { invalidateCache, invalidateTradesCache } from '@/lib/rss-combiner'
 
 const COLUMNS = 'id, ticker, company_name, created_at' as const
 
@@ -44,6 +44,7 @@ export const POST = withApiHandler(
     }
 
     invalidateCache()
+    invalidateTradesCache()
     return NextResponse.json({ company: data })
   }
 )
@@ -65,6 +66,7 @@ export const DELETE = withApiHandler(
     }
 
     invalidateCache()
+    invalidateTradesCache()
     return NextResponse.json({ success: true })
   }
 )
