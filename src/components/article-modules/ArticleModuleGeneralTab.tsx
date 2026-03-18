@@ -26,6 +26,7 @@ const SELECTION_MODE_OPTIONS: { value: ArticleSelectionMode; label: string; desc
 const BLOCK_LABELS: Record<ArticleBlockType, string> = {
   source_image: 'Source Image',
   ai_image: 'AI Image',
+  trade_image: 'Trade Image',
   title: 'Title',
   body: 'Body'
 }

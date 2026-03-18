@@ -1542,7 +1542,7 @@ export interface AdModuleAdvertiserWithDetails extends AdModuleAdvertiser {
 // Article Module System Types
 // ===========================================
 
-export type ArticleBlockType = 'source_image' | 'ai_image' | 'title' | 'body'
+export type ArticleBlockType = 'source_image' | 'ai_image' | 'trade_image' | 'title' | 'body'
 export type ArticleSelectionMode = 'top_score' | 'manual'
 
 export interface ArticleModule {
@@ -1616,6 +1616,9 @@ export interface ModuleArticle {
   ai_title: string | null
   ai_image_url: string | null
   image_alt: string | null
+  trade_image_url: string | null
+  trade_image_alt: string | null
+  ticker: string | null
   created_at: string
   updated_at: string
 }
