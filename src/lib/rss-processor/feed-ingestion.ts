@@ -86,12 +86,25 @@ export class FeedIngestion {
     try {
       const rssFeed = await parser.parseURL(feed.url)
 
-      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000)
+      // Use module's lookback_hours if feed is assigned to a module, otherwise default 6h
+      let lookbackHours = 6
+      if (feed.article_module_id) {
+        const { data: mod } = await supabaseAdmin
+          .from('article_modules')
+          .select('lookback_hours')
+          .eq('id', feed.article_module_id)
+          .single()
+        if (mod?.lookback_hours) {
+          lookbackHours = mod.lookback_hours
+        }
+      }
+
+      const cutoffTime = new Date(Date.now() - lookbackHours * 60 * 60 * 1000)
 
       const recentPosts = rssFeed.items.filter(item => {
         if (!item.pubDate) return true
         const pubDate = new Date(item.pubDate)
-        return pubDate >= sixHoursAgo
+        return pubDate >= cutoffTime
       })
 
       const newPosts: any[] = []
