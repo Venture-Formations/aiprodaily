@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import Layout from '@/components/Layout'
 import { usePublicationId } from '@/hooks/usePublicationId'
 
@@ -14,6 +14,13 @@ interface ArticleImage {
   metadata: Record<string, unknown>
   created_at: string
   updated_at: string
+}
+
+interface MemberSuggestion {
+  name: string
+  party: string
+  state: string
+  chamber: string
 }
 
 const TRANSACTION_TYPES = ['Purchase', 'Sale', 'Sale (Partial)', 'Sale (Full)', 'Exchange']
@@ -37,6 +44,7 @@ function buildLookupKey(member: string, transaction: string): string {
 export default function ArticleImagesPage() {
   const { publicationId } = usePublicationId()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const suggestionsRef = useRef<HTMLDivElement>(null)
 
   const [images, setImages] = useState<ArticleImage[]>([])
   const [loading, setLoading] = useState(true)
@@ -49,11 +57,65 @@ export default function ArticleImagesPage() {
   const [memberName, setMemberName] = useState('')
   const [transactionType, setTransactionType] = useState('Purchase')
   const [imageUrl, setImageUrl] = useState('')
-  const [party, setParty] = useState('')
-  const [state, setState] = useState('')
-  const [chamber, setChamber] = useState('')
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  // Autocomplete state
+  const [suggestions, setSuggestions] = useState<MemberSuggestion[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [allMembers, setAllMembers] = useState<MemberSuggestion[]>([])
+  const [membersLoaded, setMembersLoaded] = useState(false)
+
+  // Load all members once for fast client-side filtering
+  useEffect(() => {
+    const loadMembers = async () => {
+      try {
+        const res = await fetch('/api/article-images/members')
+        const data = await res.json()
+        setAllMembers(data.members || [])
+        setMembersLoaded(true)
+      } catch (err) {
+        console.error('Failed to load members:', err)
+      }
+    }
+    loadMembers()
+  }, [])
+
+  // Filter suggestions client-side as user types
+  const updateSuggestions = useCallback((query: string) => {
+    if (query.length < 2 || !membersLoaded) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+    const q = query.toLowerCase()
+    const filtered = allMembers
+      .filter(m => m.name.toLowerCase().includes(q))
+      .slice(0, 10)
+    setSuggestions(filtered)
+    setShowSuggestions(filtered.length > 0)
+  }, [allMembers, membersLoaded])
+
+  const handleMemberInput = (value: string) => {
+    setMemberName(value)
+    updateSuggestions(value)
+  }
+
+  const selectSuggestion = (member: MemberSuggestion) => {
+    setMemberName(member.name)
+    setShowSuggestions(false)
+  }
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
 
   const fetchImages = async () => {
     if (!publicationId) return
@@ -101,9 +163,6 @@ export default function ArticleImagesPage() {
       const displayName = buildDisplayName(memberName, transactionType)
       const lookupKey = buildLookupKey(memberName, transactionType)
       const metadata: Record<string, string> = { member: memberName, transaction: transactionType }
-      if (party) metadata.party = party
-      if (state) metadata.state = state
-      if (chamber) metadata.chamber = chamber
 
       if (editingImage) {
         const res = await fetch(`/api/article-images/${editingImage.id}`, {
@@ -165,9 +224,7 @@ export default function ArticleImagesPage() {
     setMemberName('')
     setTransactionType('Purchase')
     setImageUrl('')
-    setParty('')
-    setState('')
-    setChamber('')
+    setShowSuggestions(false)
   }
 
   const openEdit = (img: ArticleImage) => {
@@ -176,9 +233,6 @@ export default function ArticleImagesPage() {
     setMemberName(meta?.member || img.display_name.split(' - ')[0] || '')
     setTransactionType(meta?.transaction || img.display_name.split(' - ')[1] || 'Purchase')
     setImageUrl(img.image_url)
-    setParty(meta?.party || '')
-    setState(meta?.state || '')
-    setChamber(meta?.chamber || '')
     setShowAddModal(true)
   }
 
@@ -281,13 +335,8 @@ export default function ArticleImagesPage() {
                           ? 'bg-green-100 text-green-700'
                           : 'bg-gray-100 text-gray-600'
                     }`}>
-                      {meta?.transaction || '—'}
+                      {meta?.transaction || '\u2014'}
                     </span>
-                    {(meta?.party || meta?.state) && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        {[meta.party, meta.state, meta.chamber].filter(Boolean).join(' | ')}
-                      </p>
-                    )}
                     <div className="flex gap-2 mt-2">
                       <button
                         onClick={() => openEdit(img)}
@@ -318,16 +367,35 @@ export default function ArticleImagesPage() {
               </h2>
 
               <div className="space-y-4">
-                {/* Member Name */}
-                <div>
+                {/* Member Name with Autocomplete */}
+                <div className="relative" ref={suggestionsRef}>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Member Name</label>
                   <input
                     type="text"
                     value={memberName}
-                    onChange={e => setMemberName(e.target.value)}
-                    placeholder="e.g., Nancy Pelosi"
+                    onChange={e => handleMemberInput(e.target.value)}
+                    onFocus={() => { if (memberName.length >= 2) updateSuggestions(memberName) }}
+                    placeholder="Start typing a member name..."
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    autoComplete="off"
                   />
+                  {showSuggestions && suggestions.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                      {suggestions.map((member, i) => (
+                        <button
+                          key={`${member.name}-${i}`}
+                          type="button"
+                          onClick={() => selectSuggestion(member)}
+                          className="w-full text-left px-3 py-2 hover:bg-emerald-50 flex items-center justify-between text-sm border-b border-gray-50 last:border-0"
+                        >
+                          <span className="font-medium text-gray-900">{member.name}</span>
+                          <span className="text-xs text-gray-400">
+                            {[member.party?.charAt(0), member.state, member.chamber].filter(Boolean).join(' \u00B7 ')}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Transaction Type */}
@@ -420,43 +488,6 @@ export default function ArticleImagesPage() {
                       </div>
                     </div>
                   )}
-                </div>
-
-                {/* Member Metadata */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Member Details (optional)</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <label className="block text-xs text-gray-500">Party</label>
-                      <input
-                        type="text"
-                        value={party}
-                        onChange={e => setParty(e.target.value)}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                        placeholder="D / R"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500">State</label>
-                      <input
-                        type="text"
-                        value={state}
-                        onChange={e => setState(e.target.value)}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                        placeholder="CA"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500">Chamber</label>
-                      <input
-                        type="text"
-                        value={chamber}
-                        onChange={e => setChamber(e.target.value)}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                        placeholder="House / Senate"
-                      />
-                    </div>
-                  </div>
                 </div>
               </div>
 
