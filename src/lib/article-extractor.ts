@@ -222,11 +222,68 @@ export class ArticleExtractor {
   }
 
   /**
+   * Resolve Google News redirect URLs to their final destination.
+   * Google News URLs use JS-based redirects that fetch() can't follow.
+   * We use a HEAD request with redirect: 'manual' to capture the Location header,
+   * or fall back to fetching the page and parsing the redirect URL from it.
+   */
+  private async resolveGoogleNewsUrl(url: string): Promise<string> {
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+      const response = await fetch(url, {
+        method: 'GET',
+        redirect: 'follow',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': this.USER_AGENT,
+          'Accept': 'text/html',
+        }
+      })
+
+      clearTimeout(timeoutId)
+
+      // If we were redirected, the final URL is the real article
+      if (response.url && response.url !== url && !response.url.includes('news.google.com')) {
+        return response.url
+      }
+
+      // Parse the HTML for a meta refresh or JS redirect
+      const html = await response.text()
+      const metaMatch = html.match(/<meta[^>]+http-equiv=["']refresh["'][^>]+content=["'][^"']*url=([^"'\s>]+)/i)
+      if (metaMatch?.[1]) {
+        return metaMatch[1]
+      }
+
+      // Look for data-redirect or similar patterns
+      const redirectMatch = html.match(/data-redirect="([^"]+)"/i)
+        || html.match(/href="(https?:\/\/(?!news\.google\.com)[^"]+)"/i)
+      if (redirectMatch?.[1]) {
+        return redirectMatch[1]
+      }
+
+      return url // Give up, return original
+    } catch {
+      return url
+    }
+  }
+
+  /**
    * Fetch HTML and extract article content
    * Strategy: Extract first, only check for paywall indicators if content is short/missing
    */
   private async fetchAndExtract(url: string): Promise<ArticleExtractionResult> {
     try {
+      // Resolve Google News redirect URLs to actual article URLs
+      if (url.includes('news.google.com/rss/articles/')) {
+        const resolvedUrl = await this.resolveGoogleNewsUrl(url)
+        if (resolvedUrl !== url) {
+          console.log(`[Extract] Resolved Google News URL to: ${resolvedUrl.substring(0, 80)}...`)
+          url = resolvedUrl
+        }
+      }
+
       // Fetch HTML with timeout
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT_MS)
