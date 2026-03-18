@@ -162,6 +162,19 @@ export class ArticleExtractor {
     let lastError: string | undefined
     let detectedStatus: ExtractionStatus = 'failed'
 
+    // Google News URLs use JS redirects — skip Readability, go straight to Jina
+    if (this.isGoogleNewsUrl(url)) {
+      console.log(`[Extract] Google News URL detected, using Jina directly`)
+      try {
+        const jinaResult = await this.extractWithJina(url)
+        if (jinaResult.success) return jinaResult
+        return { success: false, status: jinaResult.status, error: `Jina failed for Google News URL: ${jinaResult.error}` }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unknown error'
+        return { success: false, status: 'failed', error: `Jina error for Google News URL: ${msg}` }
+      }
+    }
+
     // Log if this is a known paywall domain
     if (this.isKnownPaywallDomain(url)) {
       console.log(`[Extract] Known paywall domain, will attempt extraction: ${new URL(url).hostname}`)
@@ -222,51 +235,13 @@ export class ArticleExtractor {
   }
 
   /**
-   * Resolve Google News redirect URLs to their final destination.
-   * Google News URLs use JS-based redirects that fetch() can't follow.
-   * We use a HEAD request with redirect: 'manual' to capture the Location header,
-   * or fall back to fetching the page and parsing the redirect URL from it.
+   * Check if a URL is a Google News redirect URL.
+   * These can't be resolved via simple fetch — they use JS-based redirects
+   * with protobuf-encoded article IDs. Jina AI handles them via browser rendering.
+   * We skip the direct Readability extraction for these and go straight to Jina.
    */
-  private async resolveGoogleNewsUrl(url: string): Promise<string> {
-    try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000)
-
-      const response = await fetch(url, {
-        method: 'GET',
-        redirect: 'follow',
-        signal: controller.signal,
-        headers: {
-          'User-Agent': this.USER_AGENT,
-          'Accept': 'text/html',
-        }
-      })
-
-      clearTimeout(timeoutId)
-
-      // If we were redirected, the final URL is the real article
-      if (response.url && response.url !== url && !response.url.includes('news.google.com')) {
-        return response.url
-      }
-
-      // Parse the HTML for a meta refresh or JS redirect
-      const html = await response.text()
-      const metaMatch = html.match(/<meta[^>]+http-equiv=["']refresh["'][^>]+content=["'][^"']*url=([^"'\s>]+)/i)
-      if (metaMatch?.[1]) {
-        return metaMatch[1]
-      }
-
-      // Look for data-redirect or similar patterns
-      const redirectMatch = html.match(/data-redirect="([^"]+)"/i)
-        || html.match(/href="(https?:\/\/(?!news\.google\.com)[^"]+)"/i)
-      if (redirectMatch?.[1]) {
-        return redirectMatch[1]
-      }
-
-      return url // Give up, return original
-    } catch {
-      return url
-    }
+  private isGoogleNewsUrl(url: string): boolean {
+    return url.includes('news.google.com/rss/articles/')
   }
 
   /**
@@ -275,15 +250,6 @@ export class ArticleExtractor {
    */
   private async fetchAndExtract(url: string): Promise<ArticleExtractionResult> {
     try {
-      // Resolve Google News redirect URLs to actual article URLs
-      if (url.includes('news.google.com/rss/articles/')) {
-        const resolvedUrl = await this.resolveGoogleNewsUrl(url)
-        if (resolvedUrl !== url) {
-          console.log(`[Extract] Resolved Google News URL to: ${resolvedUrl.substring(0, 80)}...`)
-          url = resolvedUrl
-        }
-      }
-
       // Fetch HTML with timeout
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT_MS)
@@ -426,7 +392,8 @@ export class ArticleExtractor {
   private async extractWithJina(url: string): Promise<ArticleExtractionResult> {
     try {
       // Jina AI Reader: prefix URL with https://r.jina.ai/
-      const jinaUrl = `https://r.jina.ai/${encodeURIComponent(url)}`
+      // Do NOT encodeURIComponent — Jina expects the raw URL after the prefix
+      const jinaUrl = `https://r.jina.ai/${url}`
 
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), this.JINA_TIMEOUT_MS)
