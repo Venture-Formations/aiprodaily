@@ -16,14 +16,15 @@ interface TradeMetadata {
 }
 
 /**
- * Matches articles to trade images (member photos + transaction type icons)
- * from the article_images table.
+ * Matches articles to trade images from the article_images table.
+ * Each image represents a specific member + transaction type combo
+ * (e.g., "Nancy Pelosi - Purchase", "Nancy Pelosi - Sale").
  */
 export class ImageMatcher {
   /**
    * Normalize a name or label into a URL-safe lookup key.
-   * "Nancy Pelosi" → "nancy-pelosi"
-   * "Sale (Partial)" → "sale-partial"
+   * "Nancy Pelosi Purchase" → "nancy-pelosi-purchase"
+   * "Nancy Pelosi Sale (Partial)" → "nancy-pelosi-sale-partial"
    */
   static normalizeLookupKey(name: string): string {
     return name
@@ -34,9 +35,17 @@ export class ImageMatcher {
   }
 
   /**
+   * Build the combo lookup key from member name + transaction type.
+   */
+  static buildLookupKey(member: string, transaction: string): string {
+    return ImageMatcher.normalizeLookupKey(`${member} ${transaction}`)
+  }
+
+  /**
    * Attach trade images to all active module_articles for an issue/module.
-   * Reads trade metadata from the linked rss_post, matches against article_images,
-   * and updates trade_image_url, trade_image_alt, and ticker on module_articles.
+   * Reads trade metadata from the linked rss_post, matches against article_images
+   * using the combined member+transaction lookup key, and updates trade_image_url,
+   * trade_image_alt, and ticker on module_articles.
    */
   static async attachTradeImages(
     issueId: string,
@@ -60,27 +69,22 @@ export class ImageMatcher {
       return { matched: 0, unmatched: 0 }
     }
 
-    // Load all article images for this publication (small table, load once)
+    // Load all trade images for this publication (small table, load once)
     const { data: images } = await supabaseAdmin
       .from('article_images')
       .select('id, category, lookup_key, display_name, image_url, metadata')
       .eq('publication_id', publicationId)
+      .eq('category', 'trade')
 
     if (!images || images.length === 0) {
-      console.log(`[ImageMatcher] No article images configured for publication ${publicationId}`)
+      console.log(`[ImageMatcher] No trade images configured for publication ${publicationId}`)
       return { matched: 0, unmatched: articles.length }
     }
 
-    // Build lookup maps
-    const memberImages = new Map<string, ArticleImage>()
-    const transactionImages = new Map<string, ArticleImage>()
-
+    // Build lookup map: "nancy-pelosi-purchase" → image
+    const tradeImages = new Map<string, ArticleImage>()
     for (const img of images) {
-      if (img.category === 'member') {
-        memberImages.set(img.lookup_key, img as ArticleImage)
-      } else if (img.category === 'transaction') {
-        transactionImages.set(img.lookup_key, img as ArticleImage)
-      }
+      tradeImages.set(img.lookup_key, img as ArticleImage)
     }
 
     let matched = 0
@@ -102,34 +106,22 @@ export class ImageMatcher {
       const transaction = tradeMeta.transaction
       const ticker = tradeMeta.ticker
 
-      // Try to match member image
-      let memberImage: ArticleImage | undefined
-      if (memberName) {
-        const memberKey = ImageMatcher.normalizeLookupKey(memberName)
-        memberImage = memberImages.get(memberKey)
+      // Match by combined member + transaction key
+      let tradeImage: ArticleImage | undefined
+      if (memberName && transaction) {
+        const comboKey = ImageMatcher.buildLookupKey(memberName, transaction)
+        tradeImage = tradeImages.get(comboKey)
       }
 
-      // Try to match transaction type image
-      let transactionImage: ArticleImage | undefined
-      if (transaction) {
-        const txnKey = ImageMatcher.normalizeLookupKey(transaction)
-        transactionImage = transactionImages.get(txnKey)
-      }
-
-      // Use the member image as primary, fall back to transaction image
-      const tradeImageUrl = memberImage?.image_url || transactionImage?.image_url || null
-      const tradeImageAlt = memberImage
-        ? `${memberImage.display_name}${transaction ? ` - ${transaction}` : ''}`
-        : transactionImage
-          ? transactionImage.display_name
-          : null
+      const tradeImageUrl = tradeImage?.image_url || null
+      const tradeImageAlt = tradeImage?.display_name || null
 
       if (tradeImageUrl) {
         matched++
       } else {
         unmatched++
-        if (memberName) {
-          console.log(`[ImageMatcher] No image found for member "${memberName}"`)
+        if (memberName && transaction) {
+          console.log(`[ImageMatcher] No image for "${memberName} - ${transaction}"`)
         }
       }
 

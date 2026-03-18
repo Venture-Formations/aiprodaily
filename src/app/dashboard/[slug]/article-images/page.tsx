@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Layout from '@/components/Layout'
 import { usePublicationId } from '@/hooks/usePublicationId'
 
@@ -16,7 +16,7 @@ interface ArticleImage {
   updated_at: string
 }
 
-type Category = 'member' | 'transaction'
+const TRANSACTION_TYPES = ['Purchase', 'Sale', 'Sale (Partial)', 'Sale (Full)', 'Exchange']
 
 function normalizeLookupKey(name: string): string {
   return name
@@ -26,19 +26,32 @@ function normalizeLookupKey(name: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
+function buildDisplayName(member: string, transaction: string): string {
+  return `${member} - ${transaction}`
+}
+
+function buildLookupKey(member: string, transaction: string): string {
+  return normalizeLookupKey(`${member} ${transaction}`)
+}
+
 export default function ArticleImagesPage() {
   const { publicationId } = usePublicationId()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [activeTab, setActiveTab] = useState<Category>('member')
   const [images, setImages] = useState<ArticleImage[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingImage, setEditingImage] = useState<ArticleImage | null>(null)
+  const [filterMember, setFilterMember] = useState('')
+  const [filterTransaction, setFilterTransaction] = useState('')
 
   // Add form state
-  const [displayName, setDisplayName] = useState('')
+  const [memberName, setMemberName] = useState('')
+  const [transactionType, setTransactionType] = useState('Purchase')
   const [imageUrl, setImageUrl] = useState('')
-  const [metadata, setMetadata] = useState<Record<string, string>>({})
+  const [party, setParty] = useState('')
+  const [state, setState] = useState('')
+  const [chamber, setChamber] = useState('')
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -46,7 +59,7 @@ export default function ArticleImagesPage() {
     if (!publicationId) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/article-images?publication_id=${publicationId}&category=${activeTab}`)
+      const res = await fetch(`/api/article-images?publication_id=${publicationId}&category=trade`)
       const data = await res.json()
       setImages(data.images || [])
     } catch (err) {
@@ -58,7 +71,7 @@ export default function ArticleImagesPage() {
 
   useEffect(() => {
     fetchImages()
-  }, [publicationId, activeTab])
+  }, [publicationId])
 
   const handleFileUpload = async (file: File) => {
     setUploading(true)
@@ -82,9 +95,16 @@ export default function ArticleImagesPage() {
   }
 
   const handleSave = async () => {
-    if (!publicationId || !displayName || !imageUrl) return
+    if (!publicationId || !memberName || !transactionType || !imageUrl) return
     setSaving(true)
     try {
+      const displayName = buildDisplayName(memberName, transactionType)
+      const lookupKey = buildLookupKey(memberName, transactionType)
+      const metadata: Record<string, string> = { member: memberName, transaction: transactionType }
+      if (party) metadata.party = party
+      if (state) metadata.state = state
+      if (chamber) metadata.chamber = chamber
+
       if (editingImage) {
         const res = await fetch(`/api/article-images/${editingImage.id}`, {
           method: 'PATCH',
@@ -92,7 +112,7 @@ export default function ArticleImagesPage() {
           body: JSON.stringify({
             display_name: displayName,
             image_url: imageUrl,
-            lookup_key: normalizeLookupKey(displayName),
+            lookup_key: lookupKey,
             metadata,
           }),
         })
@@ -107,8 +127,8 @@ export default function ArticleImagesPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             publication_id: publicationId,
-            category: activeTab,
-            lookup_key: normalizeLookupKey(displayName),
+            category: 'trade',
+            lookup_key: lookupKey,
             display_name: displayName,
             image_url: imageUrl,
             metadata,
@@ -142,26 +162,47 @@ export default function ArticleImagesPage() {
   const resetForm = () => {
     setShowAddModal(false)
     setEditingImage(null)
-    setDisplayName('')
+    setMemberName('')
+    setTransactionType('Purchase')
     setImageUrl('')
-    setMetadata({})
+    setParty('')
+    setState('')
+    setChamber('')
   }
 
   const openEdit = (img: ArticleImage) => {
     setEditingImage(img)
-    setDisplayName(img.display_name)
+    const meta = img.metadata as Record<string, string>
+    setMemberName(meta?.member || img.display_name.split(' - ')[0] || '')
+    setTransactionType(meta?.transaction || img.display_name.split(' - ')[1] || 'Purchase')
     setImageUrl(img.image_url)
-    setMetadata((img.metadata as Record<string, string>) || {})
+    setParty(meta?.party || '')
+    setState(meta?.state || '')
+    setChamber(meta?.chamber || '')
     setShowAddModal(true)
   }
 
-  const memberMetaFields = ['party', 'state', 'chamber']
+  // Get unique members and transactions for filter dropdowns
+  const uniqueMembers = Array.from(new Set(images.map(img => (img.metadata as any)?.member).filter(Boolean))).sort()
+  const uniqueTransactions = Array.from(new Set(images.map(img => (img.metadata as any)?.transaction).filter(Boolean))).sort()
+
+  const filteredImages = images.filter(img => {
+    const meta = img.metadata as Record<string, string>
+    if (filterMember && meta?.member !== filterMember) return false
+    if (filterTransaction && meta?.transaction !== filterTransaction) return false
+    return true
+  })
 
   return (
     <Layout>
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Article Images</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Trade Images</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Each image represents a member + transaction type combination
+            </p>
+          </div>
           <button
             onClick={() => { resetForm(); setShowAddModal(true) }}
             className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
@@ -170,70 +211,101 @@ export default function ArticleImagesPage() {
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6">
-          {(['member', 'transaction'] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === tab
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+        {/* Filters */}
+        {images.length > 0 && (
+          <div className="flex gap-3 mb-6">
+            <select
+              value={filterMember}
+              onChange={e => setFilterMember(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
             >
-              {tab === 'member' ? 'Members' : 'Transactions'}
-            </button>
-          ))}
-        </div>
+              <option value="">All Members ({uniqueMembers.length})</option>
+              {uniqueMembers.map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            <select
+              value={filterTransaction}
+              onChange={e => setFilterTransaction(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+            >
+              <option value="">All Transactions</option>
+              {uniqueTransactions.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            {(filterMember || filterTransaction) && (
+              <button
+                onClick={() => { setFilterMember(''); setFilterTransaction('') }}
+                className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
+              >
+                Clear
+              </button>
+            )}
+            <span className="self-center text-sm text-gray-400">
+              {filteredImages.length} image{filteredImages.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+        )}
 
         {/* Image Grid */}
         {loading ? (
           <div className="text-center py-12 text-gray-500">Loading...</div>
         ) : images.length === 0 ? (
           <div className="text-center py-12 text-gray-400">
-            No {activeTab} images yet. Click &ldquo;Add Image&rdquo; to get started.
+            No trade images yet. Click &ldquo;Add Image&rdquo; to get started.
+          </div>
+        ) : filteredImages.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">
+            No images match the current filters.
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {images.map(img => (
-              <div key={img.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                <div className="aspect-square bg-gray-50 flex items-center justify-center p-2">
-                  <img
-                    src={img.image_url}
-                    alt={img.display_name}
-                    className="max-w-full max-h-full object-contain rounded"
-                  />
-                </div>
-                <div className="p-3">
-                  <p className="font-medium text-gray-900 text-sm truncate">{img.display_name}</p>
-                  <p className="text-xs text-gray-400 truncate">{img.lookup_key}</p>
-                  {activeTab === 'member' && img.metadata && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      {[
-                        (img.metadata as any).party,
-                        (img.metadata as any).state,
-                        (img.metadata as any).chamber
-                      ].filter(Boolean).join(' | ')}
-                    </p>
-                  )}
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      onClick={() => openEdit(img)}
-                      className="text-xs text-blue-600 hover:text-blue-800"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(img.id)}
-                      className="text-xs text-red-500 hover:text-red-700"
-                    >
-                      Delete
-                    </button>
+            {filteredImages.map(img => {
+              const meta = img.metadata as Record<string, string>
+              return (
+                <div key={img.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                  <div className="aspect-square bg-gray-50 flex items-center justify-center p-2">
+                    <img
+                      src={img.image_url}
+                      alt={img.display_name}
+                      className="max-w-full max-h-full object-contain rounded"
+                    />
+                  </div>
+                  <div className="p-3">
+                    <p className="font-medium text-gray-900 text-sm truncate">{meta?.member || img.display_name}</p>
+                    <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full ${
+                      meta?.transaction?.toLowerCase().includes('sale')
+                        ? 'bg-red-100 text-red-700'
+                        : meta?.transaction?.toLowerCase() === 'purchase'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {meta?.transaction || '—'}
+                    </span>
+                    {(meta?.party || meta?.state) && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {[meta.party, meta.state, meta.chamber].filter(Boolean).join(' | ')}
+                      </p>
+                    )}
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={() => openEdit(img)}
+                        className="text-xs text-blue-600 hover:text-blue-800"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(img.id)}
+                        className="text-xs text-red-500 hover:text-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
@@ -242,32 +314,55 @@ export default function ArticleImagesPage() {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
               <h2 className="text-lg font-bold mb-4">
-                {editingImage ? 'Edit' : 'Add'} {activeTab === 'member' ? 'Member' : 'Transaction'} Image
+                {editingImage ? 'Edit' : 'Add'} Trade Image
               </h2>
 
               <div className="space-y-4">
+                {/* Member Name */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Member Name</label>
                   <input
                     type="text"
-                    value={displayName}
-                    onChange={e => setDisplayName(e.target.value)}
-                    placeholder={activeTab === 'member' ? 'e.g., Nancy Pelosi' : 'e.g., Purchase'}
+                    value={memberName}
+                    onChange={e => setMemberName(e.target.value)}
+                    placeholder="e.g., Nancy Pelosi"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   />
-                  {displayName && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      Lookup key: {normalizeLookupKey(displayName)}
-                    </p>
-                  )}
                 </div>
 
+                {/* Transaction Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Transaction Type</label>
+                  <select
+                    value={transactionType}
+                    onChange={e => setTransactionType(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                  >
+                    {TRANSACTION_TYPES.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Preview of lookup key */}
+                {memberName && (
+                  <div className="bg-gray-50 rounded-lg px-3 py-2">
+                    <p className="text-xs text-gray-500">
+                      Display: <span className="font-medium text-gray-700">{buildDisplayName(memberName, transactionType)}</span>
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Lookup key: {buildLookupKey(memberName, transactionType)}
+                    </p>
+                  </div>
+                )}
+
+                {/* Image Upload */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Image</label>
                   {imageUrl ? (
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                       <img src={imageUrl} alt="Preview" className="w-16 h-16 object-cover rounded border" />
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <p className="text-xs text-gray-500 truncate">{imageUrl}</p>
                         <button
                           onClick={() => setImageUrl('')}
@@ -278,51 +373,91 @@ export default function ArticleImagesPage() {
                       </div>
                     </div>
                   ) : (
-                    <div>
+                    <div className="space-y-3">
                       <input
+                        ref={fileInputRef}
                         type="file"
                         accept="image/*"
                         onChange={e => {
                           const file = e.target.files?.[0]
                           if (file) handleFileUpload(file)
                         }}
-                        className="w-full text-sm"
+                        className="hidden"
                         disabled={uploading}
                       />
-                      {uploading && <p className="text-xs text-gray-500 mt-1">Uploading...</p>}
-                      <div className="mt-2">
-                        <label className="block text-xs text-gray-500 mb-1">Or paste URL:</label>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-600 hover:border-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {uploading ? (
+                          <>
+                            <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Choose Image File
+                          </>
+                        )}
+                      </button>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Or paste image URL:</label>
                         <input
                           type="url"
                           value={imageUrl}
                           onChange={e => setImageUrl(e.target.value)}
                           placeholder="https://..."
-                          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+                          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                         />
                       </div>
                     </div>
                   )}
                 </div>
 
-                {activeTab === 'member' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Metadata (optional)</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {memberMetaFields.map(field => (
-                        <div key={field}>
-                          <label className="block text-xs text-gray-500 capitalize">{field}</label>
-                          <input
-                            type="text"
-                            value={metadata[field] || ''}
-                            onChange={e => setMetadata(prev => ({ ...prev, [field]: e.target.value }))}
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                            placeholder={field === 'party' ? 'D/R' : field === 'state' ? 'CA' : 'House/Senate'}
-                          />
-                        </div>
-                      ))}
+                {/* Member Metadata */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Member Details (optional)</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-xs text-gray-500">Party</label>
+                      <input
+                        type="text"
+                        value={party}
+                        onChange={e => setParty(e.target.value)}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                        placeholder="D / R"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500">State</label>
+                      <input
+                        type="text"
+                        value={state}
+                        onChange={e => setState(e.target.value)}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                        placeholder="CA"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500">Chamber</label>
+                      <input
+                        type="text"
+                        value={chamber}
+                        onChange={e => setChamber(e.target.value)}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                        placeholder="House / Senate"
+                      />
                     </div>
                   </div>
-                )}
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 mt-6">
@@ -334,7 +469,7 @@ export default function ArticleImagesPage() {
                 </button>
                 <button
                   onClick={handleSave}
-                  disabled={saving || !displayName || !imageUrl}
+                  disabled={saving || !memberName || !transactionType || !imageUrl}
                   className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? 'Saving...' : editingImage ? 'Update' : 'Add'}
