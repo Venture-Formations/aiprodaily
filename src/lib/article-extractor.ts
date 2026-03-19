@@ -162,16 +162,14 @@ export class ArticleExtractor {
     let lastError: string | undefined
     let detectedStatus: ExtractionStatus = 'failed'
 
-    // Google News URLs use JS redirects — skip Readability, go straight to Jina
+    // Google News URLs use JS-based protobuf redirects that can't be followed
+    // by fetch() or Jina (403). Skip extraction — the article title and description
+    // from the RSS feed are sufficient for AI-based article generation.
     if (this.isGoogleNewsUrl(url)) {
-      console.log(`[Extract] Google News URL detected, using Jina directly`)
-      try {
-        const jinaResult = await this.extractWithJina(url)
-        if (jinaResult.success) return jinaResult
-        return { success: false, status: jinaResult.status, error: `Jina failed for Google News URL: ${jinaResult.error}` }
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : 'Unknown error'
-        return { success: false, status: 'failed', error: `Jina error for Google News URL: ${msg}` }
+      return {
+        success: false,
+        status: 'skipped' as ExtractionStatus,
+        error: 'Google News redirect URL — extraction skipped, using RSS metadata'
       }
     }
 

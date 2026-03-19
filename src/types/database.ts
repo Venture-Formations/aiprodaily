@@ -227,7 +227,7 @@ export interface RssFeed {
 }
 
 // Extraction status types for paywall/access detection
-export type ExtractionStatus = 'pending' | 'success' | 'paywall' | 'login_required' | 'blocked' | 'timeout' | 'failed'
+export type ExtractionStatus = 'pending' | 'success' | 'skipped' | 'paywall' | 'login_required' | 'blocked' | 'timeout' | 'failed'
 
 export interface RssPost {
   id: string
