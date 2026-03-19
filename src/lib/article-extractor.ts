@@ -162,6 +162,19 @@ export class ArticleExtractor {
     let lastError: string | undefined
     let detectedStatus: ExtractionStatus = 'failed'
 
+    // Google News URLs use JS redirects — skip Readability, go straight to Jina
+    if (this.isGoogleNewsUrl(url)) {
+      console.log(`[Extract] Google News URL detected, using Jina directly`)
+      try {
+        const jinaResult = await this.extractWithJina(url)
+        if (jinaResult.success) return jinaResult
+        return { success: false, status: jinaResult.status, error: `Jina failed for Google News URL: ${jinaResult.error}` }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unknown error'
+        return { success: false, status: 'failed', error: `Jina error for Google News URL: ${msg}` }
+      }
+    }
+
     // Log if this is a known paywall domain
     if (this.isKnownPaywallDomain(url)) {
       console.log(`[Extract] Known paywall domain, will attempt extraction: ${new URL(url).hostname}`)
@@ -219,6 +232,16 @@ export class ArticleExtractor {
       status: detectedStatus,
       error: lastError || 'All extraction methods failed'
     }
+  }
+
+  /**
+   * Check if a URL is a Google News redirect URL.
+   * These can't be resolved via simple fetch — they use JS-based redirects
+   * with protobuf-encoded article IDs. Jina AI handles them via browser rendering.
+   * We skip the direct Readability extraction for these and go straight to Jina.
+   */
+  private isGoogleNewsUrl(url: string): boolean {
+    return url.includes('news.google.com/rss/articles/')
   }
 
   /**
@@ -369,17 +392,26 @@ export class ArticleExtractor {
   private async extractWithJina(url: string): Promise<ArticleExtractionResult> {
     try {
       // Jina AI Reader: prefix URL with https://r.jina.ai/
-      const jinaUrl = `https://r.jina.ai/${encodeURIComponent(url)}`
+      // Do NOT encodeURIComponent — Jina expects the raw URL after the prefix
+      const jinaUrl = `https://r.jina.ai/${url}`
 
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), this.JINA_TIMEOUT_MS)
 
+      const headers: Record<string, string> = {
+        'Accept': 'text/plain',
+        'User-Agent': this.USER_AGENT,
+      }
+
+      // Jina requires an API key for server-side requests
+      const jinaApiKey = process.env.JINA_API_KEY
+      if (jinaApiKey) {
+        headers['Authorization'] = `Bearer ${jinaApiKey}`
+      }
+
       const response = await fetch(jinaUrl, {
         signal: controller.signal,
-        headers: {
-          'Accept': 'text/plain',
-          'User-Agent': this.USER_AGENT,
-        }
+        headers,
       })
 
       clearTimeout(timeoutId)
