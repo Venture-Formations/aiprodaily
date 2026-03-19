@@ -7,7 +7,7 @@ import { Scoring } from './scoring'
 
 const parser = new Parser({
   customFields: {
-    item: ['media:content', 'enclosure']
+    item: ['media:content', 'enclosure', 'ticker', 'company', 'member', 'transaction', 'party', 'chamber', 'state']
   }
 })
 
@@ -158,6 +158,12 @@ export class FeedIngestion {
 
         console.log(`[Ingest] Inserting post from feed ${feed.name} (${feed.id}), article_module_id: ${feed.article_module_id || 'NULL'}`)
 
+        // Extract ticker from custom RSS field (combined feed includes trade metadata)
+        // The feed package outputs extensions as { _text: 'QCOM' } or plain string
+        const rawTicker = (item as any).ticker
+        const ticker = typeof rawTicker === 'string' ? rawTicker
+          : rawTicker?._text || rawTicker?.['#text'] || null
+
         const { data: newPost, error: insertError } = await supabaseAdmin
           .from('rss_posts')
           .insert([{
@@ -172,6 +178,7 @@ export class FeedIngestion {
             publication_date: item.pubDate,
             source_url: item.link,
             image_url: imageUrl,
+            ticker,
           }])
           .select('id, source_url')
           .single()

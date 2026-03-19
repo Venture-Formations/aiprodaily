@@ -572,6 +572,41 @@ export class ArticleModuleSelector {
       return scoreB - scoreA
     })
 
+    // Ticker-based dedup: limit to 1 article per ticker (company)
+    // Fetch tickers from rss_posts for all eligible articles
+    const eligiblePostIds = sortedArticles.map(a => a.post_id).filter(Boolean)
+    const tickerMap = new Map<string, string>() // post_id → ticker
+
+    if (eligiblePostIds.length > 0) {
+      const { data: postTickers } = await supabaseAdmin
+        .from('rss_posts')
+        .select('id, ticker')
+        .in('id', eligiblePostIds)
+        .not('ticker', 'is', null)
+
+      for (const pt of postTickers || []) {
+        if (pt.ticker) tickerMap.set(pt.id, pt.ticker.toUpperCase())
+      }
+    }
+
+    // Filter: keep only the top-scoring article per ticker
+    const seenTickers = new Set<string>()
+    const dedupedArticles = sortedArticles.filter(article => {
+      if (!article.post_id) return true // no post_id, keep it
+      const ticker = tickerMap.get(article.post_id)
+      if (!ticker) return true // no ticker, keep it (non-trade article)
+      if (seenTickers.has(ticker)) {
+        console.log(`[ArticleModuleSelector] Skipping duplicate ticker ${ticker}: "${article.headline?.substring(0, 50)}"`)
+        return false
+      }
+      seenTickers.add(ticker)
+      return true
+    })
+
+    if (dedupedArticles.length < sortedArticles.length) {
+      console.log(`[ArticleModuleSelector] Ticker dedup: ${sortedArticles.length} → ${dedupedArticles.length} articles`)
+    }
+
     // Deactivate all first
     await supabaseAdmin
       .from('module_articles')
@@ -580,7 +615,7 @@ export class ArticleModuleSelector {
       .eq('article_module_id', moduleId)
 
     // Activate top N
-    const topArticles = sortedArticles.slice(0, limit)
+    const topArticles = dedupedArticles.slice(0, limit)
     const articleIds: string[] = []
 
     for (let i = 0; i < topArticles.length; i++) {
