@@ -66,3 +66,5 @@ NUL
 .claude/prds/
 .claude-backup/
 .claude/.pre-push-approved
+.claude/.security-auditor-approved
+.claude/.database-optimizer-approved
