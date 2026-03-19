@@ -48,38 +48,45 @@ export class ModuleAdSelector {
   }
 
   /**
-   * Check if a single ad is eligible (date range, paid limits, etc.)
+   * Check if a single ad is eligible (date range only — paid/frequency checks moved to company level)
    */
   private static isAdEligible(ad: Advertisement, issueDate: Date): boolean {
-    // Check date range
-    if (!this.isAdInDateRange(ad, issueDate)) {
+    return this.isAdInDateRange(ad, issueDate)
+  }
+
+  /**
+   * Check if a company is eligible for the current billing period based on junction-level frequency.
+   * - 'weekly': company hasn't appeared in current Sun-Sat week AND has remaining paid weeks
+   * - 'monthly': company hasn't appeared in current calendar month AND has remaining paid months
+   * - 'single': always eligible (no period tracking)
+   */
+  private static isCompanyEligibleThisPeriod(
+    junction: AdModuleAdvertiser,
+    issueDate: Date
+  ): boolean {
+    const frequency = junction.frequency || 'single'
+
+    if (frequency === 'single') return true
+
+    // Check remaining paid periods
+    if (junction.times_paid > 0 && junction.times_used >= junction.times_paid) {
       return false
     }
 
-    // PAID ADS ONLY: Additional checks for sponsored ads with weekly limits
-    const isPaidWeeklyAd = ad.paid === true && ad.frequency === 'weekly' && ad.times_paid && ad.times_paid > 0
+    // Check if company already appeared in current period
+    if (junction.last_used_date) {
+      const lastUsed = new Date(junction.last_used_date)
 
-    if (isPaidWeeklyAd) {
-      // Check if ad has remaining uses
-      const remaining = ad.times_paid - (ad.times_used || 0)
-      if (remaining <= 0) {
-        return false
-      }
-
-      // Check if ad already ran this week (Sun-Sat)
-      if (ad.last_used_date) {
-        const lastUsed = new Date(ad.last_used_date)
+      if (frequency === 'weekly') {
         const issueWeekStart = getWeekStart(issueDate)
         const lastUsedWeekStart = getWeekStart(lastUsed)
-
         if (issueWeekStart.getTime() === lastUsedWeekStart.getTime()) {
           return false
         }
-
-        const lastDayOfWeek = lastUsed.getDay()
-        const issueDayOfWeek = issueDate.getDay()
-
-        if (lastDayOfWeek === issueDayOfWeek) {
+      } else if (frequency === 'monthly') {
+        const issueMonth = issueDate.getFullYear() * 12 + issueDate.getMonth()
+        const lastUsedMonth = lastUsed.getFullYear() * 12 + lastUsed.getMonth()
+        if (issueMonth === lastUsedMonth) {
           return false
         }
       }
@@ -142,6 +149,9 @@ export class ModuleAdSelector {
 
       // Check advertiser not already selected in another mod for this issue
       if (excludedAdvertiserIds.has(junction.advertiser_id)) continue
+
+      // Check company-level frequency eligibility (weekly/monthly period guard)
+      if (!this.isCompanyEligibleThisPeriod(junction as AdModuleAdvertiser, issueDate)) continue
 
       // Get this company's eligible ads in this mod
       const companyAds = allAds
@@ -283,21 +293,26 @@ export class ModuleAdSelector {
       return { ad: null, reason: 'No eligible companies available (all used in other modules or inactive)' }
     }
 
+    // Paid-first tier: prioritize paid sponsors before falling back to all eligible
+    const paidCompanies = eligibleCompanies.filter(c => c.junction.paid === true)
+    const candidatePool = paidCompanies.length > 0 ? paidCompanies : eligibleCompanies
+    const poolLabel = paidCompanies.length > 0 ? 'paid-first' : 'all-eligible'
+
     // Tier 1: Select company based on mod's selection mode
     let selectedCompany: EligibleCompany | null = null
 
     switch (selectionMode) {
       case 'sequential':
-        selectedCompany = this.selectCompanySequential(eligibleCompanies, mod.next_position || 1)
+        selectedCompany = this.selectCompanySequential(candidatePool, mod.next_position || 1)
         break
       case 'random':
-        selectedCompany = this.selectCompanyRandom(eligibleCompanies)
+        selectedCompany = this.selectCompanyRandom(candidatePool)
         break
       case 'priority':
-        selectedCompany = this.selectCompanyPriority(eligibleCompanies)
+        selectedCompany = this.selectCompanyPriority(candidatePool)
         break
       default:
-        selectedCompany = this.selectCompanySequential(eligibleCompanies, mod.next_position || 1)
+        selectedCompany = this.selectCompanySequential(candidatePool, mod.next_position || 1)
     }
 
     if (!selectedCompany) {
@@ -313,7 +328,7 @@ export class ModuleAdSelector {
 
     return {
       ad: selectedAd,
-      reason: `Selected via ${selectionMode} mode: company "${selectedCompany.advertiser.company_name}" (pos ${selectedCompany.junction.display_order}), ad "${selectedAd.title}" (pos ${selectedAd.display_order}) from ${eligibleCompanies.length} eligible companies`
+      reason: `Selected via ${selectionMode}/${poolLabel} mode: company "${selectedCompany.advertiser.company_name}" (pos ${selectedCompany.junction.display_order}), ad "${selectedAd.title}" (pos ${selectedAd.display_order}) from ${candidatePool.length}/${eligibleCompanies.length} companies`
     }
   }
 
@@ -444,17 +459,6 @@ export class ModuleAdSelector {
         })
         .eq('id', ad.id)
 
-      // PAID ADS: Check if weekly ad is exhausted and mark as completed
-      if (ad.paid === true && ad.frequency === 'weekly' && ad.times_paid && ad.times_paid > 0) {
-        if (newTimesUsed >= ad.times_paid) {
-          await supabaseAdmin
-            .from('advertisements')
-            .update({ status: 'completed' })
-            .eq('id', ad.id)
-          console.log(`[AdSelector] Paid ad "${ad.title}" exhausted (${newTimesUsed}/${ad.times_paid}), set to completed`)
-        }
-      }
-
       // Update advertiser (if linked)
       if (advertiser) {
         await supabaseAdmin
@@ -473,9 +477,9 @@ export class ModuleAdSelector {
         .update({ used_at: new Date().toISOString() })
         .eq('id', selection.id)
 
-      // Update junction table: increment times_used, advance next_ad_position
+      // Update junction table: increment times_used, advance next_ad_position, update last_used_date
       if (ad.advertiser_id && ad.ad_module_id) {
-        await this.advanceAdPositionWithinCompany(ad.ad_module_id, ad.advertiser_id, ad.display_order)
+        await this.advanceAdPositionWithinCompany(ad.ad_module_id, ad.advertiser_id, ad.display_order, issueDateStr)
       }
 
       // Advance company position for sequential modules
@@ -492,12 +496,14 @@ export class ModuleAdSelector {
 
   /**
    * Advance the next_ad_position within a company after an ad is used.
-   * Also increments times_used on the junction.
+   * Also increments times_used and updates last_used_date on the junction.
+   * If a paid company is now exhausted, marks all its ads as completed.
    */
   private static async advanceAdPositionWithinCompany(
     moduleId: string,
     advertiserId: string,
-    usedDisplayOrder: number
+    usedDisplayOrder: number,
+    issueDateStr: string
   ): Promise<void> {
     // Get all active ads for this company in this mod
     const { data: ads } = await supabaseAdmin
@@ -520,23 +526,38 @@ export class ModuleAdSelector {
     // Get current junction row
     const { data: junction } = await supabaseAdmin
       .from('ad_module_advertisers')
-      .select('times_used')
+      .select('times_used, times_paid, paid, frequency')
       .eq('ad_module_id', moduleId)
       .eq('advertiser_id', advertiserId)
       .single()
 
-    // Update junction: advance ad position and increment times_used
+    const newTimesUsed = (junction?.times_used || 0) + 1
+
+    // Update junction: advance ad position, increment times_used, update last_used_date
     await supabaseAdmin
       .from('ad_module_advertisers')
       .update({
         next_ad_position: nextAdPosition,
-        times_used: (junction?.times_used || 0) + 1,
+        times_used: newTimesUsed,
+        last_used_date: issueDateStr,
         updated_at: new Date().toISOString()
       })
       .eq('ad_module_id', moduleId)
       .eq('advertiser_id', advertiserId)
 
-    console.log(`[AdSelector] Company in mod ${moduleId}: ad position -> ${nextAdPosition}, times_used -> ${(junction?.times_used || 0) + 1}`)
+    console.log(`[AdSelector] Company in mod ${moduleId}: ad position -> ${nextAdPosition}, times_used -> ${newTimesUsed}, last_used_date -> ${issueDateStr}`)
+
+    // PAID COMPANIES: Check if junction is exhausted and mark all company ads as completed
+    if (junction?.paid === true && junction?.times_paid > 0 && newTimesUsed >= junction.times_paid) {
+      await supabaseAdmin
+        .from('advertisements')
+        .update({ status: 'completed' })
+        .eq('ad_module_id', moduleId)
+        .eq('advertiser_id', advertiserId)
+        .eq('status', 'active')
+
+      console.log(`[AdSelector] Paid company in mod ${moduleId} exhausted (${newTimesUsed}/${junction.times_paid}), all ads set to completed`)
+    }
   }
 
   /**
