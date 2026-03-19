@@ -86,6 +86,10 @@ export const GET = withApiHandler(
         next_ad_position,
         times_used,
         priority,
+        frequency,
+        times_paid,
+        paid,
+        last_used_date,
         created_at,
         updated_at,
         advertiser:advertisers(id, company_name, logo_url, is_active, last_used_date, times_used)

@@ -1529,6 +1529,10 @@ export interface AdModuleAdvertiser {
   next_ad_position: number     // Which ad is next within this company
   times_used: number           // For random/priority cycle tracking
   priority: number             // For priority selection mode
+  frequency: AdFrequency       // 'single' | 'weekly' | 'monthly' — sponsorship cadence
+  times_paid: number           // Total paid periods (e.g., 8 weeks)
+  paid: boolean                // Whether this is a paid sponsorship
+  last_used_date?: string      // When company last appeared in this module
   created_at: string
   updated_at: string
 }

@@ -22,6 +22,10 @@ interface CompanyGroup {
   next_ad_position: number
   times_used: number
   priority: number
+  frequency: string
+  times_paid: number
+  paid: boolean
+  last_used_date?: string
   advertiser: { id: string; company_name: string; logo_url?: string; is_active: boolean; last_used_date?: string; times_used: number }
   advertisements: Advertisement[]
 }
@@ -628,11 +632,20 @@ export default function AdsManagementPage() {
                               NEXT COMPANY
                             </span>
                           )}
+                          {company.paid && company.frequency !== 'single' && (
+                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                              company.times_paid > 0 && company.times_used >= company.times_paid
+                                ? 'bg-gray-200 text-gray-600'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}>
+                              {company.frequency === 'weekly' ? 'Weekly' : 'Monthly'} Sponsor — {company.times_used}/{company.times_paid} used
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-gray-500 mt-0.5">
-                          Used {company.advertisements.reduce((sum: number, a: any) => sum + (a.times_used || 0), 0)}x
-                          {company.advertiser.last_used_date && (
-                            <span> | Last: {new Date(company.advertiser.last_used_date).toLocaleDateString()}</span>
+                          Used {company.times_used}x
+                          {company.last_used_date && (
+                            <span> | Last: {new Date(company.last_used_date).toLocaleDateString()}</span>
                           )}
                         </p>
                       </div>
@@ -699,21 +712,10 @@ export default function AdsManagementPage() {
                                             NEXT AD
                                           </span>
                                         )}
-                                        {ad.paid && ad.frequency === 'weekly' && ad.times_paid > 0 && (() => {
-                                          const remaining = Math.max(0, ad.times_paid - (ad.times_used || 0))
-                                          return remaining <= 2 ? (
-                                            <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-amber-100 text-amber-700 flex-shrink-0">
-                                              {remaining === 0 ? 'EXHAUSTED' : `${remaining}wk left`}
-                                            </span>
-                                          ) : null
-                                        })()}
                                       </div>
                                       <p className="text-xs text-gray-500 truncate">
                                         {ad.times_used}x used
                                         {ad.last_used_date && ` | Last: ${new Date(ad.last_used_date).toLocaleDateString()}`}
-                                        {ad.paid && ad.frequency === 'weekly' && ad.times_paid > 0 && (
-                                          <span> | {Math.max(0, ad.times_paid - (ad.times_used || 0))}/{ad.times_paid} wks</span>
-                                        )}
                                       </p>
                                     </div>
                                   </div>
