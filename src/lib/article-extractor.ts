@@ -398,12 +398,20 @@ export class ArticleExtractor {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), this.JINA_TIMEOUT_MS)
 
+      const headers: Record<string, string> = {
+        'Accept': 'text/plain',
+        'User-Agent': this.USER_AGENT,
+      }
+
+      // Jina requires an API key for server-side requests
+      const jinaApiKey = process.env.JINA_API_KEY
+      if (jinaApiKey) {
+        headers['Authorization'] = `Bearer ${jinaApiKey}`
+      }
+
       const response = await fetch(jinaUrl, {
         signal: controller.signal,
-        headers: {
-          'Accept': 'text/plain',
-          'User-Agent': this.USER_AGENT,
-        }
+        headers,
       })
 
       clearTimeout(timeoutId)
