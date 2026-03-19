@@ -192,19 +192,52 @@ export const POST = withApiHandler(
 
       const nextOrder = (maxOrderResult?.[0]?.display_order || 0) + 1
 
-      const { error: junctionError } = await supabaseAdmin
+      // Check if junction already exists
+      const { data: existingJunction } = await supabaseAdmin
         .from('ad_module_advertisers')
-        .upsert({
+        .select('id')
+        .eq('ad_module_id', ad.ad_module_id)
+        .eq('advertiser_id', ad.advertiser_id)
+        .maybeSingle()
+
+      let junctionError: { message: string } | null = null
+
+      if (existingJunction) {
+        // Junction exists — only update frequency/paid fields if provided
+        if (frequency && frequency !== 'single') {
+          const { error } = await supabaseAdmin
+            .from('ad_module_advertisers')
+            .update({
+              frequency,
+              times_paid: times_paid || 0,
+              paid: body.paid !== undefined ? body.paid : true,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingJunction.id)
+          junctionError = error
+        }
+      } else {
+        // Create new junction entry with all fields
+        const junctionData: Record<string, unknown> = {
           ad_module_id: ad.ad_module_id,
           advertiser_id: ad.advertiser_id,
           display_order: nextOrder,
           next_ad_position: 1,
           times_used: 0,
           priority: 0
-        }, {
-          onConflict: 'ad_module_id,advertiser_id',
-          ignoreDuplicates: true  // Don't update if already exists
-        })
+        }
+
+        if (frequency && frequency !== 'single') {
+          junctionData.frequency = frequency
+          junctionData.times_paid = times_paid || 0
+          junctionData.paid = body.paid !== undefined ? body.paid : true
+        }
+
+        const { error } = await supabaseAdmin
+          .from('ad_module_advertisers')
+          .insert(junctionData)
+        junctionError = error
+      }
 
       if (junctionError) {
         logger.error({ err: junctionError }, 'Failed to upsert junction entry')
