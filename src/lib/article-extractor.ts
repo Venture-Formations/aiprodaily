@@ -162,14 +162,19 @@ export class ArticleExtractor {
     let lastError: string | undefined
     let detectedStatus: ExtractionStatus = 'failed'
 
-    // Google News URLs use JS-based protobuf redirects that can't be followed
-    // by fetch() or Jina (403). Skip extraction — the article title and description
-    // from the RSS feed are sufficient for AI-based article generation.
+    // Google News URLs use JS-based protobuf redirects. Resolve to the real
+    // article URL first, then extract normally.
     if (this.isGoogleNewsUrl(url)) {
-      return {
-        success: false,
-        status: 'skipped' as ExtractionStatus,
-        error: 'Google News redirect URL — extraction skipped, using RSS metadata'
+      const resolved = await this.resolveGoogleNewsUrl(url)
+      if (resolved) {
+        console.log(`[Extract] Resolved Google News URL to: ${resolved.substring(0, 80)}...`)
+        url = resolved
+      } else {
+        return {
+          success: false,
+          status: 'failed',
+          error: 'Could not resolve Google News redirect URL'
+        }
       }
     }
 
@@ -234,12 +239,30 @@ export class ArticleExtractor {
 
   /**
    * Check if a URL is a Google News redirect URL.
-   * These can't be resolved via simple fetch — they use JS-based redirects
-   * with protobuf-encoded article IDs. Jina AI handles them via browser rendering.
-   * We skip the direct Readability extraction for these and go straight to Jina.
    */
   private isGoogleNewsUrl(url: string): boolean {
     return url.includes('news.google.com/rss/articles/')
+  }
+
+  /**
+   * Resolve a Google News redirect URL to the actual article URL.
+   * Uses google-news-decoder which calls Google's internal endpoint
+   * to decode the protobuf-encoded article ID.
+   */
+  private async resolveGoogleNewsUrl(url: string): Promise<string | null> {
+    try {
+      // @ts-ignore — no type declarations for google-news-decoder
+      const GoogleNewsDecoder = (await import('google-news-decoder')).default
+      const decoder = new GoogleNewsDecoder()
+      const result = await decoder.decodeGoogleNewsUrl(url)
+      if (result?.status && result.decodedUrl) {
+        return result.decodedUrl
+      }
+      return null
+    } catch (error) {
+      console.error(`[Extract] Google News decode failed:`, error instanceof Error ? error.message : 'Unknown')
+      return null
+    }
   }
 
   /**
