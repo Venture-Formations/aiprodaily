@@ -60,7 +60,9 @@ export class ModuleArticles {
     const candidateMultiplier = (mod.config as Record<string, any>)?.candidate_multiplier ?? 3
     const postsToAssign = articlesNeeded + candidateMultiplier
 
-    const { data: topPosts } = await supabaseAdmin
+    console.log(`[Module] Querying posts: feedIds=${JSON.stringify(feedIds)}, lookback=${lookbackTimestamp}, postsToAssign=${postsToAssign}`)
+
+    const { data: topPosts, error: postsError } = await supabaseAdmin
       .from('rss_posts')
       .select(`
         id,
@@ -78,8 +80,21 @@ export class ModuleArticles {
       .gte('processed_at', lookbackTimestamp)
       .not('post_ratings', 'is', null)
 
+    if (postsError) {
+      console.error(`[Module] Query error for mod ${mod.name}:`, postsError.message)
+      return { assigned: 0 }
+    }
+
     if (!topPosts || topPosts.length === 0) {
-      console.log(`[Module] No available posts for mod ${mod.name}`)
+      // Debug: check without the post_ratings filter
+      const { data: unfilteredPosts, error: unfilteredError } = await supabaseAdmin
+        .from('rss_posts')
+        .select('id')
+        .in('feed_id', feedIds)
+        .is('issue_id', null)
+        .gte('processed_at', lookbackTimestamp)
+
+      console.log(`[Module] No available posts for mod ${mod.name} (unfiltered count: ${unfilteredPosts?.length || 0}, error: ${unfilteredError?.message || 'none'})`)
       return { assigned: 0 }
     }
 
